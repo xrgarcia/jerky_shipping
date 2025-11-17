@@ -805,9 +805,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (webhookData.type === 'backfill' && webhookData.jobId) {
               await storage.incrementBackfillProgress(webhookData.jobId, 1);
               
-              // Check if job is complete
+              // Check if job is complete (only if totalOrders has been set)
               const job = await storage.getBackfillJob(webhookData.jobId);
-              if (job && job.processedOrders + job.failedOrders >= job.totalOrders) {
+              if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
                 await storage.updateBackfillJob(webhookData.jobId, {
                   status: "completed",
                 });
