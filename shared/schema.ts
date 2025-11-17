@@ -57,7 +57,7 @@ export type Session = typeof sessions.$inferSelect;
 // Orders cache from Shopify
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(), // Shopify order ID
-  orderNumber: integer("order_number").notNull(),
+  orderNumber: text("order_number").notNull(), // Shopify order name (e.g., "#JK3825344788")
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
