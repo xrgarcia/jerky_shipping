@@ -61,6 +61,13 @@ Preferred communication style: Simple, everyday language.
 - Worker endpoint `/api/worker/process-webhooks` dequeues and processes orders in batches
 - Environment-specific Upstash credentials (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) should be unsynced between dev and production
 
+**Real-Time Updates**: WebSocket server provides live order updates to connected clients:
+- WebSocket server runs alongside HTTP server on the same port at `/ws`
+- Session-based authentication validates users during WebSocket upgrade
+- Worker broadcasts order updates to all connected clients after processing webhooks
+- Frontend automatically refreshes order list and shows toast notifications on updates
+- Exponential backoff reconnection (1-30s) with automatic auth failure detection
+
 **Email Service**: Nodemailer is used for sending magic link authentication emails. The transporter configuration needs to be set up in production with appropriate SMTP credentials.
 
 **Database Service**: Neon serverless PostgreSQL database accessed via `DATABASE_URL` environment variable. The connection uses WebSocket protocol for serverless compatibility.
