@@ -74,7 +74,7 @@ export default function OrderDetail() {
 
   return (
     <>
-      <div className="print:hidden max-w-6xl mx-auto p-6 space-y-6">
+      <div className="print:hidden w-full p-6 space-y-6">
         <div className="flex items-center justify-between">
           <Link href="/orders">
             <Button variant="outline" data-testid="button-back">
@@ -119,39 +119,18 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl font-semibold">Customer Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                Name
-              </p>
-              <p className="text-2xl font-semibold">{order.customerName}</p>
-            </div>
-            {order.customerEmail && (
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Email
-                </p>
-                <p className="text-xl">{order.customerEmail}</p>
-              </div>
-            )}
-            {order.customerPhone && (
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Phone
-                </p>
-                <p className="text-xl">{order.customerPhone}</p>
-              </div>
-            )}
-            {shippingAddress.address1 && (
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Shipping Address
-                </p>
-                <div className="text-xl space-y-1">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardContent className="pt-6 space-y-5">
+              <p className="text-3xl font-semibold">{order.customerName}</p>
+              {order.customerEmail && (
+                <p className="text-2xl text-foreground">{order.customerEmail}</p>
+              )}
+              {order.customerPhone && (
+                <p className="text-2xl text-foreground">{order.customerPhone}</p>
+              )}
+              {shippingAddress.address1 && (
+                <div className="text-2xl text-foreground space-y-1 pt-2">
                   <p>{shippingAddress.address1}</p>
                   {shippingAddress.address2 && <p>{shippingAddress.address2}</p>}
                   <p>
@@ -159,58 +138,52 @@ export default function OrderDetail() {
                   </p>
                   <p>{shippingAddress.country}</p>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl font-semibold">Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              {lineItems.map((item) => (
-                <Card key={item.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-semibold mb-2" data-testid={`text-product-name-${item.id}`}>
-                          {item.name}
-                        </h3>
-                        {item.sku && (
-                          <p className="text-lg font-mono text-muted-foreground mb-2">
-                            SKU: {item.sku}
-                          </p>
-                        )}
-                        <p className="text-xl text-muted-foreground">
-                          ${item.price} each
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="bg-primary text-primary-foreground px-4 py-2 rounded-md">
-                          <p className="text-sm font-semibold uppercase tracking-wide">Quantity</p>
-                          <p className="text-3xl font-bold" data-testid={`text-quantity-${item.id}`}>
-                            {item.quantity}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid gap-4">
+                {lineItems.map((item) => (
+                  <Card key={item.id}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-2xl font-semibold mb-2" data-testid={`text-product-name-${item.id}`}>
+                            {item.name}
+                          </h3>
+                          {item.sku && (
+                            <p className="text-lg font-mono text-muted-foreground mb-2">
+                              SKU: {item.sku}
+                            </p>
+                          )}
+                          <p className="text-xl text-muted-foreground">
+                            ${item.price} each
                           </p>
                         </div>
+                        <div className="text-right">
+                          <div className="bg-primary text-primary-foreground px-4 py-2 rounded-md">
+                            <p className="text-sm font-semibold uppercase tracking-wide">Quantity</p>
+                            <p className="text-3xl font-bold" data-testid={`text-quantity-${item.id}`}>
+                              {item.quantity}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <p className="text-2xl font-semibold">Total</p>
-              <p className="text-4xl font-bold">${order.totalPrice}</p>
-            </div>
-          </CardContent>
-        </Card>
+                    </CardContent>
+                  </Card>
+                ))}
+                <div className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-2xl font-semibold">Total</p>
+                    <p className="text-4xl font-bold">${order.totalPrice}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="hidden print:block p-8 bg-white text-black">
