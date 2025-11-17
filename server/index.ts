@@ -92,14 +92,6 @@ app.use((req, res, next) => {
     } catch (error) {
       console.error("Failed to register Shopify webhooks:", error);
     }
-    
-    // Bootstrap existing products from Shopify (independent of webhook registration)
-    try {
-      const { bootstrapProductsFromShopify } = await import("./utils/shopify-sync");
-      await bootstrapProductsFromShopify();
-    } catch (error) {
-      console.error("Failed to bootstrap products from Shopify:", error);
-    }
   } else {
     log("Skipping Shopify webhook registration - missing configuration");
   }
@@ -142,5 +134,19 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Bootstrap products asynchronously after server starts
+    if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
+      setImmediate(async () => {
+        try {
+          log("Starting async product bootstrap from Shopify...");
+          const { bootstrapProductsFromShopify } = await import("./utils/shopify-sync");
+          await bootstrapProductsFromShopify();
+          log("Product bootstrap completed");
+        } catch (error) {
+          console.error("Failed to bootstrap products from Shopify:", error);
+        }
+      });
+    }
   });
 })();
