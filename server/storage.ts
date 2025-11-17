@@ -143,6 +143,7 @@ export class DatabaseStorage implements IStorage {
         or(
           ilike(orders.customerName, searchPattern),
           ilike(orders.customerEmail, searchPattern),
+          ilike(orders.orderNumber, searchPattern),
         ),
       )
       .orderBy(desc(orders.createdAt))

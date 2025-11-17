@@ -371,9 +371,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const query = req.query.q as string;
 
-      const orders = query
+      let orders = query
         ? await storage.searchOrders(query)
         : await storage.getAllOrders();
+
+      // If searching and no local results found, try fetching from Shopify
+      if (query && orders.length === 0) {
+        try {
+          if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
+            // Search Shopify by order number or name
+            const shopifyOrders = await fetchShopifyOrders(250);
+            const matchedOrders = shopifyOrders.filter((order: any) => {
+              const orderNum = order.order_number?.toString() || '';
+              const name = order.name || '';
+              const customerName = order.customer 
+                ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() 
+                : '';
+              const customerEmail = order.customer?.email || '';
+              
+              const lowerQuery = query.toLowerCase();
+              return (
+                orderNum.toLowerCase().includes(lowerQuery) ||
+                name.toLowerCase().includes(lowerQuery) ||
+                customerName.toLowerCase().includes(lowerQuery) ||
+                customerEmail.toLowerCase().includes(lowerQuery)
+              );
+            });
+
+            // Save matched orders to database
+            for (const shopifyOrder of matchedOrders) {
+              const orderData = {
+                id: shopifyOrder.id.toString(),
+                orderNumber: shopifyOrder.order_number,
+                customerName: shopifyOrder.customer
+                  ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
+                  : "Guest",
+                customerEmail: shopifyOrder.customer?.email || null,
+                customerPhone: shopifyOrder.customer?.phone || null,
+                shippingAddress: shopifyOrder.shipping_address || {},
+                lineItems: shopifyOrder.line_items || [],
+                fulfillmentStatus: shopifyOrder.fulfillment_status,
+                financialStatus: shopifyOrder.financial_status,
+                totalPrice: shopifyOrder.total_price,
+                createdAt: new Date(shopifyOrder.created_at),
+                updatedAt: new Date(shopifyOrder.updated_at),
+              };
+
+              const existing = await storage.getOrder(orderData.id);
+              if (existing) {
+                await storage.updateOrder(orderData.id, orderData);
+              } else {
+                await storage.createOrder(orderData);
+              }
+            }
+
+            // Fetch the saved orders from database
+            orders = await storage.searchOrders(query);
+          }
+        } catch (shopifyError) {
+          console.error("Error fetching from Shopify:", shopifyError);
+          // Continue with empty results rather than failing completely
+        }
+      }
 
       res.json({ orders });
     } catch (error) {
