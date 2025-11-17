@@ -1,9 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Printer, FileText, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { useState, useEffect } from "react";
 import type { Order } from "@shared/schema";
 
 interface LineItem {
@@ -28,17 +38,51 @@ interface ShippingAddress {
 export default function OrderDetail() {
   const [, params] = useRoute("/orders/:id");
   const orderId = params?.id;
+  const [, navigate] = useLocation();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const { data: orderData, isLoading } = useQuery<{ order: Order }>({
     queryKey: ["/api/orders", orderId],
     enabled: !!orderId,
   });
 
+  const { data: allOrdersData } = useQuery<{ orders: Order[] }>({
+    queryKey: ["/api/orders"],
+  });
+
   const order = orderData?.order;
+  const allOrders = allOrdersData?.orders || [];
+
+  const currentIndex = allOrders.findIndex(o => o.id === orderId);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < allOrders.length - 1;
 
   const handlePrint = () => {
     window.print();
   };
+
+  const handlePrevious = () => {
+    if (hasPrev) {
+      navigate(`/orders/${allOrders[currentIndex - 1].id}`);
+    }
+  };
+
+  const handleNext = () => {
+    if (hasNext) {
+      navigate(`/orders/${allOrders[currentIndex + 1].id}`);
+    }
+  };
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   if (isLoading) {
     return (
@@ -74,14 +118,84 @@ export default function OrderDetail() {
 
   return (
     <>
+      <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <CommandInput placeholder="Search orders by number or customer name..." />
+        <CommandList>
+          <CommandEmpty>No orders found.</CommandEmpty>
+          <CommandGroup heading="Orders">
+            {allOrders.map((o) => (
+              <CommandItem
+                key={o.id}
+                value={`${o.orderNumber} ${o.customerName}`}
+                onSelect={() => {
+                  navigate(`/orders/${o.id}`);
+                  setSearchOpen(false);
+                }}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <p className="font-mono font-semibold">#{o.orderNumber}</p>
+                    <p className="text-sm text-muted-foreground">{o.customerName}</p>
+                  </div>
+                  <Badge variant={o.fulfillmentStatus === "fulfilled" ? "default" : "outline"}>
+                    {o.fulfillmentStatus || "Unfulfilled"}
+                  </Badge>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+
       <div className="print:hidden w-full p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <Link href="/orders">
             <Button variant="outline" data-testid="button-back">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Orders
             </Button>
           </Link>
+          
+          <div className="flex items-center gap-4 flex-1 justify-center">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handlePrevious}
+              disabled={!hasPrev}
+              data-testid="button-prev-order"
+              className="h-12 px-6"
+            >
+              <ChevronLeft className="h-6 w-6 mr-2" />
+              <span className="text-lg font-semibold">Previous</span>
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setSearchOpen(true)}
+              data-testid="button-search-orders"
+              className="h-12 px-6"
+            >
+              <Search className="h-5 w-5 mr-2" />
+              <span className="text-lg">Search Orders</span>
+              <kbd className="pointer-events-none ml-3 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handleNext}
+              disabled={!hasNext}
+              data-testid="button-next-order"
+              className="h-12 px-6"
+            >
+              <span className="text-lg font-semibold">Next</span>
+              <ChevronRight className="h-6 w-6 ml-2" />
+            </Button>
+          </div>
+
           <div className="flex gap-2">
             <Button
               data-testid="button-print-label"
