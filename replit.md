@@ -123,6 +123,16 @@ This approach eliminates password management overhead while maintaining security
 
 **JSONB for Orders**: Shopify order data is stored as JSONB in PostgreSQL rather than normalized tables. This provides flexibility to accommodate Shopify's evolving schema without frequent migrations, though it trades some query performance for development velocity.
 
+**Comprehensive Price Field Storage**: The application captures 13 distinct price/amount fields from Shopify orders to support detailed financial reporting:
+- **Main Totals**: `orderTotal` (total_price), `subtotalPrice`, `currentTotalPrice`, `currentSubtotalPrice`
+- **Shipping**: `shippingTotal` (extracted from total_shipping_price_set.shop_money.amount)
+- **Discounts**: `totalDiscounts`, `currentTotalDiscounts`
+- **Taxes**: `totalTax`, `currentTotalTax`
+- **Additional Fees**: `totalAdditionalFees`, `currentTotalAdditionalFees` (duties, import fees, handling)
+- **Outstanding**: `totalOutstanding`
+
+All price fields are stored as text strings (matching Shopify's API format) and are extracted using the `extractShopifyOrderPrices()` helper function that's consistently applied across all three order data entry points (webhooks, manual sync, search). Fields with `current_*` prefix reflect the state after returns, refunds, and edits.
+
 **Session-Based Auth Over JWT**: HTTP-only session cookies were chosen over JWTs to prevent XSS attacks and enable server-side session revocation. The 30-day duration balances security with user convenience for warehouse staff who use the tool regularly.
 
 **File Upload Strategy**: Avatar files are stored locally rather than using a cloud storage service. This keeps the infrastructure simple for a warehouse tool, though it would need to be reconsidered if the application scales horizontally.
