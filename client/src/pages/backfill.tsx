@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   startDate: z.date({
@@ -45,6 +46,7 @@ type BackfillJob = {
 
 export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -83,8 +85,49 @@ export default function BackfillPage() {
     },
   });
 
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await apiRequest("DELETE", `/api/backfill/jobs/${jobId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
+      toast({
+        title: "Job deleted",
+        description: "Backfill job has been deleted successfully.",
+      });
+    },
+  });
+
+  const restartJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await apiRequest("POST", `/api/backfill/jobs/${jobId}/restart`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
+      setSelectedJobId(data.job.id);
+      toast({
+        title: "Job restarted",
+        description: "Backfill job has been restarted with the same date range.",
+      });
+    },
+  });
+
   const onSubmit = (data: FormData) => {
     startBackfillMutation.mutate(data);
+  };
+
+  const handleDelete = (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this backfill job?")) {
+      deleteJobMutation.mutate(jobId);
+    }
+  };
+
+  const handleRestart = (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation();
+    restartJobMutation.mutate(jobId);
   };
 
   const jobs = jobsData?.jobs || [];
@@ -291,6 +334,7 @@ export default function BackfillPage() {
                   <TableHead>Progress</TableHead>
                   <TableHead>Orders</TableHead>
                   <TableHead>Started</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -320,6 +364,30 @@ export default function BackfillPage() {
                     <TableCell>
                       <div className="text-sm text-muted-foreground">
                         {format(new Date(job.createdAt), "PP p")}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => handleRestart(e, job.id)}
+                          disabled={restartJobMutation.isPending}
+                          data-testid={`button-restart-${job.id}`}
+                          title="Restart with same date range"
+                        >
+                          <RotateCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => handleDelete(e, job.id)}
+                          disabled={deleteJobMutation.isPending}
+                          data-testid={`button-delete-${job.id}`}
+                          title="Delete job"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

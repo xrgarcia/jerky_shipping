@@ -84,6 +84,7 @@ export interface IStorage {
   updateBackfillJob(id: string, updates: Partial<InsertBackfillJob>): Promise<BackfillJob | undefined>;
   getBackfillJob(id: string): Promise<BackfillJob | undefined>;
   getAllBackfillJobs(): Promise<BackfillJob[]>;
+  deleteBackfillJob(id: string): Promise<void>;
   incrementBackfillProgress(id: string, incrementBy: number): Promise<void>;
   incrementBackfillFailed(id: string, incrementBy: number): Promise<void>;
 }
@@ -438,6 +439,10 @@ export class DatabaseStorage implements IStorage {
       .from(backfillJobs)
       .orderBy(desc(backfillJobs.createdAt));
     return result;
+  }
+
+  async deleteBackfillJob(id: string): Promise<void> {
+    await db.delete(backfillJobs).where(eq(backfillJobs.id, id));
   }
 
   async incrementBackfillProgress(id: string, incrementBy: number): Promise<void> {
