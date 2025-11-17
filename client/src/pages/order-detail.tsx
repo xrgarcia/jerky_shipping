@@ -3,7 +3,7 @@ import { useRoute, Link } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Printer, FileText } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Mail, Phone } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 interface LineItem {
@@ -121,24 +121,34 @@ export default function OrderDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
-            <CardContent className="pt-6 space-y-5">
-              <p className="text-3xl font-semibold">{order.customerName}</p>
-              {order.customerEmail && (
-                <p className="text-2xl text-foreground">{order.customerEmail}</p>
-              )}
-              {order.customerPhone && (
-                <p className="text-2xl text-foreground">{order.customerPhone}</p>
-              )}
-              {shippingAddress.address1 && (
-                <div className="text-2xl text-foreground space-y-1 pt-2">
-                  <p>{shippingAddress.address1}</p>
-                  {shippingAddress.address2 && <p>{shippingAddress.address2}</p>}
-                  <p>
-                    {shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}
-                  </p>
-                  <p>{shippingAddress.country}</p>
-                </div>
-              )}
+            <CardContent className="pt-6 space-y-6">
+              <div className="space-y-2">
+                <p className="text-3xl font-bold uppercase">{order.customerName}</p>
+                {shippingAddress.address1 && (
+                  <div className="text-2xl space-y-1">
+                    <p>{shippingAddress.address1}</p>
+                    {shippingAddress.address2 && <p>{shippingAddress.address2}</p>}
+                    <p>
+                      {shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}
+                    </p>
+                    <p>{shippingAddress.country}</p>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2 pt-2">
+                {order.customerEmail && (
+                  <div className="flex items-center gap-2 text-lg text-muted-foreground">
+                    <Mail className="h-5 w-5" />
+                    <span>{order.customerEmail}</span>
+                  </div>
+                )}
+                {order.customerPhone && (
+                  <div className="flex items-center gap-2 text-lg text-muted-foreground">
+                    <Phone className="h-5 w-5" />
+                    <span>{order.customerPhone}</span>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
