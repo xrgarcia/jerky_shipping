@@ -40,13 +40,10 @@ export async function fetchShipStationResource(resourceUrl: string): Promise<any
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  // ShipStation V1 API uses Basic Auth with API Key as username and API Secret as password
-  // For single token, we'll use it as the key with empty secret
-  const auth = Buffer.from(`${SHIPSTATION_API_KEY}:`).toString('base64');
-
+  // ShipStation V2 API uses API-Key header
   const response = await fetch(resourceUrl, {
     headers: {
-      'Authorization': `Basic ${auth}`,
+      'API-Key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -79,12 +76,10 @@ export async function subscribeToWebhook(
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const auth = Buffer.from(`${SHIPSTATION_API_KEY}:`).toString('base64');
-
   const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks/subscribe`, {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${auth}`,
+      'API-Key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -111,11 +106,9 @@ export async function listWebhooks(): Promise<any[]> {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const auth = Buffer.from(`${SHIPSTATION_API_KEY}:`).toString('base64');
-
   const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks`, {
     headers: {
-      'Authorization': `Basic ${auth}`,
+      'API-Key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -136,12 +129,10 @@ export async function unsubscribeWebhook(webhookId: string): Promise<void> {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const auth = Buffer.from(`${SHIPSTATION_API_KEY}:`).toString('base64');
-
   const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks/${webhookId}`, {
     method: 'DELETE',
     headers: {
-      'Authorization': `Basic ${auth}`,
+      'API-Key': SHIPSTATION_API_KEY,
     },
   });
 

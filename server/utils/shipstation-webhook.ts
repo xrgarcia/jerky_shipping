@@ -162,9 +162,6 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
   }
 
   const baseUrl = normalizeWebhookUrl(webhookBaseUrl);
-  // ShipStation API uses Basic Auth with API Key as username and empty password
-  const auth = Buffer.from(`${apiKey}:`).toString('base64');
-
   const webhookUrl = `${baseUrl}/api/webhooks/shipstation/shipments`;
 
   try {
@@ -172,7 +169,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     const listResponse = await fetch('https://ssapi.shipstation.com/webhooks', {
       method: 'GET',
       headers: {
-        'Authorization': `Basic ${auth}`,
+        'API-Key': apiKey,
         'Content-Type': 'application/json',
       },
     });
@@ -195,7 +192,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     const registerResponse = await fetch('https://ssapi.shipstation.com/webhooks/subscribe', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
+        'API-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
