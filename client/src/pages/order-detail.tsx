@@ -3,7 +3,8 @@ import { useRoute, Link, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search, Truck, Package } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search, Truck, Package, Clock } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import {
   Command,
   CommandDialog,
@@ -220,15 +221,22 @@ export default function OrderDetail() {
 
         <div>
           <h1 className="text-5xl font-mono font-bold mb-2">#{order.orderNumber}</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Badge variant={order.fulfillmentStatus === "fulfilled" ? "default" : "outline"}>
               {order.fulfillmentStatus || "Unfulfilled"}
             </Badge>
+            <Badge variant="outline" className="gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+            </Badge>
             <span className="text-lg text-muted-foreground">
-              {new Date(order.createdAt).toLocaleDateString("en-US", {
+              {new Date(order.createdAt).toLocaleString("en-US", {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
               })}
             </span>
           </div>
