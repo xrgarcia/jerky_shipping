@@ -35,6 +35,11 @@ export async function dequeueWebhook(): Promise<any | null> {
     return null;
   }
 
+  // Handle case where Redis returns an object instead of a string
+  if (typeof data === 'object') {
+    return data;
+  }
+
   return JSON.parse(data as string);
 }
 

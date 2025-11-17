@@ -612,10 +612,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             for (const shipmentData of shipments) {
               // Find matching order by order number
               const orderNumber = shipmentData.orderNumber;
-              const orders = await storage.searchOrders(orderNumber);
+              const order = await storage.getOrderByOrderNumber(orderNumber);
               
-              if (orders.length > 0) {
-                const order = orders[0];
+              if (order) {
                 
                 // Create or update shipment record
                 const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);

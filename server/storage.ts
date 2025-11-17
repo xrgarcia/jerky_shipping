@@ -41,6 +41,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
   getOrder(id: string): Promise<Order | undefined>;
+  getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined>;
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
 
@@ -48,6 +49,7 @@ export interface IStorage {
   createShipment(shipment: InsertShipment): Promise<Shipment>;
   updateShipment(id: string, shipment: Partial<InsertShipment>): Promise<Shipment | undefined>;
   getShipment(id: string): Promise<Shipment | undefined>;
+  getAllShipments(): Promise<Shipment[]>;
   getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
   getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
   getUserById(id: string): Promise<User | undefined>;
@@ -145,6 +147,21 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined> {
+    // Try exact match first
+    let result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber));
+    if (result[0]) return result[0];
+    
+    // Try with # prefix (Shopify format)
+    result = await db.select().from(orders).where(eq(orders.orderNumber, `#${orderNumber}`));
+    if (result[0]) return result[0];
+    
+    // Try without # prefix
+    const withoutHash = orderNumber.replace(/^#/, '');
+    result = await db.select().from(orders).where(eq(orders.orderNumber, withoutHash));
+    return result[0];
+  }
+
   async searchOrders(query: string): Promise<Order[]> {
     const searchPattern = `%${query}%`;
     const result = await db
@@ -189,6 +206,14 @@ export class DatabaseStorage implements IStorage {
   async getShipment(id: string): Promise<Shipment | undefined> {
     const result = await db.select().from(shipments).where(eq(shipments.id, id));
     return result[0];
+  }
+
+  async getAllShipments(): Promise<Shipment[]> {
+    const result = await db
+      .select()
+      .from(shipments)
+      .orderBy(desc(shipments.createdAt));
+    return result;
   }
 
   async getShipmentsByOrderId(orderId: string): Promise<Shipment[]> {
