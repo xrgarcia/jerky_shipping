@@ -53,11 +53,35 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
           const trackingNumber = trackingData.tracking_number;
           
           // Find existing shipment by tracking number
-          const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+          let existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+          
+          // If not found by tracking number, try to find by shipment ID using label_url
+          if (!existingShipment && trackingData.label_url) {
+            // Extract label ID from URL: https://api.shipengine.com/v1/labels/se-123456
+            const labelIdMatch = trackingData.label_url.match(/labels\/(se-\d+)/);
+            if (labelIdMatch) {
+              const labelId = labelIdMatch[1];
+              
+              // Fetch label to get shipment_id
+              try {
+                const labelResponse = await fetchShipStationResource(trackingData.label_url);
+                const shipmentId = labelResponse.shipment_id;
+                
+                if (shipmentId) {
+                  // Find shipment by shipment_id
+                  existingShipment = await storage.getShipmentByShipmentId(shipmentId);
+                }
+              } catch (error) {
+                console.log(`Failed to fetch label ${labelId}:`, error);
+              }
+            }
+          }
           
           if (existingShipment) {
-            // Update shipment with latest tracking data
+            // Update shipment with tracking data
             await storage.updateShipment(existingShipment.id, {
+              trackingNumber: trackingNumber,
+              carrierCode: trackingData.carrier_code || existingShipment.carrierCode,
               status: trackingData.status_code || 'unknown',
               statusDescription: trackingData.carrier_status_description || trackingData.status_description,
               shipmentData: trackingData,
@@ -69,7 +93,7 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
               broadcastOrderUpdate(order);
             }
           }
-          // If shipment doesn't exist, ignore - we need fulfillment_shipped_v2 to create it
+          // If shipment doesn't exist, ignore - it will be created by bootstrap or fulfillment webhook
         } 
         // Fulfillment webhooks need to fetch full shipment data
         else if (webhookData.resourceType === 'FULFILLMENT_V2') {

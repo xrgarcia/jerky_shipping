@@ -56,12 +56,60 @@ export async function fetchShipStationResource(resourceUrl: string): Promise<any
 }
 
 /**
- * Get shipments by order number
+ * Get labels for a shipment to retrieve tracking numbers
+ */
+export async function getLabelsForShipment(shipmentId: string): Promise<any[]> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/labels?shipment_id=${encodeURIComponent(shipmentId)}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.labels || [];
+}
+
+/**
+ * Get shipments by order number with tracking numbers from labels
+ * In ShipStation, shipment_number equals order_number
  */
 export async function getShipmentsByOrderNumber(orderNumber: string): Promise<ShipStationShipment[]> {
-  const url = `${SHIPSTATION_API_BASE}/shipments?orderNumber=${encodeURIComponent(orderNumber)}`;
-  const data: ShipStationShipmentsResponse = await fetchShipStationResource(url);
-  return data.shipments || [];
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  // V2 API endpoint - use shipment_number parameter (which equals order_number)
+  const url = `${SHIPSTATION_API_BASE}/v2/shipments?shipment_number=${encodeURIComponent(orderNumber)}&sort_dir=desc&sort_by=created_at`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data: any = await response.json();
+  const shipments = data.shipments || [];
+
+  // Note: We skip label fetching here to improve performance
+  // Most shipments during bootstrap are on_hold and don't have labels yet
+  // Tracking numbers will be filled in later when tracking webhooks arrive
+  return shipments;
 }
 
 // ShipStation V2 webhook event types
