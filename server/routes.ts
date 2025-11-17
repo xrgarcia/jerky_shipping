@@ -774,8 +774,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         try {
-          if (webhookData.type === 'shopify') {
-            // Process Shopify order webhook
+          if (webhookData.type === 'shopify' || webhookData.type === 'backfill') {
+            // Process Shopify order webhook or backfill order
             const shopifyOrder = webhookData.order;
             const orderData = {
               id: shopifyOrder.id.toString(),
@@ -789,7 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lineItems: shopifyOrder.line_items || [],
               fulfillmentStatus: shopifyOrder.fulfillment_status,
               financialStatus: shopifyOrder.financial_status,
-              totalPrice: shopifyOrder.total_price,
+              ...extractShopifyOrderPrices(shopifyOrder),
               createdAt: new Date(shopifyOrder.created_at),
               updatedAt: new Date(shopifyOrder.updated_at),
             };
@@ -799,6 +799,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateOrder(orderData.id, orderData);
             } else {
               await storage.createOrder(orderData);
+            }
+
+            // Update backfill job progress if this is a backfill webhook
+            if (webhookData.type === 'backfill' && webhookData.jobId) {
+              await storage.incrementBackfillProgress(webhookData.jobId, 1);
+              
+              // Check if job is complete
+              const job = await storage.getBackfillJob(webhookData.jobId);
+              if (job && job.processedOrders + job.failedOrders >= job.totalOrders) {
+                await storage.updateBackfillJob(webhookData.jobId, {
+                  status: "completed",
+                });
+              }
             }
 
             broadcastOrderUpdate(orderData);
@@ -870,6 +883,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking queue status:", error);
       res.status(500).json({ error: "Failed to check queue status" });
+    }
+  });
+
+  // Backfill endpoints
+  app.post("/api/backfill/start", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.body;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+
+      if (!process.env.SHOPIFY_SHOP_DOMAIN || !process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
+        return res.status(400).json({ error: "Shopify credentials not configured" });
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+
+      if (start > end) {
+        return res.status(400).json({ error: "Start date must be before end date" });
+      }
+
+      // Create backfill job
+      const job = await storage.createBackfillJob({
+        startDate: start,
+        endDate: end,
+        status: "pending",
+        totalOrders: 0,
+        processedOrders: 0,
+        failedOrders: 0,
+      });
+
+      // Fetch orders from Shopify with date filters
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+      let allOrders: any[] = [];
+      let pageInfo: string | null = null;
+      let hasNextPage = true;
+
+      // Paginate through all orders in date range
+      while (hasNextPage) {
+        let url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=250&status=any&created_at_min=${start.toISOString()}&created_at_max=${end.toISOString()}`;
+        
+        if (pageInfo) {
+          url += `&page_info=${pageInfo}`;
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          await storage.updateBackfillJob(job.id, {
+            status: "failed",
+            errorMessage: `Shopify API error: ${errorText}`,
+          });
+          return res.status(500).json({ error: "Failed to fetch orders from Shopify" });
+        }
+
+        const data = await response.json();
+        allOrders = allOrders.concat(data.orders || []);
+
+        // Check for pagination
+        const linkHeader = response.headers.get("Link");
+        if (linkHeader && linkHeader.includes('rel="next"')) {
+          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+          if (nextMatch) {
+            const nextUrl = new URL(nextMatch[1]);
+            pageInfo = nextUrl.searchParams.get("page_info");
+          } else {
+            hasNextPage = false;
+          }
+        } else {
+          hasNextPage = false;
+        }
+
+        // Rate limiting: wait 500ms between requests
+        if (hasNextPage) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Queue each order for processing
+      for (const shopifyOrder of allOrders) {
+        const webhookData = {
+          type: 'backfill',
+          jobId: job.id,
+          order: shopifyOrder,
+          receivedAt: new Date().toISOString(),
+        };
+        await enqueueWebhook(webhookData);
+      }
+
+      // Update job with total count and status
+      await storage.updateBackfillJob(job.id, {
+        totalOrders: allOrders.length,
+        status: "in_progress",
+      });
+
+      res.json({ 
+        success: true,
+        job: await storage.getBackfillJob(job.id),
+      });
+    } catch (error) {
+      console.error("Error starting backfill:", error);
+      res.status(500).json({ error: "Failed to start backfill" });
+    }
+  });
+
+  app.get("/api/backfill/jobs/:id", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getBackfillJob(req.params.id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      res.json({ job });
+    } catch (error) {
+      console.error("Error fetching backfill job:", error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
+  app.get("/api/backfill/jobs", requireAuth, async (req, res) => {
+    try {
+      const jobs = await storage.getAllBackfillJobs();
+      res.json({ jobs });
+    } catch (error) {
+      console.error("Error fetching backfill jobs:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
 

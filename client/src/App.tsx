@@ -12,6 +12,7 @@ import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Shipments from "@/pages/shipments";
 import Products from "@/pages/products";
+import Backfill from "@/pages/backfill";
 import Profile from "@/pages/profile";
 import type { User } from "@shared/schema";
 
@@ -57,6 +58,7 @@ function AppContent() {
       <Route path="/orders/:id" component={OrderDetail} />
       <Route path="/shipments" component={Shipments} />
       <Route path="/products" component={Products} />
+      <Route path="/backfill" component={Backfill} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
