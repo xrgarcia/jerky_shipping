@@ -11,6 +11,8 @@ import { insertUserSchema, insertMagicLinkTokenSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { verifyShopifyWebhook } from "./utils/shopify-webhook";
+import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -453,6 +455,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching order:", error);
       res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
+  // Shopify webhook endpoint - receives order updates and queues them
+  app.post("/api/webhooks/shopify/orders", async (req, res) => {
+    try {
+      const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
+      const shopifySecret = process.env.SHOPIFY_API_SECRET;
+
+      if (!shopifySecret) {
+        console.error("SHOPIFY_API_SECRET not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+
+      const rawBody = req.rawBody as Buffer;
+      if (!verifyShopifyWebhook(rawBody, hmacHeader, shopifySecret)) {
+        console.error("Webhook verification failed");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+
+      const webhookData = {
+        topic: req.headers['x-shopify-topic'],
+        shopDomain: req.headers['x-shopify-shop-domain'],
+        order: req.body,
+        receivedAt: new Date().toISOString(),
+      };
+
+      await enqueueWebhook(webhookData);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Worker endpoint - processes queued webhooks (requires authentication)
+  app.post("/api/worker/process-webhooks", requireAuth, async (req, res) => {
+    try {
+      let processedCount = 0;
+      const maxBatchSize = 10;
+
+      for (let i = 0; i < maxBatchSize; i++) {
+        const webhookData = await dequeueWebhook();
+        
+        if (!webhookData) {
+          break;
+        }
+
+        try {
+          const shopifyOrder = webhookData.order;
+          const orderData = {
+            id: shopifyOrder.id.toString(),
+            orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+            customerName: shopifyOrder.customer
+              ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
+              : "Guest",
+            customerEmail: shopifyOrder.customer?.email || null,
+            customerPhone: shopifyOrder.customer?.phone || null,
+            shippingAddress: shopifyOrder.shipping_address || {},
+            lineItems: shopifyOrder.line_items || [],
+            fulfillmentStatus: shopifyOrder.fulfillment_status,
+            financialStatus: shopifyOrder.financial_status,
+            totalPrice: shopifyOrder.total_price,
+            createdAt: new Date(shopifyOrder.created_at),
+            updatedAt: new Date(shopifyOrder.updated_at),
+          };
+
+          const existing = await storage.getOrder(orderData.id);
+          if (existing) {
+            await storage.updateOrder(orderData.id, orderData);
+          } else {
+            await storage.createOrder(orderData);
+          }
+
+          processedCount++;
+        } catch (orderError) {
+          console.error("Error processing individual webhook:", orderError);
+        }
+      }
+
+      const remainingCount = await getQueueLength();
+
+      res.json({ 
+        success: true, 
+        processed: processedCount,
+        remaining: remainingCount
+      });
+    } catch (error) {
+      console.error("Error in webhook worker:", error);
+      res.status(500).json({ error: "Failed to process webhooks" });
+    }
+  });
+
+  // Queue status endpoint for monitoring
+  app.get("/api/webhooks/queue-status", requireAuth, async (req, res) => {
+    try {
+      const queueLength = await getQueueLength();
+      res.json({ queueLength });
+    } catch (error) {
+      console.error("Error checking queue status:", error);
+      res.status(500).json({ error: "Failed to check queue status" });
     }
   });
 

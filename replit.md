@@ -51,7 +51,15 @@ Preferred communication style: Simple, everyday language.
 **Shopify Integration**: The application integrates with Shopify's Admin API (version 2024-01) to fetch and synchronize order data. This requires:
 - Custom app creation in Shopify admin
 - Admin API access token with read_orders, read_products, read_customers scopes
-- Environment variables: `SHOPIFY_SHOP_DOMAIN` and `SHOPIFY_ADMIN_ACCESS_TOKEN`
+- Environment variables: `SHOPIFY_SHOP_DOMAIN`, `SHOPIFY_ADMIN_ACCESS_TOKEN`, `SHOPIFY_API_SECRET`
+- Webhook registration for real-time order updates (orders/create, orders/updated)
+
+**Webhook Processing**: Real-time order synchronization uses an async queue-based architecture:
+- Shopify webhooks are received at `/api/webhooks/shopify/orders`
+- HMAC verification ensures webhook authenticity using `SHOPIFY_API_SECRET`
+- Webhook payloads are queued to Upstash Redis for async processing
+- Worker endpoint `/api/worker/process-webhooks` dequeues and processes orders in batches
+- Environment-specific Upstash credentials (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) should be unsynced between dev and production
 
 **Email Service**: Nodemailer is used for sending magic link authentication emails. The transporter configuration needs to be set up in production with appropriate SMTP credentials.
 

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import cookieParser from "cookie-parser";
 import path from "path";
+import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
 
 const app = express();
 
@@ -68,6 +69,25 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   } else {
     serveStatic(app);
+  }
+
+  // Register Shopify webhooks on startup
+  if (process.env.SHOPIFY_SHOP_DOMAIN && 
+      process.env.SHOPIFY_ADMIN_ACCESS_TOKEN && 
+      process.env.WEBHOOK_BASE_URL) {
+    try {
+      log("Checking Shopify webhook registration...");
+      await ensureWebhooksRegistered(
+        process.env.SHOPIFY_SHOP_DOMAIN,
+        process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+        process.env.WEBHOOK_BASE_URL
+      );
+      log("Shopify webhooks verified");
+    } catch (error) {
+      console.error("Failed to register Shopify webhooks:", error);
+    }
+  } else {
+    log("Skipping webhook registration - missing configuration");
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
