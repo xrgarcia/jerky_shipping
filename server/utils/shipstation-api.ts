@@ -4,7 +4,7 @@
  */
 
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
-const SHIPSTATION_API_BASE = 'https://ssapi.shipstation.com';
+const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 
 interface ShipStationShipment {
   shipmentId: number;
