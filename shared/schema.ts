@@ -65,7 +65,20 @@ export const orders = pgTable("orders", {
   lineItems: jsonb("line_items").notNull(),
   fulfillmentStatus: text("fulfillment_status"),
   financialStatus: text("financial_status"),
-  totalPrice: text("total_price"),
+  // Price fields (all monetary values are strings from Shopify API)
+  totalPrice: text("total_price"), // Legacy field, same as orderTotal
+  orderTotal: text("order_total"), // total_price from Shopify
+  subtotalPrice: text("subtotal_price"), // Price before discounts and shipping
+  currentTotalPrice: text("current_total_price"), // Total after refunds/adjustments
+  currentSubtotalPrice: text("current_subtotal_price"), // Subtotal after adjustments
+  shippingTotal: text("shipping_total"), // total_shipping_price_set.shop_money.amount
+  totalDiscounts: text("total_discounts"), // Total discounts applied
+  currentTotalDiscounts: text("current_total_discounts"), // Discounts after adjustments
+  totalTax: text("total_tax"), // Sum of all taxes
+  currentTotalTax: text("current_total_tax"), // Tax after adjustments
+  totalAdditionalFees: text("total_additional_fees"), // Duties, import fees, handling
+  currentTotalAdditionalFees: text("current_total_additional_fees"), // Fees after adjustments
+  totalOutstanding: text("total_outstanding"), // Outstanding amount remaining
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
