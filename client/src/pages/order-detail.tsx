@@ -95,16 +95,6 @@ export default function OrderDetail() {
 
   const handleCreateLabel = () => {
     if (!orderId) return;
-    
-    if (shipments.length === 0) {
-      toast({
-        title: "Cannot create label",
-        description: "No shipment found for this order.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     createLabelMutation.mutate(orderId);
   };
 
@@ -323,7 +313,7 @@ export default function OrderDetail() {
               onClick={handleCreateLabel}
               variant="outline"
               size="lg"
-              disabled={createLabelMutation.isPending || shipments.length === 0}
+              disabled={createLabelMutation.isPending}
             >
               <FileText className="mr-2 h-5 w-5" />
               {createLabelMutation.isPending ? "Creating..." : "Create Shipping Label"}
