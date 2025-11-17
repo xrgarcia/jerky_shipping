@@ -61,7 +61,6 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         };
 
         const existing = await storage.getOrder(orderData.id);
-        const isNewOrder = !existing;
         
         if (existing) {
           await storage.updateOrder(orderData.id, orderData);
@@ -70,8 +69,8 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         }
 
         // Update backfill job progress if this is a backfill webhook
-        // Only increment for new orders to avoid counting duplicates
-        if (webhookData.type === 'backfill' && webhookData.jobId && isNewOrder) {
+        // Count every order processed (new or updated) because the queue ensures no duplicates per job
+        if (webhookData.type === 'backfill' && webhookData.jobId) {
           await storage.incrementBackfillProgress(webhookData.jobId, 1);
           
           // Check if job is complete (only if totalOrders has been set)

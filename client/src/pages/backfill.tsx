@@ -87,12 +87,23 @@ export default function BackfillPage() {
         startDate: data.startDate.toISOString(),
         endDate: data.endDate.toISOString(),
       });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to start backfill");
+      }
       return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
-      setSelectedJobId(data.id);
+      setSelectedJobId(data.job.id);
       form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Cannot start backfill",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -114,6 +125,10 @@ export default function BackfillPage() {
   const restartJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
       const response = await apiRequest("POST", `/api/backfill/jobs/${jobId}/restart`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to restart backfill");
+      }
       return response.json();
     },
     onSuccess: (data: any) => {
@@ -122,6 +137,13 @@ export default function BackfillPage() {
       toast({
         title: "Job restarted",
         description: "Backfill job has been restarted with the same date range.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Cannot restart job",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });

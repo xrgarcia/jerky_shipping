@@ -795,7 +795,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
 
             const existing = await storage.getOrder(orderData.id);
-            const isNewOrder = !existing;
             
             if (existing) {
               await storage.updateOrder(orderData.id, orderData);
@@ -804,8 +803,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Update backfill job progress if this is a backfill webhook
-            // Only increment for new orders to avoid counting duplicates
-            if (webhookData.type === 'backfill' && webhookData.jobId && isNewOrder) {
+            // Count every order processed (new or updated) because the queue ensures no duplicates per job
+            if (webhookData.type === 'backfill' && webhookData.jobId) {
               await storage.incrementBackfillProgress(webhookData.jobId, 1);
               
               // Check if job is complete (only if totalOrders has been set)
@@ -907,6 +906,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (start > end) {
         return res.status(400).json({ error: "Start date must be before end date" });
+      }
+
+      // Check if there's already an active job
+      const allJobs = await storage.getAllBackfillJobs();
+      const activeJob = allJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      if (activeJob) {
+        return res.status(400).json({ 
+          error: "A backfill job is already in progress. Please wait for it to complete or delete it before starting a new one." 
+        });
       }
 
       // Create backfill job
@@ -1052,6 +1060,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!oldJob) {
         return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Check if there's already an active job
+      const allJobs = await storage.getAllBackfillJobs();
+      const activeJob = allJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      if (activeJob) {
+        return res.status(400).json({ 
+          error: "A backfill job is already in progress. Please wait for it to complete or delete it before restarting." 
+        });
       }
 
       const start = new Date(oldJob.startDate);
