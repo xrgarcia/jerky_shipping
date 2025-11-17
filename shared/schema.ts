@@ -169,3 +169,27 @@ export const insertProductVariantSchema = createInsertSchema(productVariants).om
 
 export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
 export type ProductVariant = typeof productVariants.$inferSelect;
+
+// Backfill jobs table for order backfill operations
+export const backfillJobs = pgTable("backfill_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  status: text("status").notNull().default("pending"), // pending, in_progress, completed, failed
+  totalOrders: integer("total_orders").notNull().default(0),
+  processedOrders: integer("processed_orders").notNull().default(0),
+  failedOrders: integer("failed_orders").notNull().default(0),
+  errorMessage: text("error_message"),
+  lastProcessedOrderId: text("last_processed_order_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertBackfillJobSchema = createInsertSchema(backfillJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBackfillJob = z.infer<typeof insertBackfillJobSchema>;
+export type BackfillJob = typeof backfillJobs.$inferSelect;

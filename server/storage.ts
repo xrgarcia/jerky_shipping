@@ -22,6 +22,9 @@ import {
   type ProductVariant,
   type InsertProductVariant,
   productVariants,
+  type BackfillJob,
+  type InsertBackfillJob,
+  backfillJobs,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -75,6 +78,14 @@ export interface IStorage {
   getProductVariants(productId: string): Promise<ProductVariant[]>;
   getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined>;
   getVariantBySku(sku: string): Promise<ProductVariant | undefined>;
+
+  // Backfill Jobs
+  createBackfillJob(job: InsertBackfillJob): Promise<BackfillJob>;
+  updateBackfillJob(id: string, updates: Partial<InsertBackfillJob>): Promise<BackfillJob | undefined>;
+  getBackfillJob(id: string): Promise<BackfillJob | undefined>;
+  getAllBackfillJobs(): Promise<BackfillJob[]>;
+  incrementBackfillProgress(id: string, incrementBy: number): Promise<void>;
+  incrementBackfillFailed(id: string, incrementBy: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -396,6 +407,57 @@ export class DatabaseStorage implements IStorage {
       .from(productVariants)
       .where(and(eq(productVariants.sku, sku), isNull(productVariants.deletedAt)));
     return result[0];
+  }
+
+  // Backfill Jobs
+  async createBackfillJob(job: InsertBackfillJob): Promise<BackfillJob> {
+    const result = await db.insert(backfillJobs).values(job).returning();
+    return result[0];
+  }
+
+  async updateBackfillJob(id: string, updates: Partial<InsertBackfillJob>): Promise<BackfillJob | undefined> {
+    const result = await db
+      .update(backfillJobs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(backfillJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBackfillJob(id: string): Promise<BackfillJob | undefined> {
+    const result = await db
+      .select()
+      .from(backfillJobs)
+      .where(eq(backfillJobs.id, id));
+    return result[0];
+  }
+
+  async getAllBackfillJobs(): Promise<BackfillJob[]> {
+    const result = await db
+      .select()
+      .from(backfillJobs)
+      .orderBy(desc(backfillJobs.createdAt));
+    return result;
+  }
+
+  async incrementBackfillProgress(id: string, incrementBy: number): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        processedOrders: sql`${backfillJobs.processedOrders} + ${incrementBy}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillFailed(id: string, incrementBy: number): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        failedOrders: sql`${backfillJobs.failedOrders} + ${incrementBy}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
   }
 }
 
