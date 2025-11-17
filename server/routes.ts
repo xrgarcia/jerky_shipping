@@ -500,11 +500,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all products
+  // Get all products with variants
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
-      const products = await storage.getAllProducts();
-      res.json({ products });
+      const productsWithVariants = await storage.getAllProductsWithVariants();
+      res.json({ productsWithVariants });
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ error: "Failed to fetch products" });

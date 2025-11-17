@@ -66,6 +66,7 @@ export interface IStorage {
   softDeleteProduct(id: string): Promise<void>;
   getProduct(id: string): Promise<Product | undefined>;
   getAllProducts(includeDeleted?: boolean): Promise<Product[]>;
+  getAllProductsWithVariants(includeDeleted?: boolean): Promise<Array<{ product: Product; variants: ProductVariant[] }>>;
 
   // Product Variants
   upsertProductVariant(variant: InsertProductVariant): Promise<ProductVariant>;
@@ -313,6 +314,29 @@ export class DatabaseStorage implements IStorage {
     
     const result = await query.orderBy(desc(products.createdAt));
     return result;
+  }
+
+  async getAllProductsWithVariants(includeDeleted: boolean = false): Promise<Array<{ product: Product; variants: ProductVariant[] }>> {
+    const allProducts = await this.getAllProducts(includeDeleted);
+    
+    const allVariants = await db
+      .select()
+      .from(productVariants)
+      .where(isNull(productVariants.deletedAt))
+      .orderBy(productVariants.title);
+    
+    const variantsByProduct = new Map<string, ProductVariant[]>();
+    for (const variant of allVariants) {
+      if (!variantsByProduct.has(variant.productId)) {
+        variantsByProduct.set(variant.productId, []);
+      }
+      variantsByProduct.get(variant.productId)!.push(variant);
+    }
+    
+    return allProducts.map(product => ({
+      product,
+      variants: variantsByProduct.get(product.id) || []
+    }));
   }
 
   // Product Variants

@@ -11,6 +11,7 @@ import VerifyMagicLink from "@/pages/verify-magic-link";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Shipments from "@/pages/shipments";
+import Products from "@/pages/products";
 import Profile from "@/pages/profile";
 import type { User } from "@shared/schema";
 
@@ -55,6 +56,7 @@ function AppContent() {
       <Route path="/orders" component={Orders} />
       <Route path="/orders/:id" component={OrderDetail} />
       <Route path="/shipments" component={Shipments} />
+      <Route path="/products" component={Products} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>

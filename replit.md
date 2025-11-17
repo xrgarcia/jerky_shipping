@@ -126,3 +126,19 @@ This approach eliminates password management overhead while maintaining security
 **Session-Based Auth Over JWT**: HTTP-only session cookies were chosen over JWTs to prevent XSS attacks and enable server-side session revocation. The 30-day duration balances security with user convenience for warehouse staff who use the tool regularly.
 
 **File Upload Strategy**: Avatar files are stored locally rather than using a cloud storage service. This keeps the infrastructure simple for a warehouse tool, though it would need to be reconsidered if the application scales horizontally.
+
+**Async Product Bootstrap**: Product synchronization runs asynchronously after server startup using `setImmediate` to prevent blocking the application from accepting requests. The bootstrap process fetches 794+ products from Shopify in the background while the server is already available on port 5000. This ensures the application starts quickly (< 60s) and warehouse staff can begin working immediately, even if the product catalog takes a few minutes to fully synchronize.
+
+### Product Catalog Features
+
+**Products Page**: A warehouse-optimized product catalog interface accessible at `/products`:
+- **Large Typography**: Product titles at 24px (text-2xl), variant counts at 30px (text-3xl), prices and inventory at 24px (text-2xl) for quick scanning in warehouse lighting
+- **Two-Column Grid**: Optimized layout for desktop viewing with detailed product and variant information
+- **Product Cards**: Each card displays product image, title, status badge, variant count, total inventory, and starting price
+- **Variant Details**: Expandable section showing all variants with SKU, barcode, price, and individual inventory quantities
+- **Search Functionality**: Filter products by name or ID for quick lookups
+- **Warehouse-Critical Data**: SKUs (text-lg/18px) and barcodes (text-base/16px) are prominently displayed in monospace font for easy reading
+- **Real-Time Sync**: Products automatically update when Shopify webhooks fire (create/update/delete events)
+- **Inventory Display**: Shows aggregated inventory count across all variants plus per-variant quantities with color-coded badges
+
+The Products page serves as both a catalog browser and a reference tool for warehouse staff to verify product information, check stock levels, and locate items by SKU or barcode during fulfillment operations.

@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, User as UserIcon, LogOut, ChevronUp } from "lucide-react";
+import { Package, Truck, Box, User as UserIcon, LogOut, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
@@ -64,6 +64,11 @@ export function AppSidebar() {
       icon: Truck,
     },
     {
+      title: "Products",
+      url: "/products",
+      icon: Box,
+    },
+    {
       title: "Profile",
       url: "/profile",
       icon: UserIcon,
@@ -81,16 +86,18 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
+                  <Link 
+                    href={item.url}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                      location === item.url 
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
                     data-testid={`link-${item.title.toLowerCase()}`}
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -101,25 +108,22 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  data-testid="button-user-menu"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {user?.email?.[0]?.toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col items-start text-sm">
-                    <span className="font-semibold truncate max-w-32">
-                      {user?.handle ? `@${user.handle}` : user?.email}
-                    </span>
-                  </div>
-                  <ChevronUp className="ml-auto h-4 w-4" />
-                </SidebarMenuButton>
+              <DropdownMenuTrigger
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all hover-elevate active-elevate-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                data-testid="button-user-menu"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.avatarUrl || undefined} />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {user?.email?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col items-start text-sm flex-1 min-w-0">
+                  <span className="font-semibold truncate max-w-32">
+                    {user?.handle ? `@${user.handle}` : user?.email}
+                  </span>
+                </div>
+                <ChevronUp className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
