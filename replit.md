@@ -61,6 +61,15 @@ Preferred communication style: Simple, everyday language.
 - Worker endpoint `/api/worker/process-webhooks` dequeues and processes orders in batches
 - Environment-specific Upstash credentials (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) should be unsynced between dev and production
 
+**ShipStation Integration**: The application integrates with ShipStation V2 API to track shipments and manage fulfillment:
+- Base URL: `https://api.shipstation.com`
+- Authentication uses single API key in lowercase `api-key` header (V2 requirement)
+- Environment variable: `SHIPSTATION_API_KEY` (production key from API Settings page)
+- Webhook registration at `/v2/environment/webhooks` for shipment events
+- Supported events: `fulfillment_shipped_v2`, `fulfillment_created_v2`, `fulfillment_updated_v2`, `fulfillment_canceled_v2`, `track`, `batch`, and others
+- RSA-SHA256 signature verification using JWKS endpoint for webhook security
+- Webhooks received at `/api/webhooks/shipstation/shipments`
+
 **Real-Time Updates**: WebSocket server provides live order updates to connected clients:
 - WebSocket server runs alongside HTTP server on the same port at `/ws`
 - Session-based authentication validates users during WebSocket upgrade
