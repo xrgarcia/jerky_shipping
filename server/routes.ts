@@ -500,6 +500,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all products
+  app.get("/api/products", requireAuth, async (req, res) => {
+    try {
+      const products = await storage.getAllProducts();
+      res.json({ products });
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  // Get product by ID with variants
+  app.get("/api/products/:id", requireAuth, async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      const variants = await storage.getProductVariants(product.id);
+      res.json({ product, variants });
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "Failed to fetch product" });
+    }
+  });
+
+  // Search products by barcode or SKU
+  app.get("/api/products/search", requireAuth, async (req, res) => {
+    try {
+      const barcode = req.query.barcode as string;
+      const sku = req.query.sku as string;
+
+      if (!barcode && !sku) {
+        return res.status(400).json({ error: "Either barcode or sku parameter is required" });
+      }
+
+      let variant = null;
+
+      if (barcode) {
+        variant = await storage.getVariantByBarcode(barcode);
+      } else if (sku) {
+        variant = await storage.getVariantBySku(sku);
+      }
+
+      if (!variant) {
+        return res.status(404).json({ error: "Product variant not found" });
+      }
+
+      const product = await storage.getProduct(variant.productId);
+
+      res.json({ variant, product });
+    } catch (error) {
+      console.error("Error searching products:", error);
+      res.status(500).json({ error: "Failed to search products" });
+    }
+  });
+
   // Manual sync endpoint - pulls all shipments from ShipStation for existing orders
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {
@@ -599,6 +658,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Shopify product webhook endpoint - receives product updates and queues them
+  app.post("/api/webhooks/shopify/products", async (req, res) => {
+    try {
+      const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
+      const shopifySecret = process.env.SHOPIFY_API_SECRET;
+
+      if (!shopifySecret) {
+        console.error("SHOPIFY_API_SECRET not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+
+      const rawBody = req.rawBody as Buffer;
+      if (!verifyShopifyWebhook(rawBody, hmacHeader, shopifySecret)) {
+        console.error("Webhook verification failed");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+
+      const webhookData = {
+        type: 'shopify-product',
+        topic: req.headers['x-shopify-topic'],
+        shopDomain: req.headers['x-shopify-shop-domain'],
+        product: req.body,
+        receivedAt: new Date().toISOString(),
+      };
+
+      await enqueueWebhook(webhookData);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error processing product webhook:", error);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });

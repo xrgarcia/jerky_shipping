@@ -46,6 +46,76 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         }
 
         broadcastOrderUpdate(orderData);
+      } else if (webhookData.type === 'shopify-product') {
+        const shopifyProduct = webhookData.product;
+        const topic = webhookData.topic;
+
+        // Handle product deletion
+        if (topic === 'products/delete') {
+          await storage.softDeleteProduct(shopifyProduct.id.toString());
+          // Soft delete all variants (including already deleted ones)
+          const allVariants = await storage.getProductVariants(shopifyProduct.id.toString());
+          for (const variant of allVariants) {
+            await storage.softDeleteProductVariant(variant.id);
+          }
+          console.log(`Soft deleted product ${shopifyProduct.id} and its variants`);
+        } else {
+          // Handle product create/update
+          const productData = {
+            id: shopifyProduct.id.toString(),
+            title: shopifyProduct.title,
+            imageUrl: shopifyProduct.image?.src || shopifyProduct.images?.[0]?.src || null,
+            status: shopifyProduct.status || 'active',
+            shopifyCreatedAt: new Date(shopifyProduct.created_at),
+            shopifyUpdatedAt: new Date(shopifyProduct.updated_at),
+            deletedAt: null, // Resurrect product if previously deleted
+          };
+
+          await storage.upsertProduct(productData);
+
+          // Get current variant IDs from Shopify
+          const shopifyVariants = shopifyProduct.variants || [];
+          const shopifyVariantIds = new Set(shopifyVariants.map((v: any) => v.id.toString()));
+
+          // Get existing variants (including soft-deleted ones for reconciliation)
+          const db = await import("./db").then(m => m.db);
+          const { productVariants } = await import("@shared/schema");
+          const { eq } = await import("drizzle-orm");
+          const existingVariants = await db
+            .select()
+            .from(productVariants)
+            .where(eq(productVariants.productId, shopifyProduct.id.toString()));
+
+          // Soft-delete variants that are no longer in Shopify payload
+          for (const existingVariant of existingVariants) {
+            if (!shopifyVariantIds.has(existingVariant.id) && !existingVariant.deletedAt) {
+              await storage.softDeleteProductVariant(existingVariant.id);
+            }
+          }
+
+          // Upsert all current variants (resurrect if previously deleted)
+          for (const variant of shopifyVariants) {
+            const variantData = {
+              id: variant.id.toString(),
+              productId: shopifyProduct.id.toString(),
+              sku: variant.sku || null,
+              barCode: variant.barcode || null,
+              title: variant.title || 'Default',
+              imageUrl: variant.image_id 
+                ? shopifyProduct.images?.find((img: any) => img.id === variant.image_id)?.src || null
+                : null,
+              price: variant.price,
+              inventoryQuantity: variant.inventory_quantity || 0,
+              shopifyCreatedAt: new Date(variant.created_at),
+              shopifyUpdatedAt: new Date(variant.updated_at),
+              deletedAt: null, // Resurrect variant if previously deleted
+            };
+
+            await storage.upsertProductVariant(variantData);
+          }
+
+          console.log(`Upserted product ${shopifyProduct.id} with ${shopifyVariants.length} variants`);
+        }
       } else if (webhookData.type === 'shipstation') {
         // Track webhooks contain tracking data directly in the payload
         if (webhookData.resourceType === 'API_TRACK' && webhookData.trackingData) {

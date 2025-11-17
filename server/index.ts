@@ -89,6 +89,10 @@ app.use((req, res, next) => {
         process.env.WEBHOOK_BASE_URL
       );
       log("Shopify webhooks verified");
+      
+      // Bootstrap existing products from Shopify
+      const { bootstrapProductsFromShopify } = await import("./utils/shopify-sync");
+      await bootstrapProductsFromShopify();
     } catch (error) {
       console.error("Failed to register Shopify webhooks:", error);
     }

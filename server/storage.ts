@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql, isNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -16,6 +16,12 @@ import {
   type Shipment,
   type InsertShipment,
   shipments,
+  type Product,
+  type InsertProduct,
+  products,
+  type ProductVariant,
+  type InsertProductVariant,
+  productVariants,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -54,6 +60,20 @@ export interface IStorage {
   getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
   getUserById(id: string): Promise<User | undefined>;
+
+  // Products
+  upsertProduct(product: InsertProduct): Promise<Product>;
+  softDeleteProduct(id: string): Promise<void>;
+  getProduct(id: string): Promise<Product | undefined>;
+  getAllProducts(includeDeleted?: boolean): Promise<Product[]>;
+
+  // Product Variants
+  upsertProductVariant(variant: InsertProductVariant): Promise<ProductVariant>;
+  softDeleteProductVariant(id: string): Promise<void>;
+  getProductVariant(id: string): Promise<ProductVariant | undefined>;
+  getProductVariants(productId: string): Promise<ProductVariant[]>;
+  getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined>;
+  getVariantBySku(sku: string): Promise<ProductVariant | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -244,6 +264,114 @@ export class DatabaseStorage implements IStorage {
 
   async getUserById(id: string): Promise<User | undefined> {
     return this.getUser(id);
+  }
+
+  // Products
+  async upsertProduct(product: InsertProduct): Promise<Product> {
+    const result = await db
+      .insert(products)
+      .values({
+        ...product,
+        updatedAt: new Date(),
+        lastSyncedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: products.id,
+        set: {
+          ...product,
+          updatedAt: new Date(),
+          lastSyncedAt: new Date(),
+        },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async softDeleteProduct(id: string): Promise<void> {
+    await db
+      .update(products)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(products.id, id));
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const result = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.id, id), isNull(products.deletedAt)));
+    return result[0];
+  }
+
+  async getAllProducts(includeDeleted: boolean = false): Promise<Product[]> {
+    let query = db
+      .select()
+      .from(products);
+    
+    if (!includeDeleted) {
+      query = query.where(isNull(products.deletedAt));
+    }
+    
+    const result = await query.orderBy(desc(products.createdAt));
+    return result;
+  }
+
+  // Product Variants
+  async upsertProductVariant(variant: InsertProductVariant): Promise<ProductVariant> {
+    const result = await db
+      .insert(productVariants)
+      .values({
+        ...variant,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: productVariants.id,
+        set: {
+          ...variant,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async softDeleteProductVariant(id: string): Promise<void> {
+    await db
+      .update(productVariants)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(productVariants.id, id));
+  }
+
+  async getProductVariant(id: string): Promise<ProductVariant | undefined> {
+    const result = await db
+      .select()
+      .from(productVariants)
+      .where(and(eq(productVariants.id, id), isNull(productVariants.deletedAt)));
+    return result[0];
+  }
+
+  async getProductVariants(productId: string): Promise<ProductVariant[]> {
+    const result = await db
+      .select()
+      .from(productVariants)
+      .where(and(eq(productVariants.productId, productId), isNull(productVariants.deletedAt)))
+      .orderBy(productVariants.title);
+    return result;
+  }
+
+  async getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined> {
+    const result = await db
+      .select()
+      .from(productVariants)
+      .where(and(eq(productVariants.barCode, barcode), isNull(productVariants.deletedAt)));
+    return result[0];
+  }
+
+  async getVariantBySku(sku: string): Promise<ProductVariant | undefined> {
+    const result = await db
+      .select()
+      .from(productVariants)
+      .where(and(eq(productVariants.sku, sku), isNull(productVariants.deletedAt)));
+    return result[0];
   }
 }
 

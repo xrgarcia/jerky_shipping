@@ -105,3 +105,54 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
 export type Shipment = typeof shipments.$inferSelect;
+
+// Products table for Shopify products
+export const products = pgTable("products", {
+  id: varchar("id").primaryKey(), // Shopify product ID
+  title: text("title").notNull(),
+  imageUrl: text("image_url"),
+  status: text("status").notNull().default("active"), // active, archived, draft
+  shopifyCreatedAt: timestamp("shopify_created_at").notNull(),
+  shopifyUpdatedAt: timestamp("shopify_updated_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  createdAt: true,
+  updatedAt: true,
+  lastSyncedAt: true,
+});
+
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+// Product variants table for Shopify product variants
+export const productVariants = pgTable("product_variants", {
+  id: varchar("id").primaryKey(), // Shopify variant ID
+  productId: varchar("product_id").notNull().references(() => products.id),
+  sku: text("sku"), // Indexed for fast lookups
+  barCode: text("bar_code"), // Indexed for barcode scanning
+  title: text("title").notNull(),
+  imageUrl: text("image_url"), // Variant-specific image, falls back to product image
+  price: text("price").notNull(),
+  inventoryQuantity: integer("inventory_quantity").notNull().default(0),
+  shopifyCreatedAt: timestamp("shopify_created_at").notNull(),
+  shopifyUpdatedAt: timestamp("shopify_updated_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
+}, (table) => ({
+  skuIdx: sql`CREATE INDEX IF NOT EXISTS product_variants_sku_idx ON ${table} (sku) WHERE deleted_at IS NULL`,
+  barCodeIdx: sql`CREATE INDEX IF NOT EXISTS product_variants_bar_code_idx ON ${table} (bar_code) WHERE deleted_at IS NULL`,
+}));
+
+export const insertProductVariantSchema = createInsertSchema(productVariants).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
+export type ProductVariant = typeof productVariants.$inferSelect;
