@@ -104,6 +104,10 @@ app.use((req, res, next) => {
         process.env.WEBHOOK_BASE_URL
       );
       log("ShipStation webhooks verified");
+      
+      // Bootstrap existing shipments from ShipStation
+      const { bootstrapShipmentsFromShipStation } = await import("./utils/shipstation-sync");
+      await bootstrapShipmentsFromShipStation();
     } catch (error) {
       console.error("Failed to register ShipStation webhooks:", error);
     }
