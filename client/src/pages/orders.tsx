@@ -5,8 +5,9 @@ import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package } from "lucide-react";
+import { Search, Package, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 import type { Order } from "@shared/schema";
 
 export default function Orders() {
@@ -185,6 +186,10 @@ export default function Orders() {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       {getFulfillmentBadge(order.fulfillmentStatus)}
+                      <Badge variant="outline" className="gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                      </Badge>
                       <p className="text-xl font-bold text-foreground">
                         ${order.totalPrice}
                       </p>
