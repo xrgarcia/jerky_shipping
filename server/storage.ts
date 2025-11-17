@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,

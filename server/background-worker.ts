@@ -53,47 +53,29 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
           const trackingNumber = trackingData.tracking_number;
           
           // Find existing shipment by tracking number
-          let existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
-          
-          // If not found by tracking number, try to find by shipment ID using label_url
-          if (!existingShipment && trackingData.label_url) {
-            // Extract label ID from URL: https://api.shipengine.com/v1/labels/se-123456
-            const labelIdMatch = trackingData.label_url.match(/labels\/(se-\d+)/);
-            if (labelIdMatch) {
-              const labelId = labelIdMatch[1];
-              
-              // Fetch label to get shipment_id
-              try {
-                const labelResponse = await fetchShipStationResource(trackingData.label_url);
-                const shipmentId = labelResponse.shipment_id;
-                
-                if (shipmentId) {
-                  // Find shipment by shipment_id
-                  existingShipment = await storage.getShipmentByShipmentId(shipmentId);
-                }
-              } catch (error) {
-                console.log(`Failed to fetch label ${labelId}:`, error);
-              }
-            }
-          }
+          const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
           
           if (existingShipment) {
-            // Update shipment with tracking data
+            // Update existing shipment with latest tracking data
             await storage.updateShipment(existingShipment.id, {
-              trackingNumber: trackingNumber,
               carrierCode: trackingData.carrier_code || existingShipment.carrierCode,
               status: trackingData.status_code || 'unknown',
               statusDescription: trackingData.carrier_status_description || trackingData.status_description,
+              shipDate: trackingData.ship_date ? new Date(trackingData.ship_date) : existingShipment.shipDate,
               shipmentData: trackingData,
             });
+            
+            console.log(`Updated shipment ${existingShipment.id} with tracking ${trackingNumber}`);
             
             // Broadcast update to connected clients
             const order = await storage.getOrder(existingShipment.orderId);
             if (order) {
               broadcastOrderUpdate(order);
             }
+          } else {
+            // No existing shipment found - it will be created when fulfillment_shipped_v2 webhook arrives
+            console.log(`No existing shipment found for tracking ${trackingNumber} - waiting for fulfillment webhook`);
           }
-          // If shipment doesn't exist, ignore - it will be created by bootstrap or fulfillment webhook
         } 
         // Fulfillment webhooks need to fetch full shipment data
         else if (webhookData.resourceType === 'FULFILLMENT_V2') {

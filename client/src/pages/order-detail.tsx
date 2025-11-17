@@ -15,6 +15,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import type { Order, Shipment } from "@shared/schema";
 
 interface LineItem {
@@ -41,6 +43,7 @@ export default function OrderDetail() {
   const orderId = params?.id;
   const [, navigate] = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: orderData, isLoading } = useQuery<{ order: Order; shipments: Shipment[] }>({
     queryKey: ["/api/orders", orderId],
@@ -85,6 +88,80 @@ export default function OrderDetail() {
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectDelay = 30000;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        console.error('WebSocket creation error:', error);
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        reconnectAttempts = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'order_update') {
+            if (data.order.id === orderId) {
+              queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
+              queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+              
+              toast({
+                title: "Shipment tracking updated",
+                description: `Tracking information updated for order #${data.order.orderNumber}`,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', event.code, event.reason);
+        
+        if (event.code === 1006 && reconnectAttempts > 3) {
+          return;
+        }
+        
+        if (event.code === 1008 || event.code === 1011) {
+          return;
+        }
+        
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+        reconnectAttempts++;
+        reconnectTimeout = setTimeout(connect, delay);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [orderId, toast]);
 
   if (isLoading) {
     return (
