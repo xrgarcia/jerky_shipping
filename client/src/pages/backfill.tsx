@@ -70,17 +70,15 @@ export default function BackfillPage() {
 
   const startBackfillMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest("/api/backfill/start", {
-        method: "POST",
-        body: JSON.stringify({
-          startDate: data.startDate.toISOString(),
-          endDate: data.endDate.toISOString(),
-        }),
+      const response = await apiRequest("POST", "/api/backfill/start", {
+        startDate: data.startDate.toISOString(),
+        endDate: data.endDate.toISOString(),
       });
+      return response.json();
     },
-    onSuccess: (response: any) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
-      setSelectedJobId(response.job.id);
+      setSelectedJobId(data.id);
       form.reset();
     },
   });
