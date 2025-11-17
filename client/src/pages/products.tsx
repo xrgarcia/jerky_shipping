@@ -4,6 +4,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Search, Package2, Box } from "lucide-react";
 import type { Product, ProductVariant } from "@shared/schema";
 
@@ -14,6 +16,7 @@ interface ProductDetail {
 
 export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeOnly, setActiveOnly] = useState(false);
 
   const { data: productsData, isLoading } = useQuery<{ productsWithVariants: ProductDetail[] }>({
     queryKey: ["/api/products"],
@@ -21,13 +24,28 @@ export default function Products() {
 
   const productsWithVariants = productsData?.productsWithVariants || [];
 
-  const filteredProducts = productsWithVariants.filter(({ product }) => {
+  const filteredProducts = productsWithVariants.filter(({ product, variants }) => {
+    // Filter by active status if checkbox is checked
+    if (activeOnly && product.status !== 'active') {
+      return false;
+    }
+
+    // If no search query, show all (that passed active filter)
     if (!searchQuery) return true;
     
     const query = searchQuery.toLowerCase();
-    return (
-      product.title.toLowerCase().includes(query) ||
-      product.id.includes(query)
+    
+    // Search in product fields
+    if (product.title.toLowerCase().includes(query) ||
+        product.id.includes(query)) {
+      return true;
+    }
+    
+    // Search in variant fields (SKU and barcode)
+    return variants.some(variant => 
+      variant.sku?.toLowerCase().includes(query) ||
+      variant.barCode?.toLowerCase().includes(query) ||
+      variant.title?.toLowerCase().includes(query)
     );
   });
 
@@ -97,24 +115,42 @@ export default function Products() {
           <h1 className="text-4xl font-bold font-serif">Products</h1>
         </div>
         
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search products by name or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-12 h-14 text-lg"
-            data-testid="input-search-products"
-          />
-        </div>
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search by name, ID, SKU, or barcode..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-12 h-14 text-lg"
+              data-testid="input-search-products"
+            />
+          </div>
 
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Package2 className="h-4 w-4" />
-            <span data-testid="text-product-count">
-              {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Package2 className="h-4 w-4" />
+              <span data-testid="text-product-count">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="active-only"
+                checked={activeOnly}
+                onCheckedChange={(checked) => setActiveOnly(checked as boolean)}
+                data-testid="checkbox-active-only"
+              />
+              <Label
+                htmlFor="active-only"
+                className="text-sm font-medium cursor-pointer"
+                data-testid="label-active-only"
+              >
+                Active Only
+              </Label>
+            </div>
           </div>
         </div>
 
