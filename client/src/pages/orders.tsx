@@ -179,7 +179,7 @@ export default function Orders() {
                         {order.customerName}
                       </p>
                       <p className="text-lg text-muted-foreground mt-1">
-                        {new Date(order.createdAt).toLocaleDateString()} •{" "}
+                        {new Date(order.createdAt).toLocaleString()} •{" "}
                         {Array.isArray(order.lineItems) ? order.lineItems.length : 0} items
                       </p>
                     </div>
