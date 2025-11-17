@@ -13,6 +13,9 @@ import {
   type Order,
   type InsertOrder,
   orders,
+  type Shipment,
+  type InsertShipment,
+  shipments,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -40,6 +43,14 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
+
+  // Shipments
+  createShipment(shipment: InsertShipment): Promise<Shipment>;
+  updateShipment(id: string, shipment: Partial<InsertShipment>): Promise<Shipment | undefined>;
+  getShipment(id: string): Promise<Shipment | undefined>;
+  getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
+  getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -158,6 +169,47 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(orders.createdAt))
       .limit(limit);
     return result;
+  }
+
+  // Shipments
+  async createShipment(shipment: InsertShipment): Promise<Shipment> {
+    const result = await db.insert(shipments).values(shipment).returning();
+    return result[0];
+  }
+
+  async updateShipment(id: string, shipmentUpdate: Partial<InsertShipment>): Promise<Shipment | undefined> {
+    const result = await db
+      .update(shipments)
+      .set({ ...shipmentUpdate, updatedAt: new Date() })
+      .where(eq(shipments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getShipment(id: string): Promise<Shipment | undefined> {
+    const result = await db.select().from(shipments).where(eq(shipments.id, id));
+    return result[0];
+  }
+
+  async getShipmentsByOrderId(orderId: string): Promise<Shipment[]> {
+    const result = await db
+      .select()
+      .from(shipments)
+      .where(eq(shipments.orderId, orderId))
+      .orderBy(desc(shipments.createdAt));
+    return result;
+  }
+
+  async getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined> {
+    const result = await db
+      .select()
+      .from(shipments)
+      .where(eq(shipments.trackingNumber, trackingNumber));
+    return result[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.getUser(id);
   }
 }
 

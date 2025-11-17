@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
+import { ensureShipStationWebhooksRegistered } from "./utils/shipstation-webhook";
 import { setupWebSocket } from "./websocket";
 
 const app = express();
@@ -92,7 +93,22 @@ app.use((req, res, next) => {
       console.error("Failed to register Shopify webhooks:", error);
     }
   } else {
-    log("Skipping webhook registration - missing configuration");
+    log("Skipping Shopify webhook registration - missing configuration");
+  }
+
+  // Register ShipStation webhooks on startup
+  if (process.env.SHIPSTATION_API_KEY && process.env.WEBHOOK_BASE_URL) {
+    try {
+      log("Checking ShipStation webhook registration...");
+      await ensureShipStationWebhooksRegistered(
+        process.env.WEBHOOK_BASE_URL
+      );
+      log("ShipStation webhooks verified");
+    } catch (error) {
+      console.error("Failed to register ShipStation webhooks:", error);
+    }
+  } else {
+    log("Skipping ShipStation webhook registration - missing configuration");
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

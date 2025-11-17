@@ -77,3 +77,31 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+// Shipments table for ShipStation tracking data
+export const shipments = pgTable("shipments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  shipmentId: text("shipment_id"), // ShipStation shipment ID
+  trackingNumber: text("tracking_number"),
+  carrierCode: text("carrier_code"),
+  serviceCode: text("service_code"),
+  status: text("status").notNull().default("pending"), // pending, shipped, in_transit, delivered, exception
+  statusDescription: text("status_description"),
+  labelUrl: text("label_url"),
+  shipDate: timestamp("ship_date"),
+  estimatedDeliveryDate: timestamp("estimated_delivery_date"),
+  actualDeliveryDate: timestamp("actual_delivery_date"),
+  shipmentData: jsonb("shipment_data"), // Store full ShipStation shipment payload
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertShipmentSchema = createInsertSchema(shipments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipment = z.infer<typeof insertShipmentSchema>;
+export type Shipment = typeof shipments.$inferSelect;

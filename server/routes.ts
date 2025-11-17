@@ -12,6 +12,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
+import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
+import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate } from "./websocket";
 
@@ -452,7 +454,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Order not found" });
       }
 
-      res.json({ order });
+      const shipments = await storage.getShipmentsByOrderId(order.id);
+
+      res.json({ order, shipments });
     } catch (error) {
       console.error("Error fetching order:", error);
       res.status(500).json({ error: "Failed to fetch order" });
@@ -477,6 +481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const webhookData = {
+        type: 'shopify',
         topic: req.headers['x-shopify-topic'],
         shopDomain: req.headers['x-shopify-shop-domain'],
         order: req.body,
@@ -488,6 +493,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // ShipStation webhook endpoint - receives shipment updates and queues them
+  app.post("/api/webhooks/shipstation/shipments", async (req, res) => {
+    try {
+      const rawBody = req.rawBody as Buffer;
+      const isValid = await verifyShipStationWebhook(req, rawBody.toString());
+
+      if (!isValid) {
+        console.warn("ShipStation webhook verification failed");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+
+      const webhookData = {
+        type: 'shipstation',
+        resourceType: req.body.resource_type,
+        resourceUrl: req.body.resource_url,
+        receivedAt: new Date().toISOString(),
+      };
+
+      await enqueueWebhook(webhookData);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error processing ShipStation webhook:", error);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });
@@ -506,32 +538,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         try {
-          const shopifyOrder = webhookData.order;
-          const orderData = {
-            id: shopifyOrder.id.toString(),
-            orderNumber: shopifyOrder.name || shopifyOrder.order_number,
-            customerName: shopifyOrder.customer
-              ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
-              : "Guest",
-            customerEmail: shopifyOrder.customer?.email || null,
-            customerPhone: shopifyOrder.customer?.phone || null,
-            shippingAddress: shopifyOrder.shipping_address || {},
-            lineItems: shopifyOrder.line_items || [],
-            fulfillmentStatus: shopifyOrder.fulfillment_status,
-            financialStatus: shopifyOrder.financial_status,
-            totalPrice: shopifyOrder.total_price,
-            createdAt: new Date(shopifyOrder.created_at),
-            updatedAt: new Date(shopifyOrder.updated_at),
-          };
+          if (webhookData.type === 'shopify') {
+            // Process Shopify order webhook
+            const shopifyOrder = webhookData.order;
+            const orderData = {
+              id: shopifyOrder.id.toString(),
+              orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+              customerName: shopifyOrder.customer
+                ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
+                : "Guest",
+              customerEmail: shopifyOrder.customer?.email || null,
+              customerPhone: shopifyOrder.customer?.phone || null,
+              shippingAddress: shopifyOrder.shipping_address || {},
+              lineItems: shopifyOrder.line_items || [],
+              fulfillmentStatus: shopifyOrder.fulfillment_status,
+              financialStatus: shopifyOrder.financial_status,
+              totalPrice: shopifyOrder.total_price,
+              createdAt: new Date(shopifyOrder.created_at),
+              updatedAt: new Date(shopifyOrder.updated_at),
+            };
 
-          const existing = await storage.getOrder(orderData.id);
-          if (existing) {
-            await storage.updateOrder(orderData.id, orderData);
-          } else {
-            await storage.createOrder(orderData);
+            const existing = await storage.getOrder(orderData.id);
+            if (existing) {
+              await storage.updateOrder(orderData.id, orderData);
+            } else {
+              await storage.createOrder(orderData);
+            }
+
+            broadcastOrderUpdate(orderData);
+          } else if (webhookData.type === 'shipstation') {
+            // Process ShipStation shipment webhook
+            const resourceUrl = webhookData.resourceUrl;
+            const shipmentResponse = await fetchShipStationResource(resourceUrl);
+            const shipments = shipmentResponse.shipments || [];
+
+            for (const shipmentData of shipments) {
+              // Find matching order by order number
+              const orderNumber = shipmentData.orderNumber;
+              const orders = await storage.searchOrders(orderNumber);
+              
+              if (orders.length > 0) {
+                const order = orders[0];
+                
+                // Create or update shipment record
+                const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+                
+                const shipmentRecord = {
+                  orderId: order.id,
+                  shipmentId: shipmentData.shipmentId?.toString(),
+                  trackingNumber: shipmentData.trackingNumber,
+                  carrierCode: shipmentData.carrierCode,
+                  serviceCode: shipmentData.serviceCode,
+                  status: shipmentData.voided ? 'cancelled' : 'shipped',
+                  statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+                  shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+                  shipmentData: shipmentData,
+                };
+
+                if (existingShipment) {
+                  await storage.updateShipment(existingShipment.id, shipmentRecord);
+                } else {
+                  await storage.createShipment(shipmentRecord);
+                }
+
+                // Broadcast shipment update via WebSocket
+                broadcastOrderUpdate(order);
+              }
+            }
           }
 
-          broadcastOrderUpdate(orderData);
           processedCount++;
         } catch (orderError) {
           console.error("Error processing individual webhook:", orderError);
