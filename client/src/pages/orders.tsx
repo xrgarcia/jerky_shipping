@@ -5,10 +5,12 @@ import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Clock } from "lucide-react";
+import { Search, Package, Clock, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import type { Order } from "@shared/schema";
+
+type OrderWithShipment = Order & { hasShipment?: boolean };
 import { PrintQueueBar } from "@/components/print-queue-bar";
 
 export default function Orders() {
@@ -104,7 +106,7 @@ export default function Orders() {
     };
   }, [toast]);
 
-  const { data: ordersData, isLoading } = useQuery<{ orders: Order[] }>({
+  const { data: ordersData, isLoading } = useQuery<{ orders: OrderWithShipment[] }>({
     queryKey: ["/api/orders", searchQuery],
     queryFn: async () => {
       const url = searchQuery
@@ -190,6 +192,17 @@ export default function Orders() {
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {getFulfillmentBadge(order.fulfillmentStatus)}
+                        {order.hasShipment ? (
+                          <Badge className="bg-blue-600 text-white gap-1" data-testid={`badge-shipment-${order.id}`}>
+                            <Truck className="h-3 w-3" />
+                            ShipStation
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1" data-testid={`badge-no-shipment-${order.id}`}>
+                            <Truck className="h-3 w-3" />
+                            No Shipment
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="gap-1">
                           <Clock className="h-3 w-3" />
                           {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}

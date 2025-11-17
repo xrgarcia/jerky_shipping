@@ -114,6 +114,17 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  shipDate: z.coerce.date().optional().or(z.null()),
+  estimatedDeliveryDate: z.coerce.date().optional().or(z.null()),
+  actualDeliveryDate: z.coerce.date().optional().or(z.null()),
+  shipmentId: z.string().nullish(),
+  trackingNumber: z.string().nullish(),
+  carrierCode: z.string().nullish(),
+  serviceCode: z.string().nullish(),
+  labelUrl: z.string().nullish(),
+  statusDescription: z.string().nullish(),
+  shipmentData: z.any().nullish(),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;

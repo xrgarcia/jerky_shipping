@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, createLabel } from "./utils/shipstation-api";
+import { fetchShipStationResource, createLabel, getShipmentsByOrderNumber } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 
@@ -461,7 +461,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ orders });
+      // Enrich orders with shipment status
+      const allShipments = await storage.getAllShipments();
+      const shipmentsMap = new Map<string, boolean>();
+      allShipments.forEach(shipment => shipmentsMap.set(shipment.orderId, true));
+      
+      const ordersWithShipmentStatus = orders.map(order => ({
+        ...order,
+        hasShipment: shipmentsMap.has(order.id),
+      }));
+
+      res.json({ orders: ordersWithShipmentStatus });
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ error: "Failed to fetch orders" });
@@ -495,23 +505,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let shipments = await storage.getShipmentsByOrderId(order.id);
 
+      // If no shipment in database, try fetching from ShipStation
       if (shipments.length === 0) {
-        console.log(`No shipment found for order ${order.orderNumber}, creating test shipment...`);
-        const mockShipmentId = `se-test-${Date.now()}`;
+        console.log(`No shipment found in database for order ${order.orderNumber}, checking ShipStation...`);
         
-        const testShipment = await storage.createShipment({
-          orderId: order.id,
-          shipmentId: mockShipmentId,
-          trackingNumber: `TEST${order.orderNumber}`,
-          carrierCode: "usps",
-          serviceCode: "usps_priority_mail",
-          status: "pending",
-          statusDescription: "Test shipment - pending label creation",
-          shipDate: new Date().toISOString(),
-          labelUrl: null,
-        });
-        
-        shipments = [testShipment];
+        try {
+          const shipStationShipments = await getShipmentsByOrderNumber(order.orderNumber);
+          
+          if (shipStationShipments.length > 0) {
+            console.log(`Found ${shipStationShipments.length} shipment(s) in ShipStation for order ${order.orderNumber}`);
+            
+            // Store the first shipment from ShipStation in database
+            // Schema uses z.coerce.date() to automatically convert ISO strings to Date objects
+            const shipmentData = shipStationShipments[0];
+            const storedShipment = await storage.createShipment({
+              orderId: order.id,
+              shipmentId: shipmentData.shipmentId?.toString() || null,
+              trackingNumber: shipmentData.trackingNumber || `UNKNOWN-${Date.now()}`,
+              carrierCode: shipmentData.carrierCode || 'unknown',
+              serviceCode: shipmentData.serviceCode || 'standard',
+              status: shipmentData.voided ? 'cancelled' : 'shipped',
+              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+              shipDate: shipmentData.shipDate || undefined,
+              estimatedDeliveryDate: shipmentData.estimatedDeliveryDate || undefined,
+              actualDeliveryDate: shipmentData.actualDeliveryDate || undefined,
+              labelUrl: null,
+              shipmentData: shipmentData,
+            });
+            
+            shipments = [storedShipment];
+          } else {
+            return res.status(400).json({ 
+              error: "No shipment found for this order. Please create a shipment in ShipStation first." 
+            });
+          }
+        } catch (shipStationError: any) {
+          console.error(`Error fetching from ShipStation:`, shipStationError);
+          return res.status(500).json({ 
+            error: `Could not fetch shipment from ShipStation: ${shipStationError.message}` 
+          });
+        }
       }
 
       const shipment = shipments[0];
