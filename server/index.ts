@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
+import { setupWebSocket } from "./websocket";
 
 const app = express();
 
@@ -70,6 +71,10 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
+
+  // Set up WebSocket server
+  setupWebSocket(server);
+  log("WebSocket server initialized");
 
   // Register Shopify webhooks on startup
   if (process.env.SHOPIFY_SHOP_DOMAIN && 

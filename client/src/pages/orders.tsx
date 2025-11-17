@@ -1,18 +1,104 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, RefreshCw, Package } from "lucide-react";
+import { Search, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
 
 export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectDelay = 30000;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        console.error('WebSocket creation error:', error);
+        toast({
+          title: "Connection error",
+          description: "Please refresh the page and log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        reconnectAttempts = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'order_update') {
+            queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+            toast({
+              title: "Order updated",
+              description: `Order #${data.order.orderNumber} has been updated.`,
+            });
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', event.code, event.reason);
+        
+        if (event.code === 1006 && reconnectAttempts > 3) {
+          console.error('WebSocket failed to connect - auth may have failed');
+          toast({
+            title: "Connection lost",
+            description: "Please refresh the page and log in again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (event.code === 1008 || event.code === 1011) {
+          console.error('WebSocket auth failed - please log in again');
+          toast({
+            title: "Connection lost",
+            description: "Please refresh the page and log in again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+        reconnectAttempts++;
+        reconnectTimeout = setTimeout(connect, delay);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [toast]);
 
   const { data: ordersData, isLoading } = useQuery<{ orders: Order[] }>({
     queryKey: ["/api/orders", searchQuery],
@@ -21,28 +107,6 @@ export default function Orders() {
         ? `/api/orders?q=${encodeURIComponent(searchQuery)}`
         : "/api/orders";
       return fetch(url, { credentials: "include" }).then((res) => res.json());
-    },
-  });
-
-  const syncOrdersMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/orders/sync", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to sync");
-      return res.json();
-    },
-    onSuccess: (data: { count: number }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({
-        title: "Orders synced",
-        description: `Successfully synced ${data.count} orders from Shopify.`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Sync failed",
-        description: "Failed to sync orders from Shopify.",
-        variant: "destructive",
-      });
     },
   });
 
@@ -60,22 +124,11 @@ export default function Orders() {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-serif font-bold text-foreground mb-2">Orders</h1>
-          <p className="text-muted-foreground text-lg">
-            Search and manage warehouse fulfillment
-          </p>
-        </div>
-        <Button
-          data-testid="button-sync-orders"
-          onClick={() => syncOrdersMutation.mutate()}
-          disabled={syncOrdersMutation.isPending}
-          size="lg"
-        >
-          <RefreshCw className={`mr-2 h-5 w-5 ${syncOrdersMutation.isPending ? "animate-spin" : ""}`} />
-          {syncOrdersMutation.isPending ? "Syncing..." : "Sync Orders"}
-        </Button>
+      <div>
+        <h1 className="text-4xl font-serif font-bold text-foreground mb-2">Orders</h1>
+        <p className="text-muted-foreground text-lg">
+          Search and manage warehouse fulfillment • Real-time updates
+        </p>
       </div>
 
       <Card>
@@ -104,21 +157,11 @@ export default function Orders() {
           <CardContent className="py-12 text-center">
             <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">No orders found</h3>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-muted-foreground">
               {searchQuery
                 ? "Try a different search term"
-                : "Sync orders from Shopify to get started"}
+                : "Orders will appear here automatically when they come in from Shopify"}
             </p>
-            {!searchQuery && (
-              <Button
-                data-testid="button-sync-orders-empty"
-                onClick={() => syncOrdersMutation.mutate()}
-                disabled={syncOrdersMutation.isPending}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync Orders
-              </Button>
-            )}
           </CardContent>
         </Card>
       ) : (

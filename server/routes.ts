@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
+import { broadcastOrderUpdate } from "./websocket";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -530,6 +531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createOrder(orderData);
           }
 
+          broadcastOrderUpdate(orderData);
           processedCount++;
         } catch (orderError) {
           console.error("Error processing individual webhook:", orderError);
