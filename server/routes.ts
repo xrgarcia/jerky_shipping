@@ -926,10 +926,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Paginate through all orders in date range
       while (hasNextPage) {
-        let url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=250&status=any&created_at_min=${start.toISOString()}&created_at_max=${end.toISOString()}`;
-        
+        // For pagination, use page_info OR query params, never both
+        let url: string;
         if (pageInfo) {
-          url += `&page_info=${pageInfo}`;
+          // Subsequent pages: only use page_info (Shopify requirement)
+          url = `https://${shopDomain}/admin/api/2024-01/orders.json?page_info=${pageInfo}`;
+        } else {
+          // First page: use query parameters
+          url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=250&status=any&created_at_min=${start.toISOString()}&created_at_max=${end.toISOString()}`;
         }
 
         const response = await fetch(url, {
