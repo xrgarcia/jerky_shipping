@@ -166,7 +166,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
 
   try {
     // Get existing webhooks
-    const listResponse = await fetch('https://ssapi.shipstation.com/webhooks', {
+    const listResponse = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
       method: 'GET',
       headers: {
         'API-Key': apiKey,
@@ -179,27 +179,27 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     }
 
     const webhooks = await listResponse.json();
-    const existingWebhook = webhooks.webhooks?.find((w: any) => 
-      w.target_url === webhookUrl && w.event === 'SHIP_NOTIFY'
+    const existingWebhook = webhooks?.find((w: any) => 
+      w.url === webhookUrl && w.event === 'fulfillment_shipped_v2'
     );
 
     if (existingWebhook) {
-      console.log('ShipStation SHIP_NOTIFY webhook already registered');
+      console.log('ShipStation fulfillment_shipped_v2 webhook already registered');
       return;
     }
 
-    // Register new webhook for SHIP_NOTIFY event
-    const registerResponse = await fetch('https://ssapi.shipstation.com/webhooks/subscribe', {
+    // Register new webhook for fulfillment_shipped_v2 event
+    const registerResponse = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
       method: 'POST',
       headers: {
         'API-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        target_url: webhookUrl,
-        event: 'SHIP_NOTIFY',
+        name: 'Warehouse Fulfillment - Shipments',
+        event: 'fulfillment_shipped_v2',
+        url: webhookUrl,
         store_id: null, // null means all stores
-        friendly_name: 'Warehouse Fulfillment - Shipments',
       }),
     });
 
@@ -208,7 +208,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
       throw new Error(`Failed to register ShipStation webhook: ${registerResponse.statusText} - ${errorText}`);
     }
 
-    console.log('ShipStation SHIP_NOTIFY webhook registered successfully');
+    console.log('ShipStation fulfillment_shipped_v2 webhook registered successfully');
   } catch (error) {
     console.error('Error managing ShipStation webhooks:', error);
     throw error;
