@@ -156,14 +156,14 @@ export function normalizeWebhookUrl(url: string): string {
  */
 export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string): Promise<void> {
   const apiKey = process.env.SHIPSTATION_API_KEY;
-  const apiSecret = process.env.SHIPSTATION_API_KEY;
 
-  if (!apiKey || !apiSecret) {
+  if (!apiKey) {
     throw new Error('ShipStation API credentials not configured');
   }
 
   const baseUrl = normalizeWebhookUrl(webhookBaseUrl);
-  const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+  // ShipStation API uses Basic Auth with API Key as username and empty password
+  const auth = Buffer.from(`${apiKey}:`).toString('base64');
 
   const webhookUrl = `${baseUrl}/api/webhooks/shipstation/shipments`;
 
