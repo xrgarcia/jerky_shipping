@@ -500,6 +500,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual sync endpoint - pulls all shipments from ShipStation for existing orders
+  app.post("/api/shipments/sync", requireAuth, async (req, res) => {
+    try {
+      console.log("========== MANUAL SHIPMENT SYNC STARTED ==========");
+      const orders = await storage.getAllOrders();
+      console.log(`Syncing shipments for ${orders.length} orders...`);
+
+      let syncedCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
+      const errors: string[] = [];
+
+      for (const order of orders) {
+        try {
+          // Fetch shipments from ShipStation for this order
+          const shipStationShipments = await getShipmentsByOrderNumber(order.orderNumber);
+          
+          if (shipStationShipments.length > 0) {
+            console.log(`Found ${shipStationShipments.length} shipment(s) for order ${order.orderNumber}`);
+          }
+
+          for (const shipmentData of shipStationShipments) {
+            const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+            
+            const shipmentRecord = {
+              orderId: order.id,
+              shipmentId: shipmentData.shipmentId?.toString(),
+              trackingNumber: shipmentData.trackingNumber,
+              carrierCode: shipmentData.carrierCode,
+              serviceCode: shipmentData.serviceCode,
+              status: shipmentData.voided ? 'cancelled' : 'shipped',
+              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+              shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+              shipmentData: shipmentData,
+            };
+
+            if (existingShipment) {
+              await storage.updateShipment(existingShipment.id, shipmentRecord);
+              updatedCount++;
+            } else {
+              await storage.createShipment(shipmentRecord);
+              createdCount++;
+            }
+            
+            syncedCount++;
+          }
+        } catch (orderError: any) {
+          const errorMsg = `Order ${order.orderNumber}: ${orderError.message}`;
+          console.error(errorMsg);
+          errors.push(errorMsg);
+        }
+      }
+
+      console.log(`========== SYNC COMPLETE: ${syncedCount} shipments (${createdCount} new, ${updatedCount} updated) ==========`);
+
+      res.json({ 
+        success: true,
+        syncedCount,
+        createdCount,
+        updatedCount,
+        ordersChecked: orders.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error: any) {
+      console.error("Error syncing shipments:", error);
+      res.status(500).json({ error: error.message || "Failed to sync shipments" });
+    }
+  });
+
   // Shopify webhook endpoint - receives order updates and queues them
   app.post("/api/webhooks/shopify/orders", async (req, res) => {
     try {
@@ -537,6 +606,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ShipStation webhook endpoint - receives shipment updates and queues them
   app.post("/api/webhooks/shipstation/shipments", async (req, res) => {
     try {
+      // Debug logging - critical for warehouse operations
+      console.log("========== SHIPSTATION WEBHOOK RECEIVED ==========");
+      console.log("Timestamp:", new Date().toISOString());
+      console.log("Headers:", JSON.stringify({
+        'x-shipengine-rsa-sha256-signature': req.headers['x-shipengine-rsa-sha256-signature'] ? 'present' : 'missing',
+        'x-shipengine-rsa-sha256-key-id': req.headers['x-shipengine-rsa-sha256-key-id'],
+        'x-shipengine-timestamp': req.headers['x-shipengine-timestamp'],
+        'content-type': req.headers['content-type'],
+      }, null, 2));
+      console.log("Body:", JSON.stringify(req.body, null, 2));
+      console.log("==================================================");
+
+      // Verify webhook signature (ShipEngine uses RSA-SHA256)
       const rawBody = req.rawBody as Buffer;
       const isValid = await verifyShipStationWebhook(req, rawBody.toString());
 
@@ -552,6 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedAt: new Date().toISOString(),
       };
 
+      console.log("Queuing webhook:", webhookData);
       await enqueueWebhook(webhookData);
 
       res.status(200).json({ success: true });
