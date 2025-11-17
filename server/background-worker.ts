@@ -53,6 +53,9 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
           const trackingNumber = trackingData.tracking_number;
           
           // Find existing shipment by tracking number
+          // Note: We can only safely match by tracking number. The label_url points to ShipEngine API
+          // which requires separate auth credentials we don't have. Shipments without tracking numbers
+          // will be created/updated by fulfillment_shipped_v2 webhooks which contain complete data.
           const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
           
           if (existingShipment) {
@@ -73,8 +76,8 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
               broadcastOrderUpdate(order);
             }
           } else {
-            // No existing shipment found - it will be created when fulfillment_shipped_v2 webhook arrives
-            console.log(`No existing shipment found for tracking ${trackingNumber} - waiting for fulfillment webhook`);
+            // No existing shipment found - will be created by fulfillment_shipped_v2 webhook
+            console.log(`No shipment found for tracking ${trackingNumber} - will be created by fulfillment webhook`);
           }
         } 
         // Fulfillment webhooks need to fetch full shipment data

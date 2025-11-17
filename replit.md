@@ -70,9 +70,13 @@ Preferred communication style: Simple, everyday language.
 - RSA-SHA256 signature verification using JWKS endpoint (api.shipengine.com/jwks) for webhook security
 - Webhooks received at `/api/webhooks/shipstation/shipments`
 - Order matching: ShipStation's `shipment_number` field contains the Shopify order number and is used to link shipments to orders
-- **Automatic Bootstrap**: Server startup fetches existing shipments via `/v2/shipments` endpoint for first 10 orders
-- **Label Fetching**: Bootstrap attempts to fetch `/v2/labels` for each shipment to retrieve tracking numbers (if available)
-- **Tracking Updates**: Track webhooks use `label_url` to fetch label details, extract `shipment_id`, then update matching shipments with tracking numbers
+- **Automatic Bootstrap**: Server startup fetches existing shipments via `/v2/shipments` endpoint for first 10 orders (5-second timeout per order)
+- **Webhook Architecture**:
+  - `fulfillment_shipped_v2`: Creates/updates shipments with complete data (shipment_id + tracking number + order number)
+  - `track`: Updates existing shipments that already have matching tracking numbers with latest tracking events
+  - Track webhooks cannot create new shipments because they lack order information for safe matching
+  - Shipments without tracking numbers are created by fulfillment webhooks or bootstrap, not track webhooks
+- **Real-Time Notifications**: Order detail page shows toast notifications when shipment tracking is updated via WebSocket broadcasts
 
 **Real-Time Updates**: WebSocket server provides live order updates to connected clients:
 - WebSocket server runs alongside HTTP server on the same port at `/ws`
