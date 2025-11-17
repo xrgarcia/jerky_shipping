@@ -41,7 +41,7 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
     }
 
     try {
-      if (webhookData.type === 'shopify') {
+      if (webhookData.type === 'shopify' || webhookData.type === 'backfill') {
         const shopifyOrder = webhookData.order;
         const orderData = {
           id: shopifyOrder.id.toString(),
@@ -65,6 +65,19 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
           await storage.updateOrder(orderData.id, orderData);
         } else {
           await storage.createOrder(orderData);
+        }
+
+        // Update backfill job progress if this is a backfill webhook
+        if (webhookData.type === 'backfill' && webhookData.jobId) {
+          await storage.incrementBackfillProgress(webhookData.jobId, 1);
+          
+          // Check if job is complete
+          const job = await storage.getBackfillJob(webhookData.jobId);
+          if (job && job.processedOrders + job.failedOrders >= job.totalOrders) {
+            await storage.updateBackfillJob(webhookData.jobId, {
+              status: "completed",
+            });
+          }
         }
 
         broadcastOrderUpdate(orderData);
