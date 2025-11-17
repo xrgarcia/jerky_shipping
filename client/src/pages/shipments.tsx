@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Truck, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Truck, Package, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order } from "@shared/schema";
 
@@ -116,6 +117,31 @@ export default function Shipments() {
 
   const shipments = shipmentsData?.shipments || [];
 
+  const syncShipmentsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/shipments/sync");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to sync shipments");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
+      toast({
+        title: "Shipments synced",
+        description: `Synced ${data.syncedCount} shipments (${data.createdCount} new, ${data.updatedCount} updated)`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to sync shipments",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusBadge = (status: string | null) => {
     if (!status) {
       return <Badge variant="outline">Unknown</Badge>;
@@ -143,16 +169,28 @@ export default function Shipments() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              data-testid="input-search-shipments"
-              type="search"
-              placeholder="Search by tracking number, carrier, order number, or customer name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-14 text-lg"
-            />
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                data-testid="input-search-shipments"
+                type="search"
+                placeholder="Search by tracking number, carrier, order number, or customer name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-14 text-lg"
+              />
+            </div>
+            <Button
+              data-testid="button-sync-shipments"
+              onClick={() => syncShipmentsMutation.mutate()}
+              disabled={syncShipmentsMutation.isPending}
+              size="lg"
+              className="h-14"
+            >
+              <RefreshCw className={`mr-2 h-5 w-5 ${syncShipmentsMutation.isPending ? 'animate-spin' : ''}`} />
+              {syncShipmentsMutation.isPending ? "Syncing..." : "Sync from ShipStation"}
+            </Button>
           </div>
         </CardContent>
       </Card>
