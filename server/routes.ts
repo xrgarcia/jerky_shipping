@@ -336,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const shopifyOrder of shopifyOrders) {
         const orderData = {
           id: shopifyOrder.id.toString(),
-          orderNumber: shopifyOrder.order_number,
+          orderNumber: shopifyOrder.name || shopifyOrder.order_number,
           customerName: shopifyOrder.customer
             ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
             : "Guest",
@@ -402,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             for (const shopifyOrder of matchedOrders) {
               const orderData = {
                 id: shopifyOrder.id.toString(),
-                orderNumber: shopifyOrder.order_number,
+                orderNumber: shopifyOrder.name || shopifyOrder.order_number,
                 customerName: shopifyOrder.customer
                   ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
                   : "Guest",
