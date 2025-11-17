@@ -11,7 +11,6 @@ export function setupWebSocket(server: Server): void {
 
   server.on('upgrade', async (request: IncomingMessage, socket, head) => {
     if (request.url !== '/ws') {
-      socket.destroy();
       return;
     }
 
