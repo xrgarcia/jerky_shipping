@@ -611,7 +611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             for (const shipmentData of shipments) {
               // Find matching order by order number
-              const orderNumber = shipmentData.orderNumber;
+              // ShipStation uses 'shipment_number' field for the order number
+              const orderNumber = shipmentData.shipment_number;
               const order = await storage.getOrderByOrderNumber(orderNumber);
               
               if (order) {

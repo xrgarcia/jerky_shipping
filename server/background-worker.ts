@@ -52,7 +52,8 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         const shipments = shipmentResponse.shipments || [];
 
         for (const shipmentData of shipments) {
-          const orderNumber = shipmentData.orderNumber;
+          // ShipStation uses 'shipment_number' field for the order number
+          const orderNumber = shipmentData.shipment_number;
           const order = await storage.getOrderByOrderNumber(orderNumber);
           
           if (order) {

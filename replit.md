@@ -69,6 +69,7 @@ Preferred communication style: Simple, everyday language.
 - Supported events: `fulfillment_shipped_v2`, `fulfillment_created_v2`, `fulfillment_updated_v2`, `fulfillment_canceled_v2`, `track`, `batch`, and others
 - RSA-SHA256 signature verification using JWKS endpoint for webhook security
 - Webhooks received at `/api/webhooks/shipstation/shipments`
+- Order matching: ShipStation's `shipment_number` field contains the Shopify order number and is used to link shipments to orders
 
 **Real-Time Updates**: WebSocket server provides live order updates to connected clients:
 - WebSocket server runs alongside HTTP server on the same port at `/ws`
