@@ -463,6 +463,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/shipments", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const allShipments = await storage.getAllShipments();
+
+      // Get all orders to join with shipments
+      const allOrders = await storage.getAllOrders();
+      const ordersMap = new Map(allOrders.map(o => [o.id, o]));
+
+      // Enrich shipments with order information
+      const shipmentsWithOrders = allShipments.map(shipment => {
+        const order = ordersMap.get(shipment.orderId);
+        return {
+          ...shipment,
+          order: order || null,
+        };
+      });
+
+      // Filter by query if provided
+      let filteredShipments = shipmentsWithOrders;
+      if (query) {
+        const lowerQuery = query.toLowerCase();
+        filteredShipments = shipmentsWithOrders.filter(s => 
+          s.trackingNumber?.toLowerCase().includes(lowerQuery) ||
+          s.carrierCode?.toLowerCase().includes(lowerQuery) ||
+          s.order?.orderNumber?.toLowerCase().includes(lowerQuery) ||
+          s.order?.customerName?.toLowerCase().includes(lowerQuery)
+        );
+      }
+
+      res.json({ shipments: filteredShipments });
+    } catch (error) {
+      console.error("Error fetching shipments:", error);
+      res.status(500).json({ error: "Failed to fetch shipments" });
+    }
+  });
+
   // Shopify webhook endpoint - receives order updates and queues them
   app.post("/api/webhooks/shopify/orders", async (req, res) => {
     try {
