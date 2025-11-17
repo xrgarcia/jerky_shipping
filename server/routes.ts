@@ -13,9 +13,9 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource } from "./utils/shipstation-api";
+import { fetchShipStationResource, createLabel } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
-import { broadcastOrderUpdate } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -482,6 +482,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching order:", error);
       res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
+  app.post("/api/orders/:id/create-label", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const shipments = await storage.getShipmentsByOrderId(order.id);
+
+      if (shipments.length === 0) {
+        return res.status(400).json({ error: "No shipment found for this order" });
+      }
+
+      const shipment = shipments[0];
+
+      if (!shipment.shipmentId) {
+        return res.status(400).json({ error: "Shipment does not have a ShipStation shipment ID" });
+      }
+
+      const labelData = await createLabel(shipment.shipmentId);
+
+      const labelUrl = labelData.label_download || labelData.pdf_url || labelData.href;
+
+      if (!labelUrl) {
+        return res.status(500).json({ error: "No label URL returned from ShipStation" });
+      }
+
+      await storage.updateShipment(shipment.id, { labelUrl });
+
+      const printJob = await storage.createPrintJob({
+        orderId: order.id,
+        labelUrl,
+        status: "queued",
+      });
+
+      broadcastPrintQueueUpdate({ type: "job_added", job: printJob });
+
+      res.json({ success: true, printJob, labelUrl });
+    } catch (error: any) {
+      console.error("Error creating label:", error);
+      res.status(500).json({ error: error.message || "Failed to create label" });
     }
   });
 
@@ -1162,6 +1207,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error restarting backfill:", error);
       res.status(500).json({ error: "Failed to restart backfill" });
+    }
+  });
+
+  app.get("/api/print-queue", requireAuth, async (req, res) => {
+    try {
+      const jobs = await storage.getActivePrintJobs();
+      res.json({ jobs });
+    } catch (error) {
+      console.error("Error fetching print queue:", error);
+      res.status(500).json({ error: "Failed to fetch print queue" });
+    }
+  });
+
+  app.post("/api/print-queue/:id/printing", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getPrintJob(req.params.id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Print job not found" });
+      }
+
+      if (job.status !== "queued") {
+        return res.status(400).json({ error: "Job is not in queued status" });
+      }
+
+      const updatedJob = await storage.updatePrintJobStatus(req.params.id, "printing");
+      
+      broadcastPrintQueueUpdate({ type: "job_printing", job: updatedJob });
+
+      res.json({ success: true, job: updatedJob });
+    } catch (error) {
+      console.error("Error marking print job as printing:", error);
+      res.status(500).json({ error: "Failed to mark job as printing" });
+    }
+  });
+
+  app.post("/api/print-queue/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getPrintJob(req.params.id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Print job not found" });
+      }
+
+      if (job.status === "printed") {
+        return res.json({ success: true, job });
+      }
+
+      if (job.status !== "printing") {
+        return res.status(400).json({ error: "Job must be in printing status to complete" });
+      }
+
+      const updatedJob = await storage.updatePrintJobStatus(req.params.id, "printed", new Date());
+      
+      broadcastPrintQueueUpdate({ type: "job_completed", job: updatedJob });
+
+      res.json({ success: true, job: updatedJob });
+    } catch (error) {
+      console.error("Error completing print job:", error);
+      res.status(500).json({ error: "Failed to complete print job" });
     }
   });
 

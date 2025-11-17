@@ -78,3 +78,20 @@ export function broadcastOrderUpdate(order: any): void {
     }
   });
 }
+
+export function broadcastPrintQueueUpdate(data: any): void {
+  if (!wss) {
+    return;
+  }
+
+  const message = JSON.stringify({
+    type: 'print_queue_update',
+    data,
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}

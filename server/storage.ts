@@ -25,6 +25,9 @@ import {
   type BackfillJob,
   type InsertBackfillJob,
   backfillJobs,
+  type PrintQueue,
+  type InsertPrintQueue,
+  printQueue,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -87,6 +90,13 @@ export interface IStorage {
   deleteBackfillJob(id: string): Promise<void>;
   incrementBackfillProgress(id: string, incrementBy: number): Promise<void>;
   incrementBackfillFailed(id: string, incrementBy: number): Promise<void>;
+
+  // Print Queue
+  createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
+  updatePrintJobStatus(id: string, status: string, printedAt?: Date): Promise<PrintQueue | undefined>;
+  getPrintJob(id: string): Promise<PrintQueue | undefined>;
+  getActivePrintJobs(): Promise<PrintQueue[]>;
+  deletePrintJob(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -463,6 +473,45 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(backfillJobs.id, id));
+  }
+
+  // Print Queue
+  async createPrintJob(job: InsertPrintQueue): Promise<PrintQueue> {
+    const result = await db.insert(printQueue).values(job).returning();
+    return result[0];
+  }
+
+  async updatePrintJobStatus(id: string, status: string, printedAt?: Date): Promise<PrintQueue | undefined> {
+    const result = await db
+      .update(printQueue)
+      .set({ 
+        status,
+        ...(printedAt && { printedAt })
+      })
+      .where(eq(printQueue.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getPrintJob(id: string): Promise<PrintQueue | undefined> {
+    const result = await db
+      .select()
+      .from(printQueue)
+      .where(eq(printQueue.id, id));
+    return result[0];
+  }
+
+  async getActivePrintJobs(): Promise<PrintQueue[]> {
+    const result = await db
+      .select()
+      .from(printQueue)
+      .where(or(eq(printQueue.status, "queued"), eq(printQueue.status, "printing")))
+      .orderBy(desc(printQueue.queuedAt));
+    return result;
+  }
+
+  async deletePrintJob(id: string): Promise<void> {
+    await db.delete(printQueue).where(eq(printQueue.id, id));
   }
 }
 

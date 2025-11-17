@@ -193,3 +193,21 @@ export const insertBackfillJobSchema = createInsertSchema(backfillJobs).omit({
 
 export type InsertBackfillJob = z.infer<typeof insertBackfillJobSchema>;
 export type BackfillJob = typeof backfillJobs.$inferSelect;
+
+// Print queue table for tracking label printing jobs
+export const printQueue = pgTable("print_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  labelUrl: text("label_url").notNull(), // ShipStation label PDF/ZPL URL
+  status: text("status").notNull().default("queued"), // queued, printing, printed
+  queuedAt: timestamp("queued_at").notNull().defaultNow(),
+  printedAt: timestamp("printed_at"),
+});
+
+export const insertPrintQueueSchema = createInsertSchema(printQueue).omit({
+  id: true,
+  queuedAt: true,
+});
+
+export type InsertPrintQueue = z.infer<typeof insertPrintQueueSchema>;
+export type PrintQueue = typeof printQueue.$inferSelect;

@@ -81,6 +81,36 @@ export async function getLabelsForShipment(shipmentId: string): Promise<any[]> {
 }
 
 /**
+ * Create a label for a shipment
+ * Returns label data including PDF URL
+ */
+export async function createLabel(shipmentId: string): Promise<any> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/labels`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      shipment_id: shipmentId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation label creation failed: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Get shipments by order number with tracking numbers from labels
  * In ShipStation, shipment_number equals order_number
  */
