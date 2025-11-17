@@ -43,23 +43,35 @@ Preferred communication style: Simple, everyday language.
 - **magicLinkTokens**: Time-limited authentication tokens for passwordless login
 - **sessions**: Active user sessions with token-based authentication
 - **orders**: Shopify order data synchronized from the external API (stored as JSONB for flexibility)
+- **products**: Normalized product data from Shopify (id, title, imageUrl, status, timestamps, soft-delete support)
+- **productVariants**: Normalized product variant data (id, productId, sku, barCode, title, price, inventory, soft-delete support)
 
 **Migration Strategy**: Drizzle Kit handles schema migrations with configuration pointing to the shared schema file.
 
 ### External Dependencies
 
-**Shopify Integration**: The application integrates with Shopify's Admin API (version 2024-01) to fetch and synchronize order data. This requires:
+**Shopify Integration**: The application integrates with Shopify's Admin API (version 2024-01) to fetch and synchronize order and product data. This requires:
 - Custom app creation in Shopify admin
-- Admin API access token with read_orders, read_products, read_customers scopes
+- Admin API access token with read_orders, read_products, read_customers, **write_products** scopes
+  - **IMPORTANT**: The `write_products` scope is required to register product webhooks (products/create, products/update, products/delete)
+  - After adding this scope, the Shopify app must be reinstalled to refresh the access token
 - Environment variables: `SHOPIFY_SHOP_DOMAIN`, `SHOPIFY_ADMIN_ACCESS_TOKEN`, `SHOPIFY_API_SECRET`
-- Webhook registration for real-time order updates (orders/create, orders/updated)
+- Webhook registration for real-time updates (orders/create, orders/updated, products/create, products/update, products/delete)
 
-**Webhook Processing**: Real-time order synchronization uses an async queue-based architecture:
-- Shopify webhooks are received at `/api/webhooks/shopify/orders`
+**Webhook Processing**: Real-time synchronization uses an async queue-based architecture:
+- Shopify order webhooks received at `/api/webhooks/shopify/orders`
+- Shopify product webhooks received at `/api/webhooks/shopify/products`
 - HMAC verification ensures webhook authenticity using `SHOPIFY_API_SECRET`
 - Webhook payloads are queued to Upstash Redis for async processing
-- Worker endpoint `/api/worker/process-webhooks` dequeues and processes orders in batches
+- Worker endpoint `/api/worker/process-webhooks` dequeues and processes webhooks in batches
 - Environment-specific Upstash credentials (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) should be unsynced between dev and production
+
+**Product Synchronization**:
+- **Bootstrap**: On server startup, fetches existing products from Shopify Products Admin API (`/admin/api/2024-01/products.json`)
+- **Webhooks**: Real-time updates via products/create, products/update, products/delete webhooks (requires `write_products` scope)
+- **Variant Reconciliation**: When products are updated or deleted, variants are automatically soft-deleted or resurrected to stay in sync
+- **Soft-Delete Architecture**: Products and variants use `deletedAt` timestamps instead of hard deletion for data integrity
+- **Indexed Lookups**: Database indexes on `sku` and `bar_code` enable fast barcode scanning lookups for warehouse fulfillment workflows
 
 **ShipStation Integration**: The application integrates with ShipStation V2 API to track shipments and manage fulfillment:
 - Base URL: `https://api.shipstation.com`

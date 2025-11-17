@@ -119,8 +119,23 @@ export async function ensureWebhooksRegistered(
         console.log(`Webhook already registered: ${required.topic}`);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error ensuring webhooks are registered:', error);
+    
+    // Provide helpful guidance for common errors
+    if (error.message?.includes('products/create') || error.message?.includes('products/update') || error.message?.includes('products/delete')) {
+      console.error('\n⚠️  PRODUCT WEBHOOK REGISTRATION FAILED');
+      console.error('─────────────────────────────────────────');
+      console.error('Product webhooks require the "write_products" scope in your Shopify app.');
+      console.error('\nTo fix this:');
+      console.error('1. Go to your Shopify admin: Apps → [Your App] → Configuration');
+      console.error('2. Add the "write_products" scope under Admin API access scopes');
+      console.error('3. Click "Save" and reinstall the app to refresh the access token');
+      console.error('4. Restart this application to re-register webhooks');
+      console.error('\nUntil then, product data will sync via bootstrap on startup only.');
+      console.error('─────────────────────────────────────────\n');
+    }
+    
     throw error;
   }
 }
