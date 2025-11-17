@@ -31,16 +31,22 @@ const upload = multer({
 const SESSION_COOKIE_NAME = "session_token";
 const SESSION_DURATION_DAYS = 30;
 
-// Shopify API helper
+// Shopify API helpers
+// To set up Shopify integration:
+// 1. Go to your Shopify admin: Settings > Apps and sales channels > Develop apps
+// 2. Create a new custom app with a descriptive name (e.g., "Warehouse Fulfillment")
+// 3. Configure Admin API scopes: read_orders, read_products, read_customers
+// 4. Install the app and reveal the Admin API access token
+// 5. Add these secrets: SHOPIFY_SHOP_DOMAIN (e.g., yourstore.myshopify.com) and SHOPIFY_ADMIN_ACCESS_TOKEN
 async function fetchShopifyOrders(limit: number = 50) {
-  const shopName = process.env.SHOPIFY_SHOP_NAME;
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
-  if (!shopName || !accessToken) {
-    throw new Error("Shopify credentials not configured");
+  if (!shopDomain || !accessToken) {
+    throw new Error("Shopify credentials not configured. Please set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN");
   }
 
-  const url = `https://${shopName}.myshopify.com/admin/api/2024-01/orders.json?limit=${limit}&status=any`;
+  const url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=${limit}&status=any`;
   const response = await fetch(url, {
     headers: {
       "X-Shopify-Access-Token": accessToken,
@@ -49,7 +55,8 @@ async function fetchShopifyOrders(limit: number = 50) {
   });
 
   if (!response.ok) {
-    throw new Error(`Shopify API error: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Shopify API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
@@ -57,14 +64,14 @@ async function fetchShopifyOrders(limit: number = 50) {
 }
 
 async function fetchShopifyOrder(orderId: string) {
-  const shopName = process.env.SHOPIFY_SHOP_NAME;
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
-  if (!shopName || !accessToken) {
-    throw new Error("Shopify credentials not configured");
+  if (!shopDomain || !accessToken) {
+    throw new Error("Shopify credentials not configured. Please set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN");
   }
 
-  const url = `https://${shopName}.myshopify.com/admin/api/2024-01/orders/${orderId}.json`;
+  const url = `https://${shopDomain}/admin/api/2024-01/orders/${orderId}.json`;
   const response = await fetch(url, {
     headers: {
       "X-Shopify-Access-Token": accessToken,
@@ -73,7 +80,8 @@ async function fetchShopifyOrder(orderId: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Shopify API error: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Shopify API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
@@ -318,8 +326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.get("/api/orders/sync", requireAuth, async (req, res) => {
     try {
-      if (!process.env.SHOPIFY_SHOP_NAME || !process.env.SHOPIFY_ACCESS_TOKEN) {
-        return res.status(400).json({ error: "Shopify credentials not configured" });
+      if (!process.env.SHOPIFY_SHOP_DOMAIN || !process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
+        return res.status(400).json({ error: "Shopify credentials not configured. Please set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN" });
       }
 
       const shopifyOrders = await fetchShopifyOrders(100);
