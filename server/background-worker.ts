@@ -47,38 +47,64 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
 
         broadcastOrderUpdate(orderData);
       } else if (webhookData.type === 'shipstation') {
-        const resourceUrl = webhookData.resourceUrl;
-        const shipmentResponse = await fetchShipStationResource(resourceUrl);
-        const shipments = shipmentResponse.shipments || [];
-
-        for (const shipmentData of shipments) {
-          // ShipStation uses 'shipment_number' field for the order number
-          const orderNumber = shipmentData.shipment_number;
-          const order = await storage.getOrderByOrderNumber(orderNumber);
+        // Track webhooks contain tracking data directly in the payload
+        if (webhookData.resourceType === 'API_TRACK' && webhookData.trackingData) {
+          const trackingData = webhookData.trackingData;
+          const trackingNumber = trackingData.tracking_number;
           
-          if (order) {
+          // Find existing shipment by tracking number
+          const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+          
+          if (existingShipment) {
+            // Update shipment with latest tracking data
+            await storage.updateShipment(existingShipment.id, {
+              status: trackingData.status_code || 'unknown',
+              statusDescription: trackingData.carrier_status_description || trackingData.status_description,
+              shipmentData: trackingData,
+            });
             
-            const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
-            
-            const shipmentRecord = {
-              orderId: order.id,
-              shipmentId: shipmentData.shipmentId?.toString(),
-              trackingNumber: shipmentData.trackingNumber,
-              carrierCode: shipmentData.carrierCode,
-              serviceCode: shipmentData.serviceCode,
-              status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-              shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-              shipmentData: shipmentData,
-            };
-
-            if (existingShipment) {
-              await storage.updateShipment(existingShipment.id, shipmentRecord);
-            } else {
-              await storage.createShipment(shipmentRecord);
+            // Broadcast update to connected clients
+            const order = await storage.getOrder(existingShipment.orderId);
+            if (order) {
+              broadcastOrderUpdate(order);
             }
+          }
+          // If shipment doesn't exist, ignore - we need fulfillment_shipped_v2 to create it
+        } 
+        // Fulfillment webhooks need to fetch full shipment data
+        else if (webhookData.resourceType === 'FULFILLMENT_V2') {
+          const resourceUrl = webhookData.resourceUrl;
+          const shipmentResponse = await fetchShipStationResource(resourceUrl);
+          const shipments = shipmentResponse.shipments || [];
 
-            broadcastOrderUpdate(order);
+          for (const shipmentData of shipments) {
+            // ShipStation uses 'shipment_number' field for the order number
+            const orderNumber = shipmentData.shipment_number;
+            const order = await storage.getOrderByOrderNumber(orderNumber);
+            
+            if (order) {
+              const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+              
+              const shipmentRecord = {
+                orderId: order.id,
+                shipmentId: shipmentData.shipmentId?.toString(),
+                trackingNumber: shipmentData.trackingNumber,
+                carrierCode: shipmentData.carrierCode,
+                serviceCode: shipmentData.serviceCode,
+                status: shipmentData.voided ? 'cancelled' : 'shipped',
+                statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+                shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+                shipmentData: shipmentData,
+              };
+
+              if (existingShipment) {
+                await storage.updateShipment(existingShipment.id, shipmentRecord);
+              } else {
+                await storage.createShipment(shipmentRecord);
+              }
+
+              broadcastOrderUpdate(order);
+            }
           }
         }
       }

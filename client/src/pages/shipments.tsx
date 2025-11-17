@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Search, Truck, Package, RefreshCw } from "lucide-react";
+import { Search, Truck, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order } from "@shared/schema";
 
@@ -17,28 +16,6 @@ interface ShipmentWithOrder extends Shipment {
 export default function Shipments() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("/api/shipments/sync", {
-        method: "POST",
-      });
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
-      toast({
-        title: "Sync complete",
-        description: `Synced ${data.syncedCount} shipments (${data.createdCount} new, ${data.updatedCount} updated) from ${data.ordersChecked} orders.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Sync failed",
-        description: error.message || "Failed to sync shipments from ShipStation",
-        variant: "destructive",
-      });
-    },
-  });
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -70,11 +47,11 @@ export default function Shipments() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'order_update') {
+          if (data.type === 'order_update' && data.order) {
             queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
             toast({
-              title: "Shipment updated",
-              description: "Shipment information has been updated.",
+              title: `Order ${data.order.orderNumber} updated`,
+              description: `Shipment tracking information updated for ${data.order.customerName}`,
             });
           }
         } catch (error) {
@@ -166,28 +143,16 @@ export default function Shipments() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                data-testid="input-search-shipments"
-                type="search"
-                placeholder="Search by tracking number, carrier, order number, or customer name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-14 text-lg"
-              />
-            </div>
-            <Button
-              data-testid="button-sync-shipments"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-              size="lg"
-              className="h-14 px-6"
-            >
-              <RefreshCw className={`mr-2 h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              {syncMutation.isPending ? 'Syncing...' : 'Pull from ShipStation'}
-            </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              data-testid="input-search-shipments"
+              type="search"
+              placeholder="Search by tracking number, carrier, order number, or customer name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-14 text-lg"
+            />
           </div>
         </CardContent>
       </Card>
