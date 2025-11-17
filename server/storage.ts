@@ -456,13 +456,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async incrementBackfillProgress(id: string, incrementBy: number): Promise<void> {
+    // Only increment if job is still in_progress (prevents orphaned tasks from updating failed jobs)
     await db
       .update(backfillJobs)
       .set({
         processedOrders: sql`${backfillJobs.processedOrders} + ${incrementBy}`,
         updatedAt: new Date(),
       })
-      .where(eq(backfillJobs.id, id));
+      .where(
+        sql`${backfillJobs.id} = ${id} AND ${backfillJobs.status} = 'in_progress'`
+      );
   }
 
   async incrementBackfillFailed(id: string, incrementBy: number): Promise<void> {

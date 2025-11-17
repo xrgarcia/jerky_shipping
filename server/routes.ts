@@ -902,13 +902,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Update backfill job progress if this is a backfill webhook
-            // Count every order processed (new or updated) because the queue ensures no duplicates per job
+            // incrementBackfillProgress only increments if job.status === 'in_progress' (atomic DB check)
             if (webhookData.type === 'backfill' && webhookData.jobId) {
               await storage.incrementBackfillProgress(webhookData.jobId, 1);
               
               // Check if job is complete (only if totalOrders has been set)
               const job = await storage.getBackfillJob(webhookData.jobId);
-              if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
+              if (job && job.status === 'in_progress' && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
                 await storage.updateBackfillJob(webhookData.jobId, {
                   status: "completed",
                 });
@@ -1085,22 +1085,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Queue each order for processing
-      for (const shopifyOrder of allOrders) {
-        const webhookData = {
-          type: 'backfill',
-          jobId: job.id,
-          order: shopifyOrder,
-          receivedAt: new Date().toISOString(),
-        };
-        await enqueueWebhook(webhookData);
-      }
-
-      // Update job with total count and status
+      // CRITICAL: Set totalOrders FIRST, before queuing orders
+      // This prevents race condition where worker finishes before totalOrders is set
       await storage.updateBackfillJob(job.id, {
         totalOrders: allOrders.length,
         status: "in_progress",
       });
+
+      // Now queue each order for async processing
+      // Wrap in try/catch to rollback if enqueue fails
+      try {
+        for (const shopifyOrder of allOrders) {
+          const webhookData = {
+            type: 'backfill',
+            jobId: job.id,
+            order: shopifyOrder,
+            receivedAt: new Date().toISOString(),
+          };
+          await enqueueWebhook(webhookData);
+        }
+      } catch (enqueueError: any) {
+        // Rollback: reset job completely so it can be retried
+        // Reset counters to prevent processedOrders > totalOrders from orphaned tasks
+        await storage.updateBackfillJob(job.id, {
+          totalOrders: 0,
+          processedOrders: 0,
+          failedOrders: 0,
+          status: "failed",
+          errorMessage: `Failed to queue orders: ${enqueueError.message}`,
+        });
+        console.error("Error queuing orders for backfill:", enqueueError);
+        return res.status(500).json({ error: "Failed to queue orders for processing" });
+      }
 
       res.json({ 
         success: true,
@@ -1237,22 +1253,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Queue each order for processing
-      for (const shopifyOrder of allOrders) {
-        const webhookData = {
-          type: 'backfill',
-          jobId: job.id,
-          order: shopifyOrder,
-          receivedAt: new Date().toISOString(),
-        };
-        await enqueueWebhook(webhookData);
-      }
-
-      // Update job with total count and status
+      // CRITICAL: Set totalOrders FIRST, before queuing orders
+      // This prevents race condition where worker finishes before totalOrders is set
       await storage.updateBackfillJob(job.id, {
         totalOrders: allOrders.length,
         status: "in_progress",
       });
+
+      // Now queue each order for async processing
+      // Wrap in try/catch to rollback if enqueue fails
+      try {
+        for (const shopifyOrder of allOrders) {
+          const webhookData = {
+            type: 'backfill',
+            jobId: job.id,
+            order: shopifyOrder,
+            receivedAt: new Date().toISOString(),
+          };
+          await enqueueWebhook(webhookData);
+        }
+      } catch (enqueueError: any) {
+        // Rollback: reset job completely so it can be retried
+        // Reset counters to prevent processedOrders > totalOrders from orphaned tasks
+        await storage.updateBackfillJob(job.id, {
+          totalOrders: 0,
+          processedOrders: 0,
+          failedOrders: 0,
+          status: "failed",
+          errorMessage: `Failed to queue orders: ${enqueueError.message}`,
+        });
+        console.error("Error queuing orders for backfill restart:", enqueueError);
+        return res.status(500).json({ error: "Failed to queue orders for processing" });
+      }
 
       res.json({ 
         success: true,
