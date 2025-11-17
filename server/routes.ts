@@ -43,6 +43,28 @@ const SESSION_DURATION_DAYS = 30;
 // 3. Configure Admin API scopes: read_orders, read_products, read_customers
 // 4. Install the app and reveal the Admin API access token
 // 5. Add these secrets: SHOPIFY_SHOP_DOMAIN (e.g., yourstore.myshopify.com) and SHOPIFY_ADMIN_ACCESS_TOKEN
+/**
+ * Extract all price fields from a Shopify order object
+ * Helper to ensure consistent price field extraction across all data entry points
+ */
+function extractShopifyOrderPrices(shopifyOrder: any) {
+  return {
+    totalPrice: shopifyOrder.total_price || null, // Legacy field for backwards compatibility
+    orderTotal: shopifyOrder.total_price || null,
+    subtotalPrice: shopifyOrder.subtotal_price || null,
+    currentTotalPrice: shopifyOrder.current_total_price || null,
+    currentSubtotalPrice: shopifyOrder.current_subtotal_price || null,
+    shippingTotal: shopifyOrder.total_shipping_price_set?.shop_money?.amount || null,
+    totalDiscounts: shopifyOrder.total_discounts || null,
+    currentTotalDiscounts: shopifyOrder.current_total_discounts || null,
+    totalTax: shopifyOrder.total_tax || null,
+    currentTotalTax: shopifyOrder.current_total_tax || null,
+    totalAdditionalFees: shopifyOrder.total_additional_fees_set?.shop_money?.amount || null,
+    currentTotalAdditionalFees: shopifyOrder.current_total_additional_fees_set?.shop_money?.amount || null,
+    totalOutstanding: shopifyOrder.total_outstanding || null,
+  };
+}
+
 async function fetchShopifyOrders(limit: number = 50) {
   const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
   const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -351,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lineItems: shopifyOrder.line_items || [],
           fulfillmentStatus: shopifyOrder.fulfillment_status,
           financialStatus: shopifyOrder.financial_status,
-          totalPrice: shopifyOrder.total_price,
+          ...extractShopifyOrderPrices(shopifyOrder),
           createdAt: new Date(shopifyOrder.created_at),
           updatedAt: new Date(shopifyOrder.updated_at),
         };
@@ -417,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 lineItems: shopifyOrder.line_items || [],
                 fulfillmentStatus: shopifyOrder.fulfillment_status,
                 financialStatus: shopifyOrder.financial_status,
-                totalPrice: shopifyOrder.total_price,
+                ...extractShopifyOrderPrices(shopifyOrder),
                 createdAt: new Date(shopifyOrder.created_at),
                 updatedAt: new Date(shopifyOrder.updated_at),
               };

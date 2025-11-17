@@ -5,6 +5,28 @@ import { broadcastOrderUpdate } from "./websocket";
 import { log } from "./vite";
 
 /**
+ * Extract all price fields from a Shopify order object
+ * Helper to ensure consistent price field extraction across all data entry points
+ */
+function extractShopifyOrderPrices(shopifyOrder: any) {
+  return {
+    totalPrice: shopifyOrder.total_price || null, // Legacy field for backwards compatibility
+    orderTotal: shopifyOrder.total_price || null,
+    subtotalPrice: shopifyOrder.subtotal_price || null,
+    currentTotalPrice: shopifyOrder.current_total_price || null,
+    currentSubtotalPrice: shopifyOrder.current_subtotal_price || null,
+    shippingTotal: shopifyOrder.total_shipping_price_set?.shop_money?.amount || null,
+    totalDiscounts: shopifyOrder.total_discounts || null,
+    currentTotalDiscounts: shopifyOrder.current_total_discounts || null,
+    totalTax: shopifyOrder.total_tax || null,
+    currentTotalTax: shopifyOrder.current_total_tax || null,
+    totalAdditionalFees: shopifyOrder.total_additional_fees_set?.shop_money?.amount || null,
+    currentTotalAdditionalFees: shopifyOrder.current_total_additional_fees_set?.shop_money?.amount || null,
+    totalOutstanding: shopifyOrder.total_outstanding || null,
+  };
+}
+
+/**
  * Process a single batch of webhooks from the queue
  * Returns the number of webhooks processed
  */
@@ -33,7 +55,7 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
           lineItems: shopifyOrder.line_items || [],
           fulfillmentStatus: shopifyOrder.fulfillment_status,
           financialStatus: shopifyOrder.financial_status,
-          totalPrice: shopifyOrder.total_price,
+          ...extractShopifyOrderPrices(shopifyOrder),
           createdAt: new Date(shopifyOrder.created_at),
           updatedAt: new Date(shopifyOrder.updated_at),
         };
