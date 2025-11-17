@@ -13,49 +13,7 @@ import OrderDetail from "@/pages/order-detail";
 import Profile from "@/pages/profile";
 import type { User } from "@shared/schema";
 
-function AuthenticatedApp() {
-  const { data: userData, isLoading } = useQuery<{ user: User }>({
-    queryKey: ["/api/auth/me"],
-    retry: false,
-  });
-
-  const [location] = useLocation();
-  const isPublicRoute = location === "/login" || location.startsWith("/auth/verify");
-
-  if (isLoading && !isPublicRoute) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
-
-  const isAuthenticated = !!userData?.user;
-
-  if (!isAuthenticated && !isPublicRoute) {
-    return <Redirect to="/login" />;
-  }
-
-  if (isAuthenticated && location === "/login") {
-    return <Redirect to="/orders" />;
-  }
-
-  return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route path="/auth/verify" component={VerifyMagicLink} />
-      <Route path="/">
-        <Redirect to="/orders" />
-      </Route>
-      <Route path="/orders" component={Orders} />
-      <Route path="/orders/:id" component={OrderDetail} />
-      <Route path="/profile" component={Profile} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
-function AppLayout() {
+function AppContent() {
   const { data: userData, isLoading } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
     retry: false,
@@ -70,8 +28,38 @@ function AppLayout() {
     "--sidebar-width-icon": "4rem",
   };
 
-  if (isPublicRoute || (!isLoading && !isAuthenticated)) {
-    return <AuthenticatedApp />;
+  if (isLoading && !isPublicRoute) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return <Redirect to="/login" />;
+  }
+
+  if (isAuthenticated && location === "/login") {
+    return <Redirect to="/orders" />;
+  }
+
+  const router = (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/auth/verify" component={VerifyMagicLink} />
+      <Route path="/">
+        <Redirect to="/orders" />
+      </Route>
+      <Route path="/orders" component={Orders} />
+      <Route path="/orders/:id" component={OrderDetail} />
+      <Route path="/profile" component={Profile} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+
+  if (isPublicRoute) {
+    return router;
   }
 
   return (
@@ -83,7 +71,7 @@ function AppLayout() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
           <main className="flex-1 overflow-y-auto">
-            <AuthenticatedApp />
+            {router}
           </main>
         </div>
       </div>
@@ -95,7 +83,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppLayout />
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
