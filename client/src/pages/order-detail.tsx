@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/command";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Order, Shipment } from "@shared/schema";
 
 interface LineItem {
@@ -62,8 +62,50 @@ export default function OrderDetail() {
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allOrders.length - 1;
 
-  const handlePrint = () => {
+  const handlePrintPackingSlip = () => {
     window.print();
+  };
+
+  const createLabelMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await apiRequest("POST", `/api/orders/${orderId}/create-label`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create label");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
+      toast({
+        title: "Label created",
+        description: "Shipping label added to print queue. Check the bottom of the Orders page.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create label",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateLabel = () => {
+    if (!orderId) return;
+    
+    if (shipments.length === 0) {
+      toast({
+        title: "Cannot create label",
+        description: "No shipment found for this order.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createLabelMutation.mutate(orderId);
   };
 
   const handlePrevious = () => {
@@ -278,16 +320,17 @@ export default function OrderDetail() {
           <div className="flex gap-2">
             <Button
               data-testid="button-print-label"
-              onClick={handlePrint}
+              onClick={handleCreateLabel}
               variant="outline"
               size="lg"
+              disabled={createLabelMutation.isPending || shipments.length === 0}
             >
               <FileText className="mr-2 h-5 w-5" />
-              Print Label
+              {createLabelMutation.isPending ? "Creating..." : "Create Shipping Label"}
             </Button>
             <Button
               data-testid="button-print-packing-slip"
-              onClick={handlePrint}
+              onClick={handlePrintPackingSlip}
               size="lg"
             >
               <Printer className="mr-2 h-5 w-5" />
