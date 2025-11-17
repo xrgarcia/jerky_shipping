@@ -14,6 +14,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,6 +56,7 @@ type BackfillJob = {
 
 export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -92,6 +103,7 @@ export default function BackfillPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
+      setJobToDelete(null);
       toast({
         title: "Job deleted",
         description: "Backfill job has been deleted successfully.",
@@ -118,10 +130,14 @@ export default function BackfillPage() {
     startBackfillMutation.mutate(data);
   };
 
-  const handleDelete = (e: React.MouseEvent, jobId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this backfill job?")) {
-      deleteJobMutation.mutate(jobId);
+    setJobToDelete(jobId);
+  };
+
+  const confirmDelete = () => {
+    if (jobToDelete) {
+      deleteJobMutation.mutate(jobToDelete);
     }
   };
 
@@ -381,7 +397,7 @@ export default function BackfillPage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={(e) => handleDelete(e, job.id)}
+                          onClick={(e) => handleDeleteClick(e, job.id)}
                           disabled={deleteJobMutation.isPending}
                           data-testid={`button-delete-${job.id}`}
                           title="Delete job"
@@ -397,6 +413,27 @@ export default function BackfillPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => !open && setJobToDelete(null)}>
+        <AlertDialogContent data-testid="dialog-delete-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Backfill Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this backfill job? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
