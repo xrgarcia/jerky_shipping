@@ -795,6 +795,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
 
             const existing = await storage.getOrder(orderData.id);
+            const isNewOrder = !existing;
+            
             if (existing) {
               await storage.updateOrder(orderData.id, orderData);
             } else {
@@ -802,7 +804,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Update backfill job progress if this is a backfill webhook
-            if (webhookData.type === 'backfill' && webhookData.jobId) {
+            // Only increment for new orders to avoid counting duplicates
+            if (webhookData.type === 'backfill' && webhookData.jobId && isNewOrder) {
               await storage.incrementBackfillProgress(webhookData.jobId, 1);
               
               // Check if job is complete (only if totalOrders has been set)
