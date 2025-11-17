@@ -40,10 +40,10 @@ export async function fetchShipStationResource(resourceUrl: string): Promise<any
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  // ShipStation V2 API uses API-Key header
+  // ShipStation V2 API uses api-key header (lowercase)
   const response = await fetch(resourceUrl, {
     headers: {
-      'API-Key': SHIPSTATION_API_KEY,
+      'api-key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -64,29 +64,45 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Sh
   return data.shipments || [];
 }
 
+// ShipStation V2 webhook event types
+export type ShipStationWebhookEvent = 
+  | 'batch'
+  | 'carrier_connected'
+  | 'order_source_refresh_complete'
+  | 'rate'
+  | 'report_complete'
+  | 'sales_orders_imported'
+  | 'track'
+  | 'batch_processed_v2'
+  | 'fulfillment_rejected_v2'
+  | 'fulfillment_shipped_v2'
+  | 'fulfillment_created_v2'
+  | 'fulfillment_canceled_v2'
+  | 'fulfillment_updated_v2';
+
 /**
- * Subscribe to ShipStation webhook
+ * Subscribe to ShipStation webhook (V2 API)
  */
 export async function subscribeToWebhook(
   targetUrl: string,
-  event: 'ORDER_NOTIFY' | 'SHIP_NOTIFY' | 'ITEM_ORDER_NOTIFY' | 'ITEM_SHIP_NOTIFY',
+  event: ShipStationWebhookEvent,
   friendlyName: string
 ): Promise<any> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks/subscribe`, {
+  const response = await fetch(`${SHIPSTATION_API_BASE}/v2/environment/webhooks`, {
     method: 'POST',
     headers: {
-      'API-Key': SHIPSTATION_API_KEY,
+      'api-key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      target_url: targetUrl,
+      name: friendlyName,
       event,
+      url: targetUrl,
       store_id: null, // null = all stores
-      friendly_name: friendlyName,
     }),
   });
 
@@ -106,9 +122,9 @@ export async function listWebhooks(): Promise<any[]> {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks`, {
+  const response = await fetch(`${SHIPSTATION_API_BASE}/v2/environment/webhooks`, {
     headers: {
-      'API-Key': SHIPSTATION_API_KEY,
+      'api-key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -117,8 +133,9 @@ export async function listWebhooks(): Promise<any[]> {
     throw new Error(`Failed to list ShipStation webhooks: ${response.status}`);
   }
 
+  // V2 API returns array directly, not wrapped in {webhooks: [...]}
   const data = await response.json();
-  return data.webhooks || [];
+  return Array.isArray(data) ? data : [];
 }
 
 /**
@@ -129,10 +146,10 @@ export async function unsubscribeWebhook(webhookId: string): Promise<void> {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const response = await fetch(`${SHIPSTATION_API_BASE}/webhooks/${webhookId}`, {
+  const response = await fetch(`${SHIPSTATION_API_BASE}/v2/environment/webhooks/${webhookId}`, {
     method: 'DELETE',
     headers: {
-      'API-Key': SHIPSTATION_API_KEY,
+      'api-key': SHIPSTATION_API_KEY,
     },
   });
 

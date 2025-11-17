@@ -169,7 +169,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     const listResponse = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
       method: 'GET',
       headers: {
-        'API-Key': apiKey,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
     });
@@ -192,7 +192,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     const registerResponse = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
       method: 'POST',
       headers: {
-        'API-Key': apiKey,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
