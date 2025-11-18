@@ -73,6 +73,11 @@ export default function BackfillPage() {
     refetchInterval: 2000,
   });
 
+  const { data: queueStatusData } = useQuery<{ queueLength: number }>({
+    queryKey: ["/api/webhooks/queue-status"],
+    refetchInterval: 2000,
+  });
+
   const { data: selectedJobData } = useQuery<{ job: BackfillJob }>({
     queryKey: ["/api/backfill/jobs", selectedJobId],
     enabled: !!selectedJobId,
@@ -160,6 +165,7 @@ export default function BackfillPage() {
     },
     onSuccess: (data: any) => {
       setShowPurgeDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/webhooks/queue-status"] });
       toast({
         title: "Queue purged",
         description: `Cleared ${data.clearedCount} items from the queue.`,
@@ -225,15 +231,23 @@ export default function BackfillPage() {
             Import historical orders from Shopify by date range
           </p>
         </div>
-        <Button
-          variant="destructive"
-          size="default"
-          onClick={() => setShowPurgeDialog(true)}
-          data-testid="button-purge-queue"
-        >
-          <Database className="mr-2 h-4 w-4" />
-          Purge Queue
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">Queue Items</div>
+            <div className="text-2xl font-bold" data-testid="text-queue-length">
+              {queueStatusData?.queueLength?.toLocaleString() ?? '...'}
+            </div>
+          </div>
+          <Button
+            variant="destructive"
+            size="default"
+            onClick={() => setShowPurgeDialog(true)}
+            data-testid="button-purge-queue"
+          >
+            <Database className="mr-2 h-4 w-4" />
+            Purge Queue
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
