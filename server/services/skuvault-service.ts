@@ -76,6 +76,7 @@ class TokenCache {
 export class SkuVaultService {
   private config: SkuVaultConfig;
   private client: AxiosInstance;
+  private cookieJar: CookieJar;
   private tokenCache: TokenCache;
   private isAuthenticated: boolean = false;
   private initPromise: Promise<void> | null = null;
@@ -90,11 +91,11 @@ export class SkuVaultService {
     };
 
     // Create cookie jar for maintaining session cookies
-    const jar = new CookieJar();
+    this.cookieJar = new CookieJar();
 
     // Initialize HTTP client with cookie jar and base headers
     this.client = wrapper(axios.create({
-      jar,
+      jar: this.cookieJar,
       timeout: 30000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -216,28 +217,34 @@ export class SkuVaultService {
         // Still try to extract cookies in case the indicators are wrong
       }
 
-      // Step 3: Extract sv-t cookie from response
-      const cookies = loginResponse.headers['set-cookie'] || [];
+      // Step 3: Extract sv-t cookie from CookieJar (not response headers)
+      // axios-cookiejar-support stores cookies in the jar and removes them from headers
       let authToken: string | null = null;
-
-      for (const cookie of cookies) {
-        if (cookie.startsWith('sv-t=')) {
-          const tokenValue = cookie.split('=')[1].split(';')[0];
-          
-          // Validate token is long enough (should be > 100 chars)
-          if (tokenValue && tokenValue.length > 100) {
-            authToken = tokenValue;
-            console.log(`[SkuVault] Extracted sv-t token (${tokenValue.length} chars)`);
-            break;
-          } else {
-            console.warn(`[SkuVault] sv-t cookie found but too short (${tokenValue.length} chars)`);
+      
+      try {
+        const cookies = await this.cookieJar.getCookies(this.config.loginUrl);
+        console.log(`[SkuVault] Found ${cookies.length} cookies in jar`);
+        
+        for (const cookie of cookies) {
+          if (cookie.key === 'sv-t') {
+            const tokenValue = cookie.value;
+            
+            // Validate token is long enough (should be > 100 chars)
+            if (tokenValue && tokenValue.length > 100) {
+              authToken = tokenValue;
+              console.log(`[SkuVault] Extracted sv-t token from jar (${tokenValue.length} chars)`);
+              break;
+            } else {
+              console.warn(`[SkuVault] sv-t cookie found but too short (${tokenValue.length} chars)`);
+            }
           }
         }
+      } catch (jarError) {
+        console.error('[SkuVault] Error reading from cookie jar:', jarError);
       }
 
       if (!authToken) {
-        console.error('[SkuVault] Failed to extract sv-t cookie from login response');
-        console.error('[SkuVault] Received cookies:', cookies.map(c => c.split(';')[0]));
+        console.error('[SkuVault] Failed to extract sv-t cookie from cookie jar');
         
         // Check response body for error messages
         const responseText = typeof loginResponse.data === 'string' 
