@@ -21,6 +21,7 @@ export default function Orders() {
     let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
     let reconnectAttempts = 0;
+    let isMounted = true;
     const maxReconnectDelay = 30000;
 
     const connect = () => {
@@ -31,11 +32,13 @@ export default function Orders() {
         ws = new WebSocket(wsUrl);
       } catch (error) {
         console.error('WebSocket creation error:', error);
-        toast({
-          title: "Connection error",
-          description: "Please refresh the page and log in again.",
-          variant: "destructive",
-        });
+        if (isMounted) {
+          toast({
+            title: "Connection error",
+            description: "Please refresh the page and log in again.",
+            variant: "destructive",
+          });
+        }
         return;
       }
 
@@ -49,10 +52,12 @@ export default function Orders() {
           const data = JSON.parse(event.data);
           if (data.type === 'order_update') {
             queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-            toast({
-              title: "Order updated",
-              description: `Order #${data.order.orderNumber} has been updated.`,
-            });
+            if (isMounted) {
+              toast({
+                title: "Order updated",
+                description: `Order #${data.order.orderNumber} has been updated.`,
+              });
+            }
           } else if (data.type === 'print_queue_update') {
             queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
           }
@@ -70,33 +75,40 @@ export default function Orders() {
         
         if (event.code === 1006 && reconnectAttempts > 3) {
           console.error('WebSocket failed to connect - auth may have failed');
-          toast({
-            title: "Connection lost",
-            description: "Please refresh the page and log in again.",
-            variant: "destructive",
-          });
+          if (isMounted) {
+            toast({
+              title: "Connection lost",
+              description: "Please refresh the page and log in again.",
+              variant: "destructive",
+            });
+          }
           return;
         }
         
         if (event.code === 1008 || event.code === 1011) {
           console.error('WebSocket auth failed - please log in again');
-          toast({
-            title: "Connection lost",
-            description: "Please refresh the page and log in again.",
-            variant: "destructive",
-          });
+          if (isMounted) {
+            toast({
+              title: "Connection lost",
+              description: "Please refresh the page and log in again.",
+              variant: "destructive",
+            });
+          }
           return;
         }
         
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
-        reconnectAttempts++;
-        reconnectTimeout = setTimeout(connect, delay);
+        if (isMounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(connect, delay);
+        }
       };
     };
 
     connect();
 
     return () => {
+      isMounted = false;
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
