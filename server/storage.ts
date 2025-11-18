@@ -93,6 +93,7 @@ export interface IStorage {
 
   // Print Queue
   createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
+  updatePrintJob(id: string, updates: Partial<InsertPrintQueue>): Promise<PrintQueue | undefined>;
   updatePrintJobStatus(id: string, status: string, printedAt?: Date): Promise<PrintQueue | undefined>;
   getPrintJob(id: string): Promise<PrintQueue | undefined>;
   getActivePrintJobs(): Promise<PrintQueue[]>;
@@ -481,6 +482,15 @@ export class DatabaseStorage implements IStorage {
   // Print Queue
   async createPrintJob(job: InsertPrintQueue): Promise<PrintQueue> {
     const result = await db.insert(printQueue).values(job).returning();
+    return result[0];
+  }
+
+  async updatePrintJob(id: string, updates: Partial<InsertPrintQueue>): Promise<PrintQueue | undefined> {
+    const result = await db
+      .update(printQueue)
+      .set(updates)
+      .where(eq(printQueue.id, id))
+      .returning();
     return result[0];
   }
 
