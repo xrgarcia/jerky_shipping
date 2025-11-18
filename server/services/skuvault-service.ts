@@ -32,6 +32,21 @@ interface SkuVaultConfig {
 }
 
 /**
+ * Custom error class for SkuVault API errors
+ * Preserves detailed error messages from SkuVault for display in UI
+ */
+export class SkuVaultError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 401,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'SkuVaultError';
+  }
+}
+
+/**
  * Redis-based token cache for SkuVault session token
  * Stores sv-t cookie value with 24-hour TTL for persistence across server restarts
  */
