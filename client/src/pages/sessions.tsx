@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle } from "lucide-react";
+import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ParsedSession } from "@shared/skuvault-types";
 import { SessionState } from "@shared/skuvault-types";
@@ -27,6 +27,12 @@ interface ErrorDetails {
 
 interface SessionsResponse {
   sessions: ParsedSession[];
+}
+
+interface LockoutStatus {
+  isLockedOut: boolean;
+  remainingSeconds: number;
+  endTime: number | null;
 }
 
 // Status color mapping
@@ -86,6 +92,13 @@ const formatDate = (dateString: string | null): string => {
   }
 };
 
+// Format countdown time
+const formatCountdown = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
+
 export default function Sessions() {
   const { toast } = useToast();
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
@@ -94,6 +107,15 @@ export default function Sessions() {
     queryKey: ["/api/skuvault/sessions"],
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // Query lockout status every second
+  const { data: lockoutData } = useQuery<LockoutStatus>({
+    queryKey: ["/api/skuvault/lockout-status"],
+    refetchInterval: 1000, // Refetch every second for countdown
+  });
+
+  const isLockedOut = lockoutData?.isLockedOut || false;
+  const remainingSeconds = lockoutData?.remainingSeconds || 0;
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -200,23 +222,30 @@ export default function Sessions() {
               <p className="text-destructive">
                 Failed to load SkuVault sessions. Please check your connection and credentials.
               </p>
-              <Button 
-                onClick={() => loginMutation.mutate()}
-                disabled={loginMutation.isPending}
-                data-testid="button-connect-skuvault"
-              >
-                {loginMutation.isPending ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Connect to SkuVault
-                  </>
-                )}
-              </Button>
+              {isLockedOut ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>Locked out. Retry in {formatCountdown(remainingSeconds)}</span>
+                </div>
+              ) : (
+                <Button 
+                  onClick={() => loginMutation.mutate()}
+                  disabled={loginMutation.isPending || isLockedOut}
+                  data-testid="button-connect-skuvault"
+                >
+                  {loginMutation.isPending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Connect to SkuVault
+                    </>
+                  )}
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -233,25 +262,34 @@ export default function Sessions() {
             <h1 className="text-4xl font-bold font-serif">SkuVault Sessions</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => loginMutation.mutate()}
-              disabled={loginMutation.isPending}
-              variant="outline"
-              size="sm"
-              data-testid="button-reconnect-skuvault"
-            >
-              {loginMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Reconnect
-                </>
-              )}
-            </Button>
+            {isLockedOut ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md" data-testid="lockout-countdown">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Retry in {formatCountdown(remainingSeconds)}
+                </span>
+              </div>
+            ) : (
+              <Button 
+                onClick={() => loginMutation.mutate()}
+                disabled={loginMutation.isPending || isLockedOut}
+                variant="outline"
+                size="sm"
+                data-testid="button-reconnect-skuvault"
+              >
+                {loginMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reconnect
+                  </>
+                )}
+              </Button>
+            )}
             <Badge variant="secondary" className="text-sm" data-testid="badge-session-count">
               {sessions.length} session{sessions.length !== 1 ? 's' : ''}
             </Badge>

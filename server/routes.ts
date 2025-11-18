@@ -854,6 +854,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get SkuVault lockout status
+  app.get("/api/skuvault/lockout-status", requireAuth, async (req, res) => {
+    try {
+      const lockoutStatus = await skuVaultService.getLockoutStatus();
+      res.json(lockoutStatus);
+    } catch (error: any) {
+      console.error("Error fetching SkuVault lockout status:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch lockout status",
+        message: error.message 
+      });
+    }
+  });
+
   // Get all SkuVault wave picking sessions
   app.get("/api/skuvault/sessions", requireAuth, async (req, res) => {
     try {

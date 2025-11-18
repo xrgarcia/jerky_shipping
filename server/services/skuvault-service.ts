@@ -62,6 +62,105 @@ class TokenCache {
 }
 
 /**
+ * Redis-based lockout cache for SkuVault account lockouts
+ * Stores lockout end timestamp when account is temporarily locked
+ */
+class LockoutCache {
+  private readonly REDIS_KEY = 'skuvault:lockout:endtime';
+
+  async setLockout(durationMinutes: number): Promise<void> {
+    const redis = getRedisClient();
+    const endTime = Date.now() + (durationMinutes * 60 * 1000);
+    const ttlSeconds = durationMinutes * 60;
+    
+    await redis.set(this.REDIS_KEY, endTime.toString(), { ex: ttlSeconds });
+    console.log(`[SkuVault] Lockout set for ${durationMinutes} minutes (until ${new Date(endTime).toISOString()})`);
+  }
+
+  async getLockoutEndTime(): Promise<number | null> {
+    const redis = getRedisClient();
+    const endTimeStr = await redis.get<string>(this.REDIS_KEY);
+    if (!endTimeStr) return null;
+    
+    const endTime = parseInt(endTimeStr, 10);
+    // If lockout has expired, return null
+    if (endTime <= Date.now()) {
+      await this.clear();
+      return null;
+    }
+    
+    return endTime;
+  }
+
+  async getRemainingSeconds(): Promise<number> {
+    const endTime = await this.getLockoutEndTime();
+    if (!endTime) return 0;
+    
+    const remaining = Math.ceil((endTime - Date.now()) / 1000);
+    return Math.max(0, remaining);
+  }
+
+  async isLockedOut(): Promise<boolean> {
+    const endTime = await this.getLockoutEndTime();
+    return endTime !== null && endTime > Date.now();
+  }
+
+  async clear(): Promise<void> {
+    const redis = getRedisClient();
+    await redis.del(this.REDIS_KEY);
+  }
+}
+
+/**
+ * Parse SkuVault error message to detect and extract lockout duration
+ * Returns duration in minutes, or null if no lockout detected
+ */
+function parseLockoutDuration(errorText: string): number | null {
+  // Regex pattern to match both "minutes", "minute", and "minute(s)"
+  const minutePattern = /minute(?:s|\(s\))?/i;
+  
+  // Try various patterns to extract the lockout duration
+  
+  // Pattern 1: "locked for the next X minutes/minute(s)"
+  let match = errorText.match(new RegExp(`locked.*?next\\s+(\\d+)\\s+${minutePattern.source}`, 'i'));
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  
+  // Pattern 2: "locked for X minutes/minute(s)" (without "next")
+  match = errorText.match(new RegExp(`locked.*?for\\s+(\\d+)\\s+${minutePattern.source}`, 'i'));
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  
+  // Pattern 3: "try again in X minutes/minute(s)"
+  match = errorText.match(new RegExp(`try\\s+again.*?in\\s+(\\d+)\\s+${minutePattern.source}`, 'i'));
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  
+  // Pattern 4: "wait X minutes/minute(s)"
+  match = errorText.match(new RegExp(`wait\\s+(\\d+)\\s+${minutePattern.source}`, 'i'));
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  
+  // Pattern 5: "locked out for X minute(s)"
+  match = errorText.match(new RegExp(`locked\\s+out.*?for\\s+(\\d+)\\s+${minutePattern.source}`, 'i'));
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  
+  // Fallback: Look for "temporarily locked" or "account is locked" without explicit duration
+  if (errorText.match(/temporarily\s+locked/i) || errorText.match(/account\s+(is\s+)?locked/i)) {
+    console.log('[SkuVault] Generic lockout message detected, assuming 30 minutes');
+    return 30;
+  }
+  
+  return null;
+}
+
+/**
  * SkuVault Web Service
  * 
  * Provides methods to interact with SkuVault's web API including:
@@ -74,6 +173,7 @@ export class SkuVaultService {
   private client: AxiosInstance;
   private cookieJar: CookieJar;
   private tokenCache: TokenCache;
+  private lockoutCache: LockoutCache;
   private isAuthenticated: boolean = false;
 
   constructor() {
@@ -105,6 +205,7 @@ export class SkuVaultService {
     }));
 
     this.tokenCache = new TokenCache();
+    this.lockoutCache = new LockoutCache();
   }
 
   /**
@@ -236,11 +337,23 @@ export class SkuVaultService {
         const validationMatch = responseText.match(/class="validation-summary-errors"[^>]*>(.*?)<\/div>/s);
         const fieldErrorMatch = responseText.match(/class="field-validation-error"[^>]*>(.*?)<\/span>/);
         
+        let errorMessage = '';
+        
         if (validationMatch) {
-          console.error('[SkuVault] Validation error found:', validationMatch[1].replace(/<[^>]*>/g, '').trim().substring(0, 200));
+          errorMessage = validationMatch[1].replace(/<[^>]*>/g, '').trim();
+          console.error('[SkuVault] Validation error found:', errorMessage.substring(0, 200));
         }
         if (fieldErrorMatch) {
-          console.error('[SkuVault] Field validation error:', fieldErrorMatch[1].replace(/<[^>]*>/g, '').trim());
+          const fieldError = fieldErrorMatch[1].replace(/<[^>]*>/g, '').trim();
+          errorMessage = errorMessage || fieldError;
+          console.error('[SkuVault] Field validation error:', fieldError);
+        }
+        
+        // Check for lockout and parse duration
+        const lockoutDuration = parseLockoutDuration(errorMessage || responseText);
+        if (lockoutDuration) {
+          await this.lockoutCache.setLockout(lockoutDuration);
+          console.log(`[SkuVault] Account locked out for ${lockoutDuration} minutes`);
         }
         
         // Check for generic error keywords
@@ -421,6 +534,26 @@ export class SkuVaultService {
         ? `https://app.skuvault.com/WavePicking/Picklist/${session.picklistId}`
         : null,
       extractedAt: extractedAt,
+    };
+  }
+
+  /**
+   * Get current lockout status
+   * Returns lockout information including whether locked out and time remaining
+   */
+  async getLockoutStatus(): Promise<{
+    isLockedOut: boolean;
+    remainingSeconds: number;
+    endTime: number | null;
+  }> {
+    const isLockedOut = await this.lockoutCache.isLockedOut();
+    const remainingSeconds = await this.lockoutCache.getRemainingSeconds();
+    const endTime = await this.lockoutCache.getLockoutEndTime();
+    
+    return {
+      isLockedOut,
+      remainingSeconds,
+      endTime,
     };
   }
 
