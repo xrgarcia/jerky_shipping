@@ -28,6 +28,9 @@ import {
   type PrintQueue,
   type InsertPrintQueue,
   printQueue,
+  type OrderRefund,
+  type InsertOrderRefund,
+  orderRefunds,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -57,6 +60,12 @@ export interface IStorage {
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
   getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
+
+  // Order Refunds
+  upsertOrderRefund(refund: InsertOrderRefund): Promise<OrderRefund>;
+  getOrderRefunds(orderId: string): Promise<OrderRefund[]>;
+  getRefundsInDateRange(startDate: Date, endDate: Date): Promise<OrderRefund[]>;
+  getOrderRefundByShopifyId(shopifyRefundId: string): Promise<OrderRefund | undefined>;
 
   // Shipments
   createShipment(shipment: InsertShipment): Promise<Shipment>;
@@ -247,6 +256,54 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(orders.createdAt);
     return result;
+  }
+
+  // Order Refunds
+  async upsertOrderRefund(refund: InsertOrderRefund): Promise<OrderRefund> {
+    const existing = await this.getOrderRefundByShopifyId(refund.shopifyRefundId);
+    
+    if (existing) {
+      const result = await db
+        .update(orderRefunds)
+        .set({ ...refund, updatedAt: new Date() })
+        .where(eq(orderRefunds.shopifyRefundId, refund.shopifyRefundId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(orderRefunds).values(refund).returning();
+      return result[0];
+    }
+  }
+
+  async getOrderRefunds(orderId: string): Promise<OrderRefund[]> {
+    const result = await db
+      .select()
+      .from(orderRefunds)
+      .where(eq(orderRefunds.orderId, orderId))
+      .orderBy(desc(orderRefunds.refundedAt));
+    return result;
+  }
+
+  async getRefundsInDateRange(startDate: Date, endDate: Date): Promise<OrderRefund[]> {
+    const result = await db
+      .select()
+      .from(orderRefunds)
+      .where(
+        and(
+          gte(orderRefunds.refundedAt, startDate),
+          lte(orderRefunds.refundedAt, endDate)
+        )
+      )
+      .orderBy(orderRefunds.refundedAt);
+    return result;
+  }
+
+  async getOrderRefundByShopifyId(shopifyRefundId: string): Promise<OrderRefund | undefined> {
+    const result = await db
+      .select()
+      .from(orderRefunds)
+      .where(eq(orderRefunds.shopifyRefundId, shopifyRefundId));
+    return result[0];
   }
 
   // Shipments
