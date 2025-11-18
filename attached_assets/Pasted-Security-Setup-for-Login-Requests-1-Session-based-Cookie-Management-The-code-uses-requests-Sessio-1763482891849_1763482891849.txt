@@ -1,0 +1,36 @@
+Security Setup for Login Requests
+1. Session-based Cookie Management
+The code uses requests.Session() which handles cookies automatically:
+self.session = requests.Session()  # Line 170
+Why this matters:
+GET login page may set initial cookies (CSRF tokens, session IDs, etc.)
+POST login must send those cookies back
+POST response sets the sv-t cookie
+The Session object:
+Stores cookies from the GET response
+Sends cookies with the POST request
+Maintains cookies across requests
+Handles redirects properly
+2. Browser-like Headers
+Headers are set on the session to appear browser-like:
+self.session.headers.update({    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",    "Accept": "application/json, text/plain, */*",    "Accept-Language": "en-US,en;q=0.9",    "Accept-Encoding": "gzip, deflate, br",    "Connection": "keep-alive",    "Sec-Fetch-Dest": "empty",        # Browser security header    "Sec-Fetch-Mode": "cors",         # Browser security header    "Sec-Fetch-Site": "same-site",    # Browser security header})
+3. Form-Encoded Data (Not JSON)
+Login uses form-encoded data:
+login_data = {    "Email": self.settings.skuvault.scraping.web.username,    "Password": self.settings.skuvault.scraping.web.password,}login_response = await self._make_request(    "POST",    str(self.settings.skuvault.scraping.web.login_url),    "submit_login",    data=login_data,  # Form-encoded, NOT json_data)
+This sends as application/x-www-form-urlencoded, matching a browser form submission.
+4. Automatic Cookie Handling Flow
+The session maintains cookies:
+GET login page → cookies stored (CSRF, session ID, etc.)
+POST credentials → cookies sent with request
+POST response → sv-t cookie stored
+Subsequent API calls → sv-t cookie sent
+For Node.js Implementation:
+To replicate this security setup in Node.js:
+const axios = require('axios');const { CookieJar } = require('tough-cookie');const { wrapper } = require('axios-cookiejar-support');// Create cookie jar - CRITICAL for maintaining cookiesconst cookieJar = new CookieJar();const client = wrapper(axios.create({   jar: cookieJar,  withCredentials: true,  // Important for cross-origin cookies  maxRedirects: 5}));// Set browser-like headers on default configclient.defaults.headers.common = {  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',  'Accept': 'application/json, text/plain, */*',  'Accept-Language': 'en-US,en;q=0.9',  'Accept-Encoding': 'gzip, deflate, br',  'Connection': 'keep-alive',  'Sec-Fetch-Dest': 'empty',  'Sec-Fetch-Mode': 'cors',  'Sec-Fetch-Site': 'same-site'};async function login(username, password) {  // Step 1: GET login page (cookies automatically stored)  const loginPage = await client.get('https://app.skuvault.com/account/login');    // Step 2: POST login (cookies from GET automatically sent)  const loginResponse = await client.post(    'https://app.skuvault.com/account/login',    new URLSearchParams({  // Form-encoded, not JSON!      Email: username,      Password: password    }),    {      headers: {        'Content-Type': 'application/x-www-form-urlencoded'  // Explicit form encoding      },      maxRedirects: 5,  // Allow redirects after login      validateStatus: (status) => status < 400    }  );    // Step 3: Extract sv-t cookie (now stored in cookie jar)  const cookies = await cookieJar.getCookies('https://app.skuvault.com');  const svtCookie = cookies.find(c => c.key === 'sv-t');    return svtCookie?.value;}
+Critical Points:
+Cookie jar/session: Maintain cookies between GET and POST
+Form-encoded data: Use application/x-www-form-urlencoded, not JSON
+Browser headers: Include Sec-Fetch-* and realistic User-Agent
+Redirect handling: Allow redirects after successful login (status 302)
+Same session: Use the same HTTP client instance for both GET and POST
+The requests.Session() in Python handles all of this automatically. In Node.js, use a cookie jar (tough-cookie, axios-cookiejar-support) and ensure the same client instance is used for all requests in the login flow.
