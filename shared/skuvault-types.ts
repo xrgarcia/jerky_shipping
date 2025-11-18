@@ -45,7 +45,7 @@ export function parseSessionState(state: string | null | undefined): SessionStat
  */
 export const assignedUserSchema = z.object({
   name: z.string().nullable().optional(),
-  userId: z.string().nullable().optional(),
+  userId: z.number().nullable().optional(),
 });
 
 export type AssignedUser = z.infer<typeof assignedUserSchema>;
