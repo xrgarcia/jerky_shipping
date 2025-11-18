@@ -44,7 +44,8 @@ Preferred communication style: Simple, everyday language.
   - Detailed session view modal showing:
     - Picklist summary (status, assigned user, counts, weight)
     - All orders in the session
-    - Line items for each order (SKU, description, location, picked/total quantities)
+    - Line items for each order with product images (64x64px), SKU, description, location, picked/total quantities
+  - Product images fetched from local database by matching SKUs with productVariants table
   - Token cached in Redis with 24-hour TTL for persistence across server restarts
   - Rate limiting (2-second delay between requests) prevents triggering anti-bot protection
   - Lockout countdown timer displays remaining time when account is temporarily locked

@@ -135,6 +135,7 @@ export default function Sessions() {
       return response.json();
     },
     enabled: !!selectedPicklistId,
+    staleTime: 0, // Always fetch fresh data to ensure product images are included
   });
 
   // Query lockout status - poll every second to keep countdown updated  
@@ -543,6 +544,18 @@ export default function Sessions() {
                                         className="flex gap-4 p-3 bg-muted/50 rounded-md"
                                         data-testid={`item-${item.sku}`}
                                       >
+                                        {/* Product Image */}
+                                        {item.imageUrl && (
+                                          <div className="flex-shrink-0">
+                                            <img 
+                                              src={item.imageUrl} 
+                                              alt={item.sku}
+                                              className="w-16 h-16 object-cover rounded"
+                                              data-testid={`img-product-${item.sku}`}
+                                            />
+                                          </div>
+                                        )}
+                                        
                                         <div className="flex-1 space-y-1">
                                           <div className="font-medium">{item.sku}</div>
                                           {item.description && (

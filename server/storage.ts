@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql, isNull, gte, lte } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql, isNull, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -100,6 +100,7 @@ export interface IStorage {
   getProductVariants(productId: string): Promise<ProductVariant[]>;
   getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined>;
   getVariantBySku(sku: string): Promise<ProductVariant | undefined>;
+  getProductVariantsBySKUs(skus: string[]): Promise<ProductVariant[]>;
 
   // Backfill Jobs
   createBackfillJob(job: InsertBackfillJob): Promise<BackfillJob>;
@@ -543,6 +544,21 @@ export class DatabaseStorage implements IStorage {
       .from(productVariants)
       .where(and(eq(productVariants.sku, sku), isNull(productVariants.deletedAt)));
     return result[0];
+  }
+
+  async getProductVariantsBySKUs(skus: string[]): Promise<ProductVariant[]> {
+    if (skus.length === 0) return [];
+    
+    const result = await db
+      .select()
+      .from(productVariants)
+      .where(
+        and(
+          inArray(productVariants.sku, skus),
+          isNull(productVariants.deletedAt)
+        )
+      );
+    return result;
   }
 
   // Backfill Jobs

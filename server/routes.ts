@@ -915,6 +915,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { picklistId } = req.params;
       console.log(`Fetching SkuVault session details for picklist ${picklistId}...`);
       const directions = await skuVaultService.getSessionDirections(picklistId);
+      
+      // Extract all unique SKUs from the session
+      const skus = new Set<string>();
+      if (directions.picklist?.orders) {
+        for (const order of directions.picklist.orders) {
+          if (order.items) {
+            for (const item of order.items) {
+              if (item.sku) {
+                skus.add(item.sku);
+              }
+            }
+          }
+        }
+      }
+      
+      // Fetch product images for all SKUs
+      const skuImageMap = new Map<string, string>();
+      if (skus.size > 0) {
+        const variants = await storage.getProductVariantsBySKUs(Array.from(skus));
+        for (const variant of variants) {
+          if (variant.sku && variant.imageUrl) {
+            skuImageMap.set(variant.sku, variant.imageUrl);
+          }
+        }
+      }
+      
+      // Augment line items with product images
+      if (directions.picklist?.orders) {
+        for (const order of directions.picklist.orders) {
+          if (order.items) {
+            for (const item of order.items) {
+              if (item.sku) {
+                item.imageUrl = skuImageMap.get(item.sku) || null;
+              }
+            }
+          }
+        }
+      }
+      
       res.json(directions);
     } catch (error: any) {
       console.error(`Error fetching SkuVault session details for picklist ${req.params.picklistId}:`, error);
