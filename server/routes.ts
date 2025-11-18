@@ -1337,8 +1337,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, job });
       }
 
-      if (job.status !== "printing") {
-        return res.status(400).json({ error: "Job must be in printing status to complete" });
+      if (job.status !== "queued" && job.status !== "printing") {
+        return res.status(400).json({ error: "Job must be in queued or printing status to complete" });
       }
 
       const updatedJob = await storage.updatePrintJobStatus(req.params.id, "printed", new Date());
