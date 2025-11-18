@@ -58,7 +58,7 @@ export function PrintQueueBar() {
   };
 
   const jobs = jobsData?.jobs || [];
-  const activeJobs = jobs.filter(j => j.status === "queued");
+  const activeJobs = jobs.filter(j => j.status === "queued" || j.status === "printing");
 
   if (activeJobs.length === 0) {
     return null;

@@ -122,12 +122,18 @@ export default function OrderDetail() {
   };
 
   const handlePrintLabel = () => {
-    const latestLabelJob = printJobs.find(job => job.labelUrl);
-    if (latestLabelJob?.labelUrl) {
-      const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(latestLabelJob.labelUrl)}`;
+    const shipmentsWithLabels = shipments.filter(s => s.labelUrl);
+    const latestShipment = shipmentsWithLabels.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+    
+    if (latestShipment?.labelUrl) {
+      const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(latestShipment.labelUrl)}`;
       window.open(proxyUrl, '_blank');
     }
   };
+
+  const hasExistingLabel = shipments.some(s => s.labelUrl);
 
   const handlePrevious = () => {
     if (hasPrev) {
@@ -339,7 +345,7 @@ export default function OrderDetail() {
           </div>
 
           <div className="flex gap-2">
-            {printJobs.some(job => job.labelUrl) ? (
+            {hasExistingLabel ? (
               <Button
                 data-testid="button-reprint-label"
                 onClick={handlePrintLabel}
