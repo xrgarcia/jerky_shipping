@@ -909,6 +909,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get detailed directions for a specific SkuVault session
+  app.get("/api/skuvault/sessions/:picklistId", requireAuth, async (req, res) => {
+    try {
+      const { picklistId } = req.params;
+      console.log(`Fetching SkuVault session details for picklist ${picklistId}...`);
+      const directions = await skuVaultService.getSessionDirections(picklistId);
+      res.json(directions);
+    } catch (error: any) {
+      console.error(`Error fetching SkuVault session details for picklist ${req.params.picklistId}:`, error);
+      res.status(500).json({ 
+        error: "Failed to fetch session details",
+        message: error.message 
+      });
+    }
+  });
+
   // Manual sync endpoint - pulls all shipments from ShipStation for existing orders
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {
