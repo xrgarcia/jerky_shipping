@@ -575,6 +575,7 @@ export class SkuVaultService {
       }
 
       console.log('[SkuVault] Fetching sessions with filters:', JSON.stringify(filters, null, 2));
+      console.log('[SkuVault] Request payload to SkuVault API:', JSON.stringify(requestData, null, 2));
 
       const response = await this.makeAuthenticatedRequest<any>(
         'POST',
@@ -587,9 +588,18 @@ export class SkuVaultService {
 
       // Parse and transform sessions
       const sessions = validatedResponse.lists || [];
+      
+      // Log response details for debugging
+      console.log(`[SkuVault] Successfully fetched ${sessions.length} sessions`);
+      if (sessions.length > 0 && filters?.orderNumber) {
+        console.log('[SkuVault] Session match details for order search:');
+        sessions.forEach((session: any) => {
+          // Log the entire session object to see all fields returned by SkuVault
+          console.log(`  - Session ${session.sequenceId}:`, JSON.stringify(session, null, 2));
+        });
+      }
+      
       const parsed = sessions.map(session => this.parseSession(session));
-
-      console.log(`[SkuVault] Successfully fetched ${parsed.length} sessions`);
       return parsed;
 
     } catch (error) {
