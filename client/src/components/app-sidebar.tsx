@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3 } from "lucide-react";
+import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
@@ -67,6 +67,11 @@ export function AppSidebar() {
       title: "Products",
       url: "/products",
       icon: Box,
+    },
+    {
+      title: "Sessions",
+      url: "/sessions",
+      icon: ListChecks,
     },
     {
       title: "Backfill",

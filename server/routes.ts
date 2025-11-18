@@ -17,6 +17,7 @@ import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
+import { skuVaultService } from "./services/skuvault-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 // Initialize the shipment service
@@ -825,6 +826,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching products:", error);
       res.status(500).json({ error: "Failed to search products" });
+    }
+  });
+
+  // ========== SkuVault Integration ==========
+
+  // Get all SkuVault wave picking sessions
+  app.get("/api/skuvault/sessions", requireAuth, async (req, res) => {
+    try {
+      console.log("Fetching SkuVault sessions...");
+      const sessions = await skuVaultService.getSessions();
+      console.log(`Retrieved ${sessions.length} sessions from SkuVault`);
+      res.json({ sessions });
+    } catch (error: any) {
+      console.error("Error fetching SkuVault sessions:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch SkuVault sessions",
+        message: error.message 
+      });
     }
   });
 

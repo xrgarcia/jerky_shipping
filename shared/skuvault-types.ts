@@ -18,6 +18,29 @@ export enum SessionState {
 }
 
 /**
+ * Helper to convert API status strings to SessionState enum
+ */
+export function parseSessionState(state: string | null | undefined): SessionState | null {
+  if (!state) return null;
+  
+  const normalized = state.toLowerCase();
+  switch (normalized) {
+    case "active":
+      return SessionState.ACTIVE;
+    case "inactive":
+      return SessionState.INACTIVE;
+    case "new":
+      return SessionState.NEW;
+    case "readytoship":
+      return SessionState.READY_TO_SHIP;
+    case "closed":
+      return SessionState.CLOSED;
+    default:
+      return null;
+  }
+}
+
+/**
  * User assigned to a wave picking session
  */
 export const assignedUserSchema = z.object({
@@ -59,20 +82,20 @@ export type SessionsResponse = z.infer<typeof sessionsResponseSchema>;
  * Parsed and simplified session data for easy consumption
  */
 export const parsedSessionSchema = z.object({
-  session_id: z.number().nullable().optional(),
-  picklist_id: z.string().nullable().optional(),
+  sessionId: z.number().nullable().optional(),
+  picklistId: z.string().nullable().optional(),
   status: z.nativeEnum(SessionState).nullable().optional(),
-  created_date: z.string().nullable().optional(),
-  assigned_user: z.string().nullable().optional(),
-  user_id: z.string().nullable().optional(),
-  sku_count: z.number().nullable().optional(),
-  order_count: z.number().nullable().optional(),
-  total_quantity: z.number().nullable().optional(),
-  picked_quantity: z.number().nullable().optional(),
-  available_quantity: z.number().nullable().optional(),
-  total_weight: z.number().nullable().optional(),
-  view_url: z.string().nullable().optional(),
-  extracted_at: z.number().nullable().optional(),
+  createdDate: z.string().nullable().optional(),
+  assignedUser: z.string().nullable().optional(),
+  userId: z.string().nullable().optional(),
+  skuCount: z.number().nullable().optional(),
+  orderCount: z.number().nullable().optional(),
+  totalQuantity: z.number().nullable().optional(),
+  pickedQuantity: z.number().nullable().optional(),
+  availableQuantity: z.number().nullable().optional(),
+  totalWeight: z.number().nullable().optional(),
+  viewUrl: z.string().nullable().optional(),
+  extractedAt: z.number().nullable().optional(),
 });
 
 export type ParsedSession = z.infer<typeof parsedSessionSchema>;
