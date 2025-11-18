@@ -893,11 +893,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all SkuVault wave picking sessions
+  // Get all SkuVault wave picking sessions with optional search/filter/pagination
   app.get("/api/skuvault/sessions", requireAuth, async (req, res) => {
     try {
-      console.log("Fetching SkuVault sessions...");
-      const sessions = await skuVaultService.getSessions();
+      console.log("Fetching SkuVault sessions with query params:", req.query);
+      
+      // Parse and validate query parameters
+      const filters: any = {};
+      
+      if (req.query.sessionId) {
+        filters.sessionId = parseInt(req.query.sessionId as string, 10);
+      }
+      
+      if (req.query.picklistId) {
+        filters.picklistId = req.query.picklistId as string;
+      }
+      
+      if (req.query.orderNumber) {
+        filters.orderNumber = req.query.orderNumber as string;
+      }
+      
+      if (req.query.states) {
+        // Handle both single string and array of strings
+        const statesParam = req.query.states;
+        filters.states = Array.isArray(statesParam) ? statesParam : [statesParam];
+      }
+      
+      if (req.query.sortDescending) {
+        filters.sortDescending = req.query.sortDescending === 'true';
+      }
+      
+      if (req.query.limit) {
+        filters.limit = parseInt(req.query.limit as string, 10);
+      }
+      
+      if (req.query.skip) {
+        filters.skip = parseInt(req.query.skip as string, 10);
+      }
+      
+      const sessions = await skuVaultService.getSessions(filters);
       console.log(`Retrieved ${sessions.length} sessions from SkuVault`);
       res.json({ sessions });
     } catch (error: any) {
