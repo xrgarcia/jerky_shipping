@@ -236,7 +236,11 @@ export default function BackfillPage() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              if (date) {
+                                field.onChange(date);
+                              }
+                            }}
                             initialFocus
                             data-testid="calendar-start-date"
                           />
@@ -273,7 +277,11 @@ export default function BackfillPage() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              if (date) {
+                                field.onChange(date);
+                              }
+                            }}
                             initialFocus
                             data-testid="calendar-end-date"
                           />
