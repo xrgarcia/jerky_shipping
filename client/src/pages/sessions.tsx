@@ -1,13 +1,29 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Package, User, Box, Weight, ListChecks, RefreshCw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ParsedSession } from "@shared/skuvault-types";
 import { SessionState } from "@shared/skuvault-types";
+
+interface ErrorDetails {
+  statusCode: number;
+  message: string;
+  responseData?: any;
+}
 
 interface SessionsResponse {
   sessions: ParsedSession[];
@@ -72,6 +88,7 @@ const formatDate = (dateString: string | null): string => {
 
 export default function Sessions() {
   const { toast } = useToast();
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
   
   const { data, isLoading, error, refetch } = useQuery<SessionsResponse>({
     queryKey: ["/api/skuvault/sessions"],
@@ -80,9 +97,33 @@ export default function Sessions() {
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('/api/skuvault/login', {
-        method: 'POST',
-      });
+      try {
+        const response = await fetch('/api/skuvault/login', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw {
+            statusCode: response.status,
+            message: data.message || response.statusText,
+            responseData: data,
+          };
+        }
+        
+        return data;
+      } catch (err: any) {
+        if (err.statusCode) {
+          throw err;
+        }
+        throw {
+          statusCode: 0,
+          message: err.message || 'Network error',
+          responseData: null,
+        };
+      }
     },
     onSuccess: () => {
       toast({
@@ -98,6 +139,13 @@ export default function Sessions() {
         title: "Connection Failed",
         description: error.message || "Failed to connect to SkuVault. Please try again.",
         variant: "destructive",
+      });
+      
+      // Show detailed error modal
+      setErrorDetails({
+        statusCode: error.statusCode || 0,
+        message: error.message || "Unknown error",
+        responseData: error.responseData || null,
       });
     },
   });
@@ -332,6 +380,49 @@ export default function Sessions() {
           </div>
         )}
       </div>
+
+      {/* Error Details Modal */}
+      <AlertDialog open={!!errorDetails} onOpenChange={() => setErrorDetails(null)}>
+        <AlertDialogContent data-testid="dialog-error-details">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              SkuVault Connection Error
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-left">
+                <div>
+                  <div className="text-sm font-semibold text-foreground mb-1">Status Code</div>
+                  <div className="text-sm font-mono bg-muted p-2 rounded" data-testid="text-error-status">
+                    {errorDetails?.statusCode || 'N/A'}
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="text-sm font-semibold text-foreground mb-1">Error Message</div>
+                  <div className="text-sm bg-muted p-2 rounded" data-testid="text-error-message">
+                    {errorDetails?.message || 'No error message available'}
+                  </div>
+                </div>
+                
+                {errorDetails?.responseData && (
+                  <div>
+                    <div className="text-sm font-semibold text-foreground mb-1">Response Details</div>
+                    <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-48" data-testid="text-error-response">
+                      {JSON.stringify(errorDetails.responseData, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction data-testid="button-close-error-dialog">
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
