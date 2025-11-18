@@ -260,11 +260,15 @@ export type DirectionsResponse = z.infer<typeof directionsResponseSchema>;
 
 /**
  * Simplified order with only key fields for session tracking
+ * 
+ * spot_number: 1-based index representing the order's position in the picklist.
+ * Calculated by enumerating through picklist.orders array (1st order = #1, 2nd = #2, etc.).
+ * All items within the same order share the same spot number.
  */
 export const sessionOrderSchema = z.object({
   sale_id: z.string().nullable().optional(),
   order_number: z.string().nullable().optional(),
-  spot_number: z.number().nullable().optional(),
+  spot_number: z.number().nullable().optional(), // 1-based order position in picklist
   session_picklist_id: z.string().nullable().optional(),
   session_id: z.number().nullable().optional(),
   create_date: z.string().nullable().optional(),
@@ -284,13 +288,15 @@ export type SessionOrder = z.infer<typeof sessionOrderSchema>;
 
 /**
  * Parsed direction data for easy consumption
+ * 
+ * spot_number: 1-based order position in the picklist (same as SessionOrder.spot_number)
  */
 export const parsedDirectionSchema = z.object({
   picklist_id: z.string().nullable().optional(),
   sku: z.string().nullable().optional(),
   sku_name: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
-  spot_number: z.number().nullable().optional(),
+  spot_number: z.number().nullable().optional(), // 1-based order position
   bin_info: z.string().nullable().optional(),
   quantity: z.number().nullable().optional(),
   order_number: z.string().nullable().optional(),
