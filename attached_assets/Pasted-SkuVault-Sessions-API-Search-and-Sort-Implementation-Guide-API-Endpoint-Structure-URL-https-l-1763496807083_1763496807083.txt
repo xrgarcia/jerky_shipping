@@ -1,0 +1,83 @@
+SkuVault Sessions API - Search and Sort Implementation Guide
+API Endpoint Structure
+URL: https://lmdb.skuvault.com/wavepicking/get/sessions
+Method: POST
+Headers:
+{  "Authorization": `Token ${authToken}`,  "Partition": "default",  "tid": Math.floor(Date.now() / 1000).toString(),  "idempotency-key": uuid.v4(),  "dataread": "true",  "Content-Type": "application/json"}
+Base Payload Structure
+{  "limit": 100,  "skip": 0,  "userId": "-2",  // Always use "-2" for system-wide access  "sort": [{"descending": true, "field": "createdDate"}],  "states": ["active", "inactive", "new", "readyToShip"]}
+Search Fields Implementation
+The API supports search filters using a match pattern. Currently the codebase shows saleId using this pattern, but the structure likely works for other fields too.
+1. Search by Session ID (sequenceId)
+API Field: sequenceId
+Payload structure:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["active", "inactive", "new", "readyToShip"],  // Filter by states  "sequenceId": {"match": "exact", "value": "12345"}  // Or try "contains" for partial match}
+2. Search by Picklist ID (picklistId)
+API Field: picklistId
+Payload structure:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["active", "inactive", "new", "readyToShip"],  "picklistId": {"match": "exact", "value": "uuid-string"}  // Or "contains" for partial match}
+3. Search by Order Number (via saleId)
+Important: Order numbers are typically embedded in the saleId field. The saleId format is like "1-352444-5-13038-138162-JK3825331504" where "JK3825331504" is the order number.
+API Field: saleId
+Payload structure:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["active", "inactive", "new", "readyToShip"],  "saleId": {"match": "contains", "value": "JK3825331504"}  // Order number from saleId}
+4. Search by State (Multiple States)
+API Field: states (array)
+Payload structure:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["active", "readyToShip", "new", "inactive"]  // Multiple states supported}
+Valid state values:
+"active"
+"inactive"
+"new"
+"readyToShip"
+"closed"
+"picked"
+"shipped"
+"cancelled"
+Combined Search (Multiple Fields)
+To search by multiple fields simultaneously, include multiple search filters in the payload:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["active", "readyToShip"],  // Filter by multiple states  "sequenceId": {"match": "exact", "value": "12345"},  // AND: session_id must match  "picklistId": {"match": "contains", "value": "abc"}  // AND: picklist_id must match}
+Note: Multiple filters typically act as AND conditions (all must match).
+Sorting Implementation
+Sort Field: Currently only "createdDate" is shown in the codebase, but the API might support other fields.
+Sort structure:
+"sort": [  {    "descending": false,  // false = ascending, true = descending    "field": "createdDate"  }]
+Examples:
+// Sort newest first (descending)"sort": [{"descending": true, "field": "createdDate"}]// Sort oldest first (ascending)"sort": [{"descending": false, "field": "createdDate"}]
+Complete Implementation Example
+async function searchSessions({  sessionId = null,  picklistId = null,  orderNumber = null,  states = ["active", "readyToShip", "new", "inactive"],  sortDescending = false,  limit = 100,  skip = 0}) {  const apiUrl = "https://lmdb.skuvault.com/wavepicking/get/sessions";    // Build payload  const payload = {    limit: limit,    skip: skip,    userId: "-2",    sort: [{ descending: sortDescending, field: "createdDate" }],    states: states  };    // Add search filters if provided  if (sessionId) {    payload.sequenceId = { match: "exact", value: String(sessionId) };    // Alternative: Try "contains" if "exact" doesn't work    // payload.sequenceId = { match: "contains", value: String(sessionId) };  }    if (picklistId) {    payload.picklistId = { match: "exact", value: picklistId };    // Alternative: Try "contains" if "exact" doesn't work    // payload.picklistId = { match: "contains", value: picklistId };  }    if (orderNumber) {    // Order number is in saleId, use contains match    payload.saleId = { match: "contains", value: orderNumber };  }    // Make request  const response = await client.post(apiUrl, payload, {    headers: apiHeaders  // From your login implementation  });    // Parse response  const data = response.data;    // Response structure: { lists: [...] }  const sessions = data.lists || [];    // Map API fields to your model  return sessions.map(sessionData => ({    session_id: sessionData.sequenceId,    picklist_id: sessionData.picklistId,    status: sessionData.state,  // "active", "new", etc.    created_date: sessionData.date,    assigned_user: sessionData.assigned?.name,    user_id: sessionData.assigned?.userId,    sku_count: sessionData.skuCount,    order_count: sessionData.orderCount,    total_quantity: sessionData.totalQuantity,    picked_quantity: sessionData.pickedQuantity,    available_quantity: sessionData.availableQuantity,    total_weight: sessionData.totalItemsWeight  }));}
+Usage Examples
+Example 1: Search by Session ID
+const sessions = await searchSessions({  sessionId: 12345,  states: ["active", "readyToShip"],  sortDescending: false});
+Example 2: Search by Picklist ID
+const sessions = await searchSessions({  picklistId: "uuid-abc-123",  states: ["active"],  sortDescending: true});
+Example 3: Search by Order Number
+const sessions = await searchSessions({  orderNumber: "JK3825331504",  states: ["active", "readyToShip", "new", "inactive"],  sortDescending: false});
+Example 4: Filter by States Only
+const sessions = await searchSessions({  states: ["active", "readyToShip"],  sortDescending: true,  limit: 50});
+Example 5: Combined Search
+const sessions = await searchSessions({  sessionId: 12345,  states: ["active"],  sortDescending: false});
+Match Pattern Options
+Based on the codebase showing saleId with "match": "contains", try these match types:
+"exact" - Exact match
+"contains" - Partial match (shown in codebase for saleId)
+"startsWith" - If supported
+"endsWith" - If supported
+Recommendation: Start with "contains" since that's what the codebase uses for saleId search.
+Response Structure
+{  "lists": [    {      "sequenceId": 12345,           // session_id      "picklistId": "uuid-string",   // picklist_id      "state": "active",             // status      "date": "2025-10-01T00:00:00Z", // created_date      "assigned": {        "name": "User Name",        "userId": "user-id"      },      "skuCount": 10,      "orderCount": 5,      "totalQuantity": 50,      "pickedQuantity": 30,      "availableQuantity": 20,      "totalItemsWeight": 100.5    }  ]}
+Important Notes
+Field Names: API uses sequenceId (not session_id) and picklistId (not picklist_id)
+State Values: Use lowercase API values: "active", not "ACTIVE"
+Order Number Search: Order numbers are typically part of the saleId field, so use saleId with "contains" match
+Multiple Filters: Include multiple filters in the payload for AND logic
+Sort Field: Only "createdDate" is documented; test other fields if needed
+Pagination: Use limit and skip for pagination
+Always Include: userId: "-2" and states array (even if filtering by other fields)
+Testing Approach
+Test saleId search (known to work)
+Test sequenceId with "contains" match pattern
+Test picklistId with "contains" match pattern
+Test combined filters (multiple search fields + states)
+Test different sort field options if needed beyond "createdDate"
+This should enable searching by session_id, picklist_id, order_number (via saleId), and state filtering with proper sorting.
