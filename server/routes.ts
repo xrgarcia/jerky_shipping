@@ -1331,6 +1331,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/reports/summary", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // Set end date to end of day
+      end.setHours(23, 59, 59, 999);
+
+      const ordersInRange = await storage.getOrdersInDateRange(start, end);
+
+      // Helper function to parse string amounts to numbers
+      const parseAmount = (amount: string | null): number => {
+        if (!amount) return 0;
+        const parsed = parseFloat(amount);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      // Calculate aggregations
+      let totalRevenue = 0;
+      let totalShipping = 0;
+      let totalSubtotal = 0;
+      let totalTax = 0;
+      let totalDiscounts = 0;
+      const dailyTotals: { [key: string]: number } = {};
+      const statusCounts: { [key: string]: number } = {};
+      const fulfillmentCounts: { [key: string]: number } = {};
+
+      ordersInRange.forEach((order) => {
+        // Revenue aggregations
+        totalRevenue += parseAmount(order.orderTotal);
+        totalShipping += parseAmount(order.shippingTotal);
+        totalSubtotal += parseAmount(order.subtotalPrice);
+        totalTax += parseAmount(order.totalTax);
+        totalDiscounts += parseAmount(order.totalDiscounts);
+
+        // Daily totals for chart
+        const dayKey = order.createdAt.toISOString().split('T')[0];
+        dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + parseAmount(order.orderTotal);
+
+        // Status counts
+        const financialStatus = order.financialStatus || 'unknown';
+        statusCounts[financialStatus] = (statusCounts[financialStatus] || 0) + 1;
+
+        const fulfillmentStatus = order.fulfillmentStatus || 'unfulfilled';
+        fulfillmentCounts[fulfillmentStatus] = (fulfillmentCounts[fulfillmentStatus] || 0) + 1;
+      });
+
+      // Convert daily totals to array format for chart
+      const dailyData = Object.entries(dailyTotals)
+        .map(([date, total]) => ({ date, total }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const summary = {
+        totalOrders: ordersInRange.length,
+        totalRevenue: totalRevenue.toFixed(2),
+        totalShipping: totalShipping.toFixed(2),
+        totalSubtotal: totalSubtotal.toFixed(2),
+        totalTax: totalTax.toFixed(2),
+        totalDiscounts: totalDiscounts.toFixed(2),
+        averageOrderValue: ordersInRange.length > 0 ? (totalRevenue / ordersInRange.length).toFixed(2) : '0.00',
+        averageShipping: ordersInRange.length > 0 ? (totalShipping / ordersInRange.length).toFixed(2) : '0.00',
+        dailyData,
+        statusCounts,
+        fulfillmentCounts,
+      };
+
+      res.json(summary);
+    } catch (error) {
+      console.error("Error generating reports:", error);
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
   app.get("/api/print-queue", requireAuth, async (req, res) => {
     try {
       const jobs = await storage.getActivePrintJobs();

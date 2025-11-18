@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql, isNull } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql, isNull, gte, lte } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -56,6 +56,7 @@ export interface IStorage {
   getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined>;
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
+  getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
 
   // Shipments
   createShipment(shipment: InsertShipment): Promise<Shipment>;
@@ -231,6 +232,20 @@ export class DatabaseStorage implements IStorage {
       .from(orders)
       .orderBy(desc(orders.createdAt))
       .limit(limit);
+    return result;
+  }
+
+  async getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]> {
+    const result = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          gte(orders.createdAt, startDate),
+          lte(orders.createdAt, endDate)
+        )
+      )
+      .orderBy(orders.createdAt);
     return result;
   }
 
