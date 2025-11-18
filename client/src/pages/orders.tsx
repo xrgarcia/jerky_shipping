@@ -11,7 +11,6 @@ import { formatDistanceToNow } from "date-fns";
 import type { Order } from "@shared/schema";
 
 type OrderWithShipment = Order & { hasShipment?: boolean };
-import { PrintQueueBar } from "@/components/print-queue-bar";
 
 export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -231,8 +230,6 @@ export default function Orders() {
           </div>
         )}
       </div>
-      
-      <PrintQueueBar />
     </>
   );
 }

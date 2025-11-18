@@ -180,10 +180,10 @@ export function PrintQueueBar() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50"
+      className="absolute bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50"
       data-testid="container-print-queue-bar"
     >
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="px-4 py-3">
         <div className="flex items-center gap-4 overflow-x-auto">
           <div className="flex-shrink-0 font-semibold text-sm">
             Print Queue ({activeJobs.length})
