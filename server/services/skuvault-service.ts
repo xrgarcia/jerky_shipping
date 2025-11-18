@@ -11,6 +11,8 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { CookieJar } from 'tough-cookie';
+import { wrapper } from 'axios-cookiejar-support';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   sessionsResponseSchema,
@@ -87,8 +89,12 @@ export class SkuVaultService {
       apiBaseUrl: 'https://lmdb.skuvault.com',
     };
 
-    // Initialize HTTP client with base headers
-    this.client = axios.create({
+    // Create cookie jar for maintaining session cookies
+    const jar = new CookieJar();
+
+    // Initialize HTTP client with cookie jar and base headers
+    this.client = wrapper(axios.create({
+      jar,
       timeout: 30000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -100,7 +106,7 @@ export class SkuVaultService {
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Site': 'same-site',
       },
-    });
+    }));
 
     this.tokenCache = new TokenCache();
 
@@ -238,8 +244,24 @@ export class SkuVaultService {
           ? loginResponse.data 
           : JSON.stringify(loginResponse.data);
         
-        if (responseText.includes('error') || responseText.includes('invalid')) {
-          console.error('[SkuVault] Login response may contain error:', responseText.substring(0, 500));
+        // Look for validation messages in the HTML
+        const validationMatch = responseText.match(/class="validation-summary-errors"[^>]*>(.*?)<\/div>/s);
+        const fieldErrorMatch = responseText.match(/class="field-validation-error"[^>]*>(.*?)<\/span>/);
+        
+        if (validationMatch) {
+          console.error('[SkuVault] Validation error found:', validationMatch[1].replace(/<[^>]*>/g, '').trim().substring(0, 200));
+        }
+        if (fieldErrorMatch) {
+          console.error('[SkuVault] Field validation error:', fieldErrorMatch[1].replace(/<[^>]*>/g, '').trim());
+        }
+        
+        // Check for generic error keywords
+        if (responseText.includes('error') || responseText.includes('invalid') || responseText.includes('incorrect')) {
+          const errorContext = responseText.substring(
+            Math.max(0, responseText.toLowerCase().indexOf('error') - 100),
+            Math.min(responseText.length, responseText.toLowerCase().indexOf('error') + 200)
+          );
+          console.error('[SkuVault] Possible error in response:', errorContext.replace(/<[^>]*>/g, '').trim());
         }
         
         return false;
