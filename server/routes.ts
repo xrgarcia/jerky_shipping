@@ -17,7 +17,7 @@ import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
-import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -1344,8 +1344,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Parse YYYY-MM-DD strings as Central Time
-      const start = zonedTimeToUtc(`${startDate} 00:00:00`, CST_TIMEZONE);
-      const end = zonedTimeToUtc(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+      const start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
       
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ error: "Invalid date format" });
@@ -1390,8 +1390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Daily totals for chart (excluding refunded orders)
         // Group by CST day to match date range filtering
-        const cstDate = utcToZonedTime(order.createdAt, CST_TIMEZONE);
-        const dayKey = formatTz(cstDate, 'yyyy-MM-dd', { timeZone: CST_TIMEZONE });
+        const dayKey = formatInTimeZone(order.createdAt, CST_TIMEZONE, 'yyyy-MM-dd');
         dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + parseAmount(order.orderTotal);
 
         // Status counts (excluding refunded orders)
