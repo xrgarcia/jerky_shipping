@@ -17,7 +17,7 @@ import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
-import { skuVaultService } from "./services/skuvault-service";
+import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 // Initialize the shipment service
@@ -854,16 +854,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("SkuVault login successful");
         res.json({ success: true, message: "Successfully connected to SkuVault" });
       } else {
-        console.log("SkuVault login failed");
+        console.log("SkuVault login failed (should not reach here - login() should throw)");
         res.status(401).json({ success: false, error: "Failed to authenticate with SkuVault" });
       }
     } catch (error: any) {
       console.error("Error during SkuVault login:", error);
-      res.status(500).json({ 
-        success: false,
-        error: "Failed to connect to SkuVault",
-        message: error.message 
-      });
+      
+      // Handle SkuVaultError with detailed message
+      if (error instanceof SkuVaultError) {
+        res.status(error.statusCode).json({ 
+          success: false,
+          error: error.message,
+          message: error.message,
+          details: error.details
+        });
+      } else {
+        // Handle unexpected errors
+        res.status(500).json({ 
+          success: false,
+          error: "Failed to connect to SkuVault",
+          message: error.message 
+        });
+      }
     }
   });
 
