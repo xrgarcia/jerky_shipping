@@ -176,6 +176,8 @@ export class SkuVaultService {
   private tokenCache: TokenCache;
   private lockoutCache: LockoutCache;
   private isAuthenticated: boolean = false;
+  private lastRequestTime: number = 0;
+  private readonly RATE_LIMIT_DELAY_MS = 2000; // 2 seconds between requests
 
   constructor() {
     // Load configuration from environment
@@ -207,6 +209,23 @@ export class SkuVaultService {
 
     this.tokenCache = new TokenCache();
     this.lockoutCache = new LockoutCache();
+  }
+
+  /**
+   * Apply rate limiting to prevent triggering anti-bot protection
+   * Ensures minimum 2-second delay between API requests
+   */
+  private async applyRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.RATE_LIMIT_DELAY_MS) {
+      const delayNeeded = this.RATE_LIMIT_DELAY_MS - timeSinceLastRequest;
+      console.log(`[SkuVault] Rate limiting: waiting ${delayNeeded}ms before next request`);
+      await new Promise(resolve => setTimeout(resolve, delayNeeded));
+    }
+    
+    this.lastRequestTime = Date.now();
   }
 
   /**
@@ -403,12 +422,16 @@ export class SkuVaultService {
 
   /**
    * Make authenticated request with auto-retry on 401
+   * Applies rate limiting before each request to prevent triggering anti-bot protection
    */
   private async makeAuthenticatedRequest<T>(
     method: 'GET' | 'POST',
     url: string,
     data?: any
   ): Promise<T> {
+    // Apply rate limiting before request
+    await this.applyRateLimit();
+    
     try {
       const headers = await this.getApiHeaders();
       const response = await this.client.request<T>({
@@ -432,7 +455,7 @@ export class SkuVaultService {
           throw new Error('Re-authentication failed');
         }
         
-        // Retry the request with new token
+        // Retry the request with new token (rate limiting already applied above)
         const retryHeaders = await this.getApiHeaders();
         const retryResponse = await this.client.request<T>({
           method,

@@ -1,0 +1,94 @@
+SkuVaultWebService - Implementation Guide for Node.js Reimplementation
+Overview
+The SkuVaultWebService class provides web interface integration for SkuVault using discovered API endpoints. It handles authentication via web login, session management, API calls with rate limiting, and data extraction.
+Class Structure
+class SkuVaultWebService:    """Service for SkuVault web interface integration using discovered API endpoints."""        def __init__(self):        # Initializes session, logger, caches, and base headers        async def login() -> bool:        # Authenticates with SkuVault web interface        async def get_sessions_by_sale_id(sale_id: str) -> List[ParsedSession]:        # Get sessions for a specific sale ID        async def get_all_sessions(limit, skip, sort_descending, states) -> List[ParsedSession]:        # Get all sessions with pagination and filtering        async def get_session_directions(picklist_id: str) -> List[ParsedDirection]:        # Get detailed directions for a session including SKU locations        async def get_session_orders(session: ParsedSession) -> List[SessionOrder]:        # Get orders from a session using SessionOrderBuilder        async def get_latest_session_order_state(session_order: SessionOrder) -> Optional[SessionOrder]:        # Get latest state of a SessionOrder from SkuVault
+Usage Examples
+Example 1: Basic Login and Session Search
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceasync with SkuVaultWebService() as service:    success = await service.login()    if success:        sessions = await service.get_sessions_by_sale_id("1-352444-5-13038-138162-JK3825331504")        print(f"Found {len(sessions)} sessions")        if sessions:            print(f"First session ID: {sessions[0].session_id}")
+Example 2: Complete Login Flow with Context Manager
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceservice = SkuVaultWebService()# Loginsuccess = await service.login()if success:    print(f"✅ Login successful!")    print(f"   Authentication: {service.is_authenticated}")    print(f"   Cookies: {len(service.session.cookies)}")        # Test session search    sessions = await service.get_sessions_by_sale_id("TEST123")    print(f"   Found {len(sessions)} sessions")        if sessions:        print(f"   First session ID: {sessions[0].session_id}")        print(f"   First session status: {sessions[0].status}")        # Logout    service.logout()    print("✅ Logout completed")
+Example 3: Get All Sessions with Filtering
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceasync with SkuVaultWebService() as service:    await service.login()        # Get all sessions with filtering    sessions = await service.get_all_sessions(        limit=100,        skip=0,        sort_descending=True,  # Newest first        states=["new", "active", "readyToShip"]  # Filter by states    )        print(f"Found {len(sessions)} sessions")    for session in sessions:        print(f"  Session {session.session_id}: {session.status.value}")
+Example 4: Get Session Directions (SKU Locations)
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceasync with SkuVaultWebService() as service:    await service.login()        # First get sessions    sessions = await service.get_sessions_by_sale_id("1-352444-5-13038-138162-JK3825331504")        if sessions:        session = sessions[0]                # Get directions for the session (requires picklist_id)        if session.picklist_id:            directions = await service.get_session_directions(session.picklist_id)                        print(f"Found {len(directions)} directions")            for direction in directions:                print(f"  SKU: {direction.sku}")                print(f"  Location: {direction.location}")                print(f"  Quantity: {direction.quantity}")                print(f"  Order: {direction.order_number}")
+Example 5: Get Session Orders (Full Workflow)
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceasync with SkuVaultWebService() as service:    await service.login()        # Get sessions    sessions = await service.get_sessions_by_sale_id("1-352444-5-13038-138162-JK3825331504")        if sessions:        session = sessions[0]                # Get orders from session (uses SessionOrderBuilder internally)        orders = await service.get_session_orders(session)                print(f"Found {len(orders)} orders in session")        for order in orders:            print(f"  Order: {order.order_number}")            print(f"  Spot Number: {order.spot_number}")            print(f"  Sale ID: {order.sale_id}")            print(f"  Items: {len(order.order_items)}")
+Example 6: Get Latest Session Order State
+from jerky_data_hub.models.skuvault.sessions import SessionOrderfrom jerky_data_hub.services.skuvault_web_service import SkuVaultWebServiceasync with SkuVaultWebService() as service:    await service.login()        # Existing session order (from Firestore or previous sync)    existing_order = SessionOrder(        session_id=12345,        sale_id="1-352444-5-13038-138162-JK3825331504",        spot_number=1    )        # Get latest state from SkuVault    latest_order = await service.get_latest_session_order_state(existing_order)        if latest_order:        print(f"Updated status: {latest_order.session_status}")        print(f"Order number: {latest_order.order_number}")        print(f"Picked by: {latest_order.picked_by_user_name}")
+Example 7: Production Usage Pattern (Session Sync)
+from jerky_data_hub.services.skuvault_web_service import SkuVaultWebService# Create service instance (reused across sync cycles)web_service = SkuVaultWebService()# Check for cached token first (24-hour cache)if not await web_service.check_cached_token():    # No valid cached token, perform fresh login    success = await web_service.login()    if not success:        raise Exception("Login failed")# Now authenticated - make API callssessions = await web_service.get_all_sessions(    limit=100,    skip=0,    sort_descending=True,    states=["new", "active", "readyToShip", "inactive"])# Process each sessionfor session in sessions:    # Get orders from session    orders = await web_service.get_session_orders(session)        # Process orders...    for order in orders:        print(f"Processing order: {order.order_number}")
+Authentication Flow
+Step 1: Login Process
+# 1. Check cached token (optional optimization)if await service.check_cached_token():    # Token found and valid, skip login    return True# 2. GET login pagelogin_page = GET "https://app.skuvault.com/account/login"# Cookies automatically stored in session# 3. POST credentials (form-encoded)login_response = POST "https://app.skuvault.com/account/login"Body: {    "Email": "username@example.com",    "Password": "password"}# Cookies from GET automatically sent with POST# 4. Extract auth token from cookie# Cookie name: "sv-t"# Token must be > 100 characters# 5. Set API headers for subsequent requestsheaders = {    "Authorization": f"Token {auth_token}",    "Partition": "default",    "tid": str(int(time.time())),    "idempotency-key": str(uuid.uuid4()),    "dataread": "true"}
+API Endpoints
+1. Get Sessions by Sale ID
+URL: https://lmdb.skuvault.com/wavepicking/get/sessions
+Method: POST
+Headers: API headers (from login) + Content-Type: application/json
+Body:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["new", "active", "readyToShip", ...],  "saleId": {"match": "contains", "value": "SALE_ID"}}
+2. Get All Sessions
+URL: https://lmdb.skuvault.com/wavepicking/get/sessions
+Method: POST
+Headers: API headers + Content-Type: application/json
+Body:
+{  "limit": 100,  "skip": 0,  "userId": "-2",  "sort": [{"descending": true, "field": "createdDate"}],  "states": ["new", "active", ...]}
+3. Get Session Directions
+URL: https://lmdb.skuvault.com/wavepicking/get/{picklist_id}/directions
+Method: POST
+Headers: API headers + Content-Type: application/json
+Body:
+{  "includeBinsInfo": true}
+Data Models
+ParsedSession:
+{    session_id: str,    picklist_id: str,    status: SessionState (enum),    created_date: str,    assigned_user: Optional[str],    user_id: Optional[str],    sku_count: int,    order_count: int,    total_quantity: int,    picked_quantity: int,    available_quantity: int,    total_weight: float,    view_url: Optional[str]}
+ParsedDirection:
+{    picklist_id: str,    sku: str,    sku_name: str,    location: str,    spot_number: int,    bin_info: Optional[str],    quantity: int,    order_number: str,    warehouse: Optional[str]}
+SessionOrder:
+{    session_id: int,    session_picklist_id: str,    sale_id: str,    spot_number: int,    order_number: Optional[str],    shipment_id: Optional[str],    create_date: Optional[datetime],    pick_start_datetime: Optional[datetime],    pick_end_datetime: Optional[datetime],    order_items: List[Dict],    picked_by_user_id: Optional[str],    picked_by_user_name: Optional[str],    session_status: Optional[SessionState]}
+Session States
+Valid session state values:
+"new"
+"active"
+"inactive"
+"readyToShip"
+"picked"
+"shipped"
+"cancelled"
+Security Requirements
+Base Headers (set on all requests):
+{    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",    "Accept": "application/json, text/plain, */*",    "Accept-Language": "en-US,en;q=0.9",    "Accept-Encoding": "gzip, deflate, br",    "Connection": "keep-alive",    "Sec-Fetch-Dest": "empty",    "Sec-Fetch-Mode": "cors",    "Sec-Fetch-Site": "same-site"}
+Cookie Management:
+Must use a persistent cookie jar/session
+GET login page stores cookies
+POST login sends those cookies
+POST response stores sv-t cookie
+All subsequent API calls include sv-t cookie
+Rate Limiting
+Default delay: 2.0 seconds between requests
+Applied before each API call via _apply_rate_limit()
+Error Handling
+All methods return empty lists or None on failure
+Errors logged via CloudLoggingService
+Retry logic with exponential backoff
+Max retries: 3 (configurable)
+Caching
+Directions Cache:
+In-memory cache for directions responses
+Key: picklist_id
+TTL: Configurable (default: 3600 seconds)
+Max size: Configurable (default: 100)
+Token Cache:
+24-hour token expiration
+Stored in Firestore (TokenCacheService)
+Automatic validation and refresh
+Key Implementation Details
+Session-based cookies: Use requests.Session() in Python or equivalent cookie jar in Node.js
+Form-encoded login: POST login uses application/x-www-form-urlencoded, not JSON
+Token extraction: Token comes from sv-t cookie, must be > 100 chars
+API headers: Include Authorization: Token {token}, Partition: default, tid, idempotency-key, dataread: true
+CORS preflight: Handle preflight for lmdb.skuvault.com if needed
+Async/await: All methods are async
+Context manager: Supports async with pattern for automatic cleanup
+This should provide enough detail for a Node.js reimplementation.
