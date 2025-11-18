@@ -84,7 +84,7 @@ export async function getLabelsForShipment(shipmentId: string): Promise<any[]> {
  * Create a label for a shipment
  * Returns label data including PDF URL
  */
-export async function createLabel(shipmentId: string): Promise<any> {
+export async function createLabel(shipmentData: any): Promise<any> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
@@ -98,7 +98,7 @@ export async function createLabel(shipmentId: string): Promise<any> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      shipment_id: shipmentId,
+      shipment: shipmentData,
     }),
   });
 

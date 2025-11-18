@@ -143,8 +143,16 @@ export class ShipStationShipmentService {
 
       console.log(`[ShipmentService] Creating label for shipment ${shipment.shipmentId}`);
 
-      // Call ShipStation API to create label
-      const labelData = await createShipStationLabel(shipment.shipmentId);
+      // Validate shipment has the raw ShipStation data
+      if (!shipment.shipmentData) {
+        return { 
+          success: false, 
+          error: 'Shipment does not have ShipStation data. Please sync shipment first.' 
+        };
+      }
+
+      // Call ShipStation API to create label with full shipment payload
+      const labelData = await createShipStationLabel(shipment.shipmentData);
 
       // Extract label URL from response
       const labelUrl = labelData.label_download || labelData.pdf_url || labelData.href;
