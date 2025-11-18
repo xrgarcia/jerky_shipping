@@ -102,9 +102,12 @@ const formatCountdown = (seconds: number): string => {
 export default function Sessions() {
   const { toast } = useToast();
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
+  const [hasAuthenticated, setHasAuthenticated] = useState(false);
   
+  // Only fetch sessions if user has authenticated successfully
   const { data, isLoading, error, refetch } = useQuery<SessionsResponse>({
     queryKey: ["/api/skuvault/sessions"],
+    enabled: hasAuthenticated, // Only run after successful login
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
@@ -152,9 +155,10 @@ export default function Sessions() {
         title: "Connected to SkuVault",
         description: "Successfully authenticated with SkuVault. Fetching sessions...",
       });
+      // Mark as authenticated to enable session fetching
+      setHasAuthenticated(true);
       // Refetch sessions after successful login
       queryClient.invalidateQueries({ queryKey: ["/api/skuvault/sessions"] });
-      refetch();
     },
     onError: (error: any) => {
       toast({
