@@ -72,3 +72,42 @@ Preferred communication style: Simple, everyday language.
     -   Environment variables: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 -   **Nodemailer**: For sending magic link authentication emails (requires SMTP configuration).
 -   **Neon Database**: Serverless PostgreSQL database accessed via `DATABASE_URL` (WebSocket protocol).
+
+## Future Enhancements
+
+### ShipStation Connect Auto-Print Integration
+
+**Trigger phrase:** `"re-implement shipstation connect"`
+
+**User Requirements:**
+1. One-click printing - User clicks "Create Shipping Label" once
+2. Print queue bar appears at bottom of screen
+3. Job shows in queue with visible status changes
+4. Job automatically disappears when printing completes
+
+**How It Works:**
+- Install ShipStation Connect desktop application on warehouse computers
+- Connect monitors ShipStation API for new labels created by our application
+- Automatically sends labels to configured thermal printers (Zebra, DYMO, etc.)
+- Status lifecycle: `queued` → `printing` (when Connect receives) → `printed` (auto-removes from queue)
+- Print queue bar provides real-time visual feedback throughout entire process
+- No manual "Print Now" or "Done" buttons required
+
+**Implementation Differences:**
+
+| Current Manual System | ShipStation Connect (Future) |
+|----------------------|------------------------------|
+| 1. Create label | 1. Create label |
+| 2. Manual "Print Now" click | 2. Auto-prints via Connect |
+| 3. PDF opens in new tab | 3. Sends directly to printer |
+| 4. User prints via browser | 4. No browser interaction |
+| 5. Manual "Done" click | 5. Auto-removes when complete |
+
+**Technical Implementation Notes:**
+- Backend creates label via ShipStation V2 API
+- ShipStation Connect app detects new label and auto-prints
+- Webhook from ShipStation confirms print completion
+- Backend updates job status to `printed` and removes from queue
+- Print queue bar shows status progression automatically
+- Works with existing `printJobs` table and WebSocket broadcasting
+- Supports multiple printers and warehouse locations
