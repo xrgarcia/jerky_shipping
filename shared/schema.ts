@@ -209,8 +209,9 @@ export type BackfillJob = typeof backfillJobs.$inferSelect;
 export const printQueue = pgTable("print_queue", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").notNull().references(() => orders.id),
-  labelUrl: text("label_url").notNull(), // ShipStation label PDF/ZPL URL
-  status: text("status").notNull().default("queued"), // queued, printing, printed
+  labelUrl: text("label_url"), // ShipStation label PDF/ZPL URL (nullable until label is fetched/created)
+  status: text("status").notNull().default("queued"), // queued, printing, printed, failed
+  error: text("error"), // Error message if status is failed
   queuedAt: timestamp("queued_at").notNull().defaultNow(),
   printedAt: timestamp("printed_at"),
 });
@@ -218,6 +219,9 @@ export const printQueue = pgTable("print_queue", {
 export const insertPrintQueueSchema = createInsertSchema(printQueue).omit({
   id: true,
   queuedAt: true,
+}).extend({
+  labelUrl: z.string().nullish(),
+  error: z.string().nullish(),
 });
 
 export type InsertPrintQueue = z.infer<typeof insertPrintQueueSchema>;
