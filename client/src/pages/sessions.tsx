@@ -66,6 +66,12 @@ const getStatusColor = (status: SessionState | null): string => {
       return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
     case SessionState.INACTIVE:
       return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20";
+    case SessionState.PICKED:
+      return "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/20";
+    case SessionState.SHIPPED:
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20";
+    case SessionState.CANCELLED:
+      return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
     default:
       return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
   }
@@ -86,8 +92,14 @@ const formatStatus = (status: SessionState | null): string => {
       return "New";
     case SessionState.INACTIVE:
       return "Inactive";
+    case SessionState.PICKED:
+      return "Picked";
+    case SessionState.SHIPPED:
+      return "Shipped";
+    case SessionState.CANCELLED:
+      return "Cancelled";
     default:
-      return status;
+      return "Unknown";
   }
 };
 

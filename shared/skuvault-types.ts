@@ -46,6 +46,12 @@ export function parseSessionState(state: string | null | undefined): SessionStat
       return SessionState.READY_TO_SHIP;
     case "closed":
       return SessionState.CLOSED;
+    case "picked":
+      return SessionState.PICKED;
+    case "shipped":
+      return SessionState.SHIPPED;
+    case "cancelled":
+      return SessionState.CANCELLED;
     default:
       return null;
   }
