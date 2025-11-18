@@ -661,7 +661,14 @@ export class SkuVaultService {
       
       const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
-      console.log(`[SkuVault] Successfully fetched directions for picklist ${picklistId}`);
+      // Extract and log all order IDs for debugging
+      const orders = response?.picklist?.orders || [];
+      const orderIds = orders.map((order: any) => order.id).filter(Boolean);
+      const sessionId = response?.picklist?.sequenceId;
+      
+      console.log(`[SkuVault] Successfully fetched directions for picklist ${picklistId} (Session ${sessionId})`);
+      console.log(`[SkuVault] This session contains ${orderIds.length} order(s):`, orderIds);
+      
       return response;
 
     } catch (error) {
