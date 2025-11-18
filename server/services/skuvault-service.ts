@@ -597,6 +597,42 @@ export class SkuVaultService {
   }
 
   /**
+   * Get detailed picklist directions for a specific session
+   * Fetches comprehensive picking information including orders, items, locations, and history
+   * 
+   * @param picklistId - The picklist ID to fetch directions for
+   * @returns DirectionsResponse with picklist info, directions, and history
+   */
+  async getSessionDirections(picklistId: string): Promise<any> {
+    // Check credentials before attempting to authenticate
+    if (!this.config.username || !this.config.password) {
+      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
+    }
+
+    // Ensure we're authenticated
+    if (!this.isAuthenticated) {
+      const loginSuccess = await this.login();
+      if (!loginSuccess) {
+        throw new Error('Authentication failed');
+      }
+    }
+
+    try {
+      const url = `${this.config.apiBaseUrl}/wavepicking/get/${picklistId}/directions`;
+      console.log(`[SkuVault] Fetching directions for picklist ${picklistId}`);
+      
+      const response = await this.makeAuthenticatedRequest<any>('GET', url);
+      
+      console.log(`[SkuVault] Successfully fetched directions for picklist ${picklistId}`);
+      return response;
+
+    } catch (error) {
+      console.error(`[SkuVault] Error fetching directions for picklist ${picklistId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Get current lockout status
    * Returns lockout information including whether locked out and time remaining
    */
