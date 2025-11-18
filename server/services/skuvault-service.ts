@@ -21,7 +21,9 @@ import {
   type SessionsResponse, 
   type ParsedSession, 
   type SessionData,
-  SessionState 
+  SessionState,
+  type SessionFilters,
+  MatchType
 } from '@shared/skuvault-types';
 
 interface SkuVaultConfig {
@@ -513,12 +515,12 @@ export class SkuVaultService {
   }
 
   /**
-   * Fetch wave picking sessions from SkuVault
+   * Fetch wave picking sessions from SkuVault with search, filter, sort, and pagination
    * 
-   * @param states - Optional array of session states to filter by
+   * @param filters - Optional search and filter parameters
    * @returns Array of parsed sessions
    */
-  async getSessions(states?: SessionState[]): Promise<ParsedSession[]> {
+  async getSessions(filters?: SessionFilters): Promise<ParsedSession[]> {
     // Check credentials before attempting to authenticate
     if (!this.config.username || !this.config.password) {
       throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
@@ -533,20 +535,46 @@ export class SkuVaultService {
     }
 
     try {
-      const statesToFetch = states || this.getAllSessionStates();
+      // Build base payload with defaults
+      const statesToFetch = filters?.states || this.getAllSessionStates();
+      const limit = filters?.limit || 100;
+      const skip = filters?.skip || 0;
+      const sortDescending = filters?.sortDescending ?? false;
       
       // Call the sessions API endpoint with correct format
       const url = `${this.config.apiBaseUrl}/wavepicking/get/sessions`;
-      const requestData = {
-        limit: 100,
-        skip: 0,
+      const requestData: any = {
+        limit,
+        skip,
         userId: '-2', // System-wide identifier for all users
-        sort: [{ descending: false, field: 'createdDate' }],
+        sort: [{ descending: sortDescending, field: 'createdDate' }],
         states: statesToFetch,
-        saleId: { match: 'contains', value: '' }, // Empty for all sales
       };
 
-      console.log('[SkuVault] Fetching sessions with states:', statesToFetch);
+      // Add optional search filters if provided
+      if (filters?.sessionId) {
+        requestData.sequenceId = { 
+          match: MatchType.EXACT, 
+          value: filters.sessionId.toString() 
+        };
+      }
+
+      if (filters?.picklistId) {
+        requestData.picklistId = { 
+          match: MatchType.CONTAINS, 
+          value: filters.picklistId 
+        };
+      }
+
+      if (filters?.orderNumber) {
+        // Order numbers are embedded in saleId field
+        requestData.saleId = { 
+          match: MatchType.CONTAINS, 
+          value: filters.orderNumber 
+        };
+      }
+
+      console.log('[SkuVault] Fetching sessions with filters:', JSON.stringify(filters, null, 2));
 
       const response = await this.makeAuthenticatedRequest<any>(
         'POST',

@@ -14,7 +14,18 @@ export enum SessionState {
   INACTIVE = "inactive",
   NEW = "new",
   READY_TO_SHIP = "readyToShip",
-  CLOSED = "closed"
+  CLOSED = "closed",
+  PICKED = "picked",
+  SHIPPED = "shipped",
+  CANCELLED = "cancelled"
+}
+
+/**
+ * Match patterns for search filters
+ */
+export enum MatchType {
+  EXACT = "exact",
+  CONTAINS = "contains"
 }
 
 /**
@@ -288,3 +299,29 @@ export const parsedDirectionSchema = z.object({
 });
 
 export type ParsedDirection = z.infer<typeof parsedDirectionSchema>;
+
+/**
+ * Search and filter parameters for sessions API
+ */
+export interface SessionFilters {
+  sessionId?: number | null;
+  picklistId?: string | null;
+  orderNumber?: string | null;
+  states?: SessionState[];
+  sortDescending?: boolean;
+  limit?: number;
+  skip?: number;
+}
+
+/**
+ * Zod schema for session filters validation
+ */
+export const sessionFiltersSchema = z.object({
+  sessionId: z.number().nullable().optional(),
+  picklistId: z.string().nullable().optional(),
+  orderNumber: z.string().nullable().optional(),
+  states: z.array(z.nativeEnum(SessionState)).optional(),
+  sortDescending: z.boolean().optional(),
+  limit: z.number().min(1).max(100).optional(),
+  skip: z.number().min(0).optional(),
+});
