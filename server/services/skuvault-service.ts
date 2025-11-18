@@ -102,7 +102,8 @@ class LockoutCache {
 
   async isLockedOut(): Promise<boolean> {
     const endTime = await this.getLockoutEndTime();
-    return endTime !== null && endTime > Date.now();
+    // getLockoutEndTime() already returns null for expired lockouts
+    return endTime !== null;
   }
 
   async clear(): Promise<void> {

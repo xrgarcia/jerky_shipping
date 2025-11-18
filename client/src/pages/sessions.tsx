@@ -108,10 +108,13 @@ export default function Sessions() {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  // Query lockout status every second
+  // Query lockout status - only poll continuously if there's an active lockout
   const { data: lockoutData } = useQuery<LockoutStatus>({
     queryKey: ["/api/skuvault/lockout-status"],
-    refetchInterval: 1000, // Refetch every second for countdown
+    refetchInterval: (data) => {
+      // Only poll every second if there's an active lockout
+      return data?.isLockedOut ? 1000 : false;
+    },
   });
 
   const isLockedOut = lockoutData?.isLockedOut || false;
@@ -169,6 +172,9 @@ export default function Sessions() {
         message: error.message || "Unknown error",
         responseData: error.responseData || null,
       });
+      
+      // Refresh lockout status to check if we're now locked out
+      queryClient.invalidateQueries({ queryKey: ["/api/skuvault/lockout-status"] });
     },
   });
 
