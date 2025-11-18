@@ -17,9 +17,13 @@ import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
+import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
+
+// Central Time (America/Chicago timezone) for consistent reporting
+const CST_TIMEZONE = 'America/Chicago';
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1339,9 +1343,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
-      // Parse YYYY-MM-DD strings as local midnight (not UTC)
-      const start = new Date(`${startDate}T00:00:00`);
-      const end = new Date(`${endDate}T23:59:59.999`);
+      // Parse YYYY-MM-DD strings as Central Time
+      const start = zonedTimeToUtc(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = zonedTimeToUtc(`${endDate} 23:59:59.999`, CST_TIMEZONE);
       
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return res.status(400).json({ error: "Invalid date format" });
@@ -1385,7 +1389,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalDiscounts += parseAmount(order.totalDiscounts);
 
         // Daily totals for chart (excluding refunded orders)
-        const dayKey = order.createdAt.toISOString().split('T')[0];
+        // Group by CST day to match date range filtering
+        const cstDate = utcToZonedTime(order.createdAt, CST_TIMEZONE);
+        const dayKey = formatTz(cstDate, 'yyyy-MM-dd', { timeZone: CST_TIMEZONE });
         dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + parseAmount(order.orderTotal);
 
         // Status counts (excluding refunded orders)
