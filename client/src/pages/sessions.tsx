@@ -14,10 +14,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle, Clock } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle, Clock, MapPin, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ParsedSession } from "@shared/skuvault-types";
-import { SessionState } from "@shared/skuvault-types";
+import { SessionState, parseSessionState } from "@shared/skuvault-types";
 
 interface ErrorDetails {
   statusCode: number;
@@ -103,12 +112,19 @@ export default function Sessions() {
   const { toast } = useToast();
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
   const [hasAuthenticated, setHasAuthenticated] = useState(false);
+  const [selectedPicklistId, setSelectedPicklistId] = useState<string | null>(null);
   
   // Only fetch sessions if user has authenticated successfully
   const { data, isLoading, error, refetch } = useQuery<SessionsResponse>({
     queryKey: ["/api/skuvault/sessions"],
     enabled: hasAuthenticated, // Only run after successful login
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Fetch detailed session directions when a session is selected
+  const { data: sessionDetails, isLoading: isLoadingDetails } = useQuery({
+    queryKey: ["/api/skuvault/sessions", selectedPicklistId],
+    enabled: !!selectedPicklistId,
   });
 
   // Query lockout status - poll every second to keep countdown updated  
@@ -405,18 +421,19 @@ export default function Sessions() {
                     )}
                   </div>
 
-                  {/* View Link */}
-                  {session.viewUrl && (
+                  {/* View Details Button */}
+                  {session.picklistId && (
                     <div className="pt-2 border-t">
-                      <a 
-                        href={session.viewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                        data-testid={`link-view-${session.sessionId}`}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setSelectedPicklistId(session.picklistId)}
+                        data-testid={`button-view-details-${session.sessionId}`}
                       >
-                        View in SkuVault →
-                      </a>
+                        <Package className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -425,6 +442,136 @@ export default function Sessions() {
           </div>
         )}
       </div>
+
+      {/* Session Detail Modal */}
+      <Dialog open={!!selectedPicklistId} onOpenChange={() => setSelectedPicklistId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh]" data-testid="dialog-session-details">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Session Details
+            </DialogTitle>
+            <DialogDescription>
+              Picklist: {selectedPicklistId}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+            {isLoadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : sessionDetails ? (
+              <div className="space-y-6">
+                {/* Picklist Summary */}
+                {sessionDetails.picklist && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Picklist Summary</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Status</div>
+                          <Badge className={getStatusColor(parseSessionState(sessionDetails.picklist.state))}>
+                            {formatStatus(parseSessionState(sessionDetails.picklist.state))}
+                          </Badge>
+                        </div>
+                        {sessionDetails.picklist.assigned && (
+                          <div className="space-y-1">
+                            <div className="text-xs text-muted-foreground">Assigned To</div>
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3" />
+                              <span className="text-sm font-medium">{sessionDetails.picklist.assigned.name}</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Orders</div>
+                          <div className="text-lg font-semibold">{sessionDetails.picklist.orderCount || 0}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">SKUs</div>
+                          <div className="text-lg font-semibold">{sessionDetails.picklist.skuCount || 0}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Total Quantity</div>
+                          <div className="text-lg font-semibold">{sessionDetails.picklist.totalQuantity || 0}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Picked</div>
+                          <div className="text-lg font-semibold">{sessionDetails.picklist.pickedQuantity || 0}</div>
+                        </div>
+                        {sessionDetails.picklist.totalItemsWeight && (
+                          <div className="space-y-1">
+                            <div className="text-xs text-muted-foreground">Weight</div>
+                            <div className="text-lg font-semibold">{sessionDetails.picklist.totalItemsWeight.toFixed(1)} lb</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Orders */}
+                    {sessionDetails.picklist.orders && sessionDetails.picklist.orders.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3">Orders ({sessionDetails.picklist.orders.length})</h3>
+                        <div className="space-y-4">
+                          {sessionDetails.picklist.orders.map((order: any, index: number) => (
+                            <Card key={order.id || index} data-testid={`card-order-${order.id}`}>
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <ListChecks className="h-4 w-4" />
+                                  Order: {order.id}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {order.items && order.items.length > 0 && (
+                                  <div className="space-y-3">
+                                    {order.items.map((item: any, itemIndex: number) => (
+                                      <div 
+                                        key={item.sku || itemIndex} 
+                                        className="flex gap-4 p-3 bg-muted/50 rounded-md"
+                                        data-testid={`item-${item.sku}`}
+                                      >
+                                        <div className="flex-1 space-y-1">
+                                          <div className="font-medium">{item.sku}</div>
+                                          {item.description && (
+                                            <div className="text-sm text-muted-foreground">{item.description}</div>
+                                          )}
+                                          {item.location && (
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                              <MapPin className="h-3 w-3" />
+                                              <span>{item.location}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="text-right space-y-1">
+                                          <div className="text-sm text-muted-foreground">Quantity</div>
+                                          <div className="text-lg font-semibold">
+                                            {item.picked || 0} / {item.quantity || 0}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                No details available
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Error Details Modal */}
       <AlertDialog open={!!errorDetails} onOpenChange={() => setErrorDetails(null)}>
