@@ -41,6 +41,11 @@ Preferred communication style: Simple, everyday language.
 - **SkuVault Sessions (`/sessions`)**: Displays wave picking sessions from SkuVault using a reverse-engineered web API. Features:
   - Manual authentication via "Connect to SkuVault" button to avoid anti-bot detection
   - Session list view with metrics (orders, SKUs, quantities, weight, status)
+  - Advanced search and filtering capabilities:
+    - Search by Session ID (exact match), Picklist ID (contains), or Order Number (contains)
+    - Multi-select state filtering (8 states: active, inactive, new, readyToShip, closed, picked, shipped, cancelled)
+    - Sort toggle (newest/oldest by creation date)
+    - Pagination with configurable page size (default 50) and Previous/Next navigation
   - Detailed session view modal showing:
     - Picklist summary (status, assigned user, counts, weight)
     - All orders in the session
