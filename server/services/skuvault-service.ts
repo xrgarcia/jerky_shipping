@@ -237,6 +237,11 @@ export class SkuVaultService {
       console.log('[SkuVault] Starting login process...');
       console.log('[SkuVault] Username configured:', !!this.config.username, `(${this.config.username.length} chars)`);
       console.log('[SkuVault] Password configured:', !!this.config.password, `(${this.config.password.length} chars)`);
+      
+      // TEMPORARY DEBUG: Print actual credentials for troubleshooting
+      // WARNING: Remove this after debugging - security risk
+      console.log('[SkuVault] DEBUG - Actual username:', JSON.stringify(this.config.username));
+      console.log('[SkuVault] DEBUG - Actual password:', JSON.stringify(this.config.password));
 
       // Check if we have a valid cached token
       if (await this.tokenCache.isValid()) {
