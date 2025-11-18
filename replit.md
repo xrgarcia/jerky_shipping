@@ -48,7 +48,7 @@ Preferred communication style: Simple, everyday language.
     - Pagination with configurable page size (default 50) and Previous/Next navigation
   - Detailed session view modal showing:
     - Picklist summary (status, assigned user, counts, weight)
-    - All orders in the session
+    - All orders in the session with spot numbers (1-based order position in picklist for warehouse picking workflow)
     - Line items for each order with product images (64x64px), SKU, description, location, picked/total quantities
   - Product images fetched from local database by matching SKUs with productVariants table
   - Token cached in Redis with 24-hour TTL for persistence across server restarts
