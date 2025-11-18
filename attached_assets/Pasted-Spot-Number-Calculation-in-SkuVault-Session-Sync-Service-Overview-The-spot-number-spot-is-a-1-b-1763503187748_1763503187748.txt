@@ -1,0 +1,40 @@
+Spot Number Calculation in SkuVault Session Sync Service
+Overview
+The spot_number (spot#) is a 1-based index representing the position of an order in the picklist's orders array. It is assigned when parsing directions data from the SkuVault API.
+Calculation Process
+Location in Code:
+Primary assignment: jerky_data_hub/services/skuvault_web_service.py lines 1077 and 1172
+Usage: jerky_data_hub/services/session_order_builder.py line 552
+Model definition: jerky_data_hub/models/skuvault/directions.py line 162
+How It Works:
+Fetching directions data:
+The service calls the SkuVault directions API with a picklist_id
+The API returns a DirectionsResponse containing a picklist object with an orders array
+Iterating through orders:
+   for order_index, order in enumerate(response.picklist.orders, start=1):
+Uses Python's enumerate() with start=1 to create a 1-based index
+order_index becomes the spot_number
+Assigning spot_number to directions:
+   direction = ParsedDirection(       ...       spot_number=order_index,  # 1, 2, 3, 4, etc.       order_number=order.id,       ...   )
+All direction entries for items within the same order get the same spot_number
+The first order gets spot_number=1, the second gets spot_number=2, etc.
+Propagating to SessionOrder:
+When grouping directions by sale_id (order), the spot_number from the first direction for that order is used
+This creates the final SessionOrder with its spot_number field
+Key Points
+1-based indexing: starts at 1, not 0
+Order-level assignment: all items within the same order share the same spot_number
+Position-based: reflects the order's position in the picklist's orders array, not a user-defined value
+Consistent within session: same order position = same spot_number throughout processing
+Example
+If a picklist has 3 orders:
+Order at index 0 → spot_number = 1 (first order)
+Order at index 1 → spot_number = 2 (second order)
+Order at index 2 → spot_number = 3 (third order)
+All direction entries (items) for order 1 will have spot_number=1, all items for order 2 will have spot_number=2, etc.
+Usage
+The spot_number is used to:
+Generate custom field values: "[session_id] #[spot_number]" format (see SessionOrder.to_custom_field_2())
+Match orders when syncing stale data: finds orders by matching spot_number across syncs
+Display order sequence in UI: shows which spot/position an order occupies in the picking sequence
+This ensures each order in a picklist session has a unique, sequential identifier based on its position in the picklist's order sequence.
