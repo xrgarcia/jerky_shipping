@@ -31,6 +31,9 @@ import {
   type OrderRefund,
   type InsertOrderRefund,
   orderRefunds,
+  type OrderItem,
+  type InsertOrderItem,
+  orderItems,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -66,6 +69,12 @@ export interface IStorage {
   getOrderRefunds(orderId: string): Promise<OrderRefund[]>;
   getRefundsInDateRange(startDate: Date, endDate: Date): Promise<OrderRefund[]>;
   getOrderRefundByShopifyId(shopifyRefundId: string): Promise<OrderRefund | undefined>;
+
+  // Order Items
+  upsertOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  getOrderItems(orderId: string): Promise<OrderItem[]>;
+  getOrderItemByShopifyId(shopifyLineItemId: string): Promise<OrderItem | undefined>;
+  getAllOrderItems(): Promise<OrderItem[]>;
 
   // Shipments
   createShipment(shipment: InsertShipment): Promise<Shipment>;
@@ -304,6 +313,48 @@ export class DatabaseStorage implements IStorage {
       .from(orderRefunds)
       .where(eq(orderRefunds.shopifyRefundId, shopifyRefundId));
     return result[0];
+  }
+
+  // Order Items
+  async upsertOrderItem(item: InsertOrderItem): Promise<OrderItem> {
+    const existing = await this.getOrderItemByShopifyId(item.shopifyLineItemId);
+    
+    if (existing) {
+      const result = await db
+        .update(orderItems)
+        .set({ ...item, updatedAt: new Date() })
+        .where(eq(orderItems.shopifyLineItemId, item.shopifyLineItemId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(orderItems).values(item).returning();
+      return result[0];
+    }
+  }
+
+  async getOrderItems(orderId: string): Promise<OrderItem[]> {
+    const result = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+      .orderBy(orderItems.createdAt);
+    return result;
+  }
+
+  async getOrderItemByShopifyId(shopifyLineItemId: string): Promise<OrderItem | undefined> {
+    const result = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.shopifyLineItemId, shopifyLineItemId));
+    return result[0];
+  }
+
+  async getAllOrderItems(): Promise<OrderItem[]> {
+    const result = await db
+      .select()
+      .from(orderItems)
+      .orderBy(orderItems.createdAt);
+    return result;
   }
 
   // Shipments
