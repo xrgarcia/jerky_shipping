@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, TrendingUp, DollarSign, Package, BarChart3, RotateCcw } from "lucide-react";
-import { format } from "date-fns";
+import { format, subDays, parse } from "date-fns";
+import { toZonedTime, formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import {
   LineChart,
   Line,
@@ -35,25 +36,46 @@ interface ReportSummary {
 }
 
 export default function Reports() {
-  const [startDate, setStartDate] = useState<Date>(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date;
-  });
-  const [endDate, setEndDate] = useState<Date>(new Date());
-
-  const formatDateForAPI = (date: Date) => {
+  // Central Time (America/Chicago timezone) - matches backend
+  const CST_TIMEZONE = 'America/Chicago';
+  
+  // Helper utilities for CST date string management
+  const toCalendarDate = (dateStr: string): Date => {
+    // Convert yyyy-MM-dd string to Date for Calendar component
+    return parse(dateStr, 'yyyy-MM-dd', new Date());
+  };
+  
+  const toCstDateString = (date: Date): string => {
+    // Extract calendar day components directly to preserve the clicked day
+    // No timezone conversion - if user clicks Oct 1, we want "2025-10-01"
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+  
+  const toCstMidnightUtc = (dateStr: string): Date => {
+    // Convert yyyy-MM-dd CST string to Date at CST midnight
+    return fromZonedTime(`${dateStr} 00:00:00`, CST_TIMEZONE);
+  };
+  
+  // Store dates as CST strings (single source of truth)
+  const [startDateStr, setStartDateStr] = useState<string>(() => {
+    const cstNow = toZonedTime(new Date(), CST_TIMEZONE);
+    const thirtyDaysAgo = subDays(cstNow, 30);
+    return formatInTimeZone(thirtyDaysAgo, CST_TIMEZONE, 'yyyy-MM-dd');
+  });
+  
+  const [endDateStr, setEndDateStr] = useState<string>(() => {
+    const cstNow = toZonedTime(new Date(), CST_TIMEZONE);
+    return formatInTimeZone(cstNow, CST_TIMEZONE, 'yyyy-MM-dd');
+  });
 
   const { data: summary, isLoading } = useQuery<ReportSummary>({
-    queryKey: ['/api/reports/summary', formatDateForAPI(startDate), formatDateForAPI(endDate)],
+    queryKey: ['/api/reports/summary', startDateStr, endDateStr],
     queryFn: async ({ queryKey }) => {
-      const [endpoint, startDateStr, endDateStr] = queryKey as [string, string, string];
-      const url = `${endpoint}?startDate=${startDateStr}&endDate=${endDateStr}`;
+      const [endpoint, start, end] = queryKey as [string, string, string];
+      const url = `${endpoint}?startDate=${start}&endDate=${end}`;
       const res = await fetch(url, { credentials: "include" });
       
       if (!res.ok) {
@@ -71,10 +93,15 @@ export default function Reports() {
 
   const formatChartData = () => {
     if (!summary?.dailyData) return [];
-    return summary.dailyData.map(item => ({
-      date: format(new Date(item.date), 'MMM dd'),
-      total: item.total,
-    }));
+    return summary.dailyData.map(item => {
+      // Format CST date string for chart labels
+      // This ensures chart shows correct dates regardless of browser timezone
+      const cstDate = toCstMidnightUtc(item.date);
+      return {
+        date: formatInTimeZone(cstDate, CST_TIMEZONE, 'MMM dd'),
+        total: item.total,
+      };
+    });
   };
 
   return (
@@ -107,14 +134,18 @@ export default function Reports() {
                       data-testid="button-start-date"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(startDate, "PPP")}
+                      {formatInTimeZone(toCstMidnightUtc(startDateStr), CST_TIMEZONE, "PPP")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={startDate}
-                      onSelect={(date) => date && setStartDate(date)}
+                      selected={toCalendarDate(startDateStr)}
+                      onSelect={(date) => {
+                        if (date) {
+                          setStartDateStr(toCstDateString(date));
+                        }
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -131,14 +162,18 @@ export default function Reports() {
                       data-testid="button-end-date"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(endDate, "PPP")}
+                      {formatInTimeZone(toCstMidnightUtc(endDateStr), CST_TIMEZONE, "PPP")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={endDate}
-                      onSelect={(date) => date && setEndDate(date)}
+                      selected={toCalendarDate(endDateStr)}
+                      onSelect={(date) => {
+                        if (date) {
+                          setEndDateStr(toCstDateString(date));
+                        }
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
