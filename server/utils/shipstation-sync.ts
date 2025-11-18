@@ -1,6 +1,9 @@
 import { storage } from "../storage";
-import { getShipmentsByOrderNumber } from "./shipstation-api";
+import { ShipStationShipmentService } from "../services/shipstation-shipment-service";
 import { log } from "../vite";
+
+// Initialize the shipment service
+const shipmentService = new ShipStationShipmentService(storage);
 
 /**
  * Bootstrap existing shipments from ShipStation
@@ -27,35 +30,18 @@ export async function bootstrapShipmentsFromShipStation(): Promise<void> {
 
     for (const order of ordersToProcess) {
       try {
-        // Add timeout for each API call
+        // Add timeout for syncing
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Timeout')), 5000)
         );
         
-        const shipStationShipments = await Promise.race([
-          getShipmentsByOrderNumber(order.orderNumber),
+        const result = await Promise.race([
+          shipmentService.syncShipmentsForOrder(order.orderNumber),
           timeoutPromise
-        ]) as any[];
+        ]) as any;
         
-        for (const shipmentData of shipStationShipments) {
-          const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
-          
-          if (!existingShipment) {
-            const shipmentRecord = {
-              orderId: order.id,
-              shipmentId: shipmentData.shipment_id?.toString(),
-              trackingNumber: shipmentData.trackingNumber,
-              carrierCode: shipmentData.carrierCode,
-              serviceCode: shipmentData.serviceCode,
-              status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-              shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-              shipmentData: shipmentData,
-            };
-
-            await storage.createShipment(shipmentRecord);
-            createdCount++;
-          }
+        if (result.success && result.shipments.length > 0) {
+          createdCount += result.shipments.length;
         }
       } catch (orderError: any) {
         errorCount++;

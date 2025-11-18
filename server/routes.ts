@@ -13,9 +13,13 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, createLabel, getShipmentsByOrderNumber } from "./utils/shipstation-api";
+import { fetchShipStationResource } from "./utils/shipstation-api";
 import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
+import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
+
+// Initialize the shipment service
+const shipmentService = new ShipStationShipmentService(storage);
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -503,87 +507,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Order not found" });
       }
 
-      let shipments = await storage.getShipmentsByOrderId(order.id);
+      // Use the centralized service to create label
+      const result = await shipmentService.createLabelForOrder(order.orderNumber);
 
-      // If no shipment in database, try fetching from ShipStation
-      if (shipments.length === 0) {
-        console.log(`No shipment found in database for order ${order.orderNumber}, checking ShipStation...`);
-        
-        try {
-          const shipStationShipments = await getShipmentsByOrderNumber(order.orderNumber);
-          
-          if (shipStationShipments.length > 0) {
-            console.log(`Found ${shipStationShipments.length} shipment(s) in ShipStation for order ${order.orderNumber}`);
-            
-            // Store the first shipment from ShipStation in database
-            // Schema uses z.coerce.date() to automatically convert ISO strings to Date objects
-            // Note: ShipStation V2 API uses snake_case (shipment_id) not camelCase
-            const shipmentData = shipStationShipments[0] as any;
-            
-            // Log the shipment data to debug
-            console.log(`ShipStation shipment data for ${order.orderNumber}:`, {
-              shipment_id: shipmentData.shipment_id,
-              tracking_number: shipmentData.tracking_number,
-              carrier_code: shipmentData.carrier_code,
-              ship_date: shipmentData.ship_date
-            });
-            
-            const storedShipment = await storage.createShipment({
-              orderId: order.id,
-              shipmentId: shipmentData.shipment_id?.toString() || null,
-              trackingNumber: shipmentData.tracking_number || `UNKNOWN-${Date.now()}`,
-              carrierCode: shipmentData.carrier_id || 'unknown',
-              serviceCode: shipmentData.service_code || 'standard',
-              status: shipmentData.voided ? 'cancelled' : (shipmentData.shipment_status || 'shipped'),
-              statusDescription: shipmentData.shipment_status || 'Shipment created',
-              shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-              estimatedDeliveryDate: null,
-              actualDeliveryDate: null,
-              labelUrl: null,
-              shipmentData: shipmentData,
-            });
-            
-            console.log(`Stored shipment with ShipStation ID: ${storedShipment.shipmentId}`);
-            
-            shipments = [storedShipment];
-          } else {
-            return res.status(400).json({ 
-              error: "No shipment found for this order. Please create a shipment in ShipStation first." 
-            });
-          }
-        } catch (shipStationError: any) {
-          console.error(`Error fetching from ShipStation:`, shipStationError);
-          return res.status(500).json({ 
-            error: `Could not fetch shipment from ShipStation: ${shipStationError.message}` 
-          });
-        }
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
       }
 
-      const shipment = shipments[0];
+      // Broadcast print queue update
+      broadcastPrintQueueUpdate({ type: "job_added", job: result.printJob });
 
-      if (!shipment.shipmentId) {
-        return res.status(400).json({ error: "Shipment does not have a ShipStation shipment ID" });
-      }
-
-      const labelData = await createLabel(shipment.shipmentId);
-
-      const labelUrl = labelData.label_download || labelData.pdf_url || labelData.href;
-
-      if (!labelUrl) {
-        return res.status(500).json({ error: "No label URL returned from ShipStation" });
-      }
-
-      await storage.updateShipment(shipment.id, { labelUrl });
-
-      const printJob = await storage.createPrintJob({
-        orderId: order.id,
-        labelUrl,
-        status: "queued",
-      });
-
-      broadcastPrintQueueUpdate({ type: "job_added", job: printJob });
-
-      res.json({ success: true, printJob, labelUrl });
+      res.json({ success: true, printJob: result.printJob, labelUrl: result.labelUrl });
     } catch (error: any) {
       console.error("Error creating label:", error);
       res.status(500).json({ error: error.message || "Failed to create label" });
