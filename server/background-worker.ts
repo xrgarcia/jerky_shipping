@@ -57,6 +57,35 @@ async function processOrderRefunds(orderId: string, shopifyOrder: any) {
 }
 
 /**
+ * Extract and store line items from a Shopify order
+ * Processes the line_items array and stores each item in the database
+ */
+async function processOrderLineItems(orderId: string, shopifyOrder: any) {
+  const lineItems = shopifyOrder.line_items || [];
+  
+  for (const item of lineItems) {
+    try {
+      const itemData = {
+        orderId: orderId,
+        shopifyLineItemId: item.id.toString(),
+        title: item.title || item.name || 'Unknown Item',
+        sku: item.sku || null,
+        variantId: item.variant_id ? item.variant_id.toString() : null,
+        productId: item.product_id ? item.product_id.toString() : null,
+        quantity: item.quantity || 0,
+        currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
+        price: item.price || '0.00',
+        totalDiscount: item.total_discount || null,
+      };
+
+      await storage.upsertOrderItem(itemData);
+    } catch (error) {
+      console.error(`Error processing line item ${item.id} for order ${orderId}:`, error);
+    }
+  }
+}
+
+/**
  * Process a single batch of webhooks from the queue
  * Returns the number of webhooks processed
  */
@@ -100,6 +129,9 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
 
         // Process refunds from Shopify order
         await processOrderRefunds(orderData.id, shopifyOrder);
+
+        // Process line items from Shopify order
+        await processOrderLineItems(orderData.id, shopifyOrder);
 
         // Update backfill job progress if this is a backfill webhook
         // Count every order processed (new or updated) because the queue ensures no duplicates per job

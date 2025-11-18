@@ -417,6 +417,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Process line items for this order
+        if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
+          for (const item of shopifyOrder.line_items) {
+            try {
+              const itemData = {
+                orderId: orderData.id,
+                shopifyLineItemId: item.id.toString(),
+                title: item.title || item.name || 'Unknown Item',
+                sku: item.sku || null,
+                variantId: item.variant_id ? item.variant_id.toString() : null,
+                productId: item.product_id ? item.product_id.toString() : null,
+                quantity: item.quantity || 0,
+                currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
+                price: item.price || '0.00',
+                totalDiscount: item.total_discount || null,
+              };
+
+              await storage.upsertOrderItem(itemData);
+            } catch (itemError) {
+              console.error(`Error processing line item for order ${orderData.id}:`, itemError);
+            }
+          }
+        }
+
         syncCount++;
       }
 
