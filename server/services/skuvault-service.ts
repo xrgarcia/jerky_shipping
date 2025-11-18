@@ -14,6 +14,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { CookieJar } from 'tough-cookie';
 import { wrapper } from 'axios-cookiejar-support';
 import { v4 as uuidv4 } from 'uuid';
+import { getRedisClient } from '../utils/queue';
 import { 
   sessionsResponseSchema,
   parseSessionState,
@@ -31,37 +32,32 @@ interface SkuVaultConfig {
 }
 
 /**
- * In-memory token cache
+ * Redis-based token cache for SkuVault session token
+ * Stores sv-t cookie value with 24-hour TTL for persistence across server restarts
  */
 class TokenCache {
-  private token: string | null = null;
-  private lastRefresh: number = 0;
-  private readonly TTL_MS = 3600000; // 1 hour
+  private readonly REDIS_KEY = 'skuvault:session:token';
+  private readonly TTL_SECONDS = 86400; // 24 hours
 
-  set(token: string): void {
-    this.token = token;
-    this.lastRefresh = Date.now();
+  async set(token: string): Promise<void> {
+    const redis = getRedisClient();
+    await redis.set(this.REDIS_KEY, token, { ex: this.TTL_SECONDS });
   }
 
-  get(): string | null {
-    if (!this.token) return null;
-    
-    // Check if token has expired
-    if (Date.now() - this.lastRefresh > this.TTL_MS) {
-      this.token = null;
-      return null;
-    }
-    
-    return this.token;
+  async get(): Promise<string | null> {
+    const redis = getRedisClient();
+    const token = await redis.get<string>(this.REDIS_KEY);
+    return token;
   }
 
-  clear(): void {
-    this.token = null;
-    this.lastRefresh = 0;
+  async clear(): Promise<void> {
+    const redis = getRedisClient();
+    await redis.del(this.REDIS_KEY);
   }
 
-  isValid(): boolean {
-    return this.get() !== null;
+  async isValid(): Promise<boolean> {
+    const token = await this.get();
+    return token !== null;
   }
 }
 
@@ -110,37 +106,6 @@ export class SkuVaultService {
     }));
 
     this.tokenCache = new TokenCache();
-
-    // Start authentication at construction for immediate readiness
-    this.initPromise = this.initialize();
-  }
-
-  /**
-   * Initialize service by authenticating at startup
-   */
-  private async initialize(): Promise<void> {
-    if (!this.config.username || !this.config.password) {
-      console.warn('[SkuVault] Credentials not configured, skipping automatic login');
-      return;
-    }
-
-    try {
-      console.log('[SkuVault] Initializing service with automatic login...');
-      await this.login();
-      console.log('[SkuVault] Service initialized and ready');
-    } catch (error) {
-      console.error('[SkuVault] Failed to initialize service:', error);
-      // Don't throw - allow service to be created and retry later
-    }
-  }
-
-  /**
-   * Wait for initialization to complete
-   */
-  async waitForInit(): Promise<void> {
-    if (this.initPromise) {
-      await this.initPromise;
-    }
   }
 
   /**
@@ -154,7 +119,7 @@ export class SkuVaultService {
       console.log('[SkuVault] Password configured:', !!this.config.password, `(${this.config.password.length} chars)`);
 
       // Check if we have a valid cached token
-      if (this.tokenCache.isValid()) {
+      if (await this.tokenCache.isValid()) {
         console.log('[SkuVault] Using cached token');
         this.isAuthenticated = true;
         return true;
