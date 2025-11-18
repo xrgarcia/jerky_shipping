@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Features
 - **Product Catalog (`/products`)**: Warehouse-optimized interface for product and variant details with search functionality. Synchronized via Shopify webhooks.
-- **SkuVault Sessions (`/sessions`)**: Displays wave picking sessions from SkuVault using a reverse-engineered web API for data extraction and authentication.
+- **SkuVault Sessions (`/sessions`)**: Displays wave picking sessions from SkuVault using a reverse-engineered web API. Features manual authentication via "Connect to SkuVault" button to avoid anti-bot detection. Token cached in Redis with 24-hour TTL for persistence across server restarts.
 - **Order Backfill System (`/backfill`)**: Imports historical Shopify orders using an ID-only queueing mechanism to optimize memory usage. Features a UI with progress tracking and job history.
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
