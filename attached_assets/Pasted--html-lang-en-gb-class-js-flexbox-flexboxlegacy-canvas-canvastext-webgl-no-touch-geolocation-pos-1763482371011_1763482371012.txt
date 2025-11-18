@@ -1,0 +1,317 @@
+<html lang="en-gb" class=" js flexbox flexboxlegacy canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths"><!--<![endif]--><head><style type="text/css">@charset "UTF-8";[ng\:cloak],[ng-cloak],[data-ng-cloak],[x-ng-cloak],.ng-cloak,.x-ng-cloak,.ng-hide{display:none !important;}ng\:form{display:block;}.ng-animate-block-transitions{transition:0s all!important;-webkit-transition:0s all!important;}.ng-hide-add-active,.ng-hide-remove{display:block!important;}</style>
+
+	<meta charset="utf-8">
+	<meta name="robots" content="noindex, noarchive">
+	<meta name="googlebot" content="noindex, noarchive">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<meta name="description" content="">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+	<title>Log In | SkuVault</title>
+	<link href="/Content/themes/base/bundle?v=bNrAdDhoXapu9Umkg0G_BcmNgYmWlsOA2vPEmlLQ8LQ1" rel="stylesheet">
+
+	<link href="/Content/components/wijmo/css/bundle?v=qD1zoUIYQeevKNTu5zH-Vqcl9ld8PWHAjsTSJHqmAMk1" rel="stylesheet">
+
+	<link href="/Content/css/bundle?v=JMtOJ_MQShOaQJQJLVQyMX4ZaSVPxXjRa7SimW6k4Lg1" rel="stylesheet">
+
+
+	<!-- Begin Google Tag Manager Analytics-->
+	<!-- Custom DataLayer for Tag Manger (includes Tenant and User Ids) -->
+	<script type="text/javascript" async="" src="https://linnworksglobal.us1app.churnzero.net/churnzero.js"></script><script async="" src="https://cdn.pendo.io/agent/static/e59bfbe1-7825-497b-6c38-e95637d43e1c/pendo.js"></script><script async="" src="https://fullstory.com/s/fs.js"></script><script async="" src="https://www.googletagmanager.com/gtm.js?id=GTM-5CKD3CG"></script><script>
+    	dataLayer = [{
+    		'TenantId': '',
+    		'UserId': ''
+    	}];
+    </script>
+
+	<script>
+		(function (w, d, s, l, i) {
+		w[l] = w[l] || []; w[l].push({
+			'gtm.start':
+		new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+		j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+		'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+			})(window, document, 'script', 'dataLayer', 'GTM-5CKD3CG');
+	</script>
+	<!-- End Google Tag Manager Analytics -->
+
+	<!-- Begin FullStory Analytics -->
+	<script>
+		window['_fs_debug'] = false;
+		window['_fs_host'] = 'fullstory.com';
+		window['_fs_org'] = 'BXA4M';
+		window['_fs_namespace'] = 'FS';
+		(function (m, n, e, t, l, o, g, y) {
+			if (e in m) { if (m.console && m.console.log) { m.console.log('FullStory namespace conflict. Please set window["_fs_namespace"].'); } return; }
+			g = m[e] = function (a, b) { g.q ? g.q.push([a, b]) : g._api(a, b); }; g.q = [];
+			o = n.createElement(t); o.async = 1; o.src = 'https://' + _fs_host + '/s/fs.js';
+			y = n.getElementsByTagName(t)[0]; y.parentNode.insertBefore(o, y);
+			g.identify = function (i, v) { g(l, { uid: i }); if (v) g(l, v) }; g.setUserVars = function (v) { g(l, v) };
+			g.shutdown = function () { g("rec", !1) }; g.restart = function () { g("rec", !0) };
+			g.consent = function (a) { g("consent", !arguments.length || a) };
+			g.identifyAccount = function (i, v) { o = 'account'; v = v || {}; v.acctId = i; g(o, v) };
+			g.clearUserCookie = function () { };
+		})(window, document, window['_fs_namespace'], 'script', 'user');
+	</script>
+	<!-- End FullStory Analytics  -->
+
+	<!-- Begin Pendo Analytics -->
+	<script>
+	    (function(apiKey){
+	        (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
+	        v=['initialize','identify','updateOptions','pageLoad','track'];for(w=0,x=v.length;w<x;++w)(function(m){
+	            o[m]=o[m]||function(){o._q[m===v[0]?'unshift':'push']([m].concat([].slice.call(arguments,0)));};})(v[w]);
+	            y=e.createElement(n);y.async=!0;y.src='https://cdn.pendo.io/agent/static/'+apiKey+'/pendo.js';
+	            z=e.getElementsByTagName(n)[0];z.parentNode.insertBefore(y,z);})(window,document,'script','pendo');
+	            
+	            pendo.initialize({
+					visitor: {
+						id: ''.replace('User-', '')
+	                },
+
+	                account: {
+                        id: ''.replace('Tenant-', ''),
+                        productName: ''
+	                }
+				});
+	    })('e59bfbe1-7825-497b-6c38-e95637d43e1c');
+	</script>
+	<!-- End Pendo Analytics -->
+
+	<!-- Begin ChurnZero Analytics -->
+	<script>
+	function isSvUser( email )
+	{
+		return ( ( email?.endsWith( '@skuvault.com' ) ||
+			email?.endsWith( '@linnworks.com' ) ||
+			email?.startsWith( 'svsupport@Tenant-' ) ||
+			email?.endsWith( '@1.com' ) ) ?? false );
+	}
+
+	if( !isSvUser( '' ) )
+	{
+		var ChurnZero = ChurnZero || [];
+		(function(a,b,c,d){var cz=a.createElement(b); cz.type=c; cz.async=true; cz.src=d;var s=a.getElementsByTagName(b)[0];s.parentNode.insertBefore(cz, s);})(document, "script",'text/javascript', 'https://linnworksglobal.us1app.churnzero.net/churnzero.js');
+
+		ChurnZero.push(['setAppKey', '1!kTlXcVZkM6vDn8IcYK1rYJ9aTxEoxuxBNf00LugdseMt1320']);
+		ChurnZero.push(['setContact', ''.replace('Tenant-', ''), ''.replace('User-', '')]);
+	}
+</script>
+	<!-- End ChurnZero Analytics -->
+<script src="https://static.addtoany.com/menu/modules/core.oafg07ee.js" type="module"></script><style type="text/css" scoped="scoped" class=" pendo-style-7ViCVxKHuoa7zokUUrVkR4CWgB4" style="white-space: pre-wrap;"></style><style type="text/css" scoped="scoped" class=" pendo-style-zaQkHuFsZCKa-FrdWEQTOtRM34Y" style="white-space: pre-wrap;"></style><style id="pendo-resource-center-bubble-animation">@keyframes pulse { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6) } } .pendo-resource-center-badge-notification-bubble::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(236, 32, 89); border-radius: 100%; z-index: -1; animation: pulse 2s infinite; will-change: transform; }</style></head>
+<body data-ng-app="skuvault" class="nojs ng-scope" style="">
+	<!-- Google Tag Manager (noscript) -->
+	<noscript>
+		<iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5CKD3CG"
+			        height="0" width="0" style="display:none;visibility:hidden">
+		</iframe>
+	</noscript>
+	<!-- End Google Tag Manager (noscript) -->
+
+	<!-- Prompt IE 6 users to install Chrome Frame. Remove this if you support IE 6.  chromium.org/developers/how-tos/chrome-frame-getting-started -->
+	<!--[if lt IE 7]><p class=chromeframe>Your browser is <em>ancient!</em> <a href="http://browsehappy.com/">Upgrade to a different browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to experience this site.</p><![endif]-->
+	
+	
+
+<link href="/Content/css/shared-main-page.css" rel="stylesheet">
+
+<style>
+	.alert-danger-login {
+		border: 1px solid #BE3337;
+		background-color: #FFD7D4;
+		color: #222B36
+	}
+
+	.alert-danger-login i {
+		display: inline-block;
+		vertical-align: middle;
+		font-size: 14px;
+		color: red;
+		margin-top: 2px;
+		margin-left: 5px;
+	}
+
+	.alert-danger-login-message {
+		display: inline-block;
+		vertical-align: middle;
+		margin-left: 10px;
+	}
+</style>
+
+<div class="container ng-scope" data-ng-controller="LoginController" ng-init="init()">
+	<div ng-hide="!systemMessage" class="ng-hide">
+		<div class="alert" style="overflow: hidden; text-overflow: ellipsis;" ng-class="{
+					'system-message': systemMessage, 
+					'alert-info': systemMessage.Color === 'alert-info',
+					'alert-success': systemMessage.Color === 'alert-success',
+					'alert-danger': systemMessage.Color === 'alert-danger',
+					'alert-warning': systemMessage.Color === 'alert-warning',
+		}">
+			<span ng-class="{
+				'icon-info-sign': systemMessage.Color === 'alert-info',
+				'icon-check-sign': systemMessage.Color === 'alert-success',
+				'icon-warning-sign': systemMessage.Color === 'alert-danger' || systemMessage.Color === 'alert-warning',
+			}"></span>
+			<span ng-bind-html="systemMessage.Message | unsafe" class="ng-binding"></span>
+		</div>
+	</div>
+	<div class="col-md-5 col-md-offset-4">
+		<div class="login-logo">
+			<img src="/Content/img/skuvault-by-linnworks-light.svg" class="img-responsive" alt="SkuVault">
+		</div>
+<form action="/account/login" class="ng-dirty ng-valid ng-valid-required" method="post" name="loginForm" ng-submit="login($event)" novalidate="novalidate">			<div class="well">
+				<div class="form-group" data-ng-class="{error: loginForm.Email.$dirty &amp;&amp; loginForm.Email.$invalid}">
+					<div class="input-group">
+						<div class="input-group-addon">
+							<i class="icon-envelope"></i>
+						</div>
+						<input autofocus="autofocus" class="form-control ng-valid-email ng-dirty ng-valid ng-valid-required" data-ng-model="Email" data-val="true" data-val-email="Invalid Email" data-val-required="Email is required" id="txtEmail" name="Email" placeholder="Account Email" required="required" tabindex="1" type="email" value="">
+					</div>
+				</div>
+
+				<div class="form-group" data-ng-class="{error: loginForm.Password.$dirty &amp;&amp; loginForm.Password.$invalid}">
+					<div class="input-group">
+						<div class="input-group-addon">
+							<i class="icon-key"></i>
+						</div>
+						<input class="form-control ng-dirty ng-valid ng-valid-required" data-ng-model="Password" data-val="true" data-val-required="Password is required" id="txtPassword" name="Password" placeholder="Password" required="required" tabindex="2" type="password">
+					</div>
+				</div>
+				<div class="text-center">
+					<button type="submit" class="btn btn-block btn-primary" tabindex="3">Log In <i class="icon-sign-in"></i></button>
+					<div style="padding-top:10px;">
+						<a class="editable-item link" ng-click="showResetPassword()">Forgot Password?</a>
+					</div>
+					<div style="padding-top:10px;">
+						<div class="text-left">
+							<div class="alert ng-scope ng-hide" data-ng-show="showAlert" data-ng-class="alertClass" data-sv-alert="forgotPasswordAlertInfo">	<h4 class="ng-binding"></h4>	<ul>		<!-- ngRepeat: message in messages -->	</ul>	<span ng-transclude=""></span>	</div>
+						</div>
+					</div>
+					<div>
+						Don't have an account? <a class="editable-item link" href="https://www.skuvault.com/requestdemo">Request your free demo today!</a><br>
+					<button type="button" id="_pendo-badge_6jQ9Mv5OEb8rOnf8Inby9KXaO3w" data-layout="badgeBlank" class="_pendo-badge _pendo-badge_" style="z-index: 19000; margin: 0px 0px -14px; line-height: 1; height: auto; width: auto; min-height: 20px; min-width: 20px; background-color: rgb(255, 255, 255); border-radius: 15px; padding: 2px; box-shadow: rgb(136, 136, 136) 0px 0px 0px 0px; border: 0px solid rgb(187, 187, 187); float: none; vertical-align: text-bottom; cursor: pointer; display: inline-block;"><div id="pendo-text-da8057ed" value="Trouble Logging In? " class="bb-text _pendo-simple-text _pendo-badge-text" data-_pendo-simple-text-1="" style="text-align: center; line-height: 1; padding: 0px; font-size: 14px; margin: 0px; display: block; position: relative; width: auto; letter-spacing: 0px; overflow-wrap: break-word; color: rgb(92, 146, 69); font-weight: 400; text-transform: none; float: none; vertical-align: baseline; white-space: pre-wrap;">Trouble Logging In? </div></button></div>
+				</div>
+			</div>
+</form>	</div>
+
+	<div>
+		<div class="form-horizontal ng-isolate-scope" data-sv-modal="resetPasswordModalState" data-title="Reset Password" data-ok-title="Send" data-on-ok="resetPassword( resetPasswordModalState.Email )" data-on-cancel="resetPasswordModalState.Shown = false"><form data-ng-submit="onSubmit( onOk )" action="" novalidate="" name="modalForm" class="ng-pristine ng-invalid ng-invalid-required">
+	<div class="fade ng-pristine ng-valid modal hide" data-ng-model="model.Shown" data-ui-modal="" data-backdrop="static" data-keyboard="false" data-ui-keyup="{27: 'tryHide($event)'}">
+		<div class="modal-dialog" data-ng-class="modalClass">
+			<div class="modal-content">
+				<div class="modal-header text-left">
+					<button type="button" class="close" data-dismiss="modal" aria-hidden="true" data-ng-hide="model.InProgress" data-ng-click="onCancel()" data-ng-class="btnCloseClass">×</button>
+					<h3 class="ng-binding"><!-- ngIf: isDangerWarning -->Reset Password</h3>
+				</div>
+				<div class="modal-body" data-ng-class="modalBodyClass">
+					<div class="alert alert-danger ng-isolate-scope ng-hide" data-ng-show="state.Errors" data-sv-state-errors="model" data-title="">	<h4 class="ng-binding"></h4>	<ul>		<!-- ngRepeat: error in state.Errors track by $index -->	</ul></div>
+					<div data-ng-transclude="">
+			<div data-ng-form="resetPasswordForm" class="ng-scope ng-pristine ng-invalid ng-invalid-required">
+				<div class="control-group" data-ng-class="{error: resetPasswordForm.Email.$dirty &amp;&amp; resetPasswordForm.Email.$invalid}">
+					<span class="control-label col-sm-3">Account Email:</span>
+					<div class="col-sm-7">
+						<input type="email" data-ng-model="resetPasswordModalState.Email" name="Email" class="form-control ng-pristine ng-invalid ng-invalid-required ng-valid-email" required="" autofocus="autofocus">
+					</div>
+				</div>
+			</div>
+		</div>
+				</div>
+				<div class="modal-footer" data-sv-state-spinner="model" data-spinner-class="pull-right"><div data-ng-hide="model.InProgress" class="">
+					<span style="color:red;font-weight:bold;" class="ng-binding"></span>
+					<!-- ngIf: isDangerWarning -->
+					<!-- ngIf: okTitle --><input ng-if="okTitle" type="submit" data-ng-disabled="!canSubmit()" class="btn okClass ng-scope btn-primary" data-ng-class="{'btn-danger': isDangerWarning, 'btn-primary': !isDangerWarning}" id="ok" value="Send" disabled="disabled"><!-- end ngIf: okTitle -->
+					<button type="button" class="btn btn-default btn-sm ng-binding ng-hide" data-ng-click="onMisc()" data-ng-show="miscTitle" data-ng-class="miscClass" data-ng-disabled="miscDisableOn"></button>
+					<button type="button" class="btn btn-default btn-sm ng-binding ng-hide" data-ng-click="onMisc2()" data-ng-show="misc2Title" data-ng-class="misc2Class" data-ng-disabled="misc2DisableOn"></button>
+					<button type="button" class="btn btn-default btn-sm ng-binding ng-hide" data-ng-click="onMisc3()" data-ng-show="misc3Title" data-ng-class="misc3Class" data-ng-disabled="misc3DisableOn"></button>
+					<button type="button" class="btn btn-default btn-sm ng-binding ng-hide" data-ng-click="onMisc4()" data-ng-show="misc4Title" data-ng-class="misc4Class" data-ng-disabled="misc4DisableOn"></button>
+					<button type="button" class="btn btn-default btn-sm ng-binding ng-hide" data-ng-click="onMisc5()" data-ng-show="showMisc5()" data-ng-class="misc5Class" data-ng-disabled="misc5DisableOn"></button>
+					<!-- ngIf: !isDangerWarning --><button ng-if="!isDangerWarning" type="button" data-dismiss="modal" class="btn btn-default-without-border ng-binding ng-scope" data-ng-class="cancelClass" data-ng-click="onCancel()">Cancel</button><!-- end ngIf: !isDangerWarning -->
+				</div><div data-ng-show="model.InProgress" class="spinner pull-right ng-hide"></div></div>
+			</div>
+		</div>
+	</div>
+</form></div>
+	</div>
+</div>
+<div class="footer navbar-fixed-bottom">
+	© 2025 <a class="link" href="https://www.linnworks.com/?skuvault=true">SkuVault</a>. All Rights Reserved.
+</div>
+
+	<script src="/bundles/modernizr?v=K-FFpFNtIXPUlQamnX3qHX_A5r7TM2xbAgcuEmpm3O41"></script>
+
+	<script src="/bundles/jquery?v=AntKXio0u3ObbPQMaqDBGZHmJunAPLZKT2KQVm5iuTs1"></script>
+
+	<script src="/bundles/jqueryui?v=tI_MGEUtLDsrTfp1LE6nj3LQxFFvbiJHNWj_6OFJrcw1"></script>
+
+	<script src="/bundles/jquerynumpad?v="></script>
+
+	
+	<script src="/bundles/angular?v=PqR7Bs8hD-aS8JD8-qj2S35g3uPYI2RgllQNVMGRJMs1"></script>
+
+	<script src="/bundles/wijmo3?v=YKVQg4kCx8ZrIKQ-t1DW4VZFcDG5iV71QJwCwoqES741"></script>
+
+	<script src="/bundles/wijmo5?v=pY1_owjEe8Uq3R929jsxKAAKmWfqOmnDvBlfl48Sy6Y1"></script>
+
+	<script src="/bundles/bootstrap?v=Ec3EcPJF15RAqdrZA6AhxxlaWqIP8iSM6evp5cpDxEg1"></script><script class="extras" type="text/javascript">;consoleLog('You are currently NOT caching your styles.', 'warn');</script><script class="extras">ks.opts.console=(ks.opts.console||true)</script><script>setDir('/Content/', 'root');setDir('none', 'universal')</script><script id="ffBug"></script><script id="rootDir" type="text/javascript">appendMagic('#rootDir');</script><script id="themeFunctions">appendMagic('#themeFunctions');</script><script id="console" type="text/javascript">appendMagic('#console');</script><script id="caching" type="text/javascript">appendMagic('#caching');ffSlashBugCheck();</script>
+
+	<script src="/bundles/skuvault?v=DDta-etXpBUROpW_KL9eWzsyWn9WJToLayV9ETNL6aw1"></script>
+
+
+	<script type="text/javascript">
+				
+				$.fn.bootstrapBtn = $.fn.button.noConflict();
+				_.mixin( _.string.exports() );
+
+				
+				var svDate = new SkuVault.Date();
+				svDate.setCurrentLocale();
+		</script>
+	
+	
+	<script type="text/javascript">
+
+		var LoginController = [ "$scope", "$timeout", "AccountApi", "SystemApi", "SisenseApi", function( $scope, $timeout, accountApi, systemApi, sisenseApi ) {
+			$scope.resetPasswordModalState = {};
+			sisenseApi.Init( 'https://sisense-prod.skuvault.com' );
+
+			$scope.init = function() {
+				systemApi.GetSystemMessage()
+					.onData( function( data ) {
+						$scope.systemMessage = data;
+					} );
+				sisenseApi.LogoutSilently();
+			};
+
+			$scope.login = function( event ) {
+				event.preventDefault();
+				sisenseApi.LogoutSilently().finally( () => {
+					$( 'form[name="loginForm"]' ).submit();
+				} );
+			}
+
+			$scope.showResetPassword = function() {
+				$scope.resetPasswordModalState = { Shown: true };
+			};
+
+			$scope.resetPassword = function( email ) {
+				$scope.forgotPasswordAlertInfo = null;
+				accountApi.SendResetPasswordEmail( email )
+					.onData( function( data ) {
+						$scope.resetPasswordModalState.Shown = false;
+						$scope.forgotPasswordAlertInfo = { title: "Forgot Password", messages: [ data ], type: "success" };
+					} )
+					.onBlank( function( data ) {
+						$scope.resetPasswordModalState.Shown = false;
+						$scope.forgotPasswordAlertInfo = { title: "Forgot Password", messages: data, type: "error" };
+					} )
+					.withState( $scope.resetPasswordModalState );
+			};
+		} ];
+	</script>
+
+
+	
+	<!-- AddToAny BEGIN -->
+	<script async="" src="https://static.addtoany.com/menu/page.js"></script>
+	<!-- AddToAy END -->
+
+<iframe id="cz-clean-room" src="about:blank" width="0" height="0" style="display: none;"></iframe><div id="addtoany" style="position: static;"><div style="height: 1px; width: 1px; position: absolute; z-index: 100000; top: 0px; visibility: hidden;"><iframe id="a2a_sm_ifr" title="AddToAny Utility Frame" aria-hidden="true" src="https://static.addtoany.com/menu/sm.25.html#type=core&amp;event=load" style="height: 1px; width: 1px; border: 0px; left: 0px; top: 0px; position: absolute; z-index: 100000; display: none;"></iframe></div></div><button aria-label="Open Resource Center, 8 new notifications" data-pendo-aria-label-alert-singular="Open Resource Center, {UNSEEN_COUNT} new notification" data-pendo-aria-label-alert-plural="Open Resource Center, {UNSEEN_COUNT} new notifications" aria-expanded="false" type="button" id="_pendo-badge_CRfAmO2EG9nweKrEzfX0sdZZOyM" data-layout="badgeResourceCenter" class="_pendo-badge _pendo-resource-center-badge-container _pendo-badge_" style="border-radius: 30px; bottom: 10px; margin: 0px; position: fixed; right: 10px; z-index: 19000; background: rgba(255, 255, 255, 0); padding: 0px; height: 56px; width: 56px; box-shadow: rgba(0, 0, 0, 0.15) 2px 0px 6px 0px; border: 0px; float: none; vertical-align: text-bottom; cursor: pointer; display: inline-block;" data-pendo-stashed-aria-label="Open Resource Center"><img id="pendo-image-badge-5975d56c" src="https://pendo-static-5662722108030976.storage.googleapis.com/zaQkHuFsZCKa-FrdWEQTOtRM34Y/guide-media-7c403dce-0224-40e2-a471-e4e74bb81b33" alt="Resource Center badge" data-_pendo-image-1="" class="_pendo-image _pendo-badge-image _pendo-resource-center-badge-image" style="display: block; height: 56px; width: 56px; padding: 0px; margin: 0px; line-height: 1; border: none; box-shadow: rgba(255, 255, 255, 0) 0px 0px 0px 0px; float: none; vertical-align: baseline;"><div class=" pendo-resource-center-badge-notification-bubble" style="position: absolute; border-radius: 20px; line-height: 0px; height: 26px; box-sizing: content-box; background-color: rgb(236, 32, 89); top: -2px; left: -12px; padding: 0px 10px; margin-left: 0px; margin-top: 0px;"><div class=" pendo-notification-bubble-unread-count" style="font-weight: 400; font-family: inherit; height: 100%; position: relative; top: 50%; color: rgb(255, 255, 255); white-space: pre-wrap;">8</div></div></button></body></html>
