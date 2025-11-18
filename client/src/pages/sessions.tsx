@@ -4,7 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle, Clock, MapPin, Loader2 } from "lucide-react";
+import { Package, User, Box, Weight, ListChecks, RefreshCw, AlertCircle, Clock, MapPin, Loader2, Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ParsedSession } from "@shared/skuvault-types";
 import { SessionState, parseSessionState } from "@shared/skuvault-types";
@@ -114,11 +123,51 @@ export default function Sessions() {
   const [hasAuthenticated, setHasAuthenticated] = useState(false);
   const [selectedPicklistId, setSelectedPicklistId] = useState<string | null>(null);
   
-  // Only fetch sessions if user has authenticated successfully
+  // Search and filter state
+  const [sessionIdFilter, setSessionIdFilter] = useState("");
+  const [picklistIdFilter, setPicklistIdFilter] = useState("");
+  const [orderNumberFilter, setOrderNumberFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState<string>("all");
+  const [sortDescending, setSortDescending] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
+  
+  // Build query parameters from filters
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    
+    if (sessionIdFilter.trim()) {
+      params.append('sessionId', sessionIdFilter.trim());
+    }
+    if (picklistIdFilter.trim()) {
+      params.append('picklistId', picklistIdFilter.trim());
+    }
+    if (orderNumberFilter.trim()) {
+      params.append('orderNumber', orderNumberFilter.trim());
+    }
+    if (stateFilter && stateFilter !== "all") {
+      params.append('states', stateFilter);
+    }
+    params.append('sortDescending', sortDescending.toString());
+    params.append('limit', pageSize.toString());
+    params.append('skip', ((currentPage - 1) * pageSize).toString());
+    
+    return params.toString();
+  };
+  
+  const queryParams = buildQueryParams();
+  
+  // Fetch sessions with filters
   const { data, isLoading, error, refetch } = useQuery<SessionsResponse>({
-    queryKey: ["/api/skuvault/sessions"],
-    enabled: hasAuthenticated, // Only run after successful login
-    refetchInterval: 30000, // Refetch every 30 seconds
+    queryKey: ["/api/skuvault/sessions", queryParams],
+    queryFn: async () => {
+      const url = `/api/skuvault/sessions${queryParams ? `?${queryParams}` : ''}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch sessions');
+      return response.json();
+    },
+    enabled: hasAuthenticated,
+    refetchInterval: 30000,
   });
 
   // Fetch detailed session directions when a session is selected
@@ -330,6 +379,136 @@ export default function Sessions() {
           </div>
         </div>
         
+        {/* Search and Filter Controls */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Session ID Search */}
+              <div className="space-y-2">
+                <Label htmlFor="session-id-search" className="text-sm font-medium">
+                  Session ID
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="session-id-search"
+                    type="number"
+                    placeholder="Search by ID..."
+                    value={sessionIdFilter}
+                    onChange={(e) => {
+                      setSessionIdFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9"
+                    data-testid="input-session-id"
+                  />
+                </div>
+              </div>
+
+              {/* Picklist ID Search */}
+              <div className="space-y-2">
+                <Label htmlFor="picklist-id-search" className="text-sm font-medium">
+                  Picklist ID
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="picklist-id-search"
+                    placeholder="Search by picklist..."
+                    value={picklistIdFilter}
+                    onChange={(e) => {
+                      setPicklistIdFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9"
+                    data-testid="input-picklist-id"
+                  />
+                </div>
+              </div>
+
+              {/* Order Number Search */}
+              <div className="space-y-2">
+                <Label htmlFor="order-number-search" className="text-sm font-medium">
+                  Order Number
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="order-number-search"
+                    placeholder="Search by order..."
+                    value={orderNumberFilter}
+                    onChange={(e) => {
+                      setOrderNumberFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9"
+                    data-testid="input-order-number"
+                  />
+                </div>
+              </div>
+
+              {/* State Filter */}
+              <div className="space-y-2">
+                <Label htmlFor="state-filter" className="text-sm font-medium">
+                  Status
+                </Label>
+                <Select 
+                  value={stateFilter} 
+                  onValueChange={(value) => {
+                    setStateFilter(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger id="state-filter" data-testid="select-state">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="readyToShip">Ready to Ship</SelectItem>
+                    <SelectItem value="new">New</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="picked">Picked</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Sort and Clear Controls */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSortDescending(!sortDescending)}
+                data-testid="button-toggle-sort"
+              >
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                {sortDescending ? "Newest First" : "Oldest First"}
+              </Button>
+              
+              {(sessionIdFilter || picklistIdFilter || orderNumberFilter || stateFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSessionIdFilter("");
+                    setPicklistIdFilter("");
+                    setOrderNumberFilter("");
+                    setStateFilter("all");
+                    setCurrentPage(1);
+                  }}
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
         {sessions.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
@@ -451,6 +630,41 @@ export default function Sessions() {
               </Card>
             ))}
           </div>
+        )}
+
+        {/* Pagination Controls */}
+        {sessions.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} • Showing {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={sessions.length < pageSize}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
