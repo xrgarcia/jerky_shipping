@@ -47,3 +47,12 @@ export async function getQueueLength(): Promise<number> {
   const redis = getRedisClient();
   return await redis.llen(QUEUE_KEY) || 0;
 }
+
+export async function clearQueue(): Promise<number> {
+  const redis = getRedisClient();
+  const length = await getQueueLength();
+  if (length > 0) {
+    await redis.del(QUEUE_KEY);
+  }
+  return length;
+}

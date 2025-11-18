@@ -1414,6 +1414,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/queue/clear", requireAuth, async (req, res) => {
+    try {
+      const { clearQueue } = await import('./utils/queue');
+      const clearedCount = await clearQueue();
+      res.json({ 
+        success: true, 
+        message: `Cleared ${clearedCount} webhooks from queue`,
+        clearedCount 
+      });
+    } catch (error) {
+      console.error("Error clearing queue:", error);
+      res.status(500).json({ error: "Failed to clear queue" });
+    }
+  });
+
   app.get("/api/reports/summary", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

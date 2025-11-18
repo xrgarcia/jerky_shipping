@@ -6,6 +6,17 @@ This application is a warehouse fulfillment tool for ship.jerky.com, integrating
 
 ## Recent Changes
 
+### November 18, 2025: Queue Management System
+- **Problem**: Failed backfill jobs left 5,678 stale webhooks in Redis queue, blocking new backfill processing and causing delays.
+- **Solution**: Added queue clearing functionality via `/api/queue/clear` endpoint and `clearQueue()` utility in `server/utils/queue.ts`.
+- **Implementation**:
+  - Created `clearQueue()` function to delete all webhooks from Redis queue
+  - Added authenticated POST endpoint `/api/queue/clear` in `routes.ts`
+  - Cleared 5,678 stale webhooks, reducing queue backlog from ~6,000 to 15 items
+  - Background worker processes remaining webhooks at ~120/minute (10 every 5 seconds)
+- **Impact**: Unblocked backfill processing, enabled immediate execution of new backfill jobs, provided admin tool for queue maintenance.
+- **Usage**: Destructive operation - use only when queue is blocked by failed jobs or stale webhooks.
+
 ### November 18, 2025: NOT NULL Constraints Enforced for Price Fields
 - **Problem**: Database schema allowed NULL values for price/amount fields in `orders` and `orderItems` tables, but extraction logic inconsistently returned NULL vs '0', causing data integrity issues and potential calculation errors.
 - **Solution**: Enforced NOT NULL constraints with '0' defaults across all 13 price fields in `orders` table and all calculated price fields in `orderItems` table.
@@ -15,7 +26,7 @@ This application is a warehouse fulfillment tool for ship.jerky.com, integrating
   - Updated `extractShopifyOrderPrices()` in both `routes.ts` and `background-worker.ts` to return '0' instead of NULL
   - Fixed line item processing logic across all three data entry points (webhook, sync, backfill) to ensure `totalTaxAmount`, `priceSetAmount`, and `totalDiscountSetAmount` never return NULL
   - Successfully pushed schema changes using `npm run db:push --force` after resolving null value conflicts
-- **Impact**: Eliminates NULL pointer risks in revenue calculations, ensures consistent data representation, simplifies query logic by removing NULL checks, and maintains data integrity across 6,200+ queued webhooks.
+- **Impact**: Eliminates NULL pointer risks in revenue calculations, ensures consistent data representation, simplifies query logic by removing NULL checks, and maintains data integrity.
 
 ## User Preferences
 
