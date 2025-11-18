@@ -116,6 +116,38 @@ export const insertOrderRefundSchema = createInsertSchema(orderRefunds).omit({
 export type InsertOrderRefund = z.infer<typeof insertOrderRefundSchema>;
 export type OrderRefund = typeof orderRefunds.$inferSelect;
 
+// Order items table for Shopify line items tracking
+export const orderItems = pgTable("order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  shopifyLineItemId: varchar("shopify_line_item_id").notNull(), // Shopify line item ID
+  title: text("title").notNull(), // Product title
+  sku: text("sku"), // Product SKU
+  variantId: varchar("variant_id"), // Shopify variant ID
+  productId: varchar("product_id"), // Shopify product ID
+  quantity: integer("quantity").notNull(), // Quantity ordered
+  currentQuantity: integer("current_quantity"), // Quantity after refunds/removals
+  price: text("price").notNull(), // Unit price (as string from Shopify)
+  totalDiscount: text("total_discount"), // Total discount on this line item
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orderIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON ${table} (order_id)`,
+  variantIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_variant_id_idx ON ${table} (variant_id)`,
+  productIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_product_id_idx ON ${table} (product_id)`,
+  // Unique constraint: same line item ID cannot appear twice in database
+  uniqueLineItemIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS order_items_shopify_line_item_id_idx ON ${table} (shopify_line_item_id)`,
+}));
+
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+export type OrderItem = typeof orderItems.$inferSelect;
+
 // Shipments table for ShipStation tracking data
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
