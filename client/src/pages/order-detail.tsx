@@ -121,6 +121,14 @@ export default function OrderDetail() {
     createLabelMutation.mutate(orderId);
   };
 
+  const handlePrintLabel = () => {
+    const latestLabelJob = printJobs.find(job => job.labelUrl);
+    if (latestLabelJob?.labelUrl) {
+      const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(latestLabelJob.labelUrl)}`;
+      window.open(proxyUrl, '_blank');
+    }
+  };
+
   const handlePrevious = () => {
     if (hasPrev) {
       navigate(`/orders/${allOrders[currentIndex - 1].id}`);
@@ -331,16 +339,28 @@ export default function OrderDetail() {
           </div>
 
           <div className="flex gap-2">
-            <Button
-              data-testid="button-print-label"
-              onClick={handleCreateLabel}
-              variant="outline"
-              size="lg"
-              disabled={createLabelMutation.isPending}
-            >
-              <FileText className="mr-2 h-5 w-5" />
-              {createLabelMutation.isPending ? "Creating..." : "Create Shipping Label"}
-            </Button>
+            {printJobs.some(job => job.labelUrl) ? (
+              <Button
+                data-testid="button-reprint-label"
+                onClick={handlePrintLabel}
+                variant="outline"
+                size="lg"
+              >
+                <FileText className="mr-2 h-5 w-5" />
+                Print Label
+              </Button>
+            ) : (
+              <Button
+                data-testid="button-create-label"
+                onClick={handleCreateLabel}
+                variant="outline"
+                size="lg"
+                disabled={createLabelMutation.isPending}
+              >
+                <FileText className="mr-2 h-5 w-5" />
+                {createLabelMutation.isPending ? "Creating..." : "Create Shipping Label"}
+              </Button>
+            )}
             <Button
               data-testid="button-print-packing-slip"
               onClick={handlePrintPackingSlip}
