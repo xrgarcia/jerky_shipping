@@ -343,6 +343,10 @@ export default function Reports() {
                     <span className="text-base">Discounts</span>
                     <span className="text-lg font-semibold text-red-600">-{formatCurrency(summary.totalDiscounts)}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-base">Refunds</span>
+                    <span className="text-lg font-semibold text-red-600" data-testid="text-refunds-breakdown">-{formatCurrency(summary.returnsValue)}</span>
+                  </div>
                   <div className="flex justify-between items-center pt-3 border-t">
                     <span className="text-lg font-bold">Total Revenue</span>
                     <span className="text-xl font-bold">{formatCurrency(summary.totalRevenue)}</span>
