@@ -91,6 +91,31 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
+// Order refunds table for Shopify refund tracking
+export const orderRefunds = pgTable("order_refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  shopifyRefundId: varchar("shopify_refund_id").notNull().unique(), // Shopify refund ID
+  amount: text("amount").notNull(), // Total refund amount as string
+  note: text("note"), // Refund reason/note
+  refundedAt: timestamp("refunded_at").notNull(), // When refund was created (indexed)
+  processedAt: timestamp("processed_at"), // When refund was processed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  refundedAtIdx: sql`CREATE INDEX IF NOT EXISTS order_refunds_refunded_at_idx ON ${table} (refunded_at)`,
+  orderIdIdx: sql`CREATE INDEX IF NOT EXISTS order_refunds_order_id_idx ON ${table} (order_id)`,
+}));
+
+export const insertOrderRefundSchema = createInsertSchema(orderRefunds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOrderRefund = z.infer<typeof insertOrderRefundSchema>;
+export type OrderRefund = typeof orderRefunds.$inferSelect;
+
 // Shipments table for ShipStation tracking data
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
