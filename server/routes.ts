@@ -518,6 +518,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Store the first shipment from ShipStation in database
             // Schema uses z.coerce.date() to automatically convert ISO strings to Date objects
             const shipmentData = shipStationShipments[0];
+            
+            // Log the shipment data to debug
+            console.log(`ShipStation shipment data for ${order.orderNumber}:`, {
+              shipmentId: shipmentData.shipmentId,
+              trackingNumber: shipmentData.trackingNumber,
+              carrierCode: shipmentData.carrierCode,
+              shipDate: shipmentData.shipDate
+            });
+            
             const storedShipment = await storage.createShipment({
               orderId: order.id,
               shipmentId: shipmentData.shipmentId?.toString() || null,
@@ -532,6 +541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               labelUrl: null,
               shipmentData: shipmentData,
             });
+            
+            console.log(`Stored shipment with ID: ${storedShipment.shipmentId}`);
             
             shipments = [storedShipment];
           } else {
