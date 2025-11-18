@@ -1,0 +1,65 @@
+SkuVault Web Login Process for Node.js
+Overview
+Uses a web form login. After successful login, an auth token is stored in a cookie and used for API calls to lmdb.skuvault.com.
+Step-by-Step Process
+1. Initial Setup - Base Headers
+Before login, set these base headers for all requests:
+const baseHeaders = {  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",  "Accept": "application/json, text/plain, */*",  "Accept-Language": "en-US,en;q=0.9",  "Accept-Encoding": "gzip, deflate, br",  "Connection": "keep-alive",  "Sec-Fetch-Dest": "empty",  "Sec-Fetch-Mode": "cors",  "Sec-Fetch-Site": "same-site"};
+2. Step 1: GET Login Page
+URL: https://app.skuvault.com/account/login
+Method: GET
+Headers: Use base headers above
+Purpose: Get the login page HTML (may need form data for CSRF tokens)
+Response: HTML page with login form
+3. Step 2: POST Login Credentials
+URL: https://app.skuvault.com/account/login
+Method: POST
+Headers: Same base headers
+Content-Type: application/x-www-form-urlencoded (form data)
+Body:
+{  "Email": "your-username@example.com",  // or just username  "Password": "your-password"}
+Important: Maintain cookie jar/session across requests
+Response:
+Status: 200 or 302 (redirect)
+Success indicators:
+Redirect to a URL containing "dashboard" or "main" in the URL
+OR HTML contains <div id="mount-point">
+4. Step 3: Extract Authentication Token from Cookie
+After successful login, extract the auth token from cookies:
+Cookie Name: sv-t
+Validation: Token should be longer than 100 characters
+// Example with axios cookie jar or node-fetch with cookie handlingconst cookies = response.headers['set-cookie'];const svtCookie = cookies.find(c => c.startsWith('sv-t='));const authToken = svtCookie.split('=')[1].split(';')[0];
+5. Step 4: Set API Headers for Subsequent Requests
+Once you have the token, set these headers for all API calls to lmdb.skuvault.com:
+const apiHeaders = {  ...baseHeaders,  // Include the base headers  "Authorization": `Token ${authToken}`,  // Token extracted from sv-t cookie  "Partition": "default",  "tid": Math.floor(Date.now() / 1000).toString(),  // Current Unix timestamp in seconds  "idempotency-key": uuid.v4(),  // Generate a new UUID for each request  "dataread": "true",  "Content-Type": "application/json"  // For POST requests};
+Example API Call After Login
+URL: https://lmdb.skuvault.com/wavepicking/get/sessions
+Method: POST
+Headers: Use apiHeaders from Step 4
+Body (JSON):
+{  "limit": 100,  "skip": 0,  "userId": "-2",  // System-wide identifier for all users  "sort": [{"descending": false, "field": "createdDate"}],  "states": ["new", "active", "readyToShip", ...],  // All session states  "saleId": {"match": "contains", "value": "YOUR_SALE_ID"}}
+Important Notes for Node.js Implementation
+Cookie Management:
+Use a cookie jar (axios-cookiejar-support, tough-cookie, or fetch with cookie handling)
+Maintain cookies across GET and POST login requests
+Extract the sv-t cookie after login
+CORS Preflight (if making browser requests):
+For lmdb.skuvault.com, you may need to handle CORS preflight
+Origin: https://v2.skuvault.com
+Preflight headers should include:
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: authorization,content-type,dataread
+Token Format:
+Token format: Token <token-value> (note the space after "Token")
+Token is the raw value from the sv-t cookie
+URLs Summary:
+Login Page: https://app.skuvault.com/account/login
+Web Interface: https://v2.skuvault.com
+API Endpoint: https://lmdb.skuvault.com
+Success Detection:
+Check for redirect URL containing "dashboard" or "main"
+OR check HTML for <div id="mount-point">
+OR verify sv-t cookie exists and is > 100 chars
+Node.js Example Structure
+const axios = require('axios');const { CookieJar } = require('tough-cookie');const { wrapper } = require('axios-cookiejar-support');const uuid = require('uuid');const cookieJar = new CookieJar();const client = wrapper(axios.create({ jar: cookieJar }));async function login(username, password) {  // Step 1: GET login page  const loginPage = await client.get('https://app.skuvault.com/account/login', {    headers: baseHeaders  });  // Step 2: POST credentials  const loginResponse = await client.post(    'https://app.skuvault.com/account/login',    new URLSearchParams({      Email: username,      Password: password    }),    {      headers: {        ...baseHeaders,        'Content-Type': 'application/x-www-form-urlencoded'      },      maxRedirects: 5,      validateStatus: (status) => status < 400    }  );  // Step 3: Extract token from cookies  const cookies = await cookieJar.getCookies('https://app.skuvault.com');  const svtCookie = cookies.find(c => c.key === 'sv-t');    if (!svtCookie || svtCookie.value.length <= 100) {    throw new Error('Authentication token not found in cookies');  }  return svtCookie.value;}// Use the token for API callsfunction getApiHeaders(authToken) {  return {    ...baseHeaders,    "Authorization": `Token ${authToken}`,    "Partition": "default",    "tid": Math.floor(Date.now() / 1000).toString(),    "idempotency-key": uuid.v4(),    "dataread": "true",    "Content-Type": "application/json"  };}
+This matches the Python implementation's flow and can be adapted to your Node.js setup.
