@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -57,6 +57,7 @@ type BackfillJob = {
 export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
+  const [showPurgeDialog, setShowPurgeDialog] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -148,6 +149,31 @@ export default function BackfillPage() {
     },
   });
 
+  const purgeQueueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/queue/clear");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to purge queue");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setShowPurgeDialog(false);
+      toast({
+        title: "Queue purged",
+        description: `Cleared ${data.clearedCount} items from the queue.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to purge queue",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: FormData) => {
     startBackfillMutation.mutate(data);
   };
@@ -192,11 +218,22 @@ export default function BackfillPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-4xl font-bold mb-2" data-testid="heading-backfill">Order Backfill</h1>
-        <p className="text-muted-foreground text-lg">
-          Import historical orders from Shopify by date range
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold mb-2" data-testid="heading-backfill">Order Backfill</h1>
+          <p className="text-muted-foreground text-lg">
+            Import historical orders from Shopify by date range
+          </p>
+        </div>
+        <Button
+          variant="destructive"
+          size="default"
+          onClick={() => setShowPurgeDialog(true)}
+          data-testid="button-purge-queue"
+        >
+          <Database className="mr-2 h-4 w-4" />
+          Purge Queue
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -460,6 +497,35 @@ export default function BackfillPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
+        <AlertDialogContent data-testid="dialog-purge-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Purge Queue</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to purge the entire processing queue? This will clear all pending webhooks and backfill jobs from the queue. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-purge">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => purgeQueueMutation.mutate()}
+              data-testid="button-confirm-purge"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={purgeQueueMutation.isPending}
+            >
+              {purgeQueueMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Purging...
+                </>
+              ) : (
+                'Purge Queue'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
