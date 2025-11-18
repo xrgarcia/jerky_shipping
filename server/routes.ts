@@ -1475,9 +1475,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Shopify credentials not configured" });
       }
 
-      let processedCount = 0;
-      let refundsFound = 0;
-      let failedCount = 0;
+      // Track processing metrics with better observability
+      let fetchedCount = 0;  // Orders successfully fetched from Shopify
+      let persistedCount = 0;  // Orders with refunds successfully persisted
+      let refundsFound = 0;  // Total number of refunds stored
+      let failedCount = 0;  // Orders that failed to process
+      let failedOrderIds: string[] = [];  // List of failed order IDs for operator review
       let retryCount = 0;
       const maxRetries = 5; // Increased for sustained throttling
 
@@ -1565,11 +1568,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!order.createdAt || !order.id) {
             console.error(`[CRITICAL] Order missing required fields, skipping:`, order);
             failedCount++;
-            // Skip this order but can't advance cursor safely - continue with next
+            failedOrderIds.push(order.orderNumber || 'unknown');
             continue;
           }
-
-          let orderProcessedSuccessfully = false;
           
           try {
             // Fetch full order details from Shopify (includes refunds)
@@ -1578,11 +1579,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let data;
             try {
               data = await fetchWithRetry(url);
+              fetchedCount++;  // Successfully fetched from Shopify
             } catch (fetchError: any) {
               console.error(`Failed to fetch order ${order.id} after ${maxRetries} retries:`, fetchError.message);
               failedCount++;
-              // Don't advance cursor - will retry this order on next run
-              continue;
+              failedOrderIds.push(order.orderNumber);
+              continue;  // Skip to next order but batch cursor will still advance
             }
 
             const shopifyOrder = data.order;
@@ -1609,36 +1611,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   refundsPersisted++;
                 } catch (refundError: any) {
                   console.error(`Error persisting refund for order ${order.id}:`, refundError.message);
-                  // Continue trying other refunds, don't fail the whole order
+                  // Continue trying other refunds, track failure but don't fail whole order
                 }
               }
               
-              // If we found refunds but failed to persist ANY of them, don't mark as processed
+              // If we found refunds but failed to persist ANY of them, track as failed
               if (shopifyOrder.refunds.length > 0 && refundsPersisted === 0) {
                 console.error(`Failed to persist any refunds for order ${order.id} (${shopifyOrder.refunds.length} refunds found)`);
                 failedCount++;
-                continue; // Don't advance cursor - will retry
+                failedOrderIds.push(order.orderNumber);
+              } else if (refundsPersisted > 0) {
+                // At least some refunds persisted successfully
+                persistedCount++;
               }
             }
 
-            // Successfully processed - update counters and advance cursor
+            // Track total refunds stored
             refundsFound += refundsPersisted;
-            processedCount++;
-            orderProcessedSuccessfully = true;
-            
-            // Advance cursor only after successful processing
-            lastCreatedAt = order.createdAt;
-            lastId = order.id;
 
             // Rate limiting: pause every 40 requests (Shopify allows 2 req/sec)
-            if (processedCount % 40 === 0) {
+            if (fetchedCount % 40 === 0) {
               await new Promise(resolve => setTimeout(resolve, 500));
             }
           } catch (orderError: any) {
             console.error(`Unexpected error processing order ${order.id}:`, orderError.message);
             failedCount++;
-            // Don't advance cursor - will retry this order
+            failedOrderIds.push(order.orderNumber);
           }
+        }
+        
+        // Advance cursor after processing entire batch to guarantee forward progress
+        // This prevents infinite loops even if some orders in the batch failed
+        if (ordersBatch.length > 0) {
+          const lastOrder = ordersBatch[ordersBatch.length - 1];
+          lastCreatedAt = lastOrder.createdAt;
+          lastId = lastOrder.id;
         }
 
         // Check if we got fewer results than batch size (indicates last page)
@@ -1649,10 +1656,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         success: true, 
-        ordersProcessed: processedCount,
-        refundsFound: refundsFound,
-        failedCount: failedCount,
-        retryCount: retryCount,
+        fetchedCount: fetchedCount,  // Orders successfully fetched from Shopify
+        persistedCount: persistedCount,  // Orders with refunds successfully persisted
+        refundsFound: refundsFound,  // Total refunds stored
+        failedCount: failedCount,  // Orders that failed
+        failedOrderIds: failedOrderIds.slice(0, 50),  // First 50 failed order IDs for review
+        retryCount: retryCount,  // Number of rate limit retries
       });
     } catch (error) {
       console.error("Error backfilling refunds:", error);
