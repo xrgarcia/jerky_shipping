@@ -124,6 +124,16 @@ export default function Sessions() {
   // Fetch detailed session directions when a session is selected
   const { data: sessionDetails, isLoading: isLoadingDetails } = useQuery({
     queryKey: ["/api/skuvault/sessions", selectedPicklistId],
+    queryFn: async () => {
+      if (!selectedPicklistId) throw new Error("No picklist ID selected");
+      const response = await fetch(`/api/skuvault/sessions/${selectedPicklistId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch session details: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: !!selectedPicklistId,
   });
 
