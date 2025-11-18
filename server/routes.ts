@@ -1465,6 +1465,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill refunds from Shopify for all existing orders
+  app.post("/api/refunds/backfill", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ error: "Shopify credentials not configured" });
+      }
+
+      let processedCount = 0;
+      let refundsFound = 0;
+      let failedCount = 0;
+      let retryCount = 0;
+      const maxRetries = 5; // Increased for sustained throttling
+
+      // Helper to handle Shopify rate limits with robust retry logic
+      const fetchWithRetry = async (url: string, attempt: number = 0): Promise<any> => {
+        const response = await fetch(url, {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        });
+
+        // Handle rate limiting (429)
+        if (response.status === 429) {
+          if (attempt >= maxRetries) {
+            throw new Error(`Max retries reached for ${url}`);
+          }
+          
+          // Honor Retry-After header (supports float) or use exponential backoff with jitter
+          const retryAfter = response.headers.get('Retry-After');
+          let waitMs: number;
+          
+          if (retryAfter) {
+            // Parse as float and convert to milliseconds
+            const retrySeconds = parseFloat(retryAfter);
+            waitMs = isNaN(retrySeconds) ? 1000 : retrySeconds * 1000;
+          } else {
+            // Exponential backoff with jitter: 2^attempt * 1000 + random(0-1000), capped at 30s
+            const exponentialMs = Math.pow(2, attempt) * 1000;
+            const jitter = Math.random() * 1000;
+            waitMs = Math.min(exponentialMs + jitter, 30000);
+          }
+          
+          console.log(`Rate limited. Waiting ${waitMs}ms before retry ${attempt + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          retryCount++;
+          return fetchWithRetry(url, attempt + 1);
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        return response.json();
+      };
+
+      // Cursor-based pagination to avoid skipping rows during long backfill
+      let lastCreatedAt: Date | null = null;
+      let lastId: string | null = null;
+      const batchSize = 250;
+      let hasMore = true;
+
+      while (hasMore) {
+        // Fetch batch using cursor-based pagination
+        let query = db
+          .select()
+          .from(orders)
+          .orderBy(orders.createdAt, orders.id)
+          .limit(batchSize);
+
+        // Apply cursor filter if we have a previous batch
+        if (lastCreatedAt && lastId) {
+          query = query.where(
+            or(
+              sql`${orders.createdAt} > ${lastCreatedAt}`,
+              and(
+                sql`${orders.createdAt} = ${lastCreatedAt}`,
+                sql`${orders.id} > ${lastId}`
+              )
+            )
+          );
+        }
+
+        const ordersBatch = await query;
+
+        if (ordersBatch.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        console.log(`Processing batch of ${ordersBatch.length} orders starting from ${ordersBatch[0].orderNumber}`);
+
+        for (const order of ordersBatch) {
+          // Defensive guard for malformed records
+          if (!order.createdAt || !order.id) {
+            console.error(`[CRITICAL] Order missing required fields, skipping:`, order);
+            failedCount++;
+            // Skip this order but can't advance cursor safely - continue with next
+            continue;
+          }
+
+          let orderProcessedSuccessfully = false;
+          
+          try {
+            // Fetch full order details from Shopify (includes refunds)
+            const url = `https://${shopDomain}/admin/api/2024-01/orders/${order.id}.json`;
+            
+            let data;
+            try {
+              data = await fetchWithRetry(url);
+            } catch (fetchError: any) {
+              console.error(`Failed to fetch order ${order.id} after ${maxRetries} retries:`, fetchError.message);
+              failedCount++;
+              // Don't advance cursor - will retry this order on next run
+              continue;
+            }
+
+            const shopifyOrder = data.order;
+
+            // Process refunds if they exist
+            let refundsPersisted = 0;
+            if (shopifyOrder.refunds && shopifyOrder.refunds.length > 0) {
+              for (const refund of shopifyOrder.refunds) {
+                try {
+                  const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
+                    return sum + parseFloat(txn.amount || '0');
+                  }, 0) || 0;
+
+                  const refundData = {
+                    orderId: order.id,
+                    shopifyRefundId: refund.id.toString(),
+                    amount: totalAmount.toFixed(2),
+                    note: refund.note || null,
+                    refundedAt: new Date(refund.created_at),
+                    processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
+                  };
+
+                  await storage.upsertOrderRefund(refundData);
+                  refundsPersisted++;
+                } catch (refundError: any) {
+                  console.error(`Error persisting refund for order ${order.id}:`, refundError.message);
+                  // Continue trying other refunds, don't fail the whole order
+                }
+              }
+              
+              // If we found refunds but failed to persist ANY of them, don't mark as processed
+              if (shopifyOrder.refunds.length > 0 && refundsPersisted === 0) {
+                console.error(`Failed to persist any refunds for order ${order.id} (${shopifyOrder.refunds.length} refunds found)`);
+                failedCount++;
+                continue; // Don't advance cursor - will retry
+              }
+            }
+
+            // Successfully processed - update counters and advance cursor
+            refundsFound += refundsPersisted;
+            processedCount++;
+            orderProcessedSuccessfully = true;
+            
+            // Advance cursor only after successful processing
+            lastCreatedAt = order.createdAt;
+            lastId = order.id;
+
+            // Rate limiting: pause every 40 requests (Shopify allows 2 req/sec)
+            if (processedCount % 40 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } catch (orderError: any) {
+            console.error(`Unexpected error processing order ${order.id}:`, orderError.message);
+            failedCount++;
+            // Don't advance cursor - will retry this order
+          }
+        }
+
+        // Check if we got fewer results than batch size (indicates last page)
+        if (ordersBatch.length < batchSize) {
+          hasMore = false;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        ordersProcessed: processedCount,
+        refundsFound: refundsFound,
+        failedCount: failedCount,
+        retryCount: retryCount,
+      });
+    } catch (error) {
+      console.error("Error backfilling refunds:", error);
+      res.status(500).json({ error: "Failed to backfill refunds" });
+    }
+  });
+
   app.get("/api/print-queue", requireAuth, async (req, res) => {
     try {
       const jobs = await storage.getActivePrintJobs();
