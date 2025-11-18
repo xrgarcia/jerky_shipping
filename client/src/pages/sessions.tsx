@@ -756,9 +756,16 @@ export default function Sessions() {
                           {sessionDetails.picklist.orders.map((order: any, index: number) => (
                             <Card key={order.id || index} data-testid={`card-order-${order.id}`}>
                               <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                  <ListChecks className="h-4 w-4" />
-                                  Order: {order.id}
+                                <CardTitle className="text-base flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <ListChecks className="h-4 w-4" />
+                                    <span>Order: {order.id}</span>
+                                  </div>
+                                  {order.spot_number && (
+                                    <Badge variant="secondary" data-testid={`badge-spot-${order.spot_number}`}>
+                                      Spot #{order.spot_number}
+                                    </Badge>
+                                  )}
                                 </CardTitle>
                               </CardHeader>
                               <CardContent>
