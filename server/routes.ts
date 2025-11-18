@@ -1693,6 +1693,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill line items from Shopify for all existing orders
+  app.post("/api/order-items/backfill", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ error: "Shopify credentials not configured" });
+      }
+
+      // Track processing metrics
+      let fetchedCount = 0;
+      let persistedCount = 0;
+      let itemsFound = 0;
+      let failedCount = 0;
+      let failedOrderIds: string[] = [];
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      // Helper to handle Shopify rate limits with retry logic
+      const fetchWithRetry = async (url: string, attempt: number = 0): Promise<any> => {
+        const response = await fetch(url, {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 429) {
+          if (attempt >= maxRetries) {
+            throw new Error(`Max retries reached for ${url}`);
+          }
+          
+          const retryAfter = response.headers.get('Retry-After');
+          let waitMs: number;
+          
+          if (retryAfter) {
+            const retrySeconds = parseFloat(retryAfter);
+            waitMs = isNaN(retrySeconds) ? 1000 : retrySeconds * 1000;
+          } else {
+            const exponentialMs = Math.pow(2, attempt) * 1000;
+            const jitter = Math.random() * 1000;
+            waitMs = Math.min(exponentialMs + jitter, 30000);
+          }
+          
+          console.log(`Rate limited. Waiting ${waitMs}ms before retry ${attempt + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          retryCount++;
+          return fetchWithRetry(url, attempt + 1);
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        return response.json();
+      };
+
+      // Cursor-based pagination
+      let lastCreatedAt: Date | null = null;
+      let lastId: string | null = null;
+      const batchSize = 250;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = db
+          .select()
+          .from(orders)
+          .orderBy(orders.createdAt, orders.id)
+          .limit(batchSize);
+
+        if (lastCreatedAt && lastId) {
+          query = query.where(
+            or(
+              sql`${orders.createdAt} > ${lastCreatedAt}`,
+              and(
+                sql`${orders.createdAt} = ${lastCreatedAt}`,
+                sql`${orders.id} > ${lastId}`
+              )
+            )
+          );
+        }
+
+        const ordersBatch = await query;
+
+        if (ordersBatch.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        console.log(`Processing batch of ${ordersBatch.length} orders starting from ${ordersBatch[0].orderNumber}`);
+
+        for (const order of ordersBatch) {
+          if (!order.createdAt || !order.id) {
+            console.error(`[CRITICAL] Order missing required fields, skipping:`, order);
+            failedCount++;
+            failedOrderIds.push(order.orderNumber || 'unknown');
+            continue;
+          }
+          
+          try {
+            const url = `https://${shopDomain}/admin/api/2024-01/orders/${order.id}.json`;
+            
+            let data;
+            try {
+              data = await fetchWithRetry(url);
+              fetchedCount++;
+            } catch (fetchError: any) {
+              console.error(`Failed to fetch order ${order.id} after ${maxRetries} retries:`, fetchError.message);
+              failedCount++;
+              failedOrderIds.push(order.orderNumber);
+              continue;
+            }
+
+            const shopifyOrder = data.order;
+
+            // Process line items if they exist
+            let itemsPersisted = 0;
+            if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
+              for (const item of shopifyOrder.line_items) {
+                try {
+                  const itemData = {
+                    orderId: order.id,
+                    shopifyLineItemId: item.id.toString(),
+                    title: item.title || item.name || 'Unknown Item',
+                    sku: item.sku || null,
+                    variantId: item.variant_id ? item.variant_id.toString() : null,
+                    productId: item.product_id ? item.product_id.toString() : null,
+                    quantity: item.quantity || 0,
+                    currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
+                    price: item.price || '0.00',
+                    totalDiscount: item.total_discount || null,
+                  };
+
+                  await storage.upsertOrderItem(itemData);
+                  itemsPersisted++;
+                } catch (itemError: any) {
+                  console.error(`Error persisting line item for order ${order.id}:`, itemError.message);
+                }
+              }
+              
+              if (shopifyOrder.line_items.length > 0 && itemsPersisted === 0) {
+                console.error(`Failed to persist any line items for order ${order.id} (${shopifyOrder.line_items.length} items found)`);
+                failedCount++;
+                failedOrderIds.push(order.orderNumber);
+              } else if (itemsPersisted > 0) {
+                persistedCount++;
+              }
+            }
+
+            itemsFound += itemsPersisted;
+
+            // Rate limiting: pause every 40 requests
+            if (fetchedCount % 40 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } catch (orderError: any) {
+            console.error(`Unexpected error processing order ${order.id}:`, orderError.message);
+            failedCount++;
+            failedOrderIds.push(order.orderNumber);
+          }
+        }
+        
+        if (ordersBatch.length > 0) {
+          const lastOrder = ordersBatch[ordersBatch.length - 1];
+          lastCreatedAt = lastOrder.createdAt;
+          lastId = lastOrder.id;
+        }
+
+        if (ordersBatch.length < batchSize) {
+          hasMore = false;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        fetchedCount: fetchedCount,
+        persistedCount: persistedCount,
+        itemsFound: itemsFound,
+        failedCount: failedCount,
+        failedOrderIds: failedOrderIds.slice(0, 50),
+        retryCount: retryCount,
+      });
+    } catch (error) {
+      console.error("Error backfilling line items:", error);
+      res.status(500).json({ error: "Failed to backfill line items" });
+    }
+  });
+
   app.get("/api/print-queue", requireAuth, async (req, res) => {
     try {
       const jobs = await storage.getActivePrintJobs();
