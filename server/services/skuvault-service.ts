@@ -75,7 +75,6 @@ export class SkuVaultService {
   private cookieJar: CookieJar;
   private tokenCache: TokenCache;
   private isAuthenticated: boolean = false;
-  private initPromise: Promise<void> | null = null;
 
   constructor() {
     // Load configuration from environment
@@ -257,9 +256,9 @@ export class SkuVaultService {
       }
 
       // Store token and mark as authenticated
-      this.tokenCache.set(authToken);
+      await this.tokenCache.set(authToken);
       this.isAuthenticated = true;
-      console.log('[SkuVault] Login successful, token cached');
+      console.log('[SkuVault] Login successful, token cached in Redis');
       
       return true;
 
@@ -272,8 +271,8 @@ export class SkuVaultService {
   /**
    * Get API headers with authentication and required fields
    */
-  private getApiHeaders(): Record<string, string> {
-    const token = this.tokenCache.get();
+  private async getApiHeaders(): Promise<Record<string, string>> {
+    const token = await this.tokenCache.get();
     if (!token) {
       throw new Error('No authentication token available');
     }
@@ -297,11 +296,12 @@ export class SkuVaultService {
     data?: any
   ): Promise<T> {
     try {
+      const headers = await this.getApiHeaders();
       const response = await this.client.request<T>({
         method,
         url,
         data,
-        headers: this.getApiHeaders(),
+        headers,
       });
       return response.data;
     } catch (error) {
@@ -310,7 +310,7 @@ export class SkuVaultService {
       // If 401, clear token and retry once with re-authentication
       if (axiosError.response?.status === 401) {
         console.log('[SkuVault] Received 401, re-authenticating...');
-        this.tokenCache.clear();
+        await this.tokenCache.clear();
         this.isAuthenticated = false;
         
         const loginSuccess = await this.login();
@@ -319,11 +319,12 @@ export class SkuVaultService {
         }
         
         // Retry the request with new token
+        const retryHeaders = await this.getApiHeaders();
         const retryResponse = await this.client.request<T>({
           method,
           url,
           data,
-          headers: this.getApiHeaders(),
+          headers: retryHeaders,
         });
         return retryResponse.data;
       }
@@ -350,9 +351,6 @@ export class SkuVaultService {
     if (!this.config.username || !this.config.password) {
       throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
     }
-
-    // Wait for initialization if still in progress
-    await this.waitForInit();
 
     // Ensure we're authenticated
     if (!this.isAuthenticated) {
@@ -429,10 +427,10 @@ export class SkuVaultService {
   /**
    * Logout and clear session
    */
-  logout(): void {
-    this.tokenCache.clear();
+  async logout(): Promise<void> {
+    await this.tokenCache.clear();
     this.isAuthenticated = false;
-    console.log('[SkuVault] Logged out, token cleared');
+    console.log('[SkuVault] Logged out, token cleared from Redis');
   }
 }
 

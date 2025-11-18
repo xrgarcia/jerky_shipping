@@ -1,8 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, User, Box, Weight, ListChecks } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Package, User, Box, Weight, ListChecks, RefreshCw } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ParsedSession } from "@shared/skuvault-types";
 import { SessionState } from "@shared/skuvault-types";
 
@@ -68,9 +71,35 @@ const formatDate = (dateString: string | null): string => {
 };
 
 export default function Sessions() {
-  const { data, isLoading, error } = useQuery<SessionsResponse>({
+  const { toast } = useToast();
+  
+  const { data, isLoading, error, refetch } = useQuery<SessionsResponse>({
     queryKey: ["/api/skuvault/sessions"],
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('/api/skuvault/login', {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Connected to SkuVault",
+        description: "Successfully authenticated with SkuVault. Fetching sessions...",
+      });
+      // Refetch sessions after successful login
+      queryClient.invalidateQueries({ queryKey: ["/api/skuvault/sessions"] });
+      refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to SkuVault. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const sessions = data?.sessions || [];
@@ -119,10 +148,27 @@ export default function Sessions() {
           </div>
           
           <Card className="border-destructive">
-            <CardContent className="p-6">
+            <CardContent className="p-12 text-center space-y-4">
               <p className="text-destructive">
                 Failed to load SkuVault sessions. Please check your connection and credentials.
               </p>
+              <Button 
+                onClick={() => loginMutation.mutate()}
+                disabled={loginMutation.isPending}
+                data-testid="button-connect-skuvault"
+              >
+                {loginMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Connect to SkuVault
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -138,9 +184,30 @@ export default function Sessions() {
             <Package className="h-8 w-8 text-primary" />
             <h1 className="text-4xl font-bold font-serif">SkuVault Sessions</h1>
           </div>
-          <Badge variant="secondary" className="text-sm" data-testid="badge-session-count">
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => loginMutation.mutate()}
+              disabled={loginMutation.isPending}
+              variant="outline"
+              size="sm"
+              data-testid="button-reconnect-skuvault"
+            >
+              {loginMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reconnect
+                </>
+              )}
+            </Button>
+            <Badge variant="secondary" className="text-sm" data-testid="badge-session-count">
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+            </Badge>
+          </div>
         </div>
         
         {sessions.length === 0 ? (

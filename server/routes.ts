@@ -831,6 +831,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== SkuVault Integration ==========
 
+  // Manual login to SkuVault
+  app.post("/api/skuvault/login", requireAuth, async (req, res) => {
+    try {
+      console.log("Initiating manual SkuVault login...");
+      const success = await skuVaultService.login();
+      
+      if (success) {
+        console.log("SkuVault login successful");
+        res.json({ success: true, message: "Successfully connected to SkuVault" });
+      } else {
+        console.log("SkuVault login failed");
+        res.status(401).json({ success: false, error: "Failed to authenticate with SkuVault" });
+      }
+    } catch (error: any) {
+      console.error("Error during SkuVault login:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to connect to SkuVault",
+        message: error.message 
+      });
+    }
+  });
+
   // Get all SkuVault wave picking sessions
   app.get("/api/skuvault/sessions", requireAuth, async (req, res) => {
     try {
