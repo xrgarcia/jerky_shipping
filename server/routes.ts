@@ -536,9 +536,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               serviceCode: shipmentData.service_code || 'standard',
               status: shipmentData.voided ? 'cancelled' : (shipmentData.shipment_status || 'shipped'),
               statusDescription: shipmentData.shipment_status || 'Shipment created',
-              shipDate: shipmentData.ship_date || undefined,
-              estimatedDeliveryDate: undefined,
-              actualDeliveryDate: undefined,
+              shipDate: shipmentData.ship_date || null,
+              estimatedDeliveryDate: null,
+              actualDeliveryDate: null,
               labelUrl: null,
               shipmentData: shipmentData,
             });
