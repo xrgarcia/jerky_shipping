@@ -279,7 +279,10 @@ export class SkuVaultService {
       
       if (loginPageResponse.status !== 200) {
         console.error('[SkuVault] Failed to load login page');
-        return false;
+        throw new SkuVaultError(
+          'Failed to load SkuVault login page. Please try again later.',
+          503
+        );
       }
 
       // Step 2: Build form data with credentials
@@ -394,6 +397,11 @@ export class SkuVaultService {
         if (lockoutDuration) {
           await this.lockoutCache.setLockout(lockoutDuration);
           console.log(`[SkuVault] Account locked out for ${lockoutDuration} minutes`);
+          throw new SkuVaultError(
+            errorMessage || `Account locked out for ${lockoutDuration} minutes. Please try again later.`,
+            429,
+            { lockoutMinutes: lockoutDuration }
+          );
         }
         
         // Check for generic error keywords
@@ -405,7 +413,11 @@ export class SkuVaultService {
           console.error('[SkuVault] Possible error in response:', errorContext.replace(/<[^>]*>/g, '').trim());
         }
         
-        return false;
+        // Throw error with the parsed message or a generic one
+        throw new SkuVaultError(
+          errorMessage || 'Failed to authenticate with SkuVault. Please check your credentials.',
+          401
+        );
       }
 
       // Store token and mark as authenticated
@@ -416,8 +428,18 @@ export class SkuVaultService {
       return true;
 
     } catch (error) {
+      // Re-throw SkuVaultError instances as-is to preserve detailed error messages
+      if (error instanceof SkuVaultError) {
+        throw error;
+      }
+      
+      // Wrap other errors in SkuVaultError
       console.error('[SkuVault] Login error:', error);
-      return false;
+      const message = error instanceof Error ? error.message : 'Unknown error during login';
+      throw new SkuVaultError(
+        `Login failed: ${message}`,
+        500
+      );
     }
   }
 
