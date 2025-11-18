@@ -1361,8 +1361,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Split orders into refunded and non-refunded
-      const refundedOrders = ordersInRange.filter(order => order.fulfillmentStatus === 'refunded');
-      const fulfilledOrders = ordersInRange.filter(order => order.fulfillmentStatus !== 'refunded');
+      // Check financial_status (payment status) not fulfillment_status (shipping status)
+      const refundedOrders = ordersInRange.filter(order => 
+        order.financialStatus === 'refunded' || order.financialStatus === 'partially_refunded'
+      );
+      const nonRefundedOrders = ordersInRange.filter(order => 
+        order.financialStatus !== 'refunded' && order.financialStatus !== 'partially_refunded'
+      );
 
       // Calculate returns value
       let returnsValue = 0;
@@ -1380,7 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const statusCounts: { [key: string]: number } = {};
       const fulfillmentCounts: { [key: string]: number } = {};
 
-      fulfilledOrders.forEach((order) => {
+      nonRefundedOrders.forEach((order) => {
         // Revenue aggregations (excluding refunded orders)
         totalRevenue += parseAmount(order.orderTotal);
         totalShipping += parseAmount(order.shippingTotal);
@@ -1408,7 +1413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const summary = {
         totalOrders: ordersInRange.length,
-        fulfilledOrders: fulfilledOrders.length,
+        fulfilledOrders: nonRefundedOrders.length,
         refundedOrders: refundedOrders.length,
         totalRevenue: totalRevenue.toFixed(2),
         totalShipping: totalShipping.toFixed(2),
