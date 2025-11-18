@@ -392,6 +392,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           await storage.createOrder(orderData);
         }
+
+        // Process refunds for this order
+        if (shopifyOrder.refunds && shopifyOrder.refunds.length > 0) {
+          for (const refund of shopifyOrder.refunds) {
+            try {
+              const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
+                return sum + parseFloat(txn.amount || '0');
+              }, 0) || 0;
+
+              const refundData = {
+                orderId: orderData.id,
+                shopifyRefundId: refund.id.toString(),
+                amount: totalAmount.toFixed(2),
+                note: refund.note || null,
+                refundedAt: new Date(refund.created_at),
+                processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
+              };
+
+              await storage.upsertOrderRefund(refundData);
+            } catch (refundError) {
+              console.error(`Error processing refund for order ${orderData.id}:`, refundError);
+            }
+          }
+        }
+
         syncCount++;
       }
 

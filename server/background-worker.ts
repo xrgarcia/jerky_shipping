@@ -27,6 +27,36 @@ function extractShopifyOrderPrices(shopifyOrder: any) {
 }
 
 /**
+ * Extract and store refunds from a Shopify order
+ * Processes the refunds array and stores each refund in the database
+ */
+async function processOrderRefunds(orderId: string, shopifyOrder: any) {
+  const refunds = shopifyOrder.refunds || [];
+  
+  for (const refund of refunds) {
+    try {
+      // Calculate total refund amount from transactions
+      const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
+        return sum + parseFloat(txn.amount || '0');
+      }, 0) || 0;
+
+      const refundData = {
+        orderId: orderId,
+        shopifyRefundId: refund.id.toString(),
+        amount: totalAmount.toFixed(2),
+        note: refund.note || null,
+        refundedAt: new Date(refund.created_at),
+        processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
+      };
+
+      await storage.upsertOrderRefund(refundData);
+    } catch (error) {
+      console.error(`Error processing refund ${refund.id} for order ${orderId}:`, error);
+    }
+  }
+}
+
+/**
  * Process a single batch of webhooks from the queue
  * Returns the number of webhooks processed
  */
@@ -67,6 +97,9 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         } else {
           await storage.createOrder(orderData);
         }
+
+        // Process refunds from Shopify order
+        await processOrderRefunds(orderData.id, shopifyOrder);
 
         // Update backfill job progress if this is a backfill webhook
         // Count every order processed (new or updated) because the queue ensures no duplicates per job
