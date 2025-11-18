@@ -35,6 +35,7 @@ Preferred communication style: Simple, everyday language.
     - `sessions`: User sessions.
     - `orders`: Shopify order data (JSONB).
     - `orderRefunds`: Refund tracking with indexed `refunded_at` column for scalable date range queries (separate table chosen over JSONB for performance at scale).
+    - `orderItems`: Normalized order line items with comprehensive price fields for product-level sales reporting. Stores both raw Shopify JSON structures (priceSetJson, totalDiscountSetJson, taxLinesJson) preserving multi-currency data and calculated aggregates (priceSetAmount, totalDiscountSetAmount, totalTaxAmount, preDiscountPrice, finalLinePrice) for efficient querying. Includes SKU index for fast variant lookup. Populated by webhooks, sync, and backfill endpoints using consistent extraction logic.
     - `products`, `productVariants`: Normalized Shopify product/variant data (soft-delete support, indexes on `sku`, `bar_code`).
 - **Migrations**: Drizzle Kit.
 
