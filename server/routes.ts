@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource } from "./utils/shipstation-api";
-import { enqueueWebhook, dequeueWebhook, getQueueLength } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -72,6 +72,75 @@ function extractShopifyOrderPrices(shopifyOrder: any) {
     currentTotalAdditionalFees: shopifyOrder.current_total_additional_fees_set?.shop_money?.amount || '0',
     totalOutstanding: shopifyOrder.total_outstanding || '0',
   };
+}
+
+async function processOrderRefunds(orderId: string, shopifyOrder: any) {
+  const refunds = shopifyOrder.refunds || [];
+  
+  for (const refund of refunds) {
+    try {
+      const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
+        return sum + parseFloat(txn.amount || '0');
+      }, 0) || 0;
+
+      const refundData = {
+        orderId: orderId,
+        shopifyRefundId: refund.id.toString(),
+        amount: totalAmount.toFixed(2),
+        note: refund.note || null,
+        refundedAt: new Date(refund.created_at),
+        processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
+      };
+
+      await storage.upsertOrderRefund(refundData);
+    } catch (error) {
+      console.error(`Error processing refund ${refund.id} for order ${orderId}:`, error);
+    }
+  }
+}
+
+async function processOrderLineItems(orderId: string, shopifyOrder: any) {
+  const lineItems = shopifyOrder.line_items || [];
+  
+  for (const item of lineItems) {
+    try {
+      const unitPrice = parseFloat(item.price || '0');
+      const quantity = item.quantity || 0;
+      const preDiscountPrice = (unitPrice * quantity).toFixed(2);
+      const totalDiscount = item.total_discount || '0.00';
+      const finalLinePrice = (parseFloat(preDiscountPrice) - parseFloat(totalDiscount)).toFixed(2);
+      
+      const taxAmount = item.tax_lines?.reduce((sum: number, taxLine: any) => {
+        return sum + parseFloat(taxLine.price || '0');
+      }, 0) || 0;
+
+      const itemData = {
+        orderId: orderId,
+        shopifyLineItemId: item.id.toString(),
+        title: item.title || item.name || 'Unknown Item',
+        sku: item.sku || null,
+        variantId: item.variant_id ? item.variant_id.toString() : null,
+        productId: item.product_id ? item.product_id.toString() : null,
+        quantity: quantity,
+        currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
+        price: item.price || '0.00',
+        totalDiscount: totalDiscount,
+        priceSetJson: item.price_set || null,
+        totalDiscountSetJson: item.total_discount_set || null,
+        taxLinesJson: item.tax_lines || null,
+        taxable: item.taxable !== undefined ? item.taxable : null,
+        priceSetAmount: item.price_set?.shop_money?.amount || '0',
+        totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
+        totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
+        preDiscountPrice: preDiscountPrice,
+        finalLinePrice: finalLinePrice,
+      };
+
+      await storage.upsertOrderItem(itemData);
+    } catch (error) {
+      console.error(`Error processing line item ${item.id} for order ${orderId}:`, error);
+    }
+  }
 }
 
 async function fetchShopifyOrders(limit: number = 50) {
@@ -1210,30 +1279,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "in_progress",
       });
 
-      // Now queue each order for async processing
-      // Wrap in try/catch to rollback if enqueue fails
+      // Process each order immediately and queue only the ID
+      // This prevents Redis queue from exceeding 100MB limit
       try {
         for (const shopifyOrder of allOrders) {
-          const webhookData = {
-            type: 'backfill',
-            jobId: job.id,
-            order: shopifyOrder,
-            receivedAt: new Date().toISOString(),
+          // Store order in database first
+          const orderData = {
+            id: shopifyOrder.id.toString(),
+            orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+            customerName: shopifyOrder.customer
+              ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
+              : "Guest",
+            customerEmail: shopifyOrder.customer?.email || null,
+            customerPhone: shopifyOrder.customer?.phone || null,
+            shippingAddress: shopifyOrder.shipping_address || {},
+            lineItems: shopifyOrder.line_items || [],
+            fulfillmentStatus: shopifyOrder.fulfillment_status,
+            financialStatus: shopifyOrder.financial_status,
+            ...extractShopifyOrderPrices(shopifyOrder),
+            createdAt: new Date(shopifyOrder.created_at),
+            updatedAt: new Date(shopifyOrder.updated_at),
           };
-          await enqueueWebhook(webhookData);
+
+          const existing = await storage.getOrder(orderData.id);
+          if (existing) {
+            await storage.updateOrder(orderData.id, orderData);
+          } else {
+            await storage.createOrder(orderData);
+          }
+
+          // Process refunds and line items
+          await processOrderRefunds(orderData.id, shopifyOrder);
+          await processOrderLineItems(orderData.id, shopifyOrder);
+
+          // Queue only the order ID (not full order data)
+          await enqueueOrderId(orderData.id, job.id);
         }
-      } catch (enqueueError: any) {
+      } catch (processingError: any) {
         // Rollback: reset job completely so it can be retried
-        // Reset counters to prevent processedOrders > totalOrders from orphaned tasks
         await storage.updateBackfillJob(job.id, {
           totalOrders: 0,
           processedOrders: 0,
           failedOrders: 0,
           status: "failed",
-          errorMessage: `Failed to queue orders: ${enqueueError.message}`,
+          errorMessage: `Failed to process orders: ${processingError.message}`,
         });
-        console.error("Error queuing orders for backfill:", enqueueError);
-        return res.status(500).json({ error: "Failed to queue orders for processing" });
+        console.error("Error processing orders for backfill:", processingError);
+        return res.status(500).json({ error: "Failed to process orders" });
       }
 
       res.json({ 

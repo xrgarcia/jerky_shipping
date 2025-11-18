@@ -27,6 +27,16 @@ export async function enqueueWebhook(webhookData: any): Promise<void> {
   await redis.lpush(QUEUE_KEY, JSON.stringify(webhookData));
 }
 
+export async function enqueueOrderId(orderId: string, jobId?: string): Promise<void> {
+  const redis = getRedisClient();
+  const queueItem = {
+    type: 'order-id',
+    orderId,
+    jobId: jobId || null,
+  };
+  await redis.lpush(QUEUE_KEY, JSON.stringify(queueItem));
+}
+
 export async function dequeueWebhook(): Promise<any | null> {
   const redis = getRedisClient();
   const data = await redis.rpop(QUEUE_KEY);

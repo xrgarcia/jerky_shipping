@@ -131,7 +131,31 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
     }
 
     try {
-      if (webhookData.type === 'shopify' || webhookData.type === 'backfill') {
+      if (webhookData.type === 'order-id') {
+        const orderId = webhookData.orderId;
+        const jobId = webhookData.jobId;
+        
+        const order = await storage.getOrder(orderId);
+        if (!order) {
+          console.error(`Order ${orderId} not found in database during queue processing`);
+          processedCount++;
+          continue;
+        }
+        
+        if (jobId) {
+          await storage.incrementBackfillProgress(jobId, 1);
+          
+          const job = await storage.getBackfillJob(jobId);
+          if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
+            await storage.updateBackfillJob(jobId, {
+              status: "completed",
+            });
+          }
+        }
+        
+        broadcastOrderUpdate(order);
+        processedCount++;
+      } else if (webhookData.type === 'shopify' || webhookData.type === 'backfill') {
         const shopifyOrder = webhookData.order;
         const orderData = {
           id: shopifyOrder.id.toString(),

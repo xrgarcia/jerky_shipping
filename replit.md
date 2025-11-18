@@ -6,16 +6,22 @@ This application is a warehouse fulfillment tool for ship.jerky.com, integrating
 
 ## Recent Changes
 
-### November 18, 2025: Queue Management System
-- **Problem**: Failed backfill jobs left 5,678 stale webhooks in Redis queue, blocking new backfill processing and causing delays.
-- **Solution**: Added queue clearing functionality via `/api/queue/clear` endpoint and `clearQueue()` utility in `server/utils/queue.ts`.
+### November 18, 2025: Queue Architecture Redesign - Order ID Queueing
+- **Problem**: Backfill failed when queuing 3 months of orders (~6,000 orders). Redis queue exceeded Upstash's 100MB single-record limit by storing full Shopify order objects (10-20KB each).
+- **Root Cause**: Original design queued complete order JSON payloads, causing queue size to balloon with large datasets.
+- **Solution**: Redesigned queue to store only order IDs (50 bytes each) instead of full order data. Orders are processed and stored in database immediately during backfill, then IDs are queued for progress tracking.
 - **Implementation**:
-  - Created `clearQueue()` function to delete all webhooks from Redis queue
-  - Added authenticated POST endpoint `/api/queue/clear` in `routes.ts`
-  - Cleared 5,678 stale webhooks, reducing queue backlog from ~6,000 to 15 items
-  - Background worker processes remaining webhooks at ~120/minute (10 every 5 seconds)
-- **Impact**: Unblocked backfill processing, enabled immediate execution of new backfill jobs, provided admin tool for queue maintenance.
-- **Usage**: Destructive operation - use only when queue is blocked by failed jobs or stale webhooks.
+  - Added `enqueueOrderId()` function in `server/utils/queue.ts` for ID-only queueing
+  - Updated background worker to handle `order-id` type webhooks by fetching orders from database
+  - Modified backfill endpoint to process orders immediately (store in DB with refunds and line items) before queuing IDs
+  - Added helper functions `processOrderRefunds()` and `processOrderLineItems()` in `routes.ts` for immediate processing
+  - Maintained backward compatibility - worker handles both old full-order webhooks and new ID-only webhooks
+- **Impact**: 
+  - Reduced queue memory usage by 200-400x (from ~100MB to ~300KB for 6,000 orders)
+  - Eliminated Upstash 100MB limit errors during large backfills
+  - Enabled successful backfill of months or years of historical orders
+  - Faster backfill initialization (orders processed during API fetch rather than background worker)
+- **Technical Details**: Queue now stores `{type: 'order-id', orderId: string, jobId: string}` instead of full Shopify order objects. Worker fetches order from database by ID for progress tracking and WebSocket broadcasting.
 
 ### November 18, 2025: NOT NULL Constraints Enforced for Price Fields
 - **Problem**: Database schema allowed NULL values for price/amount fields in `orders` and `orderItems` tables, but extraction logic inconsistently returned NULL vs '0', causing data integrity issues and potential calculation errors.
