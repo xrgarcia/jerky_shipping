@@ -517,32 +517,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Store the first shipment from ShipStation in database
             // Schema uses z.coerce.date() to automatically convert ISO strings to Date objects
-            const shipmentData = shipStationShipments[0];
+            // Note: ShipStation V2 API uses snake_case (shipment_id) not camelCase
+            const shipmentData = shipStationShipments[0] as any;
             
             // Log the shipment data to debug
             console.log(`ShipStation shipment data for ${order.orderNumber}:`, {
-              shipmentId: shipmentData.shipmentId,
-              trackingNumber: shipmentData.trackingNumber,
-              carrierCode: shipmentData.carrierCode,
-              shipDate: shipmentData.shipDate
+              shipment_id: shipmentData.shipment_id,
+              tracking_number: shipmentData.tracking_number,
+              carrier_code: shipmentData.carrier_code,
+              ship_date: shipmentData.ship_date
             });
             
             const storedShipment = await storage.createShipment({
               orderId: order.id,
-              shipmentId: shipmentData.shipmentId?.toString() || null,
-              trackingNumber: shipmentData.trackingNumber || `UNKNOWN-${Date.now()}`,
-              carrierCode: shipmentData.carrierCode || 'unknown',
-              serviceCode: shipmentData.serviceCode || 'standard',
-              status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-              shipDate: shipmentData.shipDate || undefined,
-              estimatedDeliveryDate: shipmentData.estimatedDeliveryDate || undefined,
-              actualDeliveryDate: shipmentData.actualDeliveryDate || undefined,
+              shipmentId: shipmentData.shipment_id?.toString() || null,
+              trackingNumber: shipmentData.tracking_number || `UNKNOWN-${Date.now()}`,
+              carrierCode: shipmentData.carrier_id || 'unknown',
+              serviceCode: shipmentData.service_code || 'standard',
+              status: shipmentData.voided ? 'cancelled' : (shipmentData.shipment_status || 'shipped'),
+              statusDescription: shipmentData.shipment_status || 'Shipment created',
+              shipDate: shipmentData.ship_date || undefined,
+              estimatedDeliveryDate: undefined,
+              actualDeliveryDate: undefined,
               labelUrl: null,
               shipmentData: shipmentData,
             });
             
-            console.log(`Stored shipment with ID: ${storedShipment.shipmentId}`);
+            console.log(`Stored shipment with ShipStation ID: ${storedShipment.shipmentId}`);
             
             shipments = [storedShipment];
           } else {
