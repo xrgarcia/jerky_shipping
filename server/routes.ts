@@ -1356,7 +1356,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(parsed) ? 0 : parsed;
       };
 
-      // Calculate aggregations
+      // Split orders into refunded and non-refunded
+      const refundedOrders = ordersInRange.filter(order => order.fulfillmentStatus === 'refunded');
+      const fulfilledOrders = ordersInRange.filter(order => order.fulfillmentStatus !== 'refunded');
+
+      // Calculate returns value
+      let returnsValue = 0;
+      refundedOrders.forEach((order) => {
+        returnsValue += parseAmount(order.orderTotal);
+      });
+
+      // Calculate aggregations (excluding refunded orders)
       let totalRevenue = 0;
       let totalShipping = 0;
       let totalSubtotal = 0;
@@ -1366,19 +1376,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const statusCounts: { [key: string]: number } = {};
       const fulfillmentCounts: { [key: string]: number } = {};
 
-      ordersInRange.forEach((order) => {
-        // Revenue aggregations
+      fulfilledOrders.forEach((order) => {
+        // Revenue aggregations (excluding refunded orders)
         totalRevenue += parseAmount(order.orderTotal);
         totalShipping += parseAmount(order.shippingTotal);
         totalSubtotal += parseAmount(order.subtotalPrice);
         totalTax += parseAmount(order.totalTax);
         totalDiscounts += parseAmount(order.totalDiscounts);
 
-        // Daily totals for chart
+        // Daily totals for chart (excluding refunded orders)
         const dayKey = order.createdAt.toISOString().split('T')[0];
         dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + parseAmount(order.orderTotal);
 
-        // Status counts
+        // Status counts (excluding refunded orders)
         const financialStatus = order.financialStatus || 'unknown';
         statusCounts[financialStatus] = (statusCounts[financialStatus] || 0) + 1;
 
@@ -1393,13 +1403,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const summary = {
         totalOrders: ordersInRange.length,
+        fulfilledOrders: fulfilledOrders.length,
+        refundedOrders: refundedOrders.length,
         totalRevenue: totalRevenue.toFixed(2),
         totalShipping: totalShipping.toFixed(2),
         totalSubtotal: totalSubtotal.toFixed(2),
         totalTax: totalTax.toFixed(2),
         totalDiscounts: totalDiscounts.toFixed(2),
-        averageOrderValue: ordersInRange.length > 0 ? (totalRevenue / ordersInRange.length).toFixed(2) : '0.00',
-        averageShipping: ordersInRange.length > 0 ? (totalShipping / ordersInRange.length).toFixed(2) : '0.00',
+        returnsValue: returnsValue.toFixed(2),
+        averageOrderValue: fulfilledOrders.length > 0 ? (totalRevenue / fulfilledOrders.length).toFixed(2) : '0.00',
+        averageShipping: fulfilledOrders.length > 0 ? (totalShipping / fulfilledOrders.length).toFixed(2) : '0.00',
         dailyData,
         statusCounts,
         fulfillmentCounts,

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, TrendingUp, DollarSign, Package, BarChart3 } from "lucide-react";
+import { CalendarIcon, TrendingUp, DollarSign, Package, BarChart3, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import {
   LineChart,
@@ -19,11 +19,14 @@ import {
 
 interface ReportSummary {
   totalOrders: number;
+  fulfilledOrders: number;
+  refundedOrders: number;
   totalRevenue: string;
   totalShipping: string;
   totalSubtotal: string;
   totalTax: string;
   totalDiscounts: string;
+  returnsValue: string;
   averageOrderValue: string;
   averageShipping: string;
   dailyData: Array<{ date: string; total: number }>;
@@ -191,7 +194,7 @@ export default function Reports() {
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card data-testid="card-total-orders">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold">Total Orders</CardTitle>
@@ -202,7 +205,22 @@ export default function Reports() {
                     {summary.totalOrders}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {format(startDate, 'MMM dd')} - {format(endDate, 'MMM dd')}
+                    All orders in period
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-fulfilled-orders">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-lg font-semibold">Fulfilled Orders</CardTitle>
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold" data-testid="text-fulfilled-orders">
+                    {summary.fulfilledOrders}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Excluding {summary.refundedOrders} returns
                   </p>
                 </CardContent>
               </Card>
@@ -248,6 +266,21 @@ export default function Reports() {
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     Before shipping & tax
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-returns">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-lg font-semibold">Returns</CardTitle>
+                  <RotateCcw className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-red-600" data-testid="text-returns-value">
+                    {formatCurrency(summary.returnsValue)}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {summary.refundedOrders} refunded orders
                   </p>
                 </CardContent>
               </Card>
