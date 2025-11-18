@@ -166,6 +166,7 @@ export type OrderItem = z.infer<typeof orderItemSchema>;
  */
 export const orderSchema = z.object({
   id: z.string().nullable().optional(),
+  spot_number: z.number().nullable().optional(), // 1-based order position in picklist
   items: z.array(orderItemSchema).nullable().optional(),
 });
 

@@ -661,8 +661,13 @@ export class SkuVaultService {
       
       const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
-      // Extract and log all order IDs for debugging
+      // Extract and assign spot numbers (1-based order position in picklist)
       const orders = response?.picklist?.orders || [];
+      orders.forEach((order: any, index: number) => {
+        // Assign spot number as 1-based index (1st order = #1, 2nd = #2, etc.)
+        order.spot_number = index + 1;
+      });
+      
       const orderIds = orders.map((order: any) => order.id).filter(Boolean);
       const sessionId = response?.picklist?.sequenceId;
       
