@@ -41,6 +41,13 @@ Preferred communication style: Simple, everyday language.
 
 - **Product Catalog (`/products`)**: Warehouse-optimized interface with large typography, two-column grid, product cards, expandable variant details (SKU, barcode, inventory), and search functionality. Real-time sync via Shopify webhooks.
 - **Order Backfill System (`/backfill`)**: Allows importing historical Shopify orders for any date range. Uses `backfillJobs` table, async processing via Upstash Redis queue, and Shopify API rate limiting. Provides UI with date pickers, real-time progress, and job history.
+- **Print Queue System**: Auto-print functionality for shipping labels using Print.js library. Fixed bottom bar displays active print jobs across all pages. Features:
+  - Automatic print dialog triggering when labels are created (no user interaction required)
+  - Smart retry prevention with `failedJobsRef` tracking to avoid infinite API loops
+  - Backend accepts both "queued" and "printing" status for job completion
+  - Real-time status updates via WebSocket broadcasting
+  - Jobs marked complete only after print dialog closes
+  - Note: Print.js cannot distinguish between confirmed prints and user-canceled dialogs
 - **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates, authenticated via sessions. Frontend refreshes order list and shows toast notifications.
 - **Price Field Storage**: Captures 13 distinct Shopify price/amount fields as text strings using `extractShopifyOrderPrices()` for consistency.
 - **Monorepo Structure**: Client, server, and shared code co-located for simplified development and type consistency.
