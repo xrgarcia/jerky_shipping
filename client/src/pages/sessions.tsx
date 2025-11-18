@@ -108,13 +108,10 @@ export default function Sessions() {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  // Query lockout status - only poll continuously if there's an active lockout
+  // Query lockout status - poll every second to keep countdown updated  
   const { data: lockoutData } = useQuery<LockoutStatus>({
     queryKey: ["/api/skuvault/lockout-status"],
-    refetchInterval: (data) => {
-      // Only poll every second if there's an active lockout
-      return data?.isLockedOut ? 1000 : false;
-    },
+    refetchInterval: 1000, // Poll every second to keep countdown live
   });
 
   const isLockedOut = lockoutData?.isLockedOut || false;
