@@ -1,12 +1,17 @@
 /**
  * SkuVault Web Service
  * 
- * Service for SkuVault web interface integration using discovered API endpoints.
- * Handles authentication, token management, and session data extraction.
+ * Service for SkuVault web interface integration using reverse-engineered web API.
+ * Handles authentication via web form login and session data extraction.
+ * 
+ * Authentication Flow:
+ * 1. GET login page at app.skuvault.com/account/login
+ * 2. POST credentials to extract sv-t cookie
+ * 3. Use sv-t cookie value as Authorization token for API calls to lmdb.skuvault.com
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { parse } from 'node-html-parser';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   sessionsResponseSchema,
   parseSessionState,
@@ -62,7 +67,7 @@ class TokenCache {
  * SkuVault Web Service
  * 
  * Provides methods to interact with SkuVault's web API including:
- * - Authentication and session management
+ * - Authentication via web form login
  * - Fetching wave picking sessions
  * - Auto-retry on authentication errors
  */
@@ -71,39 +76,75 @@ export class SkuVaultService {
   private client: AxiosInstance;
   private tokenCache: TokenCache;
   private isAuthenticated: boolean = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
     // Load configuration from environment
     this.config = {
       username: process.env.SKUVAULT_USERNAME || '',
       password: process.env.SKUVAULT_PASSWORD || '',
-      loginUrl: 'https://app.skuvault.com/Account/Login',
-      apiBaseUrl: 'https://api-wave.skuvault.com',
+      loginUrl: 'https://app.skuvault.com/account/login',
+      apiBaseUrl: 'https://lmdb.skuvault.com',
     };
 
-    // Initialize HTTP client
+    // Initialize HTTP client with base headers
     this.client = axios.create({
       timeout: 30000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
       },
-      withCredentials: true,
     });
 
     this.tokenCache = new TokenCache();
+
+    // Start authentication at construction for immediate readiness
+    this.initPromise = this.initialize();
+  }
+
+  /**
+   * Initialize service by authenticating at startup
+   */
+  private async initialize(): Promise<void> {
+    if (!this.config.username || !this.config.password) {
+      console.warn('[SkuVault] Credentials not configured, skipping automatic login');
+      return;
+    }
+
+    try {
+      console.log('[SkuVault] Initializing service with automatic login...');
+      await this.login();
+      console.log('[SkuVault] Service initialized and ready');
+    } catch (error) {
+      console.error('[SkuVault] Failed to initialize service:', error);
+      // Don't throw - allow service to be created and retry later
+    }
+  }
+
+  /**
+   * Wait for initialization to complete
+   */
+  async waitForInit(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
   }
 
   /**
    * Authenticate with SkuVault web interface
-   * Performs login and extracts auth token from cookies
+   * Performs login via web form and extracts sv-t cookie as Authorization token
    */
   async login(): Promise<boolean> {
     try {
       console.log('[SkuVault] Starting login process...');
+      console.log('[SkuVault] Username configured:', !!this.config.username, `(${this.config.username.length} chars)`);
+      console.log('[SkuVault] Password configured:', !!this.config.password, `(${this.config.password.length} chars)`);
 
       // Check if we have a valid cached token
       if (this.tokenCache.isValid()) {
@@ -112,7 +153,7 @@ export class SkuVaultService {
         return true;
       }
 
-      // Step 1: Get login page to extract form data
+      // Step 1: GET login page to extract any CSRF tokens
       const loginPageResponse = await this.client.get(this.config.loginUrl);
       
       if (loginPageResponse.status !== 200) {
@@ -120,20 +161,24 @@ export class SkuVaultService {
         return false;
       }
 
-      // Step 2: Parse login form
-      const html = parse(loginPageResponse.data);
-      const form = html.querySelector('form');
-
-      if (!form) {
-        console.error('[SkuVault] Login form not found on page');
-        return false;
-      }
-
-      // Step 3: Submit login credentials
-      const loginData = new URLSearchParams({
+      // Step 2: Build form data with credentials
+      const formData: Record<string, string> = {
         Email: this.config.username,
         Password: this.config.password,
-      });
+      };
+
+      // Check for CSRF token in the HTML response
+      if (typeof loginPageResponse.data === 'string') {
+        const csrfMatch = loginPageResponse.data.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
+        if (csrfMatch) {
+          formData.__RequestVerificationToken = csrfMatch[1];
+          console.log('[SkuVault] Found CSRF token in login form');
+        } else {
+          console.log('[SkuVault] No CSRF token found in login form');
+        }
+      }
+
+      const loginData = new URLSearchParams(formData);
 
       const loginResponse = await this.client.post(
         this.config.loginUrl,
@@ -142,52 +187,94 @@ export class SkuVaultService {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          maxRedirects: 0,
-          validateStatus: (status) => status < 400, // Accept redirects
+          maxRedirects: 5,
+          validateStatus: (status) => status < 400, // Accept success and redirects
         }
       );
 
-      // Step 4: Extract auth token from cookies
+      console.log('[SkuVault] Login response status:', loginResponse.status);
+      console.log('[SkuVault] Login response URL:', loginResponse.request?.res?.responseUrl || 'N/A');
+
+      // Check for successful login indicators
+      const responseUrl = loginResponse.request?.res?.responseUrl || this.config.loginUrl;
+      const responseHtml = typeof loginResponse.data === 'string' ? loginResponse.data : '';
+      const hasSuccessfulRedirect = responseUrl.includes('dashboard') || responseUrl.includes('main');
+      const hasMountPoint = responseHtml.includes('<div id="mount-point">');
+      
+      console.log('[SkuVault] Login success indicators:');
+      console.log('  - Redirected to dashboard/main:', hasSuccessfulRedirect);
+      console.log('  - Has mount-point div:', hasMountPoint);
+
+      if (!hasSuccessfulRedirect && !hasMountPoint) {
+        console.error('[SkuVault] Login appears to have failed - no success indicators found');
+        // Still try to extract cookies in case the indicators are wrong
+      }
+
+      // Step 3: Extract sv-t cookie from response
       const cookies = loginResponse.headers['set-cookie'] || [];
       let authToken: string | null = null;
 
       for (const cookie of cookies) {
-        // Look for .AspNetCore.Cookies or similar auth cookie
-        if (cookie.includes('.AspNetCore.Cookies') || cookie.includes('AuthToken')) {
-          const match = cookie.match(/([^=]+)=([^;]+)/);
-          if (match) {
-            authToken = match[2];
+        if (cookie.startsWith('sv-t=')) {
+          const tokenValue = cookie.split('=')[1].split(';')[0];
+          
+          // Validate token is long enough (should be > 100 chars)
+          if (tokenValue && tokenValue.length > 100) {
+            authToken = tokenValue;
+            console.log(`[SkuVault] Extracted sv-t token (${tokenValue.length} chars)`);
             break;
+          } else {
+            console.warn(`[SkuVault] sv-t cookie found but too short (${tokenValue.length} chars)`);
           }
         }
       }
 
-      if (authToken) {
-        this.tokenCache.set(authToken);
-        this.isAuthenticated = true;
-        console.log('[SkuVault] Login successful, token cached');
+      if (!authToken) {
+        console.error('[SkuVault] Failed to extract sv-t cookie from login response');
+        console.error('[SkuVault] Received cookies:', cookies.map(c => c.split(';')[0]));
         
-        // Set auth cookie for subsequent requests
-        this.client.defaults.headers.common['Cookie'] = cookies.join('; ');
-        return true;
+        // Check response body for error messages
+        const responseText = typeof loginResponse.data === 'string' 
+          ? loginResponse.data 
+          : JSON.stringify(loginResponse.data);
+        
+        if (responseText.includes('error') || responseText.includes('invalid')) {
+          console.error('[SkuVault] Login response may contain error:', responseText.substring(0, 500));
+        }
+        
+        return false;
       }
 
-      // If no explicit auth token, check if login succeeded by response
-      if (loginResponse.status >= 200 && loginResponse.status < 400) {
-        // Store all cookies
-        this.client.defaults.headers.common['Cookie'] = cookies.join('; ');
-        this.isAuthenticated = true;
-        console.log('[SkuVault] Login successful (session-based)');
-        return true;
-      }
-
-      console.error('[SkuVault] Failed to extract auth token from login response');
-      return false;
+      // Store token and mark as authenticated
+      this.tokenCache.set(authToken);
+      this.isAuthenticated = true;
+      console.log('[SkuVault] Login successful, token cached');
+      
+      return true;
 
     } catch (error) {
       console.error('[SkuVault] Login error:', error);
       return false;
     }
+  }
+
+  /**
+   * Get API headers with authentication and required fields
+   */
+  private getApiHeaders(): Record<string, string> {
+    const token = this.tokenCache.get();
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    return {
+      'Authorization': `Token ${token}`,
+      'Partition': 'default',
+      'tid': Math.floor(Date.now() / 1000).toString(),
+      'idempotency-key': uuidv4(),
+      'dataread': 'true',
+      'Content-Type': 'application/json',
+    };
   }
 
   /**
@@ -203,6 +290,7 @@ export class SkuVaultService {
         method,
         url,
         data,
+        headers: this.getApiHeaders(),
       });
       return response.data;
     } catch (error) {
@@ -219,11 +307,12 @@ export class SkuVaultService {
           throw new Error('Re-authentication failed');
         }
         
-        // Retry the request
+        // Retry the request with new token
         const retryResponse = await this.client.request<T>({
           method,
           url,
           data,
+          headers: this.getApiHeaders(),
         });
         return retryResponse.data;
       }
@@ -251,6 +340,9 @@ export class SkuVaultService {
       throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
     }
 
+    // Wait for initialization if still in progress
+    await this.waitForInit();
+
     // Ensure we're authenticated
     if (!this.isAuthenticated) {
       const loginSuccess = await this.login();
@@ -262,10 +354,15 @@ export class SkuVaultService {
     try {
       const statesToFetch = states || this.getAllSessionStates();
       
-      // Call the sessions API endpoint
-      const url = `${this.config.apiBaseUrl}/picklist/lists`;
+      // Call the sessions API endpoint with correct format
+      const url = `${this.config.apiBaseUrl}/wavepicking/get/sessions`;
       const requestData = {
+        limit: 100,
+        skip: 0,
+        userId: '-2', // System-wide identifier for all users
+        sort: [{ descending: false, field: 'createdDate' }],
         states: statesToFetch,
+        saleId: { match: 'contains', value: '' }, // Empty for all sales
       };
 
       console.log('[SkuVault] Fetching sessions with states:', statesToFetch);
@@ -324,7 +421,6 @@ export class SkuVaultService {
   logout(): void {
     this.tokenCache.clear();
     this.isAuthenticated = false;
-    delete this.client.defaults.headers.common['Cookie'];
     console.log('[SkuVault] Logged out, token cleared');
   }
 }
