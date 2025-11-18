@@ -39,11 +39,27 @@ export default function Reports() {
   });
   const [endDate, setEndDate] = useState<Date>(new Date());
 
+  const formatDateForAPI = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const { data: summary, isLoading } = useQuery<ReportSummary>({
-    queryKey: [
-      "/api/reports/summary",
-      `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
-    ],
+    queryKey: ['/api/reports/summary', formatDateForAPI(startDate), formatDateForAPI(endDate)],
+    queryFn: async ({ queryKey }) => {
+      const [endpoint, startDateStr, endDateStr] = queryKey as [string, string, string];
+      const url = `${endpoint}?startDate=${startDateStr}&endDate=${endDateStr}`;
+      const res = await fetch(url, { credentials: "include" });
+      
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(`${res.status}: ${text}`);
+      }
+      
+      return await res.json();
+    },
   });
 
   const formatCurrency = (value: string) => {
@@ -177,7 +193,7 @@ export default function Reports() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card data-testid="card-total-orders">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold">Total Orders</CardTitle>
                   <Package className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
@@ -192,7 +208,7 @@ export default function Reports() {
               </Card>
 
               <Card data-testid="card-shipping-revenue">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold">Shipping Revenue</CardTitle>
                   <TrendingUp className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
@@ -207,7 +223,7 @@ export default function Reports() {
               </Card>
 
               <Card data-testid="card-total-revenue">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold">Total Revenue</CardTitle>
                   <DollarSign className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
@@ -222,7 +238,7 @@ export default function Reports() {
               </Card>
 
               <Card data-testid="card-product-value">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold">Product Value</CardTitle>
                   <Package className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
