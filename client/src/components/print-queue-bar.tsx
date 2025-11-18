@@ -1,11 +1,10 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Clock } from "lucide-react";
+import { Clock, Printer, X } from "lucide-react";
 import { format } from "date-fns";
-import printJS from "print-js";
 
 interface PrintJob {
   id: string;
@@ -18,45 +17,11 @@ interface PrintJob {
 
 export function PrintQueueBar() {
   const { toast } = useToast();
-  const printedJobsRef = useRef<Set<string>>(new Set());
-  const processingJobsRef = useRef<Set<string>>(new Set());
-  const failedJobsRef = useRef<Set<string>>(new Set());
 
   const { data: jobsData } = useQuery<{ jobs: PrintJob[] }>({
     queryKey: ["/api/print-queue"],
     refetchInterval: 2000,
   });
-
-  useEffect(() => {
-    if (jobsData?.jobs) {
-      const keysToRemove: string[] = [];
-      
-      printedJobsRef.current.forEach(id => {
-        const job = jobsData.jobs.find(j => j.id === id);
-        if (!job) {
-          keysToRemove.push(id);
-        }
-      });
-      
-      keysToRemove.forEach(id => {
-        printedJobsRef.current.delete(id);
-        failedJobsRef.current.delete(id);
-      });
-      
-      const processingKeysToRemove: string[] = [];
-      processingJobsRef.current.forEach(id => {
-        const job = jobsData.jobs.find(j => j.id === id);
-        if (!job) {
-          processingKeysToRemove.push(id);
-        } else if (job.status === "printing") {
-          processingKeysToRemove.push(id);
-          printedJobsRef.current.add(id);
-        }
-      });
-      
-      processingKeysToRemove.forEach(id => processingJobsRef.current.delete(id));
-    }
-  }, [jobsData]);
 
   const markCompleteMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -69,6 +34,10 @@ export function PrintQueueBar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
+      toast({
+        title: "Label complete",
+        description: "Print job marked as complete.",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -79,74 +48,14 @@ export function PrintQueueBar() {
     },
   });
 
-  useEffect(() => {
-    if (!jobsData?.jobs) return;
+  const handlePrintNow = (job: PrintJob) => {
+    const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
+    window.open(proxyUrl, '_blank');
+  };
 
-    const queuedJobs = jobsData.jobs.filter(
-      (job) => job.status === "queued" && 
-               job.labelUrl &&
-               !printedJobsRef.current.has(job.id) && 
-               !processingJobsRef.current.has(job.id) &&
-               !failedJobsRef.current.has(job.id)
-    );
-
-    queuedJobs.forEach(async (job) => {
-      processingJobsRef.current.add(job.id);
-      printedJobsRef.current.add(job.id);
-      
-      try {
-        const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
-        
-        printJS({
-          printable: proxyUrl,
-          type: 'pdf',
-          showModal: false,
-          onPrintDialogClose: async () => {
-            try {
-              await markCompleteMutation.mutateAsync(job.id);
-              processingJobsRef.current.delete(job.id);
-              
-              toast({
-                title: "Label printed",
-                description: `Label for order #${job.orderId} sent to printer.`,
-              });
-            } catch (error) {
-              console.error("Failed to mark print job complete:", error);
-              processingJobsRef.current.delete(job.id);
-              failedJobsRef.current.add(job.id);
-              
-              toast({
-                title: "Print job error",
-                description: `Print dialog closed but failed to update status. Please check order #${job.orderId}.`,
-                variant: "destructive",
-              });
-            }
-          },
-          onError: (error: Error) => {
-            console.error('Print.js error:', error);
-            processingJobsRef.current.delete(job.id);
-            failedJobsRef.current.add(job.id);
-            
-            toast({
-              title: "Print failed",
-              description: `Failed to print label for order #${job.orderId}. Please try manually from the order details.`,
-              variant: "destructive",
-            });
-          }
-        });
-      } catch (error) {
-        console.error("Failed to initiate print job:", error);
-        processingJobsRef.current.delete(job.id);
-        failedJobsRef.current.add(job.id);
-        
-        toast({
-          title: "Print initialization failed",
-          description: `Could not start printing for order #${job.orderId}. Please try manually.`,
-          variant: "destructive",
-        });
-      }
-    });
-  }, [jobsData, markCompleteMutation, toast]);
+  const handleMarkComplete = (jobId: string) => {
+    markCompleteMutation.mutate(jobId);
+  };
 
   const jobs = jobsData?.jobs || [];
   const activeJobs = jobs.filter(j => j.status === "queued");
@@ -193,6 +102,25 @@ export function PrintQueueBar() {
                     {format(new Date(job.queuedAt), "HH:mm:ss")}
                   </span>
                 </div>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => handlePrintNow(job)}
+                  data-testid={`button-print-${job.id}`}
+                >
+                  <Printer className="w-3 h-3 mr-1" />
+                  Print Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleMarkComplete(job.id)}
+                  disabled={markCompleteMutation.isPending}
+                  data-testid={`button-done-${job.id}`}
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Done
+                </Button>
               </div>
             ))}
           </div>
