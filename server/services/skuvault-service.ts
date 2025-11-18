@@ -161,7 +161,16 @@ export class SkuVaultService {
       }
 
       // Step 1: GET login page to extract any CSRF tokens
-      const loginPageResponse = await this.client.get(this.config.loginUrl);
+      const loginPageResponse = await this.client.get(this.config.loginUrl, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1',
+        },
+      });
       
       if (loginPageResponse.status !== 200) {
         console.error('[SkuVault] Failed to load login page');
@@ -192,7 +201,15 @@ export class SkuVaultService {
         loginData.toString(),
         {
           headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://app.skuvault.com',
+            'Referer': 'https://app.skuvault.com/account/login',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
           },
           maxRedirects: 5,
           validateStatus: (status) => status < 400, // Accept success and redirects
