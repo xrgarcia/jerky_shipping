@@ -66,19 +66,19 @@ export const orders = pgTable("orders", {
   fulfillmentStatus: text("fulfillment_status"),
   financialStatus: text("financial_status"),
   // Price fields (all monetary values are strings from Shopify API)
-  totalPrice: text("total_price"), // Legacy field, same as orderTotal
-  orderTotal: text("order_total"), // total_price from Shopify
-  subtotalPrice: text("subtotal_price"), // Price before discounts and shipping
-  currentTotalPrice: text("current_total_price"), // Total after refunds/adjustments
-  currentSubtotalPrice: text("current_subtotal_price"), // Subtotal after adjustments
-  shippingTotal: text("shipping_total"), // total_shipping_price_set.shop_money.amount
-  totalDiscounts: text("total_discounts"), // Total discounts applied
-  currentTotalDiscounts: text("current_total_discounts"), // Discounts after adjustments
-  totalTax: text("total_tax"), // Sum of all taxes
-  currentTotalTax: text("current_total_tax"), // Tax after adjustments
-  totalAdditionalFees: text("total_additional_fees"), // Duties, import fees, handling
-  currentTotalAdditionalFees: text("current_total_additional_fees"), // Fees after adjustments
-  totalOutstanding: text("total_outstanding"), // Outstanding amount remaining
+  totalPrice: text("total_price").notNull().default('0'), // Legacy field, same as orderTotal
+  orderTotal: text("order_total").notNull().default('0'), // total_price from Shopify
+  subtotalPrice: text("subtotal_price").notNull().default('0'), // Price before discounts and shipping
+  currentTotalPrice: text("current_total_price").notNull().default('0'), // Total after refunds/adjustments
+  currentSubtotalPrice: text("current_subtotal_price").notNull().default('0'), // Subtotal after adjustments
+  shippingTotal: text("shipping_total").notNull().default('0'), // total_shipping_price_set.shop_money.amount
+  totalDiscounts: text("total_discounts").notNull().default('0'), // Total discounts applied
+  currentTotalDiscounts: text("current_total_discounts").notNull().default('0'), // Discounts after adjustments
+  totalTax: text("total_tax").notNull().default('0'), // Sum of all taxes
+  currentTotalTax: text("current_total_tax").notNull().default('0'), // Tax after adjustments
+  totalAdditionalFees: text("total_additional_fees").notNull().default('0'), // Duties, import fees, handling
+  currentTotalAdditionalFees: text("current_total_additional_fees").notNull().default('0'), // Fees after adjustments
+  totalOutstanding: text("total_outstanding").notNull().default('0'), // Outstanding amount remaining
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
@@ -129,8 +129,8 @@ export const orderItems = pgTable("order_items", {
   currentQuantity: integer("current_quantity"), // Quantity after refunds/removals
   
   // Core price fields (text strings from Shopify for consistency with orders table)
-  price: text("price").notNull(), // Unit price
-  totalDiscount: text("total_discount"), // Total discount allocated to line item
+  price: text("price").notNull().default('0'), // Unit price
+  totalDiscount: text("total_discount").notNull().default('0'), // Total discount allocated to line item
   
   // Full Shopify price structures (JSON with amount + currency)
   priceSetJson: jsonb("price_set_json"), // Full price_set with shop_money and presentment_money
@@ -141,11 +141,11 @@ export const orderItems = pgTable("order_items", {
   taxLinesJson: jsonb("tax_lines_json"), // Full tax_lines array with jurisdiction details
   
   // Calculated/aggregated fields for easy reporting queries
-  priceSetAmount: text("price_set_amount"), // Extracted shop_money.amount from price_set for easy queries
-  totalDiscountSetAmount: text("total_discount_set_amount"), // Extracted shop_money.amount from total_discount_set
-  totalTaxAmount: text("total_tax_amount"), // Sum of all tax_lines amounts
-  preDiscountPrice: text("pre_discount_price"), // Price before any discounts (price * quantity)
-  finalLinePrice: text("final_line_price"), // Final price after all discounts ((price * quantity) - total_discount)
+  priceSetAmount: text("price_set_amount").notNull().default('0'), // Extracted shop_money.amount from price_set for easy queries
+  totalDiscountSetAmount: text("total_discount_set_amount").notNull().default('0'), // Extracted shop_money.amount from total_discount_set
+  totalTaxAmount: text("total_tax_amount").notNull().default('0'), // Sum of all tax_lines amounts
+  preDiscountPrice: text("pre_discount_price").notNull().default('0'), // Price before any discounts (price * quantity)
+  finalLinePrice: text("final_line_price").notNull().default('0'), // Final price after all discounts ((price * quantity) - total_discount)
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
