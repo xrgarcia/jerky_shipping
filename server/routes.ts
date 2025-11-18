@@ -834,6 +834,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Manual login to SkuVault
   app.post("/api/skuvault/login", requireAuth, async (req, res) => {
     try {
+      console.log("========== SKUVAULT LOGIN REQUEST ==========");
+      console.log("Timestamp:", new Date().toISOString());
+      console.log("User:", req.user?.email || 'Unknown');
+      console.log("IP:", req.ip || req.connection.remoteAddress);
+      console.log("Headers:", JSON.stringify({
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent'],
+        'cookie': req.headers.cookie ? '***present***' : 'none',
+        'referer': req.headers.referer,
+      }, null, 2));
+      console.log("Body:", JSON.stringify(req.body));
+      console.log("============================================");
+      
       console.log("Initiating manual SkuVault login...");
       const success = await skuVaultService.login();
       
