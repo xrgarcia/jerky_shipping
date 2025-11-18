@@ -54,22 +54,23 @@ const SESSION_DURATION_DAYS = 30;
 /**
  * Extract all price fields from a Shopify order object
  * Helper to ensure consistent price field extraction across all data entry points
+ * All price fields default to '0' to match schema constraints
  */
 function extractShopifyOrderPrices(shopifyOrder: any) {
   return {
-    totalPrice: shopifyOrder.total_price || null, // Legacy field for backwards compatibility
-    orderTotal: shopifyOrder.total_price || null,
-    subtotalPrice: shopifyOrder.subtotal_price || null,
-    currentTotalPrice: shopifyOrder.current_total_price || null,
-    currentSubtotalPrice: shopifyOrder.current_subtotal_price || null,
-    shippingTotal: shopifyOrder.total_shipping_price_set?.shop_money?.amount || null,
-    totalDiscounts: shopifyOrder.total_discounts || null,
-    currentTotalDiscounts: shopifyOrder.current_total_discounts || null,
-    totalTax: shopifyOrder.total_tax || null,
-    currentTotalTax: shopifyOrder.current_total_tax || null,
-    totalAdditionalFees: shopifyOrder.total_additional_fees_set?.shop_money?.amount || null,
-    currentTotalAdditionalFees: shopifyOrder.current_total_additional_fees_set?.shop_money?.amount || null,
-    totalOutstanding: shopifyOrder.total_outstanding || null,
+    totalPrice: shopifyOrder.total_price || '0', // Legacy field for backwards compatibility
+    orderTotal: shopifyOrder.total_price || '0',
+    subtotalPrice: shopifyOrder.subtotal_price || '0',
+    currentTotalPrice: shopifyOrder.current_total_price || '0',
+    currentSubtotalPrice: shopifyOrder.current_subtotal_price || '0',
+    shippingTotal: shopifyOrder.total_shipping_price_set?.shop_money?.amount || '0',
+    totalDiscounts: shopifyOrder.total_discounts || '0',
+    currentTotalDiscounts: shopifyOrder.current_total_discounts || '0',
+    totalTax: shopifyOrder.total_tax || '0',
+    currentTotalTax: shopifyOrder.current_total_tax || '0',
+    totalAdditionalFees: shopifyOrder.total_additional_fees_set?.shop_money?.amount || '0',
+    currentTotalAdditionalFees: shopifyOrder.current_total_additional_fees_set?.shop_money?.amount || '0',
+    totalOutstanding: shopifyOrder.total_outstanding || '0',
   };
 }
 
@@ -456,9 +457,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 taxable: item.taxable !== undefined ? item.taxable : null,
                 
                 // Calculated/extracted fields for easy querying
-                priceSetAmount: item.price_set?.shop_money?.amount || null,
-                totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || null,
-                totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : null,
+                priceSetAmount: item.price_set?.shop_money?.amount || '0',
+                totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
+                totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
                 preDiscountPrice: preDiscountPrice,
                 finalLinePrice: finalLinePrice,
               };
@@ -1878,9 +1879,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     taxable: item.taxable !== undefined ? item.taxable : null,
                     
                     // Calculated/extracted fields for easy querying
-                    priceSetAmount: item.price_set?.shop_money?.amount || null,
-                    totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || null,
-                    totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : null,
+                    priceSetAmount: item.price_set?.shop_money?.amount || '0',
+                    totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
+                    totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
                     preDiscountPrice: preDiscountPrice,
                     finalLinePrice: finalLinePrice,
                   };

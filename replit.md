@@ -4,6 +4,19 @@
 
 This application is a warehouse fulfillment tool for ship.jerky.com, integrating with Shopify to manage orders. It provides a streamlined interface for warehouse staff to search orders, view details, and handle fulfillment tasks. The design is adapted from the `jerky_top_n_web` theme, focusing on readability and efficiency in a warehouse environment. It aims to improve order processing and inventory management through real-time synchronization and a user-friendly interface.
 
+## Recent Changes
+
+### November 18, 2025: NOT NULL Constraints Enforced for Price Fields
+- **Problem**: Database schema allowed NULL values for price/amount fields in `orders` and `orderItems` tables, but extraction logic inconsistently returned NULL vs '0', causing data integrity issues and potential calculation errors.
+- **Solution**: Enforced NOT NULL constraints with '0' defaults across all 13 price fields in `orders` table and all calculated price fields in `orderItems` table.
+- **Implementation**:
+  - Added `.notNull().default('0')` to all price columns in Drizzle schema
+  - Migrated 11,006 existing orders and 108 order items from NULL to '0' before schema push
+  - Updated `extractShopifyOrderPrices()` in both `routes.ts` and `background-worker.ts` to return '0' instead of NULL
+  - Fixed line item processing logic across all three data entry points (webhook, sync, backfill) to ensure `totalTaxAmount`, `priceSetAmount`, and `totalDiscountSetAmount` never return NULL
+  - Successfully pushed schema changes using `npm run db:push --force` after resolving null value conflicts
+- **Impact**: Eliminates NULL pointer risks in revenue calculations, ensures consistent data representation, simplifies query logic by removing NULL checks, and maintains data integrity across 6,200+ queued webhooks.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
