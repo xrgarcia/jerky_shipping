@@ -5,7 +5,7 @@
 
 import type { IStorage } from '../storage';
 import type { InsertShipment, Order } from '@shared/schema';
-import { getShipmentsByOrderNumber, createLabel as createShipStationLabel } from '../utils/shipstation-api';
+import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel } from '../utils/shipstation-api';
 
 export class ShipStationShipmentService {
   constructor(private storage: IStorage) {}
@@ -97,7 +97,12 @@ export class ShipStationShipmentService {
 
   /**
    * Create a shipping label for an order
-   * Ensures shipment exists, validates it has required data, then creates label
+   * WORKFLOW:
+   * 1. Create print job FIRST (so user sees it immediately)
+   * 2. Check if label exists (DB or fetch from ShipStation)
+   * 3. If label exists → use it (reprint is normal)
+   * 4. If no label → create new one
+   * 5. Update print job with label URL → client auto-prints
    */
   async createLabelForOrder(orderNumber: string): Promise<{
     success: boolean;
@@ -105,6 +110,8 @@ export class ShipStationShipmentService {
     printJob?: any;
     error?: string;
   }> {
+    let printJob: any = null;
+    
     try {
       console.log(`[ShipmentService] Creating label for order ${orderNumber}`);
 
@@ -114,6 +121,14 @@ export class ShipStationShipmentService {
         return { success: false, error: 'Order not found' };
       }
 
+      // STEP 1: Create print job FIRST so user sees it in queue immediately
+      printJob = await this.storage.createPrintJob({
+        orderId: order.id,
+        labelUrl: null,
+        status: 'queued',
+      });
+      console.log(`[ShipmentService] Created print job ${printJob.id} (queued)`);
+
       // Ensure shipments are synced
       let shipments = await this.storage.getShipmentsByOrderId(order.id);
       
@@ -122,8 +137,13 @@ export class ShipStationShipmentService {
         const syncResult = await this.syncShipmentsForOrder(orderNumber);
         
         if (!syncResult.success || syncResult.shipments.length === 0) {
+          await this.storage.updatePrintJob(printJob.id, { 
+            status: 'failed',
+            error: syncResult.error || 'No shipment found' 
+          });
           return { 
             success: false, 
+            printJob,
             error: syncResult.error || 'No shipment found for this order. Please create a shipment in ShipStation first.' 
           };
         }
@@ -135,43 +155,90 @@ export class ShipStationShipmentService {
 
       // Validate shipment has ShipStation ID
       if (!shipment.shipmentId) {
+        await this.storage.updatePrintJob(printJob.id, { 
+          status: 'failed',
+          error: 'No ShipStation shipment ID' 
+        });
         return { 
           success: false, 
+          printJob,
           error: 'Shipment does not have a ShipStation shipment ID. Please check ShipStation.' 
         };
       }
 
-      console.log(`[ShipmentService] Creating label for shipment ${shipment.shipmentId}`);
+      let labelUrl: string | null = null;
 
-      // Validate shipment has the raw ShipStation data
-      if (!shipment.shipmentData) {
+      // STEP 2: Check if label already exists in database
+      if (shipment.labelUrl) {
+        console.log(`[ShipmentService] Using existing label from database: ${shipment.labelUrl}`);
+        labelUrl = shipment.labelUrl;
+      } else {
+        // STEP 3: Try to fetch existing label from ShipStation
+        console.log(`[ShipmentService] Fetching labels from ShipStation for shipment ${shipment.shipmentId}`);
+        const existingLabels = await getLabelsForShipment(shipment.shipmentId);
+        
+        if (existingLabels.length > 0) {
+          console.log(`[ShipmentService] Found ${existingLabels.length} existing label(s) in ShipStation`);
+          const label = existingLabels[0];
+          labelUrl = label.label_download?.href || label.label_download || null;
+          
+          if (labelUrl) {
+            // Save label URL to database for next time
+            await this.storage.updateShipment(shipment.id, { labelUrl });
+          }
+        }
+      }
+
+      // STEP 4: If still no label, create a new one
+      if (!labelUrl) {
+        console.log(`[ShipmentService] No existing label found, creating new label...`);
+        
+        if (!shipment.shipmentData) {
+          await this.storage.updatePrintJob(printJob.id, { 
+            status: 'failed',
+            error: 'No ShipStation data' 
+          });
+          return { 
+            success: false, 
+            printJob,
+            error: 'Shipment does not have ShipStation data. Please sync shipment first.' 
+          };
+        }
+
+        // Strip ShipStation-managed fields from payload
+        const cleanShipmentData = { ...shipment.shipmentData };
+        delete cleanShipmentData.shipment_id;
+        delete cleanShipmentData.label_id;
+        delete cleanShipmentData.created_at;
+        delete cleanShipmentData.modified_at;
+
+        const labelData = await createShipStationLabel(cleanShipmentData);
+        labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
+
+        if (labelUrl) {
+          await this.storage.updateShipment(shipment.id, { labelUrl });
+        }
+      }
+
+      if (!labelUrl) {
+        await this.storage.updatePrintJob(printJob.id, { 
+          status: 'failed',
+          error: 'No label URL returned' 
+        });
         return { 
           success: false, 
-          error: 'Shipment does not have ShipStation data. Please sync shipment first.' 
+          printJob,
+          error: 'No label URL returned from ShipStation' 
         };
       }
 
-      // Call ShipStation API to create label with full shipment payload
-      const labelData = await createShipStationLabel(shipment.shipmentData);
-
-      // Extract label URL from response
-      const labelUrl = labelData.label_download || labelData.pdf_url || labelData.href;
-
-      if (!labelUrl) {
-        return { success: false, error: 'No label URL returned from ShipStation' };
-      }
-
-      // Update shipment with label URL
-      await this.storage.updateShipment(shipment.id, { labelUrl });
-
-      // Create print job
-      const printJob = await this.storage.createPrintJob({
-        orderId: order.id,
+      // STEP 5: Update print job with label URL (client will auto-print)
+      await this.storage.updatePrintJob(printJob.id, { 
         labelUrl,
-        status: 'queued',
+        status: 'printing' 
       });
 
-      console.log(`[ShipmentService] Successfully created label and print job`);
+      console.log(`[ShipmentService] Successfully got label and updated print job`);
 
       return {
         success: true,
@@ -181,8 +248,22 @@ export class ShipStationShipmentService {
 
     } catch (error: any) {
       console.error(`[ShipmentService] Error creating label for order ${orderNumber}:`, error);
+      
+      // Update print job to failed if we created one
+      if (printJob) {
+        try {
+          await this.storage.updatePrintJob(printJob.id, { 
+            status: 'failed',
+            error: error.message 
+          });
+        } catch (e) {
+          console.error(`[ShipmentService] Failed to update print job:`, e);
+        }
+      }
+      
       return { 
         success: false, 
+        printJob,
         error: error.message || 'Failed to create label' 
       };
     }
