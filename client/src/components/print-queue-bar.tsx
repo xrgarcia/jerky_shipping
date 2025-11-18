@@ -5,6 +5,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Clock } from "lucide-react";
 import { format } from "date-fns";
+import printJS from "print-js";
 
 interface PrintJob {
   id: string;
@@ -19,6 +20,7 @@ export function PrintQueueBar() {
   const { toast } = useToast();
   const printedJobsRef = useRef<Set<string>>(new Set());
   const processingJobsRef = useRef<Set<string>>(new Set());
+  const failedJobsRef = useRef<Set<string>>(new Set());
 
   const { data: jobsData } = useQuery<{ jobs: PrintJob[] }>({
     queryKey: ["/api/print-queue"],
@@ -36,7 +38,10 @@ export function PrintQueueBar() {
         }
       });
       
-      keysToRemove.forEach(id => printedJobsRef.current.delete(id));
+      keysToRemove.forEach(id => {
+        printedJobsRef.current.delete(id);
+        failedJobsRef.current.delete(id);
+      });
       
       const processingKeysToRemove: string[] = [];
       processingJobsRef.current.forEach(id => {
@@ -81,7 +86,8 @@ export function PrintQueueBar() {
       (job) => job.status === "queued" && 
                job.labelUrl &&
                !printedJobsRef.current.has(job.id) && 
-               !processingJobsRef.current.has(job.id)
+               !processingJobsRef.current.has(job.id) &&
+               !failedJobsRef.current.has(job.id)
     );
 
     queuedJobs.forEach(async (job) => {
@@ -89,11 +95,19 @@ export function PrintQueueBar() {
       printedJobsRef.current.add(job.id);
       
       try {
-        window.open(job.labelUrl, '_blank');
+        printJS({
+          printable: job.labelUrl,
+          type: 'pdf',
+          showModal: true,
+          modalMessage: 'Preparing label for printing...',
+          onError: (error: Error) => {
+            console.error('Print.js error:', error);
+          }
+        });
         
         toast({
-          title: "Label opened",
-          description: `Label for order #${job.orderId} opened in new tab. Please print it.`,
+          title: "Label printing",
+          description: `Label for order #${job.orderId} sent to printer.`,
         });
         
         await markCompleteMutation.mutateAsync(job.id);
@@ -102,10 +116,11 @@ export function PrintQueueBar() {
       } catch (error) {
         console.error("Failed to process print job:", error);
         processingJobsRef.current.delete(job.id);
-        printedJobsRef.current.delete(job.id);
+        failedJobsRef.current.add(job.id);
+        
         toast({
           title: "Print failed",
-          description: "Failed to open label. Please try again.",
+          description: `Failed to print label for order #${job.orderId}. Please try manually from the order details.`,
           variant: "destructive",
         });
       }
