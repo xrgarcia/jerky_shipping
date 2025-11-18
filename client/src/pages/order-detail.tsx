@@ -3,6 +3,12 @@ import { useRoute, Link, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search, Truck, Package, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -54,9 +60,26 @@ export default function OrderDetail() {
     queryKey: ["/api/orders"],
   });
 
+  interface PrintJob {
+    id: string;
+    orderId: string;
+    labelUrl: string | null;
+    status: "queued" | "printing" | "printed" | "failed";
+    error: string | null;
+    queuedAt: string;
+    printedAt: string | null;
+  }
+
+  const { data: printJobsData } = useQuery<{ printJobs: PrintJob[] }>({
+    queryKey: ["/api/orders", orderId, "print-jobs"],
+    enabled: !!orderId,
+    refetchInterval: 2000,
+  });
+
   const order = orderData?.order;
   const shipments = orderData?.shipments || [];
   const allOrders = allOrdersData?.orders || [];
+  const printJobs = printJobsData?.printJobs || [];
 
   const currentIndex = allOrders.findIndex(o => o.id === orderId);
   const hasPrev = currentIndex > 0;
@@ -509,6 +532,105 @@ export default function OrderDetail() {
                   </Card>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {printJobs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Printer className="h-6 w-6" />
+                Print History ({printJobs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="single" collapsible className="w-full">
+                {printJobs.map((job, index) => (
+                  <AccordionItem key={job.id} value={`job-${job.id}`}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center justify-between w-full pr-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-semibold">Print Job #{printJobs.length - index}</span>
+                          <Badge 
+                            variant={
+                              job.status === 'printed' ? 'default' :
+                              job.status === 'printing' ? 'secondary' :
+                              job.status === 'failed' ? 'destructive' : 'outline'
+                            }
+                            data-testid={`badge-print-status-${job.id}`}
+                          >
+                            {job.status}
+                          </Badge>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(job.queuedAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid gap-3 pt-2 text-base">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                            Queued At
+                          </p>
+                          <p className="text-lg">
+                            {new Date(job.queuedAt).toLocaleString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </p>
+                        </div>
+                        {job.printedAt && (
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                              Printed At
+                            </p>
+                            <p className="text-lg">
+                              {new Date(job.printedAt).toLocaleString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </p>
+                          </div>
+                        )}
+                        {job.error && (
+                          <div>
+                            <p className="text-sm font-semibold text-destructive uppercase tracking-wide mb-1">
+                              Error
+                            </p>
+                            <p className="text-lg text-destructive">{job.error}</p>
+                          </div>
+                        )}
+                        {job.labelUrl && (
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                              Label
+                            </p>
+                            <a 
+                              href={job.labelUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-lg text-primary hover:underline"
+                              data-testid={`link-label-${job.id}`}
+                            >
+                              View Label PDF
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             </CardContent>
           </Card>
         )}

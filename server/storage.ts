@@ -97,6 +97,7 @@ export interface IStorage {
   updatePrintJobStatus(id: string, status: string, printedAt?: Date): Promise<PrintQueue | undefined>;
   getPrintJob(id: string): Promise<PrintQueue | undefined>;
   getActivePrintJobs(): Promise<PrintQueue[]>;
+  getPrintJobsByOrderId(orderId: string): Promise<PrintQueue[]>;
   deletePrintJob(id: string): Promise<void>;
 }
 
@@ -519,6 +520,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(printQueue)
       .where(or(eq(printQueue.status, "queued"), eq(printQueue.status, "printing")))
+      .orderBy(desc(printQueue.queuedAt));
+    return result;
+  }
+
+  async getPrintJobsByOrderId(orderId: string): Promise<PrintQueue[]> {
+    const result = await db
+      .select()
+      .from(printQueue)
+      .where(eq(printQueue.orderId, orderId))
       .orderBy(desc(printQueue.queuedAt));
     return result;
   }

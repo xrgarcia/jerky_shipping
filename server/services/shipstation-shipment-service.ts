@@ -232,10 +232,9 @@ export class ShipStationShipmentService {
         };
       }
 
-      // STEP 5: Update print job with label URL (client will auto-print)
+      // STEP 5: Update print job with label URL (keep status as 'queued' so frontend auto-prints)
       await this.storage.updatePrintJob(printJob.id, { 
-        labelUrl,
-        status: 'printing' 
+        labelUrl
       });
 
       console.log(`[ShipmentService] Successfully got label and updated print job`);

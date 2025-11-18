@@ -499,6 +499,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orders/:id/print-jobs", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const printJobs = await storage.getPrintJobsByOrderId(order.id);
+
+      res.json({ printJobs });
+    } catch (error) {
+      console.error("Error fetching print jobs:", error);
+      res.status(500).json({ error: "Failed to fetch print jobs" });
+    }
+  });
+
   app.post("/api/orders/:id/create-label", requireAuth, async (req, res) => {
     try {
       const order = await storage.getOrder(req.params.id);
