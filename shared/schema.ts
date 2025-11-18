@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -127,14 +127,33 @@ export const orderItems = pgTable("order_items", {
   productId: varchar("product_id"), // Shopify product ID
   quantity: integer("quantity").notNull(), // Quantity ordered
   currentQuantity: integer("current_quantity"), // Quantity after refunds/removals
-  price: text("price").notNull(), // Unit price (as string from Shopify)
-  totalDiscount: text("total_discount"), // Total discount on this line item
+  
+  // Core price fields (text strings from Shopify for consistency with orders table)
+  price: text("price").notNull(), // Unit price
+  totalDiscount: text("total_discount"), // Total discount allocated to line item
+  
+  // Full Shopify price structures (JSON with amount + currency)
+  priceSetJson: jsonb("price_set_json"), // Full price_set with shop_money and presentment_money
+  totalDiscountSetJson: jsonb("total_discount_set_json"), // Full total_discount_set with shop_money and presentment_money
+  
+  // Tax information
+  taxable: boolean("taxable"), // Whether the item is taxable
+  taxLinesJson: jsonb("tax_lines_json"), // Full tax_lines array with jurisdiction details
+  
+  // Calculated/aggregated fields for easy reporting queries
+  priceSetAmount: text("price_set_amount"), // Extracted shop_money.amount from price_set for easy queries
+  totalDiscountSetAmount: text("total_discount_set_amount"), // Extracted shop_money.amount from total_discount_set
+  totalTaxAmount: text("total_tax_amount"), // Sum of all tax_lines amounts
+  preDiscountPrice: text("pre_discount_price"), // Price before any discounts (price * quantity)
+  finalLinePrice: text("final_line_price"), // Final price after all discounts ((price * quantity) - total_discount)
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   orderIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON ${table} (order_id)`,
   variantIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_variant_id_idx ON ${table} (variant_id)`,
   productIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_product_id_idx ON ${table} (product_id)`,
+  skuIdx: sql`CREATE INDEX IF NOT EXISTS order_items_sku_idx ON ${table} (sku) WHERE sku IS NOT NULL`,
   // Unique constraint: same line item ID cannot appear twice in database
   uniqueLineItemIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS order_items_shopify_line_item_id_idx ON ${table} (shopify_line_item_id)`,
 }));

@@ -58,13 +58,26 @@ async function processOrderRefunds(orderId: string, shopifyOrder: any) {
 
 /**
  * Extract and store line items from a Shopify order
- * Processes the line_items array and stores each item in the database
+ * Processes the line_items array and stores each item in the database with comprehensive price fields
+ * Stores full Shopify JSON structures plus calculated aggregates for efficient reporting
  */
 async function processOrderLineItems(orderId: string, shopifyOrder: any) {
   const lineItems = shopifyOrder.line_items || [];
   
   for (const item of lineItems) {
     try {
+      // Calculate derived price fields
+      const unitPrice = parseFloat(item.price || '0');
+      const quantity = item.quantity || 0;
+      const preDiscountPrice = (unitPrice * quantity).toFixed(2);
+      const totalDiscount = item.total_discount || '0.00';
+      const finalLinePrice = (parseFloat(preDiscountPrice) - parseFloat(totalDiscount)).toFixed(2);
+      
+      // Sum all tax amounts from tax_lines array
+      const taxAmount = item.tax_lines?.reduce((sum: number, taxLine: any) => {
+        return sum + parseFloat(taxLine.price || '0');
+      }, 0) || 0;
+
       const itemData = {
         orderId: orderId,
         shopifyLineItemId: item.id.toString(),
@@ -72,10 +85,27 @@ async function processOrderLineItems(orderId: string, shopifyOrder: any) {
         sku: item.sku || null,
         variantId: item.variant_id ? item.variant_id.toString() : null,
         productId: item.product_id ? item.product_id.toString() : null,
-        quantity: item.quantity || 0,
+        quantity: quantity,
         currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
+        
+        // Core price fields (text strings for consistency)
         price: item.price || '0.00',
-        totalDiscount: item.total_discount || null,
+        totalDiscount: totalDiscount,
+        
+        // Full Shopify JSON structures (preserves currency and complete data)
+        priceSetJson: item.price_set || null,
+        totalDiscountSetJson: item.total_discount_set || null,
+        taxLinesJson: item.tax_lines || null,
+        
+        // Tax information
+        taxable: item.taxable !== undefined ? item.taxable : null,
+        
+        // Calculated/extracted fields for easy querying
+        priceSetAmount: item.price_set?.shop_money?.amount || null,
+        totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || null,
+        totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : null,
+        preDiscountPrice: preDiscountPrice,
+        finalLinePrice: finalLinePrice,
       };
 
       await storage.upsertOrderItem(itemData);
