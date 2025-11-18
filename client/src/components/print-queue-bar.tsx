@@ -95,8 +95,10 @@ export function PrintQueueBar() {
       printedJobsRef.current.add(job.id);
       
       try {
+        const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
+        
         printJS({
-          printable: job.labelUrl,
+          printable: proxyUrl,
           type: 'pdf',
           showModal: false,
           onPrintDialogClose: async () => {

@@ -541,6 +541,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/labels/proxy", requireAuth, async (req, res) => {
+    try {
+      const labelUrl = req.query.url as string;
+      
+      if (!labelUrl) {
+        return res.status(400).json({ error: "Missing label URL" });
+      }
+
+      if (!labelUrl.includes('api.shipstation.com')) {
+        return res.status(400).json({ error: "Invalid label URL" });
+      }
+
+      const apiKey = process.env.SHIPSTATION_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "ShipStation API key not configured" });
+      }
+
+      const response = await fetch(labelUrl, {
+        headers: {
+          'api-key': apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+      }
+
+      const pdfBuffer = await response.arrayBuffer();
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="label.pdf"');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.send(Buffer.from(pdfBuffer));
+    } catch (error: any) {
+      console.error("Error proxying label:", error);
+      res.status(500).json({ error: error.message || "Failed to proxy label" });
+    }
+  });
+
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
       const query = req.query.q as string;
