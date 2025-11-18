@@ -16,6 +16,7 @@ import Products from "@/pages/products";
 import Backfill from "@/pages/backfill";
 import PrintQueue from "@/pages/print-queue";
 import Profile from "@/pages/profile";
+import Reports from "@/pages/reports";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -62,6 +63,7 @@ function AppContent() {
       <Route path="/products" component={Products} />
       <Route path="/backfill" component={Backfill} />
       <Route path="/print-queue" component={PrintQueue} />
+      <Route path="/reports" component={Reports} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
