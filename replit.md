@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
 
 - **Product Catalog (`/products`)**: Warehouse-optimized interface with large typography, two-column grid, product cards, expandable variant details (SKU, barcode, inventory), and search functionality. Real-time sync via Shopify webhooks.
 - **Order Backfill System (`/backfill`)**: Allows importing historical Shopify orders for any date range. Uses `backfillJobs` table, async processing via Upstash Redis queue, and Shopify API rate limiting. Provides UI with date pickers, real-time progress, and job history.
+- **Reports Page (`/reports`)**: Business analytics dashboard for shipping managers. Features date range filtering (default: last 30 days), interactive line chart showing order totals by day, and summary widgets for key metrics: shipping revenue (customer-paid shipping costs), total revenue, product value, and order count. Includes detailed breakdown cards for revenue components and order status distribution. Uses segmented TanStack Query cache keys for efficient data refetching. All date handling uses local timezone with YYYY-MM-DD format to avoid timezone conversion issues.
 - **Print Queue System**: Manual print workflow for shipping labels. Fixed bottom bar displays active print jobs across all pages. Features:
   - Manual "Print Now" button opens label PDF in new tab for printing
   - "Done" button marks jobs complete and removes them from queue
