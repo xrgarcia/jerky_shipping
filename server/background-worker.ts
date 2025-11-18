@@ -138,6 +138,19 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         const order = await storage.getOrder(orderId);
         if (!order) {
           console.error(`Order ${orderId} not found in database during queue processing`);
+          
+          // If this is a backfill job, increment failed count so job can complete
+          if (jobId) {
+            await storage.incrementBackfillFailed(jobId, 1);
+            
+            const job = await storage.getBackfillJob(jobId);
+            if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
+              await storage.updateBackfillJob(jobId, {
+                status: "completed",
+              });
+            }
+          }
+          
           processedCount++;
           continue;
         }
