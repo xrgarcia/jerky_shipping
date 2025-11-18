@@ -1385,6 +1385,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(parsed) ? 0 : parsed;
       };
 
+      // Query refunds by refund date (not order creation date)
+      const refundsInRange = await storage.getRefundsInDateRange(start, end);
+      
+      // Calculate returns value from actual refund amounts
+      let returnsValue = 0;
+      const refundedOrderIds = new Set<string>();
+      refundsInRange.forEach((refund) => {
+        returnsValue += parseAmount(refund.amount);
+        refundedOrderIds.add(refund.orderId);
+      });
+
       // Split orders into refunded and non-refunded
       // Check financial_status (payment status) not fulfillment_status (shipping status)
       const refundedOrders = ordersInRange.filter(order => 
@@ -1393,12 +1404,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nonRefundedOrders = ordersInRange.filter(order => 
         order.financialStatus !== 'refunded' && order.financialStatus !== 'partially_refunded'
       );
-
-      // Calculate returns value
-      let returnsValue = 0;
-      refundedOrders.forEach((order) => {
-        returnsValue += parseAmount(order.orderTotal);
-      });
 
       // Calculate aggregations (excluding refunded orders)
       let totalRevenue = 0;
@@ -1439,7 +1444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const summary = {
         totalOrders: ordersInRange.length,
         fulfilledOrders: nonRefundedOrders.length,
-        refundedOrders: refundedOrders.length,
+        refundedOrders: refundedOrderIds.size, // Use unique orders with refunds in this date range
         totalRevenue: totalRevenue.toFixed(2),
         totalShipping: totalShipping.toFixed(2),
         totalSubtotal: totalSubtotal.toFixed(2),
