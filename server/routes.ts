@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -1022,21 +1022,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual sync endpoint - pulls all shipments from ShipStation for existing orders
+  // AND fetches rich tracking data for each shipment
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {
-      console.log("========== MANUAL SHIPMENT SYNC STARTED ==========");
+      console.log("========== MANUAL SHIPMENT SYNC WITH TRACKING STARTED ==========");
       const orders = await storage.getAllOrders();
       console.log(`Syncing shipments for ${orders.length} orders...`);
 
       let syncedCount = 0;
       let createdCount = 0;
       let updatedCount = 0;
+      let trackingEnrichedCount = 0;
       const errors: string[] = [];
+      let lastRateLimit: any = null;
 
       for (const order of orders) {
         try {
           // Fetch shipments from ShipStation for this order
-          const { data: shipStationShipments } = await getShipmentsByOrderNumber(order.orderNumber);
+          const { data: shipStationShipments, rateLimit } = await getShipmentsByOrderNumber(order.orderNumber);
+          lastRateLimit = rateLimit;
           
           if (shipStationShipments.length > 0) {
             console.log(`Found ${shipStationShipments.length} shipment(s) for order ${order.orderNumber}`);
@@ -1045,6 +1049,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const shipmentData of shipStationShipments) {
             const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
             
+            // Start with basic shipment data
+            let statusDescription = shipmentData.voided ? 'Shipment voided' : 'Shipment created';
+            let enrichedShipmentData = shipmentData;
+            
+            // Try to fetch rich tracking details if shipment has a tracking number
+            if (shipmentData.trackingNumber && !shipmentData.voided) {
+              try {
+                const trackingDetails = await getTrackingDetails(shipmentData.trackingNumber);
+                
+                if (trackingDetails) {
+                  lastRateLimit = trackingDetails.rateLimit;
+                  
+                  // Use rich carrier status description if available
+                  if (trackingDetails.carrierStatusDescription) {
+                    statusDescription = trackingDetails.carrierStatusDescription;
+                    trackingEnrichedCount++;
+                  } else if (trackingDetails.trackingStatus) {
+                    statusDescription = trackingDetails.trackingStatus;
+                    trackingEnrichedCount++;
+                  }
+                  
+                  // Merge tracking data with shipment data
+                  enrichedShipmentData = {
+                    ...shipmentData,
+                    trackingDetails: {
+                      labelId: trackingDetails.labelId,
+                      trackingStatus: trackingDetails.trackingStatus,
+                      carrierStatusDescription: trackingDetails.carrierStatusDescription,
+                      events: trackingDetails.events,
+                    },
+                  };
+                  
+                  console.log(`  ✓ Enriched ${shipmentData.trackingNumber}: "${statusDescription}"`);
+                }
+                
+                // Rate limit check - pause if getting low
+                if (lastRateLimit && lastRateLimit.remaining < 5) {
+                  const waitTime = Math.max(lastRateLimit.reset, 2) * 1000;
+                  console.log(`  ⏸ Rate limit low (${lastRateLimit.remaining} remaining), waiting ${waitTime/1000}s...`);
+                  await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+              } catch (trackingError: any) {
+                console.warn(`  ⚠ Could not fetch tracking for ${shipmentData.trackingNumber}: ${trackingError.message}`);
+                // Continue with basic shipment data
+              }
+            }
+            
             const shipmentRecord = {
               orderId: order.id,
               shipmentId: shipmentData.shipmentId?.toString(),
@@ -1052,9 +1103,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               carrierCode: shipmentData.carrierCode,
               serviceCode: shipmentData.serviceCode,
               status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+              statusDescription,
               shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-              shipmentData: shipmentData,
+              shipmentData: enrichedShipmentData,
             };
 
             if (existingShipment) {
@@ -1074,13 +1125,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      console.log(`========== SYNC COMPLETE: ${syncedCount} shipments (${createdCount} new, ${updatedCount} updated) ==========`);
+      console.log(`========== SYNC COMPLETE ==========`);
+      console.log(`Total: ${syncedCount} shipments (${createdCount} new, ${updatedCount} updated)`);
+      console.log(`Tracking enriched: ${trackingEnrichedCount} shipments`);
 
       res.json({ 
         success: true,
         syncedCount,
         createdCount,
         updatedCount,
+        trackingEnrichedCount,
         ordersChecked: orders.length,
         errors: errors.length > 0 ? errors : undefined
       });
