@@ -534,7 +534,7 @@ export default function Shipments() {
                             )}
                             {shipment.shipDate && (
                               <span>
-                                {new Date(shipment.shipDate).toLocaleDateString()}
+                                {new Date(shipment.shipDate).toLocaleString()}
                               </span>
                             )}
                           </div>
