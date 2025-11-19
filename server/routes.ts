@@ -1036,7 +1036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const order of orders) {
         try {
           // Fetch shipments from ShipStation for this order
-          const shipStationShipments = await getShipmentsByOrderNumber(order.orderNumber);
+          const { data: shipStationShipments } = await getShipmentsByOrderNumber(order.orderNumber);
           
           if (shipStationShipments.length > 0) {
             console.log(`Found ${shipStationShipments.length} shipment(s) for order ${order.orderNumber}`);

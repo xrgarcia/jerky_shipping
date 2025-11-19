@@ -1,0 +1,116 @@
+025-11-19 08:19:44.60
+0019b17e
+User
+Order JK3825345120: shipStationShipments is not iterable
+2025-11-19 08:19:46.07
+0019b17e
+User
+2:19:46 PM [express] GET /api/print-queue 304 in 121ms :: {"jobs":[]}
+2025-11-19 08:19:46.13
+0019b17e
+User
+Order JK3825345119: shipStationShipments is not iterable
+2025-11-19 08:19:47.64
+0019b17e
+User
+Order JK3825345118: shipStationShipments is not iterable
+2025-11-19 08:19:48.27
+0019b17e
+User
+Upserted product 10051192881466 with 1 variants
+2025-11-19 08:19:48.27
+0019b17e
+User
+2:19:48 PM [express] Background worker processed 1 webhook(s), 0 remaining
+2025-11-19 08:19:49.17
+0019b17e
+User
+Order JK3825345117: shipStationShipments is not iterable
+2025-11-19 08:19:50.74
+0019b17e
+User
+Order JK3825345116: shipStationShipments is not iterable
+2025-11-19 08:19:52.28
+0019b17e
+User
+Order JK3825345115: shipStationShipments is not iterable
+2025-11-19 08:19:53.52
+0019b17e
+User
+2:19:53 PM [express] GET /api/print-queue 304 in 123ms :: {"jobs":[]}
+2025-11-19 08:19:53.81
+0019b17e
+User
+Order JK3825345114: shipStationShipments is not iterable
+2025-11-19 08:19:55.33
+0019b17e
+User
+Order JK3825345113: shipStationShipments is not iterable
+2025-11-19 08:19:57.01
+0019b17e
+User
+Order JK3825345112: shipStationShipments is not iterable
+2025-11-19 08:19:58.58
+0019b17e
+User
+Order JK3825345111: shipStationShipments is not iterable
+2025-11-19 08:20:00.15
+0019b17e
+User
+Order JK3825345110: shipStationShipments is not iterable
+2025-11-19 08:20:01.69
+0019b17e
+User
+2:20:01 PM [express] POST /api/webhooks/shopify/orders 200 in 4ms :: {"success":true}
+2025-11-19 08:20:01.73
+0019b17e
+User
+Order JK3825345109: shipStationShipments is not iterable
+2025-11-19 08:20:03.33
+0019b17e
+User
+2:20:03 PM [express] Background worker processed 1 webhook(s), 0 remaining
+2025-11-19 08:20:03.61
+0019b17e
+User
+Order JK3825345108: shipStationShipments is not iterable
+2025-11-19 08:20:03.78
+0019b17e
+User
+2:20:03 PM [express] GET /api/shipments 304 in 366ms :: {"shipments":[{"id":"ca3748e1-0f9e-4771-8246…
+2025-11-19 08:20:05.27
+0019b17e
+User
+Order JK3825345107: shipStationShipments is not iterable
+2025-11-19 08:20:05.44
+0019b17e
+User
+2:20:05 PM [express] POST /api/webhooks/shopify/orders 200 in 10ms :: {"success":true}
+2025-11-19 08:20:07.01
+0019b17e
+User
+Order JK3825345106: shipStationShipments is not iterable
+2025-11-19 08:20:08.41
+0019b17e
+User
+2:20:08 PM [express] Background worker processed 1 webhook(s), 0 remaining
+2025-11-19 08:20:08.69
+0019b17e
+User
+Order JK3825345105: shipStationShipments is not iterable
+2025-11-19 08:20:08.92
+0019b17e
+User
+2:20:08 PM [express] GET /api/shipments 304 in 363ms :: {"shipments":[{"id":"ca3748e1-0f9e-4771-8246…
+2025-11-19 08:20:10.28
+0019b17e
+User
+Order JK3825345104: shipStationShipments is not iterable
+2025-11-19 08:20:12.34
+0019b17e
+User
+Order JK3825345103: shipStationShipments is not iterable
+2025-11-19 08:20:14.02
+0019b17e
+User
+Order JK3825345102: shipStationShipments is not iterable
