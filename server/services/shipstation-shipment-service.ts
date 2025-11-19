@@ -5,7 +5,7 @@
 
 import type { IStorage } from '../storage';
 import type { InsertShipment, Order } from '@shared/schema';
-import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel } from '../utils/shipstation-api';
+import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo } from '../utils/shipstation-api';
 
 export class ShipStationShipmentService {
   constructor(private storage: IStorage) {}
@@ -13,17 +13,23 @@ export class ShipStationShipmentService {
   /**
    * Sync shipments for an order from ShipStation to our database
    * This is the ONE method to use for importing/syncing shipments
+   * Returns shipments and rate limit info for smart backfill throttling
    */
-  async syncShipmentsForOrder(orderNumber: string): Promise<{ success: boolean; shipments: any[]; error?: string }> {
+  async syncShipmentsForOrder(orderNumber: string): Promise<{ 
+    success: boolean; 
+    shipments: any[]; 
+    error?: string;
+    rateLimit?: RateLimitInfo;
+  }> {
     try {
       console.log(`[ShipmentService] Syncing shipments for order ${orderNumber}`);
       
-      // Fetch from ShipStation API
-      const shipStationShipments = await getShipmentsByOrderNumber(orderNumber);
+      // Fetch from ShipStation API with rate limit info
+      const { data: shipStationShipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
       
       if (shipStationShipments.length === 0) {
         console.log(`[ShipmentService] No shipments found in ShipStation for order ${orderNumber}`);
-        return { success: true, shipments: [] };
+        return { success: true, shipments: [], rateLimit };
       }
 
       console.log(`[ShipmentService] Found ${shipStationShipments.length} shipment(s) in ShipStation`);
@@ -32,7 +38,7 @@ export class ShipStationShipmentService {
       const order = await this.storage.getOrderByOrderNumber(orderNumber);
       if (!order) {
         console.error(`[ShipmentService] Order ${orderNumber} not found in database`);
-        return { success: false, shipments: [], error: 'Order not found in database' };
+        return { success: false, shipments: [], error: 'Order not found in database', rateLimit };
       }
 
       const syncedShipments = [];
@@ -64,7 +70,7 @@ export class ShipStationShipmentService {
       }
 
       console.log(`[ShipmentService] Successfully synced ${syncedShipments.length} shipment(s)`);
-      return { success: true, shipments: syncedShipments };
+      return { success: true, shipments: syncedShipments, rateLimit };
 
     } catch (error: any) {
       console.error(`[ShipmentService] Error syncing shipments for order ${orderNumber}:`, error);

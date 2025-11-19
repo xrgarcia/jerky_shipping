@@ -32,6 +32,28 @@ interface ShipStationShipmentsResponse {
   pages: number;
 }
 
+export interface RateLimitInfo {
+  limit: number;
+  remaining: number;
+  reset: number;
+}
+
+export interface ApiResponseWithRateLimit<T> {
+  data: T;
+  rateLimit: RateLimitInfo;
+}
+
+/**
+ * Extract rate limit headers from ShipStation response
+ */
+function extractRateLimitInfo(headers: Headers): RateLimitInfo {
+  return {
+    limit: parseInt(headers.get('X-Rate-Limit-Limit') || '40'),
+    remaining: parseInt(headers.get('X-Rate-Limit-Remaining') || '0'),
+    reset: parseInt(headers.get('X-Rate-Limit-Reset') || '60'),
+  };
+}
+
 /**
  * Fetch shipments from ShipStation API using resource_url
  */
@@ -113,8 +135,9 @@ export async function createLabel(shipmentData: any): Promise<any> {
 /**
  * Get shipments by order number with tracking numbers from labels
  * In ShipStation, shipment_number equals order_number
+ * Returns shipments array and rate limit info
  */
-export async function getShipmentsByOrderNumber(orderNumber: string): Promise<ShipStationShipment[]> {
+export async function getShipmentsByOrderNumber(orderNumber: string): Promise<ApiResponseWithRateLimit<ShipStationShipment[]>> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
@@ -135,11 +158,15 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Sh
 
   const data: any = await response.json();
   const shipments = data.shipments || [];
+  const rateLimit = extractRateLimitInfo(response.headers);
 
   // Note: We skip label fetching here to improve performance
   // Most shipments during bootstrap are on_hold and don't have labels yet
   // Tracking numbers will be filled in later when tracking webhooks arrive
-  return shipments;
+  return {
+    data: shipments,
+    rateLimit,
+  };
 }
 
 /**
