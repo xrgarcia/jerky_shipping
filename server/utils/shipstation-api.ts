@@ -142,6 +142,39 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Sh
   return shipments;
 }
 
+/**
+ * Get fulfillment by tracking number using V2 API
+ * Returns null if fulfillment not found
+ */
+export async function getFulfillmentByTrackingNumber(trackingNumber: string): Promise<any | null> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  // V2 API endpoint - supports tracking_number parameter
+  const url = `${SHIPSTATION_API_BASE}/v2/fulfillments?tracking_number=${encodeURIComponent(trackingNumber)}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data: any = await response.json();
+  const fulfillments = data.fulfillments || [];
+  
+  // Return the first matching fulfillment (there should only be one per tracking number)
+  return fulfillments.length > 0 ? fulfillments[0] : null;
+}
+
 // ShipStation V2 webhook event types
 export type ShipStationWebhookEvent = 
   | 'batch'
