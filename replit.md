@@ -32,12 +32,13 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL via Neon serverless connection (WebSockets).
 - **Schema**:
     - `users`, `magicLinkTokens`, `sessions`: For authentication and user management.
-    - `orders`, `orderRefunds`, `orderItems`: Store Shopify order, refund, and line item data. `orderRefunds` uses an indexed `refunded_at` column for scalable date range queries. `orderItems` stores normalized line item data with comprehensive price fields and SKU index.
+    - `orders`, `orderRefunds`, `orderItems`: Store Shopify order, refund, and line item data. `orderRefunds` uses an indexed `refunded_at` column for scalable date range queries. `orderItems` stores normalized line item data with comprehensive price fields and SKU index. Orders table includes `marketplace_order_number` column for storing Amazon/marketplace order numbers (extracted from fulfillment data) to enable shipment tracking for marketplace orders.
     - `products`, `productVariants`: Normalized Shopify product/variant data with soft-delete support and indexes on `sku`, `bar_code`.
 - **Migrations**: Drizzle Kit.
 
 ### Core Features
 - **Product Catalog (`/products`)**: Warehouse-optimized interface for product and variant details with search functionality. Synchronized via Shopify webhooks.
+- **Marketplace Order Backfill (`/api/orders/backfill-marketplace-numbers`)**: API endpoint to populate `marketplace_order_number` for existing Amazon orders. Uses cursor-based pagination to iterate through all Shopify orders and extract Amazon order numbers from fulfillment data. Authenticated endpoint that can process thousands of orders efficiently with rate limiting.
 - **SkuVault Sessions (`/sessions`)**: Displays wave picking sessions from SkuVault using a reverse-engineered web API. Features:
   - Manual authentication via "Connect to SkuVault" button to avoid anti-bot detection
   - Session list view with metrics (orders, SKUs, quantities, weight, status)
@@ -66,12 +67,13 @@ Preferred communication style: Simple, everyday language.
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization. Utilizes webhooks for real-time updates.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment. Webhooks are used for status updates.
-    -   **Tracking Webhook Handling**: Comprehensive 5-tier fallback strategy for creating shipment records when tracking webhooks arrive before fulfillment webhooks:
+    -   **Tracking Webhook Handling**: Comprehensive 6-tier fallback strategy for creating shipment records when tracking webhooks arrive before fulfillment webhooks:
         1. Extract shipment ID from `label_url` (format: `se-XXXXXXX` or `se-UUID`)
         2. Fetch full shipment details from ShipStation `/v2/shipments?shipment_id={id}`
-        3. Find order using multiple fallback methods: `shipment_number`, `orderId`, `orderKey`, `external_shipment_id`, fulfillment API
+        3. Find order using multiple fallback methods: `shipment_number` (Shopify order number), `orderId`, `orderKey`, `external_shipment_id`, **`marketplace_order_number`** (Amazon order number), fulfillment API
         4. Create shipment record with complete tracking data linked to order
         5. Implemented via shared `linkTrackingToOrder()` utility in `server/utils/shipment-linkage.ts` to avoid code duplication
+    -   **Marketplace Order Numbers**: ShipStation returns Amazon marketplace order numbers (e.g., "111-7320858-2210642") for Amazon-origin orders instead of Shopify order numbers. The system extracts and stores these marketplace order numbers from Shopify order fulfillment data to enable proper shipment tracking linkage.
 -   **SkuVault Integration**: Reverse-engineered web API for accessing wave picking session data, including HTML form login and token caching. Rate limiting (2-second delay between requests) prevents triggering anti-bot protection.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Nodemailer**: For sending magic link authentication emails.
