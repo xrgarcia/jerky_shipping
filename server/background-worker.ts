@@ -1,5 +1,5 @@
 import { dequeueWebhook, getQueueLength } from "./utils/queue";
-import { fetchShipStationResource } from "./utils/shipstation-api";
+import { fetchShipStationResource, getFulfillmentByTrackingNumber } from "./utils/shipstation-api";
 import { storage } from "./storage";
 import { broadcastOrderUpdate } from "./websocket";
 import { log } from "./vite";
@@ -316,8 +316,45 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
               broadcastOrderUpdate(order);
             }
           } else {
-            // No existing shipment found - will be created by fulfillment_shipped_v2 webhook
-            console.log(`No shipment found for tracking ${trackingNumber} - will be created by fulfillment webhook`);
+            // No existing shipment found - fetch from ShipStation and create it
+            console.log(`No shipment found for tracking ${trackingNumber} - fetching from ShipStation`);
+            
+            try {
+              const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
+              
+              if (fulfillmentData) {
+                // Look up the order by order number from the fulfillment data
+                const orderNumber = fulfillmentData.shipment_number;
+                const order = await storage.getOrderByOrderNumber(orderNumber);
+                
+                if (order) {
+                  // Create the shipment record with complete data from fulfillment and tracking
+                  const shipmentRecord = {
+                    orderId: order.id,
+                    shipmentId: fulfillmentData.shipment_id || fulfillmentData.fulfillment_id,
+                    trackingNumber: fulfillmentData.tracking_number,
+                    carrierCode: trackingData.carrier_code || fulfillmentData.fulfillment_provider_code,
+                    serviceCode: fulfillmentData.fulfillment_service_code,
+                    status: trackingData.status_code || (fulfillmentData.voided ? 'cancelled' : 'shipped'),
+                    statusDescription: trackingData.carrier_status_description || trackingData.status_description,
+                    shipDate: fulfillmentData.ship_date ? new Date(fulfillmentData.ship_date) : (trackingData.ship_date ? new Date(trackingData.ship_date) : null),
+                    shipmentData: { ...fulfillmentData, trackingData },
+                  };
+                  
+                  await storage.createShipment(shipmentRecord);
+                  console.log(`Created shipment for order ${orderNumber} with tracking ${trackingNumber}`);
+                  
+                  // Broadcast update to connected clients
+                  broadcastOrderUpdate(order);
+                } else {
+                  console.log(`Order ${orderNumber} not found for tracking ${trackingNumber}`);
+                }
+              } else {
+                console.log(`Fulfillment data not found in ShipStation for tracking ${trackingNumber}`);
+              }
+            } catch (error) {
+              console.error(`Error fetching fulfillment by tracking number ${trackingNumber}:`, error);
+            }
           }
         } 
         // Fulfillment webhooks need to fetch full shipment data
