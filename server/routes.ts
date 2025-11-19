@@ -77,11 +77,13 @@ function extractShopifyOrderPrices(shopifyOrder: any) {
 }
 
 /**
- * Extract marketplace order number (e.g., Amazon order number) from Shopify order
- * Amazon orders are identified by source_name="amazon" and contain the Amazon order number in fulfillment data
+ * Extract the actual order number from any sales channel
+ * - For Amazon orders: returns Amazon order number (e.g., "111-7320858-2210642")
+ * - For direct Shopify orders: returns Shopify order number (e.g., "JK3825344788")
+ * - For other marketplaces: returns their native order number format
  */
-function extractMarketplaceOrderNumber(shopifyOrder: any): string | null {
-  // Method 1: Check fulfillments for Amazon gateway data
+function extractActualOrderNumber(shopifyOrder: any): string {
+  // Method 1: Check fulfillments for Amazon marketplace data
   const fulfillments = shopifyOrder.fulfillments || [];
   for (const fulfillment of fulfillments) {
     // Amazon orders have gateway set to "amazon" and receipt contains marketplace data
@@ -104,7 +106,9 @@ function extractMarketplaceOrderNumber(shopifyOrder: any): string | null {
     return shopifyOrder.name;
   }
   
-  return null;
+  // Method 4: Default to Shopify order name, stripping the # prefix if present
+  const shopifyOrderName = shopifyOrder.name || shopifyOrder.order_number || '';
+  return shopifyOrderName.replace(/^#/, '');
 }
 
 async function processOrderRefunds(orderId: string, shopifyOrder: any) {
@@ -474,8 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const shopifyOrder of shopifyOrders) {
         const orderData = {
           id: shopifyOrder.id.toString(),
-          orderNumber: shopifyOrder.name || shopifyOrder.order_number,
-          marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
+          orderNumber: extractActualOrderNumber(shopifyOrder),
           customerName: shopifyOrder.customer
             ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
             : "Guest",
@@ -1430,8 +1433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const shopifyOrder = webhookData.order;
             const orderData = {
               id: shopifyOrder.id.toString(),
-              orderNumber: shopifyOrder.name || shopifyOrder.order_number,
-              marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
+              orderNumber: extractActualOrderNumber(shopifyOrder),
               customerName: shopifyOrder.customer
                 ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
                 : "Guest",
@@ -1801,8 +1803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Store order in database first
           const orderData = {
             id: shopifyOrder.id.toString(),
-            orderNumber: shopifyOrder.name || shopifyOrder.order_number,
-            marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
+            orderNumber: extractActualOrderNumber(shopifyOrder),
             customerName: shopifyOrder.customer
               ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
               : "Guest",
@@ -2637,102 +2638,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error completing print job:", error);
       res.status(500).json({ error: "Failed to complete print job" });
-    }
-  });
-
-  app.post("/api/orders/backfill-marketplace-numbers", requireAuth, async (req, res) => {
-    try {
-      const limit = parseInt(req.body.limit as string) || 1000;
-      const shopifyDomain = process.env.SHOPIFY_SHOP_DOMAIN;
-      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-
-      if (!shopifyDomain || !accessToken) {
-        return res.status(500).json({ error: "Shopify credentials not configured" });
-      }
-
-      let updatedCount = 0;
-      let processedCount = 0;
-      let pageInfo: string | null = null;
-      let hasNextPage = true;
-
-      console.log(`[Marketplace Backfill] Starting backfill for up to ${limit} orders...`);
-
-      while (hasNextPage && processedCount < limit) {
-        const pageLimit = Math.min(250, limit - processedCount);
-        
-        // Use cursor-based pagination with page_info parameter
-        let url = `https://${shopifyDomain}/admin/api/2024-01/orders.json?status=any&limit=${pageLimit}`;
-        if (pageInfo) {
-          url += `&page_info=${pageInfo}`;
-        }
-        
-        const response = await fetch(url, {
-          headers: {
-            "X-Shopify-Access-Token": accessToken,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Shopify API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const orders = data.orders || [];
-
-        if (orders.length === 0) {
-          hasNextPage = false;
-          break;
-        }
-
-        for (const shopifyOrder of orders) {
-          const marketplaceOrderNumber = extractMarketplaceOrderNumber(shopifyOrder);
-          
-          if (marketplaceOrderNumber) {
-            const orderId = shopifyOrder.id.toString();
-            const existing = await storage.getOrder(orderId);
-            
-            if (existing && !existing.marketplaceOrderNumber) {
-              await storage.updateOrder(orderId, {
-                ...existing,
-                marketplaceOrderNumber: marketplaceOrderNumber,
-              });
-              updatedCount++;
-              console.log(`[Marketplace Backfill] Updated order ${existing.orderNumber} with marketplace number ${marketplaceOrderNumber}`);
-            }
-          }
-          processedCount++;
-        }
-
-        // Extract page_info from Link header for cursor-based pagination
-        const linkHeader = response.headers.get('Link');
-        if (linkHeader) {
-          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-          if (nextMatch) {
-            const nextUrl = nextMatch[1];
-            const pageInfoMatch = nextUrl.match(/page_info=([^&]+)/);
-            if (pageInfoMatch) {
-              pageInfo = pageInfoMatch[1];
-            } else {
-              hasNextPage = false;
-            }
-          } else {
-            hasNextPage = false;
-          }
-        } else {
-          hasNextPage = false;
-        }
-        
-        // Rate limiting: 2 requests per second
-        if (hasNextPage) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      console.log(`[Marketplace Backfill] Completed: ${updatedCount} orders updated out of ${processedCount} processed`);
-      res.json({ success: true, updatedCount, processedCount });
-    } catch (error) {
-      console.error("Error backfilling marketplace order numbers:", error);
-      res.status(500).json({ error: "Failed to backfill marketplace order numbers" });
     }
   });
 

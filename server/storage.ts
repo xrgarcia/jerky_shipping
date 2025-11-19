@@ -90,7 +90,6 @@ export interface IStorage {
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
   getOrder(id: string): Promise<Order | undefined>;
   getOrderByOrderNumber(orderNumber: string): Promise<Order | undefined>;
-  getOrderByMarketplaceOrderNumber(marketplaceOrderNumber: string): Promise<Order | undefined>;
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
   getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
@@ -252,21 +251,13 @@ export class DatabaseStorage implements IStorage {
     let result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber));
     if (result[0]) return result[0];
     
-    // Try with # prefix (Shopify format)
+    // Try with # prefix (old Shopify format)
     result = await db.select().from(orders).where(eq(orders.orderNumber, `#${orderNumber}`));
     if (result[0]) return result[0];
     
     // Try without # prefix
     const withoutHash = orderNumber.replace(/^#/, '');
     result = await db.select().from(orders).where(eq(orders.orderNumber, withoutHash));
-    return result[0];
-  }
-
-  async getOrderByMarketplaceOrderNumber(marketplaceOrderNumber: string): Promise<Order | undefined> {
-    const result = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.marketplaceOrderNumber, marketplaceOrderNumber));
     return result[0];
   }
 

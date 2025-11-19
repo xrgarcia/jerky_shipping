@@ -29,6 +29,41 @@ function extractShopifyOrderPrices(shopifyOrder: any) {
 }
 
 /**
+ * Extract the actual order number from any sales channel
+ * - For Amazon orders: returns Amazon order number (e.g., "111-7320858-2210642")
+ * - For direct Shopify orders: returns Shopify order number (e.g., "JK3825344788")
+ * - For other marketplaces: returns their native order number format
+ */
+function extractActualOrderNumber(shopifyOrder: any): string {
+  // Method 1: Check fulfillments for Amazon marketplace data
+  const fulfillments = shopifyOrder.fulfillments || [];
+  for (const fulfillment of fulfillments) {
+    // Amazon orders have gateway set to "amazon" and receipt contains marketplace data
+    if (fulfillment.receipt?.marketplace_fulfillment_order_id) {
+      return fulfillment.receipt.marketplace_fulfillment_order_id;
+    }
+    // Alternative: Some Amazon orders store it in the order_id field
+    if (fulfillment.receipt?.order_id && /^\d{3}-\d{7}-\d{7}$/.test(fulfillment.receipt.order_id)) {
+      return fulfillment.receipt.order_id;
+    }
+  }
+  
+  // Method 2: Check if source_name indicates Amazon marketplace
+  if (shopifyOrder.source_name === 'amazon' && shopifyOrder.source_identifier) {
+    return shopifyOrder.source_identifier;
+  }
+  
+  // Method 3: Parse order name if it matches Amazon format (###-#######-#######)
+  if (shopifyOrder.name && /^\d{3}-\d{7}-\d{7}$/.test(shopifyOrder.name)) {
+    return shopifyOrder.name;
+  }
+  
+  // Method 4: Default to Shopify order name, stripping the # prefix if present
+  const shopifyOrderName = shopifyOrder.name || shopifyOrder.order_number || '';
+  return shopifyOrderName.replace(/^#/, '');
+}
+
+/**
  * Extract and store refunds from a Shopify order
  * Processes the refunds array and stores each refund in the database
  */
@@ -173,7 +208,7 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
         const shopifyOrder = webhookData.order;
         const orderData = {
           id: shopifyOrder.id.toString(),
-          orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+          orderNumber: extractActualOrderNumber(shopifyOrder),
           customerName: shopifyOrder.customer
             ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
             : "Guest",

@@ -134,19 +134,10 @@ export async function linkTrackingToOrder(
       }
     }
     
-    // Method 5: Try marketplace order number (e.g., Amazon order number)
-    if (!order && orderNumber) {
-      console.log(`[DEBUG] Method 5: Looking up order by marketplace order number: ${orderNumber}`);
-      order = await storage.getOrderByMarketplaceOrderNumber(orderNumber);
-      if (order) {
-        console.log(`[DEBUG] ✓ Found order ${order.orderNumber} (ID: ${order.id}) via marketplace order number`);
-      }
-    }
-    
-    // Method 6: Try fulfillment API lookup by tracking number as last resort
+    // Method 5: Try fulfillment API lookup by tracking number as last resort
     if (!order) {
       try {
-        console.log(`[DEBUG] Method 6: Calling fulfillment API for tracking ${trackingNumber}`);
+        console.log(`[DEBUG] Method 5: Calling fulfillment API for tracking ${trackingNumber}`);
         const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
         console.log(`[DEBUG] Fulfillment API response:`, JSON.stringify({
           order_number: fulfillmentData?.order_number,
@@ -164,12 +155,12 @@ export async function linkTrackingToOrder(
     }
     
     if (!order) {
-      console.error(`[DEBUG] ✗ FAILED to link tracking ${trackingNumber} to any order after all 6 methods`);
+      console.error(`[DEBUG] ✗ FAILED to link tracking ${trackingNumber} to any order after all 5 methods`);
       return {
         order: null,
         shipmentData,
         orderNumber,
-        error: `Cannot link tracking ${trackingNumber} to any order - tried shipment_number, orderId, orderKey, external_shipment_id, marketplace_order_number, and fulfillment API`,
+        error: `Cannot link tracking ${trackingNumber} to any order - tried order_number, orderId, orderKey, external_shipment_id, and fulfillment API`,
       };
     }
     
