@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -1064,6 +1064,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error syncing shipments:", error);
       res.status(500).json({ error: error.message || "Failed to sync shipments" });
+    }
+  });
+
+  // Sync tracking status for non-delivered shipments
+  app.post("/api/shipments/sync-tracking", requireAuth, async (req, res) => {
+    try {
+      console.log("========== TRACKING SYNC STARTED ==========");
+      const nonDeliveredShipments = await storage.getNonDeliveredShipments();
+      console.log(`Syncing tracking for ${nonDeliveredShipments.length} non-delivered shipments...`);
+
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const errors: string[] = [];
+
+      for (const shipment of nonDeliveredShipments) {
+        try {
+          // Skip shipments without tracking numbers
+          if (!shipment.trackingNumber) {
+            skippedCount++;
+            continue;
+          }
+
+          // Fetch latest fulfillment data from ShipStation
+          const fulfillmentData = await getFulfillmentByTrackingNumber(shipment.trackingNumber);
+          
+          if (fulfillmentData) {
+            // Prepare update payload - only include actual state transitions
+            const updatePayload: any = {};
+
+            // Merge shipmentData instead of replacing
+            if (shipment.shipmentData) {
+              updatePayload.shipmentData = { ...shipment.shipmentData, ...fulfillmentData };
+            } else {
+              updatePayload.shipmentData = fulfillmentData;
+            }
+
+            // Only update status on meaningful transitions (don't regress)
+            if (fulfillmentData.voided && shipment.status !== 'cancelled') {
+              // Transition to cancelled
+              updatePayload.status = 'cancelled';
+              updatePayload.statusDescription = 'Shipment voided';
+            } else if (fulfillmentData.delivered_at && shipment.status !== 'DE') {
+              // Transition to delivered
+              updatePayload.status = 'DE';
+              updatePayload.statusDescription = 'DELIVERED';
+              updatePayload.actualDeliveryDate = new Date(fulfillmentData.delivered_at);
+            }
+            // Don't regress from cancelled/delivered/exception to 'shipped'
+
+            // Only update if there are actual changes
+            if (Object.keys(updatePayload).length > 1) { // More than just shipmentData
+              await storage.updateShipment(shipment.id, updatePayload);
+              updatedCount++;
+              console.log(`Updated tracking for ${shipment.trackingNumber}: ${updatePayload.status || shipment.status}`);
+            } else if (Object.keys(updatePayload).length === 1) {
+              // Only shipmentData changed, still update to preserve metadata
+              await storage.updateShipment(shipment.id, updatePayload);
+              updatedCount++;
+              console.log(`Updated metadata for ${shipment.trackingNumber}`);
+            } else {
+              skippedCount++;
+            }
+          } else {
+            skippedCount++;
+            console.log(`No fulfillment data found for tracking ${shipment.trackingNumber}`);
+          }
+        } catch (shipmentError: any) {
+          const errorMsg = `Tracking ${shipment.trackingNumber}: ${shipmentError.message}`;
+          console.error(errorMsg);
+          errors.push(errorMsg);
+          skippedCount++;
+        }
+      }
+
+      console.log(`========== TRACKING SYNC COMPLETE: ${updatedCount} updated, ${skippedCount} skipped ==========`);
+
+      res.json({ 
+        success: true,
+        updatedCount,
+        skippedCount,
+        totalChecked: nonDeliveredShipments.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (error: any) {
+      console.error("Error syncing tracking:", error);
+      res.status(500).json({ error: error.message || "Failed to sync tracking" });
     }
   });
 
