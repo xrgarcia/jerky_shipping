@@ -84,6 +84,7 @@ export interface IStorage {
   getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
   getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
+  getNonDeliveredShipments(): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -409,6 +410,20 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(eq(shipments.shipmentId, shipmentId));
     return result[0];
+  }
+
+  async getNonDeliveredShipments(): Promise<Shipment[]> {
+    const result = await db
+      .select()
+      .from(shipments)
+      .where(
+        and(
+          sql`${shipments.status} != 'DE'`,
+          isNull(shipments.actualDeliveryDate)
+        )
+      )
+      .orderBy(desc(shipments.createdAt));
+    return result;
   }
 
   async getUserById(id: string): Promise<User | undefined> {
