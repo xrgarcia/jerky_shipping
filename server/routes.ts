@@ -735,15 +735,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
-      const query = req.query.q as string;
-      const allShipments = await storage.getAllShipments();
+      // Parse filter parameters from query string
+      const filters: any = {
+        search: req.query.search as string | undefined,
+        page: req.query.page ? parseInt(req.query.page as string) : 1,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : 50,
+        sortBy: req.query.sortBy as any || 'createdAt',
+        sortOrder: req.query.sortOrder as any || 'desc',
+      };
+
+      // Parse array parameters
+      if (req.query.status) {
+        filters.status = Array.isArray(req.query.status)
+          ? req.query.status
+          : [req.query.status];
+      }
+      if (req.query.carrierCode) {
+        filters.carrierCode = Array.isArray(req.query.carrierCode)
+          ? req.query.carrierCode
+          : [req.query.carrierCode];
+      }
+
+      // Parse date parameters
+      if (req.query.dateFrom) {
+        filters.dateFrom = new Date(req.query.dateFrom as string);
+      }
+      if (req.query.dateTo) {
+        filters.dateTo = new Date(req.query.dateTo as string);
+      }
+
+      // Get filtered shipments with pagination
+      const { shipments: filteredShipments, total } = await storage.getFilteredShipments(filters);
 
       // Get all orders to join with shipments
       const allOrders = await storage.getAllOrders();
       const ordersMap = new Map(allOrders.map(o => [o.id, o]));
 
       // Enrich shipments with order information
-      const shipmentsWithOrders = allShipments.map(shipment => {
+      const shipmentsWithOrders = filteredShipments.map(shipment => {
         const order = ordersMap.get(shipment.orderId);
         return {
           ...shipment,
@@ -751,19 +780,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Filter by query if provided
-      let filteredShipments = shipmentsWithOrders;
-      if (query) {
-        const lowerQuery = query.toLowerCase();
-        filteredShipments = shipmentsWithOrders.filter(s => 
-          s.trackingNumber?.toLowerCase().includes(lowerQuery) ||
-          s.carrierCode?.toLowerCase().includes(lowerQuery) ||
-          s.order?.orderNumber?.toLowerCase().includes(lowerQuery) ||
-          s.order?.customerName?.toLowerCase().includes(lowerQuery)
-        );
-      }
-
-      res.json({ shipments: filteredShipments });
+      res.json({
+        shipments: shipmentsWithOrders,
+        total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+        totalPages: Math.ceil(total / filters.pageSize),
+      });
     } catch (error) {
       console.error("Error fetching shipments:", error);
       res.status(500).json({ error: "Failed to fetch shipments" });

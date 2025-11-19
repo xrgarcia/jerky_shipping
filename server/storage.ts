@@ -54,6 +54,18 @@ export interface OrderFilters {
   pageSize?: number;
 }
 
+export interface ShipmentFilters {
+  search?: string; // Search tracking number, carrier, order number, customer name
+  status?: string[];
+  carrierCode?: string[];
+  dateFrom?: Date; // Ship date range
+  dateTo?: Date;
+  sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -104,6 +116,7 @@ export interface IStorage {
   getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
   getNonDeliveredShipments(): Promise<Shipment[]>;
+  getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -616,6 +629,85 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(shipments.createdAt));
     return result;
+  }
+
+  async getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }> {
+    const {
+      search,
+      status: statusFilters,
+      carrierCode: carrierFilters,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      pageSize = 50,
+    } = filters;
+
+    // Build WHERE conditions
+    const conditions = [];
+
+    // Text search across tracking number, carrier, order fields
+    if (search) {
+      const searchLower = search.toLowerCase();
+      conditions.push(
+        or(
+          ilike(shipments.trackingNumber, `%${searchLower}%`),
+          ilike(shipments.carrierCode, `%${searchLower}%`),
+          ilike(shipments.shipmentId, `%${searchLower}%`)
+        )
+      );
+    }
+
+    // Status filter
+    if (statusFilters && statusFilters.length > 0) {
+      conditions.push(inArray(shipments.status, statusFilters));
+    }
+
+    // Carrier filter
+    if (carrierFilters && carrierFilters.length > 0) {
+      conditions.push(inArray(shipments.carrierCode, carrierFilters));
+    }
+
+    // Date range filter (ship date)
+    if (dateFrom) {
+      conditions.push(gte(shipments.shipDate, dateFrom));
+    }
+    if (dateTo) {
+      conditions.push(lte(shipments.shipDate, dateTo));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(whereClause);
+    const total = countResult[0]?.count || 0;
+
+    // Build ORDER BY
+    const sortColumn = {
+      shipDate: shipments.shipDate,
+      createdAt: shipments.createdAt,
+      trackingNumber: shipments.trackingNumber,
+      status: shipments.status,
+      carrierCode: shipments.carrierCode,
+    }[sortBy];
+
+    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    // Get paginated results
+    const offset = (page - 1) * pageSize;
+    const result = await db
+      .select()
+      .from(shipments)
+      .where(whereClause)
+      .orderBy(orderByClause)
+      .limit(pageSize)
+      .offset(offset);
+
+    return { shipments: result, total };
   }
 
   async getUserById(id: string): Promise<User | undefined> {
