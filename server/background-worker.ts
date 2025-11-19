@@ -355,6 +355,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               trackingNumber,
               reason: 'webhook',
               enqueuedAt: Date.now(),
+              originalWebhook: webhookData, // Preserve original webhook for troubleshooting
             });
           }
         } 
@@ -376,6 +377,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
                 orderNumber,
                 reason: 'webhook',
                 enqueuedAt: Date.now(),
+                originalWebhook: webhookData, // Preserve original webhook for troubleshooting
               });
             } else {
               console.warn(`Shipment ${shipmentData.shipmentId} missing shipment_number field - cannot queue`);
