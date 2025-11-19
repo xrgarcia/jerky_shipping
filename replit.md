@@ -56,9 +56,15 @@ Preferred communication style: Simple, everyday language.
   - Lockout countdown timer displays remaining time when account is temporarily locked
 - **Order Backfill System (`/backfill`)**: Imports historical Shopify orders AND their shipments from ShipStation using an ID-only queueing mechanism to optimize memory usage. Features intelligent rate limiting that monitors ShipStation API headers (X-Rate-Limit-Remaining, X-Rate-Limit-Reset) to avoid hitting rate limits. Includes a UI with progress tracking and job history.
 - **Background Worker**: Asynchronous webhook processor with mutex-based concurrency control. Processes 50 webhooks per batch (5-second intervals), preventing overlapping executions via globally unique run IDs. Optimized for high-volume webhook ingestion with ~5x performance improvement over previous 10-item batches.
+- **Shipment Sync Worker**: Dual-path async processor (10s intervals, 50 batches) that enriches shipment data from ShipStation:
+  - **Path A (Tracking Number)**: Receives tracking number from track webhooks → calls `linkTrackingToOrder()` → fetches shipment by ID → finds order via 5-tier fallback → creates/updates shipment
+  - **Path B (Order Number)**: Receives order number from fulfillment webhooks → fetches shipments via `getShipmentsByOrderNumber()` → creates/updates all shipments for order
+  - Both paths produce identical enriched shipment records with symmetric rate-limit protection
+  - Failures logged to `shipmentSyncFailures` dead letter queue for monitoring
+  - Webhook handlers queue messages instead of making synchronous ShipStation API calls, improving response times and preventing rate limit violations
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
-- **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates and notifications.
+- **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates, queue status (webhook queue, shipment sync queue, failure count), and notifications.
 - **Price Field Storage**: Captures 13 distinct Shopify price/amount fields consistently as text strings.
 - **Monorepo Structure**: Client, server, and shared code are co-located.
 - **Async Product Bootstrap**: Products synchronize asynchronously on server startup for quick application launch.
@@ -66,13 +72,18 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization. Utilizes webhooks for real-time updates.
--   **ShipStation Integration**: V2 API for shipment tracking and fulfillment. Webhooks are used for status updates.
-    -   **Tracking Webhook Handling**: Comprehensive 5-tier fallback strategy for creating shipment records when tracking webhooks arrive before fulfillment webhooks:
+-   **ShipStation Integration**: V2 API for shipment tracking and fulfillment. Uses async dual-path queue system for webhook processing:
+    -   **Dual-Path Shipment Sync**: Track and fulfillment webhooks queue to shipment sync worker instead of processing synchronously:
+        - **Track Webhooks** (`API_TRACK`): Extract tracking number → queue for async processing → worker calls `linkTrackingToOrder()` with 5-tier fallback strategy
+        - **Fulfillment Webhooks** (`FULFILLMENT_V2`): Extract order numbers → queue for async processing → worker calls `getShipmentsByOrderNumber()`
+        - Both paths produce identical enriched shipment records, with symmetric rate-limit protection
+        - Centralizes all ShipStation API calls in shipment sync worker for better rate limit management
+    -   **Tracking Linkage Strategy**: 5-tier fallback for linking tracking numbers to orders:
         1. Extract shipment ID from `label_url` (format: `se-XXXXXXX` or `se-UUID`)
-        2. Fetch full shipment details from ShipStation `/v2/shipments?shipment_id={id}`
+        2. Fetch full shipment details from ShipStation `/v2/shipments?shipment_id={id}` with rate limit headers
         3. Find order using multiple fallback methods: `order_number` (matches any channel), `orderId`, `orderKey`, `external_shipment_id`, fulfillment API
         4. Create shipment record with complete tracking data linked to order
-        5. Implemented via shared `linkTrackingToOrder()` utility in `server/utils/shipment-linkage.ts` to avoid code duplication
+        5. Implemented via shared `linkTrackingToOrder()` utility in `server/utils/shipment-linkage.ts`
     -   **Multi-Channel Order Numbers**: The `order_number` field stores the actual order number from any sales channel. For Amazon orders, the system extracts the Amazon order number (e.g., "111-7320858-2210642") from Shopify fulfillment data instead of using Shopify's internal order number, enabling seamless shipment tracking across all channels.
 -   **SkuVault Integration**: Reverse-engineered web API for accessing wave picking session data, including HTML form login and token caching. Rate limiting (2-second delay between requests) prevents triggering anti-bot protection.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.

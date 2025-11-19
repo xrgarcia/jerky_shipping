@@ -1,6 +1,5 @@
-import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength } from "./utils/queue";
+import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, enqueueShipmentSync } from "./utils/queue";
 import { fetchShipStationResource } from "./utils/shipstation-api";
-import { linkTrackingToOrder } from "./utils/shipment-linkage";
 import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
 import { log } from "./vite";
@@ -323,15 +322,12 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
           console.log(`Upserted product ${shopifyProduct.id} with ${shopifyVariants.length} variants`);
         }
       } else if (webhookData.type === 'shipstation') {
-        // Track webhooks contain tracking data directly in the payload
+        // Track webhooks - queue for async processing by shipment sync worker
         if (webhookData.resourceType === 'API_TRACK' && webhookData.trackingData) {
           const trackingData = webhookData.trackingData;
           const trackingNumber = trackingData.tracking_number;
           
-          // Find existing shipment by tracking number
-          // Note: We can only safely match by tracking number. The label_url points to ShipEngine API
-          // which requires separate auth credentials we don't have. Shipments without tracking numbers
-          // will be created/updated by fulfillment_shipped_v2 webhooks which contain complete data.
+          // Check if we already have this shipment
           const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
           
           if (existingShipment) {
@@ -352,71 +348,37 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               broadcastOrderUpdate(order);
             }
           } else {
-            // No existing shipment found - use shipment linkage to find and create it
-            console.log(`No shipment found for tracking ${trackingNumber} - fetching from ShipStation`);
+            // No existing shipment - queue for async processing
+            console.log(`No shipment found for tracking ${trackingNumber} - queuing for shipment sync worker`);
             
-            const linkageResult = await linkTrackingToOrder(trackingData, storage);
-            
-            if (linkageResult.error) {
-              console.error(linkageResult.error);
-            } else if (linkageResult.order && linkageResult.shipmentData) {
-              // Create the shipment record with complete data from shipment and tracking
-              const shipmentRecord = {
-                orderId: linkageResult.order.id,
-                shipmentId: linkageResult.shipmentData.shipment_id,
-                trackingNumber: trackingNumber,
-                carrierCode: trackingData.carrier_code || linkageResult.shipmentData.carrier_code,
-                serviceCode: linkageResult.shipmentData.service_code,
-                status: trackingData.status_code === 'DE' ? 'delivered' : 'in_transit',
-                statusDescription: trackingData.status_description || 'In Transit',
-                shipDate: linkageResult.shipmentData.ship_date ? new Date(linkageResult.shipmentData.ship_date) : null,
-                shipmentData: {
-                  ...linkageResult.shipmentData,
-                  latestTracking: trackingData,
-                },
-              };
-              
-              await storage.createShipment(shipmentRecord);
-              console.log(`Created shipment ${trackingNumber} for order ${linkageResult.order.orderNumber}`);
-              
-              // Broadcast update to connected clients
-              broadcastOrderUpdate(linkageResult.order);
-            }
+            await enqueueShipmentSync({
+              trackingNumber,
+              reason: 'webhook',
+              enqueuedAt: Date.now(),
+            });
           }
         } 
-        // Fulfillment webhooks need to fetch full shipment data
+        // Fulfillment webhooks - queue for async processing by shipment sync worker
         else if (webhookData.resourceType === 'FULFILLMENT_V2') {
           const resourceUrl = webhookData.resourceUrl;
           const shipmentResponse = await fetchShipStationResource(resourceUrl);
           const shipments = shipmentResponse.shipments || [];
 
+          // Queue each order number for shipment sync processing
           for (const shipmentData of shipments) {
             // ShipStation uses 'shipment_number' field for the order number
             const orderNumber = shipmentData.shipment_number;
-            const order = await storage.getOrderByOrderNumber(orderNumber);
             
-            if (order) {
-              const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+            if (orderNumber) {
+              console.log(`Queueing order ${orderNumber} for shipment sync from FULFILLMENT_V2 webhook`);
               
-              const shipmentRecord = {
-                orderId: order.id,
-                shipmentId: shipmentData.shipmentId?.toString(),
-                trackingNumber: shipmentData.trackingNumber,
-                carrierCode: shipmentData.carrierCode,
-                serviceCode: shipmentData.serviceCode,
-                status: shipmentData.voided ? 'cancelled' : 'shipped',
-                statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-                shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-                shipmentData: shipmentData,
-              };
-
-              if (existingShipment) {
-                await storage.updateShipment(existingShipment.id, shipmentRecord);
-              } else {
-                await storage.createShipment(shipmentRecord);
-              }
-
-              broadcastOrderUpdate(order);
+              await enqueueShipmentSync({
+                orderNumber,
+                reason: 'webhook',
+                enqueuedAt: Date.now(),
+              });
+            } else {
+              console.warn(`Shipment ${shipmentData.shipmentId} missing shipment_number field - cannot queue`);
             }
           }
         }
