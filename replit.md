@@ -75,6 +75,11 @@ Preferred communication style: Simple, everyday language.
   - Color-coded health indicators (green/yellow/red) based on queue size and message age
   - Worker status panel showing both background workers (Shopify webhook processor, shipment sync worker) with running state
   - Backfill job status showing active backfill job with real-time progress bar, or recent completed/failed jobs
+  - **Data Health Metrics**: Real-time tracking of orders without shipments, updated every 5-10 seconds via WebSocket:
+    - Total orders without any shipment records
+    - Recent orders (last 30 days) without shipments
+    - Paid orders without shipments
+    - All metrics computed using a single efficient SQL query with conditional aggregation and leftJoin
   - Purge actions with confirmation dialogs for clearing Shopify queue, shipment sync queue, or entire failure table
   - Interactive failures table with search (by order number or error message), pagination, and expandable details showing full request/response data
   - Detailed failure records preserve complete webhook payloads for troubleshooting
