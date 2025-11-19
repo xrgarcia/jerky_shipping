@@ -1,5 +1,5 @@
 import { dequeueWebhook, getQueueLength } from "./utils/queue";
-import { fetchShipStationResource } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentByTrackingNumber } from "./utils/shipstation-api";
 import { storage } from "./storage";
 import { broadcastOrderUpdate } from "./websocket";
 import { log } from "./vite";
@@ -316,8 +316,45 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
               broadcastOrderUpdate(order);
             }
           } else {
-            // No existing shipment found - will be created by fulfillment_shipped_v2 webhook
-            console.log(`No shipment found for tracking ${trackingNumber} - will be created by fulfillment webhook`);
+            // No existing shipment found - fetch from ShipStation and create it
+            console.log(`No shipment found for tracking ${trackingNumber} - fetching from ShipStation`);
+            
+            try {
+              const shipmentData = await getShipmentByTrackingNumber(trackingNumber);
+              
+              if (shipmentData) {
+                // Look up the order by order number from the shipment data
+                const orderNumber = shipmentData.orderNumber;
+                const order = await storage.getOrderByOrderNumber(orderNumber);
+                
+                if (order) {
+                  // Create the shipment record with complete data
+                  const shipmentRecord = {
+                    orderId: order.id,
+                    shipmentId: shipmentData.shipmentId?.toString(),
+                    trackingNumber: shipmentData.trackingNumber,
+                    carrierCode: shipmentData.carrierCode || trackingData.carrier_code,
+                    serviceCode: shipmentData.serviceCode,
+                    status: trackingData.status_code || 'shipped',
+                    statusDescription: trackingData.carrier_status_description || trackingData.status_description,
+                    shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : (trackingData.ship_date ? new Date(trackingData.ship_date) : null),
+                    shipmentData: { ...shipmentData, trackingData },
+                  };
+                  
+                  await storage.createShipment(shipmentRecord);
+                  console.log(`Created shipment for order ${orderNumber} with tracking ${trackingNumber}`);
+                  
+                  // Broadcast update to connected clients
+                  broadcastOrderUpdate(order);
+                } else {
+                  console.log(`Order ${orderNumber} not found for tracking ${trackingNumber}`);
+                }
+              } else {
+                console.log(`Shipment data not found in ShipStation for tracking ${trackingNumber}`);
+              }
+            } catch (error) {
+              console.error(`Error fetching shipment by tracking number ${trackingNumber}:`, error);
+            }
           }
         } 
         // Fulfillment webhooks need to fetch full shipment data
