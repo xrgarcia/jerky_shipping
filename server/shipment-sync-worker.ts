@@ -35,8 +35,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
 
   log(`Processing ${messages.length} shipment sync message(s)`);
   let processedCount = 0;
-  let rateLimitRemaining = 40; // ShipStation default
-  let rateLimitReset = 60; // Default reset time in seconds
   
   for (const message of messages) {
     try {
@@ -48,24 +46,24 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         // Use linkTrackingToOrder to fetch shipment and find the order
         log(`Processing tracking number: ${trackingNumber}`);
         
-        // Check rate limiting before making API call
-        if (rateLimitRemaining <= 2) {
-          log(`⚠️  Low quota (${rateLimitRemaining} remaining), waiting ${rateLimitReset}s before next request...`);
-          await new Promise(resolve => setTimeout(resolve, rateLimitReset * 1000));
-          rateLimitRemaining = 40; // Reset after waiting
-        }
-        
         const trackingData: TrackingData = {
           tracking_number: trackingNumber,
         };
         
         const linkageResult = await linkTrackingToOrder(trackingData, storage);
         
-        // Update rate limit tracking from linkage result
+        // Check rate limit AFTER API call and break if exhausted
         if (linkageResult.rateLimit) {
-          rateLimitRemaining = linkageResult.rateLimit.remaining;
-          rateLimitReset = linkageResult.rateLimit.reset;
-          log(`[${trackingNumber}] API call made, ${rateLimitRemaining}/${linkageResult.rateLimit.limit} calls remaining`);
+          const { remaining, reset, limit } = linkageResult.rateLimit;
+          log(`[${trackingNumber}] API call made, ${remaining}/${limit} calls remaining`);
+          
+          // If we're out of quota, stop processing this batch and let next worker run start fresh
+          if (remaining <= 0) {
+            const waitTime = reset + 3; // Add 3 second buffer to ensure we're past the window
+            log(`⚠️  Rate limit exhausted (0 remaining), stopping batch. Next run in ${waitTime}s...`);
+            // Break out of the loop - next worker run will have fresh quota
+            break;
+          }
         }
         
         if (linkageResult.error || !linkageResult.order || !linkageResult.shipmentData) {
@@ -136,21 +134,18 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           continue;
         }
 
-        // Check rate limiting before making API call
-        if (rateLimitRemaining <= 2) {
-          log(`⚠️  Low quota (${rateLimitRemaining} remaining), waiting ${rateLimitReset}s before next request...`);
-          await new Promise(resolve => setTimeout(resolve, rateLimitReset * 1000));
-          rateLimitRemaining = 40; // Reset after waiting
-        }
-
         // Fetch shipments from ShipStation
         const { data: shipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
         
-        // Update rate limit tracking
-        rateLimitRemaining = rateLimit.remaining;
-        rateLimitReset = rateLimit.reset;
+        log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
         
-        log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimitRemaining}/${rateLimit.limit} API calls remaining`);
+        // Check rate limit AFTER API call and break if exhausted
+        if (rateLimit.remaining <= 0) {
+          const waitTime = rateLimit.reset + 3; // Add 3 second buffer to ensure we're past the window
+          log(`⚠️  Rate limit exhausted (0 remaining), stopping batch. Next run in ${waitTime}s...`);
+          // Break out of the loop - next worker run will have fresh quota
+          break;
+        }
 
         // Update shipments in database
         for (const shipmentData of shipments) {
