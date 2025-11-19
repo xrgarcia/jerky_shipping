@@ -76,6 +76,7 @@ export interface ShipmentSyncMessage {
   trackingNumber?: string; // Optional: use for tracking-based sync
   enqueuedAt: number;
   jobId?: string; // Optional backfill job ID for tracking
+  originalWebhook?: any; // Optional: preserve original webhook payload for troubleshooting
 }
 
 export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<void> {
