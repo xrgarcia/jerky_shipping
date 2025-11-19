@@ -74,6 +74,8 @@ export interface ShipmentSyncMessage {
   reason: 'backfill' | 'webhook' | 'manual';
   orderNumber?: string; // Optional: use for order-based sync
   trackingNumber?: string; // Optional: use for tracking-based sync
+  labelUrl?: string; // Optional: label URL for shipment ID extraction
+  shipmentId?: string; // Optional: direct shipment ID if available
   enqueuedAt: number;
   jobId?: string; // Optional backfill job ID for tracking
   originalWebhook?: any; // Optional: preserve original webhook payload for troubleshooting
