@@ -553,70 +553,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/orders", requireAuth, async (req, res) => {
     try {
-      const query = req.query.q as string;
+      // Parse filter parameters from query string
+      const filters: any = {
+        search: req.query.search as string | undefined,
+        page: req.query.page ? parseInt(req.query.page as string) : 1,
+        pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : 50,
+        sortBy: req.query.sortBy as any || 'createdAt',
+        sortOrder: req.query.sortOrder as any || 'desc',
+      };
 
-      let orders = query
-        ? await storage.searchOrders(query)
-        : await storage.getAllOrders();
-
-      // If searching and no local results found, try fetching from Shopify
-      if (query && orders.length === 0) {
-        try {
-          if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
-            // Search Shopify by order number or name
-            const shopifyOrders = await fetchShopifyOrders(250);
-            const matchedOrders = shopifyOrders.filter((order: any) => {
-              const orderNum = order.order_number?.toString() || '';
-              const name = order.name || '';
-              const customerName = order.customer 
-                ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() 
-                : '';
-              const customerEmail = order.customer?.email || '';
-              
-              const lowerQuery = query.toLowerCase();
-              return (
-                orderNum.toLowerCase().includes(lowerQuery) ||
-                name.toLowerCase().includes(lowerQuery) ||
-                customerName.toLowerCase().includes(lowerQuery) ||
-                customerEmail.toLowerCase().includes(lowerQuery)
-              );
-            });
-
-            // Save matched orders to database
-            for (const shopifyOrder of matchedOrders) {
-              const orderData = {
-                id: shopifyOrder.id.toString(),
-                orderNumber: shopifyOrder.name || shopifyOrder.order_number,
-                customerName: shopifyOrder.customer
-                  ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
-                  : "Guest",
-                customerEmail: shopifyOrder.customer?.email || null,
-                customerPhone: shopifyOrder.customer?.phone || null,
-                shippingAddress: shopifyOrder.shipping_address || {},
-                lineItems: shopifyOrder.line_items || [],
-                fulfillmentStatus: shopifyOrder.fulfillment_status,
-                financialStatus: shopifyOrder.financial_status,
-                ...extractShopifyOrderPrices(shopifyOrder),
-                createdAt: new Date(shopifyOrder.created_at),
-                updatedAt: new Date(shopifyOrder.updated_at),
-              };
-
-              const existing = await storage.getOrder(orderData.id);
-              if (existing) {
-                await storage.updateOrder(orderData.id, orderData);
-              } else {
-                await storage.createOrder(orderData);
-              }
-            }
-
-            // Fetch the saved orders from database
-            orders = await storage.searchOrders(query);
-          }
-        } catch (shopifyError) {
-          console.error("Error fetching from Shopify:", shopifyError);
-          // Continue with empty results rather than failing completely
-        }
+      // Parse array parameters
+      if (req.query.fulfillmentStatus) {
+        filters.fulfillmentStatus = Array.isArray(req.query.fulfillmentStatus) 
+          ? req.query.fulfillmentStatus 
+          : [req.query.fulfillmentStatus];
       }
+      if (req.query.financialStatus) {
+        filters.financialStatus = Array.isArray(req.query.financialStatus)
+          ? req.query.financialStatus
+          : [req.query.financialStatus];
+      }
+      if (req.query.shipmentStatus) {
+        filters.shipmentStatus = Array.isArray(req.query.shipmentStatus)
+          ? req.query.shipmentStatus
+          : [req.query.shipmentStatus];
+      }
+      if (req.query.carrierCode) {
+        filters.carrierCode = Array.isArray(req.query.carrierCode)
+          ? req.query.carrierCode
+          : [req.query.carrierCode];
+      }
+
+      // Parse boolean parameters
+      if (req.query.hasShipment !== undefined) {
+        filters.hasShipment = req.query.hasShipment === 'true';
+      }
+      if (req.query.hasRefund !== undefined) {
+        filters.hasRefund = req.query.hasRefund === 'true';
+      }
+
+      // Parse date parameters
+      if (req.query.dateFrom) {
+        filters.dateFrom = new Date(req.query.dateFrom as string);
+      }
+      if (req.query.dateTo) {
+        filters.dateTo = new Date(req.query.dateTo as string);
+      }
+
+      // Parse price range
+      if (req.query.minTotal) {
+        filters.minTotal = parseFloat(req.query.minTotal as string);
+      }
+      if (req.query.maxTotal) {
+        filters.maxTotal = parseFloat(req.query.maxTotal as string);
+      }
+
+      // Get filtered orders with pagination
+      const { orders, total } = await storage.getFilteredOrders(filters);
 
       // Enrich orders with shipment status
       const allShipments = await storage.getAllShipments();
@@ -628,7 +621,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasShipment: shipmentsMap.has(order.id),
       }));
 
-      res.json({ orders: ordersWithShipmentStatus });
+      res.json({ 
+        orders: ordersWithShipmentStatus,
+        total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+        totalPages: Math.ceil(total / filters.pageSize),
+      });
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ error: "Failed to fetch orders" });

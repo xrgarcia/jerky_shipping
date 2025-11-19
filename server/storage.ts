@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql, isNull, gte, lte, inArray } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql, isNull, gte, lte, inArray, asc, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -36,6 +36,24 @@ import {
   orderItems,
 } from "@shared/schema";
 
+export interface OrderFilters {
+  search?: string; // Search order number, customer name/email, tracking number, SKU, product title
+  fulfillmentStatus?: string[];
+  financialStatus?: string[];
+  shipmentStatus?: string[];
+  hasShipment?: boolean;
+  hasRefund?: boolean;
+  carrierCode?: string[];
+  dateFrom?: Date;
+  dateTo?: Date;
+  minTotal?: number;
+  maxTotal?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'orderTotal' | 'customerName';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -63,6 +81,7 @@ export interface IStorage {
   searchOrders(query: string): Promise<Order[]>;
   getAllOrders(limit?: number): Promise<Order[]>;
   getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
+  getFilteredOrders(filters: OrderFilters): Promise<{ orders: Order[], total: number }>;
 
   // Order Refunds
   upsertOrderRefund(refund: InsertOrderRefund): Promise<OrderRefund>;
@@ -267,6 +286,179 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(orders.createdAt);
     return result;
+  }
+
+  async getFilteredOrders(filters: OrderFilters): Promise<{ orders: Order[], total: number }> {
+    const {
+      search,
+      fulfillmentStatus,
+      financialStatus,
+      shipmentStatus,
+      hasShipment,
+      hasRefund,
+      carrierCode,
+      dateFrom,
+      dateTo,
+      minTotal,
+      maxTotal,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      pageSize = 50,
+    } = filters;
+
+    const conditions: any[] = [];
+
+    // Date range filter
+    if (dateFrom) {
+      conditions.push(gte(orders.createdAt, dateFrom));
+    }
+    if (dateTo) {
+      conditions.push(lte(orders.createdAt, dateTo));
+    }
+
+    // Status filters
+    if (fulfillmentStatus && fulfillmentStatus.length > 0) {
+      conditions.push(inArray(orders.fulfillmentStatus, fulfillmentStatus));
+    }
+    if (financialStatus && financialStatus.length > 0) {
+      conditions.push(inArray(orders.financialStatus, financialStatus));
+    }
+
+    // Price range filter
+    if (minTotal !== undefined) {
+      conditions.push(sql`CAST(${orders.orderTotal} AS DECIMAL) >= ${minTotal}`);
+    }
+    if (maxTotal !== undefined) {
+      conditions.push(sql`CAST(${orders.orderTotal} AS DECIMAL) <= ${maxTotal}`);
+    }
+
+    // Search - need to check multiple tables
+    if (search) {
+      const searchPattern = `%${search}%`;
+      
+      // Get order IDs that match search in orders table
+      const orderIdsByOrders = db
+        .select({ orderId: orders.id })
+        .from(orders)
+        .where(
+          or(
+            ilike(orders.orderNumber, searchPattern),
+            ilike(orders.customerName, searchPattern),
+            ilike(orders.customerEmail, searchPattern),
+          )
+        );
+
+      // Get order IDs that have matching tracking numbers
+      const orderIdsByTracking = db
+        .selectDistinct({ orderId: shipments.orderId })
+        .from(shipments)
+        .where(ilike(shipments.trackingNumber, searchPattern));
+
+      // Get order IDs that have matching SKUs or product titles
+      const orderIdsByItems = db
+        .selectDistinct({ orderId: orderItems.orderId })
+        .from(orderItems)
+        .where(
+          or(
+            ilike(orderItems.sku, searchPattern),
+            ilike(orderItems.title, searchPattern),
+          )
+        );
+
+      // Combine all search results
+      conditions.push(
+        or(
+          sql`${orders.id} IN ${orderIdsByOrders}`,
+          sql`${orders.id} IN ${orderIdsByTracking}`,
+          sql`${orders.id} IN ${orderIdsByItems}`,
+        )
+      );
+    }
+
+    // Shipment filters - need to check if order has shipments
+    if (hasShipment !== undefined || shipmentStatus || carrierCode) {
+      if (hasShipment === true) {
+        const orderIdsWithShipments = db
+          .selectDistinct({ orderId: shipments.orderId })
+          .from(shipments);
+        conditions.push(sql`${orders.id} IN ${orderIdsWithShipments}`);
+      } else if (hasShipment === false) {
+        const orderIdsWithShipments = db
+          .selectDistinct({ orderId: shipments.orderId })
+          .from(shipments);
+        conditions.push(sql`${orders.id} NOT IN ${orderIdsWithShipments}`);
+      }
+
+      if (shipmentStatus && shipmentStatus.length > 0) {
+        const orderIdsByShipmentStatus = db
+          .selectDistinct({ orderId: shipments.orderId })
+          .from(shipments)
+          .where(inArray(shipments.status, shipmentStatus));
+        conditions.push(sql`${orders.id} IN ${orderIdsByShipmentStatus}`);
+      }
+
+      if (carrierCode && carrierCode.length > 0) {
+        const orderIdsByCarrier = db
+          .selectDistinct({ orderId: shipments.orderId })
+          .from(shipments)
+          .where(inArray(shipments.carrierCode, carrierCode));
+        conditions.push(sql`${orders.id} IN ${orderIdsByCarrier}`);
+      }
+    }
+
+    // Refund filter
+    if (hasRefund !== undefined) {
+      const orderIdsWithRefunds = db
+        .selectDistinct({ orderId: orderRefunds.orderId })
+        .from(orderRefunds);
+      
+      if (hasRefund === true) {
+        conditions.push(sql`${orders.id} IN ${orderIdsWithRefunds}`);
+      } else {
+        conditions.push(sql`${orders.id} NOT IN ${orderIdsWithRefunds}`);
+      }
+    }
+
+    // Build the where clause
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: count() })
+      .from(orders)
+      .where(whereClause);
+    const total = countResult[0]?.count || 0;
+
+    // Determine sort column and direction
+    let sortColumn;
+    switch (sortBy) {
+      case 'updatedAt':
+        sortColumn = orders.updatedAt;
+        break;
+      case 'orderTotal':
+        sortColumn = sql`CAST(${orders.orderTotal} AS DECIMAL)`;
+        break;
+      case 'customerName':
+        sortColumn = orders.customerName;
+        break;
+      default:
+        sortColumn = orders.createdAt;
+    }
+
+    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    // Get paginated results
+    const offset = (page - 1) * pageSize;
+    const result = await db
+      .select()
+      .from(orders)
+      .where(whereClause)
+      .orderBy(orderByClause)
+      .limit(pageSize)
+      .offset(offset);
+
+    return { orders: result, total };
   }
 
   // Order Refunds
