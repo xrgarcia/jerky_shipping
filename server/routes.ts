@@ -1540,41 +1540,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             } else {
               // Regular shipment webhook (fulfillment_shipped_v2, etc.)
+              // Fetch the resource to extract order numbers, then queue for async processing
               const resourceUrl = webhookData.resourceUrl;
               const shipmentResponse = await fetchShipStationResource(resourceUrl);
               const shipments = shipmentResponse.shipments || [];
 
+              // Queue each order number for shipment sync processing
               for (const shipmentData of shipments) {
-                // Find matching order by order number
                 // ShipStation uses 'shipment_number' field for the order number
                 const orderNumber = shipmentData.shipment_number;
-                const order = await storage.getOrderByOrderNumber(orderNumber);
                 
-                if (order) {
+                if (orderNumber) {
+                  console.log(`Queueing order ${orderNumber} for shipment sync from ${resourceType} webhook`);
                   
-                  // Create or update shipment record
-                  const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
-                  
-                  const shipmentRecord = {
-                    orderId: order.id,
-                    shipmentId: shipmentData.shipmentId?.toString(),
-                    trackingNumber: shipmentData.trackingNumber,
-                    carrierCode: shipmentData.carrierCode,
-                    serviceCode: shipmentData.serviceCode,
-                    status: shipmentData.voided ? 'cancelled' : 'shipped',
-                    statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-                    shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-                    shipmentData: shipmentData,
-                  };
-
-                  if (existingShipment) {
-                    await storage.updateShipment(existingShipment.id, shipmentRecord);
-                  } else {
-                    await storage.createShipment(shipmentRecord);
-                  }
-
-                  // Broadcast shipment update via WebSocket
-                  broadcastOrderUpdate(order);
+                  await enqueueShipmentSync({
+                    orderNumber,
+                    reason: 'webhook',
+                    enqueuedAt: Date.now(),
+                  });
+                } else {
+                  console.warn(`Shipment ${shipmentData.shipmentId} missing shipment_number field - cannot queue`);
                 }
               }
             }
