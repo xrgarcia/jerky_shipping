@@ -61,6 +61,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const linkageResult = await linkTrackingToOrder(trackingData, storage);
         
+        // Update rate limit tracking from linkage result
+        if (linkageResult.rateLimit) {
+          rateLimitRemaining = linkageResult.rateLimit.remaining;
+          rateLimitReset = linkageResult.rateLimit.reset;
+          log(`[${trackingNumber}] API call made, ${rateLimitRemaining}/${linkageResult.rateLimit.limit} calls remaining`);
+        }
+        
         if (linkageResult.error || !linkageResult.order || !linkageResult.shipmentData) {
           // Failed to link tracking to order
           await logShipmentSyncFailure({

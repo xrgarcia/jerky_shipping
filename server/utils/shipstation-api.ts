@@ -171,9 +171,9 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Ap
 
 /**
  * Get shipment by shipment ID using V2 API
- * Returns null if shipment not found
+ * Returns shipment data and rate limit info, or null if not found
  */
-export async function getShipmentByShipmentId(shipmentId: string): Promise<any | null> {
+export async function getShipmentByShipmentId(shipmentId: string): Promise<ApiResponseWithRateLimit<any | null>> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
@@ -188,9 +188,11 @@ export async function getShipmentByShipmentId(shipmentId: string): Promise<any |
     },
   });
 
+  const rateLimit = extractRateLimitInfo(response.headers);
+
   if (!response.ok) {
     if (response.status === 404) {
-      return null;
+      return { data: null, rateLimit };
     }
     throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
   }
@@ -199,7 +201,8 @@ export async function getShipmentByShipmentId(shipmentId: string): Promise<any |
   const shipments = data.shipments || [];
   
   // Return the first matching shipment (there should only be one per shipment_id)
-  return shipments.length > 0 ? shipments[0] : null;
+  const shipment = shipments.length > 0 ? shipments[0] : null;
+  return { data: shipment, rateLimit };
 }
 
 /**

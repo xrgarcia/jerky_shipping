@@ -3,7 +3,7 @@
  * Handles shipment ID extraction and multi-tier order lookup fallback strategy
  */
 
-import { getShipmentByShipmentId, getFulfillmentByTrackingNumber } from './shipstation-api';
+import { getShipmentByShipmentId, getFulfillmentByTrackingNumber, type RateLimitInfo } from './shipstation-api';
 import type { IStorage } from '../storage';
 
 export interface TrackingData {
@@ -22,6 +22,7 @@ export interface ShipmentLinkageResult {
   shipmentData: any | null;
   orderNumber: string | null;
   error: string | null;
+  rateLimit: RateLimitInfo | null;
 }
 
 /**
@@ -58,13 +59,14 @@ export async function linkTrackingToOrder(
       shipmentData: null,
       orderNumber: null,
       error: `Could not extract shipment_id for tracking ${trackingNumber} - no label_url or shipment_id field available`,
+      rateLimit: null,
     };
   }
   
   try {
     // Fetch full shipment details from ShipStation
     console.log(`[DEBUG] Fetching shipment ${shipmentId} from ShipStation for tracking ${trackingNumber}`);
-    const shipmentData = await getShipmentByShipmentId(shipmentId);
+    const { data: shipmentData, rateLimit } = await getShipmentByShipmentId(shipmentId);
     
     if (!shipmentData) {
       return {
@@ -72,6 +74,7 @@ export async function linkTrackingToOrder(
         shipmentData: null,
         orderNumber: null,
         error: `ShipStation returned null for shipment ${shipmentId}`,
+        rateLimit,
       };
     }
     
@@ -161,6 +164,7 @@ export async function linkTrackingToOrder(
         shipmentData,
         orderNumber,
         error: `Cannot link tracking ${trackingNumber} to any order - tried order_number, orderId, orderKey, external_shipment_id, and fulfillment API`,
+        rateLimit,
       };
     }
     
@@ -169,6 +173,7 @@ export async function linkTrackingToOrder(
       shipmentData,
       orderNumber: order.orderNumber,
       error: null,
+      rateLimit,
     };
   } catch (error: any) {
     return {
@@ -176,6 +181,7 @@ export async function linkTrackingToOrder(
       shipmentData: null,
       orderNumber: null,
       error: `Failed to fetch shipment ${shipmentId} from ShipStation: ${error.message}`,
+      rateLimit: null,
     };
   }
 }
