@@ -553,6 +553,44 @@ export default function OrderDetail() {
                             </Badge>
                           </div>
                         </div>
+                        
+                        {/* Tracking Events Timeline */}
+                        {shipment.shipmentData?.trackingDetails?.events && 
+                         shipment.shipmentData.trackingDetails.events.length > 0 && (
+                          <div className="mt-6 pt-6 border-t">
+                            <h3 className="text-lg font-semibold mb-4">Tracking History</h3>
+                            <div className="space-y-3">
+                              {shipment.shipmentData.trackingDetails.events.map((event: any, index: number) => (
+                                <div 
+                                  key={index}
+                                  className="flex gap-4 pb-3 last:pb-0 border-b last:border-b-0"
+                                  data-testid={`tracking-event-${index}`}
+                                >
+                                  <div className="flex-shrink-0 w-32 text-sm text-muted-foreground">
+                                    {event.occurred_at ? new Date(event.occurred_at).toLocaleString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                    }) : 'N/A'}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-semibold">
+                                      {event.description || event.event_description || 'Status Update'}
+                                    </p>
+                                    {(event.city_locality || event.state_province) && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {[event.city_locality, event.state_province, event.country_code]
+                                          .filter(Boolean)
+                                          .join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
