@@ -102,6 +102,7 @@ export function broadcastQueueStatus(data: {
   shipmentFailureCount: number;
   shopifyQueueOldestAt?: number | null;
   shipmentSyncQueueOldestAt?: number | null;
+  backfillActiveJob?: any | null;
 }): void {
   if (!wss) {
     return;

@@ -173,8 +173,8 @@ export default function OperationsPage() {
           const message = JSON.parse(event.data);
           
           if (message.type === 'queue_status' && message.data) {
-            // Update live queue stats from WebSocket, preserving backfill data from initial fetch
-            setLiveQueueStats(prev => ({
+            // Update live queue stats from WebSocket with backfill data directly from broadcast
+            setLiveQueueStats({
               shopifyQueue: {
                 size: message.data.shopifyQueue,
                 oldestMessageAt: message.data.shopifyQueueOldestAt,
@@ -186,8 +186,11 @@ export default function OperationsPage() {
               failures: {
                 total: message.data.shipmentFailureCount,
               },
-              backfill: (prev || initialQueueStats)?.backfill || { activeJob: null, recentJobs: [] },
-            }));
+              backfill: {
+                activeJob: message.data.backfillActiveJob || null,
+                recentJobs: [],
+              },
+            });
           }
         } catch (error) {
           console.error('WebSocket message error:', error);

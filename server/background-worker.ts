@@ -456,12 +456,17 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       
+      // Get active backfill job
+      const allBackfillJobs = await storage.getAllBackfillJobs();
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
         shipmentFailureCount: failureCount,
         shopifyQueueOldestAt: oldestShopify.enqueuedAt,
         shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
+        backfillActiveJob: activeBackfillJob,
       });
     } catch (error) {
       console.error("Background worker error:", error);

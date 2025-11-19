@@ -290,12 +290,17 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       
+      // Get active backfill job
+      const allBackfillJobs = await storage.getAllBackfillJobs();
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
         shipmentFailureCount: failureCount,
         shopifyQueueOldestAt: oldestShopify.enqueuedAt,
         shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
+        backfillActiveJob: activeBackfillJob,
       });
     } catch (error) {
       console.error("Shipment sync worker error:", error);
