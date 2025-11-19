@@ -170,6 +170,39 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Ap
 }
 
 /**
+ * Get shipment by shipment ID using V2 API
+ * Returns null if shipment not found
+ */
+export async function getShipmentByShipmentId(shipmentId: string): Promise<any | null> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  // V2 API endpoint - use shipment_id parameter
+  const url = `${SHIPSTATION_API_BASE}/v2/shipments?shipment_id=${encodeURIComponent(shipmentId)}&sort_dir=desc&sort_by=created_at`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data: any = await response.json();
+  const shipments = data.shipments || [];
+  
+  // Return the first matching shipment (there should only be one per shipment_id)
+  return shipments.length > 0 ? shipments[0] : null;
+}
+
+/**
  * Get fulfillment by tracking number using V2 API
  * Returns null if fulfillment not found
  */

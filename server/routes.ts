@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -1383,42 +1383,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             broadcastOrderUpdate(orderData);
           } else if (webhookData.type === 'shipstation') {
-            // Process ShipStation shipment webhook
-            const resourceUrl = webhookData.resourceUrl;
-            const shipmentResponse = await fetchShipStationResource(resourceUrl);
-            const shipments = shipmentResponse.shipments || [];
-
-            for (const shipmentData of shipments) {
-              // Find matching order by order number
-              // ShipStation uses 'shipment_number' field for the order number
-              const orderNumber = shipmentData.shipment_number;
-              const order = await storage.getOrderByOrderNumber(orderNumber);
+            // Process ShipStation webhook - handle both tracking and shipment webhooks
+            const resourceType = webhookData.resourceType;
+            
+            if (resourceType === 'API_TRACK') {
+              // This is a tracking webhook - contains tracking events but not full shipment data
+              const trackingData = webhookData.trackingData;
+              const trackingNumber = trackingData?.tracking_number;
               
-              if (order) {
+              if (!trackingNumber) {
+                console.error('Tracking webhook missing tracking_number');
+                continue;
+              }
+              
+              // Check if we already have this shipment
+              let existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+              
+              if (!existingShipment) {
+                // We don't have this shipment yet - need to fetch it from ShipStation
+                console.log(`No shipment found for tracking ${trackingNumber} - fetching from ShipStation`);
                 
-                // Create or update shipment record
-                const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+                // Try to extract shipment_id from multiple sources
+                let shipmentId: string | null = null;
                 
-                const shipmentRecord = {
-                  orderId: order.id,
-                  shipmentId: shipmentData.shipmentId?.toString(),
-                  trackingNumber: shipmentData.trackingNumber,
-                  carrierCode: shipmentData.carrierCode,
-                  serviceCode: shipmentData.serviceCode,
-                  status: shipmentData.voided ? 'cancelled' : 'shipped',
-                  statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-                  shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-                  shipmentData: shipmentData,
-                };
-
-                if (existingShipment) {
-                  await storage.updateShipment(existingShipment.id, shipmentRecord);
-                } else {
-                  await storage.createShipment(shipmentRecord);
+                // Method 1: Extract from label_url (supports both numeric and UUID formats)
+                // Examples: "se-594045345" or "se-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                const labelUrl = trackingData?.label_url;
+                if (labelUrl) {
+                  const shipmentIdMatch = labelUrl.match(/\/labels\/(se-[a-f0-9-]+)/i);
+                  if (shipmentIdMatch) {
+                    shipmentId = shipmentIdMatch[1];
+                  }
                 }
+                
+                // Method 2: Fallback to shipment_id field if present in tracking data
+                if (!shipmentId && trackingData?.shipment_id) {
+                  shipmentId = trackingData.shipment_id;
+                }
+                
+                if (shipmentId) {
+                  try {
+                    // Fetch full shipment details from ShipStation
+                    const shipmentData = await getShipmentByShipmentId(shipmentId);
+                    
+                    if (shipmentData) {
+                      // Try to get order number from multiple sources in shipmentData
+                      let orderNumber = shipmentData.shipment_number || shipmentData.orderNumber;
+                      let order: any = null;
+                      
+                      // Method 1: If we have an order number, try to find the order
+                      if (orderNumber) {
+                        order = await storage.getOrderByOrderNumber(orderNumber);
+                      }
+                      
+                      // Method 2: Try using orderId directly from shipment payload
+                      if (!order && shipmentData.orderId) {
+                        order = await storage.getOrder(shipmentData.orderId.toString());
+                      }
+                      
+                      // Method 3: Try using orderKey from shipment payload
+                      if (!order && shipmentData.orderKey) {
+                        order = await storage.getOrder(shipmentData.orderKey);
+                      }
+                      
+                      // Method 4: Try external_shipment_id (format: "shopifyOrderId-lineItemId")
+                      if (!order && shipmentData.external_shipment_id) {
+                        const externalIdParts = shipmentData.external_shipment_id.split('-');
+                        if (externalIdParts.length >= 1) {
+                          const shopifyOrderId = externalIdParts[0];
+                          order = await storage.getOrder(shopifyOrderId);
+                          if (order) {
+                            console.log(`Found order ${order.orderNumber} via external_shipment_id for tracking ${trackingNumber}`);
+                          }
+                        }
+                      }
+                      
+                      // Method 5: Try fulfillment API lookup by tracking number as last resort
+                      if (!order) {
+                        try {
+                          const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
+                          if (fulfillmentData?.order_number) {
+                            order = await storage.getOrderByOrderNumber(fulfillmentData.order_number);
+                            if (order) {
+                              console.log(`Found order ${order.orderNumber} via fulfillment API for tracking ${trackingNumber}`);
+                            }
+                          }
+                        } catch (fulfillmentError: any) {
+                          console.warn(`Fulfillment API lookup failed for ${trackingNumber}:`, fulfillmentError.message);
+                        }
+                      }
+                      
+                      if (!order) {
+                        console.error(`Cannot link tracking ${trackingNumber} to any order - tried shipment_number, orderId, orderKey, external_shipment_id, and fulfillment API`);
+                      } else {
+                          // Create the shipment record
+                          const shipmentRecord = {
+                            orderId: order.id,
+                            shipmentId: shipmentData.shipment_id,
+                            trackingNumber: trackingNumber,
+                            carrierCode: trackingData.carrier_code || shipmentData.carrier_code,
+                            serviceCode: shipmentData.service_code,
+                            status: trackingData.status_code === 'DE' ? 'delivered' : 'in_transit',
+                            statusDescription: trackingData.status_description || 'In Transit',
+                            shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
+                            shipmentData: {
+                              ...shipmentData,
+                              latestTracking: trackingData,
+                            },
+                          };
+                          
+                          existingShipment = await storage.createShipment(shipmentRecord);
+                          console.log(`Created shipment ${trackingNumber} for order ${order.orderNumber}`);
+                          
+                          // Broadcast update
+                          broadcastOrderUpdate(order);
+                      }
+                    } else {
+                      console.warn(`ShipStation returned null for shipment ${shipmentId} - tracking ${trackingNumber} cannot be linked`);
+                    }
+                  } catch (error: any) {
+                    console.error(`Failed to fetch shipment ${shipmentId} from ShipStation:`, error.message);
+                  }
+                } else {
+                  console.warn(`Could not extract shipment_id for tracking ${trackingNumber} - no label_url or shipment_id field available`);
+                }
+              }
+              
+              // Update existing shipment with tracking info (if we have one now)
+              if (existingShipment) {
+                const updatedShipmentData = {
+                  ...(existingShipment.shipmentData || {}),
+                  latestTracking: trackingData,
+                };
+                
+                await storage.updateShipment(existingShipment.id, {
+                  status: trackingData.status_code === 'DE' ? 'delivered' : 'in_transit',
+                  statusDescription: trackingData.status_description || existingShipment.statusDescription,
+                  shipmentData: updatedShipmentData,
+                });
+                
+                // Broadcast update
+                const order = await storage.getOrder(existingShipment.orderId);
+                if (order) {
+                  broadcastOrderUpdate(order);
+                }
+              }
+            } else {
+              // Regular shipment webhook (fulfillment_shipped_v2, etc.)
+              const resourceUrl = webhookData.resourceUrl;
+              const shipmentResponse = await fetchShipStationResource(resourceUrl);
+              const shipments = shipmentResponse.shipments || [];
 
-                // Broadcast shipment update via WebSocket
-                broadcastOrderUpdate(order);
+              for (const shipmentData of shipments) {
+                // Find matching order by order number
+                // ShipStation uses 'shipment_number' field for the order number
+                const orderNumber = shipmentData.shipment_number;
+                const order = await storage.getOrderByOrderNumber(orderNumber);
+                
+                if (order) {
+                  
+                  // Create or update shipment record
+                  const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
+                  
+                  const shipmentRecord = {
+                    orderId: order.id,
+                    shipmentId: shipmentData.shipmentId?.toString(),
+                    trackingNumber: shipmentData.trackingNumber,
+                    carrierCode: shipmentData.carrierCode,
+                    serviceCode: shipmentData.serviceCode,
+                    status: shipmentData.voided ? 'cancelled' : 'shipped',
+                    statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+                    shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+                    shipmentData: shipmentData,
+                  };
+
+                  if (existingShipment) {
+                    await storage.updateShipment(existingShipment.id, shipmentRecord);
+                  } else {
+                    await storage.createShipment(shipmentRecord);
+                  }
+
+                  // Broadcast shipment update via WebSocket
+                  broadcastOrderUpdate(order);
+                }
               }
             }
           }
