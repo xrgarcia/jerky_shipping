@@ -76,6 +76,37 @@ function extractShopifyOrderPrices(shopifyOrder: any) {
   };
 }
 
+/**
+ * Extract marketplace order number (e.g., Amazon order number) from Shopify order
+ * Amazon orders are identified by source_name="amazon" and contain the Amazon order number in fulfillment data
+ */
+function extractMarketplaceOrderNumber(shopifyOrder: any): string | null {
+  // Method 1: Check fulfillments for Amazon gateway data
+  const fulfillments = shopifyOrder.fulfillments || [];
+  for (const fulfillment of fulfillments) {
+    // Amazon orders have gateway set to "amazon" and receipt contains marketplace data
+    if (fulfillment.receipt?.marketplace_fulfillment_order_id) {
+      return fulfillment.receipt.marketplace_fulfillment_order_id;
+    }
+    // Alternative: Some Amazon orders store it in the order_id field
+    if (fulfillment.receipt?.order_id && /^\d{3}-\d{7}-\d{7}$/.test(fulfillment.receipt.order_id)) {
+      return fulfillment.receipt.order_id;
+    }
+  }
+  
+  // Method 2: Check if source_name indicates Amazon marketplace
+  if (shopifyOrder.source_name === 'amazon' && shopifyOrder.source_identifier) {
+    return shopifyOrder.source_identifier;
+  }
+  
+  // Method 3: Parse order name if it matches Amazon format (###-#######-#######)
+  if (shopifyOrder.name && /^\d{3}-\d{7}-\d{7}$/.test(shopifyOrder.name)) {
+    return shopifyOrder.name;
+  }
+  
+  return null;
+}
+
 async function processOrderRefunds(orderId: string, shopifyOrder: any) {
   const refunds = shopifyOrder.refunds || [];
   
@@ -444,6 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderData = {
           id: shopifyOrder.id.toString(),
           orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+          marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
           customerName: shopifyOrder.customer
             ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
             : "Guest",
@@ -1399,6 +1431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const orderData = {
               id: shopifyOrder.id.toString(),
               orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+              marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
               customerName: shopifyOrder.customer
                 ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
                 : "Guest",
@@ -1769,6 +1802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderData = {
             id: shopifyOrder.id.toString(),
             orderNumber: shopifyOrder.name || shopifyOrder.order_number,
+            marketplaceOrderNumber: extractMarketplaceOrderNumber(shopifyOrder),
             customerName: shopifyOrder.customer
               ? `${shopifyOrder.customer.first_name || ""} ${shopifyOrder.customer.last_name || ""}`.trim()
               : "Guest",

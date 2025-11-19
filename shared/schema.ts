@@ -58,6 +58,7 @@ export type Session = typeof sessions.$inferSelect;
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(), // Shopify order ID
   orderNumber: text("order_number").notNull(), // Shopify order name (e.g., "#JK3825344788")
+  marketplaceOrderNumber: text("marketplace_order_number"), // Marketplace order number (e.g., Amazon order number "111-7320858-2210642")
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
