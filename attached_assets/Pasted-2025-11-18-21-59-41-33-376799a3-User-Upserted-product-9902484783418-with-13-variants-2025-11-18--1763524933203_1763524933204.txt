@@ -1,0 +1,149 @@
+2025-11-18 21:59:41.33
+376799a3
+User
+Upserted product 9902484783418 with 13 variants
+2025-11-18 21:59:41.99
+376799a3
+User
+Upserted product 9799945158970 with 12 variants
+2025-11-18 21:59:42.04
+376799a3
+User
+3:59:42 AM [express] Background worker processed 6 webhook(s), -2 remaining
+2025-11-18 21:59:42.04
+376799a3
+User
+3:59:42 AM [express] Background worker processed 6 webhook(s), -2 remaining
+2025-11-18 21:59:56.23
+0019b17e
+User
+3:59:56 AM [express] POST /api/webhooks/shopify/orders 200 in 53ms :: {"success":true}
+2025-11-18 21:59:56.23
+0019b17e
+User
+3:59:56 AM [express] POST /api/webhooks/shopify/orders 200 in 53ms :: {"success":true}
+2025-11-18 21:59:59.99
+376799a3
+User
+3:59:59 AM [express] Background worker processed 1 webhook(s), 0 remaining
+2025-11-18 22:00:00.70
+0019b17e
+User
+4:00:00 AM [express] GET /api/orders 200 in 593ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 22:00:01.09
+0019b17e
+User
+4:00:01 AM [express] GET /api/orders 304 in 266ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 22:00:04.52
+0019b17e
+User
+4:00:04 AM [express] GET /api/auth/me 304 in 84ms :: {"user":{"id":"52de1be0-114c-4f91-84e0-6152db2a…
+2025-11-18 22:00:04.71
+0019b17e
+User
+4:00:04 AM [express] GET /api/print-queue 304 in 133ms :: {"jobs":[]}
+2025-11-18 22:00:04.86
+0019b17e
+User
+WebSocket client connected
+2025-11-18 22:00:05.21
+0019b17e
+User
+4:00:05 AM [express] GET /api/orders 304 in 596ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 22:00:06.92
+0019b17e
+User
+4:00:06 AM [express] GET /api/print-queue 304 in 131ms :: {"jobs":[]}
+2025-11-18 22:00:07.57
+0019b17e
+User
+WebSocket client disconnected
+2025-11-18 22:00:07.74
+0019b17e
+User
+WebSocket client connected
+2025-11-18 22:00:08.03
+0019b17e
+User
+4:00:08 AM [express] GET /api/shipments 200 in 417ms :: {"shipments":[{"id":"ca3748e1-0f9e-4771-8246…
+
+2025-11-18 22:00:09.10
+0019b17e
+User
+4:00:09 AM [express] GET /api/print-queue 304 in 132ms :: {"jobs":[]}
+2025-11-18 22:00:11.29
+0019b17e
+User
+4:00:11 AM [express] GET /api/print-queue 304 in 133ms :: {"jobs":[]}
+2025-11-18 22:00:13.47
+0019b17e
+User
+4:00:13 AM [express] GET /api/print-queue 304 in 125ms :: {"jobs":[]}
+2025-11-18 22:00:15.66
+0019b17e
+User
+4:00:15 AM [express] GET /api/print-queue 304 in 131ms :: {"jobs":[]}
+2025-11-18 22:00:17.48
+0019b17e
+User
+WebSocket client disconnected
+2025-11-18 22:00:17.64
+0019b17e
+User
+WebSocket client connected
+2025-11-18 22:00:17.84
+0019b17e
+User
+4:00:17 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-18 22:00:20.04
+0019b17e
+User
+4:00:20 AM [express] GET /api/print-queue 304 in 133ms :: {"jobs":[]}
+2025-11-18 22:00:20.95
+0019b17e
+User
+WebSocket client disconnected
+2025-11-18 22:00:21.18
+0019b17e
+User
+4:00:21 AM [express] GET /api/auth/me 304 in 83ms :: {"user":{"id":"52de1be0-114c-4f91-84e0-6152db2a…
+2025-11-18 22:00:21.37
+0019b17e
+User
+4:00:21 AM [express] GET /api/print-queue 304 in 129ms :: {"jobs":[]}
+2025-11-18 22:00:21.50
+0019b17e
+User
+WebSocket client connected
+2025-11-18 22:00:21.85
+0019b17e
+User
+4:00:21 AM [express] GET /api/orders 304 in 592ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 22:00:23.57
+0019b17e
+User
+4:00:23 AM [express] GET /api/print-queue 304 in 137ms :: {"jobs":[]}
+2025-11-18 22:00:28.68
+0019b17e
+User
+4:00:28 AM [express] POST /api/webhooks/shopify/orders 200 in 111ms :: {"success":true}
+2025-11-18 22:00:29.86
+0019b17e
+User
+4:00:29 AM [express] GET /api/print-queue 304 in 126ms :: {"jobs":[]}
+2025-11-18 22:00:30.24
+376799a3
+User
+4:00:30 AM [express] Background worker processed 1 webhook(s), 0 remaining
+2025-11-18 22:00:30.69
+0019b17e
+User
+4:00:30 AM [express] GET /api/orders 304 in 419ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 22:00:31.09
+0019b17e
+User
+WebSocket client disconnected
+2025-11-18 22:00:31.19
+0019b17e
+User
+4:00:31 AM [express] GET /api/orders 304 in 345ms :: {"orders":[{"id":"6852349002042","orderNumber":…
