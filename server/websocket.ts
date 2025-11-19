@@ -95,3 +95,20 @@ export function broadcastPrintQueueUpdate(data: any): void {
     }
   });
 }
+
+export function broadcastQueueStatus(data: { webhookQueue: number; shipmentSyncQueue: number; shipmentFailureCount: number }): void {
+  if (!wss) {
+    return;
+  }
+
+  const message = JSON.stringify({
+    type: 'queue_status',
+    data,
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}

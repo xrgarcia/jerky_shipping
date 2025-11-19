@@ -9,11 +9,12 @@ import { db } from './db';
 import { 
   dequeueShipmentSyncBatch,
   getShipmentSyncQueueLength,
+  getQueueLength,
   type ShipmentSyncMessage,
 } from './utils/queue';
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { shipmentSyncFailures, type InsertShipmentSyncFailure } from '@shared/schema';
-import { broadcastOrderUpdate } from './websocket';
+import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -189,6 +190,17 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
           log(`Processed ${processed} shipment sync message(s) in ${duration}ms, ${queueLength - processed} remaining`);
         }
       }
+      
+      // Broadcast queue status via WebSocket
+      const webhookQueueLength = await getQueueLength();
+      const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const failureCount = await storage.getShipmentSyncFailureCount();
+      
+      broadcastQueueStatus({
+        webhookQueue: webhookQueueLength,
+        shipmentSyncQueue: shipmentSyncQueueLength,
+        shipmentFailureCount: failureCount,
+      });
     } catch (error) {
       console.error("Shipment sync worker error:", error);
     } finally {

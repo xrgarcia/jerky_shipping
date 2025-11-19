@@ -1,8 +1,8 @@
-import { dequeueWebhook, getQueueLength } from "./utils/queue";
+import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength } from "./utils/queue";
 import { fetchShipStationResource } from "./utils/shipstation-api";
 import { linkTrackingToOrder } from "./utils/shipment-linkage";
 import { storage } from "./storage";
-import { broadcastOrderUpdate } from "./websocket";
+import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
 import { log } from "./vite";
 
 /**
@@ -482,6 +482,17 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
           log(`Background worker processed ${processed} webhook(s) in ${duration}ms, ${queueLength - processed} remaining`);
         }
       }
+      
+      // Broadcast queue status via WebSocket
+      const webhookQueueLength = await getQueueLength();
+      const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const failureCount = await storage.getShipmentSyncFailureCount();
+      
+      broadcastQueueStatus({
+        webhookQueue: webhookQueueLength,
+        shipmentSyncQueue: shipmentSyncQueueLength,
+        shipmentFailureCount: failureCount,
+      });
     } catch (error) {
       console.error("Background worker error:", error);
     } finally {
