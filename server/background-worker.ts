@@ -353,6 +353,8 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
             
             await enqueueShipmentSync({
               trackingNumber,
+              labelUrl: trackingData.label_url, // Extract label URL for shipment ID extraction
+              shipmentId: trackingData.shipment_id, // Extract shipment ID if present
               reason: 'webhook',
               enqueuedAt: Date.now(),
               originalWebhook: webhookData, // Preserve original webhook for troubleshooting
