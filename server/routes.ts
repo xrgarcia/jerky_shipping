@@ -2622,6 +2622,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Shopify credential validation (cached for 10 minutes)
+  app.get("/api/operations/shopify-validation", requireAuth, async (req, res) => {
+    try {
+      const { validateShopifyCredentials } = await import("./utils/shopify-validation");
+      const result = await validateShopifyCredentials();
+      
+      res.json({
+        isValid: result.isValid,
+        errors: result.errors,
+        lastChecked: result.lastChecked,
+        shopName: result.shopName,
+      });
+    } catch (error) {
+      console.error("Error validating Shopify credentials:", error);
+      res.status(500).json({ 
+        isValid: false,
+        errors: ["Failed to validate credentials"],
+        lastChecked: new Date(),
+      });
+    }
+  });
+
   app.get("/api/operations/environment", requireAuth, async (req, res) => {
     try {
       // Return safe environment info (no secrets)
