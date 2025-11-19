@@ -55,6 +55,7 @@ Preferred communication style: Simple, everyday language.
   - Rate limiting (2-second delay between requests) prevents triggering anti-bot protection
   - Lockout countdown timer displays remaining time when account is temporarily locked
 - **Order Backfill System (`/backfill`)**: Imports historical Shopify orders AND their shipments from ShipStation using an ID-only queueing mechanism to optimize memory usage. Features intelligent rate limiting that monitors ShipStation API headers (X-Rate-Limit-Remaining, X-Rate-Limit-Reset) to avoid hitting rate limits. Includes a UI with progress tracking and job history.
+- **Background Worker**: Asynchronous webhook processor with mutex-based concurrency control. Processes 50 webhooks per batch (5-second intervals), preventing overlapping executions via globally unique run IDs. Optimized for high-volume webhook ingestion with ~5x performance improvement over previous 10-item batches.
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
 - **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates and notifications.
