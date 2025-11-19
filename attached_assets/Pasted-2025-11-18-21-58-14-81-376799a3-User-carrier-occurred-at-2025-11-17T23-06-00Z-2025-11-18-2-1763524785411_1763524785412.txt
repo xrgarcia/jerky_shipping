@@ -1,0 +1,148 @@
+2025-11-18 21:58:14.81
+376799a3
+User
+"carrier_occurred_at": "2025-11-17T23:06:00Z",
+2025-11-18 21:58:14.81
+376799a3
+User
+"event_code": "L1",
+2025-11-18 21:58:14.81
+376799a3
+User
+"description": "ORIGIN ACCEPTANCE",
+2025-11-18 21:58:14.81
+376799a3
+User
+"status_detail_code": "HUB_SCAN_OUT",
+2025-11-18 21:58:14.81
+376799a3
+User
+"proof_of_delivery_url": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+"status_detail_description": "Your parcel has left the carrier's hub.",
+2025-11-18 21:58:14.81
+376799a3
+User
+"carrier_occurred_at": "2025-11-18T06:38:00Z",
+2025-11-18 21:58:14.81
+376799a3
+User
+"event_description": "PROCESSED THROUGH USPS FACILITY",
+2025-11-18 21:58:14.81
+376799a3
+User
+"carrier_detail_code": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+"country_code": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+"data": {
+2025-11-18 21:58:14.81
+376799a3
+User
+"event_code": "10",
+2025-11-18 21:58:14.81
+376799a3
+User
+"state_province": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+{
+2025-11-18 21:58:14.81
+376799a3
+User
+"status_detail_description": "Your parcel has left the carrier's hub.",
+2025-11-18 21:58:14.81
+376799a3
+User
+"city_locality": "OKLAHOMA CITY OK DISTRIBUTION C",
+2025-11-18 21:58:14.81
+376799a3
+User
+"status_code": "IT",
+2025-11-18 21:58:14.81
+376799a3
+User
+"company_name": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+"events": [
+2025-11-18 21:58:14.81
+376799a3
+User
+"description": "DEPARTED USPS REGIONAL FACILITY",
+2025-11-18 21:58:14.81
+376799a3
+User
+"estimated_delivery_date": null,
+2025-11-18 21:58:14.81
+376799a3
+User
+"status_description": "In Transit",
+2025-11-18 21:58:14.81
+376799a3
+User
+{
+2025-11-18 21:58:14.81
+376799a3
+User
+"latitude": 35.4816,
+2025-11-18 21:58:14.81
+376799a3
+User
+"resource_type": "API_TRACK",
+2025-11-18 21:58:14.81
+376799a3
+User
+"postal_code": "73107",
+2025-11-18 21:58:14.81
+376799a3
+User
+"carrier_status_description": "DEPARTED USPS REGIONAL FACILITY",
+2025-11-18 21:58:19.64
+376799a3
+User
+Fulfillment data not found in ShipStation for tracking 9400150105501257593901
+2025-11-18 21:58:19.75
+376799a3
+User
+3:58:19 AM [express] Background worker processed 2 webhook(s), 0 remaining
+2025-11-18 21:58:42.67
+376799a3
+User
+3:58:42 AM [express] Bootstrapped 0 new products, updated 794 existing products, and synced 1384 variants
+2025-11-18 21:58:44.04
+0019b17e
+User
+3:58:44 AM [express] GET /api/print-queue 304 in 125ms :: {"jobs":[]}
+2025-11-18 21:58:46.26
+0019b17e
+User
+3:58:46 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-18 21:58:48.45
+0019b17e
+User
+3:58:48 AM [express] GET /api/print-queue 304 in 126ms :: {"jobs":[]}
+2025-11-18 21:58:50.22
+0019b17e
+User
+WebSocket client disconnected
+2025-11-18 21:59:01.91
+0019b17e
+User
+3:59:01 AM [express] POST /api/webhooks/shopify/products 200 in 54ms :: {"success":true}
+2025-11-18 21:59:04.56
+376799a3
+User
+Upserted product 10051192881466 with 1 variants
+2025-11-18 21:59:04.57
+376799a3
+User
+3:59:04 AM [express] Background worker processed 1 webhook(s), 0 remaining
