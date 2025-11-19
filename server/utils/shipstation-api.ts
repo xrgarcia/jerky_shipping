@@ -310,6 +310,85 @@ export async function listWebhooks(): Promise<any[]> {
 }
 
 /**
+ * Get tracking details for a shipment by tracking number
+ * Returns rich tracking data including carrier status descriptions and event timeline
+ */
+export async function getTrackingDetails(trackingNumber: string): Promise<{
+  labelId: string | null;
+  trackingStatus: string | null;
+  carrierStatusDescription: string | null;
+  events: any[];
+  rateLimit: RateLimitInfo;
+} | null> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  try {
+    // Step 1: Get label by tracking number
+    const labelsUrl = `${SHIPSTATION_API_BASE}/v2/labels?tracking_number=${encodeURIComponent(trackingNumber)}`;
+    const labelsResponse = await fetch(labelsUrl, {
+      headers: {
+        'api-key': SHIPSTATION_API_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const rateLimit = extractRateLimitInfo(labelsResponse.headers);
+
+    if (!labelsResponse.ok) {
+      if (labelsResponse.status === 404) {
+        return null;
+      }
+      throw new Error(`ShipStation API error: ${labelsResponse.status} ${labelsResponse.statusText}`);
+    }
+
+    const labelsData: any = await labelsResponse.json();
+    const labels = labelsData.labels || [];
+    
+    if (labels.length === 0) {
+      return null;
+    }
+
+    const label = labels[0];
+    const labelId = label.label_id;
+    
+    // Step 2: Get detailed tracking events
+    const trackingUrl = `${SHIPSTATION_API_BASE}/v2/labels/${labelId}/track`;
+    const trackingResponse = await fetch(trackingUrl, {
+      headers: {
+        'api-key': SHIPSTATION_API_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!trackingResponse.ok) {
+      // If tracking details fail, return basic info from label
+      return {
+        labelId,
+        trackingStatus: label.tracking_status || null,
+        carrierStatusDescription: null,
+        events: [],
+        rateLimit,
+      };
+    }
+
+    const trackingData: any = await trackingResponse.json();
+    
+    return {
+      labelId,
+      trackingStatus: trackingData.status_description || label.tracking_status || null,
+      carrierStatusDescription: trackingData.carrier_status_description || null,
+      events: trackingData.events || [],
+      rateLimit,
+    };
+  } catch (error: any) {
+    console.error(`Error fetching tracking details for ${trackingNumber}:`, error);
+    return null;
+  }
+}
+
+/**
  * Unsubscribe from a webhook
  */
 export async function unsubscribeWebhook(webhookId: string): Promise<void> {
