@@ -72,7 +72,8 @@ const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync';
 
 export interface ShipmentSyncMessage {
   reason: 'backfill' | 'webhook' | 'manual';
-  orderNumber: string;
+  orderNumber?: string; // Optional: use for order-based sync
+  trackingNumber?: string; // Optional: use for tracking-based sync
   enqueuedAt: number;
   jobId?: string; // Optional backfill job ID for tracking
 }
