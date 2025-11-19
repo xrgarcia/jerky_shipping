@@ -1,0 +1,148 @@
+2025-11-18 21:53:30.72
+bed740da
+User
+3:53:30 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-18 21:53:32.89
+bed740da
+User
+3:53:32 AM [express] GET /api/print-queue 304 in 125ms :: {"jobs":[]}
+2025-11-18 21:53:38.53
+376799a3
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-11-18 21:53:38.53
+376799a3
+System
+starting up user application
+2025-11-18 21:53:38.53
+376799a3
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2025-11-18 21:53:39.50
+376799a3
+User
+> rest-express@1.0.0 start
+2025-11-18 21:53:39.50
+376799a3
+User
+> NODE_ENV=production node dist/index.js
+2025-11-18 21:53:40.75
+376799a3
+User
+3:53:40 AM [express] WebSocket server initialized
+2025-11-18 21:53:40.75
+376799a3
+User
+3:53:40 AM [express] Checking Shopify webhook registration...
+2025-11-18 21:53:40.75
+376799a3
+User
+3:53:40 AM [express] Webhook base URL (PRODUCTION): https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev
+2025-11-18 21:53:41.03
+376799a3
+User
+Webhook already registered: products/update
+2025-11-18 21:53:41.03
+376799a3
+User
+Webhook already registered: orders/create
+2025-11-18 21:53:41.03
+376799a3
+User
+Webhook already registered: products/create
+2025-11-18 21:53:41.03
+376799a3
+User
+Webhook already registered: products/delete
+2025-11-18 21:53:41.03
+376799a3
+User
+Webhook already registered: orders/updated
+2025-11-18 21:53:41.03
+376799a3
+User
+3:53:41 AM [express] Shopify webhooks verified
+2025-11-18 21:53:41.03
+376799a3
+User
+3:53:41 AM [express] Checking ShipStation webhook registration...
+2025-11-18 21:53:41.24
+376799a3
+User
+ShipStation fulfillment_rejected_v2 webhook already registered
+2025-11-18 21:53:41.24
+376799a3
+User
+3:53:41 AM [express] ShipStation webhooks verified
+2025-11-18 21:53:41.24
+376799a3
+User
+ShipStation track webhook already registered
+2025-11-18 21:53:41.24
+376799a3
+User
+ShipStation fulfillment_shipped_v2 webhook already registered
+2025-11-18 21:53:41.24
+376799a3
+User
+ShipStation batch webhook already registered
+2025-11-18 21:53:41.24
+376799a3
+User
+3:53:41 AM [express] Background worker started (interval: 5000ms)
+2025-11-18 21:53:41.25
+376799a3
+User
+3:53:41 AM [express] serving on port 5000
+2025-11-18 21:53:41.25
+376799a3
+User
+3:53:41 AM [express] Starting async product bootstrap from Shopify...
+2025-11-18 21:53:41.25
+376799a3
+User
+3:53:41 AM [express] Fetching products from Shopify...
+2025-11-18 21:54:13.34
+376799a3
+User
+3:54:13 AM [express] Processing 794 products from Shopify...
+2025-11-18 21:54:21.23
+376799a3
+User
+3:54:21 AM [express] GET /api/print-queue 304 in 251ms :: {"jobs":[]}
+2025-11-18 21:54:21.85
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:54:21.85
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:54:22.27
+376799a3
+User
+3:54:22 AM [express] GET /api/auth/me 304 in 79ms :: {"user":{"id":"52de1be0-114c-4f91-84e0-6152db2a…
+2025-11-18 21:54:22.72
+376799a3
+User
+3:54:22 AM [express] GET /api/print-queue 304 in 266ms :: {"jobs":[]}
+2025-11-18 21:54:22.75
+376799a3
+User
+WebSocket client connected
+2025-11-18 21:54:23.00
+376799a3
+User
+3:54:23 AM [express] GET /api/orders 304 in 540ms :: {"orders":[{"id":"6852349002042","orderNumber":…
+2025-11-18 21:54:30.96
+376799a3
+User
+3:54:30 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-18 21:54:33.13
+376799a3
+User
+WebSocket client disconnected
+2025-11-18 21:54:33.13
+376799a3
+User
+WebSocket client disconnected
