@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database, RefreshCw } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -58,7 +58,6 @@ export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
-  const [resyncProgress, setResyncProgress] = useState<{ synced: number; isRunning: boolean }>({ synced: 0, isRunning: false });
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -181,58 +180,6 @@ export default function BackfillPage() {
     },
   });
 
-  const resyncOrderNumbers = async () => {
-    setResyncProgress({ synced: 0, isRunning: true });
-    let totalSynced = 0;
-    let batchCount = 0;
-    let cursor: string | null = null;
-    
-    try {
-      while (true) {
-        let url = "/api/orders/sync";
-        if (cursor) {
-          const params = new URLSearchParams({ page_info: cursor });
-          url = `/api/orders/sync?${params.toString()}`;
-        }
-        
-        const response = await fetch(url, {
-          credentials: "include",
-        });
-        
-        if (!response.ok) {
-          throw new Error("Failed to sync orders");
-        }
-        
-        const data = await response.json();
-        totalSynced += data.count || 0;
-        batchCount++;
-        
-        setResyncProgress({ synced: totalSynced, isRunning: true });
-        
-        if (!data.hasMore || !data.nextCursor) {
-          break;
-        }
-        
-        cursor = data.nextCursor;
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      setResyncProgress({ synced: totalSynced, isRunning: false });
-      toast({
-        title: "Order numbers re-synced",
-        description: `Successfully updated ${totalSynced} orders across ${batchCount} batches.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-    } catch (error: any) {
-      setResyncProgress({ synced: totalSynced, isRunning: false });
-      toast({
-        title: "Re-sync failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const onSubmit = (data: FormData) => {
     startBackfillMutation.mutate(data);
   };
@@ -302,57 +249,6 @@ export default function BackfillPage() {
           </Button>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Re-sync Order Numbers</CardTitle>
-          <CardDescription>
-            Update all existing orders with their actual sales channel order numbers (Amazon, Shopify, etc.)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              This will re-sync all orders from Shopify using cursor pagination and extract the actual order numbers for each sales channel. 
-              Amazon orders will get their marketplace order number (e.g., "111-7320858-2210642"), and Shopify orders will keep their JK format.
-              The process walks through all historical orders until every order is updated.
-            </div>
-            
-            {resyncProgress.isRunning && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Syncing orders...</span>
-                  <span className="font-medium" data-testid="text-resync-progress">
-                    {resyncProgress.synced} orders updated
-                  </span>
-                </div>
-                <Progress value={100} className="h-2 animate-pulse" data-testid="progress-resync" />
-              </div>
-            )}
-            
-            {!resyncProgress.isRunning && resyncProgress.synced > 0 && (
-              <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 p-3 rounded-md" data-testid="text-resync-complete">
-                ✓ Completed! Updated {resyncProgress.synced} orders.
-              </div>
-            )}
-            
-            <Button
-              onClick={resyncOrderNumbers}
-              disabled={resyncProgress.isRunning}
-              className="w-full"
-              data-testid="button-resync-orders"
-            >
-              {resyncProgress.isRunning && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {!resyncProgress.isRunning && (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              {resyncProgress.isRunning ? "Re-syncing..." : "Re-sync All Orders"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
