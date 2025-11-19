@@ -112,7 +112,8 @@ export default function OperationsPage() {
 
   const purgeShopifyMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/operations/purge-shopify-queue");
+      const response = await apiRequest("POST", "/api/operations/purge-shopify-queue");
+      return await response.json();
     },
     onSuccess: (data: any) => {
       toast({
@@ -133,7 +134,8 @@ export default function OperationsPage() {
 
   const purgeShipmentSyncMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/operations/purge-shipment-sync-queue");
+      const response = await apiRequest("POST", "/api/operations/purge-shipment-sync-queue");
+      return await response.json();
     },
     onSuccess: (data: any) => {
       toast({
@@ -154,7 +156,8 @@ export default function OperationsPage() {
 
   const purgeFailuresMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/operations/purge-failures");
+      const response = await apiRequest("POST", "/api/operations/purge-failures");
+      return await response.json();
     },
     onSuccess: () => {
       toast({
