@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { Fragment } from "react";
 import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -774,8 +775,8 @@ function FailuresDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               </TableHeader>
               <TableBody>
                 {failuresData.failures.map((failure) => (
-                  <>
-                    <TableRow key={failure.id} className="cursor-pointer hover:bg-muted/50" data-testid={`row-failure-${failure.id}`}>
+                  <Fragment key={failure.id}>
+                    <TableRow className="cursor-pointer hover:bg-muted/50" data-testid={`row-failure-${failure.id}`}>
                       <TableCell>
                         <button onClick={() => toggleRow(failure.id)} className="p-1">
                           {expandedRows.has(failure.id) ? (
@@ -799,7 +800,7 @@ function FailuresDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                       </TableCell>
                     </TableRow>
                     {expandedRows.has(failure.id) && (
-                      <TableRow key={`${failure.id}-details`}>
+                      <TableRow>
                         <TableCell colSpan={5} className="bg-muted/30">
                           <div className="p-4 space-y-4">
                             <div>
@@ -830,7 +831,7 @@ function FailuresDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

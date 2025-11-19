@@ -54,7 +54,13 @@ Preferred communication style: Simple, everyday language.
   - Token cached in Redis with 24-hour TTL for persistence across server restarts
   - Rate limiting (2-second delay between requests) prevents triggering anti-bot protection
   - Lockout countdown timer displays remaining time when account is temporarily locked
-- **Order Backfill System (`/backfill`)**: Imports historical Shopify orders AND their shipments from ShipStation using an ID-only queueing mechanism to optimize memory usage. Features intelligent rate limiting that monitors ShipStation API headers (X-Rate-Limit-Remaining, X-Rate-Limit-Reset) to avoid hitting rate limits. Includes a UI with progress tracking and job history.
+- **Order Backfill System (`/backfill`)**: Imports historical Shopify orders AND their shipments from ShipStation using an ID-only queueing mechanism to optimize memory usage. Features:
+  - Intelligent rate limiting monitors ShipStation API headers (X-Rate-Limit-Remaining, X-Rate-Limit-Reset) to avoid hitting rate limits
+  - Per-order error isolation: Each order wrapped in try-catch blocks so one bad order doesn't abort entire job
+  - Detailed failure logging with order number and error messages for failed orders
+  - Accurate progress tracking: Counters update regardless of job status for correct final totals
+  - UI with progress tracking, job history, and clickable failures viewer
+  - Shipment sync failures dialog displays detailed debugging info (order number, error message, reason, timestamp, request/response data)
 - **Background Worker**: Asynchronous webhook processor with mutex-based concurrency control. Processes 50 webhooks per batch (5-second intervals), preventing overlapping executions via globally unique run IDs. Optimized for high-volume webhook ingestion with ~5x performance improvement over previous 10-item batches.
 - **Shipment Sync Worker**: Dual-path async processor (10s intervals, 50 batches) that enriches shipment data from ShipStation:
   - **Path A (Tracking Number)**: Receives tracking number from track webhooks → calls `linkTrackingToOrder()` → fetches shipment by ID → finds order via 5-tier fallback → creates/updates shipment
