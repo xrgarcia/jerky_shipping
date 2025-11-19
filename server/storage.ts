@@ -34,6 +34,7 @@ import {
   type OrderItem,
   type InsertOrderItem,
   orderItems,
+  shipmentSyncFailures,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -152,6 +153,9 @@ export interface IStorage {
   getActivePrintJobs(): Promise<PrintQueue[]>;
   getPrintJobsByOrderId(orderId: string): Promise<PrintQueue[]>;
   deletePrintJob(id: string): Promise<void>;
+  
+  // Shipment Sync Failures
+  getShipmentSyncFailureCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -973,6 +977,14 @@ export class DatabaseStorage implements IStorage {
 
   async deletePrintJob(id: string): Promise<void> {
     await db.delete(printQueue).where(eq(printQueue.id, id));
+  }
+
+  // Shipment Sync Failures
+  async getShipmentSyncFailureCount(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(shipmentSyncFailures);
+    return result[0]?.count || 0;
   }
 }
 

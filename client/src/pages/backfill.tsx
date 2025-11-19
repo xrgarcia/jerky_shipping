@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -58,6 +58,9 @@ export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
+  const [webhookQueueLength, setWebhookQueueLength] = useState<number>(0);
+  const [shipmentSyncQueueLength, setShipmentSyncQueueLength] = useState<number>(0);
+  const [shipmentFailureCount, setShipmentFailureCount] = useState<number>(0);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -75,12 +78,10 @@ export default function BackfillPage() {
 
   const { data: queueStatusData } = useQuery<{ queueLength: number }>({
     queryKey: ["/api/webhooks/queue-status"],
-    refetchInterval: 2000,
   });
 
   const { data: shipmentSyncStatusData } = useQuery<{ queueLength: number; failureCount: number }>({
     queryKey: ["/api/shipment-sync/status"],
-    refetchInterval: 2000,
   });
 
   const { data: selectedJobData } = useQuery<{ job: BackfillJob }>({
@@ -210,6 +211,80 @@ export default function BackfillPage() {
     },
   });
 
+  // Initialize queue counts from API on mount
+  useEffect(() => {
+    if (queueStatusData) {
+      setWebhookQueueLength(queueStatusData.queueLength);
+    }
+  }, [queueStatusData]);
+
+  useEffect(() => {
+    if (shipmentSyncStatusData) {
+      setShipmentSyncQueueLength(shipmentSyncStatusData.queueLength);
+      setShipmentFailureCount(shipmentSyncStatusData.failureCount);
+    }
+  }, [shipmentSyncStatusData]);
+
+  // WebSocket connection for real-time queue updates
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout;
+    let isMounted = true;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        console.error('WebSocket creation error:', error);
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'queue_status') {
+            setWebhookQueueLength(message.data.webhookQueue);
+            setShipmentSyncQueueLength(message.data.shipmentSyncQueue);
+            setShipmentFailureCount(message.data.shipmentFailureCount);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        if (isMounted) {
+          reconnectTimeout = setTimeout(connect, 3000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, []);
+
   const onSubmit = (data: FormData) => {
     startBackfillMutation.mutate(data);
   };
@@ -266,7 +341,7 @@ export default function BackfillPage() {
             <div className="text-center">
               <div className="text-sm text-muted-foreground">Webhook Queue</div>
               <div className="text-2xl font-bold" data-testid="text-queue-length">
-                {queueStatusData?.queueLength?.toLocaleString() ?? '...'}
+                {webhookQueueLength.toLocaleString()}
               </div>
             </div>
             <Button
@@ -283,11 +358,11 @@ export default function BackfillPage() {
             <div className="text-center">
               <div className="text-sm text-muted-foreground">Shipment Sync Queue</div>
               <div className="text-2xl font-bold" data-testid="text-shipment-sync-queue-length">
-                {shipmentSyncStatusData?.queueLength?.toLocaleString() ?? '...'}
+                {shipmentSyncQueueLength.toLocaleString()}
               </div>
-              {shipmentSyncStatusData && shipmentSyncStatusData.failureCount > 0 && (
+              {shipmentFailureCount > 0 && (
                 <div className="text-sm text-destructive">
-                  {shipmentSyncStatusData.failureCount} failed
+                  {shipmentFailureCount} failed
                 </div>
               )}
             </div>
