@@ -19,6 +19,7 @@ import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
+import { checkRateLimit } from "./utils/rate-limiter";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -1537,6 +1538,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process each order immediately and queue only the ID
       // This prevents Redis queue from exceeding 100MB limit
       try {
+        let lastRateLimit;
+        
         for (const shopifyOrder of allOrders) {
           // Store order in database first
           const orderData = {
@@ -1566,6 +1569,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Process refunds and line items
           await processOrderRefunds(orderData.id, shopifyOrder);
           await processOrderLineItems(orderData.id, shopifyOrder);
+
+          // NEW: Sync shipments from ShipStation with smart rate limiting
+          try {
+            // Check rate limit before making ShipStation API call
+            await checkRateLimit(lastRateLimit);
+            
+            const shipmentResult = await shipmentService.syncShipmentsForOrder(orderData.orderNumber);
+            lastRateLimit = shipmentResult.rateLimit;
+            
+            if (shipmentResult.success && shipmentResult.shipments.length > 0) {
+              console.log(`[Backfill] Synced ${shipmentResult.shipments.length} shipment(s) for order ${orderData.orderNumber}`);
+            }
+          } catch (shipmentError: any) {
+            // Log but don't fail the entire backfill if shipment sync fails
+            console.error(`[Backfill] Failed to sync shipments for order ${orderData.orderNumber}:`, shipmentError.message);
+          }
 
           // Queue only the order ID (not full order data)
           await enqueueOrderId(orderData.id, job.id);
