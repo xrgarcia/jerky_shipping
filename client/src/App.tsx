@@ -18,6 +18,7 @@ import PrintQueue from "@/pages/print-queue";
 import Profile from "@/pages/profile";
 import Reports from "@/pages/reports";
 import Sessions from "@/pages/sessions";
+import Operations from "@/pages/operations";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -64,6 +65,7 @@ function AppContent() {
       <Route path="/products" component={Products} />
       <Route path="/sessions" component={Sessions} />
       <Route path="/backfill" component={Backfill} />
+      <Route path="/operations" component={Operations} />
       <Route path="/print-queue" component={PrintQueue} />
       <Route path="/reports" component={Reports} />
       <Route path="/profile" component={Profile} />
