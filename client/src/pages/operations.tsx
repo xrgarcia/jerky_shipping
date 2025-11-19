@@ -490,7 +490,7 @@ export default function OperationsPage() {
             <AlertCircle className="h-5 w-5" />
             Data Health
           </CardTitle>
-          <CardDescription>Orders missing shipment tracking data</CardDescription>
+          <CardDescription>Orders with no records in the shipments table</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
@@ -500,7 +500,7 @@ export default function OperationsPage() {
                 <span className="text-3xl font-bold" data-testid="text-orders-without-shipments">
                   {statsLoading ? "-" : queueStats?.dataHealth?.ordersWithoutShipments.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">no shipment</span>
+                <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
             <div className="space-y-2">
@@ -509,7 +509,7 @@ export default function OperationsPage() {
                 <span className="text-3xl font-bold" data-testid="text-recent-orders-without-shipments">
                   {statsLoading ? "-" : queueStats?.dataHealth?.recentOrdersWithoutShipments.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">no shipment</span>
+                <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
             <div className="space-y-2">
@@ -518,7 +518,7 @@ export default function OperationsPage() {
                 <span className="text-3xl font-bold" data-testid="text-paid-orders-without-shipments">
                   {statsLoading ? "-" : queueStats?.dataHealth?.paidOrdersWithoutShipments.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">no shipment</span>
+                <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
           </div>
