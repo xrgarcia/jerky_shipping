@@ -156,7 +156,7 @@ async function processOrderLineItems(orderId: string, shopifyOrder: any) {
  * Process a single batch of webhooks from the queue
  * Returns the number of webhooks processed
  */
-export async function processWebhookBatch(maxBatchSize: number = 10): Promise<number> {
+export async function processWebhookBatch(maxBatchSize: number = 50): Promise<number> {
   let processedCount = 0;
 
   for (let i = 0; i < maxBatchSize; i++) {
@@ -434,12 +434,15 @@ export async function processWebhookBatch(maxBatchSize: number = 10): Promise<nu
 // Use globalThis to persist worker state across hot-reloads
 declare global {
   var __backgroundWorkerInterval: NodeJS.Timeout | undefined;
+  var __backgroundWorkerActiveRunId: number | null | undefined;
+  var __backgroundWorkerNextRunId: number | undefined;
 }
 
 /**
  * Start the background worker that processes webhooks from the queue
  * Runs every intervalMs milliseconds
  * Uses singleton pattern to prevent duplicate workers on hot-reload
+ * Uses activeRunId mutex (null = idle, number = active) to prevent overlapping batches
  */
 export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout {
   // Prevent duplicate workers (survives hot-reload)
@@ -448,20 +451,44 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
     return globalThis.__backgroundWorkerInterval;
   }
 
-  log(`Background worker started (interval: ${intervalMs}ms)`);
+  // Initialize mutex only if undefined (don't clear in-flight batches)
+  if (globalThis.__backgroundWorkerActiveRunId === undefined) {
+    globalThis.__backgroundWorkerActiveRunId = null;
+  }
+  // Persist run ID counter so IDs never collide across stop/start cycles
+  globalThis.__backgroundWorkerNextRunId = globalThis.__backgroundWorkerNextRunId ?? 0;
+  
+  log(`Background worker started (interval: ${intervalMs}ms, batch size: 50)`);
   
   const processQueue = async () => {
+    // Check if a batch is already running
+    if (globalThis.__backgroundWorkerActiveRunId !== null) {
+      return;
+    }
+    
+    // Claim this run with a globally unique ID
+    const myRunId = ++(globalThis.__backgroundWorkerNextRunId!);
+    globalThis.__backgroundWorkerActiveRunId = myRunId;
+
     try {
+      const startTime = Date.now();
       const queueLength = await getQueueLength();
       
       if (queueLength > 0) {
-        const processed = await processWebhookBatch(10);
+        const processed = await processWebhookBatch(50);
+        const duration = Date.now() - startTime;
+        
         if (processed > 0) {
-          log(`Background worker processed ${processed} webhook(s), ${queueLength - processed} remaining`);
+          log(`Background worker processed ${processed} webhook(s) in ${duration}ms, ${queueLength - processed} remaining`);
         }
       }
     } catch (error) {
       console.error("Background worker error:", error);
+    } finally {
+      // Only release the lock if we still own it (handles stop/start edge cases)
+      if (globalThis.__backgroundWorkerActiveRunId === myRunId) {
+        globalThis.__backgroundWorkerActiveRunId = null;
+      }
     }
   };
 
@@ -471,11 +498,13 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
 
 /**
  * Stop the background worker
+ * Note: Does not clear activeRunId - let in-flight batches finish naturally
  */
 export function stopBackgroundWorker(): void {
   if (globalThis.__backgroundWorkerInterval) {
     clearInterval(globalThis.__backgroundWorkerInterval);
     globalThis.__backgroundWorkerInterval = undefined;
+    // Don't clear activeRunId - let running batch finish and release the lock
     log('Background worker stopped');
   }
 }
