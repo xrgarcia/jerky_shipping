@@ -1,0 +1,154 @@
+2025-11-18 21:40:51.10
+bed740da
+User
+3:40:51 AM [express] GET /api/print-queue 304 in 264ms :: {"jobs":[]}
+2025-11-18 21:41:15.78
+bed740da
+User
+3:41:15 AM [express] GET /api/print-queue 304 in 273ms :: {"jobs":[]}
+2025-11-18 21:41:17.50
+92dc45c8
+User
+WebSocket client disconnected
+2025-11-18 21:41:17.50
+92dc45c8
+System
+system: received signal terminated
+2025-11-18 21:41:17.97
+bed740da
+User
+3:41:17 AM [express] GET /api/print-queue 304 in 133ms :: {"jobs":[]}
+2025-11-18 21:41:19.60
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:41:20.18
+bed740da
+User
+3:41:20 AM [express] GET /api/print-queue 304 in 138ms :: {"jobs":[]}
+2025-11-18 21:41:20.52
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:41:20.69
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:41:22.36
+bed740da
+User
+3:41:22 AM [express] GET /api/print-queue 304 in 129ms :: {"jobs":[]}
+2025-11-18 21:41:24.54
+bed740da
+User
+3:41:24 AM [express] GET /api/print-queue 304 in 129ms :: {"jobs":[]}
+2025-11-18 21:41:24.92
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:41:25.41
+bed740da
+User
+3:41:25 AM [express] GET /api/products 200 in 433ms :: {"productsWithVariants":[{"product":{"id":"67…
+2025-11-18 21:41:26.79
+bed740da
+User
+3:41:26 AM [express] GET /api/print-queue 304 in 131ms :: {"jobs":[]}
+2025-11-18 21:41:27.96
+bed740da
+User
+3:41:27 AM [express] GET /api/skuvault/lockout-status 304 in 126ms :: {"isLockedOut":false,"remainin…
+2025-11-18 21:41:29.07
+bed740da
+User
+3:41:29 AM [express] GET /api/print-queue 304 in 130ms :: {"jobs":[]}
+2025-11-18 21:41:29.27
+bed740da
+User
+3:41:29 AM [express] GET /api/skuvault/lockout-status 304 in 224ms :: {"isLockedOut":false,"remainin…
+2025-11-18 21:41:30.45
+bed740da
+User
+3:41:30 AM [express] GET /api/skuvault/lockout-status 304 in 94ms :: {"isLockedOut":false,"remaining…
+2025-11-18 21:41:30.86
+bed740da
+User
+3:41:30 AM [express] GET /api/webhooks/queue-status 304 in 90ms :: {"queueLength":0}
+2025-11-18 21:41:30.88
+bed740da
+User
+3:41:30 AM [express] GET /api/backfill/jobs 304 in 131ms :: {"jobs":[{"id":"a48fdd34-43a4-45e9-a884-…
+2025-11-18 21:41:31.35
+bed740da
+User
+3:41:31 AM [express] GET /api/print-queue 304 in 126ms :: {"jobs":[]}
+2025-11-18 21:41:33.10
+bed740da
+User
+3:41:33 AM [express] GET /api/webhooks/queue-status 304 in 88ms :: {"queueLength":0}
+2025-11-18 21:41:33.14
+bed740da
+User
+3:41:33 AM [express] GET /api/backfill/jobs 304 in 130ms :: {"jobs":[{"id":"a48fdd34-43a4-45e9-a884-…
+2025-11-18 21:41:33.62
+bed740da
+User
+3:41:33 AM [express] GET /api/print-queue 304 in 133ms :: {"jobs":[]}
+2025-11-18 21:41:33.87
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:41:35.09
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:41:35.95
+bed740da
+User
+3:41:35 AM [express] GET /api/print-queue 304 in 130ms :: {"jobs":[]}
+2025-11-18 21:41:36.61
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:41:37.24
+bed740da
+User
+3:41:37 AM [express] GET /api/backfill/jobs 304 in 126ms :: {"jobs":[{"id":"a48fdd34-43a4-45e9-a884-…
+2025-11-18 21:41:37.32
+bed740da
+User
+3:41:37 AM [express] GET /api/webhooks/queue-status 304 in 207ms :: {"queueLength":0}
+2025-11-18 21:41:38.22
+bed740da
+User
+3:41:38 AM [express] GET /api/print-queue 304 in 125ms :: {"jobs":[]}
+2025-11-18 21:41:39.57
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:41:40.56
+bed740da
+User
+3:41:40 AM [express] GET /api/print-queue 304 in 123ms :: {"jobs":[]}
+2025-11-18 21:41:42.76
+bed740da
+User
+3:41:42 AM [express] GET /api/print-queue 304 in 126ms :: {"jobs":[]}
+2025-11-18 21:42:40.79
+bed740da
+User
+WebSocket client disconnected
+2025-11-18 21:42:42.71
+bed740da
+User
+WebSocket client connected
+2025-11-18 21:42:42.71
+bed740da
+User
+WebSocket client connected
+
+Collapse
+
+Wrap
+
+Colors
