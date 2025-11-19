@@ -13,6 +13,7 @@ import {
   type ShipmentSyncMessage,
 } from './utils/queue';
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
+import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
 import { shipmentSyncFailures, type InsertShipmentSyncFailure } from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
 
@@ -39,69 +40,145 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   
   for (const message of messages) {
     try {
-      const { orderNumber, reason, jobId } = message;
+      const { orderNumber, trackingNumber, reason, jobId } = message;
       
-      // Find the order in our database
-      const order = await storage.getOrderByOrderNumber(orderNumber);
-      
-      if (!order) {
-        // Order not found - log to dead letter queue
-        await logShipmentSyncFailure({
-          orderNumber,
-          reason,
-          errorMessage: `Order ${orderNumber} not found in database`,
-          requestData: { message },
-          responseData: null,
-          retryCount: 0,
-          failedAt: new Date(),
-        });
-        processedCount++;
-        continue;
-      }
-
-      // Check rate limiting before making API call
-      if (rateLimitRemaining <= 2) {
-        log(`⚠️  Low quota (${rateLimitRemaining} remaining), waiting ${rateLimitReset}s before next request...`);
-        await new Promise(resolve => setTimeout(resolve, rateLimitReset * 1000));
-        rateLimitRemaining = 40; // Reset after waiting
-      }
-
-      // Fetch shipments from ShipStation
-      const { data: shipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
-      
-      // Update rate limit tracking
-      rateLimitRemaining = rateLimit.remaining;
-      rateLimitReset = rateLimit.reset;
-      
-      log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimitRemaining}/${rateLimit.limit} API calls remaining`);
-
-      // Update shipments in database
-      for (const shipmentData of shipments) {
-        const existingShipment = await storage.getShipmentByShipmentId(String(shipmentData.shipmentId));
+      // Determine which path to use: tracking number or order number
+      if (trackingNumber) {
+        // PATH A: Tracking number path
+        // Use linkTrackingToOrder to fetch shipment and find the order
+        log(`Processing tracking number: ${trackingNumber}`);
+        
+        // Check rate limiting before making API call
+        if (rateLimitRemaining <= 2) {
+          log(`⚠️  Low quota (${rateLimitRemaining} remaining), waiting ${rateLimitReset}s before next request...`);
+          await new Promise(resolve => setTimeout(resolve, rateLimitReset * 1000));
+          rateLimitRemaining = 40; // Reset after waiting
+        }
+        
+        const trackingData: TrackingData = {
+          tracking_number: trackingNumber,
+        };
+        
+        const linkageResult = await linkTrackingToOrder(trackingData, storage);
+        
+        if (linkageResult.error || !linkageResult.order || !linkageResult.shipmentData) {
+          // Failed to link tracking to order
+          await logShipmentSyncFailure({
+            orderNumber: linkageResult.orderNumber || trackingNumber,
+            reason,
+            errorMessage: linkageResult.error || 'Failed to link tracking to order',
+            requestData: { message },
+            responseData: linkageResult.shipmentData,
+            retryCount: 0,
+            failedAt: new Date(),
+          });
+          processedCount++;
+          continue;
+        }
+        
+        // Successfully linked - create/update shipment
+        const order = linkageResult.order;
+        const shipmentData = linkageResult.shipmentData;
+        
+        const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
         
         const shipmentRecord = {
           orderId: order.id,
-          shipmentId: String(shipmentData.shipmentId),
-          trackingNumber: shipmentData.trackingNumber || null,
-          carrierCode: shipmentData.carrierCode || null,
-          serviceCode: shipmentData.serviceCode || null,
+          shipmentId: String(shipmentData.shipment_id || shipmentData.shipmentId),
+          trackingNumber: trackingNumber,
+          carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
+          serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
           status: shipmentData.voided ? 'cancelled' : 'shipped',
           statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-          shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+          shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
           shipmentData: shipmentData,
         };
-
+        
         if (existingShipment) {
           await storage.updateShipment(existingShipment.id, shipmentRecord);
+          log(`[${trackingNumber}] Updated shipment for order ${order.orderNumber}`);
         } else {
           await storage.createShipment(shipmentRecord);
+          log(`[${trackingNumber}] Created shipment for order ${order.orderNumber}`);
         }
-      }
+        
+        // Broadcast order update via WebSocket
+        broadcastOrderUpdate(order);
+        
+        processedCount++;
+        
+      } else if (orderNumber) {
+        // PATH B: Order number path (existing logic)
+        log(`Processing order number: ${orderNumber}`);
+        
+        // Find the order in our database
+        const order = await storage.getOrderByOrderNumber(orderNumber);
+        
+        if (!order) {
+          // Order not found - log to dead letter queue
+          await logShipmentSyncFailure({
+            orderNumber,
+            reason,
+            errorMessage: `Order ${orderNumber} not found in database`,
+            requestData: { message },
+            responseData: null,
+            retryCount: 0,
+            failedAt: new Date(),
+          });
+          processedCount++;
+          continue;
+        }
 
-      // Broadcast order update via WebSocket
-      broadcastOrderUpdate(order);
-      
-      processedCount++;
+        // Check rate limiting before making API call
+        if (rateLimitRemaining <= 2) {
+          log(`⚠️  Low quota (${rateLimitRemaining} remaining), waiting ${rateLimitReset}s before next request...`);
+          await new Promise(resolve => setTimeout(resolve, rateLimitReset * 1000));
+          rateLimitRemaining = 40; // Reset after waiting
+        }
+
+        // Fetch shipments from ShipStation
+        const { data: shipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
+        
+        // Update rate limit tracking
+        rateLimitRemaining = rateLimit.remaining;
+        rateLimitReset = rateLimit.reset;
+        
+        log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimitRemaining}/${rateLimit.limit} API calls remaining`);
+
+        // Update shipments in database
+        for (const shipmentData of shipments) {
+          const existingShipment = await storage.getShipmentByShipmentId(String(shipmentData.shipmentId));
+          
+          const shipmentRecord = {
+            orderId: order.id,
+            shipmentId: String(shipmentData.shipmentId),
+            trackingNumber: shipmentData.trackingNumber || null,
+            carrierCode: shipmentData.carrierCode || null,
+            serviceCode: shipmentData.serviceCode || null,
+            status: shipmentData.voided ? 'cancelled' : 'shipped',
+            statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+            shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+            shipmentData: shipmentData,
+          };
+
+          if (existingShipment) {
+            await storage.updateShipment(existingShipment.id, shipmentRecord);
+          } else {
+            await storage.createShipment(shipmentRecord);
+          }
+        }
+
+        // Broadcast order update via WebSocket
+        broadcastOrderUpdate(order);
+        
+        processedCount++;
+        
+      } else {
+        // Invalid message - neither tracking number nor order number
+        log(`⚠️  Invalid message: missing both orderNumber and trackingNumber`);
+        processedCount++;
+        continue;
+      }
       
       // Add small delay between requests to be respectful to API
       if (processedCount < messages.length) {
@@ -111,7 +188,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
     } catch (error: any) {
       // Log failure to dead letter queue
       await logShipmentSyncFailure({
-        orderNumber: message.orderNumber,
+        orderNumber: message.orderNumber || message.trackingNumber || 'unknown',
         reason: message.reason,
         errorMessage: error.message || 'Unknown error',
         requestData: { message },
@@ -120,7 +197,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         failedAt: new Date(),
       });
       
-      log(`❌ Failed to sync shipments for ${message.orderNumber}: ${error.message}`);
+      log(`❌ Failed to sync shipments for ${message.orderNumber || message.trackingNumber}: ${error.message}`);
       processedCount++;
     }
   }
