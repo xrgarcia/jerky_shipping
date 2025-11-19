@@ -142,42 +142,6 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Sh
   return shipments;
 }
 
-/**
- * Get shipment by tracking number using V1 API
- * V2 API does not support tracking number search, so we use V1
- * Returns null if shipment not found
- */
-export async function getShipmentByTrackingNumber(trackingNumber: string): Promise<any | null> {
-  if (!SHIPSTATION_API_KEY) {
-    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
-  }
-
-  // V1 API endpoint - supports trackingNumber parameter
-  // V1 uses Basic Auth with API key as username and secret as password
-  // For V1 API, we use the API key directly in Basic Auth format
-  const url = `https://ssapi.shipstation.com/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`;
-  
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Basic ${Buffer.from(SHIPSTATION_API_KEY + ':' + SHIPSTATION_API_KEY).toString('base64')}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
-      return null;
-    }
-    throw new Error(`ShipStation V1 API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data: any = await response.json();
-  const shipments = data.shipments || [];
-  
-  // Return the first matching shipment (there should only be one per tracking number)
-  return shipments.length > 0 ? shipments[0] : null;
-}
-
 // ShipStation V2 webhook event types
 export type ShipStationWebhookEvent = 
   | 'batch'
