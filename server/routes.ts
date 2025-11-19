@@ -180,7 +180,7 @@ async function processOrderLineItems(orderId: string, shopifyOrder: any) {
   }
 }
 
-async function fetchShopifyOrders(limit: number = 50) {
+async function fetchShopifyOrders(limit: number = 50, pageInfo?: string) {
   const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
   const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
@@ -188,7 +188,13 @@ async function fetchShopifyOrders(limit: number = 50) {
     throw new Error("Shopify credentials not configured. Please set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN");
   }
 
-  const url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=${limit}&status=any`;
+  let url: string;
+  if (pageInfo) {
+    url = `https://${shopDomain}/admin/api/2024-01/orders.json?page_info=${encodeURIComponent(pageInfo)}&limit=${limit}`;
+  } else {
+    url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=${limit}&status=any`;
+  }
+
   const response = await fetch(url, {
     headers: {
       "X-Shopify-Access-Token": accessToken,
@@ -201,8 +207,18 @@ async function fetchShopifyOrders(limit: number = 50) {
     throw new Error(`Shopify API error (${response.status}): ${errorText}`);
   }
 
+  const linkHeader = response.headers.get('Link');
+  let nextPageInfo: string | null = null;
+  
+  if (linkHeader) {
+    const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+    if (nextMatch) {
+      nextPageInfo = decodeURIComponent(nextMatch[1]);
+    }
+  }
+
   const data = await response.json();
-  return data.orders;
+  return { orders: data.orders, nextPageInfo };
 }
 
 async function fetchShopifyOrder(orderId: string) {
@@ -472,7 +488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Shopify credentials not configured. Please set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN" });
       }
 
-      const shopifyOrders = await fetchShopifyOrders(100);
+      const pageInfo = req.query.page_info as string | undefined;
+      const { orders: shopifyOrders, nextPageInfo } = await fetchShopifyOrders(100, pageInfo);
       let syncCount = 0;
 
       for (const shopifyOrder of shopifyOrders) {
@@ -580,7 +597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         syncCount++;
       }
 
-      res.json({ success: true, count: syncCount });
+      res.json({ 
+        success: true, 
+        count: syncCount,
+        nextCursor: nextPageInfo,
+        hasMore: !!nextPageInfo
+      });
     } catch (error) {
       console.error("Error syncing orders:", error);
       res.status(500).json({ error: "Failed to sync orders" });
