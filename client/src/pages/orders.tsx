@@ -5,16 +5,46 @@ import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Package, Clock, Truck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, Package, Clock, Truck, ChevronDown, ChevronUp, Filter, X, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import type { Order } from "@shared/schema";
 
 type OrderWithShipment = Order & { hasShipment?: boolean };
 
+interface OrdersResponse {
+  orders: OrderWithShipment[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export default function Orders() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { toast } = useToast();
+
+  // Filter states
+  const [search, setSearch] = useState("");
+  const [fulfillmentStatus, setFulfillmentStatus] = useState<string[]>([]);
+  const [financialStatus, setFinancialStatus] = useState<string[]>([]);
+  const [shipmentStatus, setShipmentStatus] = useState<string[]>([]);
+  const [hasShipment, setHasShipment] = useState<string>("all");
+  const [hasRefund, setHasRefund] = useState<string>("all");
+  const [carrierCode, setCarrierCode] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [minTotal, setMinTotal] = useState("");
+  const [maxTotal, setMaxTotal] = useState("");
+
+  // Pagination and sorting
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -117,17 +147,72 @@ export default function Orders() {
     };
   }, [toast]);
 
-  const { data: ordersData, isLoading } = useQuery<{ orders: OrderWithShipment[] }>({
-    queryKey: ["/api/orders", searchQuery],
+  // Build query string
+  const buildQueryString = () => {
+    const params = new URLSearchParams();
+    
+    if (search) params.append('search', search);
+    fulfillmentStatus.forEach(s => params.append('fulfillmentStatus', s));
+    financialStatus.forEach(s => params.append('financialStatus', s));
+    shipmentStatus.forEach(s => params.append('shipmentStatus', s));
+    carrierCode.forEach(c => params.append('carrierCode', c));
+    
+    if (hasShipment !== "all") params.append('hasShipment', hasShipment);
+    if (hasRefund !== "all") params.append('hasRefund', hasRefund);
+    if (dateFrom) params.append('dateFrom', dateFrom);
+    if (dateTo) params.append('dateTo', dateTo);
+    if (minTotal) params.append('minTotal', minTotal);
+    if (maxTotal) params.append('maxTotal', maxTotal);
+    
+    params.append('page', page.toString());
+    params.append('pageSize', pageSize.toString());
+    params.append('sortBy', sortBy);
+    params.append('sortOrder', sortOrder);
+    
+    return params.toString();
+  };
+
+  const { data: ordersData, isLoading } = useQuery<OrdersResponse>({
+    queryKey: ["/api/orders", search, fulfillmentStatus, financialStatus, shipmentStatus, hasShipment, hasRefund, carrierCode, dateFrom, dateTo, minTotal, maxTotal, page, pageSize, sortBy, sortOrder],
     queryFn: async () => {
-      const url = searchQuery
-        ? `/api/orders?q=${encodeURIComponent(searchQuery)}`
-        : "/api/orders";
+      const queryString = buildQueryString();
+      const url = `/api/orders?${queryString}`;
       return fetch(url, { credentials: "include" }).then((res) => res.json());
     },
   });
 
   const orders = ordersData?.orders || [];
+  const total = ordersData?.total || 0;
+  const totalPages = ordersData?.totalPages || 1;
+
+  const clearFilters = () => {
+    setSearch("");
+    setFulfillmentStatus([]);
+    setFinancialStatus([]);
+    setShipmentStatus([]);
+    setHasShipment("all");
+    setHasRefund("all");
+    setCarrierCode([]);
+    setDateFrom("");
+    setDateTo("");
+    setMinTotal("");
+    setMaxTotal("");
+    setPage(1);
+  };
+
+  const activeFiltersCount = [
+    search,
+    fulfillmentStatus.length > 0,
+    financialStatus.length > 0,
+    shipmentStatus.length > 0,
+    hasShipment !== "all",
+    hasRefund !== "all",
+    carrierCode.length > 0,
+    dateFrom,
+    dateTo,
+    minTotal,
+    maxTotal,
+  ].filter(Boolean).length;
 
   const getFulfillmentBadge = (status: string | null) => {
     if (!status) {
@@ -137,6 +222,14 @@ export default function Orders() {
       return <Badge className="bg-green-600 text-white">Fulfilled</Badge>;
     }
     return <Badge variant="secondary">{status}</Badge>;
+  };
+
+  const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
+    if (current.includes(value)) {
+      setter(current.filter(v => v !== value));
+    } else {
+      setter([...current, value]);
+    }
   };
 
   return (
@@ -149,22 +242,250 @@ export default function Orders() {
           </p>
         </div>
 
+        {/* Search and Filters */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 data-testid="input-search-orders"
                 type="search"
-                placeholder="Search by order number, customer name, or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by order number, customer, email, tracking number, SKU, or product..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-10 h-14 text-lg"
               />
+            </div>
+
+            <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <div className="flex items-center justify-between gap-4">
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="gap-2" data-testid="button-toggle-filters">
+                    <Filter className="h-4 w-4" />
+                    Advanced Filters
+                    {activeFiltersCount > 0 && (
+                      <Badge variant="secondary" className="ml-1">{activeFiltersCount}</Badge>
+                    )}
+                    {filtersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                
+                {activeFiltersCount > 0 && (
+                  <Button variant="ghost" onClick={clearFilters} className="gap-2" data-testid="button-clear-filters">
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              <CollapsibleContent className="pt-4 space-y-4">
+                {/* Status Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Fulfillment Status</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['fulfilled', 'unfulfilled', 'partial', 'restocked'].map(status => (
+                        <Badge
+                          key={status}
+                          variant={fulfillmentStatus.includes(status) ? "default" : "outline"}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleArrayFilter(status, fulfillmentStatus, setFulfillmentStatus)}
+                          data-testid={`filter-fulfillment-${status}`}
+                        >
+                          {status}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Financial Status</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['paid', 'pending', 'refunded', 'authorized', 'partially_refunded'].map(status => (
+                        <Badge
+                          key={status}
+                          variant={financialStatus.includes(status) ? "default" : "outline"}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleArrayFilter(status, financialStatus, setFinancialStatus)}
+                          data-testid={`filter-financial-${status}`}
+                        >
+                          {status.replace('_', ' ')}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Shipment Status</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['pending', 'shipped', 'DE', 'exception', 'cancelled'].map(status => (
+                        <Badge
+                          key={status}
+                          variant={shipmentStatus.includes(status) ? "default" : "outline"}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleArrayFilter(status, shipmentStatus, setShipmentStatus)}
+                          data-testid={`filter-shipment-${status}`}
+                        >
+                          {status === 'DE' ? 'Delivered' : status}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Boolean Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Has Shipment</label>
+                    <Select value={hasShipment} onValueChange={setHasShipment}>
+                      <SelectTrigger data-testid="select-has-shipment">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Has Refund</label>
+                    <Select value={hasRefund} onValueChange={setHasRefund}>
+                      <SelectTrigger data-testid="select-has-refund">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Carrier</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['usps', 'fedex', 'ups', 'dhl'].map(carrier => (
+                        <Badge
+                          key={carrier}
+                          variant={carrierCode.includes(carrier) ? "default" : "outline"}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleArrayFilter(carrier, carrierCode, setCarrierCode)}
+                          data-testid={`filter-carrier-${carrier}`}
+                        >
+                          {carrier.toUpperCase()}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date and Price Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Order Date Range</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        placeholder="From"
+                        data-testid="input-date-from"
+                      />
+                      <Input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        placeholder="To"
+                        data-testid="input-date-to"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Order Total Range</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        value={minTotal}
+                        onChange={(e) => setMinTotal(e.target.value)}
+                        placeholder="Min $"
+                        min="0"
+                        step="0.01"
+                        data-testid="input-min-total"
+                      />
+                      <Input
+                        type="number"
+                        value={maxTotal}
+                        onChange={(e) => setMaxTotal(e.target.value)}
+                        placeholder="Max $"
+                        min="0"
+                        step="0.01"
+                        data-testid="input-max-total"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Sort and Page Size */}
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Sort by:</span>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-40" data-testid="select-sort-by">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="createdAt">Order Date</SelectItem>
+                    <SelectItem value="updatedAt">Last Updated</SelectItem>
+                    <SelectItem value="orderTotal">Order Total</SelectItem>
+                    <SelectItem value="customerName">Customer Name</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger className="w-32" data-testid="select-sort-order">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Newest</SelectItem>
+                    <SelectItem value="asc">Oldest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-sm font-semibold">Show:</span>
+                <Select value={pageSize.toString()} onValueChange={(val) => { setPageSize(parseInt(val)); setPage(1); }}>
+                  <SelectTrigger className="w-24" data-testid="select-page-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Results Summary */}
+        {!isLoading && (
+          <div className="text-sm text-muted-foreground">
+            Showing {orders.length === 0 ? 0 : ((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, total)} of {total} orders
+          </div>
+        )}
+
+        {/* Orders List */}
         {isLoading ? (
           <div className="text-center py-12">
             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
@@ -176,8 +497,8 @@ export default function Orders() {
               <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">No orders found</h3>
               <p className="text-muted-foreground">
-                {searchQuery
-                  ? "Try a different search term"
+                {activeFiltersCount > 0
+                  ? "Try adjusting your filters"
                   : "Orders will appear here automatically when they come in from Shopify"}
               </p>
             </CardContent>
@@ -228,6 +549,39 @@ export default function Orders() {
               </Link>
             ))}
           </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  data-testid="button-prev-page"
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  data-testid="button-next-page"
+                >
+                  Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </>
