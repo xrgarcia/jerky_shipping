@@ -80,6 +80,71 @@ export async function listShopifyWebhooks(
   return data.webhooks || [];
 }
 
+export async function deleteShopifyWebhook(
+  shopDomain: string,
+  accessToken: string,
+  webhookId: string
+): Promise<void> {
+  const url = `https://${shopDomain}/admin/api/2024-01/webhooks/${webhookId}.json`;
+  
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete webhook ${webhookId}: ${response.status} ${errorText}`);
+  }
+}
+
+export async function deleteAllShopifyWebhooks(
+  shopDomain: string,
+  accessToken: string
+): Promise<number> {
+  const existingWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
+  
+  let deletedCount = 0;
+  for (const webhook of existingWebhooks) {
+    try {
+      console.log(`Deleting webhook: ${webhook.topic} (ID: ${webhook.id})`);
+      await deleteShopifyWebhook(shopDomain, accessToken, webhook.id.toString());
+      deletedCount++;
+    } catch (error) {
+      console.error(`Failed to delete webhook ${webhook.id}:`, error);
+      // Continue deleting other webhooks even if one fails
+    }
+  }
+  
+  return deletedCount;
+}
+
+export async function reregisterAllWebhooks(
+  shopDomain: string,
+  accessToken: string,
+  webhookBaseUrl: string
+): Promise<{ deleted: number; registered: number }> {
+  console.log('Starting webhook re-registration...');
+  
+  // Step 1: Delete all existing webhooks
+  const deletedCount = await deleteAllShopifyWebhooks(shopDomain, accessToken);
+  console.log(`Deleted ${deletedCount} existing webhook(s)`);
+  
+  // Step 2: Re-register required webhooks
+  await ensureWebhooksRegistered(shopDomain, accessToken, webhookBaseUrl);
+  
+  // Count how many were registered
+  const newWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
+  const registeredCount = newWebhooks.length;
+  
+  console.log(`Re-registered ${registeredCount} webhook(s)`);
+  
+  return { deleted: deletedCount, registered: registeredCount };
+}
+
 export async function ensureWebhooksRegistered(
   shopDomain: string,
   accessToken: string,
