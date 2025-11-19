@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, shipmentSyncFailures } from "@shared/schema";
 import { eq, count, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, enqueueShipmentSync } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, enqueueShipmentSync, getShipmentSyncQueueLength, clearShipmentSyncQueue } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
@@ -2143,6 +2143,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error clearing queue:", error);
       res.status(500).json({ error: "Failed to clear queue" });
+    }
+  });
+
+  app.post("/api/shipment-sync/clear", requireAuth, async (req, res) => {
+    try {
+      const clearedCount = await clearShipmentSyncQueue();
+      res.json({ 
+        success: true, 
+        message: `Cleared ${clearedCount} items from shipment sync queue`,
+        clearedCount 
+      });
+    } catch (error) {
+      console.error("Error clearing shipment sync queue:", error);
+      res.status(500).json({ error: "Failed to clear shipment sync queue" });
     }
   });
 

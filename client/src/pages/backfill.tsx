@@ -159,12 +159,12 @@ export default function BackfillPage() {
     },
   });
 
-  const purgeQueueMutation = useMutation({
+  const purgeWebhookQueueMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/queue/clear");
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to purge queue");
+        throw new Error(error.error || "Failed to purge webhook queue");
       }
       return response.json();
     },
@@ -172,13 +172,38 @@ export default function BackfillPage() {
       setShowPurgeDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/webhooks/queue-status"] });
       toast({
-        title: "Queue purged",
-        description: `Cleared ${data.clearedCount} items from the queue.`,
+        title: "Webhook queue purged",
+        description: `Cleared ${data.clearedCount} items from the webhook queue.`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to purge queue",
+        title: "Failed to purge webhook queue",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const purgeShipmentSyncQueueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/shipment-sync/clear");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to purge shipment sync queue");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shipment-sync/status"] });
+      toast({
+        title: "Shipment sync queue purged",
+        description: `Cleared ${data.clearedCount} items from the shipment sync queue.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to purge shipment sync queue",
         description: error.message,
         variant: "destructive",
       });
@@ -236,33 +261,56 @@ export default function BackfillPage() {
             Import historical orders from Shopify by date range
           </p>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground">Webhook Queue</div>
-            <div className="text-2xl font-bold" data-testid="text-queue-length">
-              {queueStatusData?.queueLength?.toLocaleString() ?? '...'}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground">Shipment Sync Queue</div>
-            <div className="text-2xl font-bold" data-testid="text-shipment-sync-queue-length">
-              {shipmentSyncStatusData?.queueLength?.toLocaleString() ?? '...'}
-            </div>
-            {shipmentSyncStatusData && shipmentSyncStatusData.failureCount > 0 && (
-              <div className="text-sm text-destructive mt-1">
-                {shipmentSyncStatusData.failureCount} failed
+        <div className="flex items-start gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Webhook Queue</div>
+              <div className="text-2xl font-bold" data-testid="text-queue-length">
+                {queueStatusData?.queueLength?.toLocaleString() ?? '...'}
               </div>
-            )}
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowPurgeDialog(true)}
+              data-testid="button-purge-webhook-queue"
+            >
+              <Database className="mr-2 h-4 w-4" />
+              Purge
+            </Button>
           </div>
-          <Button
-            variant="destructive"
-            size="default"
-            onClick={() => setShowPurgeDialog(true)}
-            data-testid="button-purge-queue"
-          >
-            <Database className="mr-2 h-4 w-4" />
-            Purge Queue
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Shipment Sync Queue</div>
+              <div className="text-2xl font-bold" data-testid="text-shipment-sync-queue-length">
+                {shipmentSyncStatusData?.queueLength?.toLocaleString() ?? '...'}
+              </div>
+              {shipmentSyncStatusData && shipmentSyncStatusData.failureCount > 0 && (
+                <div className="text-sm text-destructive">
+                  {shipmentSyncStatusData.failureCount} failed
+                </div>
+              )}
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => purgeShipmentSyncQueueMutation.mutate()}
+              disabled={purgeShipmentSyncQueueMutation.isPending}
+              data-testid="button-purge-shipment-sync-queue"
+            >
+              {purgeShipmentSyncQueueMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Purging...
+                </>
+              ) : (
+                <>
+                  <Database className="mr-2 h-4 w-4" />
+                  Purge
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -535,20 +583,20 @@ export default function BackfillPage() {
       <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
         <AlertDialogContent data-testid="dialog-purge-confirmation">
           <AlertDialogHeader>
-            <AlertDialogTitle>Purge Queue</AlertDialogTitle>
+            <AlertDialogTitle>Purge Webhook Queue</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to purge the entire processing queue? This will clear all pending webhooks and backfill jobs from the queue. This action cannot be undone.
+              Are you sure you want to purge the webhook queue? This will clear all pending webhooks from the queue. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-purge">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => purgeQueueMutation.mutate()}
+              onClick={() => purgeWebhookQueueMutation.mutate()}
               data-testid="button-confirm-purge"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={purgeQueueMutation.isPending}
+              disabled={purgeWebhookQueueMutation.isPending}
             >
-              {purgeQueueMutation.isPending ? (
+              {purgeWebhookQueueMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Purging...
