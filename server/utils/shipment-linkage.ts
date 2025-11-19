@@ -63,6 +63,7 @@ export async function linkTrackingToOrder(
   
   try {
     // Fetch full shipment details from ShipStation
+    console.log(`[DEBUG] Fetching shipment ${shipmentId} from ShipStation for tracking ${trackingNumber}`);
     const shipmentData = await getShipmentByShipmentId(shipmentId);
     
     if (!shipmentData) {
@@ -74,33 +75,61 @@ export async function linkTrackingToOrder(
       };
     }
     
+    // Log ALL fields from shipmentData to see what we're getting
+    console.log(`[DEBUG] ShipStation shipment data for ${trackingNumber}:`, JSON.stringify({
+      shipment_number: shipmentData.shipment_number,
+      orderNumber: shipmentData.orderNumber,
+      orderId: shipmentData.orderId,
+      orderKey: shipmentData.orderKey,
+      external_shipment_id: shipmentData.external_shipment_id,
+      order_number: shipmentData.order_number,
+    }, null, 2));
+    
     // Try to get order number from multiple sources in shipmentData
-    let orderNumber = shipmentData.shipment_number || shipmentData.orderNumber;
+    let orderNumber = shipmentData.shipment_number || shipmentData.orderNumber || shipmentData.order_number;
     let order: any = null;
+    
+    console.log(`[DEBUG] Extracted orderNumber: ${orderNumber}`);
     
     // Method 1: If we have an order number, try to find the order
     if (orderNumber) {
+      console.log(`[DEBUG] Method 1: Looking up order by orderNumber: ${orderNumber}`);
       order = await storage.getOrderByOrderNumber(orderNumber);
+      if (order) {
+        console.log(`[DEBUG] ✓ Found order ${order.orderNumber} (ID: ${order.id}) via shipment_number`);
+      } else {
+        console.log(`[DEBUG] ✗ No order found with orderNumber ${orderNumber}`);
+      }
     }
     
     // Method 2: Try using orderId directly from shipment payload
     if (!order && shipmentData.orderId) {
+      console.log(`[DEBUG] Method 2: Looking up order by orderId: ${shipmentData.orderId}`);
       order = await storage.getOrder(shipmentData.orderId.toString());
+      if (order) {
+        console.log(`[DEBUG] ✓ Found order ${order.orderNumber} via orderId`);
+      }
     }
     
     // Method 3: Try using orderKey from shipment payload
     if (!order && shipmentData.orderKey) {
+      console.log(`[DEBUG] Method 3: Looking up order by orderKey: ${shipmentData.orderKey}`);
       order = await storage.getOrder(shipmentData.orderKey);
+      if (order) {
+        console.log(`[DEBUG] ✓ Found order ${order.orderNumber} via orderKey`);
+      }
     }
     
     // Method 4: Try external_shipment_id (format: "shopifyOrderId-lineItemId")
     if (!order && shipmentData.external_shipment_id) {
+      console.log(`[DEBUG] Method 4: Parsing external_shipment_id: ${shipmentData.external_shipment_id}`);
       const externalIdParts = shipmentData.external_shipment_id.split('-');
       if (externalIdParts.length >= 1) {
         const shopifyOrderId = externalIdParts[0];
+        console.log(`[DEBUG] Extracted shopifyOrderId: ${shopifyOrderId}`);
         order = await storage.getOrder(shopifyOrderId);
         if (order) {
-          console.log(`Found order ${order.orderNumber} via external_shipment_id for tracking ${trackingNumber}`);
+          console.log(`[DEBUG] ✓ Found order ${order.orderNumber} via external_shipment_id`);
         }
       }
     }
@@ -108,19 +137,25 @@ export async function linkTrackingToOrder(
     // Method 5: Try fulfillment API lookup by tracking number as last resort
     if (!order) {
       try {
+        console.log(`[DEBUG] Method 5: Calling fulfillment API for tracking ${trackingNumber}`);
         const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
+        console.log(`[DEBUG] Fulfillment API response:`, JSON.stringify({
+          order_number: fulfillmentData?.order_number,
+          orderId: fulfillmentData?.orderId,
+        }, null, 2));
         if (fulfillmentData?.order_number) {
           order = await storage.getOrderByOrderNumber(fulfillmentData.order_number);
           if (order) {
-            console.log(`Found order ${order.orderNumber} via fulfillment API for tracking ${trackingNumber}`);
+            console.log(`[DEBUG] ✓ Found order ${order.orderNumber} via fulfillment API`);
           }
         }
       } catch (fulfillmentError: any) {
-        console.warn(`Fulfillment API lookup failed for ${trackingNumber}:`, fulfillmentError.message);
+        console.warn(`[DEBUG] Fulfillment API lookup failed for ${trackingNumber}:`, fulfillmentError.message);
       }
     }
     
     if (!order) {
+      console.error(`[DEBUG] ✗ FAILED to link tracking ${trackingNumber} to any order after all 5 methods`);
       return {
         order: null,
         shipmentData,
