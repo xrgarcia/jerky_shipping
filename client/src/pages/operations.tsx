@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -98,12 +98,93 @@ export default function OperationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
+  const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
   const { toast } = useToast();
 
-  const { data: queueStats, isLoading: statsLoading } = useQuery<QueueStats>({
+  // Initial fetch of queue stats (no polling)
+  const { data: initialQueueStats, isLoading: statsLoading } = useQuery<QueueStats>({
     queryKey: ["/api/operations/queue-stats"],
-    refetchInterval: 5000,
   });
+
+  // Use live stats from WebSocket if available, otherwise fall back to initial fetch
+  const queueStats = liveQueueStats || initialQueueStats;
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    let isMounted = true;
+    const maxReconnectDelay = 30000;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        console.error('WebSocket creation error:', error);
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected (Operations)');
+        reconnectAttempts = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'queue_status' && message.data) {
+            // Update live queue stats from WebSocket
+            setLiveQueueStats({
+              shopifyQueue: {
+                size: message.data.shopifyQueue,
+                oldestMessageAt: message.data.shopifyQueueOldestAt,
+              },
+              shipmentSyncQueue: {
+                size: message.data.shipmentSyncQueue,
+                oldestMessageAt: message.data.shipmentSyncQueueOldestAt,
+              },
+              failures: {
+                total: message.data.shipmentFailureCount,
+              },
+            });
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', event.code, event.reason);
+        
+        if (isMounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(connect, delay);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, []);
 
   const { data: failuresData } = useQuery<FailuresResponse>({
     queryKey: ["/api/operations/failures", currentPage, searchTerm],

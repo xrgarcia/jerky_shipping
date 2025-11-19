@@ -96,7 +96,13 @@ export function broadcastPrintQueueUpdate(data: any): void {
   });
 }
 
-export function broadcastQueueStatus(data: { shopifyQueue: number; shipmentSyncQueue: number; shipmentFailureCount: number }): void {
+export function broadcastQueueStatus(data: { 
+  shopifyQueue: number; 
+  shipmentSyncQueue: number; 
+  shipmentFailureCount: number;
+  shopifyQueueOldestAt?: number | null;
+  shipmentSyncQueueOldestAt?: number | null;
+}): void {
   if (!wss) {
     return;
   }

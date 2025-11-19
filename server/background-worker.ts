@@ -1,4 +1,4 @@
-import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, enqueueShipmentSync } from "./utils/queue";
+import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, enqueueShipmentSync, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
 import { fetchShipStationResource } from "./utils/shipstation-api";
 import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
@@ -453,11 +453,15 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
       const failureCount = await storage.getShipmentSyncFailureCount();
+      const oldestShopify = await getOldestShopifyQueueMessage();
+      const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
         shipmentFailureCount: failureCount,
+        shopifyQueueOldestAt: oldestShopify.enqueuedAt,
+        shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
       });
     } catch (error) {
       console.error("Background worker error:", error);

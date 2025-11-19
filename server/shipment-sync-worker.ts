@@ -10,6 +10,8 @@ import {
   dequeueShipmentSyncBatch,
   getShipmentSyncQueueLength,
   getQueueLength,
+  getOldestShopifyQueueMessage,
+  getOldestShipmentSyncQueueMessage,
   type ShipmentSyncMessage,
 } from './utils/queue';
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
@@ -285,11 +287,15 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
       const failureCount = await storage.getShipmentSyncFailureCount();
+      const oldestShopify = await getOldestShopifyQueueMessage();
+      const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
         shipmentFailureCount: failureCount,
+        shopifyQueueOldestAt: oldestShopify.enqueuedAt,
+        shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
       });
     } catch (error) {
       console.error("Shipment sync worker error:", error);
