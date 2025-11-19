@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, enqueueShipmentSync, getShipmentSyncQueueLength, clearShipmentSyncQueue } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
@@ -2579,6 +2579,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error backfilling line items:", error);
       res.status(500).json({ error: "Failed to backfill line items" });
+    }
+  });
+
+  // Operations Dashboard - Queue Management
+  app.get("/api/operations/queue-stats", requireAuth, async (req, res) => {
+    try {
+      const shopifyQueueLength = await getQueueLength();
+      const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const oldestShopify = await getOldestShopifyQueueMessage();
+      const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+      
+      const failureCount = await db.select({ count: count() })
+        .from(shipmentSyncFailures)
+        .then(rows => rows[0]?.count || 0);
+
+      res.json({
+        shopifyQueue: {
+          size: shopifyQueueLength,
+          oldestMessageAt: oldestShopify.enqueuedAt,
+        },
+        shipmentSyncQueue: {
+          size: shipmentSyncQueueLength,
+          oldestMessageAt: oldestShipmentSync.enqueuedAt,
+        },
+        failures: {
+          total: failureCount,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching queue stats:", error);
+      res.status(500).json({ error: "Failed to fetch queue stats" });
+    }
+  });
+
+  app.post("/api/operations/purge-shopify-queue", requireAuth, async (req, res) => {
+    try {
+      const clearedCount = await clearQueue();
+      res.json({ success: true, clearedCount });
+    } catch (error) {
+      console.error("Error purging Shopify queue:", error);
+      res.status(500).json({ error: "Failed to purge Shopify queue" });
+    }
+  });
+
+  app.post("/api/operations/purge-shipment-sync-queue", requireAuth, async (req, res) => {
+    try {
+      const clearedCount = await clearShipmentSyncQueue();
+      res.json({ success: true, clearedCount });
+    } catch (error) {
+      console.error("Error purging shipment sync queue:", error);
+      res.status(500).json({ error: "Failed to purge shipment sync queue" });
+    }
+  });
+
+  app.post("/api/operations/purge-failures", requireAuth, async (req, res) => {
+    try {
+      await db.delete(shipmentSyncFailures);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error purging failures:", error);
+      res.status(500).json({ error: "Failed to purge failures table" });
+    }
+  });
+
+  app.get("/api/operations/failures", requireAuth, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const search = req.query.search as string;
+      const offset = (page - 1) * limit;
+
+      let query = db.select().from(shipmentSyncFailures);
+
+      if (search) {
+        const { like, or } = await import("drizzle-orm");
+        query = query.where(
+          or(
+            like(shipmentSyncFailures.orderNumber, `%${search}%`),
+            like(shipmentSyncFailures.errorMessage, `%${search}%`)
+          )
+        );
+      }
+
+      const failures = await query
+        .orderBy(desc(shipmentSyncFailures.failedAt))
+        .limit(limit)
+        .offset(offset);
+
+      const totalCount = await db.select({ count: count() })
+        .from(shipmentSyncFailures)
+        .then(rows => rows[0]?.count || 0);
+
+      res.json({
+        failures,
+        totalCount,
+        page,
+        totalPages: Math.ceil(totalCount / limit),
+      });
+    } catch (error) {
+      console.error("Error fetching failures:", error);
+      res.status(500).json({ error: "Failed to fetch failures" });
     }
   });
 

@@ -142,3 +142,35 @@ export async function clearShipmentSyncQueue(): Promise<number> {
   }
   return length;
 }
+
+export async function getOldestShopifyQueueMessage(): Promise<{ enqueuedAt: number | null }> {
+  const redis = getRedisClient();
+  const data = await redis.lindex(QUEUE_KEY, -1);
+  
+  if (!data) {
+    return { enqueuedAt: null };
+  }
+  
+  try {
+    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+    return { enqueuedAt: parsed.enqueuedAt || parsed.receivedAt || null };
+  } catch {
+    return { enqueuedAt: null };
+  }
+}
+
+export async function getOldestShipmentSyncQueueMessage(): Promise<{ enqueuedAt: number | null }> {
+  const redis = getRedisClient();
+  const data = await redis.lindex(SHIPMENT_SYNC_QUEUE_KEY, -1);
+  
+  if (!data) {
+    return { enqueuedAt: null };
+  }
+  
+  try {
+    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+    return { enqueuedAt: parsed.enqueuedAt || null };
+  } catch {
+    return { enqueuedAt: null };
+  }
+}
