@@ -230,6 +230,7 @@ export default function Orders() {
     } else {
       setter([...current, value]);
     }
+    setPage(1); // Reset to first page when filter changes
   };
 
   return (
@@ -340,28 +341,28 @@ export default function Orders() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Has Shipment</label>
-                    <Select value={hasShipment} onValueChange={setHasShipment}>
+                    <Select value={hasShipment} onValueChange={(val) => { setHasShipment(val); setPage(1); }}>
                       <SelectTrigger data-testid="select-has-shipment">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
+                        <SelectItem value="all" data-testid="has-shipment-all">All</SelectItem>
+                        <SelectItem value="true" data-testid="has-shipment-yes">Yes</SelectItem>
+                        <SelectItem value="false" data-testid="has-shipment-no">No</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Has Refund</label>
-                    <Select value={hasRefund} onValueChange={setHasRefund}>
+                    <Select value={hasRefund} onValueChange={(val) => { setHasRefund(val); setPage(1); }}>
                       <SelectTrigger data-testid="select-has-refund">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
+                        <SelectItem value="all" data-testid="has-refund-all">All</SelectItem>
+                        <SelectItem value="true" data-testid="has-refund-yes">Yes</SelectItem>
+                        <SelectItem value="false" data-testid="has-refund-no">No</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -392,14 +393,14 @@ export default function Orders() {
                       <Input
                         type="date"
                         value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
+                        onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
                         placeholder="From"
                         data-testid="input-date-from"
                       />
                       <Input
                         type="date"
                         value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
+                        onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
                         placeholder="To"
                         data-testid="input-date-to"
                       />
@@ -412,7 +413,7 @@ export default function Orders() {
                       <Input
                         type="number"
                         value={minTotal}
-                        onChange={(e) => setMinTotal(e.target.value)}
+                        onChange={(e) => { setMinTotal(e.target.value); setPage(1); }}
                         placeholder="Min $"
                         min="0"
                         step="0.01"
@@ -421,7 +422,7 @@ export default function Orders() {
                       <Input
                         type="number"
                         value={maxTotal}
-                        onChange={(e) => setMaxTotal(e.target.value)}
+                        onChange={(e) => { setMaxTotal(e.target.value); setPage(1); }}
                         placeholder="Max $"
                         min="0"
                         step="0.01"
@@ -438,24 +439,24 @@ export default function Orders() {
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Sort by:</span>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={(val) => { setSortBy(val); setPage(1); }}>
                   <SelectTrigger className="w-40" data-testid="select-sort-by">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="createdAt">Order Date</SelectItem>
-                    <SelectItem value="updatedAt">Last Updated</SelectItem>
-                    <SelectItem value="orderTotal">Order Total</SelectItem>
-                    <SelectItem value="customerName">Customer Name</SelectItem>
+                    <SelectItem value="createdAt" data-testid="sort-option-createdAt">Order Date</SelectItem>
+                    <SelectItem value="updatedAt" data-testid="sort-option-updatedAt">Last Updated</SelectItem>
+                    <SelectItem value="orderTotal" data-testid="sort-option-orderTotal">Order Total</SelectItem>
+                    <SelectItem value="customerName" data-testid="sort-option-customerName">Customer Name</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={sortOrder} onValueChange={setSortOrder}>
+                <Select value={sortOrder} onValueChange={(val) => { setSortOrder(val); setPage(1); }}>
                   <SelectTrigger className="w-32" data-testid="select-sort-order">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="desc">Newest</SelectItem>
-                    <SelectItem value="asc">Oldest</SelectItem>
+                    <SelectItem value="desc" data-testid="sort-order-desc">Newest</SelectItem>
+                    <SelectItem value="asc" data-testid="sort-order-asc">Oldest</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -467,10 +468,10 @@ export default function Orders() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="200">200</SelectItem>
+                    <SelectItem value="25" data-testid="page-size-25">25</SelectItem>
+                    <SelectItem value="50" data-testid="page-size-50">50</SelectItem>
+                    <SelectItem value="100" data-testid="page-size-100">100</SelectItem>
+                    <SelectItem value="200" data-testid="page-size-200">200</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
