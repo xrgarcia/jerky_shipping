@@ -70,3 +70,13 @@ Preferred communication style: Simple, everyday language.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Nodemailer**: For sending magic link authentication emails.
 -   **Neon Database**: Serverless PostgreSQL database.
+
+## Webhook Configuration
+
+The application uses environment-aware webhook registration to support both development and production simultaneously:
+
+-   **Development (REPLIT_DEPLOYMENT not set)**: Auto-detects dev workspace URL from `REPLIT_DOMAINS` environment variable.
+-   **Production (REPLIT_DEPLOYMENT=1)**: Uses hardcoded production URL `https://jerkyshippping.replit.app`.
+-   **Manual Override**: `WEBHOOK_BASE_URL` environment variable takes precedence if explicitly set (must be a valid http/https URL).
+
+Both environments register their own webhooks to Shopify and ShipStation, allowing independent webhook delivery to dev and production. Invalid or empty webhook URLs trigger explicit warnings and skip registration gracefully.
