@@ -81,16 +81,29 @@ export async function validateShopifyCredentials(): Promise<ValidationResult> {
       } else {
         errors.push(`Shopify API error: ${response.status} ${response.statusText}`);
       }
+
+      // Cache error result and return early (don't try to parse JSON)
+      const result: ValidationResult = {
+        isValid: false,
+        errors,
+        lastChecked: new Date(),
+      };
+      
+      cachedResult = result;
+      cacheExpiry = now + CACHE_TTL_MS;
+      
+      return result;
     }
 
+    // Only parse JSON if response was successful
     const data = await response.json();
     const shopName = data.shop?.name;
 
     const result: ValidationResult = {
-      isValid: errors.length === 0,
-      errors,
+      isValid: true,
+      errors: [],
       lastChecked: new Date(),
-      shopName: errors.length === 0 ? shopName : undefined,
+      shopName,
     };
 
     // Cache the result
