@@ -103,6 +103,11 @@ export function broadcastQueueStatus(data: {
   shopifyQueueOldestAt?: number | null;
   shipmentSyncQueueOldestAt?: number | null;
   backfillActiveJob?: any | null;
+  dataHealth?: {
+    ordersWithoutShipments: number;
+    recentOrdersWithoutShipments: number;
+    paidOrdersWithoutShipments: number;
+  };
 }): void {
   if (!wss) {
     return;

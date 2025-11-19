@@ -158,6 +158,13 @@ export interface IStorage {
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
   getShipmentSyncFailures(limit?: number, offset?: number): Promise<ShipmentSyncFailure[]>;
+
+  // Data Health Metrics
+  getDataHealthMetrics(daysBack?: number): Promise<{
+    ordersWithoutShipments: number;
+    recentOrdersWithoutShipments: number;
+    paidOrdersWithoutShipments: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -996,6 +1003,32 @@ export class DatabaseStorage implements IStorage {
       .limit(limit)
       .offset(offset);
     return result;
+  }
+
+  // Data Health Metrics - Batched query for all metrics to avoid multiple DB calls
+  async getDataHealthMetrics(daysBack: number = 30): Promise<{
+    ordersWithoutShipments: number;
+    recentOrdersWithoutShipments: number;
+    paidOrdersWithoutShipments: number;
+  }> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+    
+    // Single query using conditional aggregation for all 3 metrics
+    const result = await db
+      .select({
+        total: count(sql`CASE WHEN ${shipments.id} IS NULL THEN 1 END`),
+        recent: count(sql`CASE WHEN ${shipments.id} IS NULL AND ${orders.createdAt} >= ${cutoffDate} THEN 1 END`),
+        paid: count(sql`CASE WHEN ${shipments.id} IS NULL AND ${orders.financialStatus} = 'paid' THEN 1 END`),
+      })
+      .from(orders)
+      .leftJoin(shipments, eq(orders.id, shipments.orderId));
+    
+    return {
+      ordersWithoutShipments: result[0]?.total || 0,
+      recentOrdersWithoutShipments: result[0]?.recent || 0,
+      paidOrdersWithoutShipments: result[0]?.paid || 0,
+    };
   }
 }
 

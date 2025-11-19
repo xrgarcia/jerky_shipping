@@ -75,6 +75,11 @@ type QueueStats = {
     activeJob: BackfillJob | null;
     recentJobs: BackfillJob[];
   };
+  dataHealth?: {
+    ordersWithoutShipments: number;
+    recentOrdersWithoutShipments: number;
+    paidOrdersWithoutShipments: number;
+  };
 };
 
 type EnvironmentInfo = {
@@ -190,6 +195,7 @@ export default function OperationsPage() {
                 activeJob: message.data.backfillActiveJob || null,
                 recentJobs: [],
               },
+              dataHealth: message.data.dataHealth,
             });
           }
         } catch (error) {
@@ -473,6 +479,47 @@ export default function OperationsPage() {
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear All
               </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-data-health">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <AlertCircle className="h-5 w-5" />
+            Data Health
+          </CardTitle>
+          <CardDescription>Orders missing shipment tracking data</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">All Orders</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold" data-testid="text-orders-without-shipments">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersWithoutShipments.toLocaleString() ?? "-"}
+                </span>
+                <span className="text-sm text-muted-foreground">no shipment</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Last 30 Days</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold" data-testid="text-recent-orders-without-shipments">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.recentOrdersWithoutShipments.toLocaleString() ?? "-"}
+                </span>
+                <span className="text-sm text-muted-foreground">no shipment</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Paid Orders</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold" data-testid="text-paid-orders-without-shipments">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.paidOrdersWithoutShipments.toLocaleString() ?? "-"}
+                </span>
+                <span className="text-sm text-muted-foreground">no shipment</span>
+              </div>
             </div>
           </div>
         </CardContent>

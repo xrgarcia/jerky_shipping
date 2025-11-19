@@ -460,6 +460,9 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       const allBackfillJobs = await storage.getAllBackfillJobs();
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
       
+      // Get data health metrics (single batched query)
+      const dataHealth = await storage.getDataHealthMetrics(30);
+      
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
@@ -467,6 +470,7 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
         shopifyQueueOldestAt: oldestShopify.enqueuedAt,
         shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
         backfillActiveJob: activeBackfillJob,
+        dataHealth,
       });
     } catch (error) {
       console.error("Background worker error:", error);
