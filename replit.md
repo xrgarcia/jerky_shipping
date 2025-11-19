@@ -92,6 +92,7 @@ Preferred communication style: Simple, everyday language.
         3. Find order using multiple fallback methods: `order_number` (matches any channel), `orderId`, `orderKey`, `external_shipment_id`, fulfillment API
         4. Create shipment record with complete tracking data linked to order
         5. Implemented via shared `linkTrackingToOrder()` utility in `server/utils/shipment-linkage.ts`
+        - **Queue Message Structure**: Track webhook messages now carry `labelUrl` and `shipmentId` fields extracted from webhook `trackingData`, ensuring the extraction logic receives the data it needs. Background worker extracts these fields when queuing, shipment sync worker passes them to `linkTrackingToOrder()`, preventing "no label_url or shipment_id field available" failures.
     -   **Multi-Channel Order Numbers**: The `order_number` field stores the actual order number from any sales channel. For Amazon orders, the system extracts the Amazon order number (e.g., "111-7320858-2210642") from Shopify fulfillment data instead of using Shopify's internal order number, enabling seamless shipment tracking across all channels.
 -   **SkuVault Integration**: Reverse-engineered web API for accessing wave picking session data, including HTML form login and token caching. Rate limiting (2-second delay between requests) prevents triggering anti-bot protection.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
