@@ -1508,120 +1508,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               // Check if we already have this shipment
-              let existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+              const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
               
               if (!existingShipment) {
-                // We don't have this shipment yet - need to fetch it from ShipStation
-                console.log(`No shipment found for tracking ${trackingNumber} - fetching from ShipStation`);
+                // We don't have this shipment yet - queue it for async processing
+                console.log(`No shipment found for tracking ${trackingNumber} - queuing for shipment sync worker`);
                 
-                // Try to extract shipment_id from multiple sources
-                let shipmentId: string | null = null;
-                
-                // Method 1: Extract from label_url (supports both numeric and UUID formats)
-                // Examples: "se-594045345" or "se-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                const labelUrl = trackingData?.label_url;
-                if (labelUrl) {
-                  const shipmentIdMatch = labelUrl.match(/\/labels\/(se-[a-f0-9-]+)/i);
-                  if (shipmentIdMatch) {
-                    shipmentId = shipmentIdMatch[1];
-                  }
-                }
-                
-                // Method 2: Fallback to shipment_id field if present in tracking data
-                if (!shipmentId && trackingData?.shipment_id) {
-                  shipmentId = trackingData.shipment_id;
-                }
-                
-                if (shipmentId) {
-                  try {
-                    // Fetch full shipment details from ShipStation
-                    const shipmentData = await getShipmentByShipmentId(shipmentId);
-                    
-                    if (shipmentData) {
-                      // Try to get order number from multiple sources in shipmentData
-                      let orderNumber = shipmentData.shipment_number || shipmentData.orderNumber;
-                      let order: any = null;
-                      
-                      // Method 1: If we have an order number, try to find the order
-                      if (orderNumber) {
-                        order = await storage.getOrderByOrderNumber(orderNumber);
-                      }
-                      
-                      // Method 2: Try using orderId directly from shipment payload
-                      if (!order && shipmentData.orderId) {
-                        order = await storage.getOrder(shipmentData.orderId.toString());
-                      }
-                      
-                      // Method 3: Try using orderKey from shipment payload
-                      if (!order && shipmentData.orderKey) {
-                        order = await storage.getOrder(shipmentData.orderKey);
-                      }
-                      
-                      // Method 4: Try external_shipment_id (format: "shopifyOrderId-lineItemId")
-                      if (!order && shipmentData.external_shipment_id) {
-                        const externalIdParts = shipmentData.external_shipment_id.split('-');
-                        if (externalIdParts.length >= 1) {
-                          const shopifyOrderId = externalIdParts[0];
-                          order = await storage.getOrder(shopifyOrderId);
-                          if (order) {
-                            console.log(`Found order ${order.orderNumber} via external_shipment_id for tracking ${trackingNumber}`);
-                          }
-                        }
-                      }
-                      
-                      // Method 5: Try fulfillment API lookup by tracking number as last resort
-                      if (!order) {
-                        try {
-                          const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
-                          if (fulfillmentData?.order_number) {
-                            order = await storage.getOrderByOrderNumber(fulfillmentData.order_number);
-                            if (order) {
-                              console.log(`Found order ${order.orderNumber} via fulfillment API for tracking ${trackingNumber}`);
-                            }
-                          }
-                        } catch (fulfillmentError: any) {
-                          console.warn(`Fulfillment API lookup failed for ${trackingNumber}:`, fulfillmentError.message);
-                        }
-                      }
-                      
-                      if (!order) {
-                        console.error(`Cannot link tracking ${trackingNumber} to any order - tried shipment_number, orderId, orderKey, external_shipment_id, and fulfillment API`);
-                      } else {
-                          // Create the shipment record
-                          const shipmentRecord = {
-                            orderId: order.id,
-                            shipmentId: shipmentData.shipment_id,
-                            trackingNumber: trackingNumber,
-                            carrierCode: trackingData.carrier_code || shipmentData.carrier_code,
-                            serviceCode: shipmentData.service_code,
-                            status: trackingData.status_code === 'DE' ? 'delivered' : 'in_transit',
-                            statusDescription: trackingData.status_description || 'In Transit',
-                            shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-                            shipmentData: {
-                              ...shipmentData,
-                              latestTracking: trackingData,
-                            },
-                          };
-                          
-                          existingShipment = await storage.createShipment(shipmentRecord);
-                          console.log(`Created shipment ${trackingNumber} for order ${order.orderNumber}`);
-                          
-                          // Broadcast update
-                          broadcastOrderUpdate(order);
-                      }
-                    } else {
-                      console.warn(`ShipStation returned null for shipment ${shipmentId} - tracking ${trackingNumber} cannot be linked`);
-                    }
-                  } catch (error: any) {
-                    console.error(`Failed to fetch shipment ${shipmentId} from ShipStation:`, error.message);
-                  }
-                } else {
-                  console.warn(`Could not extract shipment_id for tracking ${trackingNumber} - no label_url or shipment_id field available`);
-                }
-              }
-              
-              // Update existing shipment with tracking info (if we have one now)
-              if (existingShipment) {
+                await enqueueShipmentSync({
+                  trackingNumber,
+                  reason: 'webhook',
+                  enqueuedAt: Date.now(),
+                });
+              } else {
+                // Update existing shipment with latest tracking info
                 const updatedShipmentData = {
                   ...(existingShipment.shipmentData || {}),
                   latestTracking: trackingData,
