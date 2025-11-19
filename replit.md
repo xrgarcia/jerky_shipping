@@ -54,7 +54,7 @@ Preferred communication style: Simple, everyday language.
   - Token cached in Redis with 24-hour TTL for persistence across server restarts
   - Rate limiting (2-second delay between requests) prevents triggering anti-bot protection
   - Lockout countdown timer displays remaining time when account is temporarily locked
-- **Order Backfill System (`/backfill`)**: Imports historical Shopify orders using an ID-only queueing mechanism to optimize memory usage. Features a UI with progress tracking and job history.
+- **Order Backfill System (`/backfill`)**: Imports historical Shopify orders AND their shipments from ShipStation using an ID-only queueing mechanism to optimize memory usage. Features intelligent rate limiting that monitors ShipStation API headers (X-Rate-Limit-Remaining, X-Rate-Limit-Reset) to avoid hitting rate limits. Includes a UI with progress tracking and job history.
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
 - **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates and notifications.
