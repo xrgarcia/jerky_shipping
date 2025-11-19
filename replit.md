@@ -71,12 +71,14 @@ Preferred communication style: Simple, everyday language.
   - Webhook handlers queue messages instead of making synchronous ShipStation API calls, improving response times and preventing rate limit violations
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Operations Dashboard (`/operations`)**: Real-time queue monitoring and management interface providing comprehensive visibility into system health. Features:
-  - Live queue metrics with 5-second auto-refresh: Shopify webhook queue and shipment sync queue sizes, oldest message timestamps
+  - Live queue metrics via WebSocket with instant updates: Shopify webhook queue and shipment sync queue sizes, oldest message timestamps
   - Color-coded health indicators (green/yellow/red) based on queue size and message age
   - Worker status panel showing both background workers (Shopify webhook processor, shipment sync worker) with running state
+  - Backfill job status showing active backfill job with real-time progress bar, or recent completed/failed jobs
   - Purge actions with confirmation dialogs for clearing Shopify queue, shipment sync queue, or entire failure table
   - Interactive failures table with search (by order number or error message), pagination, and expandable details showing full request/response data
   - Detailed failure records preserve complete webhook payloads for troubleshooting
+  - WebSocket-based real-time updates eliminate HTTP polling for instant metric updates
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
 - **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates, queue status (Shopify queue, shipment sync queue, failure count), and notifications.
 - **Price Field Storage**: Captures 13 distinct Shopify price/amount fields consistently as text strings.

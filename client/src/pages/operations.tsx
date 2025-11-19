@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+type BackfillJob = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  totalOrders: number;
+  processedOrders: number;
+  failedOrders: number;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type QueueStats = {
   shopifyQueue: {
     size: number;
@@ -55,6 +69,10 @@ type QueueStats = {
   };
   failures: {
     total: number;
+  };
+  backfill: {
+    activeJob: BackfillJob | null;
+    recentJobs: BackfillJob[];
   };
 };
 
@@ -138,8 +156,8 @@ export default function OperationsPage() {
           const message = JSON.parse(event.data);
           
           if (message.type === 'queue_status' && message.data) {
-            // Update live queue stats from WebSocket
-            setLiveQueueStats({
+            // Update live queue stats from WebSocket, preserving backfill data from initial fetch
+            setLiveQueueStats(prev => ({
               shopifyQueue: {
                 size: message.data.shopifyQueue,
                 oldestMessageAt: message.data.shopifyQueueOldestAt,
@@ -151,7 +169,8 @@ export default function OperationsPage() {
               failures: {
                 total: message.data.shipmentFailureCount,
               },
-            });
+              backfill: (prev || initialQueueStats)?.backfill || { activeJob: null, recentJobs: [] },
+            }));
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
@@ -472,6 +491,88 @@ export default function OperationsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {queueStats?.backfill && (queueStats.backfill.activeJob || queueStats.backfill.recentJobs.length > 0) && (
+        <Card data-testid="card-backfill-status">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Backfill Jobs
+            </CardTitle>
+            <CardDescription>Historical order backfill status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {queueStats.backfill.activeJob ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Active Backfill Job</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(queueStats.backfill.activeJob.startDate).toLocaleDateString()} - {new Date(queueStats.backfill.activeJob.endDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={queueStats.backfill.activeJob.status === "in_progress" ? "default" : "secondary"}
+                    data-testid="badge-backfill-status"
+                  >
+                    {queueStats.backfill.activeJob.status === "in_progress" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
+                    {queueStats.backfill.activeJob.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
+                    {queueStats.backfill.activeJob.status}
+                  </Badge>
+                </div>
+                
+                {queueStats.backfill.activeJob.totalOrders > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">
+                        {queueStats.backfill.activeJob.processedOrders.toLocaleString()} / {queueStats.backfill.activeJob.totalOrders.toLocaleString()}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(queueStats.backfill.activeJob.processedOrders / queueStats.backfill.activeJob.totalOrders) * 100}
+                      data-testid="progress-backfill"
+                    />
+                    {queueStats.backfill.activeJob.failedOrders > 0 && (
+                      <p className="text-sm text-destructive">
+                        {queueStats.backfill.activeJob.failedOrders} failed orders
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Recent jobs:</p>
+                <div className="space-y-2">
+                  {queueStats.backfill.recentJobs.slice(0, 3).map((job) => (
+                    <div key={job.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          {new Date(job.startDate).toLocaleDateString()} - {new Date(job.endDate).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {job.processedOrders.toLocaleString()} / {job.totalOrders.toLocaleString()} orders
+                        </p>
+                      </div>
+                      <Badge 
+                        variant={
+                          job.status === "completed" ? "default" :
+                          job.status === "failed" ? "destructive" : "secondary"
+                        }
+                      >
+                        {job.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        {job.status === "failed" && <AlertCircle className="h-3 w-3 mr-1" />}
+                        {job.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={purgeAction !== null} onOpenChange={(open) => !open && setPurgeAction(null)}>
         <AlertDialogContent data-testid="dialog-purge-confirmation">

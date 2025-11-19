@@ -2594,6 +2594,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(shipmentSyncFailures)
         .then(rows => rows[0]?.count || 0);
 
+      // Get active/recent backfill jobs
+      const allBackfillJobs = await storage.getAllBackfillJobs();
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      const recentBackfillJobs = allBackfillJobs.slice(0, 5); // Last 5 jobs
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -2605,6 +2610,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         failures: {
           total: failureCount,
+        },
+        backfill: {
+          activeJob: activeBackfillJob || null,
+          recentJobs: recentBackfillJobs,
         },
       });
     } catch (error) {
