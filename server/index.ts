@@ -79,9 +79,14 @@ app.use((req, res, next) => {
 
   // Determine webhook base URL based on environment
   function getWebhookBaseUrl(): string | null {
-    // Allow explicit override via WEBHOOK_BASE_URL
-    if (process.env.WEBHOOK_BASE_URL) {
-      return process.env.WEBHOOK_BASE_URL.replace(/\/$/, ''); // Remove trailing slash
+    // Allow explicit override via WEBHOOK_BASE_URL (but sanitize it)
+    const envOverride = process.env.WEBHOOK_BASE_URL?.trim();
+    if (envOverride) {
+      const sanitized = envOverride.replace(/\/$/, ''); // Remove trailing slash
+      if (sanitized && sanitized.startsWith('http')) {
+        return sanitized;
+      }
+      log(`Warning: WEBHOOK_BASE_URL is set but invalid: "${envOverride}"`);
     }
 
     // Auto-detect based on environment
@@ -92,7 +97,7 @@ app.use((req, res, next) => {
       return 'https://jerkyshippping.replit.app';
     } else {
       // Development workspace - use REPLIT_DOMAINS
-      const devDomain = process.env.REPLIT_DOMAINS;
+      const devDomain = process.env.REPLIT_DOMAINS?.trim();
       if (devDomain) {
         // Ensure it has https:// prefix and no trailing slash
         const url = devDomain.startsWith('http') ? devDomain : `https://${devDomain}`;
@@ -108,6 +113,8 @@ app.use((req, res, next) => {
   if (webhookBaseUrl) {
     const envName = process.env.REPLIT_DEPLOYMENT === '1' ? 'PRODUCTION' : 'DEV';
     log(`Webhook base URL (${envName}): ${webhookBaseUrl}`);
+  } else {
+    log('Warning: No valid webhook base URL detected - webhook registration will be skipped');
   }
 
   // Register Shopify webhooks on startup
