@@ -58,7 +58,7 @@ export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
-  const [webhookQueueLength, setWebhookQueueLength] = useState<number>(0);
+  const [shopifyQueueLength, setShopifyQueueLength] = useState<number>(0);
   const [shipmentSyncQueueLength, setShipmentSyncQueueLength] = useState<number>(0);
   const [shipmentFailureCount, setShipmentFailureCount] = useState<number>(0);
   const { toast } = useToast();
@@ -160,12 +160,12 @@ export default function BackfillPage() {
     },
   });
 
-  const purgeWebhookQueueMutation = useMutation({
+  const purgeShopifyQueueMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/queue/clear");
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to purge webhook queue");
+        throw new Error(error.error || "Failed to purge Shopify queue");
       }
       return response.json();
     },
@@ -173,13 +173,13 @@ export default function BackfillPage() {
       setShowPurgeDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/webhooks/queue-status"] });
       toast({
-        title: "Webhook queue purged",
-        description: `Cleared ${data.clearedCount} items from the webhook queue.`,
+        title: "Shopify queue purged",
+        description: `Cleared ${data.clearedCount} items from the Shopify queue.`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to purge webhook queue",
+        title: "Failed to purge Shopify queue",
         description: error.message,
         variant: "destructive",
       });
@@ -214,7 +214,7 @@ export default function BackfillPage() {
   // Initialize queue counts from API on mount
   useEffect(() => {
     if (queueStatusData) {
-      setWebhookQueueLength(queueStatusData.queueLength);
+      setShopifyQueueLength(queueStatusData.queueLength);
     }
   }, [queueStatusData]);
 
@@ -251,7 +251,7 @@ export default function BackfillPage() {
           const message = JSON.parse(event.data);
           
           if (message.type === 'queue_status') {
-            setWebhookQueueLength(message.data.webhookQueue);
+            setShopifyQueueLength(message.data.shopifyQueue);
             setShipmentSyncQueueLength(message.data.shipmentSyncQueue);
             setShipmentFailureCount(message.data.shipmentFailureCount);
           }
@@ -339,16 +339,16 @@ export default function BackfillPage() {
         <div className="flex items-start gap-6">
           <div className="flex flex-col items-center gap-2">
             <div className="text-center">
-              <div className="text-sm text-muted-foreground">Webhook Queue</div>
+              <div className="text-sm text-muted-foreground">Shopify Queue</div>
               <div className="text-2xl font-bold" data-testid="text-queue-length">
-                {webhookQueueLength.toLocaleString()}
+                {shopifyQueueLength.toLocaleString()}
               </div>
             </div>
             <Button
               variant="destructive"
               size="sm"
               onClick={() => setShowPurgeDialog(true)}
-              data-testid="button-purge-webhook-queue"
+              data-testid="button-purge-shopify-queue"
             >
               <Database className="mr-2 h-4 w-4" />
               Purge
@@ -658,20 +658,20 @@ export default function BackfillPage() {
       <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
         <AlertDialogContent data-testid="dialog-purge-confirmation">
           <AlertDialogHeader>
-            <AlertDialogTitle>Purge Webhook Queue</AlertDialogTitle>
+            <AlertDialogTitle>Purge Shopify Queue</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to purge the webhook queue? This will clear all pending webhooks from the queue. This action cannot be undone.
+              Are you sure you want to purge the Shopify queue? This will clear all pending webhooks from the queue. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-purge">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => purgeWebhookQueueMutation.mutate()}
+              onClick={() => purgeShopifyQueueMutation.mutate()}
               data-testid="button-confirm-purge"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={purgeWebhookQueueMutation.isPending}
+              disabled={purgeShopifyQueueMutation.isPending}
             >
-              {purgeWebhookQueueMutation.isPending ? (
+              {purgeShopifyQueueMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Purging...

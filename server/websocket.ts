@@ -96,7 +96,7 @@ export function broadcastPrintQueueUpdate(data: any): void {
   });
 }
 
-export function broadcastQueueStatus(data: { webhookQueue: number; shipmentSyncQueue: number; shipmentFailureCount: number }): void {
+export function broadcastQueueStatus(data: { shopifyQueue: number; shipmentSyncQueue: number; shipmentFailureCount: number }): void {
   if (!wss) {
     return;
   }

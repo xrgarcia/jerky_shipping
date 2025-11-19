@@ -446,12 +446,12 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       }
       
       // Broadcast queue status via WebSocket
-      const webhookQueueLength = await getQueueLength();
+      const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
       const failureCount = await storage.getShipmentSyncFailureCount();
       
       broadcastQueueStatus({
-        webhookQueue: webhookQueueLength,
+        shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
         shipmentFailureCount: failureCount,
       });

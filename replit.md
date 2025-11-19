@@ -64,7 +64,7 @@ Preferred communication style: Simple, everyday language.
   - Webhook handlers queue messages instead of making synchronous ShipStation API calls, improving response times and preventing rate limit violations
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
-- **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates, queue status (webhook queue, shipment sync queue, failure count), and notifications.
+- **Real-Time Updates**: WebSocket server (`/ws`) provides live order updates, queue status (Shopify queue, shipment sync queue, failure count), and notifications.
 - **Price Field Storage**: Captures 13 distinct Shopify price/amount fields consistently as text strings.
 - **Monorepo Structure**: Client, server, and shared code are co-located.
 - **Async Product Bootstrap**: Products synchronize asynchronously on server startup for quick application launch.
