@@ -49,6 +49,12 @@ export class ShipStationShipmentService {
           // Normalize ShipStation data to our schema
           const normalizedShipment = this.normalizeShipStationShipment(shipStationData, order.id);
           
+          // Skip shipments without a valid shipmentId to prevent duplicate inserts
+          if (!normalizedShipment.shipmentId) {
+            console.log(`[ShipmentService] Skipping shipment with missing ID for order ${orderNumber}`);
+            continue;
+          }
+          
           // Check if shipment already exists
           const existing = await this.storage.getShipmentsByOrderId(order.id);
           const existingShipment = existing.find(s => s.shipmentId === normalizedShipment.shipmentId);
@@ -79,20 +85,44 @@ export class ShipStationShipmentService {
   }
 
   /**
-   * Normalize ShipStation V2 API response (snake_case) to our database schema
-   * Handles field mapping and type conversions in ONE place
+   * Helper to get the first non-empty value from multiple fields
+   * Treats null, undefined, and empty strings as "empty"
+   */
+  private firstNonEmpty(...values: any[]): any {
+    for (const val of values) {
+      if (val !== null && val !== undefined && val !== '') {
+        return val;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Normalize ShipStation V2 API response to our database schema
+   * Handles both camelCase (V2 API) and snake_case (webhook) formats
+   * Field mapping and type conversions in ONE place
    */
   private normalizeShipStationShipment(shipStationData: any, orderId: string): InsertShipment {
+    // ShipStation V2 API returns camelCase, webhooks return snake_case
+    // Use firstNonEmpty to handle both empty strings and null/undefined
+    const shipmentId = this.firstNonEmpty(shipStationData.shipmentId, shipStationData.shipment_id);
+    const trackingNumber = this.firstNonEmpty(shipStationData.trackingNumber, shipStationData.tracking_number);
+    const carrierCode = this.firstNonEmpty(shipStationData.carrierCode, shipStationData.carrier_code);
+    const serviceCode = this.firstNonEmpty(shipStationData.serviceCode, shipStationData.service_code);
+    const voided = shipStationData.voided ?? false;
+    const shipmentStatus = this.firstNonEmpty(shipStationData.shipmentStatus, shipStationData.shipment_status);
+    const shipDate = this.firstNonEmpty(shipStationData.shipDate, shipStationData.ship_date);
+    
     return {
       orderId,
-      shipmentId: shipStationData.shipment_id?.toString() || null,
-      trackingNumber: shipStationData.tracking_number || null,
-      carrierCode: shipStationData.carrier_code || shipStationData.carrierCode || null,
-      serviceCode: shipStationData.service_code || shipStationData.serviceCode || null,
-      status: shipStationData.voided ? 'cancelled' : (shipStationData.shipment_status || 'pending'),
-      statusDescription: shipStationData.shipment_status || null,
+      shipmentId: shipmentId?.toString() || null,
+      trackingNumber: trackingNumber || null,
+      carrierCode: carrierCode || null,
+      serviceCode: serviceCode || null,
+      status: voided ? 'cancelled' : (shipmentStatus || 'pending'),
+      statusDescription: shipmentStatus || null,
       // Convert ISO date strings to Date objects
-      shipDate: shipStationData.ship_date ? new Date(shipStationData.ship_date) : null,
+      shipDate: shipDate ? new Date(shipDate) : null,
       estimatedDeliveryDate: null,
       actualDeliveryDate: null,
       labelUrl: null,
