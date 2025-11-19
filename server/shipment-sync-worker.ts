@@ -38,7 +38,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   
   for (const message of messages) {
     try {
-      const { orderNumber, trackingNumber, reason, jobId } = message;
+      const { orderNumber, trackingNumber, labelUrl, shipmentId, reason, jobId } = message;
       
       // Determine which path to use: tracking number or order number
       if (trackingNumber) {
@@ -48,6 +48,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const trackingData: TrackingData = {
           tracking_number: trackingNumber,
+          label_url: labelUrl,
+          shipment_id: shipmentId,
         };
         
         const linkageResult = await linkTrackingToOrder(trackingData, storage);
