@@ -1,0 +1,59 @@
+2025-11-19T03:35:51Z info: Deployment: 5481c672-3991-4606-be7a-37b1f51226e4
+2025-11-19T03:35:51Z info: Build: bed740da-2103-4426-9a41-869feb41ed2d
+2025-11-19T03:35:51Z info: Connecting to builder
+2025-11-19T03:35:51Z info: Builder connected
+2025-11-19T03:35:52Z info: Installing packages
+2025-11-19T03:35:53Z info: Starting Build
+
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+vite v5.4.20 building for production...
+
+transforming...
+
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+✓ 3408 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                     2.01 kB │ gzip:   0.76 kB
+
+../dist/public/assets/index-CGkatOxG.css     75.84 kB │ gzip:  12.49 kB
+../dist/public/assets/index-Dx14zfhg.js   1,111.83 kB │ gzip: 315.20 kB
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+✓ built in 13.22s
+
+
+  dist/index.js  194.5kb
+
+⚡ Done in 284ms
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.6.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.2
+npm notice To update run: npm install -g npm@11.6.2
+npm notice
+
+2025-11-19T03:36:11Z info: Pushing pid1 binary layer...
+2025-11-19T03:36:12Z info: Pushing hosting layer...
+2025-11-19T03:36:12Z info: Pushing Repl layer...
+2025-11-19T03:36:13Z info: Created hosting layer
+2025-11-19T03:36:13Z info: Created pid1 binary layer
+2025-11-19T03:36:37Z info: Created Repl layer
+2025-11-19T03:36:40Z info: Pushed image manifest
+2025-11-19T03:36:41Z info: Pushed soci index manifest
+2025-11-19T03:36:45Z info: Creating Autoscale service
+2025-11-19T03:37:15Z info: Waiting for service to be ready
+2025-11-19T03:37:18Z info: Deployment successful
