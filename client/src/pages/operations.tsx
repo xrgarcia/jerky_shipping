@@ -93,6 +93,13 @@ type EnvironmentInfo = {
   };
 };
 
+type ShopifyValidation = {
+  isValid: boolean;
+  errors: string[];
+  lastChecked: string;
+  shopName?: string;
+};
+
 type ShipmentSyncFailure = {
   id: string;
   orderNumber: string;
@@ -144,6 +151,11 @@ export default function OperationsPage() {
   // Fetch environment info (static, no polling)
   const { data: envInfo, isLoading: envLoading } = useQuery<EnvironmentInfo>({
     queryKey: ["/api/operations/environment"],
+  });
+
+  // Fetch Shopify credential validation (cached for 10 minutes on backend)
+  const { data: shopifyValidation, isLoading: validationLoading } = useQuery<ShopifyValidation>({
+    queryKey: ["/api/operations/shopify-validation"],
   });
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
@@ -521,6 +533,78 @@ export default function OperationsPage() {
                 <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-shopify-credentials">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Shopify Credentials
+            </CardTitle>
+            <CardDescription>API connection status (cached 10min)</CardDescription>
+          </div>
+          <Badge
+            data-testid="badge-shopify-validation"
+            variant={shopifyValidation?.isValid ? "default" : "destructive"}
+          >
+            {validationLoading ? (
+              "Checking..."
+            ) : shopifyValidation?.isValid ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Valid
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Invalid
+              </>
+            )}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {validationLoading ? (
+              <p className="text-sm text-muted-foreground">Validating credentials...</p>
+            ) : shopifyValidation?.isValid ? (
+              <div className="space-y-2">
+                {shopifyValidation.shopName && (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium">Shop:</span>
+                    <span className="text-sm text-muted-foreground" data-testid="text-shop-name">
+                      {shopifyValidation.shopName}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  All credentials valid
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Last checked: {formatDistanceToNow(new Date(shopifyValidation.lastChecked), { addSuffix: true })}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-destructive">Configuration Issues:</p>
+                <ul className="space-y-1">
+                  {shopifyValidation?.errors.map((error, idx) => (
+                    <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                      <span data-testid={`text-error-${idx}`}>{error}</span>
+                    </li>
+                  ))}
+                </ul>
+                {shopifyValidation?.lastChecked && (
+                  <p className="text-xs text-muted-foreground">
+                    Last checked: {formatDistanceToNow(new Date(shopifyValidation.lastChecked), { addSuffix: true })}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
