@@ -67,7 +67,7 @@ Preferred communication style: Simple, everyday language.
   - **Path B (Order Number)**: Receives order number from fulfillment webhooks → fetches shipments via `getShipmentsByOrderNumber()` → creates/updates all shipments for order
   - Both paths produce identical enriched shipment records with symmetric rate-limit protection
   - **Rate Limit Handling**: Reads ShipStation's actual `X-Rate-Limit-*` headers after each API call instead of manual tracking. When quota exhausted (remaining ≤ 0), worker breaks out of batch processing and lets next run (10s later) start fresh. This enables burst processing of ~40 orders when quota available.
-  - Failures logged to `shipmentSyncFailures` dead letter queue for monitoring
+  - **Failure Logging**: Failures logged to `shipmentSyncFailures` dead letter queue with complete webhook payload preservation. Each failure record stores both the simplified queue message AND the original webhook data (label_url, tracking events, status codes, etc.) in the `requestData` field, enabling complete troubleshooting without data loss.
   - Webhook handlers queue messages instead of making synchronous ShipStation API calls, improving response times and preventing rate limit violations
 - **Reports Page (`/reports`)**: Business analytics dashboard with date range filtering, interactive charts, and summary widgets for key metrics (orders, revenue, shipping, returns). All reporting is aligned to **Central Standard Time (America/Chicago timezone)**. Includes detailed revenue breakdown and robust refund tracking.
 - **Print Queue System**: Manages shipping label printing workflow, displaying active print jobs with real-time status updates via WebSockets.
