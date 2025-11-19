@@ -1702,8 +1702,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process each order immediately and queue only the ID
       // This prevents Redis queue from exceeding 100MB limit
-      try {
-        for (const shopifyOrder of allOrders) {
+      // Wrap EACH order in try-catch so one bad order doesn't kill the whole job
+      let processedCount = 0;
+      let failedCount = 0;
+      
+      for (const shopifyOrder of allOrders) {
+        try {
           // Store order in database first
           const orderData = {
             id: shopifyOrder.id.toString(),
@@ -1743,19 +1747,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Queue only the order ID (not full order data)
           await enqueueOrderId(orderData.id, job.id);
+          
+          processedCount++;
+        } catch (orderError: any) {
+          // Log individual order failure - don't abort entire backfill
+          const orderNumber = shopifyOrder.order_number || shopifyOrder.id || 'unknown';
+          console.error(`[Backfill ${job.id}] Failed to process order ${orderNumber}:`, orderError.message);
+          
+          // Increment failed counter
+          await storage.incrementBackfillFailed(job.id, 1);
+          failedCount++;
         }
-      } catch (processingError: any) {
-        // Rollback: reset job completely so it can be retried
-        await storage.updateBackfillJob(job.id, {
-          totalOrders: 0,
-          processedOrders: 0,
-          failedOrders: 0,
-          status: "failed",
-          errorMessage: `Failed to process orders: ${processingError.message}`,
-        });
-        console.error("Error processing orders for backfill:", processingError);
-        return res.status(500).json({ error: "Failed to process orders" });
       }
+      
+      console.log(`[Backfill ${job.id}] Completed: ${processedCount} queued, ${failedCount} failed out of ${allOrders.length} total orders`);
 
       res.json({ 
         success: true,
@@ -1831,12 +1836,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/shipment-sync/failures", requireAuth, async (req, res) => {
     try {
-      const failures = await db.select()
-        .from(shipmentSyncFailures)
-        .orderBy(desc(shipmentSyncFailures.failedAt))
-        .limit(100);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
       
-      res.json({ failures });
+      const failures = await storage.getShipmentSyncFailures(limit, offset);
+      const totalCount = await storage.getShipmentSyncFailureCount();
+      
+      res.json({ 
+        failures,
+        totalCount,
+        limit,
+        offset,
+      });
     } catch (error) {
       console.error("Error fetching shipment sync failures:", error);
       res.status(500).json({ error: "Failed to fetch failures" });

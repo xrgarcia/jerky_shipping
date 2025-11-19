@@ -34,6 +34,7 @@ import {
   type OrderItem,
   type InsertOrderItem,
   orderItems,
+  type ShipmentSyncFailure,
   shipmentSyncFailures,
 } from "@shared/schema";
 
@@ -156,6 +157,7 @@ export interface IStorage {
   
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
+  getShipmentSyncFailures(limit?: number, offset?: number): Promise<ShipmentSyncFailure[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -900,16 +902,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async incrementBackfillProgress(id: string, incrementBy: number): Promise<void> {
-    // Only increment if job is still in_progress (prevents orphaned tasks from updating failed jobs)
+    // Allow increments regardless of job status to get accurate final count
+    // This ensures all processed orders are counted even if job completes before worker finishes
     await db
       .update(backfillJobs)
       .set({
         processedOrders: sql`${backfillJobs.processedOrders} + ${incrementBy}`,
         updatedAt: new Date(),
       })
-      .where(
-        sql`${backfillJobs.id} = ${id} AND ${backfillJobs.status} = 'in_progress'`
-      );
+      .where(eq(backfillJobs.id, id));
   }
 
   async incrementBackfillFailed(id: string, incrementBy: number): Promise<void> {
@@ -985,6 +986,16 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipmentSyncFailures);
     return result[0]?.count || 0;
+  }
+
+  async getShipmentSyncFailures(limit: number = 50, offset: number = 0): Promise<ShipmentSyncFailure[]> {
+    const result = await db
+      .select()
+      .from(shipmentSyncFailures)
+      .orderBy(desc(shipmentSyncFailures.failedAt))
+      .limit(limit)
+      .offset(offset);
+    return result;
   }
 }
 

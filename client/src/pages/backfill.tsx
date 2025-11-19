@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, RotateCw, Trash2, Database, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -24,6 +24,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,10 +66,23 @@ type BackfillJob = {
   updatedAt: string;
 };
 
+type ShipmentSyncFailure = {
+  id: string;
+  orderNumber: string;
+  reason: string;
+  errorMessage: string;
+  requestData: any;
+  responseData: any;
+  retryCount: number;
+  failedAt: string;
+  createdAt: string;
+};
+
 export default function BackfillPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
+  const [showFailuresDialog, setShowFailuresDialog] = useState(false);
   const [shopifyQueueLength, setShopifyQueueLength] = useState<number>(0);
   const [shipmentSyncQueueLength, setShipmentSyncQueueLength] = useState<number>(0);
   const [shipmentFailureCount, setShipmentFailureCount] = useState<number>(0);
@@ -361,9 +386,13 @@ export default function BackfillPage() {
                 {shipmentSyncQueueLength.toLocaleString()}
               </div>
               {shipmentFailureCount > 0 && (
-                <div className="text-sm text-destructive">
+                <button 
+                  onClick={() => setShowFailuresDialog(true)}
+                  className="text-sm text-destructive hover:underline cursor-pointer"
+                  data-testid="button-view-failures"
+                >
                   {shipmentFailureCount} failed
-                </div>
+                </button>
               )}
             </div>
             <Button
@@ -683,6 +712,135 @@ export default function BackfillPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Failures Dialog */}
+      <FailuresDialog open={showFailuresDialog} onOpenChange={setShowFailuresDialog} />
     </div>
+  );
+}
+
+// Failures Dialog Component
+function FailuresDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const { data: failuresData, isLoading } = useQuery<{ 
+    failures: ShipmentSyncFailure[]; 
+    totalCount: number;
+    limit: number;
+    offset: number;
+  }>({
+    queryKey: ["/api/shipment-sync/failures"],
+    enabled: open,
+  });
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-failures">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            Shipment Sync Failures
+          </DialogTitle>
+          <DialogDescription>
+            {failuresData?.totalCount ? `${failuresData.totalCount} failed shipment sync attempts` : 'Loading...'}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : failuresData && failuresData.failures.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead>Order Number</TableHead>
+                  <TableHead>Error Message</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Failed At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {failuresData.failures.map((failure) => (
+                  <>
+                    <TableRow key={failure.id} className="cursor-pointer hover:bg-muted/50" data-testid={`row-failure-${failure.id}`}>
+                      <TableCell>
+                        <button onClick={() => toggleRow(failure.id)} className="p-1">
+                          {expandedRows.has(failure.id) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${failure.id}`}>
+                        {failure.orderNumber}
+                      </TableCell>
+                      <TableCell className="max-w-md truncate" data-testid={`text-error-${failure.id}`}>
+                        {failure.errorMessage}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{failure.reason}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(failure.failedAt), "MMM d, yyyy h:mm a")}
+                      </TableCell>
+                    </TableRow>
+                    {expandedRows.has(failure.id) && (
+                      <TableRow key={`${failure.id}-details`}>
+                        <TableCell colSpan={5} className="bg-muted/30">
+                          <div className="p-4 space-y-4">
+                            <div>
+                              <div className="font-semibold text-sm mb-1">Full Error Message</div>
+                              <div className="text-sm bg-background p-3 rounded border">
+                                {failure.errorMessage}
+                              </div>
+                            </div>
+                            
+                            {failure.requestData && (
+                              <div>
+                                <div className="font-semibold text-sm mb-1">Request Data</div>
+                                <pre className="text-xs bg-background p-3 rounded border overflow-auto max-h-40">
+                                  {JSON.stringify(failure.requestData, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                            
+                            {failure.responseData && (
+                              <div>
+                                <div className="font-semibold text-sm mb-1">Response Data</div>
+                                <pre className="text-xs bg-background p-3 rounded border overflow-auto max-h-40">
+                                  {JSON.stringify(failure.responseData, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center text-muted-foreground p-8">
+              No failures found
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
