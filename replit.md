@@ -66,6 +66,12 @@ Preferred communication style: Simple, everyday language.
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization. Utilizes webhooks for real-time updates.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment. Webhooks are used for status updates.
+    -   **Tracking Webhook Handling**: Comprehensive 5-tier fallback strategy for creating shipment records when tracking webhooks arrive before fulfillment webhooks:
+        1. Extract shipment ID from `label_url` (format: `se-XXXXXXX` or `se-UUID`)
+        2. Fetch full shipment details from ShipStation `/v2/shipments?shipment_id={id}`
+        3. Find order using multiple fallback methods: `shipment_number`, `orderId`, `orderKey`, `external_shipment_id`, fulfillment API
+        4. Create shipment record with complete tracking data linked to order
+        5. Implemented via shared `linkTrackingToOrder()` utility in `server/utils/shipment-linkage.ts` to avoid code duplication
 -   **SkuVault Integration**: Reverse-engineered web API for accessing wave picking session data, including HTML form login and token caching. Rate limiting (2-second delay between requests) prevents triggering anti-bot protection.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Nodemailer**: For sending magic link authentication emails.
