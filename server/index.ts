@@ -77,16 +77,49 @@ app.use((req, res, next) => {
   setupWebSocket(server);
   log("WebSocket server initialized");
 
+  // Determine webhook base URL based on environment
+  function getWebhookBaseUrl(): string | null {
+    // Allow explicit override via WEBHOOK_BASE_URL
+    if (process.env.WEBHOOK_BASE_URL) {
+      return process.env.WEBHOOK_BASE_URL.replace(/\/$/, ''); // Remove trailing slash
+    }
+
+    // Auto-detect based on environment
+    const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+    
+    if (isProduction) {
+      // Production deployment - use published .replit.app URL
+      return 'https://jerkyshippping.replit.app';
+    } else {
+      // Development workspace - use REPLIT_DOMAINS
+      const devDomain = process.env.REPLIT_DOMAINS;
+      if (devDomain) {
+        // Ensure it has https:// prefix and no trailing slash
+        const url = devDomain.startsWith('http') ? devDomain : `https://${devDomain}`;
+        return url.replace(/\/$/, '');
+      }
+    }
+
+    return null;
+  }
+
+  const webhookBaseUrl = getWebhookBaseUrl();
+  
+  if (webhookBaseUrl) {
+    const envName = process.env.REPLIT_DEPLOYMENT === '1' ? 'PRODUCTION' : 'DEV';
+    log(`Webhook base URL (${envName}): ${webhookBaseUrl}`);
+  }
+
   // Register Shopify webhooks on startup
   if (process.env.SHOPIFY_SHOP_DOMAIN && 
       process.env.SHOPIFY_ADMIN_ACCESS_TOKEN && 
-      process.env.WEBHOOK_BASE_URL) {
+      webhookBaseUrl) {
     try {
       log("Checking Shopify webhook registration...");
       await ensureWebhooksRegistered(
         process.env.SHOPIFY_SHOP_DOMAIN,
         process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
-        process.env.WEBHOOK_BASE_URL
+        webhookBaseUrl
       );
       log("Shopify webhooks verified");
     } catch (error) {
@@ -97,11 +130,11 @@ app.use((req, res, next) => {
   }
 
   // Register ShipStation webhooks on startup
-  if (process.env.SHIPSTATION_API_KEY && process.env.WEBHOOK_BASE_URL) {
+  if (process.env.SHIPSTATION_API_KEY && webhookBaseUrl) {
     try {
       log("Checking ShipStation webhook registration...");
       await ensureShipStationWebhooksRegistered(
-        process.env.WEBHOOK_BASE_URL
+        webhookBaseUrl
       );
       log("ShipStation webhooks verified");
     } catch (error) {
