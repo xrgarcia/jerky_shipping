@@ -11,7 +11,7 @@ import { insertUserSchema, insertMagicLinkTokenSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { verifyShopifyWebhook } from "./utils/shopify-webhook";
+import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
@@ -2707,6 +2707,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error purging failures:", error);
       res.status(500).json({ error: "Failed to purge failures table" });
+    }
+  });
+
+  app.post("/api/operations/reregister-shopify-webhooks", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+      const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || (
+        process.env.REPLIT_DEPLOYMENT 
+          ? 'https://jerkyshippping.replit.app' 
+          : (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : '')
+      );
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ 
+          error: "Missing Shopify credentials. Ensure SHOPIFY_SHOP_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN are set." 
+        });
+      }
+
+      if (!webhookBaseUrl) {
+        return res.status(400).json({ 
+          error: "Cannot determine webhook base URL. Check environment configuration." 
+        });
+      }
+
+      console.log('Re-registering Shopify webhooks via API request...');
+      const result = await reregisterAllWebhooks(shopDomain, accessToken, webhookBaseUrl);
+      
+      res.json({ 
+        success: true, 
+        deleted: result.deleted,
+        registered: result.registered,
+        message: `Successfully deleted ${result.deleted} and re-registered ${result.registered} webhook(s)`
+      });
+    } catch (error: any) {
+      console.error("Error re-registering Shopify webhooks:", error);
+      res.status(500).json({ 
+        error: "Failed to re-register Shopify webhooks",
+        details: error.message 
+      });
     }
   });
 
