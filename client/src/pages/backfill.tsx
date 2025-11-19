@@ -78,6 +78,11 @@ export default function BackfillPage() {
     refetchInterval: 2000,
   });
 
+  const { data: shipmentSyncStatusData } = useQuery<{ queueLength: number; failureCount: number }>({
+    queryKey: ["/api/shipment-sync/status"],
+    refetchInterval: 2000,
+  });
+
   const { data: selectedJobData } = useQuery<{ job: BackfillJob }>({
     queryKey: ["/api/backfill/jobs", selectedJobId],
     enabled: !!selectedJobId,
@@ -231,12 +236,23 @@ export default function BackfillPage() {
             Import historical orders from Shopify by date range
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">Queue Items</div>
+            <div className="text-sm text-muted-foreground">Webhook Queue</div>
             <div className="text-2xl font-bold" data-testid="text-queue-length">
               {queueStatusData?.queueLength?.toLocaleString() ?? '...'}
             </div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">Shipment Sync Queue</div>
+            <div className="text-2xl font-bold" data-testid="text-shipment-sync-queue-length">
+              {shipmentSyncStatusData?.queueLength?.toLocaleString() ?? '...'}
+            </div>
+            {shipmentSyncStatusData && shipmentSyncStatusData.failureCount > 0 && (
+              <div className="text-sm text-destructive mt-1">
+                {shipmentSyncStatusData.failureCount} failed
+              </div>
+            )}
           </div>
           <Button
             variant="destructive"

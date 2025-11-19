@@ -155,8 +155,12 @@ app.use((req, res, next) => {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     const { startBackgroundWorker } = await import("./background-worker");
     startBackgroundWorker(5000); // Process queue every 5 seconds
+    
+    // Start shipment sync worker to process shipment sync requests
+    const { startShipmentSyncWorker } = await import("./shipment-sync-worker");
+    startShipmentSyncWorker(10000); // Process shipment sync queue every 10 seconds
   } else {
-    log("Skipping background worker - Redis not configured");
+    log("Skipping background workers - Redis not configured");
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

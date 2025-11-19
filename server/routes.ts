@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, count, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
 import { z } from "zod";
@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, enqueueShipmentSync } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
@@ -1819,8 +1819,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process each order immediately and queue only the ID
       // This prevents Redis queue from exceeding 100MB limit
       try {
-        let lastRateLimit;
-        
         for (const shopifyOrder of allOrders) {
           // Store order in database first
           const orderData = {
@@ -1851,21 +1849,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await processOrderRefunds(orderData.id, shopifyOrder);
           await processOrderLineItems(orderData.id, shopifyOrder);
 
-          // NEW: Sync shipments from ShipStation with smart rate limiting
-          try {
-            // Check rate limit before making ShipStation API call
-            await checkRateLimit(lastRateLimit);
-            
-            const shipmentResult = await shipmentService.syncShipmentsForOrder(orderData.orderNumber);
-            lastRateLimit = shipmentResult.rateLimit;
-            
-            if (shipmentResult.success && shipmentResult.shipments.length > 0) {
-              console.log(`[Backfill] Synced ${shipmentResult.shipments.length} shipment(s) for order ${orderData.orderNumber}`);
-            }
-          } catch (shipmentError: any) {
-            // Log but don't fail the entire backfill if shipment sync fails
-            console.error(`[Backfill] Failed to sync shipments for order ${orderData.orderNumber}:`, shipmentError.message);
-          }
+          // Enqueue shipment sync request (processed asynchronously by shipment-sync-worker)
+          await enqueueShipmentSync({
+            reason: 'backfill',
+            orderNumber: orderData.orderNumber,
+            enqueuedAt: Date.now(),
+            jobId: job.id,
+          });
 
           // Queue only the order ID (not full order data)
           await enqueueOrderId(orderData.id, job.id);
@@ -1931,6 +1921,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting backfill job:", error);
       res.status(500).json({ error: "Failed to delete job" });
+    }
+  });
+
+  // Shipment Sync API endpoints
+  app.get("/api/shipment-sync/status", requireAuth, async (req, res) => {
+    try {
+      const { getShipmentSyncQueueLength } = await import("./utils/queue");
+      const queueLength = await getShipmentSyncQueueLength();
+      
+      // Count failures in dead letter queue
+      const failures = await db.select({ count: count() })
+        .from(shipmentSyncFailures);
+      const failureCount = failures[0]?.count || 0;
+      
+      res.json({ 
+        queueLength,
+        failureCount,
+      });
+    } catch (error) {
+      console.error("Error fetching shipment sync status:", error);
+      res.status(500).json({ error: "Failed to fetch status" });
+    }
+  });
+
+  app.get("/api/shipment-sync/failures", requireAuth, async (req, res) => {
+    try {
+      const failures = await db.select()
+        .from(shipmentSyncFailures)
+        .orderBy(desc(shipmentSyncFailures.failedAt))
+        .limit(100);
+      
+      res.json({ failures });
+    } catch (error) {
+      console.error("Error fetching shipment sync failures:", error);
+      res.status(500).json({ error: "Failed to fetch failures" });
+    }
+  });
+
+  app.post("/api/shipment-sync/retry/:id", requireAuth, async (req, res) => {
+    try {
+      // Get the failure record
+      const failure = await db.select()
+        .from(shipmentSyncFailures)
+        .where(eq(shipmentSyncFailures.id, req.params.id))
+        .limit(1);
+      
+      if (!failure || failure.length === 0) {
+        return res.status(404).json({ error: "Failure record not found" });
+      }
+
+      const record = failure[0];
+      
+      // Re-enqueue the shipment sync message
+      await enqueueShipmentSync({
+        reason: 'manual',
+        orderNumber: record.orderNumber,
+        enqueuedAt: Date.now(),
+      });
+
+      // Update retry count
+      await db.update(shipmentSyncFailures)
+        .set({ retryCount: record.retryCount + 1 })
+        .where(eq(shipmentSyncFailures.id, req.params.id));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error retrying shipment sync:", error);
+      res.status(500).json({ error: "Failed to retry" });
+    }
+  });
+
+  app.delete("/api/shipment-sync/failures/:id", requireAuth, async (req, res) => {
+    try {
+      await db.delete(shipmentSyncFailures)
+        .where(eq(shipmentSyncFailures.id, req.params.id));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting shipment sync failure:", error);
+      res.status(500).json({ error: "Failed to delete failure" });
     }
   });
 

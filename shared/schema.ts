@@ -302,3 +302,30 @@ export const insertPrintQueueSchema = createInsertSchema(printQueue).omit({
 
 export type InsertPrintQueue = z.infer<typeof insertPrintQueueSchema>;
 export type PrintQueue = typeof printQueue.$inferSelect;
+
+// Shipment sync failures table for dead letter queue
+export const shipmentSyncFailures = pgTable("shipment_sync_failures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderNumber: text("order_number").notNull(),
+  reason: text("reason").notNull(), // 'backfill' | 'webhook' | 'manual'
+  errorMessage: text("error_message").notNull(),
+  requestData: jsonb("request_data"), // Original request details
+  responseData: jsonb("response_data"), // API response if available
+  retryCount: integer("retry_count").notNull().default(0),
+  failedAt: timestamp("failed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shipment_sync_failures_order_number_idx ON ${table} (order_number)`,
+  failedAtIdx: sql`CREATE INDEX IF NOT EXISTS shipment_sync_failures_failed_at_idx ON ${table} (failed_at)`,
+}));
+
+export const insertShipmentSyncFailureSchema = createInsertSchema(shipmentSyncFailures).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  requestData: z.any().nullish(),
+  responseData: z.any().nullish(),
+});
+
+export type InsertShipmentSyncFailure = z.infer<typeof insertShipmentSyncFailureSchema>;
+export type ShipmentSyncFailure = typeof shipmentSyncFailures.$inferSelect;

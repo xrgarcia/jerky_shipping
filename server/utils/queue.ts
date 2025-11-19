@@ -66,3 +66,75 @@ export async function clearQueue(): Promise<number> {
   }
   return length;
 }
+
+// Shipment Sync Queue operations
+const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync';
+
+export interface ShipmentSyncMessage {
+  reason: 'backfill' | 'webhook' | 'manual';
+  orderNumber: string;
+  enqueuedAt: number;
+  jobId?: string; // Optional backfill job ID for tracking
+}
+
+export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<void> {
+  const redis = getRedisClient();
+  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+}
+
+export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+  
+  const redis = getRedisClient();
+  const serialized = messages.map(msg => JSON.stringify(msg));
+  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+}
+
+export async function dequeueShipmentSync(): Promise<ShipmentSyncMessage | null> {
+  const redis = getRedisClient();
+  const data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY);
+  
+  if (!data) {
+    return null;
+  }
+
+  // Handle case where Redis returns an object instead of a string
+  if (typeof data === 'object') {
+    return data as ShipmentSyncMessage;
+  }
+
+  return JSON.parse(data as string);
+}
+
+export async function dequeueShipmentSyncBatch(count: number): Promise<ShipmentSyncMessage[]> {
+  const redis = getRedisClient();
+  const messages: ShipmentSyncMessage[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    const data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY);
+    if (!data) break;
+    
+    // Handle case where Redis returns an object instead of a string
+    if (typeof data === 'object') {
+      messages.push(data as ShipmentSyncMessage);
+    } else {
+      messages.push(JSON.parse(data as string));
+    }
+  }
+  
+  return messages;
+}
+
+export async function getShipmentSyncQueueLength(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.llen(SHIPMENT_SYNC_QUEUE_KEY) || 0;
+}
+
+export async function clearShipmentSyncQueue(): Promise<number> {
+  const redis = getRedisClient();
+  const length = await getShipmentSyncQueueLength();
+  if (length > 0) {
+    await redis.del(SHIPMENT_SYNC_QUEUE_KEY);
+  }
+  return length;
+}
