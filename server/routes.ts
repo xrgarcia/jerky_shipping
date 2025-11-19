@@ -2622,6 +2622,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/operations/environment", requireAuth, async (req, res) => {
+    try {
+      // Return safe environment info (no secrets)
+      const redisUrl = process.env.UPSTASH_REDIS_REST_URL || '';
+      const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || 
+        (process.env.REPLIT_DEPLOYMENT === '1' 
+          ? 'https://jerkyshippping.replit.app'
+          : `https://${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost'}`);
+      
+      // Extract just the host from Redis URL (no token)
+      let redisHost = 'Not configured';
+      try {
+        if (redisUrl) {
+          const url = new URL(redisUrl);
+          redisHost = url.hostname;
+        }
+      } catch {
+        redisHost = 'Invalid URL';
+      }
+
+      res.json({
+        redis: {
+          host: redisHost,
+          configured: !!redisUrl,
+        },
+        webhooks: {
+          baseUrl: webhookBaseUrl,
+          environment: process.env.REPLIT_DEPLOYMENT === '1' ? 'production' : 'development',
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching environment info:", error);
+      res.status(500).json({ error: "Failed to fetch environment info" });
+    }
+  });
+
   app.post("/api/operations/purge-shopify-queue", requireAuth, async (req, res) => {
     try {
       const clearedCount = await clearQueue();

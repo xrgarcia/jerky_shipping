@@ -12,7 +12,8 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-  Activity
+  Activity,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,6 +77,17 @@ type QueueStats = {
   };
 };
 
+type EnvironmentInfo = {
+  redis: {
+    host: string;
+    configured: boolean;
+  };
+  webhooks: {
+    baseUrl: string;
+    environment: "production" | "development";
+  };
+};
+
 type ShipmentSyncFailure = {
   id: string;
   orderNumber: string;
@@ -122,6 +134,11 @@ export default function OperationsPage() {
   // Initial fetch of queue stats (no polling)
   const { data: initialQueueStats, isLoading: statsLoading } = useQuery<QueueStats>({
     queryKey: ["/api/operations/queue-stats"],
+  });
+
+  // Fetch environment info (static, no polling)
+  const { data: envInfo, isLoading: envLoading } = useQuery<EnvironmentInfo>({
+    queryKey: ["/api/operations/environment"],
   });
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
@@ -486,6 +503,43 @@ export default function OperationsPage() {
               <Badge variant="default" data-testid="badge-shipment-worker">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Running
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-environment">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Environment Configuration
+          </CardTitle>
+          <CardDescription>Verify system configuration</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Cache Server</p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {envLoading ? "Loading..." : envInfo?.redis.host || "Not configured"}
+                </p>
+              </div>
+              <Badge variant={envInfo?.redis.configured ? "default" : "destructive"} data-testid="badge-redis-status">
+                {envInfo?.redis.configured ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <AlertCircle className="h-3 w-3 mr-1" />}
+                {envInfo?.redis.configured ? "Connected" : "Not configured"}
+              </Badge>
+            </div>
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Webhook Base URL</p>
+                <p className="text-sm text-muted-foreground font-mono break-all">
+                  {envLoading ? "Loading..." : envInfo?.webhooks.baseUrl || "Not configured"}
+                </p>
+              </div>
+              <Badge variant="outline" data-testid="badge-environment">
+                {envInfo?.webhooks.environment || "unknown"}
               </Badge>
             </div>
           </div>
