@@ -184,6 +184,14 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
               )}
             </div>
 
+            {/* Tracking Number */}
+            {shipment.trackingNumber && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Truck className="h-4 w-4" />
+                <span className="font-mono">{shipment.trackingNumber}</span>
+              </div>
+            )}
+
             {/* ShipStation Tags only */}
             {tags && tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
