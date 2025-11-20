@@ -86,31 +86,40 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
                     {shipment.order.customerName || shipment.order.customerEmail}
                   </p>
                 </>
-              ) : shipment.shipToName ? (
-                <>
-                  <p className="text-lg font-semibold text-foreground">
-                    {shipment.shipToName}
-                  </p>
-                  {shipment.shipToEmail && (
-                    <p className="text-sm text-muted-foreground">
-                      {shipment.shipToEmail}
-                    </p>
-                  )}
-                  {(shipment.shipToCity || shipment.shipToState) && (
-                    <p className="text-sm text-muted-foreground">
-                      {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground italic">
-                    ShipStation data (no Shopify order)
-                  </p>
-                </>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  No order or customer data
-                </p>
+                <>
+                  {shipment.orderNumber && (
+                    <p className="text-xl font-semibold text-foreground">
+                      Order #{shipment.orderNumber}
+                    </p>
+                  )}
+                  {shipment.shipToName ? (
+                    <>
+                      <p className="text-lg font-semibold text-foreground">
+                        {shipment.shipToName}
+                      </p>
+                      {shipment.shipToEmail && (
+                        <p className="text-sm text-muted-foreground">
+                          {shipment.shipToEmail}
+                        </p>
+                      )}
+                      {(shipment.shipToCity || shipment.shipToState) && (
+                        <p className="text-sm text-muted-foreground">
+                          {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground italic">
+                        ShipStation data (no Shopify order)
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No customer data available
+                    </p>
+                  )}
+                </>
               )}
               {shipment.shipmentId && (
                 <p className="text-sm font-mono text-muted-foreground">
