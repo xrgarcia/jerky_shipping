@@ -1036,25 +1036,23 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
     const total = countResult[0]?.count || 0;
 
-    // Build ORDER BY with NULLS LAST for ship date and order date to push orphaned shipments to the end
+    // Build ORDER BY - default to createdAt if sortBy is invalid
     let orderByClause;
-    if (sortBy === 'shipDate') {
-      // Use raw SQL to add NULLS LAST for ship date sorting
+    const sortColumn = {
+      shipDate: shipments.shipDate,
+      orderDate: shipments.createdAt, // Use createdAt as proxy for now
+      createdAt: shipments.createdAt,
+      trackingNumber: shipments.trackingNumber,
+      status: shipments.status,
+      carrierCode: shipments.carrierCode,
+    }[sortBy] || shipments.createdAt;
+    
+    // Use NULLS LAST for date columns
+    if (sortBy === 'shipDate' || sortBy === 'orderDate') {
       orderByClause = sortOrder === 'asc' 
-        ? sql`${shipments.shipDate} ASC NULLS LAST`
-        : sql`${shipments.shipDate} DESC NULLS LAST`;
-    } else if (sortBy === 'orderDate') {
-      // Use raw SQL to add NULLS LAST for order date sorting
-      orderByClause = sortOrder === 'asc' 
-        ? sql`${shipments.orderDate} ASC NULLS LAST`
-        : sql`${shipments.orderDate} DESC NULLS LAST`;
+        ? sql`${sortColumn} ASC NULLS LAST`
+        : sql`${sortColumn} DESC NULLS LAST`;
     } else {
-      const sortColumn = {
-        createdAt: shipments.createdAt,
-        trackingNumber: shipments.trackingNumber,
-        status: shipments.status,
-        carrierCode: shipments.carrierCode,
-      }[sortBy];
       orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
     }
 
