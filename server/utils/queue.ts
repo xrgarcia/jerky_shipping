@@ -174,3 +174,17 @@ export async function getOldestShipmentSyncQueueMessage(): Promise<{ enqueuedAt:
     return { enqueuedAt: null };
   }
 }
+
+/**
+ * Requeue shipment sync messages back to the front of the queue (FIFO order preserved)
+ * Used when worker needs to stop processing due to rate limits
+ */
+export async function requeueShipmentSyncMessages(messages: ShipmentSyncMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+  
+  const redis = getRedisClient();
+  // RPUSH adds to the end of the queue (which is the front for RPOP consumers)
+  // Reverse the array to maintain FIFO order - first message should be processed first
+  const serialized = messages.reverse().map(msg => JSON.stringify(msg));
+  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+}
