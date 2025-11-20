@@ -392,6 +392,18 @@ Please analyze this failure and help me understand:
 
   const { data: failuresData } = useQuery<FailuresResponse>({
     queryKey: ["/api/operations/failures", currentPage, searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "50",
+      });
+      if (searchTerm) {
+        params.set("search", searchTerm);
+      }
+      const response = await fetch(`/api/operations/failures?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch failures");
+      return response.json();
+    },
     enabled: showFailuresDialog,
   });
 
