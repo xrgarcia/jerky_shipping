@@ -1,0 +1,218 @@
+2025-11-19 18:24:24.85
+b656dce6
+User
+12:24:24 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:25.15
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:25.15
+b656dce6
+User
+12:24:25 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:25.18
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:25.18
+b656dce6
+User
+12:24:25 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:25.72
+b656dce6
+User
+12:24:25 AM [express] GET /api/print-queue 304 in 122ms :: {"jobs":[]}
+2025-11-19 18:24:26.44
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:26.45
+b656dce6
+User
+12:24:26 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:27.90
+b656dce6
+User
+12:24:27 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 18:24:30.09
+b656dce6
+User
+12:24:30 AM [express] GET /api/print-queue 304 in 131ms :: {"jobs":[]}
+2025-11-19 18:24:30.22
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:30.22
+b656dce6
+User
+12:24:30 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:30.23
+b656dce6
+User
+12:24:30 AM [express] POST /api/webhooks/shopify/products 401 in 1ms :: {"error":"Webhook verificatio…
+2025-11-19 18:24:30.23
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:32.26
+b656dce6
+User
+12:24:32 AM [express] GET /api/print-queue 304 in 123ms :: {"jobs":[]}
+2025-11-19 18:24:34.45
+b656dce6
+User
+12:24:34 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 18:24:36.63
+b656dce6
+User
+12:24:36 AM [express] GET /api/print-queue 304 in 128ms :: {"jobs":[]}
+2025-11-19 18:24:37.06
+b656dce6
+User
+WebSocket client disconnected
+2025-11-19 18:24:37.21
+b656dce6
+User
+WebSocket client connected
+2025-11-19 18:24:38.79
+b656dce6
+User
+12:24:38 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-19 18:24:39.62
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:39.62
+b656dce6
+User
+12:24:39 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:40.57
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:40.57
+b656dce6
+User
+12:24:40 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:40.97
+b656dce6
+User
+12:24:40 AM [express] GET /api/print-queue 304 in 122ms :: {"jobs":[]}
+2025-11-19 18:24:41.63
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:41.63
+b656dce6
+User
+12:24:41 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:43.15
+b656dce6
+User
+12:24:43 AM [express] GET /api/print-queue 304 in 128ms :: {"jobs":[]}
+2025-11-19 18:24:43.16
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:43.17
+b656dce6
+User
+12:24:43 AM [express] POST /api/webhooks/shopify/orders 401 in 2ms :: {"error":"Webhook verification …
+2025-11-19 18:24:45.32
+b656dce6
+User
+12:24:45 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-19 18:24:47.50
+b656dce6
+User
+12:24:47 AM [express] GET /api/print-queue 304 in 123ms :: {"jobs":[]}
+2025-11-19 18:24:49.68
+b656dce6
+User
+12:24:49 AM [express] GET /api/print-queue 304 in 121ms :: {"jobs":[]}
+2025-11-19 18:24:51.86
+b656dce6
+User
+12:24:51 AM [express] GET /api/print-queue 304 in 122ms :: {"jobs":[]}
+2025-11-19 18:24:54.04
+b656dce6
+User
+12:24:54 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 18:24:56.22
+b656dce6
+User
+12:24:56 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 18:24:58.34
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:58.34
+b656dce6
+User
+12:24:58 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:58.39
+b656dce6
+User
+12:24:58 AM [express] GET /api/print-queue 304 in 126ms :: {"jobs":[]}
+2025-11-19 18:24:58.63
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:58.63
+b656dce6
+User
+12:24:58 AM [express] POST /api/webhooks/shopify/orders 401 in 0ms :: {"error":"Webhook verification …
+2025-11-19 18:24:59.04
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:59.05
+b656dce6
+User
+12:24:59 AM [express] POST /api/webhooks/shopify/orders 401 in 1ms :: {"error":"Webhook verification …
+2025-11-19 18:24:59.60
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:24:59.60
+b656dce6
+User
+12:24:59 AM [express] POST /api/webhooks/shopify/products 401 in 1ms :: {"error":"Webhook verificatio…
+2025-11-19 18:25:00.57
+b656dce6
+User
+12:25:00 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 18:25:01.72
+b656dce6
+User
+12:25:01 AM [express] Bootstrapped 0 new products, updated 799 existing products, and synced 1389 variants
+2025-11-19 18:25:01.72
+b656dce6
+User
+12:25:01 AM [express] Product bootstrap completed
+2025-11-19 18:25:02.76
+b656dce6
+User
+12:25:02 AM [express] GET /api/print-queue 304 in 127ms :: {"jobs":[]}
+2025-11-19 18:25:04.97
+b656dce6
+User
+12:25:04 AM [express] GET /api/print-queue 304 in 149ms :: {"jobs":[]}
+2025-11-19 18:25:07.14
+b656dce6
+User
+12:25:07 AM [express] GET /api/print-queue 304 in 128ms :: {"jobs":[]}
+2025-11-19 18:25:08.05
+b656dce6
+User
+Webhook verification failed
+2025-11-19 18:25:08.05
+b656dce6
+User
+12:25:08 AM [express] POST /api/webhooks/shopify/products 401 in 1ms :: {"error":"Webhook verificatio…
+
+Collapse
+
+Wrap
+
+Colors
