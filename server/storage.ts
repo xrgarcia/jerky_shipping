@@ -1017,6 +1017,12 @@ export class DatabaseStorage implements IStorage {
         containsAlcohol: shipments.containsAlcohol,
         notesForGift: shipments.notesForGift,
         notesFromBuyer: shipments.notesFromBuyer,
+        // Item count (subquery)
+        itemCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM ${shipmentItems}
+          WHERE ${shipmentItems.shipmentId} = ${shipments.id}
+        )`.as('item_count'),
         // Order fields (will be null if no matching order)
         order: {
           id: orders.id,
