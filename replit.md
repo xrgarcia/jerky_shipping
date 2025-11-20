@@ -75,6 +75,14 @@ Preferred communication style: Simple, everyday language.
   - Color-coded health indicators (green/yellow/red) based on queue size and message age
   - Worker status panel showing both background workers (Shopify webhook processor, shipment sync worker) with running state
   - Backfill job status showing active backfill job with real-time progress bar, or recent completed/failed jobs
+  - **Shopify Credentials Validation**: Real-time validation of Shopify API credentials with 10-minute caching
+  - **Webhook Re-registration**: Safe webhook replacement after credential rotation using per-topic atomic strategy:
+    - Matches webhooks by BOTH topic AND address to preserve third-party integrations
+    - Per-topic replacement: cache → delete → create → rollback on failure
+    - Never leaves system with zero webhooks (at worst N-1 active during replacement)
+    - Automatic rollback restores original webhook if creation fails
+    - Detailed logging with step-by-step progress and success/failure indicators
+    - Partial success allowed (some topics replaced, others rolled back)
   - **Data Health Metrics**: Real-time tracking of orders without shipments, updated every 5-10 seconds via WebSocket:
     - Total orders without any shipment records
     - Recent orders (last 30 days) without shipments
