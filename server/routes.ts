@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
@@ -1070,126 +1070,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual sync endpoint - pulls all shipments from ShipStation for existing orders
-  // AND fetches rich tracking data for each shipment
+  // Manual sync endpoint - enqueues async jobs for all non-delivered shipments and orders without shipments
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {
-      console.log("========== MANUAL SHIPMENT SYNC WITH TRACKING STARTED ==========");
-      const orders = await storage.getAllOrders();
-      console.log(`Syncing shipments for ${orders.length} orders...`);
-
-      let syncedCount = 0;
-      let createdCount = 0;
-      let updatedCount = 0;
-      let trackingEnrichedCount = 0;
-      const errors: string[] = [];
-      let lastRateLimit: any = null;
-
-      for (const order of orders) {
-        try {
-          // Fetch shipments from ShipStation for this order
-          const { data: shipStationShipments, rateLimit } = await getShipmentsByOrderNumber(order.orderNumber);
-          lastRateLimit = rateLimit;
-          
-          if (shipStationShipments.length > 0) {
-            console.log(`Found ${shipStationShipments.length} shipment(s) for order ${order.orderNumber}`);
+      console.log("========== ASYNC SHIPMENT SYNC JOB STARTED ==========");
+      
+      // Get all non-delivered shipments
+      const nonDeliveredShipments = await storage.getNonDeliveredShipments();
+      console.log(`Found ${nonDeliveredShipments.length} non-delivered shipments`);
+      
+      // Get all orders without shipments
+      const ordersWithoutShipments = await storage.getOrdersWithoutShipments();
+      console.log(`Found ${ordersWithoutShipments.length} orders without shipments`);
+      
+      // Build sync messages
+      const messages: any[] = [];
+      
+      // Add messages for non-delivered shipments (use tracking number if available, otherwise order number)
+      for (const shipment of nonDeliveredShipments) {
+        if (shipment.trackingNumber) {
+          messages.push({
+            trackingNumber: shipment.trackingNumber,
+            reason: 'manual-sync',
+            enqueuedAt: Date.now(),
+          });
+        } else if (shipment.orderId) {
+          // Get order to find order number
+          const order = await storage.getOrder(shipment.orderId);
+          if (order?.orderNumber) {
+            messages.push({
+              orderNumber: order.orderNumber,
+              reason: 'manual-sync',
+              enqueuedAt: Date.now(),
+            });
           }
-
-          for (const shipmentData of shipStationShipments) {
-            const existingShipment = await storage.getShipmentByTrackingNumber(shipmentData.trackingNumber);
-            
-            // Start with basic shipment data
-            let statusDescription = shipmentData.voided ? 'Shipment voided' : 'Shipment created';
-            let enrichedShipmentData = shipmentData;
-            
-            // Try to fetch rich tracking details if shipment has a tracking number
-            if (shipmentData.trackingNumber && !shipmentData.voided) {
-              try {
-                const trackingDetails = await getTrackingDetails(shipmentData.trackingNumber);
-                
-                if (trackingDetails) {
-                  lastRateLimit = trackingDetails.rateLimit;
-                  
-                  // Use rich carrier status description if available
-                  if (trackingDetails.carrierStatusDescription) {
-                    statusDescription = trackingDetails.carrierStatusDescription;
-                    trackingEnrichedCount++;
-                  } else if (trackingDetails.trackingStatus) {
-                    statusDescription = trackingDetails.trackingStatus;
-                    trackingEnrichedCount++;
-                  }
-                  
-                  // Merge tracking data with shipment data
-                  enrichedShipmentData = {
-                    ...shipmentData,
-                    trackingDetails: {
-                      labelId: trackingDetails.labelId,
-                      trackingStatus: trackingDetails.trackingStatus,
-                      carrierStatusDescription: trackingDetails.carrierStatusDescription,
-                      events: trackingDetails.events,
-                    },
-                  };
-                  
-                  console.log(`  ✓ Enriched ${shipmentData.trackingNumber}: "${statusDescription}"`);
-                }
-                
-                // Rate limit check - pause if getting low
-                if (lastRateLimit && lastRateLimit.remaining < 5) {
-                  const waitTime = Math.max(lastRateLimit.reset, 2) * 1000;
-                  console.log(`  ⏸ Rate limit low (${lastRateLimit.remaining} remaining), waiting ${waitTime/1000}s...`);
-                  await new Promise(resolve => setTimeout(resolve, waitTime));
-                }
-              } catch (trackingError: any) {
-                console.warn(`  ⚠ Could not fetch tracking for ${shipmentData.trackingNumber}: ${trackingError.message}`);
-                // Continue with basic shipment data
-              }
-            }
-            
-            const shipmentRecord = {
-              orderId: order.id,
-              shipmentId: shipmentData.shipmentId?.toString(),
-              trackingNumber: shipmentData.trackingNumber,
-              carrierCode: shipmentData.carrierCode,
-              serviceCode: shipmentData.serviceCode,
-              status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription,
-              shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-              shipmentData: enrichedShipmentData,
-            };
-
-            if (existingShipment) {
-              await storage.updateShipment(existingShipment.id, shipmentRecord);
-              updatedCount++;
-            } else {
-              await storage.createShipment(shipmentRecord);
-              createdCount++;
-            }
-            
-            syncedCount++;
-          }
-        } catch (orderError: any) {
-          const errorMsg = `Order ${order.orderNumber}: ${orderError.message}`;
-          console.error(errorMsg);
-          errors.push(errorMsg);
         }
       }
-
-      console.log(`========== SYNC COMPLETE ==========`);
-      console.log(`Total: ${syncedCount} shipments (${createdCount} new, ${updatedCount} updated)`);
-      console.log(`Tracking enriched: ${trackingEnrichedCount} shipments`);
+      
+      // Add messages for orders without shipments
+      for (const order of ordersWithoutShipments) {
+        messages.push({
+          orderNumber: order.orderNumber,
+          reason: 'manual-sync',
+          enqueuedAt: Date.now(),
+        });
+      }
+      
+      // Enqueue all messages in batch
+      if (messages.length > 0) {
+        await enqueueShipmentSyncBatch(messages);
+        console.log(`Enqueued ${messages.length} shipment sync jobs`);
+      }
+      
+      console.log(`========== ASYNC JOB CREATION COMPLETE ==========`);
 
       res.json({ 
         success: true,
-        syncedCount,
-        createdCount,
-        updatedCount,
-        trackingEnrichedCount,
-        ordersChecked: orders.length,
-        errors: errors.length > 0 ? errors : undefined
+        enqueuedCount: messages.length,
+        nonDeliveredShipments: nonDeliveredShipments.length,
+        ordersWithoutShipments: ordersWithoutShipments.length,
+        message: `Enqueued ${messages.length} jobs for async processing`
       });
     } catch (error: any) {
-      console.error("Error syncing shipments:", error);
-      res.status(500).json({ error: error.message || "Failed to sync shipments" });
+      console.error("Error creating shipment sync jobs:", error);
+      res.status(500).json({ error: error.message || "Failed to create sync jobs" });
     }
   });
 
