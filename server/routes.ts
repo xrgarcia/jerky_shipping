@@ -1447,6 +1447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 await enqueueShipmentSync({
                   trackingNumber,
+                  labelUrl: trackingData.label_url,
+                  trackingData, // Include full tracking data for fast updates
                   reason: 'webhook',
                   enqueuedAt: Date.now(),
                 });

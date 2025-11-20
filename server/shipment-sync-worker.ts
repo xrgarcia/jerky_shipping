@@ -51,13 +51,38 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
     const message = messages[i];
     
     try {
-      const { orderNumber, trackingNumber, labelUrl, shipmentId, reason, jobId } = message;
+      const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId } = message;
       
       // Determine which path to use: tracking number or order number
       if (trackingNumber) {
         // PATH A: Tracking number path
-        // Use linkTrackingToOrder to fetch shipment and find the order
         log(`Processing tracking number: ${trackingNumber}`);
+        
+        // OPTIMIZATION: Check if we already have this shipment in our database
+        const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+        
+        // If shipment exists AND is linked to an order, just update tracking status (skip API call)
+        if (existingShipment && existingShipment.orderId && webhookTrackingData) {
+          log(`[${trackingNumber}] ⚡ Found existing shipment linked to order, updating status without API call`);
+          
+          // Update shipment with latest tracking info from webhook
+          await storage.updateShipment(existingShipment.id, {
+            status: webhookTrackingData.status_code || existingShipment.status,
+            statusDescription: webhookTrackingData.status_description || existingShipment.statusDescription,
+            shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : existingShipment.shipDate,
+            shipmentData: {
+              ...(existingShipment.shipmentData || {}),
+              latestTracking: webhookTrackingData,
+            },
+          });
+          
+          log(`[${trackingNumber}] ✓ Updated shipment status for order-linked shipment (0 API calls)`);
+          processedCount++;
+          continue; // Skip to next message without API call
+        }
+        
+        // Otherwise, proceed with API call to get full shipment details
+        log(`[${trackingNumber}] ${existingShipment ? 'Shipment exists but not linked to order' : 'New shipment'}, calling ShipStation API`);
         
         const trackingData: TrackingData = {
           tracking_number: trackingNumber,

@@ -77,6 +77,7 @@ export interface ShipmentSyncMessage {
   trackingNumber?: string; // Optional: use for tracking-based sync
   labelUrl?: string; // Optional: label URL for shipment ID extraction
   shipmentId?: string; // Optional: direct shipment ID if available
+  trackingData?: any; // Optional: tracking data from webhook (status, ship_date, etc.) for fast updates
   enqueuedAt: number;
   jobId?: string; // Optional backfill job ID for tracking
   originalWebhook?: any; // Optional: preserve original webhook payload for troubleshooting
