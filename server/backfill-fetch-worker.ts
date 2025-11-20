@@ -216,10 +216,20 @@ export async function processBackfillFetchTasks(batchSize: number = 10): Promise
       
       // Update backfill job progress
       if (result.success) {
-        await storage.incrementBackfillFetchTaskCompleted(jobId);
+        // Use per-source increment methods for dual-source tracking
+        if (source === 'shopify') {
+          await storage.incrementBackfillShopifyFetchCompleted(jobId);
+        } else if (source === 'shipstation') {
+          await storage.incrementBackfillShipstationFetchCompleted(jobId);
+        }
         log(`✓ ${source} fetch completed: ${result.count} items enqueued`);
       } else {
-        await storage.incrementBackfillFetchTaskFailed(jobId);
+        // Use per-source increment methods for dual-source tracking
+        if (source === 'shopify') {
+          await storage.incrementBackfillShopifyFetchFailed(jobId);
+        } else if (source === 'shipstation') {
+          await storage.incrementBackfillShipstationFetchFailed(jobId);
+        }
         log(`✗ ${source} fetch failed: ${result.error}`);
         
         // Update job error log
@@ -238,7 +248,12 @@ export async function processBackfillFetchTasks(batchSize: number = 10): Promise
       }
     } catch (error: any) {
       log(`Error processing fetch task: ${error.message}`);
-      await storage.incrementBackfillFetchTaskFailed(jobId);
+      // Use per-source increment methods for dual-source tracking
+      if (source === 'shopify') {
+        await storage.incrementBackfillShopifyFetchFailed(jobId);
+      } else if (source === 'shipstation') {
+        await storage.incrementBackfillShipstationFetchFailed(jobId);
+      }
     } finally {
       // Always remove from in-flight set
       await removeBackfillFetchTaskFromInflight(task);
