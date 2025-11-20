@@ -14,7 +14,6 @@ import {
   getOldestShipmentSyncQueueMessage,
   getShopifyOrderSyncQueueLength,
   getOldestShopifyOrderSyncQueueMessage,
-  requeueShipmentSyncMessages,
   enqueueShopifyOrderSync,
   removeShipmentSyncFromInflight,
   type ShipmentSyncMessage,
@@ -43,6 +42,37 @@ import { eq, inArray } from 'drizzle-orm';
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
   console.log(`${timestamp} [shipment-sync] ${message}`);
+}
+
+/**
+ * Sleep/wait until the rate limit resets
+ * @param resetSeconds - Seconds until rate limit resets (relative time, not absolute timestamp)
+ */
+async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
+  // ShipStation returns reset as relative seconds from now, not absolute Unix timestamp
+  // Ensure we have a proper number (header might be a string)
+  const resetValue = Number(resetSeconds);
+  
+  if (isNaN(resetValue)) {
+    log(`Invalid reset value received: ${resetSeconds}, defaulting to 60s wait`);
+    await new Promise(resolve => setTimeout(resolve, 60000));
+    return;
+  }
+  
+  const waitTimeSeconds = resetValue + 3; // Add 3 second buffer
+  
+  // Defensive logging to catch header format shifts
+  log(`Rate limit exhausted. Waiting ${waitTimeSeconds}s until reset...`);
+  
+  if (waitTimeSeconds > 0 && waitTimeSeconds < 300) { // Sanity check: don't wait more than 5 minutes
+    await new Promise(resolve => setTimeout(resolve, waitTimeSeconds * 1000));
+    log(`Rate limit reset. Resuming processing...`);
+  } else if (waitTimeSeconds >= 300) {
+    log(`Calculated wait time (${waitTimeSeconds}s) exceeds 5 minutes, likely a header format issue. Waiting 60s instead.`);
+    await new Promise(resolve => setTimeout(resolve, 60000));
+  } else {
+    log(`Invalid wait time (${waitTimeSeconds}s), continuing immediately`);
+  }
 }
 
 /**
@@ -148,7 +178,7 @@ async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: an
       }
     }
   } catch (error) {
-    log(`⚠️  Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
+    log(`Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
     // Don't throw - this is a non-critical operation that shouldn't break the main flow
   }
 }
@@ -168,7 +198,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
 
   log(`Processing ${messages.length} shipment sync message(s)`);
   let processedCount = 0;
-  let shouldStopBatch = false;
   
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
@@ -188,7 +217,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         // If shipment exists AND is linked to an order, just update tracking status (skip API call)
         if (cachedShipment && cachedShipment.orderId && webhookTrackingData) {
           try {
-            log(`[${trackingNumber}] ⚡ Found existing shipment linked to order, updating status without API call`);
+            log(`[${trackingNumber}] Found existing shipment linked to order, updating status without API call`);
             
             // Normalize status using helper
             const { status, statusDescription } = normalizeShipmentStatus(webhookTrackingData);
@@ -257,13 +286,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               broadcastOrderUpdate(order);
             }
             
-            log(`[${trackingNumber}] ✓ Updated shipment status for order-linked shipment (0 API calls)`);
+            log(`[${trackingNumber}] Updated shipment status for order-linked shipment (0 API calls)`);
             processedCount++;
             continue; // Success - skip to next message without API call
           } catch (error: any) {
             // Store fast-path error and fall through to API sync fallback
             fastPathError = error;
-            log(`⚠️  Fast-path failed for ${trackingNumber}, falling back to full API sync: ${error.message}`);
+            log(`Fast-path failed for ${trackingNumber}, falling back to full API sync: ${error.message}`);
             // Fall through to API sync below
           }
         }
@@ -279,16 +308,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const linkageResult = await linkTrackingToOrder(trackingData, storage);
         
-        // Check rate limit AFTER API call and stop batch immediately if exhausted
+        // Check rate limit AFTER API call and wait if exhausted
         if (linkageResult.rateLimit) {
           const { remaining, reset, limit } = linkageResult.rateLimit;
           log(`[${trackingNumber}] API call made, ${remaining}/${limit} calls remaining`);
           
-          // If we're out of quota, requeue remaining messages and stop batch
+          // If we're out of quota, pause the worker until rate limit resets
           if (remaining <= 0) {
-            const waitTime = reset + 3; // Add 3 second buffer to ensure we're past the window
-            log(`⚠️  Rate limit exhausted (0 remaining), will stop batch after this message. Next run in ${waitTime}s...`);
-            shouldStopBatch = true;
+            await waitForRateLimitReset(reset);
           }
         }
         
@@ -302,7 +329,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // Validate shipment ID exists
             const rawShipmentId = shipmentData.shipment_id || shipmentData.shipmentId;
             if (!rawShipmentId) {
-              log(`⚠️  [${trackingNumber}] Skipping shipment with missing ID`);
+              log(`[${trackingNumber}] Skipping shipment with missing ID`);
               await logShipmentSyncFailure({
                 orderNumber: linkageResult.orderNumber || trackingNumber,
                 reason,
@@ -316,15 +343,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                 failedAt: new Date(),
               });
               processedCount++;
-              
-              if (shouldStopBatch) {
-                const remainingMessages = messages.slice(i + 1);
-                if (remainingMessages.length > 0) {
-                  await requeueShipmentSyncMessages(remainingMessages);
-                  log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-                }
-                break;
-              }
               continue;
             }
             
@@ -368,7 +386,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             
             // Fire-and-forget: Trigger Shopify order sync if we found an order number
             if (linkageResult.orderNumber) {
-              log(`📤 Triggering fire-and-forget Shopify order sync for ${linkageResult.orderNumber}`);
+              log(`Triggering fire-and-forget Shopify order sync for ${linkageResult.orderNumber}`);
               const shopifyMessage: ShopifyOrderSyncMessage = {
                 orderNumber: linkageResult.orderNumber,
                 reason: 'shipment-webhook',
@@ -379,15 +397,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             }
             
             processedCount++;
-            
-            if (shouldStopBatch) {
-              const remainingMessages = messages.slice(i + 1);
-              if (remainingMessages.length > 0) {
-                await requeueShipmentSyncMessages(remainingMessages);
-                log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-              }
-              break;
-            }
             continue;
           }
           
@@ -405,15 +414,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             failedAt: new Date(),
           });
           processedCount++;
-          
-          if (shouldStopBatch) {
-            const remainingMessages = messages.slice(i + 1);
-            if (remainingMessages.length > 0) {
-              await requeueShipmentSyncMessages(remainingMessages);
-              log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-            }
-            break;
-          }
           continue;
         }
         
@@ -424,7 +424,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         // Validate shipment ID exists to prevent corrupting DB with "undefined" string
         const rawShipmentId = shipmentData.shipment_id || shipmentData.shipmentId;
         if (!rawShipmentId) {
-          log(`⚠️  [${trackingNumber}] Skipping shipment with missing ID for order ${order.orderNumber}`);
+          log(`[${trackingNumber}] Skipping shipment with missing ID for order ${order.orderNumber}`);
           await logShipmentSyncFailure({
             orderNumber: order.orderNumber,
             reason,
@@ -438,16 +438,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             failedAt: new Date(),
           });
           processedCount++;
-          
-          // If we hit rate limit during this request, requeue remaining and stop
-          if (shouldStopBatch) {
-            const remainingMessages = messages.slice(i + 1);
-            if (remainingMessages.length > 0) {
-              await requeueShipmentSyncMessages(remainingMessages);
-              log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-            }
-            break;
-          }
           continue;
         }
         
@@ -493,16 +483,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         processedCount++;
         
-        // If we hit rate limit during this request, requeue remaining and stop
-        if (shouldStopBatch) {
-          const remainingMessages = messages.slice(i + 1);
-          if (remainingMessages.length > 0) {
-            await requeueShipmentSyncMessages(remainingMessages);
-            log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-          }
-          break;
-        }
-        
       } else if (orderNumber) {
         // PATH B: Order number path
         log(`Processing order number: ${orderNumber}`);
@@ -534,7 +514,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             retryCount: 0,
             failedAt: new Date(),
           });
-          log(`📋 Logged to failures: 0 shipments found for ${orderNumber} (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
+          log(`Logged to failures: 0 shipments found for ${orderNumber} (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
         }
         
         // Find the order in our database (may be null for multi-channel orders)
@@ -549,7 +529,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           // Validate shipment ID exists to prevent corrupting DB with "undefined" string
           const rawShipmentId = data.shipment_id || data.shipmentId;
           if (!rawShipmentId) {
-            log(`⚠️  [${orderNumber}] Skipping shipment with missing ID: ${JSON.stringify(data)}`);
+            log(`[${orderNumber}] Skipping shipment with missing ID: ${JSON.stringify(data)}`);
             continue;
           }
           
@@ -600,7 +580,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         // Fire-and-forget: Trigger Shopify order sync if order not found
         if (!order) {
-          log(`📤 Triggering fire-and-forget Shopify order sync for ${orderNumber}`);
+          log(`Triggering fire-and-forget Shopify order sync for ${orderNumber}`);
           const shopifyMessage: ShopifyOrderSyncMessage = {
             orderNumber,
             reason: 'shipment-webhook',
@@ -616,27 +596,15 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         processedCount++;
         
-        // Check rate limit AFTER saving data and mark to stop if exhausted
+        // Check rate limit AFTER saving data and wait if exhausted
         if (rateLimit.remaining <= 0) {
-          const waitTime = rateLimit.reset + 3; // Add 3 second buffer to ensure we're past the window
-          log(`⚠️  Rate limit exhausted (${rateLimit.remaining} remaining), will stop batch after this message. Next run in ${waitTime}s...`);
-          shouldStopBatch = true;
+          await waitForRateLimitReset(rateLimit.reset);
         }
         
       } else {
         // Invalid message - neither tracking number nor order number
-        log(`⚠️  Invalid message: missing both orderNumber and trackingNumber`);
+        log(`Invalid message: missing both orderNumber and trackingNumber`);
         processedCount++;
-        
-        // If we hit rate limit during a previous request, requeue remaining and stop
-        if (shouldStopBatch) {
-          const remainingMessages = messages.slice(i + 1);
-          if (remainingMessages.length > 0) {
-            await requeueShipmentSyncMessages(remainingMessages);
-            log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-          }
-          break;
-        }
         continue;
       }
       
@@ -685,21 +653,11 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         failedAt: new Date(),
       });
       
-      log(`❌ Failed to sync shipments for ${trackingId}: ${errorMessage}`);
+      log(`Failed to sync shipments for ${trackingId}: ${errorMessage}`);
       processedCount++;
     } finally {
       // Always remove from in-flight set after processing (success or failure)
       await removeShipmentSyncFromInflight(message);
-    }
-    
-    // If we should stop due to rate limits, requeue remaining unprocessed messages
-    if (shouldStopBatch) {
-      const remainingMessages = messages.slice(i + 1); // Get all messages after current index
-      if (remainingMessages.length > 0) {
-        await requeueShipmentSyncMessages(remainingMessages);
-        log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
-      }
-      break; // Exit the loop now that unprocessed messages are safely back in queue
     }
   }
 
