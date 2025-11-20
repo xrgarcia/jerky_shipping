@@ -24,6 +24,7 @@ import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
 import { 
   extractOrderNumber,
+  extractOrderDate,
   extractShipToFields,
   extractReturnGiftFields,
   extractTotalWeight,
@@ -215,6 +216,16 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               cachedShipment.shipmentData?.shipmentNumber ||
               cachedShipment.orderNumber;
             
+            // Extract order_date with multiple fallbacks:
+            // 1. From merged shipmentData (includes tracking webhook + cached data)
+            // 2. Directly from cached shipmentData JSONB (create_date/createDate)
+            // 3. From cached order_date column (backfilled or previously extracted)
+            const extractedOrderDate = 
+              extractOrderDate(mergedShipmentData) || 
+              (cachedShipment.shipmentData?.create_date ? new Date(cachedShipment.shipmentData.create_date) : null) ||
+              (cachedShipment.shipmentData?.createDate ? new Date(cachedShipment.shipmentData.createDate) : null) ||
+              cachedShipment.orderDate;
+            
             // Build update object
             const updateData: any = {
               status: finalStatus,
@@ -227,6 +238,12 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // This ensures backfilled values are maintained even if webhook lacks shipment_number
             if (extractedOrderNumber) {
               updateData.orderNumber = extractedOrderNumber;
+            }
+            
+            // Always explicitly set order_date (extracted, cached, or preserve existing)
+            // This ensures backfilled values are maintained even if webhook lacks create_date
+            if (extractedOrderDate) {
+              updateData.orderDate = extractedOrderDate;
             }
             
             // Update shipment with latest tracking info from webhook
