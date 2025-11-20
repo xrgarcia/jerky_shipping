@@ -172,6 +172,14 @@ function extractShipToFields(shipmentData: any): Record<string, any> {
   };
 }
 
+/**
+ * Extract order_number from ShipStation shipmentData
+ * Returns the customer-facing order number (e.g., "JK3825345229")
+ */
+function extractOrderNumber(shipmentData: any): string | null {
+  return shipmentData?.shipment_number || shipmentData?.shipmentNumber || null;
+}
+
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
 /**
@@ -321,6 +329,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             const shipmentRecord = {
               orderId: null, // No order linkage
               shipmentId: String(rawShipmentId),
+              orderNumber: extractOrderNumber(shipmentData),
               trackingNumber: trackingNumber,
               carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
               serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
@@ -438,6 +447,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         const shipmentRecord = {
           orderId: order.id,
           shipmentId: String(rawShipmentId),
+          orderNumber: extractOrderNumber(shipmentData),
           trackingNumber: trackingNumber,
           carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
           serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
@@ -542,6 +552,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           const shipmentRecord = {
             orderId: order?.id || null, // Nullable order linkage
             shipmentId: shipmentId,
+            orderNumber: extractOrderNumber(shipmentData),
             trackingNumber: trackingNumber,
             carrierCode: carrierCode,
             serviceCode: serviceCode,
