@@ -164,6 +164,10 @@ export interface IStorage {
   incrementBackfillFailed(id: string, incrementBy: number): Promise<void>;
   incrementBackfillFetchTaskCompleted(id: string): Promise<void>;
   incrementBackfillFetchTaskFailed(id: string): Promise<void>;
+  incrementBackfillShopifyFetchCompleted(id: string): Promise<void>;
+  incrementBackfillShopifyFetchFailed(id: string): Promise<void>;
+  incrementBackfillShipstationFetchCompleted(id: string): Promise<void>;
+  incrementBackfillShipstationFetchFailed(id: string): Promise<void>;
 
   // Print Queue
   createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
@@ -1313,6 +1317,50 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(backfillJobs)
       .set({
+        failedFetchTasks: sql`${backfillJobs.failedFetchTasks} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillShopifyFetchCompleted(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        shopifyFetchCompleted: sql`${backfillJobs.shopifyFetchCompleted} + 1`,
+        completedFetchTasks: sql`${backfillJobs.completedFetchTasks} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillShopifyFetchFailed(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        shopifyFetchFailed: sql`${backfillJobs.shopifyFetchFailed} + 1`,
+        failedFetchTasks: sql`${backfillJobs.failedFetchTasks} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillShipstationFetchCompleted(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        shipstationFetchCompleted: sql`${backfillJobs.shipstationFetchCompleted} + 1`,
+        completedFetchTasks: sql`${backfillJobs.completedFetchTasks} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillShipstationFetchFailed(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        shipstationFetchFailed: sql`${backfillJobs.shipstationFetchFailed} + 1`,
         failedFetchTasks: sql`${backfillJobs.failedFetchTasks} + 1`,
         updatedAt: new Date(),
       })
