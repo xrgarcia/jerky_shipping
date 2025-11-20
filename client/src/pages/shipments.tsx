@@ -893,12 +893,12 @@ export default function Shipments() {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Status:</span>
-                <Select value={statusDescription} onValueChange={(val) => { setStatusDescription(val); setPage(1); }}>
+                <Select value={statusDescription || "all"} onValueChange={(val) => { setStatusDescription(val === "all" ? "" : val); setPage(1); }}>
                   <SelectTrigger className="w-64" data-testid="select-status-description">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="" data-testid="status-desc-all">All statuses</SelectItem>
+                    <SelectItem value="all" data-testid="status-desc-all">All statuses</SelectItem>
                     {statusDescriptions.map((desc) => (
                       <SelectItem key={desc} value={desc} data-testid={`status-desc-${desc}`}>
                         {desc}
