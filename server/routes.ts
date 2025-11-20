@@ -2804,6 +2804,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/operations/clear-order-data", requireAuth, async (req, res) => {
+    try {
+      // Execute all deletions in a transaction to ensure atomicity
+      await db.transaction(async (tx) => {
+        // Delete child tables first (foreign key constraints)
+        await tx.delete(orderItems);
+        await tx.delete(shipments);
+        await tx.delete(orderRefunds);
+        // Then delete parent table
+        await tx.delete(orders);
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "All order data cleared successfully" 
+      });
+    } catch (error) {
+      console.error("Error clearing order data:", error);
+      res.status(500).json({ error: "Failed to clear order data" });
+    }
+  });
+
   // List all registered Shopify webhooks (diagnostic endpoint)
   app.get("/api/operations/list-shopify-webhooks", requireAuth, async (req, res) => {
     try {
