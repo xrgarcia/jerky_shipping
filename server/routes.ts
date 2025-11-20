@@ -821,6 +821,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.dateTo = new Date(req.query.dateTo as string);
       }
 
+      // Parse orphaned filter
+      if (req.query.orphaned === 'true') {
+        filters.orphaned = true;
+      }
+
       // Get filtered shipments with proper SQL JOIN (no limit on orders!)
       const { shipments: shipmentsWithOrders, total } = await storage.getFilteredShipmentsWithOrders(filters);
 

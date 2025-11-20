@@ -62,6 +62,7 @@ export interface ShipmentFilters {
   carrierCode?: string[];
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
+  orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -731,6 +732,7 @@ export class DatabaseStorage implements IStorage {
       carrierCode: carrierFilters,
       dateFrom,
       dateTo,
+      orphaned,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
@@ -770,6 +772,17 @@ export class DatabaseStorage implements IStorage {
     }
     if (dateTo) {
       conditions.push(lte(shipments.shipDate, dateTo));
+    }
+
+    // Orphaned filter - shipments missing tracking number, ship date, and shipment ID
+    if (orphaned) {
+      conditions.push(
+        and(
+          isNull(shipments.trackingNumber),
+          isNull(shipments.shipDate),
+          isNull(shipments.shipmentId)
+        )
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
