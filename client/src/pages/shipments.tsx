@@ -794,9 +794,9 @@ export default function Shipments() {
               </div>
 
               <CollapsibleContent className="pt-4 space-y-4">
-                {/* Status Filters */}
+                {/* Fulfillment Status */}
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Status Filters</label>
+                  <label className="text-sm font-semibold">Fulfillment Status</label>
                   <div className="flex flex-wrap items-center gap-2">
                     <Select value={status || "all"} onValueChange={(val) => { 
                       const newStatus = val === "all" ? "" : val;
@@ -833,25 +833,6 @@ export default function Shipments() {
                         {statusDescriptions.map((desc) => (
                           <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
                             {desc}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select 
-                      value={shipmentStatus || "all"} 
-                      onValueChange={(val) => { 
-                        setShipmentStatus(val === "all" ? "" : val); 
-                        setPage(1); 
-                      }}
-                    >
-                      <SelectTrigger className="w-48" data-testid="select-shipment-status">
-                        <SelectValue placeholder="All warehouse statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" data-testid="shipment-status-all">All warehouse statuses</SelectItem>
-                        {shipmentStatuses.map((s) => (
-                          <SelectItem key={s ?? "null"} value={s ?? "null"} data-testid={`shipment-status-${s ?? "null"}`}>
-                            {s ?? "No Status"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -942,8 +923,31 @@ export default function Shipments() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Sort and Page Size */}
+            {/* Warehouse Status, Sort and Page Size */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
+              {/* Warehouse Status */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Warehouse Status:</span>
+                <Select 
+                  value={shipmentStatus || "all"} 
+                  onValueChange={(val) => { 
+                    setShipmentStatus(val === "all" ? "" : val); 
+                    setPage(1); 
+                  }}
+                >
+                  <SelectTrigger className="w-48" data-testid="select-shipment-status">
+                    <SelectValue placeholder="All warehouse statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="shipment-status-all">All warehouse statuses</SelectItem>
+                    {shipmentStatuses.map((s) => (
+                      <SelectItem key={s ?? "null"} value={s ?? "null"} data-testid={`shipment-status-${s ?? "null"}`}>
+                        {s ?? "No Status"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Sort Options */}
               <div className="flex items-center gap-2">
