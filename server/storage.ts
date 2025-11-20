@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql, isNull, gte, lte, inArray, asc, count } from "drizzle-orm";
+import { eq, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -458,12 +458,14 @@ export class DatabaseStorage implements IStorage {
       if (hasShipment === true) {
         const orderIdsWithShipments = db
           .selectDistinct({ orderId: shipments.orderId })
-          .from(shipments);
+          .from(shipments)
+          .where(isNotNull(shipments.orderId));
         conditions.push(sql`${orders.id} IN ${orderIdsWithShipments}`);
       } else if (hasShipment === false) {
         const orderIdsWithShipments = db
           .selectDistinct({ orderId: shipments.orderId })
-          .from(shipments);
+          .from(shipments)
+          .where(isNotNull(shipments.orderId));
         conditions.push(sql`${orders.id} NOT IN ${orderIdsWithShipments}`);
       }
 
@@ -471,7 +473,12 @@ export class DatabaseStorage implements IStorage {
         const orderIdsByShipmentStatus = db
           .selectDistinct({ orderId: shipments.orderId })
           .from(shipments)
-          .where(inArray(shipments.status, shipmentStatus));
+          .where(
+            and(
+              isNotNull(shipments.orderId),
+              inArray(shipments.status, shipmentStatus)
+            )
+          );
         conditions.push(sql`${orders.id} IN ${orderIdsByShipmentStatus}`);
       }
 
@@ -479,7 +486,12 @@ export class DatabaseStorage implements IStorage {
         const orderIdsByCarrier = db
           .selectDistinct({ orderId: shipments.orderId })
           .from(shipments)
-          .where(inArray(shipments.carrierCode, carrierCode));
+          .where(
+            and(
+              isNotNull(shipments.orderId),
+              inArray(shipments.carrierCode, carrierCode)
+            )
+          );
         conditions.push(sql`${orders.id} IN ${orderIdsByCarrier}`);
       }
     }
