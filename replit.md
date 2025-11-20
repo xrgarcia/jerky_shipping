@@ -36,6 +36,28 @@ Preferred communication style: Simple, everyday language.
 - **Webhook Configuration**: Environment-aware webhook registration for development and production, supporting independent webhook delivery and automatic rollback on failure.
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup prevents dev/prod webhook duplication. REPLIT_DOMAINS is correctly parsed (comma-separated list, first domain only) and webhooks pointing to different base URLs are automatically deleted. URL parsing is wrapped in try/catch to handle malformed addresses gracefully.
 
+## Known Issues and Troubleshooting
+
+### Shipment Sync Failures
+
+The dead letter queue logs all shipment sync failures for troubleshooting. There are two main types:
+
+1. **"0 shipments found in ShipStation"** - Expected when:
+   - Orders exist in Shopify but haven't shipped yet (fulfillment_status = null)
+   - Rate limit exhausted before completing search
+   - Order numbers don't exist in ShipStation (multi-channel orders from Amazon/TikTok)
+   - **Logged with full data**: order number, API endpoint, rate limit status, shipments count
+
+2. **"Could not extract shipment_id for tracking..."** - Historical issue from manual sync:
+   - 43 tracking numbers from manual sync only had tracking_number field
+   - Missing both label_url AND shipment_id fields needed for extraction
+   - Cannot be processed without additional data
+   - **Current webhooks work fine**: New ShipStation webhooks include label_url field
+   - **No action needed**: These are legacy failures from incomplete data
+   - **Shipment ID extraction works via**: 
+     - `label_url` regex: `/labels/(se-[a-f0-9-]+)` extracts "se-594210232" from URL
+     - Fallback to `shipment_id` field if present
+
 ## External Dependencies
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, utilizing webhooks for real-time updates.
