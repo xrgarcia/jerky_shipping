@@ -2714,11 +2714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
       const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-      const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || (
-        process.env.REPLIT_DEPLOYMENT 
-          ? 'https://jerkyshippping.replit.app' 
-          : (process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : '')
-      );
+      
+      // Use shared webhook URL detection logic
+      const { getWebhookBaseUrl } = await import("./utils/webhook-url.js");
+      const webhookBaseUrl = getWebhookBaseUrl();
 
       if (!shopDomain || !accessToken) {
         return res.status(400).json({ 
@@ -2728,11 +2727,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!webhookBaseUrl) {
         return res.status(400).json({ 
-          error: "Cannot determine webhook base URL. Check environment configuration." 
+          error: "Cannot determine webhook base URL. Check environment configuration (WEBHOOK_BASE_URL or REPLIT_DOMAINS)." 
         });
       }
 
-      console.log('Re-registering Shopify webhooks via API request...');
+      console.log(`Re-registering Shopify webhooks via API request using URL: ${webhookBaseUrl}`);
       const result = await reregisterAllWebhooks(shopDomain, accessToken, webhookBaseUrl);
       
       res.json({ 
