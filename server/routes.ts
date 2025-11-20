@@ -1629,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Shopify credentials not configured" });
       }
 
-      if (!process.env.SHIPSTATION_API_KEY || !process.env.SHIPSTATION_API_SECRET) {
+      if (!process.env.SHIPSTATION_API_KEY) {
         return res.status(400).json({ error: "ShipStation credentials not configured" });
       }
 

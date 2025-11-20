@@ -12,6 +12,7 @@ import {
   enqueueShipmentSyncBatch,
   type BackfillFetchTask,
 } from './utils/queue';
+import { getShipmentsByDateRange } from './utils/shipstation-api';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -118,71 +119,59 @@ async function fetchShopifyOrders(task: BackfillFetchTask): Promise<{ success: b
 
 /**
  * Fetch ShipStation shipments for a given date range
- * Paginates through all results and enqueues to Shipment Sync queue
+ * Uses existing V2 API service with proper rate limiting and pagination
  */
 async function fetchShipStationShipments(task: BackfillFetchTask): Promise<{ success: boolean; count: number; error?: string }> {
   const { startDate, endDate, jobId } = task;
   
-  const apiKey = process.env.SHIPSTATION_API_KEY;
-  const apiSecret = process.env.SHIPSTATION_API_SECRET;
-  
-  if (!apiKey || !apiSecret) {
-    return { success: false, count: 0, error: 'ShipStation credentials not configured' };
-  }
-  
-  const authHeader = 'Basic ' + Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-  
-  let enqueuedCount = 0;
-  let page = 1;
-  const pageSize = 100;
-  let hasMorePages = true;
-  
   try {
-    while (hasMorePages) {
-      const url = `https://ssapi.shipstation.com/shipments?createDateStart=${startDate}&createDateEnd=${endDate}&page=${page}&pageSize=${pageSize}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { success: false, count: enqueuedCount, error: `ShipStation API error: ${errorText}` };
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Use existing V2 API service (handles all pagination and rate limiting internally)
+    const response = await getShipmentsByDateRange(start, end, 100);
+    const shipments = response.data;
+    const { rateLimit } = response;
+    
+    // Filter out shipments without tracking numbers (newly created/on-hold records)
+    // These cannot be processed by the shipment sync worker
+    const shipmentsWithTracking = shipments.filter((shipment: any) => {
+      const hasTracking = shipment.tracking_number && shipment.tracking_number.trim() !== '';
+      if (!hasTracking) {
+        log(`Skipping shipment ${shipment.shipment_id} - no tracking number`);
       }
-      
-      const data = await response.json();
-      const shipments = data.shipments || [];
-      
-      // Batch enqueue shipments to Shipment Sync queue
-      const syncMessages = shipments.map((shipment: any) => ({
-        reason: 'backfill' as const,
-        trackingNumber: shipment.trackingNumber,
-        enqueuedAt: Date.now(),
-        jobId,
-        shipmentId: shipment.shipmentId?.toString(),
-      }));
-      
-      const enqueued = await enqueueShipmentSyncBatch(syncMessages);
-      enqueuedCount += enqueued;
-      
-      // Check if there are more pages
-      hasMorePages = shipments.length === pageSize;
-      page++;
-      
-      // Rate limiting: wait 1.5s between requests (40 calls/min = 1.5s/call)
-      if (hasMorePages) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      return hasTracking;
+    });
+    
+    // Batch enqueue shipments to Shipment Sync queue
+    const syncMessages = shipmentsWithTracking.map((shipment: any) => ({
+      reason: 'backfill' as const,
+      trackingNumber: shipment.tracking_number,
+      enqueuedAt: Date.now(),
+      jobId,
+      shipmentId: shipment.shipment_id?.toString(),
+    }));
+    
+    const enqueued = await enqueueShipmentSyncBatch(syncMessages);
+    
+    log(`ShipStation: Fetched ${shipments.length} shipments (${shipmentsWithTracking.length} with tracking), enqueued ${enqueued}`);
+    log(`ShipStation: Rate limit remaining: ${rateLimit.remaining}/${rateLimit.limit} (resets at ${new Date(rateLimit.reset * 1000).toISOString()})`);
+    
+    // If rate limit is low, pause before next task
+    if (rateLimit.remaining < 5) {
+      const resetEpochMs = rateLimit.reset * 1000;
+      const now = Date.now();
+      if (resetEpochMs > now) {
+        const waitTimeMs = resetEpochMs - now + 1000; // Add 1 second buffer
+        const waitTimeSec = Math.ceil(waitTimeMs / 1000);
+        log(`ShipStation: Rate limit low (${rateLimit.remaining} remaining), pausing ${waitTimeSec}s before next task...`);
+        await new Promise(resolve => setTimeout(resolve, waitTimeMs));
       }
-      
-      log(`ShipStation: Fetched page ${page - 1}, enqueued ${enqueued} shipments (total: ${enqueuedCount})`);
     }
     
-    return { success: true, count: enqueuedCount };
+    return { success: true, count: enqueued };
   } catch (error: any) {
-    return { success: false, count: enqueuedCount, error: error.message };
+    return { success: false, count: 0, error: error.message };
   }
 }
 

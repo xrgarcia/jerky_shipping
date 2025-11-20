@@ -294,6 +294,7 @@ export interface ShopifyOrderSyncMessage {
   enqueuedAt: number;
   retryCount?: number; // Track retry attempts to prevent infinite loops
   triggeringShipmentTracking?: string; // Optional: tracking number that triggered this sync
+  jobId?: string; // Optional: backfill job ID for downstream error correlation
 }
 
 /**
