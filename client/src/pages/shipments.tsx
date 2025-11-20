@@ -559,7 +559,14 @@ export default function Shipments() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(shipment.status)}
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(shipment.status)}
+                            {isOrphanedShipment(shipment) && (
+                              <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400">
+                                Orphaned
+                              </Badge>
+                            )}
+                          </div>
                           {shipment.serviceCode && (
                             <p className="text-sm text-muted-foreground">
                               {shipment.serviceCode}
