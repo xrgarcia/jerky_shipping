@@ -240,6 +240,11 @@ export default function Shipments() {
     },
   });
 
+  const isOrphanedShipment = (shipment: ShipmentWithOrder) => {
+    // A shipment is orphaned if it's missing all key identifiers
+    return !shipment.trackingNumber && !shipment.shipDate && !shipment.shipmentId;
+  };
+
   const getStatusBadge = (status: string | null) => {
     if (!status) {
       return <Badge variant="outline">Unknown</Badge>;
