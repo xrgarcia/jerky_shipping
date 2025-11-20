@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone } from "lucide-react";
+import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
 interface ShipmentWithOrder extends Shipment {
   order: Order | null;
+  itemCount?: number;
 }
 
 interface ShipmentsResponse {
@@ -188,6 +189,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             {/* Weight */}
             {shipment.totalWeight && (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Scale className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="font-medium">Shipping weight {shipment.totalWeight}</span>
               </div>
             )}
@@ -195,6 +197,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             {/* Tracking Number */}
             {shipment.trackingNumber && (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Hash className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="font-mono">{shipment.trackingNumber}</span>
               </div>
             )}
