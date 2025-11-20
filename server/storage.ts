@@ -868,12 +868,17 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(shipments.statusDescription, statusDescription));
     }
 
-    // Shipment status filter (warehouse status) - supports "null" for null values
-    if (shipmentStatus !== undefined && shipmentStatus !== "") {
-      if (shipmentStatus === "null") {
-        conditions.push(isNull(shipments.shipmentStatus));
-      } else {
-        conditions.push(eq(shipments.shipmentStatus, shipmentStatus));
+    // Shipment status filter (warehouse status) - OR condition for multiple values
+    if (shipmentStatus && shipmentStatus.length > 0) {
+      const statusConditions = shipmentStatus.map(s => {
+        if (s === "null") {
+          return isNull(shipments.shipmentStatus);
+        } else {
+          return eq(shipments.shipmentStatus, s);
+        }
+      });
+      if (statusConditions.length > 0) {
+        conditions.push(or(...statusConditions));
       }
     }
 

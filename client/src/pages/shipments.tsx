@@ -386,7 +386,7 @@ export default function Shipments() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
-  const [shipmentStatus, setShipmentStatus] = useState<string[]>([]); // Warehouse status filter (multi-select)
+  const [shipmentStatus, setShipmentStatus] = useState<string[]>(["on_hold", "pending", "label_purchased"]); // Warehouse status filter (multi-select with defaults)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -414,7 +414,8 @@ export default function Shipments() {
     setSearch(params.get('search') || '');
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
-    setShipmentStatus(params.getAll('shipmentStatus'));
+    const shipmentStatusValues = params.getAll('shipmentStatus');
+    setShipmentStatus(shipmentStatusValues.length > 0 ? shipmentStatusValues : ["on_hold", "pending", "label_purchased"]);
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -925,21 +926,43 @@ export default function Shipments() {
 
             {/* Warehouse Status, Sort and Page Size */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
-              {/* Warehouse Status */}
-              <div className="flex items-center gap-2">
+              {/* Warehouse Status Dropdown */}
+              <div className="flex items-center gap-2 relative group">
                 <span className="text-sm font-semibold">Warehouse Status:</span>
-                <div className="flex flex-wrap gap-2">
-                  {shipmentStatuses.map(s => (
-                    <Badge
-                      key={s ?? "null"}
-                      variant={shipmentStatus.includes(s ?? "null") ? "default" : "outline"}
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => toggleArrayFilter(s ?? "null", shipmentStatus, setShipmentStatus)}
-                      data-testid={`filter-warehouse-status-${s ?? "null"}`}
-                    >
-                      {s ?? "No Status"}
-                    </Badge>
-                  ))}
+                <div className="relative">
+                  <button 
+                    className="px-3 py-2 border rounded-md text-sm hover-elevate active-elevate-2 flex items-center gap-2 bg-background"
+                    data-testid="button-warehouse-status-dropdown"
+                  >
+                    {shipmentStatus.length > 0 ? `${shipmentStatus.length} selected` : "All"}
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <div className="absolute left-0 mt-1 w-48 bg-background border rounded-md shadow-lg z-50 hidden group-hover:block p-2 space-y-2">
+                    {shipmentStatuses.map(s => {
+                      const value = s ?? "null";
+                      const label = s ?? "No Status";
+                      return (
+                        <div key={value} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`warehouse-status-${value}`}
+                            checked={shipmentStatus.includes(value)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setShipmentStatus([...shipmentStatus, value]);
+                              } else {
+                                setShipmentStatus(shipmentStatus.filter(v => v !== value));
+                              }
+                              setPage(1);
+                            }}
+                            data-testid={`checkbox-warehouse-status-${value}`}
+                          />
+                          <label htmlFor={`warehouse-status-${value}`} className="text-sm cursor-pointer">
+                            {label}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
