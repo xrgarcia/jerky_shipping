@@ -214,9 +214,9 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             <div className="flex flex-col gap-1.5 lg:items-end">
               {getStatusBadge(shipment.status)}
               {shipment.statusDescription && (
-                <p className="text-xs text-muted-foreground lg:text-right">
+                <Badge variant="outline" className="text-xs text-center">
                   {shipment.statusDescription}
-                </p>
+                </Badge>
               )}
             </div>
 
