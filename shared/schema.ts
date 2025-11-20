@@ -170,7 +170,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 // Shipments table for ShipStation tracking data
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderId: varchar("order_id").notNull().references(() => orders.id),
+  orderId: varchar("order_id").references(() => orders.id), // Nullable to allow shipments without linked orders
   shipmentId: text("shipment_id"), // ShipStation shipment ID
   trackingNumber: text("tracking_number"),
   carrierCode: text("carrier_code"),
@@ -191,6 +191,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
+  orderId: z.string().nullish(), // orderId is now optional
   shipDate: z.coerce.date().optional().or(z.null()),
   estimatedDeliveryDate: z.coerce.date().optional().or(z.null()),
   actualDeliveryDate: z.coerce.date().optional().or(z.null()),
