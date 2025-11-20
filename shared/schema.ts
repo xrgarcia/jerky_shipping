@@ -402,6 +402,11 @@ export const backfillJobs = pgTable("backfill_jobs", {
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   status: text("status").notNull().default("pending"), // pending, in_progress, completed, failed
+  // Fetch task tracking (new architecture)
+  totalFetchTasks: integer("total_fetch_tasks").notNull().default(0),
+  completedFetchTasks: integer("completed_fetch_tasks").notNull().default(0),
+  failedFetchTasks: integer("failed_fetch_tasks").notNull().default(0),
+  // Legacy order tracking (kept for backward compatibility)
   totalOrders: integer("total_orders").notNull().default(0),
   processedOrders: integer("processed_orders").notNull().default(0),
   failedOrders: integer("failed_orders").notNull().default(0),
@@ -409,7 +414,7 @@ export const backfillJobs = pgTable("backfill_jobs", {
   lastProcessedOrderId: text("last_processed_order_id"),
   // Observability fields for troubleshooting stuck jobs
   lastActivityAt: timestamp("last_activity_at"), // Heartbeat timestamp updated every few seconds
-  currentStage: text("current_stage"), // fetching_orders, syncing_shipments, finalizing
+  currentStage: text("current_stage"), // generating_tasks, fetching, processing, completed
   currentOrderIndex: integer("current_order_index"), // Which order (1-based) is being processed
   errorLog: jsonb("error_log"), // Array of all errors encountered (even if job continues)
   createdAt: timestamp("created_at").notNull().defaultNow(),
