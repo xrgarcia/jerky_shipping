@@ -12,6 +12,30 @@ export function extractOrderNumber(shipmentData: any): string | null {
 }
 
 /**
+ * Extract order_date from shipmentData
+ * Returns the ShipStation shipment creation timestamp (ISO 8601 format)
+ * Looks for createDate (snake_case) or createdAt (camelCase) fields
+ */
+export function extractOrderDate(shipmentData: any): Date | null {
+  const dateStr = shipmentData?.create_date || shipmentData?.createDate || shipmentData?.created_at || shipmentData?.createdAt;
+  
+  if (!dateStr) {
+    return null;
+  }
+  
+  try {
+    const date = new Date(dateStr);
+    // Validate that the date is valid
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return date;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Extract ship_to customer fields from shipmentData
  * Returns an object with all ship_to fields
  */
