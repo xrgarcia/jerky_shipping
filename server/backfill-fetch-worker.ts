@@ -133,20 +133,21 @@ async function fetchShipStationShipments(task: BackfillFetchTask): Promise<{ suc
     const shipments = response.data;
     const { rateLimit } = response;
     
-    // Filter out shipments without tracking numbers (newly created/on-hold records)
-    // These cannot be processed by the shipment sync worker
-    const shipmentsWithTracking = shipments.filter((shipment: any) => {
-      const hasTracking = shipment.tracking_number && shipment.tracking_number.trim() !== '';
-      if (!hasTracking) {
-        log(`Skipping shipment ${shipment.shipment_id} - no tracking number`);
+    // Filter out shipments without order numbers (shipment_number field)
+    // The shipment sync worker uses orderNumber to fetch full shipment data
+    const shipmentsWithOrderNumber = shipments.filter((shipment: any) => {
+      const hasOrderNumber = shipment.shipment_number && shipment.shipment_number.trim() !== '';
+      if (!hasOrderNumber) {
+        log(`Skipping shipment ${shipment.shipment_id} - no order number`);
       }
-      return hasTracking;
+      return hasOrderNumber;
     });
     
-    // Batch enqueue shipments to Shipment Sync queue
-    const syncMessages = shipmentsWithTracking.map((shipment: any) => ({
+    // Batch enqueue shipments to Shipment Sync queue using orderNumber
+    // The shipment sync worker will fetch full shipment data (including tracking) from ShipStation
+    const syncMessages = shipmentsWithOrderNumber.map((shipment: any) => ({
       reason: 'backfill' as const,
-      trackingNumber: shipment.tracking_number,
+      orderNumber: shipment.shipment_number, // Use shipment_number as orderNumber
       enqueuedAt: Date.now(),
       jobId,
       shipmentId: shipment.shipment_id?.toString(),
@@ -154,7 +155,7 @@ async function fetchShipStationShipments(task: BackfillFetchTask): Promise<{ suc
     
     const enqueued = await enqueueShipmentSyncBatch(syncMessages);
     
-    log(`ShipStation: Fetched ${shipments.length} shipments (${shipmentsWithTracking.length} with tracking), enqueued ${enqueued}`);
+    log(`ShipStation: Fetched ${shipments.length} shipments (${shipmentsWithOrderNumber.length} with order numbers), enqueued ${enqueued}`);
     log(`ShipStation: Rate limit remaining: ${rateLimit.remaining}/${rateLimit.limit} (resets at ${new Date(rateLimit.reset * 1000).toISOString()})`);
     
     // If rate limit is low, pause before next task

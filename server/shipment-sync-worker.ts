@@ -503,7 +503,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
       } else if (orderNumber) {
         // PATH B: Order number path
-        log(`Processing order number: ${orderNumber}`);
+        log(`Processing order number: ${orderNumber}${shipmentId ? ` (shipmentId: ${shipmentId})` : ''}`);
         
         // Fetch shipments from ShipStation (regardless of order existence)
         const { data: shipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
@@ -535,12 +535,71 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           log(`Logged to failures: 0 shipments found for ${orderNumber} (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
         }
         
+        // If shipmentId is provided, filter to only that specific shipment
+        // This prevents duplicate processing when multiple shipments share the same order number
+        let shipmentsToProcess = shipments;
+        let targetShipmentNotFound = false;
+        
+        if (shipmentId) {
+          const matchingShipment = shipments.find((s: any) => {
+            const sid = s.shipment_id || s.shipmentId;
+            return sid && String(sid) === shipmentId;
+          });
+          
+          if (matchingShipment) {
+            shipmentsToProcess = [matchingShipment];
+            log(`[${orderNumber}] Filtered to specific shipment ${shipmentId}`);
+          } else {
+            // Target shipment not in API response - likely propagation delay
+            // Requeue the message instead of removing from inflight
+            targetShipmentNotFound = true;
+            log(`[${orderNumber}] Target shipment ${shipmentId} not found in API response (${shipments.length} shipment(s) returned)`);
+            
+            // Remove from inflight BEFORE requeueing to avoid dedupe blocking
+            await removeShipmentSyncFromInflight(message);
+            removedFromInflight = true;
+            
+            // Requeue with backoff (increment retry count)
+            const retryCount = (message.retryCount || 0) + 1;
+            const maxRetries = 5;
+            
+            if (retryCount <= maxRetries) {
+              const requeuedMessage = { ...message, retryCount };
+              await enqueueShipmentSync(requeuedMessage);
+              log(`[${orderNumber}] Requeued message for shipment ${shipmentId} (retry ${retryCount}/${maxRetries})`);
+            } else {
+              // Max retries exceeded, log to DLQ
+              await logShipmentSyncFailure({
+                orderNumber,
+                reason: message.reason,
+                errorMessage: `Target shipment ${shipmentId} not found after ${maxRetries} retries`,
+                requestData: {
+                  queueMessage: message,
+                  searchedOrderNumber: orderNumber,
+                  targetShipmentId: shipmentId,
+                },
+                responseData: {
+                  shipmentsReturned: shipments.length,
+                  shipmentIds: shipments.map((s: any) => s.shipment_id || s.shipmentId),
+                },
+                retryCount,
+                failedAt: new Date(),
+              });
+              log(`[${orderNumber}] Max retries exceeded for shipment ${shipmentId}, logged to DLQ`);
+            }
+            
+            // Skip processing for this message (will be retried or moved to DLQ)
+            processedCount++;
+            continue;
+          }
+        }
+        
         // Find the order in our database (may be null for multi-channel orders)
         const order = await storage.getOrderByOrderNumber(orderNumber);
         
         // CRITICAL: Save shipments to database BEFORE checking rate limit
         // This ensures we don't waste API calls by fetching data then discarding it
-        for (const shipmentData of shipments) {
+        for (const shipmentData of shipmentsToProcess) {
           // ShipStation V2 API returns snake_case fields, handle both formats
           const data = shipmentData as any;
           

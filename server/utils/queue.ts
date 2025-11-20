@@ -86,9 +86,13 @@ export interface ShipmentSyncMessage {
 
 /**
  * Generate a deduplication key for a shipment sync message
- * Uses tracking number or order number to identify unique shipments
+ * Priority: shipmentId > trackingNumber > orderNumber
+ * Using shipmentId ensures per-shipment uniqueness for multi-shipment orders
  */
 function getShipmentSyncDedupeKey(message: ShipmentSyncMessage): string | null {
+  if (message.shipmentId) {
+    return `shipment:${message.shipmentId}`;
+  }
   if (message.trackingNumber) {
     return `tracking:${message.trackingNumber}`;
   }
