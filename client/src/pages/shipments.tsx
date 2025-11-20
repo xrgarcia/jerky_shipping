@@ -376,6 +376,7 @@ export default function Shipments() {
   // Filter states
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string[]>([]);
+  const [statusDescription, setStatusDescription] = useState<string>("");
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -402,6 +403,7 @@ export default function Shipments() {
     // Always reset to defaults, then apply URL params
     setSearch(params.get('search') || '');
     setStatus(params.getAll('status'));
+    setStatusDescription(params.get('statusDescription') || '');
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -415,6 +417,7 @@ export default function Shipments() {
     // Open filters if any are active
     const hasActiveFilters = params.get('search') || 
       params.getAll('status').length ||
+      params.get('statusDescription') ||
       params.getAll('carrierCode').length ||
       params.get('dateFrom') ||
       params.get('dateTo') ||
@@ -437,6 +440,7 @@ export default function Shipments() {
     
     if (search) params.set('search', search);
     status.forEach(s => params.append('status', s));
+    if (statusDescription) params.set('statusDescription', statusDescription);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.set('dateFrom', dateFrom);
@@ -458,7 +462,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -565,6 +569,7 @@ export default function Shipments() {
     
     if (search) params.append('search', search);
     status.forEach(s => params.append('status', s));
+    if (statusDescription) params.append('statusDescription', statusDescription);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.append('dateFrom', dateFrom);
@@ -580,8 +585,15 @@ export default function Shipments() {
     return params.toString();
   };
 
+  // Fetch distinct status descriptions for the filter dropdown
+  const { data: statusDescriptionsData } = useQuery<{ statusDescriptions: string[] }>({
+    queryKey: ["/api/shipments/status-descriptions"],
+  });
+
+  const statusDescriptions = statusDescriptionsData?.statusDescriptions || [];
+
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder],
+    queryKey: ["/api/shipments", search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -612,6 +624,7 @@ export default function Shipments() {
   const clearFilters = () => {
     setSearch("");
     setStatus([]);
+    setStatusDescription("");
     setCarrierCode([]);
     setDateFrom("");
     setDateTo("");
@@ -623,6 +636,7 @@ export default function Shipments() {
   const activeFiltersCount = [
     search,
     status.length > 0,
+    statusDescription,
     carrierCode.length > 0,
     dateFrom,
     dateTo,
@@ -872,6 +886,24 @@ export default function Shipments() {
                   <SelectContent>
                     <SelectItem value="desc" data-testid="sort-order-desc">Newest</SelectItem>
                     <SelectItem value="asc" data-testid="sort-order-asc">Oldest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Status:</span>
+                <Select value={statusDescription} onValueChange={(val) => { setStatusDescription(val); setPage(1); }}>
+                  <SelectTrigger className="w-64" data-testid="select-status-description">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="" data-testid="status-desc-all">All statuses</SelectItem>
+                    {statusDescriptions.map((desc) => (
+                      <SelectItem key={desc} value={desc} data-testid={`status-desc-${desc}`}>
+                        {desc}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

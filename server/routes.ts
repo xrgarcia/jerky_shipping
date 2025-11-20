@@ -734,6 +734,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct status descriptions for filtering
+  app.get("/api/shipments/status-descriptions", requireAuth, async (req, res) => {
+    try {
+      const statusDescriptions = await storage.getDistinctStatusDescriptions();
+      res.json({ statusDescriptions });
+    } catch (error) {
+      console.error("Error fetching status descriptions:", error);
+      res.status(500).json({ error: "Failed to fetch status descriptions" });
+    }
+  });
+
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
       // Parse filter parameters from query string
@@ -750,6 +761,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.status = Array.isArray(req.query.status)
           ? req.query.status
           : [req.query.status];
+      }
+      if (req.query.statusDescription) {
+        filters.statusDescription = req.query.statusDescription as string;
       }
       if (req.query.carrierCode) {
         filters.carrierCode = Array.isArray(req.query.carrierCode)

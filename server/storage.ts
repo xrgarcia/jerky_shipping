@@ -65,6 +65,7 @@ export interface OrderFilters {
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
   status?: string[];
+  statusDescription?: string;
   carrierCode?: string[];
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
@@ -129,6 +130,7 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
+  getDistinctStatusDescriptions(): Promise<string[]>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
@@ -882,10 +884,21 @@ export class DatabaseStorage implements IStorage {
     return { shipments: result, total };
   }
 
+  async getDistinctStatusDescriptions(): Promise<string[]> {
+    const results = await db
+      .selectDistinct({ statusDescription: shipments.statusDescription })
+      .from(shipments)
+      .where(isNotNull(shipments.statusDescription))
+      .orderBy(shipments.statusDescription);
+    
+    return results.map(r => r.statusDescription).filter((s): s is string => s !== null);
+  }
+
   async getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }> {
     const {
       search,
       status: statusFilters,
+      statusDescription,
       carrierCode: carrierFilters,
       dateFrom,
       dateTo,
@@ -917,6 +930,11 @@ export class DatabaseStorage implements IStorage {
     // Status filter
     if (statusFilters && statusFilters.length > 0) {
       conditions.push(inArray(shipments.status, statusFilters));
+    }
+
+    // Status description filter
+    if (statusDescription) {
+      conditions.push(eq(shipments.statusDescription, statusDescription));
     }
 
     // Carrier filter
