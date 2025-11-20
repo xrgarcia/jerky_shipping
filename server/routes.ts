@@ -15,7 +15,7 @@ import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-web
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -2656,6 +2656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
       const recentBackfillJobs = allBackfillJobs.slice(0, 5); // Last 5 jobs
 
+      // Get comprehensive data health metrics
+      const dataHealthMetrics = await storage.getDataHealthMetrics();
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -2672,10 +2675,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           activeJob: activeBackfillJob || null,
           recentJobs: recentBackfillJobs,
         },
+        dataHealth: dataHealthMetrics,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);
       res.status(500).json({ error: "Failed to fetch queue stats" });
+    }
+  });
+
+  // Clear shipment sync failures
+  app.delete("/api/operations/shipment-sync-failures", requireAuth, async (req, res) => {
+    try {
+      await storage.clearShipmentSyncFailures();
+      console.log("All shipment sync failures cleared");
+      
+      // Broadcast updated queue stats with full canonical payload
+      const shopifyQueueLength = await getQueueLength();
+      const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const failureCount = await storage.getShipmentSyncFailureCount();
+      const oldestShopify = await getOldestShopifyQueueMessage();
+      const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+      const allBackfillJobs = await storage.getAllBackfillJobs();
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      const dataHealth = await storage.getDataHealthMetrics();
+      
+      broadcastQueueStatus({
+        shopifyQueue: shopifyQueueLength,
+        shipmentSyncQueue: shipmentSyncQueueLength,
+        shipmentFailureCount: failureCount,
+        shopifyQueueOldestAt: oldestShopify.enqueuedAt,
+        shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
+        backfillActiveJob: activeBackfillJob,
+        dataHealth,
+      });
+      
+      res.json({ success: true, message: "All shipment sync failures cleared" });
+    } catch (error) {
+      console.error("Error clearing shipment sync failures:", error);
+      res.status(500).json({ error: "Failed to clear shipment sync failures" });
     }
   });
 

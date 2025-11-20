@@ -161,12 +161,16 @@ export interface IStorage {
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
   getShipmentSyncFailures(limit?: number, offset?: number): Promise<ShipmentSyncFailure[]>;
+  clearShipmentSyncFailures(): Promise<void>;
 
   // Data Health Metrics
-  getDataHealthMetrics(daysBack?: number): Promise<{
-    ordersWithoutShipments: number;
-    recentOrdersWithoutShipments: number;
-    paidOrdersWithoutShipments: number;
+  getDataHealthMetrics(): Promise<{
+    ordersMissingShipments: number;
+    shipmentsWithoutOrders: number;
+    orphanedShipments: number;
+    shipmentsWithoutStatus: number;
+    shipmentSyncFailures: number;
+    ordersWithoutOrderItems: number;
   }>;
 }
 
@@ -1190,30 +1194,66 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  // Data Health Metrics - Batched query for all metrics to avoid multiple DB calls
-  async getDataHealthMetrics(daysBack: number = 30): Promise<{
-    ordersWithoutShipments: number;
-    recentOrdersWithoutShipments: number;
-    paidOrdersWithoutShipments: number;
+  // Data Health Metrics - Batched queries for comprehensive metrics
+  async getDataHealthMetrics(): Promise<{
+    ordersMissingShipments: number;
+    shipmentsWithoutOrders: number;
+    orphanedShipments: number;
+    shipmentsWithoutStatus: number;
+    shipmentSyncFailures: number;
+    ordersWithoutOrderItems: number;
   }> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-    
-    // Single query using conditional aggregation for all 3 metrics
-    const result = await db
-      .select({
-        total: count(sql`CASE WHEN ${shipments.id} IS NULL THEN 1 END`),
-        recent: count(sql`CASE WHEN ${shipments.id} IS NULL AND ${orders.createdAt} >= ${cutoffDate} THEN 1 END`),
-        paid: count(sql`CASE WHEN ${shipments.id} IS NULL AND ${orders.financialStatus} = 'paid' THEN 1 END`),
-      })
+    // Query 1: Orders missing shipments
+    const ordersMissingShipmentsResult = await db
+      .select({ count: count() })
       .from(orders)
-      .leftJoin(shipments, eq(orders.id, shipments.orderId));
+      .leftJoin(shipments, eq(orders.id, shipments.orderId))
+      .where(sql`${shipments.id} IS NULL`);
+    
+    // Query 2: Shipments without orders (orphaned by order relationship)
+    const shipmentsWithoutOrdersResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .leftJoin(orders, eq(shipments.orderId, orders.id))
+      .where(sql`${orders.id} IS NULL`);
+    
+    // Query 3: Orphaned shipments (missing ALL three: tracking number, ship date, shipment ID)
+    const orphanedShipmentsResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        sql`${shipments.trackingNumber} IS NULL AND ${shipments.shipDate} IS NULL AND ${shipments.shipmentId} IS NULL`
+      );
+    
+    // Query 4: Shipments without status (status is NULL or empty)
+    const shipmentsWithoutStatusResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(sql`${shipments.status} IS NULL OR ${shipments.status} = ''`);
+    
+    // Query 5: Shipment sync failures count
+    const syncFailuresResult = await db
+      .select({ count: count() })
+      .from(shipmentSyncFailures);
+    
+    // Query 6: Orders without order items (using conditional aggregation)
+    const ordersWithoutItemsResult = await db
+      .select({ count: count(sql`CASE WHEN ${orderItems.id} IS NULL THEN 1 END`) })
+      .from(orders)
+      .leftJoin(orderItems, eq(orders.id, orderItems.orderId));
     
     return {
-      ordersWithoutShipments: result[0]?.total || 0,
-      recentOrdersWithoutShipments: result[0]?.recent || 0,
-      paidOrdersWithoutShipments: result[0]?.paid || 0,
+      ordersMissingShipments: ordersMissingShipmentsResult[0]?.count || 0,
+      shipmentsWithoutOrders: shipmentsWithoutOrdersResult[0]?.count || 0,
+      orphanedShipments: orphanedShipmentsResult[0]?.count || 0,
+      shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,
+      shipmentSyncFailures: syncFailuresResult[0]?.count || 0,
+      ordersWithoutOrderItems: ordersWithoutItemsResult[0]?.count || 0,
     };
+  }
+
+  async clearShipmentSyncFailures(): Promise<void> {
+    await db.delete(shipmentSyncFailures);
   }
 }
 

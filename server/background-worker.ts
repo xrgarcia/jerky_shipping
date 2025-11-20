@@ -460,8 +460,8 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       const allBackfillJobs = await storage.getAllBackfillJobs();
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
       
-      // Get data health metrics (single batched query)
-      const dataHealth = await storage.getDataHealthMetrics(30);
+      // Get comprehensive data health metrics
+      const dataHealth = await storage.getDataHealthMetrics();
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,

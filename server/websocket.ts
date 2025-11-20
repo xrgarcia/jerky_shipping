@@ -96,26 +96,75 @@ export function broadcastPrintQueueUpdate(data: any): void {
   });
 }
 
-export function broadcastQueueStatus(data: { 
-  shopifyQueue: number; 
-  shipmentSyncQueue: number; 
+// Canonical queue status structure
+export type QueueStatusData = {
+  shopifyQueue: number;
+  shipmentSyncQueue: number;
   shipmentFailureCount: number;
+  shopifyQueueOldestAt: number | null;
+  shipmentSyncQueueOldestAt: number | null;
+  backfillActiveJob: any | null;
+  dataHealth: {
+    ordersMissingShipments: number;
+    shipmentsWithoutOrders: number;
+    orphanedShipments: number;
+    shipmentsWithoutStatus: number;
+    shipmentSyncFailures: number;
+    ordersWithoutOrderItems: number;
+  };
+};
+
+export function broadcastQueueStatus(data: { 
+  shopifyQueue?: number;
+  shopifyQueueLength?: number;
+  shipmentSyncQueue?: number;
+  shipmentSyncQueueLength?: number;
+  shipmentFailureCount?: number;
+  failureCount?: number;
   shopifyQueueOldestAt?: number | null;
   shipmentSyncQueueOldestAt?: number | null;
+  oldestShopify?: { enqueuedAt?: number | null };
+  oldestShipmentSync?: { enqueuedAt?: number | null };
   backfillActiveJob?: any | null;
+  activeBackfillJob?: any | null;
   dataHealth?: {
-    ordersWithoutShipments: number;
-    recentOrdersWithoutShipments: number;
-    paidOrdersWithoutShipments: number;
+    ordersMissingShipments?: number;
+    shipmentsWithoutOrders?: number;
+    orphanedShipments?: number;
+    shipmentsWithoutStatus?: number;
+    shipmentSyncFailures?: number;
+    ordersWithoutOrderItems?: number;
+    // Legacy fields for backwards compatibility
+    ordersWithoutShipments?: number;
+    recentOrdersWithoutShipments?: number;
+    paidOrdersWithoutShipments?: number;
   };
 }): void {
   if (!wss) {
     return;
   }
 
+  // Normalize to canonical format
+  const canonicalData: QueueStatusData = {
+    shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? 0,
+    shipmentSyncQueue: data.shipmentSyncQueue ?? data.shipmentSyncQueueLength ?? 0,
+    shipmentFailureCount: data.shipmentFailureCount ?? data.failureCount ?? 0,
+    shopifyQueueOldestAt: data.shopifyQueueOldestAt ?? data.oldestShopify?.enqueuedAt ?? null,
+    shipmentSyncQueueOldestAt: data.shipmentSyncQueueOldestAt ?? data.oldestShipmentSync?.enqueuedAt ?? null,
+    backfillActiveJob: data.backfillActiveJob ?? data.activeBackfillJob ?? null,
+    dataHealth: {
+      ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,
+      shipmentsWithoutOrders: data.dataHealth?.shipmentsWithoutOrders ?? 0,
+      orphanedShipments: data.dataHealth?.orphanedShipments ?? 0,
+      shipmentsWithoutStatus: data.dataHealth?.shipmentsWithoutStatus ?? 0,
+      shipmentSyncFailures: data.dataHealth?.shipmentSyncFailures ?? 0,
+      ordersWithoutOrderItems: data.dataHealth?.ordersWithoutOrderItems ?? 0,
+    },
+  };
+
   const message = JSON.stringify({
     type: 'queue_status',
-    data,
+    data: canonicalData,
   });
 
   wss.clients.forEach((client) => {

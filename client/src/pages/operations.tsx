@@ -76,9 +76,12 @@ type QueueStats = {
     recentJobs: BackfillJob[];
   };
   dataHealth?: {
-    ordersWithoutShipments: number;
-    recentOrdersWithoutShipments: number;
-    paidOrdersWithoutShipments: number;
+    ordersMissingShipments: number;
+    shipmentsWithoutOrders: number;
+    orphanedShipments: number;
+    shipmentsWithoutStatus: number;
+    shipmentSyncFailures: number;
+    ordersWithoutOrderItems: number;
   };
 };
 
@@ -149,6 +152,68 @@ function getQueueHealth(size: number, oldestMessageAt: number | null): "healthy"
   if (size > 500) return "warning";
   
   return "healthy";
+}
+
+function ClearFailuresButton() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+
+  const clearFailuresMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest({
+        url: "/api/operations/shipment-sync-failures",
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      toast({
+        title: "Success",
+        description: "All shipment sync failures have been cleared",
+      });
+      setShowDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to clear failures",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowDialog(true)}
+        data-testid="button-clear-failures"
+      >
+        Clear All
+      </Button>
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent data-testid="dialog-clear-failures">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Shipment Sync Failures?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all shipment sync failure records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-clear-failures">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => clearFailuresMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-clear-failures"
+            >
+              {clearFailuresMutation.isPending ? "Clearing..." : "Clear All"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 export default function OperationsPage() {
@@ -599,35 +664,56 @@ export default function OperationsPage() {
             <AlertCircle className="h-5 w-5" />
             Data Health
           </CardTitle>
-          <CardDescription>Orders with no records in the shipments table</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">All Orders</p>
+              <p className="text-sm font-medium text-muted-foreground">Orders Missing Shipments</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-orders-without-shipments">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersWithoutShipments.toLocaleString() ?? "-"}
+                <span className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersMissingShipments.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Last 30 Days</p>
+              <p className="text-sm font-medium text-muted-foreground">Shipments With No Orders</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-recent-orders-without-shipments">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.recentOrdersWithoutShipments.toLocaleString() ?? "-"}
+                <span className="text-3xl font-bold" data-testid="text-shipments-without-orders">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentsWithoutOrders.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">missing record</span>
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Paid Orders</p>
+              <p className="text-sm font-medium text-muted-foreground">Orphaned Shipments</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-paid-orders-without-shipments">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.paidOrdersWithoutShipments.toLocaleString() ?? "-"}
+                <span className="text-3xl font-bold" data-testid="text-orphaned-shipments">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.orphanedShipments.toLocaleString() ?? "-"}
                 </span>
-                <span className="text-sm text-muted-foreground">missing record</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Shipments With No Status</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold" data-testid="text-shipments-without-status">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentsWithoutStatus.toLocaleString() ?? "-"}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Shipment Sync Failures</p>
+              <div className="flex flex-col gap-2">
+                <span className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentSyncFailures.toLocaleString() ?? "-"}
+                </span>
+                <ClearFailuresButton />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Orders With No Items</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold" data-testid="text-orders-without-order-items">
+                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersWithoutOrderItems.toLocaleString() ?? "-"}
+                </span>
               </div>
             </div>
           </div>
