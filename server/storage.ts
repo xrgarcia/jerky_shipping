@@ -1232,11 +1232,13 @@ export class DatabaseStorage implements IStorage {
         sql`${shipments.trackingNumber} IS NULL AND ${shipments.shipDate} IS NULL AND ${shipments.shipmentId} IS NULL`
       );
     
-    // Query 4: Shipments without status (status is NULL or empty)
+    // Query 4: Shipped shipments without tracking numbers
     const shipmentsWithoutStatusResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(sql`${shipments.status} IS NULL OR ${shipments.status} = ''`);
+      .where(
+        sql`${shipments.status} = 'shipped' AND ${shipments.trackingNumber} IS NULL`
+      );
     
     // Query 5: Shipment sync failures count
     const syncFailuresResult = await db
