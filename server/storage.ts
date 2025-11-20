@@ -119,6 +119,7 @@ export interface IStorage {
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
+  getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -715,6 +716,134 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select()
       .from(shipments)
+      .where(whereClause)
+      .orderBy(orderByClause)
+      .limit(pageSize)
+      .offset(offset);
+
+    return { shipments: result, total };
+  }
+
+  async getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }> {
+    const {
+      search,
+      status: statusFilters,
+      carrierCode: carrierFilters,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      pageSize = 50,
+    } = filters;
+
+    // Build WHERE conditions
+    const conditions = [];
+
+    // Text search across tracking number, carrier, order fields
+    if (search) {
+      const searchLower = search.toLowerCase();
+      conditions.push(
+        or(
+          ilike(shipments.trackingNumber, `%${searchLower}%`),
+          ilike(shipments.carrierCode, `%${searchLower}%`),
+          ilike(shipments.shipmentId, `%${searchLower}%`),
+          ilike(orders.orderNumber, `%${searchLower}%`),
+          ilike(orders.customerName, `%${searchLower}%`)
+        )
+      );
+    }
+
+    // Status filter
+    if (statusFilters && statusFilters.length > 0) {
+      conditions.push(inArray(shipments.status, statusFilters));
+    }
+
+    // Carrier filter
+    if (carrierFilters && carrierFilters.length > 0) {
+      conditions.push(inArray(shipments.carrierCode, carrierFilters));
+    }
+
+    // Date range filter (ship date)
+    if (dateFrom) {
+      conditions.push(gte(shipments.shipDate, dateFrom));
+    }
+    if (dateTo) {
+      conditions.push(lte(shipments.shipDate, dateTo));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count with JOIN
+    const countResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .leftJoin(orders, eq(shipments.orderId, orders.id))
+      .where(whereClause);
+    const total = countResult[0]?.count || 0;
+
+    // Build ORDER BY
+    const sortColumn = {
+      shipDate: shipments.shipDate,
+      createdAt: shipments.createdAt,
+      trackingNumber: shipments.trackingNumber,
+      status: shipments.status,
+      carrierCode: shipments.carrierCode,
+    }[sortBy];
+
+    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    // Get paginated results with LEFT JOIN
+    const offset = (page - 1) * pageSize;
+    const result = await db
+      .select({
+        // Shipment fields
+        id: shipments.id,
+        orderId: shipments.orderId,
+        shipmentId: shipments.shipmentId,
+        trackingNumber: shipments.trackingNumber,
+        carrierCode: shipments.carrierCode,
+        serviceCode: shipments.serviceCode,
+        status: shipments.status,
+        statusDescription: shipments.statusDescription,
+        labelUrl: shipments.labelUrl,
+        shipDate: shipments.shipDate,
+        estimatedDeliveryDate: shipments.estimatedDeliveryDate,
+        actualDeliveryDate: shipments.actualDeliveryDate,
+        shipmentData: shipments.shipmentData,
+        createdAt: shipments.createdAt,
+        updatedAt: shipments.updatedAt,
+        // Order fields (will be null if no matching order)
+        order: {
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          customerName: orders.customerName,
+          customerEmail: orders.customerEmail,
+          customerPhone: orders.customerPhone,
+          shippingAddress: orders.shippingAddress,
+          lineItems: orders.lineItems,
+          fulfillmentStatus: orders.fulfillmentStatus,
+          financialStatus: orders.financialStatus,
+          totalPrice: orders.totalPrice,
+          orderTotal: orders.orderTotal,
+          subtotalPrice: orders.subtotalPrice,
+          currentTotalPrice: orders.currentTotalPrice,
+          currentSubtotalPrice: orders.currentSubtotalPrice,
+          shippingTotal: orders.shippingTotal,
+          totalDiscounts: orders.totalDiscounts,
+          currentTotalDiscounts: orders.currentTotalDiscounts,
+          totalTax: orders.totalTax,
+          currentTotalTax: orders.currentTotalTax,
+          totalAdditionalFees: orders.totalAdditionalFees,
+          currentTotalAdditionalFees: orders.currentTotalAdditionalFees,
+          totalOutstanding: orders.totalOutstanding,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+          lastSyncedAt: orders.lastSyncedAt,
+        }
+      })
+      .from(shipments)
+      .leftJoin(orders, eq(shipments.orderId, orders.id))
       .where(whereClause)
       .orderBy(orderByClause)
       .limit(pageSize)
