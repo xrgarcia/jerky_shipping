@@ -515,16 +515,27 @@ export default function Shipments() {
                               {shipment.trackingNumber || "No tracking"}
                             </CardTitle>
                           </div>
-                          {shipment.order && (
-                            <div className="space-y-1">
-                              <p className="text-xl font-semibold text-foreground">
-                                Order #{shipment.order.orderNumber}
+                          <div className="space-y-1">
+                            {shipment.order ? (
+                              <>
+                                <p className="text-xl font-semibold text-foreground">
+                                  Order #{shipment.order.orderNumber}
+                                </p>
+                                <p className="text-lg text-muted-foreground">
+                                  {shipment.order.customerName}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">
+                                No order linked
                               </p>
-                              <p className="text-lg text-muted-foreground">
-                                {shipment.order.customerName}
+                            )}
+                            {shipment.shipmentId && (
+                              <p className="text-sm font-mono text-muted-foreground">
+                                Shipment ID: {shipment.shipmentId}
                               </p>
-                            </div>
-                          )}
+                            )}
+                          </div>
                           <div className="flex items-center gap-4 mt-3 text-lg text-muted-foreground">
                             {shipment.carrierCode && (
                               <div className="flex items-center gap-2">
