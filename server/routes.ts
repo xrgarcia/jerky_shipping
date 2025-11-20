@@ -821,21 +821,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.dateTo = new Date(req.query.dateTo as string);
       }
 
-      // Get filtered shipments with pagination
-      const { shipments: filteredShipments, total } = await storage.getFilteredShipments(filters);
-
-      // Get all orders to join with shipments
-      const allOrders = await storage.getAllOrders();
-      const ordersMap = new Map(allOrders.map(o => [o.id, o]));
-
-      // Enrich shipments with order information
-      const shipmentsWithOrders = filteredShipments.map(shipment => {
-        const order = ordersMap.get(shipment.orderId);
-        return {
-          ...shipment,
-          order: order || null,
-        };
-      });
+      // Get filtered shipments with proper SQL JOIN (no limit on orders!)
+      const { shipments: shipmentsWithOrders, total } = await storage.getFilteredShipmentsWithOrders(filters);
 
       res.json({
         shipments: shipmentsWithOrders,
