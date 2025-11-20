@@ -160,12 +160,13 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
               </div>
             )}
 
-            {/* Service & Carrier */}
-            {(shipment.carrierCode || shipment.serviceCode) && (
+            {/* Service & Carrier with Status Description */}
+            {(shipment.carrierCode || shipment.serviceCode || shipment.statusDescription) && (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Truck className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span>Ship via</span>
+                  {shipment.statusDescription && <span>{shipment.statusDescription}</span>}
+                  {(shipment.carrierCode || shipment.serviceCode) && <span>via</span>}
                   {shipment.carrierCode && (
                     <Badge variant="outline" className="text-xs uppercase font-semibold">
                       {shipment.carrierCode}
@@ -231,11 +232,6 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             {/* Status Badge */}
             <div className="flex flex-col gap-1.5 lg:items-end">
               {getStatusBadge(shipment.status)}
-              {shipment.statusDescription && (
-                <Badge variant="outline" className="text-xs text-center">
-                  {shipment.statusDescription}
-                </Badge>
-              )}
             </div>
 
             {/* Status & Special Handling Badges */}
