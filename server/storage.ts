@@ -16,6 +16,10 @@ import {
   type Shipment,
   type InsertShipment,
   shipments,
+  type ShipmentItem,
+  shipmentItems,
+  type ShipmentTag,
+  shipmentTags,
   type Product,
   type InsertProduct,
   products,
@@ -125,6 +129,8 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
+  getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
+  getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -704,6 +710,24 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(shipments.createdAt));
+    return result;
+  }
+
+  async getShipmentItems(shipmentId: string): Promise<ShipmentItem[]> {
+    const result = await db
+      .select()
+      .from(shipmentItems)
+      .where(eq(shipmentItems.shipmentId, shipmentId))
+      .orderBy(asc(shipmentItems.createdAt));
+    return result;
+  }
+
+  async getShipmentTags(shipmentId: string): Promise<ShipmentTag[]> {
+    const result = await db
+      .select()
+      .from(shipmentTags)
+      .where(eq(shipmentTags.shipmentId, shipmentId))
+      .orderBy(asc(shipmentTags.createdAt));
     return result;
   }
 
