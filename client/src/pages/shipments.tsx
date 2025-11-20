@@ -85,8 +85,8 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
           <div className="space-y-3">
             {/* Customer Name - Most Important */}
             {shipment.shipToName && (
-              <div className="flex items-center gap-2">
-                <User className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+              <div className="flex items-start gap-2">
+                <User className="h-6 w-6 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <CardTitle className="text-2xl font-bold leading-tight">
                   {shipment.shipToName}
                 </CardTitle>
@@ -95,25 +95,46 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
 
             {/* Order Number - Second Most Important */}
             {shipment.orderNumber && (
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex items-start gap-2">
+                <Package className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <p className="text-lg font-bold text-foreground">
                   #{shipment.orderNumber}
                 </p>
               </div>
             )}
 
+            {/* Age/Order Date */}
+            {shipment.orderDate && (
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">
+                    {formatRelativeTime(shipment.orderDate)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(shipment.orderDate).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Contact Info */}
             <div className="space-y-1.5 text-sm text-muted-foreground">
               {shipment.shipToEmail && (
-                <div className="flex items-center gap-1.5">
-                  <Mail className="h-4 w-4 flex-shrink-0" />
+                <div className="flex items-start gap-1.5">
+                  <Mail className="h-4 w-4 flex-shrink-0 mt-0.5" />
                   <span className="truncate">{shipment.shipToEmail}</span>
                 </div>
               )}
               {shipment.shipToPhone && (
-                <div className="flex items-center gap-1.5">
-                  <Phone className="h-4 w-4 flex-shrink-0" />
+                <div className="flex items-start gap-1.5">
+                  <Phone className="h-4 w-4 flex-shrink-0 mt-0.5" />
                   <span>{shipment.shipToPhone}</span>
                 </div>
               )}
@@ -139,55 +160,41 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             )}
 
             {/* Service & Carrier */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {shipment.carrierCode && (
-                <Badge variant="outline" className="text-xs uppercase font-semibold">
-                  {shipment.carrierCode}
-                </Badge>
-              )}
-              {shipment.serviceCode && (
-                <span className="text-sm text-muted-foreground">{shipment.serviceCode}</span>
-              )}
-            </div>
-
-            {/* Age/Order Date */}
-            {shipment.orderDate && (
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-medium">
-                    {formatRelativeTime(shipment.orderDate)}
-                  </span>
+            {(shipment.carrierCode || shipment.serviceCode) && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Truck className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Ship via</span>
+                  {shipment.carrierCode && (
+                    <Badge variant="outline" className="text-xs uppercase font-semibold">
+                      {shipment.carrierCode}
+                    </Badge>
+                  )}
+                  {shipment.serviceCode && (
+                    <span>{shipment.serviceCode}</span>
+                  )}
                 </div>
-                <span className="text-xs text-muted-foreground ml-6">
-                  {new Date(shipment.orderDate).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
-                </span>
               </div>
             )}
 
-            {/* Items Count & Weight */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              {shipment.itemCount != null && shipment.itemCount > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <PackageOpen className="h-4 w-4" />
-                  <span>{shipment.itemCount} item{shipment.itemCount !== 1 ? 's' : ''}</span>
-                </div>
-              )}
-              {shipment.totalWeight && (
-                <span className="font-medium">{shipment.totalWeight}</span>
-              )}
-            </div>
+            {/* Items Count */}
+            {shipment.itemCount != null && shipment.itemCount > 0 && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <PackageOpen className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>Order contains {shipment.itemCount} item{shipment.itemCount !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+
+            {/* Weight */}
+            {shipment.totalWeight && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <span className="font-medium">Shipping weight {shipment.totalWeight}</span>
+              </div>
+            )}
 
             {/* Tracking Number */}
             {shipment.trackingNumber && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Truck className="h-4 w-4" />
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <span className="font-mono">{shipment.trackingNumber}</span>
               </div>
             )}
