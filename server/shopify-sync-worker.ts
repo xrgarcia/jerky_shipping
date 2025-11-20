@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { db } from './db';
 import {
   dequeueShopifyOrderSyncBatch,
   requeueShopifyOrderSyncMessages,
@@ -6,6 +7,7 @@ import {
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from './utils/shopify-utils';
+import { shopifyOrderSyncFailures, type InsertShopifyOrderSyncFailure } from '@shared/schema';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -13,6 +15,17 @@ function log(message: string) {
 }
 
 const MAX_RETRY_COUNT = 3; // Maximum retries before giving up
+
+/**
+ * Log a Shopify order sync failure to the dead letter queue
+ */
+async function logShopifyOrderSyncFailure(failure: InsertShopifyOrderSyncFailure): Promise<void> {
+  try {
+    await db.insert(shopifyOrderSyncFailures).values(failure);
+  } catch (error) {
+    console.error('[shopify-sync] Failed to log failure to dead letter queue:', error);
+  }
+}
 
 /**
  * Process a batch of Shopify order sync messages
@@ -51,9 +64,22 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
       if (!shopifyOrder) {
         log(`⚠️  Order ${orderNumber} not found in Shopify`);
         
-        // If we've exhausted retries, give up
+        // If we've exhausted retries, log to dead letter queue and give up
         if (retryCount >= MAX_RETRY_COUNT - 1) {
-          log(`❌ Max retries reached for order ${orderNumber}, giving up`);
+          log(`❌ Max retries reached for order ${orderNumber}, logging to dead letter queue`);
+          
+          await logShopifyOrderSyncFailure({
+            orderNumber,
+            reason: message.reason || 'unknown',
+            errorMessage: `Order ${orderNumber} not found in Shopify after ${MAX_RETRY_COUNT} attempts`,
+            requestData: {
+              queueMessage: message,
+            },
+            responseData: null,
+            retryCount,
+            failedAt: new Date(),
+          });
+          
           processedCount++;
           continue;
         }
@@ -110,9 +136,22 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
     } catch (error: any) {
       log(`❌ Error processing order ${message.orderNumber}: ${error.message}`);
       
-      // If we've exhausted retries, give up
+      // If we've exhausted retries, log to dead letter queue and give up
       if (retryCount >= MAX_RETRY_COUNT - 1) {
-        log(`❌ Max retries reached for order ${message.orderNumber}, giving up`);
+        log(`❌ Max retries reached for order ${message.orderNumber}, logging to dead letter queue`);
+        
+        await logShopifyOrderSyncFailure({
+          orderNumber: message.orderNumber,
+          reason: message.reason || 'unknown',
+          errorMessage: error.message || 'Unknown error',
+          requestData: {
+            queueMessage: message,
+          },
+          responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
+          retryCount,
+          failedAt: new Date(),
+        });
+        
         processedCount++;
         continue;
       }

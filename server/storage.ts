@@ -36,6 +36,8 @@ import {
   orderItems,
   type ShipmentSyncFailure,
   shipmentSyncFailures,
+  type ShopifyOrderSyncFailure,
+  shopifyOrderSyncFailures,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -162,6 +164,11 @@ export interface IStorage {
   getShipmentSyncFailureCount(): Promise<number>;
   getShipmentSyncFailures(limit?: number, offset?: number): Promise<ShipmentSyncFailure[]>;
   clearShipmentSyncFailures(): Promise<void>;
+  
+  // Shopify Order Sync Failures
+  getShopifyOrderSyncFailureCount(): Promise<number>;
+  getShopifyOrderSyncFailures(limit?: number, offset?: number): Promise<ShopifyOrderSyncFailure[]>;
+  clearShopifyOrderSyncFailures(): Promise<void>;
 
   // Data Health Metrics
   getDataHealthMetrics(): Promise<{
@@ -170,7 +177,7 @@ export interface IStorage {
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
     shipmentSyncFailures: number;
-    ordersWithoutOrderItems: number;
+    shopifyOrderSyncFailures: number;
   }>;
 }
 
@@ -1236,11 +1243,10 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipmentSyncFailures);
     
-    // Query 6: Orders without order items (using conditional aggregation)
-    const ordersWithoutItemsResult = await db
-      .select({ count: count(sql`CASE WHEN ${orderItems.id} IS NULL THEN 1 END`) })
-      .from(orders)
-      .leftJoin(orderItems, eq(orders.id, orderItems.orderId));
+    // Query 6: Shopify order sync failures count
+    const shopifyOrderSyncFailuresResult = await db
+      .select({ count: count() })
+      .from(shopifyOrderSyncFailures);
     
     return {
       ordersMissingShipments: ordersMissingShipmentsResult[0]?.count || 0,
@@ -1248,12 +1254,33 @@ export class DatabaseStorage implements IStorage {
       orphanedShipments: orphanedShipmentsResult[0]?.count || 0,
       shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,
       shipmentSyncFailures: syncFailuresResult[0]?.count || 0,
-      ordersWithoutOrderItems: ordersWithoutItemsResult[0]?.count || 0,
+      shopifyOrderSyncFailures: shopifyOrderSyncFailuresResult[0]?.count || 0,
     };
   }
 
   async clearShipmentSyncFailures(): Promise<void> {
     await db.delete(shipmentSyncFailures);
+  }
+  
+  async getShopifyOrderSyncFailureCount(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(shopifyOrderSyncFailures);
+    return result[0]?.count || 0;
+  }
+
+  async getShopifyOrderSyncFailures(limit: number = 50, offset: number = 0): Promise<ShopifyOrderSyncFailure[]> {
+    const result = await db
+      .select()
+      .from(shopifyOrderSyncFailures)
+      .orderBy(desc(shopifyOrderSyncFailures.failedAt))
+      .limit(limit)
+      .offset(offset);
+    return result;
+  }
+
+  async clearShopifyOrderSyncFailures(): Promise<void> {
+    await db.delete(shopifyOrderSyncFailures);
   }
 }
 

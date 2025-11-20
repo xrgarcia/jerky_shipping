@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
@@ -3028,6 +3028,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching failures:", error);
       res.status(500).json({ error: "Failed to fetch failures" });
+    }
+  });
+
+  app.get("/api/operations/shopify-order-sync-failures", requireAuth, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const search = req.query.search as string;
+      const offset = (page - 1) * limit;
+
+      let query = db.select().from(shopifyOrderSyncFailures);
+      let countQuery = db.select({ count: count() }).from(shopifyOrderSyncFailures);
+
+      if (search) {
+        const { like, or } = await import("drizzle-orm");
+        const searchCondition = or(
+          like(shopifyOrderSyncFailures.orderNumber, `%${search}%`),
+          like(shopifyOrderSyncFailures.errorMessage, `%${search}%`)
+        );
+        query = query.where(searchCondition);
+        countQuery = countQuery.where(searchCondition);
+      }
+
+      const failures = await query
+        .orderBy(desc(shopifyOrderSyncFailures.failedAt))
+        .limit(limit)
+        .offset(offset);
+
+      const totalCount = await countQuery.then(rows => rows[0]?.count || 0);
+
+      res.json({
+        failures,
+        totalCount,
+        page,
+        totalPages: Math.ceil(totalCount / limit),
+      });
+    } catch (error) {
+      console.error("Error fetching Shopify order sync failures:", error);
+      res.status(500).json({ error: "Failed to fetch failures" });
+    }
+  });
+  
+  app.delete("/api/operations/shopify-order-sync-failures", requireAuth, async (req, res) => {
+    try {
+      await storage.clearShopifyOrderSyncFailures();
+      console.log("All Shopify order sync failures cleared");
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing Shopify order sync failures:", error);
+      res.status(500).json({ error: "Failed to clear failures" });
     }
   });
 

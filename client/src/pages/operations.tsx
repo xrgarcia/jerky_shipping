@@ -91,7 +91,7 @@ type QueueStats = {
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
     shipmentSyncFailures: number;
-    ordersWithoutOrderItems: number;
+    shopifyOrderSyncFailures: number;
   };
 };
 
@@ -227,10 +227,13 @@ function ClearFailuresButton() {
 }
 
 export default function OperationsPage() {
-  const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "failures" | null>(null);
+  const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
+  const [showShopifyOrderSyncFailuresDialog, setShowShopifyOrderSyncFailuresDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [shopifyOrderSyncSearchTerm, setShopifyOrderSyncSearchTerm] = useState("");
+  const [shopifyOrderSyncCurrentPage, setShopifyOrderSyncCurrentPage] = useState(1);
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
@@ -416,6 +419,23 @@ Please analyze this failure and help me understand:
     },
     enabled: showFailuresDialog,
   });
+  
+  const { data: shopifyOrderSyncFailuresData } = useQuery<FailuresResponse>({
+    queryKey: ["/api/operations/shopify-order-sync-failures", shopifyOrderSyncCurrentPage, shopifyOrderSyncSearchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: shopifyOrderSyncCurrentPage.toString(),
+        limit: "50",
+      });
+      if (shopifyOrderSyncSearchTerm) {
+        params.set("search", shopifyOrderSyncSearchTerm);
+      }
+      const response = await fetch(`/api/operations/shopify-order-sync-failures?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch Shopify order sync failures");
+      return response.json();
+    },
+    enabled: showShopifyOrderSyncFailuresDialog,
+  });
 
   const purgeShopifyMutation = useMutation({
     mutationFn: async () => {
@@ -480,6 +500,29 @@ Please analyze this failure and help me understand:
       toast({
         title: "Clear Failed",
         description: "Failed to clear failures table",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const purgeShopifyOrderSyncFailuresMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/operations/shopify-order-sync-failures");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Failures Cleared",
+        description: "All Shopify order sync failures have been cleared",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-order-sync-failures"] });
+      setPurgeAction(null);
+      setShowShopifyOrderSyncFailuresDialog(false);
+    },
+    onError: () => {
+      toast({
+        title: "Clear Failed",
+        description: "Failed to clear Shopify order sync failures",
         variant: "destructive",
       });
     },
@@ -582,6 +625,8 @@ Please analyze this failure and help me understand:
       purgeShipmentSyncMutation.mutate();
     } else if (purgeAction === "failures") {
       purgeFailuresMutation.mutate();
+    } else if (purgeAction === "shopify-order-sync-failures") {
+      purgeShopifyOrderSyncFailuresMutation.mutate();
     }
   };
 
@@ -855,17 +900,43 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-orders-without-items">
+        <Card data-testid="card-shopify-order-sync-failures">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
-              Orders Without Items
+              Shopify Order Sync Failures
             </CardTitle>
-            <CardDescription>Orders missing line item details</CardDescription>
+            <CardDescription>Orders that failed to import from Shopify</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="text-orders-without-order-items">
-              {statsLoading ? "-" : (queueStats?.dataHealth?.ordersWithoutOrderItems ?? 0).toLocaleString()}
+            <div className="space-y-3">
+              <div className="text-3xl font-bold" data-testid="text-shopify-order-sync-failures">
+                {statsLoading ? "-" : (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0).toLocaleString()}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  data-testid="button-view-shopify-order-sync-failures"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowShopifyOrderSyncFailuresDialog(true)}
+                  disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
+                  className="flex-1"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  View
+                </Button>
+                <Button
+                  data-testid="button-purge-shopify-order-sync-failures"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurgeAction("shopify-order-sync-failures")}
+                  disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
+                  className="flex-1"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1261,6 +1332,7 @@ Please analyze this failure and help me understand:
               {purgeAction === "shopify" && "This will permanently delete all messages in the Shopify queue. This action cannot be undone."}
               {purgeAction === "shipment" && "This will permanently delete all messages in the shipment sync queue. This action cannot be undone."}
               {purgeAction === "failures" && "This will permanently delete all failure records. This action cannot be undone."}
+              {purgeAction === "shopify-order-sync-failures" && "This will permanently delete all Shopify order sync failure records. This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1503,6 +1575,128 @@ Please analyze this failure and help me understand:
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.min(failuresData.totalPages, p + 1))}
                   disabled={currentPage === failuresData.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showShopifyOrderSyncFailuresDialog} onOpenChange={setShowShopifyOrderSyncFailuresDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-shopify-order-sync-failures">
+          <DialogHeader>
+            <DialogTitle>Shopify Order Sync Failures</DialogTitle>
+            <DialogDescription>
+              Orders that failed to import from Shopify after multiple attempts
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                data-testid="input-search-shopify-order-sync-failures"
+                placeholder="Search by order number or error message..."
+                value={shopifyOrderSyncSearchTerm}
+                onChange={(e) => {
+                  setShopifyOrderSyncSearchTerm(e.target.value);
+                  setShopifyOrderSyncCurrentPage(1);
+                }}
+                className="flex-1"
+              />
+            </div>
+
+            {shopifyOrderSyncFailuresData && shopifyOrderSyncFailuresData.failures.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-shopify-order-sync-failures">
+                No failures found
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {shopifyOrderSyncFailuresData?.failures.map((failure) => (
+                  <Collapsible
+                    key={failure.id}
+                    open={expandedFailure === failure.id}
+                    onOpenChange={(open) => setExpandedFailure(open ? failure.id : null)}
+                  >
+                    <Card data-testid={`card-shopify-order-sync-failure-${failure.id}`}>
+                      <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover-elevate active-elevate-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {expandedFailure === failure.id ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                              <div>
+                                <CardTitle className="text-base">{failure.orderNumber}</CardTitle>
+                                <CardDescription className="text-xs">
+                                  {formatDistanceToNow(new Date(failure.failedAt), { addSuffix: true })}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{failure.reason}</Badge>
+                              {failure.retryCount > 0 && (
+                                <Badge variant="outline">{failure.retryCount} retries</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="space-y-4">
+                          <div>
+                            <p className="text-sm font-medium mb-1">Error Message</p>
+                            <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">
+                              {failure.errorMessage}
+                            </p>
+                          </div>
+                          {failure.requestData && (
+                            <div>
+                              <p className="text-sm font-medium mb-1">Request Data</p>
+                              <pre className="text-xs text-muted-foreground font-mono bg-muted p-2 rounded overflow-x-auto">
+                                {JSON.stringify(JSON.parse(failure.requestData), null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {failure.responseData && (
+                            <div>
+                              <p className="text-sm font-medium mb-1">Response Data</p>
+                              <pre className="text-xs text-muted-foreground font-mono bg-muted p-2 rounded overflow-x-auto">
+                                {JSON.stringify(JSON.parse(failure.responseData), null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                ))}
+              </div>
+            )}
+
+            {shopifyOrderSyncFailuresData && shopifyOrderSyncFailuresData.totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  data-testid="button-prev-shopify-page"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShopifyOrderSyncCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={shopifyOrderSyncCurrentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground" data-testid="text-shopify-page-info">
+                  Page {shopifyOrderSyncCurrentPage} of {shopifyOrderSyncFailuresData.totalPages}
+                </span>
+                <Button
+                  data-testid="button-next-shopify-page"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShopifyOrderSyncCurrentPage(p => Math.min(shopifyOrderSyncFailuresData.totalPages, p + 1))}
+                  disabled={shopifyOrderSyncCurrentPage === shopifyOrderSyncFailuresData.totalPages}
                 >
                   Next
                 </Button>
