@@ -1331,6 +1331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
       const shopifySecret = process.env.SHOPIFY_API_SECRET;
+      const topic = req.headers['x-shopify-topic'] as string;
+      const webhookId = req.headers['x-shopify-webhook-id'] as string;
 
       if (!shopifySecret) {
         console.error("SHOPIFY_API_SECRET not configured");
@@ -1339,7 +1341,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rawBody = req.rawBody as Buffer;
       if (!verifyShopifyWebhook(rawBody, hmacHeader, shopifySecret)) {
-        console.error("Webhook verification failed");
+        console.error("========== SHOPIFY WEBHOOK VERIFICATION FAILED ==========");
+        console.error(`Timestamp: ${new Date().toISOString()}`);
+        console.error(`Topic: ${topic || 'unknown'}`);
+        console.error(`Webhook ID: ${webhookId || 'unknown'}`);
+        console.error(`Request Path: ${req.path}`);
+        console.error(`Shop Domain: ${req.headers['x-shopify-shop-domain'] || 'unknown'}`);
+        console.error(`HMAC Header Present: ${!!hmacHeader}`);
+        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
+        console.error("=========================================================");
         return res.status(401).json({ error: "Webhook verification failed" });
       }
 
@@ -1365,6 +1375,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
       const shopifySecret = process.env.SHOPIFY_API_SECRET;
+      const topic = req.headers['x-shopify-topic'] as string;
+      const webhookId = req.headers['x-shopify-webhook-id'] as string;
 
       if (!shopifySecret) {
         console.error("SHOPIFY_API_SECRET not configured");
@@ -1373,7 +1385,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rawBody = req.rawBody as Buffer;
       if (!verifyShopifyWebhook(rawBody, hmacHeader, shopifySecret)) {
-        console.error("Webhook verification failed");
+        console.error("========== SHOPIFY WEBHOOK VERIFICATION FAILED ==========");
+        console.error(`Timestamp: ${new Date().toISOString()}`);
+        console.error(`Topic: ${topic || 'unknown'}`);
+        console.error(`Webhook ID: ${webhookId || 'unknown'}`);
+        console.error(`Request Path: ${req.path}`);
+        console.error(`Shop Domain: ${req.headers['x-shopify-shop-domain'] || 'unknown'}`);
+        console.error(`HMAC Header Present: ${!!hmacHeader}`);
+        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
+        console.error("=========================================================");
         return res.status(401).json({ error: "Webhook verification failed" });
       }
 
@@ -2877,6 +2897,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error re-registering Shopify webhooks:", error);
       res.status(500).json({ 
         error: "Failed to re-register Shopify webhooks",
+        details: error.message 
+      });
+    }
+  });
+
+  // List all Shopify webhooks
+  app.get("/api/operations/shopify-webhooks", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ 
+          error: "Missing Shopify credentials" 
+        });
+      }
+
+      const { listShopifyWebhooks } = await import("./utils/shopify-webhook");
+      const webhooks = await listShopifyWebhooks(shopDomain, accessToken);
+      
+      res.json({ webhooks });
+    } catch (error: any) {
+      console.error("Error listing Shopify webhooks:", error);
+      res.status(500).json({ 
+        error: "Failed to list webhooks",
+        details: error.message 
+      });
+    }
+  });
+
+  // Delete individual Shopify webhook
+  app.delete("/api/operations/shopify-webhooks/:webhookId", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+      const { webhookId } = req.params;
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ 
+          error: "Missing Shopify credentials" 
+        });
+      }
+
+      if (!webhookId) {
+        return res.status(400).json({ 
+          error: "Missing webhook ID" 
+        });
+      }
+
+      const { deleteShopifyWebhook } = await import("./utils/shopify-webhook");
+      
+      console.log(`Deleting Shopify webhook ${webhookId} via API request`);
+      await deleteShopifyWebhook(shopDomain, accessToken, webhookId);
+      
+      res.json({ 
+        success: true,
+        message: `Successfully deleted webhook ${webhookId}`
+      });
+    } catch (error: any) {
+      console.error(`Error deleting Shopify webhook ${req.params.webhookId}:`, error);
+      res.status(500).json({ 
+        error: "Failed to delete webhook",
         details: error.message 
       });
     }
