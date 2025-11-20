@@ -83,6 +83,7 @@ async function fetchShopifyOrders(task: BackfillFetchTask): Promise<{ success: b
           orderNumber,
           reason: 'backfill',
           enqueuedAt: Date.now(),
+          jobId,
         });
         enqueuedCount++;
       }
