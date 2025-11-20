@@ -205,20 +205,34 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               latestTracking: webhookTrackingData,
             };
             
-            // Extract order_number from merged data (always populate this field)
-            const extractedOrderNumber = extractOrderNumber(mergedShipmentData);
+            // Extract order_number with multiple fallbacks:
+            // 1. From merged shipmentData (includes tracking webhook + cached data)
+            // 2. Directly from cached shipmentData JSONB (in case field was missed)
+            // 3. From cached order_number column (backfilled or previously extracted)
+            const extractedOrderNumber = 
+              extractOrderNumber(mergedShipmentData) || 
+              cachedShipment.shipmentData?.shipment_number || 
+              cachedShipment.shipmentData?.shipmentNumber ||
+              cachedShipment.orderNumber;
             
-            // Update shipment with latest tracking info from webhook
-            // NOTE: Don't extract ship_to in fast path - tracking webhooks don't include it
-            // and extracting empty data would overwrite existing customer columns
-            await storage.updateShipment(cachedShipment.id, {
+            // Build update object
+            const updateData: any = {
               status: finalStatus,
               statusDescription: finalDescription,
               shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
               shipmentData: mergedShipmentData,
-              // Always update order_number if available in webhook data
-              ...(extractedOrderNumber && { orderNumber: extractedOrderNumber }),
-            });
+            };
+            
+            // Always explicitly set order_number (extracted, cached, or preserve existing)
+            // This ensures backfilled values are maintained even if webhook lacks shipment_number
+            if (extractedOrderNumber) {
+              updateData.orderNumber = extractedOrderNumber;
+            }
+            
+            // Update shipment with latest tracking info from webhook
+            // NOTE: Don't extract ship_to in fast path - tracking webhooks don't include it
+            // and extracting empty data would overwrite existing customer columns
+            await storage.updateShipment(cachedShipment.id, updateData);
             
             // Broadcast realtime update to WebSocket clients
             const order = await storage.getOrder(cachedShipment.orderId);
