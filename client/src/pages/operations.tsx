@@ -13,7 +13,11 @@ import {
   ChevronDown,
   ChevronRight,
   Activity,
-  Settings
+  Settings,
+  Package,
+  Truck,
+  ShoppingCart,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -658,67 +662,102 @@ export default function OperationsPage() {
         </CardContent>
       </Card>
 
-      <Card data-testid="card-data-health">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            Data Health
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Orders Missing Shipments</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersMissingShipments.toLocaleString() ?? "-"}
-                </span>
-              </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card data-testid="card-orders-missing-shipments">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Orders Missing Shipments
+            </CardTitle>
+            <CardDescription>Orders without shipment records</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
+              {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Shipments With No Orders</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-shipments-without-orders">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentsWithoutOrders.toLocaleString() ?? "-"}
-                </span>
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-shipments-without-orders">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Shipments Without Orders
+            </CardTitle>
+            <CardDescription>Shipment records with no linked orders</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
+              {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Orphaned Shipments</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-orphaned-shipments">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.orphanedShipments.toLocaleString() ?? "-"}
-                </span>
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-orphaned-shipments">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Orphaned Shipments
+            </CardTitle>
+            <CardDescription>Missing tracking, ship date, and shipment ID</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold" data-testid="text-orphaned-shipments">
+              {statsLoading ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Shipments With No Status</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-shipments-without-status">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentsWithoutStatus.toLocaleString() ?? "-"}
-                </span>
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-shipments-without-status">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Shipments Without Status
+            </CardTitle>
+            <CardDescription>Shipments missing status information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold" data-testid="text-shipments-without-status">
+              {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Shipment Sync Failures</p>
-              <div className="flex flex-col gap-2">
-                <span className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.shipmentSyncFailures.toLocaleString() ?? "-"}
-                </span>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-shipment-sync-failures">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <XCircle className="h-5 w-5" />
+              Shipment Sync Failures
+            </CardTitle>
+            <CardDescription>Failed shipment synchronization attempts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
+                {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentSyncFailures ?? 0).toLocaleString()}
+              </div>
+              {queueStats?.dataHealth?.shipmentSyncFailures ? (
                 <ClearFailuresButton />
-              </div>
+              ) : null}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Orders With No Items</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold" data-testid="text-orders-without-order-items">
-                  {statsLoading ? "-" : queueStats?.dataHealth?.ordersWithoutOrderItems.toLocaleString() ?? "-"}
-                </span>
-              </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-orders-without-items">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Orders Without Items
+            </CardTitle>
+            <CardDescription>Orders missing line item details</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold" data-testid="text-orders-without-order-items">
+              {statsLoading ? "-" : (queueStats?.dataHealth?.ordersWithoutOrderItems ?? 0).toLocaleString()}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card data-testid="card-shopify-credentials">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
