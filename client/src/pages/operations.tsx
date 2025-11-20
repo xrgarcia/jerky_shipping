@@ -618,50 +618,6 @@ export default function OperationsPage() {
         </Card>
       </div>
 
-      <Card data-testid="card-failures">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Shipment Sync Failures
-          </CardTitle>
-          <CardDescription>Dead letter queue for failed shipment syncs</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold" data-testid="text-failure-count">
-                {statsLoading ? "-" : queueStats?.failures.total.toLocaleString()}
-              </span>
-              <span className="text-muted-foreground">failures</span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                data-testid="button-view-failures"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFailuresDialog(true)}
-                disabled={!queueStats || queueStats.failures.total === 0}
-                className="flex-1"
-              >
-                <Search className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
-              <Button
-                data-testid="button-purge-failures"
-                variant="outline"
-                size="sm"
-                onClick={() => setPurgeAction("failures")}
-                disabled={!queueStats || queueStats.failures.total === 0}
-                className="flex-1"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Clear All
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 md:grid-cols-3">
         <Card data-testid="card-orders-missing-shipments">
           <CardHeader>
@@ -732,13 +688,34 @@ export default function OperationsPage() {
             <CardDescription>Failed shipment synchronization attempts</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
+            <div className="space-y-3">
               <div className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
                 {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentSyncFailures ?? 0).toLocaleString()}
               </div>
-              {queueStats?.dataHealth?.shipmentSyncFailures ? (
-                <ClearFailuresButton />
-              ) : null}
+              <div className="flex gap-2">
+                <Button
+                  data-testid="button-view-failures"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFailuresDialog(true)}
+                  disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
+                  className="flex-1"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  View
+                </Button>
+                <Button
+                  data-testid="button-purge-failures"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurgeAction("failures")}
+                  disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
+                  className="flex-1"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
