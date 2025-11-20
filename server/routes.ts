@@ -2971,6 +2971,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // List all ShipStation webhooks
+  app.get("/api/operations/shipstation-webhooks", requireAuth, async (req, res) => {
+    try {
+      const apiKey = process.env.SHIPSTATION_API_KEY;
+
+      if (!apiKey) {
+        return res.status(400).json({ 
+          error: "Missing ShipStation API key" 
+        });
+      }
+
+      const { listShipStationWebhooks } = await import("./utils/shipstation-webhook");
+      const webhooks = await listShipStationWebhooks(apiKey);
+      
+      res.json({ webhooks });
+    } catch (error: any) {
+      console.error("Error listing ShipStation webhooks:", error);
+      res.status(500).json({ 
+        error: "Failed to list webhooks",
+        details: error.message 
+      });
+    }
+  });
+
+  // Delete individual ShipStation webhook
+  app.delete("/api/operations/shipstation-webhooks/:webhookId", requireAuth, async (req, res) => {
+    try {
+      const apiKey = process.env.SHIPSTATION_API_KEY;
+      const { webhookId } = req.params;
+
+      if (!apiKey) {
+        return res.status(400).json({ 
+          error: "Missing ShipStation API key" 
+        });
+      }
+
+      if (!webhookId) {
+        return res.status(400).json({ 
+          error: "Missing webhook ID" 
+        });
+      }
+
+      const { deleteShipStationWebhook } = await import("./utils/shipstation-webhook");
+      
+      // Audit log: Track who deleted the webhook and when
+      const user = req.user as any;
+      const timestamp = new Date().toISOString();
+      console.log(`[AUDIT] ShipStation webhook deletion initiated by user ${user?.email || 'unknown'} at ${timestamp}`);
+      console.log(`[AUDIT] Target: Webhook ID ${webhookId}`);
+      
+      await deleteShipStationWebhook(apiKey, webhookId);
+      
+      console.log(`[AUDIT] Successfully deleted ShipStation webhook ${webhookId}`);
+      
+      res.json({ 
+        success: true,
+        message: `Successfully deleted webhook ${webhookId}`
+      });
+    } catch (error: any) {
+      console.error(`[AUDIT] Failed to delete ShipStation webhook ${req.params.webhookId}:`, error);
+      res.status(500).json({ 
+        error: "Failed to delete webhook",
+        details: error.message 
+      });
+    }
+  });
+
   app.get("/api/operations/failures", requireAuth, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
