@@ -22,8 +22,15 @@ import {
 } from './utils/queue';
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
-import { shipmentSyncFailures, type InsertShipmentSyncFailure } from '@shared/schema';
+import { 
+  shipmentSyncFailures, 
+  shipmentItems, 
+  shipmentTags, 
+  orderItems,
+  type InsertShipmentSyncFailure 
+} from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
+import { eq } from 'drizzle-orm';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -60,6 +67,73 @@ function normalizeShipmentStatus(shipmentData: any): { status: string; statusDes
   
   // Default for newly created shipments without tracking updates
   return { status: 'shipped', statusDescription: 'Shipment created' };
+}
+
+/**
+ * Populate normalized shipment_items and shipment_tags tables from shipmentData JSONB
+ * Deletes existing entries and re-creates from current shipmentData to ensure consistency
+ */
+async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: any) {
+  if (!shipmentData) return;
+
+  try {
+    // Delete existing entries for this shipment (ensure clean state)
+    await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
+    await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipmentId));
+
+    // Extract and insert items
+    if (shipmentData.items && Array.isArray(shipmentData.items)) {
+      const itemsToInsert = [];
+
+      for (const item of shipmentData.items) {
+        // Try to link to order_items if we have external_order_item_id
+        let orderItemId = null;
+        if (item.external_order_item_id) {
+          const matchingOrderItem = await db
+            .select()
+            .from(orderItems)
+            .where(eq(orderItems.shopifyLineItemId, item.external_order_item_id))
+            .limit(1);
+
+          if (matchingOrderItem.length > 0) {
+            orderItemId = matchingOrderItem[0].id;
+          }
+        }
+
+        itemsToInsert.push({
+          shipmentId,
+          orderItemId,
+          sku: item.sku || null,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unit_price?.toString() || null,
+          externalOrderItemId: item.external_order_item_id || null,
+          imageUrl: item.image_url || null,
+        });
+      }
+
+      if (itemsToInsert.length > 0) {
+        await db.insert(shipmentItems).values(itemsToInsert);
+      }
+    }
+
+    // Extract and insert tags
+    if (shipmentData.tags && Array.isArray(shipmentData.tags)) {
+      const tagsToInsert = shipmentData.tags.map((tag: any) => ({
+        shipmentId,
+        name: tag.name,
+        color: tag.color || null,
+        tagId: tag.tag_id || null,
+      }));
+
+      if (tagsToInsert.length > 0) {
+        await db.insert(shipmentTags).values(tagsToInsert);
+      }
+    }
+  } catch (error) {
+    log(`⚠️  Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
+    // Don't throw - this is a non-critical operation that shouldn't break the main flow
+  }
 }
 
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
@@ -215,13 +289,19 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               shipmentData: shipmentData,
             };
             
+            let finalShipmentId: string;
             if (existingShipmentOrphan) {
               await storage.updateShipment(existingShipmentOrphan.id, shipmentRecord);
+              finalShipmentId = existingShipmentOrphan.id;
               log(`[${trackingNumber}] Updated shipment without order linkage`);
             } else {
-              await storage.createShipment(shipmentRecord);
+              const createdShipment = await storage.createShipment(shipmentRecord);
+              finalShipmentId = createdShipment.id;
               log(`[${trackingNumber}] Created shipment without order linkage`);
             }
+            
+            // Populate normalized shipment items and tags tables
+            await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
             
             // Fire-and-forget: Trigger Shopify order sync if we found an order number
             if (linkageResult.orderNumber) {
@@ -325,13 +405,19 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           shipmentData: shipmentData,
         };
         
+        let finalShipmentId: string;
         if (existingShipment) {
           await storage.updateShipment(existingShipment.id, shipmentRecord);
+          finalShipmentId = existingShipment.id;
           log(`[${trackingNumber}] Updated shipment for order ${order.orderNumber}`);
         } else {
-          await storage.createShipment(shipmentRecord);
+          const createdShipment = await storage.createShipment(shipmentRecord);
+          finalShipmentId = createdShipment.id;
           log(`[${trackingNumber}] Created shipment for order ${order.orderNumber}`);
         }
+        
+        // Populate normalized shipment items and tags tables
+        await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
         
         // Broadcast order update via WebSocket
         broadcastOrderUpdate(order);
@@ -422,13 +508,19 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             shipmentData: shipmentData,
           };
 
+          let finalShipmentId: string;
           if (existingShipment) {
             await storage.updateShipment(existingShipment.id, shipmentRecord);
+            finalShipmentId = existingShipment.id;
             log(`[${orderNumber}] Updated shipment ${shipmentId}${order ? ` for order ${order.orderNumber}` : ' (no order linkage)'}`);
           } else {
-            await storage.createShipment(shipmentRecord);
+            const createdShipment = await storage.createShipment(shipmentRecord);
+            finalShipmentId = createdShipment.id;
             log(`[${orderNumber}] Created shipment ${shipmentId}${order ? ` for order ${order.orderNumber}` : ' (no order linkage)'}`);
           }
+          
+          // Populate normalized shipment items and tags tables
+          await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
         }
         
         // Fire-and-forget: Trigger Shopify order sync if order not found
