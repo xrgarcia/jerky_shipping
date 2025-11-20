@@ -604,3 +604,19 @@ export async function clearBackfillFetchQueue(): Promise<number> {
   }
   return length;
 }
+
+export async function getOldestBackfillFetchTaskMessage(): Promise<{ enqueuedAt: number | null }> {
+  const redis = getRedisClient();
+  const data = await redis.lindex(BACKFILL_FETCH_QUEUE_KEY, -1);
+  
+  if (!data) {
+    return { enqueuedAt: null };
+  }
+  
+  try {
+    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+    return { enqueuedAt: parsed.enqueuedAt || null };
+  } catch {
+    return { enqueuedAt: null };
+  }
+}

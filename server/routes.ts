@@ -1701,6 +1701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await enqueueBackfillFetchTaskBatch(tasks.map(task => ({
         ...task,
         jobId: job.id,
+        enqueuedAt: Date.now(),
       })));
 
       console.log(`[Backfill ${job.id}] Created ${tasks.length} fetch tasks (${tasks.filter(t => t.source === 'shopify').length} Shopify, ${tasks.filter(t => t.source === 'shipstation').length} ShipStation)`);

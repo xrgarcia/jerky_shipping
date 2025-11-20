@@ -1,9 +1,10 @@
-import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, enqueueShipmentSync, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
+import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, getBackfillFetchQueueLength, enqueueShipmentSync, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getOldestBackfillFetchTaskMessage } from "./utils/queue";
 import { fetchShipStationResource } from "./utils/shipstation-api";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
 import { log } from "./vite";
+import { processBackfillFetchTasks } from "./backfill-fetch-worker";
 
 /**
  * Extract and store refunds from a Shopify order
@@ -433,12 +434,26 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
         }
       }
       
+      // Process backfill fetch tasks (10 per batch)
+      const backfillFetchLength = await getBackfillFetchQueueLength();
+      if (backfillFetchLength > 0) {
+        const fetchStartTime = Date.now();
+        const processedFetchTasks = await processBackfillFetchTasks(10);
+        const fetchDuration = Date.now() - fetchStartTime;
+        
+        if (processedFetchTasks > 0) {
+          log(`Background worker processed ${processedFetchTasks} backfill fetch task(s) in ${fetchDuration}ms`);
+        }
+      }
+      
       // Broadcast queue status via WebSocket
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const backfillFetchQueueLength = await getBackfillFetchQueueLength();
       const failureCount = await storage.getShipmentSyncFailureCount();
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+      const oldestBackfillFetchTask = await getOldestBackfillFetchTaskMessage();
       
       // Get active backfill job
       const allBackfillJobs = await storage.getAllBackfillJobs();
@@ -450,9 +465,11 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
+        backfillFetchQueue: backfillFetchQueueLength,
         shipmentFailureCount: failureCount,
         shopifyQueueOldestAt: oldestShopify.enqueuedAt,
         shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
+        backfillFetchQueueOldestAt: oldestBackfillFetchTask.enqueuedAt,
         backfillActiveJob: activeBackfillJob,
         dataHealth,
       });
