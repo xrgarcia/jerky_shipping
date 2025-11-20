@@ -32,6 +32,7 @@ Preferred communication style: Simple, everyday language.
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration for development and production, supporting independent webhook delivery and automatic rollback on failure.
+- **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup prevents dev/prod webhook duplication. REPLIT_DOMAINS is correctly parsed (comma-separated list, first domain only) and webhooks pointing to different base URLs are automatically deleted. URL parsing is wrapped in try/catch to handle malformed addresses gracefully.
 
 ## External Dependencies
 

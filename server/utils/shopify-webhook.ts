@@ -175,9 +175,15 @@ export async function reregisterAllWebhooks(
     }
     
     // Check if this webhook points to a different base URL
-    const webhookUrl = new URL(webhook.address);
-    const currentUrl = new URL(normalizedBaseUrl);
-    return webhookUrl.host !== currentUrl.host;
+    try {
+      const webhookUrl = new URL(webhook.address);
+      const currentUrl = new URL(normalizedBaseUrl);
+      return webhookUrl.host !== currentUrl.host;
+    } catch (error: any) {
+      // Malformed webhook address - log and skip (don't delete malformed webhooks automatically)
+      console.warn(`Skipping webhook with malformed address: ${webhook.address} (${error.message})`);
+      return false;
+    }
   });
   
   if (orphanedWebhooks.length > 0) {
@@ -330,9 +336,15 @@ export async function ensureWebhooksRegistered(
       }
       
       // Check if this webhook points to a different base URL
-      const webhookUrl = new URL(webhook.address);
-      const currentUrl = new URL(normalizedBaseUrl);
-      return webhookUrl.host !== currentUrl.host;
+      try {
+        const webhookUrl = new URL(webhook.address);
+        const currentUrl = new URL(normalizedBaseUrl);
+        return webhookUrl.host !== currentUrl.host;
+      } catch (error: any) {
+        // Malformed webhook address - log and skip (don't delete malformed webhooks automatically)
+        console.warn(`Skipping webhook with malformed address: ${webhook.address} (${error.message})`);
+        return false;
+      }
     });
     
     if (orphanedWebhooks.length > 0) {
