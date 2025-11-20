@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds } from "@shared/schema";
+import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds, printQueue } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
@@ -2809,6 +2809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Execute all deletions in a transaction to ensure atomicity
       await db.transaction(async (tx) => {
         // Delete child tables first (foreign key constraints)
+        await tx.delete(printQueue);
         await tx.delete(orderItems);
         await tx.delete(shipments);
         await tx.delete(orderRefunds);

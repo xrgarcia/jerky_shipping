@@ -1167,7 +1167,7 @@ Please analyze this failure and help me understand:
             <Database className="h-5 w-5" />
             Clear All Order Data
           </CardTitle>
-          <CardDescription>Permanently delete all orders, items, shipments, and refunds</CardDescription>
+          <CardDescription>Permanently delete all print queue jobs, orders, items, shipments, and refunds</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -1180,6 +1180,7 @@ Please analyze this failure and help me understand:
                 This will permanently delete all data from the following tables:
               </p>
               <ul className="list-disc list-inside text-sm text-muted-foreground ml-2">
+                <li>Print Queue</li>
                 <li>Orders</li>
                 <li>Order Items</li>
                 <li>Shipments</li>
@@ -1471,6 +1472,7 @@ Please analyze this failure and help me understand:
                 This will <strong className="text-destructive">permanently delete</strong> all data from the following tables:
               </p>
               <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>Print Queue</strong> - All pending print jobs</li>
                 <li><strong>Orders</strong> - All order records</li>
                 <li><strong>Order Items</strong> - All line item details</li>
                 <li><strong>Shipments</strong> - All shipping information</li>
