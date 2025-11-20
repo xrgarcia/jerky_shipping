@@ -595,7 +595,7 @@ Please analyze this failure and help me understand:
     queueStats.shipmentSyncQueue.oldestMessageAt
   ) : "healthy";
 
-  const shopifyOrderSyncHealth = queueStats ? getQueueHealth(
+  const shopifyOrderSyncHealth = queueStats && queueStats.shopifyOrderSyncQueue ? getQueueHealth(
     queueStats.shopifyOrderSyncQueue.size,
     queueStats.shopifyOrderSyncQueue.oldestMessageAt
   ) : "healthy";
