@@ -4,6 +4,7 @@ import {
   dequeueShopifyOrderSyncBatch,
   requeueShopifyOrderSyncMessages,
   getShopifyOrderSyncQueueLength,
+  removeShopifyOrderSyncFromInflight,
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from './utils/shopify-utils';
@@ -44,6 +45,7 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     const retryCount = message.retryCount || 0;
+    let wasRequeued = false; // Track if message was requeued for retry
     
     try {
       const { orderNumber } = message;
@@ -91,6 +93,7 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
         };
         await requeueShopifyOrderSyncMessages([retryMessage]);
         log(`📥 Requeued order ${orderNumber} for retry (${retryCount + 1}/${MAX_RETRY_COUNT})`);
+        wasRequeued = true;
         processedCount++;
         continue;
       }
@@ -163,7 +166,14 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
       };
       await requeueShopifyOrderSyncMessages([retryMessage]);
       log(`📥 Requeued order ${message.orderNumber} for retry due to error (${retryCount + 1}/${MAX_RETRY_COUNT})`);
+      wasRequeued = true;
       processedCount++;
+    } finally {
+      // Always remove from in-flight set after processing completes or fails permanently
+      // Skip cleanup only if message was requeued for retry
+      if (!wasRequeued) {
+        await removeShopifyOrderSyncFromInflight(message);
+      }
     }
   }
   

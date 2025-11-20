@@ -285,6 +285,7 @@ export async function requeueShipmentSyncMessages(messages: ShipmentSyncMessage[
 
 // Shopify Order Sync Queue operations
 const SHOPIFY_ORDER_SYNC_QUEUE_KEY = 'shopify:order-sync';
+const SHOPIFY_ORDER_SYNC_INFLIGHT_KEY = 'shopify:order-sync:inflight';
 
 export interface ShopifyOrderSyncMessage {
   orderNumber: string; // The order number to import from Shopify
@@ -294,17 +295,88 @@ export interface ShopifyOrderSyncMessage {
   triggeringShipmentTracking?: string; // Optional: tracking number that triggered this sync
 }
 
-export async function enqueueShopifyOrderSync(message: ShopifyOrderSyncMessage): Promise<void> {
-  const redis = getRedisClient();
-  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, JSON.stringify(message));
+/**
+ * Generate a deduplication key for a Shopify order sync message
+ * Uses order number to identify unique orders
+ */
+function getShopifyOrderSyncDedupeKey(message: ShopifyOrderSyncMessage): string {
+  return `order:${message.orderNumber}`;
 }
 
-export async function enqueueShopifyOrderSyncBatch(messages: ShopifyOrderSyncMessage[]): Promise<void> {
-  if (messages.length === 0) return;
+/**
+ * Enqueue a Shopify order sync message with deduplication
+ * Returns true if enqueued, false if already in queue
+ * Uses SADD's atomic return value to prevent race conditions
+ */
+export async function enqueueShopifyOrderSync(message: ShopifyOrderSyncMessage): Promise<boolean> {
+  const redis = getRedisClient();
+  const dedupeKey = getShopifyOrderSyncDedupeKey(message);
+  
+  // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+  const added = await redis.sadd(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, dedupeKey);
+  
+  // If already existed, don't enqueue
+  if (added === 0) {
+    return false; // Already queued/processing
+  }
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue the message
+  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, JSON.stringify(message));
+  return true;
+}
+
+/**
+ * Enqueue multiple Shopify order sync messages with deduplication
+ * Returns count of messages successfully enqueued (deduplicated messages are skipped)
+ * Handles both in-batch duplicates and existing queue duplicates atomically
+ */
+export async function enqueueShopifyOrderSyncBatch(messages: ShopifyOrderSyncMessage[]): Promise<number> {
+  if (messages.length === 0) return 0;
   
   const redis = getRedisClient();
-  const serialized = messages.map(msg => JSON.stringify(msg));
+  const toEnqueue: ShopifyOrderSyncMessage[] = [];
+  const seenKeys = new Set<string>(); // Track duplicates within this batch
+  
+  for (const message of messages) {
+    const dedupeKey = getShopifyOrderSyncDedupeKey(message);
+    
+    // Skip if already seen in this batch
+    if (seenKeys.has(dedupeKey)) {
+      continue;
+    }
+    
+    // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+    const added = await redis.sadd(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, dedupeKey);
+    
+    if (added === 1) {
+      toEnqueue.push(message);
+      seenKeys.add(dedupeKey);
+    }
+  }
+  
+  if (toEnqueue.length === 0) return 0;
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue all messages
+  const serialized = toEnqueue.map(msg => JSON.stringify(msg));
   await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
+  
+  return toEnqueue.length;
+}
+
+/**
+ * Remove a Shopify order sync message from the in-flight set
+ * Call this after processing completes (success or failure)
+ */
+export async function removeShopifyOrderSyncFromInflight(message: ShopifyOrderSyncMessage): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = getShopifyOrderSyncDedupeKey(message);
+  await redis.srem(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, dedupeKey);
 }
 
 export async function dequeueShopifyOrderSync(): Promise<ShopifyOrderSyncMessage | null> {
