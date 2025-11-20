@@ -11,23 +11,22 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
+import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
-interface ShipmentWithOrder extends Shipment {
-  order: Order | null;
+interface ShipmentWithItemCount extends Shipment {
   itemCount?: number;
 }
 
 interface ShipmentsResponse {
-  shipments: ShipmentWithOrder[];
+  shipments: ShipmentWithItemCount[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
 }
 
-function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
+function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
   
@@ -43,7 +42,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
     enabled: !!shipmentIdOrUuid,
   });
 
-  const isOrphanedShipment = (shipment: ShipmentWithOrder) => {
+  const isOrphanedShipment = (shipment: ShipmentWithItemCount) => {
     return !shipment.trackingNumber && !shipment.shipDate && !shipment.shipmentId;
   };
 
@@ -678,7 +677,7 @@ export default function Shipments() {
     },
   });
 
-  const isOrphanedShipment = (shipment: ShipmentWithOrder) => {
+  const isOrphanedShipment = (shipment: ShipmentWithItemCount) => {
     // A shipment is orphaned if it's missing all key identifiers
     return !shipment.trackingNumber && !shipment.shipDate && !shipment.shipmentId;
   };

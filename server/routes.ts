@@ -789,11 +789,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.withoutOrders = true;
       }
 
-      // Get filtered shipments with proper SQL JOIN (no limit on orders!)
-      const { shipments: shipmentsWithOrders, total } = await storage.getFilteredShipmentsWithOrders(filters);
+      // Get filtered shipments (no orders table join - all data comes from shipments table)
+      const { shipments, total } = await storage.getFilteredShipments(filters);
 
       res.json({
-        shipments: shipmentsWithOrders,
+        shipments,
         total,
         page: filters.page,
         pageSize: filters.pageSize,
