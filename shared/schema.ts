@@ -172,6 +172,7 @@ export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").references(() => orders.id), // Nullable to allow shipments without linked orders
   shipmentId: text("shipment_id"), // ShipStation shipment ID
+  orderNumber: text("order_number"), // Customer-facing order number from ShipStation (e.g., "JK3825345229")
   trackingNumber: text("tracking_number"),
   carrierCode: text("carrier_code"),
   serviceCode: text("service_code"),
@@ -197,7 +198,9 @@ export const shipments = pgTable("shipments", {
   shipmentData: jsonb("shipment_data"), // Store full ShipStation shipment payload
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_number_idx ON ${table} (order_number) WHERE order_number IS NOT NULL`,
+}));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
   id: true,
@@ -209,6 +212,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   estimatedDeliveryDate: z.coerce.date().optional().or(z.null()),
   actualDeliveryDate: z.coerce.date().optional().or(z.null()),
   shipmentId: z.string().nullish(),
+  orderNumber: z.string().nullish(),
   trackingNumber: z.string().nullish(),
   carrierCode: z.string().nullish(),
   serviceCode: z.string().nullish(),
