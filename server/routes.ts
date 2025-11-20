@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
@@ -1124,50 +1124,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual sync endpoint - enqueues async jobs for all non-delivered shipments and orders without shipments
+  // Manual sync endpoint - fetches last 7 days of shipments from ShipStation API and enqueues them for processing
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {
-      console.log("========== ASYNC SHIPMENT SYNC JOB STARTED ==========");
+      console.log("========== SHIPSTATION SYNC FROM API STARTED ==========");
       
-      // Get all non-delivered shipments
-      const nonDeliveredShipments = await storage.getNonDeliveredShipments();
-      console.log(`Found ${nonDeliveredShipments.length} non-delivered shipments`);
+      // Calculate date range: last 7 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
       
-      // Get all orders without shipments
-      const ordersWithoutShipments = await storage.getOrdersWithoutShipments();
-      console.log(`Found ${ordersWithoutShipments.length} orders without shipments`);
+      console.log(`Fetching shipments from ${startDate.toISOString()} to ${endDate.toISOString()}`);
       
-      // Build sync messages
+      // Fetch shipments from ShipStation API (with rate limit handling and retries)
+      const { data: shipments, rateLimit } = await getShipmentsByDateRange(startDate, endDate);
+      console.log(`Fetched ${shipments.length} shipments from ShipStation (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
+      
+      // Track skipped shipments for diagnostics
+      const skippedShipments: string[] = [];
+      
+      // Build sync messages from ShipStation data
       const messages: any[] = [];
       
-      // Add messages for non-delivered shipments (use tracking number if available, otherwise order number)
-      for (const shipment of nonDeliveredShipments) {
-        if (shipment.trackingNumber) {
+      for (const shipment of shipments) {
+        // Extract order number from shipment_number field (this is the customer-facing order number)
+        const orderNumber = shipment.shipment_number || shipment.order_number;
+        
+        // Extract tracking number if available
+        const trackingNumber = shipment.tracking_number;
+        
+        // Prefer tracking number if available, otherwise use order number
+        if (trackingNumber) {
           messages.push({
-            trackingNumber: shipment.trackingNumber,
-            reason: 'manual-sync',
+            trackingNumber,
+            shipmentId: shipment.shipment_id,
+            reason: 'manual-sync-api',
             enqueuedAt: Date.now(),
           });
-        } else if (shipment.orderId) {
-          // Get order to find order number
-          const order = await storage.getOrder(shipment.orderId);
-          if (order?.orderNumber) {
-            messages.push({
-              orderNumber: order.orderNumber,
-              reason: 'manual-sync',
-              enqueuedAt: Date.now(),
-            });
-          }
+        } else if (orderNumber) {
+          messages.push({
+            orderNumber,
+            shipmentId: shipment.shipment_id,
+            reason: 'manual-sync-api',
+            enqueuedAt: Date.now(),
+          });
+        } else {
+          const shipmentId = shipment.shipment_id || 'unknown';
+          console.warn(`Skipping shipment ${shipmentId} - no tracking number or order number`);
+          skippedShipments.push(shipmentId);
         }
-      }
-      
-      // Add messages for orders without shipments
-      for (const order of ordersWithoutShipments) {
-        messages.push({
-          orderNumber: order.orderNumber,
-          reason: 'manual-sync',
-          enqueuedAt: Date.now(),
-        });
       }
       
       // Enqueue all messages in batch
@@ -1176,18 +1181,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Enqueued ${messages.length} shipment sync jobs`);
       }
       
-      console.log(`========== ASYNC JOB CREATION COMPLETE ==========`);
+      console.log(`========== SHIPSTATION SYNC COMPLETE ==========`);
 
       res.json({ 
         success: true,
         enqueuedCount: messages.length,
-        nonDeliveredShipments: nonDeliveredShipments.length,
-        ordersWithoutShipments: ordersWithoutShipments.length,
-        message: `Enqueued ${messages.length} jobs for async processing`
+        shipmentsFromApi: shipments.length,
+        skippedCount: skippedShipments.length,
+        dateRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
+        rateLimit: {
+          remaining: rateLimit.remaining,
+          limit: rateLimit.limit,
+        },
+        message: `Successfully enqueued ${messages.length} shipments from ShipStation API (last 7 days)${skippedShipments.length > 0 ? `, skipped ${skippedShipments.length} shipments without identifiers` : ''}`
       });
     } catch (error: any) {
-      console.error("Error creating shipment sync jobs:", error);
-      res.status(500).json({ error: error.message || "Failed to create sync jobs" });
+      console.error("Error syncing from ShipStation API:", error);
+      res.status(500).json({ 
+        success: false,
+        error: error.message || "Failed to sync from ShipStation",
+        details: "Sync failed before completion. Please check server logs for details."
+      });
     }
   });
 

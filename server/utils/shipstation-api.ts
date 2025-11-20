@@ -206,6 +206,112 @@ export async function getShipmentByShipmentId(shipmentId: string): Promise<ApiRe
 }
 
 /**
+ * Get shipments by date range using V2 API
+ * Returns all shipments created within the specified date range with pagination support
+ * Date format: ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)
+ * Implements proper rate limit handling with backoff using epoch reset timestamp
+ * Throws error if unable to fetch complete results
+ */
+export async function getShipmentsByDateRange(
+  startDate: Date,
+  endDate: Date,
+  pageSize: number = 100
+): Promise<ApiResponseWithRateLimit<any[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const allShipments: any[] = [];
+  let page = 1;
+  let lastRateLimit: RateLimitInfo = { limit: 40, remaining: 40, reset: 60 };
+  let expectedTotal: number | null = null;
+
+  // Format dates to ISO 8601
+  const startDateISO = startDate.toISOString();
+  const endDateISO = endDate.toISOString();
+
+  console.log(`Fetching shipments from ${startDateISO} to ${endDateISO}`);
+
+  while (true) {
+    // Check if we need to wait for rate limit reset (using epoch timestamp)
+    if (lastRateLimit.remaining < 2) {
+      const resetEpochMs = lastRateLimit.reset * 1000;
+      const now = Date.now();
+      
+      if (resetEpochMs > now) {
+        const waitTimeMs = resetEpochMs - now + 1000; // Add 1 second buffer
+        const waitTimeSec = Math.ceil(waitTimeMs / 1000);
+        console.log(`Rate limit exhausted (${lastRateLimit.remaining} remaining), waiting ${waitTimeSec}s until reset (${new Date(resetEpochMs).toISOString()})...`);
+        await new Promise(resolve => setTimeout(resolve, waitTimeMs));
+      }
+    }
+
+    const url = `${SHIPSTATION_API_BASE}/v2/shipments?created_at_start=${encodeURIComponent(startDateISO)}&created_at_end=${encodeURIComponent(endDateISO)}&page=${page}&page_size=${pageSize}&sort_by=created_at&sort_dir=desc`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'api-key': SHIPSTATION_API_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    lastRateLimit = extractRateLimitInfo(response.headers);
+
+    // Handle rate limit errors explicitly
+    if (response.status === 429) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+      console.log(`Rate limited by API (429), waiting ${retryAfter}s before retry...`);
+      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+      continue; // Retry same page
+    }
+
+    if (!response.ok) {
+      throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    const shipments = data.shipments || [];
+    
+    // Store expected total on first page
+    if (expectedTotal === null && data.total) {
+      expectedTotal = data.total;
+    }
+    
+    console.log(`Fetched page ${page}: ${shipments.length} shipments (rate limit: ${lastRateLimit.remaining}/${lastRateLimit.limit}, total expected: ${expectedTotal || 'unknown'})`);
+    
+    allShipments.push(...shipments);
+
+    // Check if we've fetched all pages
+    const hasMoreData = data.total && allShipments.length < data.total;
+    const hasMorePages = data.pages && page < data.pages;
+    
+    if (!hasMoreData && !hasMorePages) {
+      console.log(`Pagination complete: fetched ${allShipments.length} of ${expectedTotal || allShipments.length} total shipments`);
+      break;
+    }
+    
+    // Safety check: if we got fewer shipments than page size but still expect more, something is wrong
+    if (shipments.length < pageSize && hasMoreData) {
+      console.warn(`Received partial page (${shipments.length} < ${pageSize}) but total indicates more data exists`);
+    }
+    
+    page++;
+  }
+
+  // Verify we fetched complete data
+  if (expectedTotal !== null && allShipments.length < expectedTotal) {
+    throw new Error(`Incomplete fetch: Retrieved ${allShipments.length} of ${expectedTotal} shipments due to pagination issues`);
+  }
+
+  console.log(`Total shipments fetched: ${allShipments.length}`);
+
+  return {
+    data: allShipments,
+    rateLimit: lastRateLimit,
+  };
+}
+
+/**
  * Get fulfillment by tracking number using V2 API
  * Returns null if fulfillment not found
  */
