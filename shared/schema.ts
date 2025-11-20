@@ -231,6 +231,7 @@ export const shipments = pgTable("shipments", {
   importServices: boolean("import_services"),
   overrideHoliday: boolean("override_holiday"),
   shipmentData: jsonb("shipment_data"), // Store full ShipStation shipment payload
+  orderDate: timestamp("order_date"), // ShipStation createDate - when the shipment/label was created
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -246,6 +247,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   shipDate: z.coerce.date().optional().or(z.null()),
   estimatedDeliveryDate: z.coerce.date().optional().or(z.null()),
   actualDeliveryDate: z.coerce.date().optional().or(z.null()),
+  orderDate: z.coerce.date().optional().or(z.null()),
   shipmentId: z.string().nullish(),
   orderNumber: z.string().nullish(),
   trackingNumber: z.string().nullish(),
