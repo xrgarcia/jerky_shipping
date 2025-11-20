@@ -386,7 +386,7 @@ export default function Shipments() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
-  const [shipmentStatus, setShipmentStatus] = useState<string>(""); // Warehouse status filter
+  const [shipmentStatus, setShipmentStatus] = useState<string[]>([]); // Warehouse status filter (multi-select)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -414,7 +414,7 @@ export default function Shipments() {
     setSearch(params.get('search') || '');
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
-    setShipmentStatus(params.get('shipmentStatus') || '');
+    setShipmentStatus(params.getAll('shipmentStatus'));
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -429,7 +429,7 @@ export default function Shipments() {
     const hasActiveFilters = params.get('search') || 
       params.get('status') ||
       params.get('statusDescription') ||
-      params.get('shipmentStatus') ||
+      params.getAll('shipmentStatus').length ||
       params.getAll('carrierCode').length ||
       params.get('dateFrom') ||
       params.get('dateTo') ||
@@ -453,7 +453,7 @@ export default function Shipments() {
     if (search) params.set('search', search);
     if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
-    if (shipmentStatus) params.set('shipmentStatus', shipmentStatus);
+    shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.set('dateFrom', dateFrom);
@@ -583,7 +583,7 @@ export default function Shipments() {
     if (search) params.append('search', search);
     if (status) params.append('status', status); // Single status value
     if (statusDescription) params.append('statusDescription', statusDescription);
-    if (shipmentStatus) params.append('shipmentStatus', shipmentStatus);
+    shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.append('dateFrom', dateFrom);
@@ -663,7 +663,7 @@ export default function Shipments() {
     setSearch("");
     setStatus("");
     setStatusDescription("");
-    setShipmentStatus("");
+    setShipmentStatus([]);
     setCarrierCode([]);
     setDateFrom("");
     setDateTo("");
@@ -676,7 +676,7 @@ export default function Shipments() {
     search,
     status,
     statusDescription,
-    shipmentStatus,
+    shipmentStatus.length > 0,
     carrierCode.length > 0,
     dateFrom,
     dateTo,
@@ -928,25 +928,19 @@ export default function Shipments() {
               {/* Warehouse Status */}
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold">Warehouse Status:</span>
-                <Select 
-                  value={shipmentStatus || "all"} 
-                  onValueChange={(val) => { 
-                    setShipmentStatus(val === "all" ? "" : val); 
-                    setPage(1); 
-                  }}
-                >
-                  <SelectTrigger className="w-48" data-testid="select-shipment-status">
-                    <SelectValue placeholder="All warehouse statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" data-testid="shipment-status-all">All warehouse statuses</SelectItem>
-                    {shipmentStatuses.map((s) => (
-                      <SelectItem key={s ?? "null"} value={s ?? "null"} data-testid={`shipment-status-${s ?? "null"}`}>
-                        {s ?? "No Status"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-2">
+                  {shipmentStatuses.map(s => (
+                    <Badge
+                      key={s ?? "null"}
+                      variant={shipmentStatus.includes(s ?? "null") ? "default" : "outline"}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => toggleArrayFilter(s ?? "null", shipmentStatus, setShipmentStatus)}
+                      data-testid={`filter-warehouse-status-${s ?? "null"}`}
+                    >
+                      {s ?? "No Status"}
+                    </Badge>
+                  ))}
+                </div>
               </div>
 
               {/* Sort Options */}
