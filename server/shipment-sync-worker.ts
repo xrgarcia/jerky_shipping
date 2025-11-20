@@ -13,7 +13,9 @@ import {
   getOldestShopifyQueueMessage,
   getOldestShipmentSyncQueueMessage,
   requeueShipmentSyncMessages,
+  enqueueShopifyOrderSync,
   type ShipmentSyncMessage,
+  type ShopifyOrderSyncMessage,
 } from './utils/queue';
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
@@ -24,6 +26,8 @@ function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
   console.log(`${timestamp} [shipment-sync] ${message}`);
 }
+
+const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
 /**
  * Process a batch of shipment sync messages
