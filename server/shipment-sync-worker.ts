@@ -30,6 +30,38 @@ function log(message: string) {
   console.log(`${timestamp} [shipment-sync] ${message}`);
 }
 
+/**
+ * Normalize ShipStation status codes to our internal status values
+ * - DE (Delivered) → "delivered"
+ * - Any other tracking code → "in_transit"
+ * - Voided → "cancelled"
+ * - Default → "shipped"
+ */
+function normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
+  // Check if shipment is voided first
+  if (shipmentData.voided) {
+    return { status: 'cancelled', statusDescription: 'Shipment voided' };
+  }
+  
+  // Check for tracking status code (from tracking webhooks)
+  const statusCode = shipmentData.status_code || shipmentData.statusCode;
+  if (statusCode) {
+    if (statusCode === 'DE') {
+      return {
+        status: 'delivered',
+        statusDescription: shipmentData.status_description || shipmentData.statusDescription || 'Delivered'
+      };
+    }
+    return {
+      status: 'in_transit',
+      statusDescription: shipmentData.status_description || shipmentData.statusDescription || 'In transit'
+    };
+  }
+  
+  // Default for newly created shipments without tracking updates
+  return { status: 'shipped', statusDescription: 'Shipment created' };
+}
+
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
 /**
@@ -59,30 +91,54 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         log(`Processing tracking number: ${trackingNumber}`);
         
         // OPTIMIZATION: Check if we already have this shipment in our database
-        const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+        const cachedShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+        let fastPathError: Error | null = null;
         
         // If shipment exists AND is linked to an order, just update tracking status (skip API call)
-        if (existingShipment && existingShipment.orderId && webhookTrackingData) {
-          log(`[${trackingNumber}] ⚡ Found existing shipment linked to order, updating status without API call`);
-          
-          // Update shipment with latest tracking info from webhook
-          await storage.updateShipment(existingShipment.id, {
-            status: webhookTrackingData.status_code || existingShipment.status,
-            statusDescription: webhookTrackingData.status_description || existingShipment.statusDescription,
-            shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : existingShipment.shipDate,
-            shipmentData: {
-              ...(existingShipment.shipmentData || {}),
-              latestTracking: webhookTrackingData,
-            },
-          });
-          
-          log(`[${trackingNumber}] ✓ Updated shipment status for order-linked shipment (0 API calls)`);
-          processedCount++;
-          continue; // Skip to next message without API call
+        if (cachedShipment && cachedShipment.orderId && webhookTrackingData) {
+          try {
+            log(`[${trackingNumber}] ⚡ Found existing shipment linked to order, updating status without API call`);
+            
+            // Normalize status using helper
+            const { status, statusDescription } = normalizeShipmentStatus(webhookTrackingData);
+            
+            // CRITICAL: Don't downgrade delivered shipments to in_transit
+            // Once delivered, always delivered (terminal status)
+            const finalStatus = cachedShipment.status === 'delivered' ? 'delivered' : status;
+            const finalDescription = cachedShipment.status === 'delivered' 
+              ? cachedShipment.statusDescription 
+              : statusDescription;
+            
+            // Update shipment with latest tracking info from webhook
+            await storage.updateShipment(cachedShipment.id, {
+              status: finalStatus,
+              statusDescription: finalDescription,
+              shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
+              shipmentData: {
+                ...(cachedShipment.shipmentData || {}),
+                latestTracking: webhookTrackingData,
+              },
+            });
+            
+            // Broadcast realtime update to WebSocket clients
+            const order = await storage.getOrder(cachedShipment.orderId);
+            if (order) {
+              broadcastOrderUpdate(order);
+            }
+            
+            log(`[${trackingNumber}] ✓ Updated shipment status for order-linked shipment (0 API calls)`);
+            processedCount++;
+            continue; // Success - skip to next message without API call
+          } catch (error: any) {
+            // Store fast-path error and fall through to API sync fallback
+            fastPathError = error;
+            log(`⚠️  Fast-path failed for ${trackingNumber}, falling back to full API sync: ${error.message}`);
+            // Fall through to API sync below
+          }
         }
         
-        // Otherwise, proceed with API call to get full shipment details
-        log(`[${trackingNumber}] ${existingShipment ? 'Shipment exists but not linked to order' : 'New shipment'}, calling ShipStation API`);
+        // Proceed with API call (either because shipment doesn't exist, isn't linked, or fast-path failed)
+        log(`[${trackingNumber}] ${cachedShipment ? 'Shipment exists but not linked to order' : 'New shipment'}, calling ShipStation API`);
         
         const trackingData: TrackingData = {
           tracking_number: trackingNumber,
@@ -142,7 +198,10 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             }
             
             // Create shipment without order linkage (orderId will be null)
-            const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+            const existingShipmentOrphan = await storage.getShipmentByTrackingNumber(trackingNumber);
+            
+            // Normalize status using helper
+            const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
             
             const shipmentRecord = {
               orderId: null, // No order linkage
@@ -150,14 +209,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               trackingNumber: trackingNumber,
               carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
               serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
-              status: shipmentData.voided ? 'cancelled' : 'shipped',
-              statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+              status,
+              statusDescription,
               shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
               shipmentData: shipmentData,
             };
             
-            if (existingShipment) {
-              await storage.updateShipment(existingShipment.id, shipmentRecord);
+            if (existingShipmentOrphan) {
+              await storage.updateShipment(existingShipmentOrphan.id, shipmentRecord);
               log(`[${trackingNumber}] Updated shipment without order linkage`);
             } else {
               await storage.createShipment(shipmentRecord);
@@ -251,14 +310,17 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
         
+        // Normalize status using helper
+        const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
+        
         const shipmentRecord = {
           orderId: order.id,
           shipmentId: String(rawShipmentId),
           trackingNumber: trackingNumber,
           carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
           serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
-          status: shipmentData.voided ? 'cancelled' : 'shipped',
-          statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
+          status,
+          statusDescription,
           shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
           shipmentData: shipmentData,
         };
@@ -345,14 +407,17 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           
           const existingShipment = await storage.getShipmentByShipmentId(shipmentId);
           
+          // Normalize status using helper
+          const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
+          
           const shipmentRecord = {
             orderId: order?.id || null, // Nullable order linkage
             shipmentId: shipmentId,
             trackingNumber: trackingNumber,
             carrierCode: carrierCode,
             serviceCode: serviceCode,
-            status: voided ? 'cancelled' : 'shipped',
-            statusDescription: voided ? 'Shipment voided' : 'Shipment created',
+            status,
+            statusDescription,
             shipDate: shipDate ? new Date(shipDate) : null,
             shipmentData: shipmentData,
           };
@@ -414,21 +479,46 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
       }
       
     } catch (error: any) {
-      // Log failure to dead letter queue
+      // Combine fast-path and API fallback errors if both failed
+      const trackingId = message.orderNumber || message.trackingNumber || 'unknown';
+      
+      // Build structured error data
+      const errorData: any = {
+        apiError: {
+          message: error.message || 'Unknown error',
+          stack: error.stack || null,
+        }
+      };
+      
+      // If fast-path failed before API sync, include both errors
+      if (fastPathError) {
+        errorData.fastPathError = {
+          message: fastPathError.message,
+          stack: fastPathError.stack || null,
+        };
+      }
+      
+      // Create combined error message for logs
+      const errorMessage = fastPathError 
+        ? `Fast-path failed: ${fastPathError.message}; API fallback failed: ${error.message}`
+        : error.message || 'Unknown error';
+      
+      // Log failure to dead letter queue with structured errors
       await logShipmentSyncFailure({
-        orderNumber: message.orderNumber || message.trackingNumber || 'unknown',
+        orderNumber: trackingId,
         reason: message.reason,
-        errorMessage: error.message || 'Unknown error',
+        errorMessage,
         requestData: {
           queueMessage: message,
           originalWebhook: message.originalWebhook || null,
+          errors: errorData, // Structured error objects with stacks
         },
         responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
         retryCount: 0,
         failedAt: new Date(),
       });
       
-      log(`❌ Failed to sync shipments for ${message.orderNumber || message.trackingNumber}: ${error.message}`);
+      log(`❌ Failed to sync shipments for ${trackingId}: ${errorMessage}`);
       processedCount++;
     } finally {
       // Always remove from in-flight set after processing (success or failure)

@@ -1438,39 +1438,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 continue;
               }
               
-              // Check if we already have this shipment
-              const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
+              // ALWAYS queue tracking webhooks to the worker for optimization
+              // The worker will check if shipment exists and skip API calls if possible
+              console.log(`Queuing tracking webhook ${trackingNumber} for shipment sync worker`);
               
-              if (!existingShipment) {
-                // We don't have this shipment yet - queue it for async processing
-                console.log(`No shipment found for tracking ${trackingNumber} - queuing for shipment sync worker`);
-                
-                await enqueueShipmentSync({
-                  trackingNumber,
-                  labelUrl: trackingData.label_url,
-                  trackingData, // Include full tracking data for fast updates
-                  reason: 'webhook',
-                  enqueuedAt: Date.now(),
-                });
-              } else {
-                // Update existing shipment with latest tracking info
-                const updatedShipmentData = {
-                  ...(existingShipment.shipmentData || {}),
-                  latestTracking: trackingData,
-                };
-                
-                await storage.updateShipment(existingShipment.id, {
-                  status: trackingData.status_code === 'DE' ? 'delivered' : 'in_transit',
-                  statusDescription: trackingData.status_description || existingShipment.statusDescription,
-                  shipmentData: updatedShipmentData,
-                });
-                
-                // Broadcast update
-                const order = await storage.getOrder(existingShipment.orderId);
-                if (order) {
-                  broadcastOrderUpdate(order);
-                }
-              }
+              await enqueueShipmentSync({
+                trackingNumber,
+                labelUrl: trackingData.label_url,
+                trackingData, // Include full tracking data for fast updates
+                reason: 'webhook',
+                enqueuedAt: Date.now(),
+              });
             } else {
               // Regular shipment webhook (fulfillment_shipped_v2, etc.)
               // Fetch the resource to extract order numbers, then queue for async processing
