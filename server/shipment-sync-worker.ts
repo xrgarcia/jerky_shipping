@@ -270,6 +270,31 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
         
+        // Log to dead letter queue for troubleshooting when 0 shipments found
+        if (shipments.length === 0) {
+          await logShipmentSyncFailure({
+            orderNumber: orderNumber,
+            reason: message.reason,
+            errorMessage: `0 shipments found in ShipStation for order number ${orderNumber}`,
+            requestData: {
+              queueMessage: message,
+              searchedOrderNumber: orderNumber,
+              apiEndpoint: `v2/shipments?shipment_number=${orderNumber}`,
+            },
+            responseData: {
+              shipmentsCount: 0,
+              rateLimit: {
+                limit: rateLimit.limit,
+                remaining: rateLimit.remaining,
+                reset: rateLimit.reset,
+              },
+            },
+            retryCount: 0,
+            failedAt: new Date(),
+          });
+          log(`📋 Logged to failures: 0 shipments found for ${orderNumber} (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
+        }
+        
         // Find the order in our database (may be null for multi-channel orders)
         const order = await storage.getOrderByOrderNumber(orderNumber);
         
