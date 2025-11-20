@@ -79,6 +79,7 @@ export interface ShipmentSyncMessage {
   enqueuedAt: number;
   jobId?: string; // Optional backfill job ID for tracking
   originalWebhook?: any; // Optional: preserve original webhook payload for troubleshooting
+  retryCount?: number; // Retry count to prevent infinite loops
 }
 
 export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<void> {
@@ -187,4 +188,107 @@ export async function requeueShipmentSyncMessages(messages: ShipmentSyncMessage[
   // Reverse the array to maintain FIFO order - first message should be processed first
   const serialized = messages.reverse().map(msg => JSON.stringify(msg));
   await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+}
+
+// Shopify Order Sync Queue operations
+const SHOPIFY_ORDER_SYNC_QUEUE_KEY = 'shopify:order-sync';
+
+export interface ShopifyOrderSyncMessage {
+  orderNumber: string; // The order number to import from Shopify
+  reason: 'shipment-webhook' | 'manual' | 'backfill'; // Why this order needs to be synced
+  enqueuedAt: number;
+  retryCount?: number; // Track retry attempts to prevent infinite loops
+  triggeringShipmentTracking?: string; // Optional: tracking number that triggered this sync
+}
+
+export async function enqueueShopifyOrderSync(message: ShopifyOrderSyncMessage): Promise<void> {
+  const redis = getRedisClient();
+  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, JSON.stringify(message));
+}
+
+export async function enqueueShopifyOrderSyncBatch(messages: ShopifyOrderSyncMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+  
+  const redis = getRedisClient();
+  const serialized = messages.map(msg => JSON.stringify(msg));
+  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
+}
+
+export async function dequeueShopifyOrderSync(): Promise<ShopifyOrderSyncMessage | null> {
+  const redis = getRedisClient();
+  const data = await redis.rpop(SHOPIFY_ORDER_SYNC_QUEUE_KEY);
+  
+  if (!data) {
+    return null;
+  }
+
+  // Handle case where Redis returns an object instead of a string
+  if (typeof data === 'object') {
+    return data as ShopifyOrderSyncMessage;
+  }
+
+  return JSON.parse(data as string);
+}
+
+export async function dequeueShopifyOrderSyncBatch(count: number): Promise<ShopifyOrderSyncMessage[]> {
+  const redis = getRedisClient();
+  const messages: ShopifyOrderSyncMessage[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    const data = await redis.rpop(SHOPIFY_ORDER_SYNC_QUEUE_KEY);
+    if (!data) break;
+    
+    // Handle case where Redis returns an object instead of a string
+    if (typeof data === 'object') {
+      messages.push(data as ShopifyOrderSyncMessage);
+    } else {
+      messages.push(JSON.parse(data as string));
+    }
+  }
+  
+  return messages;
+}
+
+export async function getShopifyOrderSyncQueueLength(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.llen(SHOPIFY_ORDER_SYNC_QUEUE_KEY) || 0;
+}
+
+export async function clearShopifyOrderSyncQueue(): Promise<number> {
+  const redis = getRedisClient();
+  const length = await getShopifyOrderSyncQueueLength();
+  if (length > 0) {
+    await redis.del(SHOPIFY_ORDER_SYNC_QUEUE_KEY);
+  }
+  return length;
+}
+
+export async function getOldestShopifyOrderSyncQueueMessage(): Promise<{ enqueuedAt: number | null }> {
+  const redis = getRedisClient();
+  const data = await redis.lindex(SHOPIFY_ORDER_SYNC_QUEUE_KEY, -1);
+  
+  if (!data) {
+    return { enqueuedAt: null };
+  }
+  
+  try {
+    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+    return { enqueuedAt: parsed.enqueuedAt || null };
+  } catch {
+    return { enqueuedAt: null };
+  }
+}
+
+/**
+ * Requeue Shopify order sync messages back to the front of the queue (FIFO order preserved)
+ * Used when worker needs to retry or defer processing
+ */
+export async function requeueShopifyOrderSyncMessages(messages: ShopifyOrderSyncMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+  
+  const redis = getRedisClient();
+  // RPUSH adds to the end of the queue (which is the front for RPOP consumers)
+  // Reverse the array to maintain FIFO order - first message should be processed first
+  const serialized = messages.reverse().map(msg => JSON.stringify(msg));
+  await redis.rpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
 }
