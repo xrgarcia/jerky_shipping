@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ interface OrdersResponse {
 export default function Orders() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const searchParams = useSearch();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastSyncedSearchRef = useRef<string>('');
 
   // Filter states
   const [search, setSearch] = useState("");
@@ -45,6 +49,90 @@ export default function Orders() {
   const [pageSize, setPageSize] = useState(50);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Initialize state from URL params (runs when URL changes, including browser navigation)
+  useEffect(() => {
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    // Skip if this is the same URL we just synced to avoid loops
+    if (lastSyncedSearchRef.current === currentSearch && isInitialized) {
+      return;
+    }
+    
+    const params = new URLSearchParams(currentSearch);
+    
+    // Always reset to defaults, then apply URL params
+    setSearch(params.get('search') || '');
+    setFulfillmentStatus(params.getAll('fulfillmentStatus'));
+    setFinancialStatus(params.getAll('financialStatus'));
+    setShipmentStatus(params.getAll('shipmentStatus'));
+    setCarrierCode(params.getAll('carrierCode'));
+    setHasShipment(params.get('hasShipment') || 'all');
+    setHasRefund(params.get('hasRefund') || 'all');
+    setDateFrom(params.get('dateFrom') || '');
+    setDateTo(params.get('dateTo') || '');
+    setMinTotal(params.get('minTotal') || '');
+    setMaxTotal(params.get('maxTotal') || '');
+    setPage(parseInt(params.get('page') || '1'));
+    setPageSize(parseInt(params.get('pageSize') || '50'));
+    setSortBy(params.get('sortBy') || 'createdAt');
+    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'desc');
+    
+    // Open filters if any are active
+    const hasActiveFilters = params.get('search') || 
+      params.getAll('fulfillmentStatus').length ||
+      params.getAll('financialStatus').length ||
+      params.getAll('shipmentStatus').length ||
+      params.getAll('carrierCode').length ||
+      (params.get('hasShipment') && params.get('hasShipment') !== 'all') ||
+      (params.get('hasRefund') && params.get('hasRefund') !== 'all') ||
+      params.get('dateFrom') ||
+      params.get('dateTo') ||
+      params.get('minTotal') ||
+      params.get('maxTotal');
+    
+    if (hasActiveFilters) {
+      setFiltersOpen(true);
+    }
+    
+    lastSyncedSearchRef.current = currentSearch;
+    setIsInitialized(true);
+  }, [searchParams]); // Re-run when URL changes (including browser navigation)
+
+  // Update URL when state changes
+  useEffect(() => {
+    if (!isInitialized) return; // Don't update URL during initialization
+    
+    const params = new URLSearchParams();
+    
+    if (search) params.set('search', search);
+    fulfillmentStatus.forEach(s => params.append('fulfillmentStatus', s));
+    financialStatus.forEach(s => params.append('financialStatus', s));
+    shipmentStatus.forEach(s => params.append('shipmentStatus', s));
+    carrierCode.forEach(c => params.append('carrierCode', c));
+    
+    if (hasShipment !== "all") params.set('hasShipment', hasShipment);
+    if (hasRefund !== "all") params.set('hasRefund', hasRefund);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (minTotal) params.set('minTotal', minTotal);
+    if (maxTotal) params.set('maxTotal', maxTotal);
+    
+    if (page !== 1) params.set('page', page.toString());
+    if (pageSize !== 50) params.set('pageSize', pageSize.toString());
+    if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    
+    const newSearch = params.toString();
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    // Only update if different to avoid infinite loops
+    if (currentSearch !== newSearch) {
+      lastSyncedSearchRef.current = newSearch;
+      const newUrl = newSearch ? `?${newSearch}` : '';
+      window.history.replaceState({}, '', `/orders${newUrl}`);
+    }
+  }, [search, fulfillmentStatus, financialStatus, shipmentStatus, hasShipment, hasRefund, carrierCode, dateFrom, dateTo, minTotal, maxTotal, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;

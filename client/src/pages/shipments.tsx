@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,10 @@ interface ShipmentsResponse {
 export default function Shipments() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const searchParams = useSearch();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastSyncedSearchRef = useRef<string>('');
 
   // Filter states
   const [search, setSearch] = useState("");
@@ -36,12 +40,85 @@ export default function Shipments() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showOrphanedOnly, setShowOrphanedOnly] = useState(false);
+  const [showWithoutOrders, setShowWithoutOrders] = useState(false);
 
   // Pagination and sorting
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Initialize state from URL params (runs when URL changes, including browser navigation)
+  useEffect(() => {
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    // Skip if this is the same URL we just synced to avoid loops
+    if (lastSyncedSearchRef.current === currentSearch && isInitialized) {
+      return;
+    }
+    
+    const params = new URLSearchParams(currentSearch);
+    
+    // Always reset to defaults, then apply URL params
+    setSearch(params.get('search') || '');
+    setStatus(params.getAll('status'));
+    setCarrierCode(params.getAll('carrierCode'));
+    setDateFrom(params.get('dateFrom') || '');
+    setDateTo(params.get('dateTo') || '');
+    setShowOrphanedOnly(params.get('orphaned') === 'true');
+    setShowWithoutOrders(params.get('withoutOrders') === 'true');
+    setPage(parseInt(params.get('page') || '1'));
+    setPageSize(parseInt(params.get('pageSize') || '50'));
+    setSortBy(params.get('sortBy') || 'createdAt');
+    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'desc');
+    
+    // Open filters if any are active
+    const hasActiveFilters = params.get('search') || 
+      params.getAll('status').length ||
+      params.getAll('carrierCode').length ||
+      params.get('dateFrom') ||
+      params.get('dateTo') ||
+      params.get('orphaned') === 'true' ||
+      params.get('withoutOrders') === 'true';
+    
+    if (hasActiveFilters) {
+      setFiltersOpen(true);
+    }
+    
+    lastSyncedSearchRef.current = currentSearch;
+    setIsInitialized(true);
+  }, [searchParams]); // Re-run when URL changes (including browser navigation)
+
+  // Update URL when state changes
+  useEffect(() => {
+    if (!isInitialized) return; // Don't update URL during initialization
+    
+    const params = new URLSearchParams();
+    
+    if (search) params.set('search', search);
+    status.forEach(s => params.append('status', s));
+    carrierCode.forEach(c => params.append('carrierCode', c));
+    
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (showOrphanedOnly) params.set('orphaned', 'true');
+    if (showWithoutOrders) params.set('withoutOrders', 'true');
+    
+    if (page !== 1) params.set('page', page.toString());
+    if (pageSize !== 50) params.set('pageSize', pageSize.toString());
+    if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    
+    const newSearch = params.toString();
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    // Only update if different to avoid infinite loops
+    if (currentSearch !== newSearch) {
+      lastSyncedSearchRef.current = newSearch;
+      const newUrl = newSearch ? `?${newSearch}` : '';
+      window.history.replaceState({}, '', `/shipments${newUrl}`);
+    }
+  }, [search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -153,6 +230,7 @@ export default function Shipments() {
     if (dateFrom) params.append('dateFrom', dateFrom);
     if (dateTo) params.append('dateTo', dateTo);
     if (showOrphanedOnly) params.append('orphaned', 'true');
+    if (showWithoutOrders) params.append('withoutOrders', 'true');
     
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
@@ -163,7 +241,7 @@ export default function Shipments() {
   };
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, page, pageSize, sortBy, sortOrder],
+    queryKey: ["/api/shipments", search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -198,6 +276,7 @@ export default function Shipments() {
     setDateFrom("");
     setDateTo("");
     setShowOrphanedOnly(false);
+    setShowWithoutOrders(false);
     setPage(1);
   };
 
@@ -208,6 +287,7 @@ export default function Shipments() {
     dateFrom,
     dateTo,
     showOrphanedOnly,
+    showWithoutOrders,
   ].filter(Boolean).length;
 
   const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
@@ -387,22 +467,41 @@ export default function Shipments() {
 
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Other Filters</label>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="orphaned-filter"
-                        checked={showOrphanedOnly}
-                        onCheckedChange={(checked) => {
-                          setShowOrphanedOnly(checked as boolean);
-                          setPage(1);
-                        }}
-                        data-testid="checkbox-orphaned-filter"
-                      />
-                      <label
-                        htmlFor="orphaned-filter"
-                        className="text-sm cursor-pointer"
-                      >
-                        Show orphaned shipments only
-                      </label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="orphaned-filter"
+                          checked={showOrphanedOnly}
+                          onCheckedChange={(checked) => {
+                            setShowOrphanedOnly(checked as boolean);
+                            setPage(1);
+                          }}
+                          data-testid="checkbox-orphaned-filter"
+                        />
+                        <label
+                          htmlFor="orphaned-filter"
+                          className="text-sm cursor-pointer"
+                        >
+                          Show orphaned shipments only
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="without-orders-filter"
+                          checked={showWithoutOrders}
+                          onCheckedChange={(checked) => {
+                            setShowWithoutOrders(checked as boolean);
+                            setPage(1);
+                          }}
+                          data-testid="checkbox-without-orders-filter"
+                        />
+                        <label
+                          htmlFor="without-orders-filter"
+                          className="text-sm cursor-pointer"
+                        >
+                          Show shipments without orders only
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>

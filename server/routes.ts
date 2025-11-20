@@ -770,6 +770,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.orphaned = true;
       }
 
+      // Parse withoutOrders filter
+      if (req.query.withoutOrders === 'true') {
+        filters.withoutOrders = true;
+      }
+
       // Get filtered shipments with proper SQL JOIN (no limit on orders!)
       const { shipments: shipmentsWithOrders, total } = await storage.getFilteredShipmentsWithOrders(filters);
 

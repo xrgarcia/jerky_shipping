@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 import { 
   Database, 
   Trash2, 
@@ -799,50 +800,56 @@ Please analyze this failure and help me understand:
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card data-testid="card-orders-missing-shipments">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Orders Missing Shipments
-            </CardTitle>
-            <CardDescription>Orders without shipment records</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
-              {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/orders?hasShipment=false">
+          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Orders Missing Shipments
+              </CardTitle>
+              <CardDescription>Orders without shipment records</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
+                {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card data-testid="card-shipments-without-orders">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Shipments Without Orders
-            </CardTitle>
-            <CardDescription>Shipment records with no linked orders</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
-              {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/shipments?withoutOrders=true">
+          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Shipments Without Orders
+              </CardTitle>
+              <CardDescription>Shipment records with no linked orders</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
+                {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card data-testid="card-orphaned-shipments">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Orphaned Shipments
-            </CardTitle>
-            <CardDescription>Missing tracking, ship date, and shipment ID</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="text-orphaned-shipments">
-              {statsLoading ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/shipments?orphaned=true">
+          <Card data-testid="card-orphaned-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Orphaned Shipments
+              </CardTitle>
+              <CardDescription>Missing tracking, ship date, and shipment ID</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold" data-testid="text-orphaned-shipments">
+                {statsLoading ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card data-testid="card-shipments-without-status">
           <CardHeader>

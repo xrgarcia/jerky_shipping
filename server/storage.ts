@@ -65,6 +65,7 @@ export interface ShipmentFilters {
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
   orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
+  withoutOrders?: boolean; // Filter for shipments with no linked order
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -781,6 +782,7 @@ export class DatabaseStorage implements IStorage {
       dateFrom,
       dateTo,
       orphaned,
+      withoutOrders,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
@@ -831,6 +833,11 @@ export class DatabaseStorage implements IStorage {
           isNull(shipments.shipmentId)
         )
       );
+    }
+
+    // Without orders filter - shipments with no linked order
+    if (withoutOrders) {
+      conditions.push(isNull(shipments.orderId));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
