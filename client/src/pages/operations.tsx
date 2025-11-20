@@ -797,11 +797,22 @@ export default function OperationsPage() {
         <AlertDialogContent data-testid="dialog-reregister-confirmation">
           <AlertDialogHeader>
             <AlertDialogTitle>Re-register Shopify Webhooks</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will delete ALL existing Shopify webhooks and re-register them with the current API secret.
-              Use this after rotating your SHOPIFY_API_SECRET to update webhook signatures.
-              <br /><br />
-              <strong>Warning:</strong> Webhooks will be temporarily unavailable during this process.
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                This will create <strong>new</strong> webhooks with your current API secret, then delete the old ones.
+                Use this after rotating your SHOPIFY_API_SECRET to fix signature verification.
+              </p>
+              <div className="rounded-md bg-muted p-3 space-y-1 text-sm">
+                <p className="font-medium">Safety Features:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>New webhooks registered BEFORE deleting old ones</li>
+                  <li>If registration fails, old webhooks stay active</li>
+                  <li>Automatic rollback on errors</li>
+                </ul>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                <strong>Note:</strong> Check server logs if this fails. You may need to verify Shopify API permissions or manually manage webhooks in Shopify admin.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

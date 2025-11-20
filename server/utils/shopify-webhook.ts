@@ -127,22 +127,123 @@ export async function reregisterAllWebhooks(
   accessToken: string,
   webhookBaseUrl: string
 ): Promise<{ deleted: number; registered: number }> {
-  console.log('Starting webhook re-registration...');
+  console.log('⚠️  WEBHOOK RE-REGISTRATION STARTED - Critical operation');
+  console.log(`Shop: ${shopDomain}, Base URL: ${webhookBaseUrl}`);
   
-  // Step 1: Delete all existing webhooks
-  const deletedCount = await deleteAllShopifyWebhooks(shopDomain, accessToken);
-  console.log(`Deleted ${deletedCount} existing webhook(s)`);
+  let normalizedBaseUrl = webhookBaseUrl.trim();
+  if (!normalizedBaseUrl.startsWith('https://')) {
+    throw new Error('WEBHOOK_BASE_URL must use HTTPS');
+  }
+  while (normalizedBaseUrl.endsWith('/')) {
+    normalizedBaseUrl = normalizedBaseUrl.slice(0, -1);
+  }
+
+  const requiredWebhooks = [
+    { topic: 'orders/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
+    { topic: 'orders/updated', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
+    { topic: 'products/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
+    { topic: 'products/update', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
+    { topic: 'products/delete', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
+  ];
+
+  // Get list of existing webhooks before making any changes
+  const existingWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
+  console.log(`Found ${existingWebhooks.length} existing webhook(s)`);
   
-  // Step 2: Re-register required webhooks
-  await ensureWebhooksRegistered(shopDomain, accessToken, webhookBaseUrl);
+  // PER-TOPIC REPLACEMENT STRATEGY
+  // For each webhook: (1) cache old, (2) delete old, (3) create new, (4) rollback if failed
+  // This avoids Shopify's duplicate topic/address constraint
+  let replacedCount = 0;
+  let deletedCount = 0;
+  const failures: string[] = [];
   
-  // Count how many were registered
-  const newWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
-  const registeredCount = newWebhooks.length;
+  for (const required of requiredWebhooks) {
+    console.log(`\n→ Replacing webhook: ${required.topic}`);
+    
+    // Find existing webhook with this topic
+    const existing = existingWebhooks.find((w: any) => w.topic === required.topic);
+    
+    if (!existing) {
+      // No existing webhook for this topic - just create it
+      try {
+        console.log(`  No existing webhook found, creating new...`);
+        await registerShopifyWebhook(shopDomain, accessToken, required.topic, required.address);
+        replacedCount++;
+        console.log(`  ✓ Created ${required.topic}`);
+      } catch (error: any) {
+        const errorMsg = `Failed to create ${required.topic}: ${error.message}`;
+        console.error(`  ✗ ${errorMsg}`);
+        failures.push(errorMsg);
+      }
+      continue;
+    }
+    
+    // Cache existing webhook data for rollback
+    const cachedWebhook = {
+      id: existing.id.toString(),
+      topic: existing.topic,
+      address: existing.address,
+      format: existing.format || 'json',
+    };
+    console.log(`  Found existing webhook (ID: ${cachedWebhook.id})`);
+    
+    try {
+      // Step 1: Delete old webhook
+      console.log(`  Step 1/2: Deleting old webhook...`);
+      await deleteShopifyWebhook(shopDomain, accessToken, cachedWebhook.id);
+      deletedCount++;
+      console.log(`  ✓ Deleted old webhook`);
+      
+      // Step 2: Create new webhook (with updated secret)
+      try {
+        console.log(`  Step 2/2: Creating new webhook...`);
+        await registerShopifyWebhook(shopDomain, accessToken, required.topic, required.address);
+        replacedCount++;
+        console.log(`  ✓ Created new webhook`);
+      } catch (createError: any) {
+        // ROLLBACK: Re-create the original webhook
+        console.error(`  ✗ Failed to create new webhook: ${createError.message}`);
+        console.log(`  🔄 ROLLBACK: Re-creating original webhook...`);
+        
+        try {
+          // Try to restore the original (note: it will have a new ID)
+          await registerShopifyWebhook(shopDomain, accessToken, cachedWebhook.topic, cachedWebhook.address);
+          console.log(`  ✓ Rollback successful - original webhook restored`);
+          failures.push(`Failed to replace ${required.topic} (rolled back): ${createError.message}`);
+        } catch (rollbackError: any) {
+          console.error(`  ✗ ROLLBACK FAILED: ${rollbackError.message}`);
+          failures.push(`CRITICAL: Failed to replace AND rollback ${required.topic}. Webhook may be missing!`);
+        }
+      }
+    } catch (deleteError: any) {
+      // Failed to delete - original webhook still exists (safe)
+      console.error(`  ✗ Failed to delete old webhook: ${deleteError.message}`);
+      failures.push(`Failed to delete old ${required.topic}: ${deleteError.message}`);
+    }
+  }
+
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ WEBHOOK RE-REGISTRATION COMPLETE');
+  console.log(`Summary: Replaced ${replacedCount}/${requiredWebhooks.length} webhooks, deleted ${deletedCount} old`);
   
-  console.log(`Re-registered ${registeredCount} webhook(s)`);
+  if (failures.length > 0) {
+    console.warn(`\n⚠️  Encountered ${failures.length} issue(s):`);
+    failures.forEach((f, i) => console.warn(`  ${i + 1}. ${f}`));
+    console.warn('\nCheck Shopify admin to verify webhook configuration.');
+    
+    // If ANY critical failures (rollback failed), throw error
+    const criticalFailures = failures.filter(f => f.includes('CRITICAL'));
+    if (criticalFailures.length > 0) {
+      throw new Error(`Critical failures during webhook re-registration. ${criticalFailures.length} webhook(s) may be missing. Check logs and Shopify admin immediately.`);
+    }
+    
+    // If ALL replacements failed, throw error
+    if (replacedCount === 0) {
+      throw new Error(`Failed to replace any webhooks. ${failures.join('; ')}`);
+    }
+  }
   
-  return { deleted: deletedCount, registered: registeredCount };
+  return { deleted: deletedCount, registered: replacedCount };
 }
 
 export async function ensureWebhooksRegistered(
