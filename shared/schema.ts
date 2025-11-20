@@ -207,6 +207,55 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
 export type Shipment = typeof shipments.$inferSelect;
 
+// Shipment items table for normalized shipment line items
+export const shipmentItems = pgTable("shipment_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  orderItemId: varchar("order_item_id").references(() => orderItems.id), // Nullable - not all shipments linked to orders
+  sku: text("sku"), // Product SKU
+  name: text("name").notNull(), // Product name/title
+  quantity: integer("quantity").notNull(), // Quantity in this shipment
+  unitPrice: text("unit_price"), // Price per unit (text for consistency)
+  externalOrderItemId: text("external_order_item_id"), // ShipStation's reference to Shopify line item
+  imageUrl: text("image_url"), // Product image URL
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  shipmentIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_shipment_id_idx ON ${table} (shipment_id)`,
+  orderItemIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_order_item_id_idx ON ${table} (order_item_id) WHERE order_item_id IS NOT NULL`,
+  skuIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_sku_idx ON ${table} (sku) WHERE sku IS NOT NULL`,
+}));
+
+export const insertShipmentItemSchema = createInsertSchema(shipmentItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipmentItem = z.infer<typeof insertShipmentItemSchema>;
+export type ShipmentItem = typeof shipmentItems.$inferSelect;
+
+// Shipment tags table for normalized shipment tags
+export const shipmentTags = pgTable("shipment_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  name: text("name").notNull(), // Tag name (e.g., "All Orders", "Check Address")
+  color: text("color"), // Tag color (nullable)
+  tagId: integer("tag_id"), // ShipStation tag ID (nullable)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  shipmentIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_tags_shipment_id_idx ON ${table} (shipment_id)`,
+  nameIdx: sql`CREATE INDEX IF NOT EXISTS shipment_tags_name_idx ON ${table} (name)`,
+}));
+
+export const insertShipmentTagSchema = createInsertSchema(shipmentTags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertShipmentTag = z.infer<typeof insertShipmentTagSchema>;
+export type ShipmentTag = typeof shipmentTags.$inferSelect;
+
 // Products table for Shopify products
 export const products = pgTable("products", {
   id: varchar("id").primaryKey(), // Shopify product ID
