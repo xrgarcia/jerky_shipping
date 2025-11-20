@@ -200,7 +200,6 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               }
             } else {
               // No shipments found at all - enqueue a sync to check ShipStation
-              const { enqueueShipmentSync } = await import('./utils/queue.js');
               const enqueued = await enqueueShipmentSync({
                 reason: 'webhook',
                 orderNumber: orderData.orderNumber,
