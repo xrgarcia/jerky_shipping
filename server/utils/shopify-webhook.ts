@@ -158,15 +158,18 @@ export async function reregisterAllWebhooks(
   const failures: string[] = [];
   
   for (const required of requiredWebhooks) {
-    console.log(`\n→ Replacing webhook: ${required.topic}`);
+    console.log(`\n→ Replacing webhook: ${required.topic} → ${required.address}`);
     
-    // Find existing webhook with this topic
-    const existing = existingWebhooks.find((w: any) => w.topic === required.topic);
+    // Find existing webhook with BOTH matching topic AND address
+    // This prevents accidentally deleting third-party integration webhooks
+    const existing = existingWebhooks.find((w: any) => 
+      w.topic === required.topic && w.address === required.address
+    );
     
     if (!existing) {
-      // No existing webhook for this topic - just create it
+      // No existing webhook for this topic+address combination - just create it
       try {
-        console.log(`  No existing webhook found, creating new...`);
+        console.log(`  No existing webhook found for this address, creating new...`);
         await registerShopifyWebhook(shopDomain, accessToken, required.topic, required.address);
         replacedCount++;
         console.log(`  ✓ Created ${required.topic}`);
