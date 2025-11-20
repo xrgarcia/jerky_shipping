@@ -268,6 +268,11 @@ export const backfillJobs = pgTable("backfill_jobs", {
   failedOrders: integer("failed_orders").notNull().default(0),
   errorMessage: text("error_message"),
   lastProcessedOrderId: text("last_processed_order_id"),
+  // Observability fields for troubleshooting stuck jobs
+  lastActivityAt: timestamp("last_activity_at"), // Heartbeat timestamp updated every few seconds
+  currentStage: text("current_stage"), // fetching_orders, syncing_shipments, finalizing
+  currentOrderIndex: integer("current_order_index"), // Which order (1-based) is being processed
+  errorLog: jsonb("error_log"), // Array of all errors encountered (even if job continues)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

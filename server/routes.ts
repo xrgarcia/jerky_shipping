@@ -1624,7 +1624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create backfill job
+      // Create backfill job with observability fields
       const job = await storage.createBackfillJob({
         startDate: start,
         endDate: end,
@@ -1632,6 +1632,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalOrders: 0,
         processedOrders: 0,
         failedOrders: 0,
+        currentStage: "fetching_orders",
+        lastActivityAt: new Date(),
+        errorLog: [],
       });
 
       // Fetch orders from Shopify with date filters
@@ -1641,9 +1644,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let allOrders: any[] = [];
       let pageInfo: string | null = null;
       let hasNextPage = true;
+      let fetchPageCount = 0;
 
       // Paginate through all orders in date range
       while (hasNextPage) {
+        fetchPageCount++;
+        
+        // Heartbeat update every page to prove job is alive
+        await storage.updateBackfillJob(job.id, {
+          lastActivityAt: new Date(),
+        });
         // For pagination, use page_info OR query params, never both
         let url: string;
         if (pageInfo) {
@@ -1698,6 +1708,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateBackfillJob(job.id, {
         totalOrders: allOrders.length,
         status: "in_progress",
+        currentStage: "storing_orders",
+        lastActivityAt: new Date(),
       });
 
       // Process each order immediately and queue only the ID
@@ -1705,8 +1717,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Wrap EACH order in try-catch so one bad order doesn't kill the whole job
       let processedCount = 0;
       let failedCount = 0;
+      const errorLog: any[] = [];
+      let lastHeartbeat = Date.now();
       
-      for (const shopifyOrder of allOrders) {
+      for (let i = 0; i < allOrders.length; i++) {
+        const shopifyOrder = allOrders[i];
+        const orderIndex = i + 1; // 1-based index for UI
+        
+        // Check for cancellation on every iteration (read-only)
+        const currentJob = await storage.getBackfillJob(job.id);
+        if (currentJob && currentJob.status === "failed" && currentJob.currentStage === "cancelled") {
+          console.log(`[Backfill ${job.id}] Job cancelled by user, stopping at order ${i} of ${allOrders.length}`);
+          
+          // Update job with final stats before returning
+          await storage.updateBackfillJob(job.id, {
+            lastActivityAt: new Date(),
+            errorLog,
+            currentOrderIndex: orderIndex,
+          });
+          
+          return res.json({ 
+            success: true,
+            job: await storage.getBackfillJob(job.id),
+            message: "Job cancelled by user",
+          });
+        }
+        
+        // Heartbeat update every 5 seconds (write)
+        const now = Date.now();
+        if (now - lastHeartbeat > 5000) {
+          await storage.updateBackfillJob(job.id, {
+            lastActivityAt: new Date(),
+            currentOrderIndex: orderIndex,
+          });
+          lastHeartbeat = now;
+        }
+        
         try {
           // Store order in database first
           const orderData = {
@@ -1754,10 +1800,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderNumber = shopifyOrder.order_number || shopifyOrder.id || 'unknown';
           console.error(`[Backfill ${job.id}] Failed to process order ${orderNumber}:`, orderError.message);
           
-          // Increment failed counter
+          // Add to error log for troubleshooting
+          errorLog.push({
+            orderNumber,
+            orderIndex,
+            error: orderError.message,
+            timestamp: new Date().toISOString(),
+          });
+          
+          // Increment failed counter and update error log
           await storage.incrementBackfillFailed(job.id, 1);
+          await storage.updateBackfillJob(job.id, {
+            errorLog,
+            lastActivityAt: new Date(),
+          });
+          
           failedCount++;
         }
+      }
+      
+      // Final update: set stage to completed (but don't overwrite if cancelled)
+      const finalJob = await storage.getBackfillJob(job.id);
+      if (finalJob && finalJob.currentStage !== "cancelled") {
+        await storage.updateBackfillJob(job.id, {
+          currentStage: "completed",
+          lastActivityAt: new Date(),
+          errorLog,
+        });
+      } else {
+        // Job was cancelled, just update error log and timestamp
+        await storage.updateBackfillJob(job.id, {
+          lastActivityAt: new Date(),
+          errorLog,
+        });
       }
       
       console.log(`[Backfill ${job.id}] Completed: ${processedCount} queued, ${failedCount} failed out of ${allOrders.length} total orders`);
@@ -1810,6 +1885,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting backfill job:", error);
       res.status(500).json({ error: "Failed to delete job" });
+    }
+  });
+
+  app.post("/api/backfill/jobs/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.getBackfillJob(req.params.id);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.status !== "in_progress" && job.status !== "pending") {
+        return res.status(400).json({ error: "Only pending or in-progress jobs can be cancelled" });
+      }
+
+      await storage.updateBackfillJob(req.params.id, {
+        status: "failed",
+        errorMessage: "Cancelled by user",
+        currentStage: "cancelled",
+        lastActivityAt: new Date(),
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error cancelling backfill job:", error);
+      res.status(500).json({ error: "Failed to cancel job" });
     }
   });
 

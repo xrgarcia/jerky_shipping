@@ -63,6 +63,15 @@ type BackfillJob = {
   processedOrders: number;
   failedOrders: number;
   errorMessage: string | null;
+  lastActivityAt: string | null;
+  currentStage: string | null;
+  currentOrderIndex: number | null;
+  errorLog: Array<{
+    orderNumber: string;
+    orderIndex: number;
+    error: string;
+    timestamp: string;
+  }> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -180,6 +189,31 @@ export default function BackfillPage() {
     onError: (error: Error) => {
       toast({
         title: "Cannot restart job",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await apiRequest("POST", `/api/backfill/jobs/${jobId}/cancel`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to cancel backfill");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
+      toast({
+        title: "Job cancelled",
+        description: "Backfill job has been cancelled successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Cannot cancel job",
         description: error.message,
         variant: "destructive",
       });
@@ -351,6 +385,46 @@ export default function BackfillPage() {
   const getProgressPercentage = (job: BackfillJob) => {
     if (job.totalOrders === 0) return 0;
     return Math.round((job.processedOrders / job.totalOrders) * 100);
+  };
+
+  const getLastActivityText = (lastActivityAt: string | null) => {
+    if (!lastActivityAt) return null;
+    
+    const now = Date.now();
+    const activityTime = new Date(lastActivityAt).getTime();
+    const seconds = Math.floor((now - activityTime) / 1000);
+    
+    if (seconds < 10) return "Active now";
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 120) return "1m ago";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
+
+  const getStageName = (stage: string | null) => {
+    if (!stage) return null;
+    
+    const stageNames: Record<string, string> = {
+      fetching_orders: "Fetching orders from Shopify",
+      storing_orders: "Storing orders in database",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    };
+    
+    return stageNames[stage] || stage;
+  };
+
+  const isJobStuck = (job: BackfillJob) => {
+    if (job.status !== "in_progress") return false;
+    if (!job.lastActivityAt) return false;
+    
+    const now = Date.now();
+    const activityTime = new Date(job.lastActivityAt).getTime();
+    const seconds = Math.floor((now - activityTime) / 1000);
+    
+    // Consider stuck if no activity for 60+ seconds
+    return seconds > 60;
   };
 
   return (
@@ -540,6 +614,53 @@ export default function BackfillPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Last Activity & Current Stage */}
+              {activeJob.status === "in_progress" && (
+                <div className="flex flex-col gap-2 text-sm">
+                  {activeJob.lastActivityAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Last activity:</span>
+                      <span className={cn(
+                        "font-medium",
+                        isJobStuck(activeJob) ? "text-destructive" : "text-foreground"
+                      )} data-testid="text-last-activity">
+                        {getLastActivityText(activeJob.lastActivityAt)}
+                        {isJobStuck(activeJob) && (
+                          <AlertCircle className="inline ml-1 h-4 w-4" />
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {activeJob.currentStage && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Current stage:</span>
+                      <span className="font-medium" data-testid="text-current-stage">
+                        {getStageName(activeJob.currentStage)}
+                      </span>
+                    </div>
+                  )}
+                  {activeJob.currentOrderIndex && activeJob.totalOrders > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Processing:</span>
+                      <span className="font-medium" data-testid="text-current-order">
+                        Order {activeJob.currentOrderIndex} of {activeJob.totalOrders}
+                      </span>
+                    </div>
+                  )}
+                  {isJobStuck(activeJob) && (
+                    <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-md">
+                      <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                      <div className="text-sm text-destructive">
+                        <div className="font-medium">Job may be stuck</div>
+                        <div className="text-xs mt-1">
+                          No activity detected for over 60 seconds. Consider cancelling and restarting.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span>Progress</span>
@@ -567,8 +688,51 @@ export default function BackfillPage() {
                 </div>
               )}
 
-              <div className="text-xs text-muted-foreground">
-                Started {format(new Date(activeJob.createdAt), "PPpp")}
+              {/* Error Log Viewer */}
+              {activeJob.errorLog && activeJob.errorLog.length > 0 && (
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between" data-testid="button-toggle-error-log">
+                      <span className="text-destructive">View error log ({activeJob.errorLog.length} errors)</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 max-h-64 overflow-y-auto border rounded-md">
+                      <div className="divide-y">
+                        {activeJob.errorLog.map((error, idx) => (
+                          <div key={idx} className="p-3 text-sm" data-testid={`error-log-${idx}`}>
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-medium">Order {error.orderNumber}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(error.timestamp), "HH:mm:ss")}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">Index: {error.orderIndex}</div>
+                            <div className="text-xs text-destructive mt-1">{error.error}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                <div className="text-xs text-muted-foreground">
+                  Started {format(new Date(activeJob.createdAt), "PPpp")}
+                </div>
+                {(activeJob.status === "in_progress" || activeJob.status === "pending") && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => cancelJobMutation.mutate(activeJob.id)}
+                    disabled={cancelJobMutation.isPending}
+                    data-testid="button-cancel-job"
+                  >
+                    {cancelJobMutation.isPending ? "Cancelling..." : "Cancel Job"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
