@@ -903,16 +903,25 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
     const total = countResult[0]?.count || 0;
 
-    // Build ORDER BY
+    // Build ORDER BY - default to createdAt if sortBy is invalid
     const sortColumn = {
       shipDate: shipments.shipDate,
+      orderDate: shipments.createdAt, // Use createdAt as proxy for now
       createdAt: shipments.createdAt,
       trackingNumber: shipments.trackingNumber,
       status: shipments.status,
       carrierCode: shipments.carrierCode,
-    }[sortBy];
+    }[sortBy] || shipments.createdAt;
 
-    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    // Use NULLS LAST for date columns
+    let orderByClause;
+    if (sortBy === 'shipDate' || sortBy === 'orderDate') {
+      orderByClause = sortOrder === 'asc' 
+        ? sql`${sortColumn} ASC NULLS LAST`
+        : sql`${sortColumn} DESC NULLS LAST`;
+    } else {
+      orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    }
 
     // Get paginated results
     const offset = (page - 1) * pageSize;
