@@ -386,6 +386,7 @@ export default function Shipments() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
+  const [shipmentStatus, setShipmentStatus] = useState<string>(""); // Warehouse status filter
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -413,6 +414,7 @@ export default function Shipments() {
     setSearch(params.get('search') || '');
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
+    setShipmentStatus(params.get('shipmentStatus') || '');
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -427,6 +429,7 @@ export default function Shipments() {
     const hasActiveFilters = params.get('search') || 
       params.get('status') ||
       params.get('statusDescription') ||
+      params.get('shipmentStatus') ||
       params.getAll('carrierCode').length ||
       params.get('dateFrom') ||
       params.get('dateTo') ||
@@ -450,6 +453,7 @@ export default function Shipments() {
     if (search) params.set('search', search);
     if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
+    if (shipmentStatus) params.set('shipmentStatus', shipmentStatus);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.set('dateFrom', dateFrom);
@@ -471,7 +475,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -579,6 +583,7 @@ export default function Shipments() {
     if (search) params.append('search', search);
     if (status) params.append('status', status); // Single status value
     if (statusDescription) params.append('statusDescription', statusDescription);
+    if (shipmentStatus) params.append('shipmentStatus', shipmentStatus);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
     if (dateFrom) params.append('dateFrom', dateFrom);
@@ -618,8 +623,15 @@ export default function Shipments() {
 
   const statusDescriptions = statusDescriptionsData?.statusDescriptions || [];
 
+  // Fetch distinct shipment statuses for the shipment status filter dropdown
+  const { data: shipmentStatusesData } = useQuery<{ shipmentStatuses: Array<string | null> }>({
+    queryKey: ["/api/shipments/shipment-statuses"],
+  });
+
+  const shipmentStatuses = shipmentStatusesData?.shipmentStatuses || [];
+
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -651,6 +663,7 @@ export default function Shipments() {
     setSearch("");
     setStatus("");
     setStatusDescription("");
+    setShipmentStatus("");
     setCarrierCode([]);
     setDateFrom("");
     setDateTo("");
@@ -663,6 +676,7 @@ export default function Shipments() {
     search,
     status,
     statusDescription,
+    shipmentStatus,
     carrierCode.length > 0,
     dateFrom,
     dateTo,
@@ -780,6 +794,71 @@ export default function Shipments() {
               </div>
 
               <CollapsibleContent className="pt-4 space-y-4">
+                {/* Status Filters */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Status Filters</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select value={status || "all"} onValueChange={(val) => { 
+                      const newStatus = val === "all" ? "" : val;
+                      setStatus(newStatus);
+                      // Clear sub status when status changes to prevent invalid combinations
+                      setStatusDescription("");
+                      setPage(1); 
+                    }}>
+                      <SelectTrigger className="w-40" data-testid="select-status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="status-all">All statuses</SelectItem>
+                        {statuses.map((s) => (
+                          <SelectItem key={s} value={s} data-testid={`status-${s}`}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select 
+                      value={statusDescription || "all"} 
+                      onValueChange={(val) => { 
+                        setStatusDescription(val === "all" ? "" : val); 
+                        setPage(1); 
+                      }}
+                      disabled={!status && statusDescriptions.length === 0}
+                    >
+                      <SelectTrigger className="w-48" data-testid="select-sub-status">
+                        <SelectValue placeholder={status ? "All sub statuses" : "Select a status first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="sub-status-all">All sub statuses</SelectItem>
+                        {statusDescriptions.map((desc) => (
+                          <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
+                            {desc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select 
+                      value={shipmentStatus || "all"} 
+                      onValueChange={(val) => { 
+                        setShipmentStatus(val === "all" ? "" : val); 
+                        setPage(1); 
+                      }}
+                    >
+                      <SelectTrigger className="w-48" data-testid="select-shipment-status">
+                        <SelectValue placeholder="All warehouse statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="shipment-status-all">All warehouse statuses</SelectItem>
+                        {shipmentStatuses.map((s) => (
+                          <SelectItem key={s ?? "null"} value={s ?? "null"} data-testid={`shipment-status-${s ?? "null"}`}>
+                            {s ?? "No Status"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 {/* Carrier Filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Carrier</label>
@@ -863,51 +942,8 @@ export default function Shipments() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Status Filters, Sort, and Page Size */}
+            {/* Sort and Page Size */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
-              {/* Status Filters */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">Status:</span>
-                <Select value={status || "all"} onValueChange={(val) => { 
-                  const newStatus = val === "all" ? "" : val;
-                  setStatus(newStatus);
-                  // Clear sub status when status changes to prevent invalid combinations
-                  setStatusDescription("");
-                  setPage(1); 
-                }}>
-                  <SelectTrigger className="w-40" data-testid="select-status">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" data-testid="status-all">All statuses</SelectItem>
-                    {statuses.map((s) => (
-                      <SelectItem key={s} value={s} data-testid={`status-${s}`}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select 
-                  value={statusDescription || "all"} 
-                  onValueChange={(val) => { 
-                    setStatusDescription(val === "all" ? "" : val); 
-                    setPage(1); 
-                  }}
-                  disabled={!status && statusDescriptions.length === 0}
-                >
-                  <SelectTrigger className="w-48" data-testid="select-sub-status">
-                    <SelectValue placeholder={status ? "All sub statuses" : "Select a status first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" data-testid="sub-status-all">All sub statuses</SelectItem>
-                    {statusDescriptions.map((desc) => (
-                      <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
-                        {desc}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* Sort Options */}
               <div className="flex items-center gap-2">

@@ -758,6 +758,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct shipment statuses for filtering (includes null values)
+  app.get("/api/shipments/shipment-statuses", requireAuth, async (req, res) => {
+    try {
+      const shipmentStatuses = await storage.getDistinctShipmentStatuses();
+      res.json({ shipmentStatuses });
+    } catch (error) {
+      console.error("Error fetching shipment statuses:", error);
+      res.status(500).json({ error: "Failed to fetch shipment statuses" });
+    }
+  });
+
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
       // Parse filter parameters from query string
@@ -775,6 +786,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (req.query.statusDescription) {
         filters.statusDescription = req.query.statusDescription as string;
+      }
+      // Include shipmentStatus even if it's "null" (for filtering null values)
+      if (req.query.shipmentStatus !== undefined) {
+        filters.shipmentStatus = req.query.shipmentStatus as string;
       }
       if (req.query.carrierCode) {
         filters.carrierCode = Array.isArray(req.query.carrierCode)

@@ -66,6 +66,7 @@ export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
   status?: string; // Single status for cascading filter
   statusDescription?: string;
+  shipmentStatus?: string; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
   carrierCode?: string[];
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
@@ -133,6 +134,7 @@ export interface IStorage {
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
+  getDistinctShipmentStatuses(): Promise<Array<string | null>>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
@@ -827,6 +829,7 @@ export class DatabaseStorage implements IStorage {
       search,
       status: statusFilter,
       statusDescription,
+      shipmentStatus,
       carrierCode: carrierFilters,
       dateFrom,
       dateTo,
@@ -863,6 +866,15 @@ export class DatabaseStorage implements IStorage {
     // Status description filter
     if (statusDescription) {
       conditions.push(eq(shipments.statusDescription, statusDescription));
+    }
+
+    // Shipment status filter (warehouse status) - supports "null" for null values
+    if (shipmentStatus !== undefined && shipmentStatus !== "") {
+      if (shipmentStatus === "null") {
+        conditions.push(isNull(shipments.shipmentStatus));
+      } else {
+        conditions.push(eq(shipments.shipmentStatus, shipmentStatus));
+      }
     }
 
     // Carrier filter
@@ -961,6 +973,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(shipments.statusDescription);
     
     return results.map(r => r.statusDescription).filter((s): s is string => s !== null);
+  }
+
+  async getDistinctShipmentStatuses(): Promise<Array<string | null>> {
+    const results = await db
+      .selectDistinct({ shipmentStatus: shipments.shipmentStatus })
+      .from(shipments)
+      .orderBy(shipments.shipmentStatus);
+    
+    return results.map(r => r.shipmentStatus);
   }
 
   async getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }> {
