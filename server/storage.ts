@@ -162,6 +162,8 @@ export interface IStorage {
   deleteBackfillJob(id: string): Promise<void>;
   incrementBackfillProgress(id: string, incrementBy: number): Promise<void>;
   incrementBackfillFailed(id: string, incrementBy: number): Promise<void>;
+  incrementBackfillFetchTaskCompleted(id: string): Promise<void>;
+  incrementBackfillFetchTaskFailed(id: string): Promise<void>;
 
   // Print Queue
   createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
@@ -1292,6 +1294,26 @@ export class DatabaseStorage implements IStorage {
       .update(backfillJobs)
       .set({
         failedOrders: sql`${backfillJobs.failedOrders} + ${incrementBy}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillFetchTaskCompleted(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        completedFetchTasks: sql`${backfillJobs.completedFetchTasks} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(backfillJobs.id, id));
+  }
+
+  async incrementBackfillFetchTaskFailed(id: string): Promise<void> {
+    await db
+      .update(backfillJobs)
+      .set({
+        failedFetchTasks: sql`${backfillJobs.failedFetchTasks} + 1`,
         updatedAt: new Date(),
       })
       .where(eq(backfillJobs.id, id));
