@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures, orders } from "@shared/schema";
+import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
