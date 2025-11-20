@@ -97,6 +97,7 @@ export interface IStorage {
   getAllOrders(limit?: number): Promise<Order[]>;
   getOrdersInDateRange(startDate: Date, endDate: Date): Promise<Order[]>;
   getFilteredOrders(filters: OrderFilters): Promise<{ orders: Order[], total: number }>;
+  getOrdersWithoutShipments(): Promise<Order[]>;
 
   // Order Refunds
   upsertOrderRefund(refund: InsertOrderRefund): Promise<OrderRefund>;
@@ -299,6 +300,43 @@ export class DatabaseStorage implements IStorage {
       .from(orders)
       .orderBy(desc(orders.createdAt))
       .limit(limit);
+    return result;
+  }
+
+  async getOrdersWithoutShipments(): Promise<Order[]> {
+    const result = await db
+      .select({
+        id: orders.id,
+        shopifyOrderId: orders.shopifyOrderId,
+        orderNumber: orders.orderNumber,
+        customerName: orders.customerName,
+        customerEmail: orders.customerEmail,
+        customerPhone: orders.customerPhone,
+        shippingAddress: orders.shippingAddress,
+        lineItems: orders.lineItems,
+        fulfillmentStatus: orders.fulfillmentStatus,
+        financialStatus: orders.financialStatus,
+        totalPrice: orders.totalPrice,
+        orderTotal: orders.orderTotal,
+        subtotalPrice: orders.subtotalPrice,
+        currentTotalPrice: orders.currentTotalPrice,
+        currentSubtotalPrice: orders.currentSubtotalPrice,
+        shippingTotal: orders.shippingTotal,
+        totalDiscounts: orders.totalDiscounts,
+        currentTotalDiscounts: orders.currentTotalDiscounts,
+        totalTax: orders.totalTax,
+        currentTotalTax: orders.currentTotalTax,
+        totalAdditionalFees: orders.totalAdditionalFees,
+        currentTotalAdditionalFees: orders.currentTotalAdditionalFees,
+        totalOutstanding: orders.totalOutstanding,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+        lastSyncedAt: orders.lastSyncedAt,
+      })
+      .from(orders)
+      .leftJoin(shipments, eq(shipments.orderId, orders.id))
+      .where(isNull(shipments.orderId))
+      .orderBy(desc(orders.createdAt));
     return result;
   }
 
