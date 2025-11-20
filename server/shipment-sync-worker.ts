@@ -92,11 +92,31 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         const order = linkageResult.order;
         const shipmentData = linkageResult.shipmentData;
         
+        // Validate shipment ID exists to prevent corrupting DB with "undefined" string
+        const rawShipmentId = shipmentData.shipment_id || shipmentData.shipmentId;
+        if (!rawShipmentId) {
+          log(`⚠️  [${trackingNumber}] Skipping shipment with missing ID for order ${order.orderNumber}`);
+          await logShipmentSyncFailure({
+            orderNumber: order.orderNumber,
+            reason,
+            errorMessage: 'Shipment data missing shipment_id field',
+            requestData: {
+              queueMessage: message,
+              originalWebhook: message.originalWebhook || null,
+            },
+            responseData: shipmentData,
+            retryCount: 0,
+            failedAt: new Date(),
+          });
+          processedCount++;
+          continue;
+        }
+        
         const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
         
         const shipmentRecord = {
           orderId: order.id,
-          shipmentId: String(shipmentData.shipment_id || shipmentData.shipmentId),
+          shipmentId: String(rawShipmentId),
           trackingNumber: trackingNumber,
           carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
           serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
@@ -152,26 +172,43 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         // CRITICAL: Save shipments to database BEFORE checking rate limit
         // This ensures we don't waste API calls by fetching data then discarding it
         for (const shipmentData of shipments) {
-          const existingShipment = await storage.getShipmentByShipmentId(String(shipmentData.shipmentId));
+          // ShipStation V2 API returns snake_case fields, handle both formats
+          const data = shipmentData as any;
+          
+          // Validate shipment ID exists to prevent corrupting DB with "undefined" string
+          const rawShipmentId = data.shipment_id || data.shipmentId;
+          if (!rawShipmentId) {
+            log(`⚠️  [${orderNumber}] Skipping shipment with missing ID: ${JSON.stringify(data)}`);
+            continue;
+          }
+          
+          const shipmentId = String(rawShipmentId);
+          const trackingNumber = data.tracking_number || data.trackingNumber || null;
+          const carrierCode = data.carrier_code || data.carrierCode || null;
+          const serviceCode = data.service_code || data.serviceCode || null;
+          const shipDate = data.ship_date || data.shipDate;
+          const voided = data.voided || false;
+          
+          const existingShipment = await storage.getShipmentByShipmentId(shipmentId);
           
           const shipmentRecord = {
             orderId: order.id,
-            shipmentId: String(shipmentData.shipmentId),
-            trackingNumber: shipmentData.trackingNumber || null,
-            carrierCode: shipmentData.carrierCode || null,
-            serviceCode: shipmentData.serviceCode || null,
-            status: shipmentData.voided ? 'cancelled' : 'shipped',
-            statusDescription: shipmentData.voided ? 'Shipment voided' : 'Shipment created',
-            shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
+            shipmentId: shipmentId,
+            trackingNumber: trackingNumber,
+            carrierCode: carrierCode,
+            serviceCode: serviceCode,
+            status: voided ? 'cancelled' : 'shipped',
+            statusDescription: voided ? 'Shipment voided' : 'Shipment created',
+            shipDate: shipDate ? new Date(shipDate) : null,
             shipmentData: shipmentData,
           };
 
           if (existingShipment) {
             await storage.updateShipment(existingShipment.id, shipmentRecord);
-            log(`[${orderNumber}] Updated shipment ${shipmentData.shipmentId}`);
+            log(`[${orderNumber}] Updated shipment ${shipmentId}`);
           } else {
             await storage.createShipment(shipmentRecord);
-            log(`[${orderNumber}] Created shipment ${shipmentData.shipmentId}`);
+            log(`[${orderNumber}] Created shipment ${shipmentId}`);
           }
         }
 
