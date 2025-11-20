@@ -782,16 +782,22 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
     const total = countResult[0]?.count || 0;
 
-    // Build ORDER BY
-    const sortColumn = {
-      shipDate: shipments.shipDate,
-      createdAt: shipments.createdAt,
-      trackingNumber: shipments.trackingNumber,
-      status: shipments.status,
-      carrierCode: shipments.carrierCode,
-    }[sortBy];
-
-    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    // Build ORDER BY with NULLS LAST for ship date to push orphaned shipments to the end
+    let orderByClause;
+    if (sortBy === 'shipDate') {
+      // Use raw SQL to add NULLS LAST for ship date sorting
+      orderByClause = sortOrder === 'asc' 
+        ? sql`${shipments.shipDate} ASC NULLS LAST`
+        : sql`${shipments.shipDate} DESC NULLS LAST`;
+    } else {
+      const sortColumn = {
+        createdAt: shipments.createdAt,
+        trackingNumber: shipments.trackingNumber,
+        status: shipments.status,
+        carrierCode: shipments.carrierCode,
+      }[sortBy];
+      orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    }
 
     // Get paginated results with LEFT JOIN
     const offset = (page - 1) * pageSize;
