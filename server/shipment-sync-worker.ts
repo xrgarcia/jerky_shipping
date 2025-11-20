@@ -149,15 +149,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
         
-        // Check rate limit AFTER API call and break if exhausted
-        if (rateLimit.remaining <= 0) {
-          const waitTime = rateLimit.reset + 3; // Add 3 second buffer to ensure we're past the window
-          log(`⚠️  Rate limit exhausted (0 remaining), stopping batch. Next run in ${waitTime}s...`);
-          // Break out of the loop - next worker run will have fresh quota
-          break;
-        }
-
-        // Update shipments in database
+        // CRITICAL: Save shipments to database BEFORE checking rate limit
+        // This ensures we don't waste API calls by fetching data then discarding it
         for (const shipmentData of shipments) {
           const existingShipment = await storage.getShipmentByShipmentId(String(shipmentData.shipmentId));
           
@@ -175,8 +168,10 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
 
           if (existingShipment) {
             await storage.updateShipment(existingShipment.id, shipmentRecord);
+            log(`[${orderNumber}] Updated shipment ${shipmentData.shipmentId}`);
           } else {
             await storage.createShipment(shipmentRecord);
+            log(`[${orderNumber}] Created shipment ${shipmentData.shipmentId}`);
           }
         }
 
@@ -184,6 +179,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         broadcastOrderUpdate(order);
         
         processedCount++;
+        
+        // Check rate limit AFTER saving data and decide whether to continue processing more messages
+        if (rateLimit.remaining <= 0) {
+          const waitTime = rateLimit.reset + 3; // Add 3 second buffer to ensure we're past the window
+          log(`⚠️  Rate limit exhausted (${rateLimit.remaining} remaining), stopping batch. Next run in ${waitTime}s...`);
+          // Break out of the loop - next worker run will have fresh quota
+          break;
+        }
         
       } else {
         // Invalid message - neither tracking number nor order number
