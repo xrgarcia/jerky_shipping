@@ -205,6 +205,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               latestTracking: webhookTrackingData,
             };
             
+            // Extract order_number from merged data (always populate this field)
+            const extractedOrderNumber = extractOrderNumber(mergedShipmentData);
+            
             // Update shipment with latest tracking info from webhook
             // NOTE: Don't extract ship_to in fast path - tracking webhooks don't include it
             // and extracting empty data would overwrite existing customer columns
@@ -213,6 +216,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               statusDescription: finalDescription,
               shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
               shipmentData: mergedShipmentData,
+              // Always update order_number if available in webhook data
+              ...(extractedOrderNumber && { orderNumber: extractedOrderNumber }),
             });
             
             // Broadcast realtime update to WebSocket clients
