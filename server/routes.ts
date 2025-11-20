@@ -2948,15 +2948,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { deleteShopifyWebhook } = await import("./utils/shopify-webhook");
       
-      console.log(`Deleting Shopify webhook ${webhookId} via API request`);
+      // Audit log: Track who deleted the webhook and when
+      const user = req.user as any;
+      const timestamp = new Date().toISOString();
+      console.log(`[AUDIT] Webhook deletion initiated by user ${user?.email || 'unknown'} at ${timestamp}`);
+      console.log(`[AUDIT] Target: Webhook ID ${webhookId} on shop ${shopDomain}`);
+      
       await deleteShopifyWebhook(shopDomain, accessToken, webhookId);
+      
+      console.log(`[AUDIT] Successfully deleted webhook ${webhookId}`);
       
       res.json({ 
         success: true,
         message: `Successfully deleted webhook ${webhookId}`
       });
     } catch (error: any) {
-      console.error(`Error deleting Shopify webhook ${req.params.webhookId}:`, error);
+      console.error(`[AUDIT] Failed to delete webhook ${req.params.webhookId}:`, error);
       res.status(500).json({ 
         error: "Failed to delete webhook",
         details: error.message 

@@ -77,7 +77,22 @@ export async function listShopifyWebhooks(
   }
 
   const data = await response.json();
-  return data.webhooks || [];
+  const webhooks = data.webhooks || [];
+  
+  // Return webhooks with explicit field mapping to ensure consistent snake_case structure
+  // (Shopify API returns snake_case; we maintain this for frontend compatibility)
+  return webhooks.map((webhook: any) => ({
+    id: webhook.id,
+    address: webhook.address,
+    topic: webhook.topic,
+    created_at: webhook.created_at,
+    updated_at: webhook.updated_at,
+    format: webhook.format,
+    fields: webhook.fields,
+    metafield_namespaces: webhook.metafield_namespaces,
+    private_metafield_namespaces: webhook.private_metafield_namespaces,
+    api_version: webhook.api_version,
+  }));
 }
 
 export async function deleteShopifyWebhook(
