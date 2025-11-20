@@ -335,3 +335,30 @@ export const insertShipmentSyncFailureSchema = createInsertSchema(shipmentSyncFa
 
 export type InsertShipmentSyncFailure = z.infer<typeof insertShipmentSyncFailureSchema>;
 export type ShipmentSyncFailure = typeof shipmentSyncFailures.$inferSelect;
+
+// Shopify order sync failures table for dead letter queue
+export const shopifyOrderSyncFailures = pgTable("shopify_order_sync_failures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderNumber: text("order_number").notNull(),
+  reason: text("reason").notNull(), // 'shipment-webhook' | 'manual' | etc
+  errorMessage: text("error_message").notNull(),
+  requestData: jsonb("request_data"), // Original request details (queue message)
+  responseData: jsonb("response_data"), // Shopify API response if available
+  retryCount: integer("retry_count").notNull().default(0),
+  failedAt: timestamp("failed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shopify_order_sync_failures_order_number_idx ON ${table} (order_number)`,
+  failedAtIdx: sql`CREATE INDEX IF NOT EXISTS shopify_order_sync_failures_failed_at_idx ON ${table} (failed_at)`,
+}));
+
+export const insertShopifyOrderSyncFailureSchema = createInsertSchema(shopifyOrderSyncFailures).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  requestData: z.any().nullish(),
+  responseData: z.any().nullish(),
+});
+
+export type InsertShopifyOrderSyncFailure = z.infer<typeof insertShopifyOrderSyncFailureSchema>;
+export type ShopifyOrderSyncFailure = typeof shopifyOrderSyncFailures.$inferSelect;
