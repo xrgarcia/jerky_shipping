@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds, printQueue } from "@shared/schema";
+import { users, shipmentSyncFailures, orders, orderItems, shipments, orderRefunds } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
@@ -2809,7 +2809,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Execute all deletions in a transaction to ensure atomicity
       await db.transaction(async (tx) => {
         // Delete child tables first (foreign key constraints)
-        await tx.delete(printQueue);
         await tx.delete(orderItems);
         await tx.delete(shipments);
         await tx.delete(orderRefunds);
@@ -2821,8 +2820,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         message: "All order data cleared successfully" 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error clearing order data:", error);
+      
+      // Check if it's a foreign key constraint error from print_queue
+      if (error.code === '23503' && error.table === 'print_queue') {
+        return res.status(400).json({ 
+          error: "Cannot clear order data while print queue has pending jobs. Please clear the print queue first." 
+        });
+      }
+      
       res.status(500).json({ error: "Failed to clear order data" });
     }
   });
