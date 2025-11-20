@@ -338,6 +338,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               orderId: null, // No order linkage
               shipmentId: String(rawShipmentId),
               orderNumber: extractOrderNumber(shipmentData),
+              orderDate: extractOrderDate(shipmentData),
               trackingNumber: trackingNumber,
               carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
               serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
@@ -459,6 +460,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           orderId: order.id,
           shipmentId: String(rawShipmentId),
           orderNumber: extractOrderNumber(shipmentData),
+          orderDate: extractOrderDate(shipmentData),
           trackingNumber: trackingNumber,
           carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
           serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
@@ -567,6 +569,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             orderId: order?.id || null, // Nullable order linkage
             shipmentId: shipmentId,
             orderNumber: extractOrderNumber(shipmentData),
+            orderDate: extractOrderDate(shipmentData),
             trackingNumber: trackingNumber,
             carrierCode: carrierCode,
             serviceCode: serviceCode,
