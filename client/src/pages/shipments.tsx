@@ -145,17 +145,42 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {getStatusBadge(shipment.status)}
               {isOrphanedShipment(shipment) && (
                 <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400">
                   Orphaned
                 </Badge>
               )}
+              {shipment.isReturn && (
+                <Badge variant="outline" className="border-purple-500 text-purple-700 dark:text-purple-400">
+                  Return
+                </Badge>
+              )}
+              {shipment.isGift && (
+                <Badge variant="outline" className="border-pink-500 text-pink-700 dark:text-pink-400">
+                  Gift
+                </Badge>
+              )}
+              {shipment.saturdayDelivery && (
+                <Badge variant="outline" className="border-blue-500 text-blue-700 dark:text-blue-400" data-testid="badge-saturday-delivery">
+                  Saturday Delivery
+                </Badge>
+              )}
+              {shipment.containsAlcohol && (
+                <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400" data-testid="badge-contains-alcohol">
+                  Contains Alcohol
+                </Badge>
+              )}
             </div>
             {shipment.serviceCode && (
               <p className="text-sm text-muted-foreground">
                 {shipment.serviceCode}
+              </p>
+            )}
+            {shipment.totalWeight && (
+              <p className="text-sm text-muted-foreground">
+                Weight: {shipment.totalWeight}
               </p>
             )}
           </div>
@@ -195,6 +220,24 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
                         {tag.name}
                       </Badge>
                     ))}
+                  </div>
+                )}
+                
+                {/* Gift Message and Buyer Notes */}
+                {(shipment.notesForGift || shipment.notesFromBuyer) && (
+                  <div className="space-y-3 pb-4 border-b">
+                    {shipment.notesForGift && (
+                      <div className="bg-pink-50 dark:bg-pink-950/20 border border-pink-200 dark:border-pink-800 rounded-md p-3">
+                        <p className="text-xs font-semibold text-pink-700 dark:text-pink-400 mb-1">Gift Message</p>
+                        <p className="text-sm text-foreground" data-testid="text-gift-message">{shipment.notesForGift}</p>
+                      </div>
+                    )}
+                    {shipment.notesFromBuyer && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Customer Notes</p>
+                        <p className="text-sm text-foreground" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 
