@@ -23,6 +23,13 @@ import {
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
 import { 
+  extractOrderNumber,
+  extractShipToFields,
+  extractReturnGiftFields,
+  extractTotalWeight,
+  extractAdvancedOptions,
+} from './utils/shipment-extraction';
+import { 
   shipmentSyncFailures, 
   shipmentItems, 
   shipmentTags, 
@@ -143,41 +150,6 @@ async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: an
     log(`⚠️  Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
     // Don't throw - this is a non-critical operation that shouldn't break the main flow
   }
-}
-
-/**
- * Extract ship_to customer data from ShipStation shipmentData
- * Returns object with all ship_to fields or empty object if no ship_to data
- */
-function extractShipToFields(shipmentData: any): Record<string, any> {
-  if (!shipmentData?.ship_to) {
-    return {};
-  }
-
-  const shipTo = shipmentData.ship_to;
-  
-  return {
-    shipToName: shipTo.name || null,
-    shipToPhone: shipTo.phone || null,
-    shipToEmail: shipTo.email || null,
-    shipToCompany: shipTo.company_name || null,
-    shipToAddressLine1: shipTo.address_line1 || null,
-    shipToAddressLine2: shipTo.address_line2 || null,
-    shipToAddressLine3: shipTo.address_line3 || null,
-    shipToCity: shipTo.city_locality || null,
-    shipToState: shipTo.state_province || null,
-    shipToPostalCode: shipTo.postal_code || null,
-    shipToCountry: shipTo.country_code || null,
-    shipToIsResidential: shipTo.address_residential_indicator || null,
-  };
-}
-
-/**
- * Extract order_number from ShipStation shipmentData
- * Returns the customer-facing order number (e.g., "JK3825345229")
- */
-function extractOrderNumber(shipmentData: any): string | null {
-  return shipmentData?.shipment_number || shipmentData?.shipmentNumber || null;
 }
 
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
@@ -337,6 +309,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               statusDescription,
               shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
               ...extractShipToFields(shipmentData), // Extract ship_to customer data
+              ...extractReturnGiftFields(shipmentData), // Extract return and gift data
+              totalWeight: extractTotalWeight(shipmentData), // Extract total weight
+              ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
               shipmentData: shipmentData,
             };
             
@@ -455,6 +430,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           statusDescription,
           shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
           ...extractShipToFields(shipmentData), // Extract ship_to customer data
+          ...extractReturnGiftFields(shipmentData), // Extract return and gift data
+          totalWeight: extractTotalWeight(shipmentData), // Extract total weight
+          ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
           shipmentData: shipmentData,
         };
         
@@ -560,6 +538,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             statusDescription,
             shipDate: shipDate ? new Date(shipDate) : null,
             ...extractShipToFields(shipmentData), // Extract ship_to customer data
+            ...extractReturnGiftFields(shipmentData), // Extract return and gift data
+            totalWeight: extractTotalWeight(shipmentData), // Extract total weight
+            ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
             shipmentData: shipmentData,
           };
 
