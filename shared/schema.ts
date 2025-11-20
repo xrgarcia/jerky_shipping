@@ -178,6 +178,7 @@ export const shipments = pgTable("shipments", {
   serviceCode: text("service_code"),
   status: text("status").notNull().default("pending"), // pending, shipped, in_transit, delivered, exception
   statusDescription: text("status_description"),
+  shipmentStatus: text("shipment_status"), // ShipStation shipment lifecycle status: on_hold, pending, shipped, cancelled, etc.
   labelUrl: text("label_url"),
   shipDate: timestamp("ship_date"),
   estimatedDeliveryDate: timestamp("estimated_delivery_date"),
@@ -255,6 +256,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   serviceCode: z.string().nullish(),
   labelUrl: z.string().nullish(),
   statusDescription: z.string().nullish(),
+  shipmentStatus: z.string().nullish(),
   shipmentData: z.any().nullish(),
   // Return and gift fields
   isReturn: z.boolean().nullish(),

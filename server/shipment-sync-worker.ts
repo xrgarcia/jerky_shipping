@@ -93,10 +93,80 @@ async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
 }
 
 /**
+ * Extract ShipStation shipment_status field
+ * Returns the raw shipment lifecycle status from ShipStation (on_hold, pending, shipped, cancelled, etc.)
+ * Searches common nesting patterns as ShipStation API varies payload structure
+ */
+function extractShipmentStatus(shipmentData: any): string | null {
+  if (!shipmentData) return null;
+  
+  // Check top-level fields first
+  if (shipmentData.shipment_status) return shipmentData.shipment_status;
+  if (shipmentData.shipmentStatus) return shipmentData.shipmentStatus;
+  
+  // Check top-level advancedOptions (recent API versions, both camelCase and snake_case)
+  if (shipmentData.advancedOptions?.shipmentStatus) {
+    return shipmentData.advancedOptions.shipmentStatus;
+  }
+  if (shipmentData.advancedOptions?.shipment_status) {
+    return shipmentData.advancedOptions.shipment_status;
+  }
+  if (shipmentData.advanced_options?.shipment_status) {
+    return shipmentData.advanced_options.shipment_status;
+  }
+  if (shipmentData.advanced_options?.shipmentStatus) {
+    return shipmentData.advanced_options.shipmentStatus;
+  }
+  
+  // Check nested shipment object (common in webhook payloads)
+  if (shipmentData.shipment) {
+    if (shipmentData.shipment.shipment_status) return shipmentData.shipment.shipment_status;
+    if (shipmentData.shipment.shipmentStatus) return shipmentData.shipment.shipmentStatus;
+    
+    // Check advancedOptions within nested shipment
+    if (shipmentData.shipment.advancedOptions?.shipmentStatus) {
+      return shipmentData.shipment.advancedOptions.shipmentStatus;
+    }
+    if (shipmentData.shipment.advancedOptions?.shipment_status) {
+      return shipmentData.shipment.advancedOptions.shipment_status;
+    }
+    if (shipmentData.shipment.advanced_options?.shipment_status) {
+      return shipmentData.shipment.advanced_options.shipment_status;
+    }
+    if (shipmentData.shipment.advanced_options?.shipmentStatus) {
+      return shipmentData.shipment.advanced_options.shipmentStatus;
+    }
+    
+    // Check double-nested shipment.shipment (some webhook variants)
+    if (shipmentData.shipment.shipment) {
+      if (shipmentData.shipment.shipment.shipment_status) return shipmentData.shipment.shipment.shipment_status;
+      if (shipmentData.shipment.shipment.shipmentStatus) return shipmentData.shipment.shipment.shipmentStatus;
+      
+      // Check advancedOptions within double-nested shipment
+      if (shipmentData.shipment.shipment.advancedOptions?.shipmentStatus) {
+        return shipmentData.shipment.shipment.advancedOptions.shipmentStatus;
+      }
+      if (shipmentData.shipment.shipment.advancedOptions?.shipment_status) {
+        return shipmentData.shipment.shipment.advancedOptions.shipment_status;
+      }
+      if (shipmentData.shipment.shipment.advanced_options?.shipment_status) {
+        return shipmentData.shipment.shipment.advanced_options.shipment_status;
+      }
+      if (shipmentData.shipment.shipment.advanced_options?.shipmentStatus) {
+        return shipmentData.shipment.shipment.advanced_options.shipmentStatus;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Normalize ShipStation status codes to our internal status values
- * - DE (Delivered) → "delivered"
- * - Any other tracking code → "in_transit"
  * - Voided → "cancelled"
+ * - DE (Delivered tracking code) → "delivered"
+ * - Any other tracking code → "in_transit"
+ * - on_hold shipment_status → "pending"
  * - Default → "shipped"
  */
 function normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
@@ -105,7 +175,7 @@ function normalizeShipmentStatus(shipmentData: any): { status: string; statusDes
     return { status: 'cancelled', statusDescription: 'Shipment voided' };
   }
   
-  // Check for tracking status code (from tracking webhooks)
+  // Check for tracking status code (from tracking webhooks) - highest priority
   const statusCode = shipmentData.status_code || shipmentData.statusCode;
   if (statusCode) {
     if (statusCode === 'DE') {
@@ -118,6 +188,15 @@ function normalizeShipmentStatus(shipmentData: any): { status: string; statusDes
       status: 'in_transit',
       statusDescription: shipmentData.status_description || shipmentData.statusDescription || 'In transit'
     };
+  }
+  
+  // Check for ShipStation shipment_status (from API queries)
+  const shipmentStatus = extractShipmentStatus(shipmentData);
+  if (shipmentStatus === 'on_hold') {
+    return { status: 'pending', statusDescription: 'On hold - awaiting warehouse processing' };
+  }
+  if (shipmentStatus === 'cancelled') {
+    return { status: 'cancelled', statusDescription: 'Shipment cancelled' };
   }
   
   // Default for newly created shipments without tracking updates
@@ -277,6 +356,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             const updateData: any = {
               status: finalStatus,
               statusDescription: finalDescription,
+              shipmentStatus: extractShipmentStatus(mergedShipmentData) || cachedShipment.shipmentStatus,
               shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
               shipmentData: mergedShipmentData,
             };
@@ -474,6 +554,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
           status,
           statusDescription,
+          shipmentStatus: extractShipmentStatus(shipmentData),
           shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
           ...extractShipToFields(shipmentData), // Extract ship_to customer data
           ...extractReturnGiftFields(shipmentData), // Extract return and gift data
@@ -632,6 +713,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             serviceCode: serviceCode,
             status,
             statusDescription,
+            shipmentStatus: extractShipmentStatus(shipmentData),
             shipDate: shipDate ? new Date(shipDate) : null,
             ...extractShipToFields(shipmentData), // Extract ship_to customer data
             ...extractReturnGiftFields(shipmentData), // Extract return and gift data
