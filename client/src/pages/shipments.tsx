@@ -385,7 +385,7 @@ export default function Shipments() {
   // Pagination and sorting
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortBy, setSortBy] = useState("orderDate");
   const [sortOrder, setSortOrder] = useState("desc");
 
   // Initialize state from URL params (runs when URL changes, including browser navigation)
@@ -410,7 +410,7 @@ export default function Shipments() {
     setShowWithoutOrders(params.get('withoutOrders') === 'true');
     setPage(parseInt(params.get('page') || '1'));
     setPageSize(parseInt(params.get('pageSize') || '50'));
-    setSortBy(params.get('sortBy') || 'createdAt');
+    setSortBy(params.get('sortBy') || 'orderDate');
     setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'desc');
     
     // Open filters if any are active
@@ -449,7 +449,7 @@ export default function Shipments() {
     
     if (page !== 1) params.set('page', page.toString());
     if (pageSize !== 50) params.set('pageSize', pageSize.toString());
-    if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+    if (sortBy !== 'orderDate') params.set('sortBy', sortBy);
     if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
     
     const newSearch = params.toString();
@@ -919,6 +919,7 @@ export default function Shipments() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="orderDate" data-testid="sort-option-orderDate">Order Date</SelectItem>
                     <SelectItem value="createdAt" data-testid="sort-option-createdAt">Created Date</SelectItem>
                     <SelectItem value="shipDate" data-testid="sort-option-shipDate">Ship Date</SelectItem>
                     <SelectItem value="trackingNumber" data-testid="sort-option-trackingNumber">Tracking #</SelectItem>

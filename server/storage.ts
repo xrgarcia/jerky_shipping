@@ -71,7 +71,7 @@ export interface ShipmentFilters {
   dateTo?: Date;
   orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
   withoutOrders?: boolean; // Filter for shipments with no linked order
-  sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode';
+  sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode' | 'orderDate';
   sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
@@ -1036,13 +1036,18 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
     const total = countResult[0]?.count || 0;
 
-    // Build ORDER BY with NULLS LAST for ship date to push orphaned shipments to the end
+    // Build ORDER BY with NULLS LAST for ship date and order date to push orphaned shipments to the end
     let orderByClause;
     if (sortBy === 'shipDate') {
       // Use raw SQL to add NULLS LAST for ship date sorting
       orderByClause = sortOrder === 'asc' 
         ? sql`${shipments.shipDate} ASC NULLS LAST`
         : sql`${shipments.shipDate} DESC NULLS LAST`;
+    } else if (sortBy === 'orderDate') {
+      // Use raw SQL to add NULLS LAST for order date sorting
+      orderByClause = sortOrder === 'asc' 
+        ? sql`${shipments.orderDate} ASC NULLS LAST`
+        : sql`${shipments.orderDate} DESC NULLS LAST`;
     } else {
       const sortColumn = {
         createdAt: shipments.createdAt,
