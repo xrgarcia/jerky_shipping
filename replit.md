@@ -58,6 +58,19 @@ The dead letter queue logs all shipment sync failures for troubleshooting. There
      - `label_url` regex: `/labels/(se-[a-f0-9-]+)` extracts "se-594210232" from URL
      - Fallback to `shipment_id` field if present
 
+### Order Filter SQL Optimization (Fixed)
+
+**Issue**: Orders page "Has Shipment: No" filter was returning 0 results despite Operations dashboard showing 467 orders missing shipments.
+
+**Root Cause**: SQL `NOT IN` with NULL values bug. The shipments table contains 301 shipments with NULL `order_id` (multi-channel orders from Amazon/TikTok). When using `NOT IN` with a subquery containing NULLs, SQL returns zero rows because NULL comparisons are treated as unknown.
+
+**Fix**: Added `isNotNull(shipments.orderId)` filter to all shipment-related subqueries in `server/storage.ts`:
+- hasShipment=true/false filters
+- shipmentStatus filter
+- carrierCode filter
+
+This ensures only shipments linked to orders are checked, preventing NULL values from breaking the NOT IN clause. Query now correctly returns ~465 orders without shipments.
+
 ## External Dependencies
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, utilizing webhooks for real-time updates.
