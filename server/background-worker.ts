@@ -179,6 +179,48 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
         // Process line items from Shopify order
         await processOrderLineItems(orderData.id, shopifyOrder);
 
+        // Check for shipments and link them if needed
+        // This provides recovery when ShipStation webhooks are missed or delayed
+        try {
+          if (orderData.orderNumber) {
+            // First check for shipments by order number (includes unlinked shipments)
+            const shipmentsByNumber = await storage.getShipmentsByOrderNumber(orderData.orderNumber);
+            
+            // If we found shipments, link any that aren't already linked
+            if (shipmentsByNumber.length > 0) {
+              let linkedCount = 0;
+              for (const shipment of shipmentsByNumber) {
+                if (!shipment.orderId) {
+                  await storage.updateShipment(shipment.id, { orderId: orderData.id });
+                  linkedCount++;
+                }
+              }
+              if (linkedCount > 0) {
+                console.log(`[background-worker] Linked ${linkedCount} existing shipment(s) to order ${orderData.orderNumber}`);
+              }
+            } else {
+              // No shipments found at all - enqueue a sync to check ShipStation
+              const { enqueueShipmentSync } = await import('./utils/queue.js');
+              const enqueued = await enqueueShipmentSync({
+                reason: 'webhook',
+                orderNumber: orderData.orderNumber,
+                enqueuedAt: Date.now(),
+                originalWebhook: {
+                  source: 'shopify',
+                  topic: webhookData.topic,
+                },
+              });
+              
+              if (enqueued) {
+                console.log(`[background-worker] Order ${orderData.orderNumber} has no shipments, triggered shipment sync`);
+              }
+            }
+          }
+        } catch (shipmentCheckError) {
+          // Don't fail order processing if shipment check fails
+          console.error('[background-worker] Failed to check/enqueue shipments:', shipmentCheckError);
+        }
+
         // Update backfill job progress if this is a backfill webhook
         // Count every order processed (new or updated) because the queue ensures no duplicates per job
         if (webhookData.type === 'backfill' && webhookData.jobId) {

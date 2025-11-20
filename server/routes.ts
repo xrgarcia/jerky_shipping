@@ -1384,32 +1384,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await enqueueWebhook(webhookData);
 
-      // Also trigger shipment sync for this order to proactively fetch shipment data from ShipStation
-      // This provides redundancy in case ShipStation webhooks are missed or delayed
-      try {
-        const orderNumber = extractActualOrderNumber(req.body);
-        if (orderNumber) {
-          const { enqueueShipmentSync } = await import('./utils/queue.js');
-          const enqueued = await enqueueShipmentSync({
-            reason: 'webhook',
-            orderNumber,
-            enqueuedAt: Date.now(),
-            originalWebhook: {
-              source: 'shopify',
-              topic,
-              webhookId,
-            },
-          });
-          
-          if (enqueued) {
-            console.log(`[shopify-webhook] Triggered shipment sync for order ${orderNumber}`);
-          }
-        }
-      } catch (shipmentSyncError) {
-        // Don't fail the webhook if shipment sync enqueueing fails
-        console.error('[shopify-webhook] Failed to enqueue shipment sync:', shipmentSyncError);
-      }
-
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error processing webhook:", error);
