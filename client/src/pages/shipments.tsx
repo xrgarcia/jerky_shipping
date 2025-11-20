@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order } from "@shared/schema";
@@ -34,6 +35,7 @@ export default function Shipments() {
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showOrphanedOnly, setShowOrphanedOnly] = useState(false);
 
   // Pagination and sorting
   const [page, setPage] = useState(1);
@@ -150,6 +152,7 @@ export default function Shipments() {
     
     if (dateFrom) params.append('dateFrom', dateFrom);
     if (dateTo) params.append('dateTo', dateTo);
+    if (showOrphanedOnly) params.append('orphaned', 'true');
     
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
@@ -160,7 +163,7 @@ export default function Shipments() {
   };
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", search, status, carrierCode, dateFrom, dateTo, page, pageSize, sortBy, sortOrder],
+    queryKey: ["/api/shipments", search, status, carrierCode, dateFrom, dateTo, showOrphanedOnly, page, pageSize, sortBy, sortOrder],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -194,6 +197,7 @@ export default function Shipments() {
     setCarrierCode([]);
     setDateFrom("");
     setDateTo("");
+    setShowOrphanedOnly(false);
     setPage(1);
   };
 
@@ -203,6 +207,7 @@ export default function Shipments() {
     carrierCode.length > 0,
     dateFrom,
     dateTo,
+    showOrphanedOnly,
   ].filter(Boolean).length;
 
   const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
@@ -378,6 +383,27 @@ export default function Shipments() {
                         placeholder="To"
                         data-testid="input-date-to"
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Other Filters</label>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="orphaned-filter"
+                        checked={showOrphanedOnly}
+                        onCheckedChange={(checked) => {
+                          setShowOrphanedOnly(checked as boolean);
+                          setPage(1);
+                        }}
+                        data-testid="checkbox-orphaned-filter"
+                      />
+                      <label
+                        htmlFor="orphaned-filter"
+                        className="text-sm cursor-pointer"
+                      >
+                        Show orphaned shipments only
+                      </label>
                     </div>
                   </div>
                 </div>
