@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import {
   dequeueShopifyOrderSyncBatch,
   requeueShopifyOrderSyncMessages,
+  getShopifyOrderSyncQueueLength,
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from './utils/shopify-utils';
@@ -166,4 +167,82 @@ async function fetchShopifyOrderByOrderNumber(orderNumber: string): Promise<any 
   
   // Return the first matching order (should only be one)
   return orders.length > 0 ? orders[0] : null;
+}
+
+// Use globalThis to persist worker state across hot-reloads
+declare global {
+  var __shopifyOrderSyncWorkerInterval: NodeJS.Timeout | undefined;
+  var __shopifyOrderSyncWorkerActiveRunId: number | null | undefined;
+  var __shopifyOrderSyncWorkerNextRunId: number | undefined;
+}
+
+/**
+ * Start the Shopify order sync worker that processes order import requests from the queue
+ * Runs every intervalMs milliseconds
+ * Uses singleton pattern to prevent duplicate workers on hot-reload
+ * Uses activeRunId mutex (null = idle, number = active) to prevent overlapping batches
+ */
+export function startShopifyOrderSyncWorker(intervalMs: number = 8000): NodeJS.Timeout {
+  // Prevent duplicate workers (survives hot-reload)
+  if (globalThis.__shopifyOrderSyncWorkerInterval) {
+    log('Shopify order sync worker already running, skipping duplicate start');
+    return globalThis.__shopifyOrderSyncWorkerInterval;
+  }
+
+  // Initialize mutex only if undefined (don't clear in-flight batches)
+  if (globalThis.__shopifyOrderSyncWorkerActiveRunId === undefined) {
+    globalThis.__shopifyOrderSyncWorkerActiveRunId = null;
+  }
+  // Persist run ID counter so IDs never collide across stop/start cycles
+  globalThis.__shopifyOrderSyncWorkerNextRunId = globalThis.__shopifyOrderSyncWorkerNextRunId ?? 0;
+  
+  log(`Shopify order sync worker started (interval: ${intervalMs}ms, batch size: 10)`);
+  
+  const processQueue = async () => {
+    // Check if a batch is already running
+    if (globalThis.__shopifyOrderSyncWorkerActiveRunId !== null) {
+      return;
+    }
+    
+    // Claim this run with a globally unique ID
+    const myRunId = ++(globalThis.__shopifyOrderSyncWorkerNextRunId!);
+    globalThis.__shopifyOrderSyncWorkerActiveRunId = myRunId;
+
+    try {
+      const startTime = Date.now();
+      const queueLength = await getShopifyOrderSyncQueueLength();
+      
+      if (queueLength > 0) {
+        const processed = await processShopifyOrderSyncBatch(10); // Smaller batch size for API calls
+        const duration = Date.now() - startTime;
+        
+        if (processed > 0) {
+          log(`Processed ${processed} Shopify order sync message(s) in ${duration}ms, ${queueLength - processed} remaining`);
+        }
+      }
+    } catch (error) {
+      console.error("Shopify order sync worker error:", error);
+    } finally {
+      // Only release the lock if we still own it (handles stop/start edge cases)
+      if (globalThis.__shopifyOrderSyncWorkerActiveRunId === myRunId) {
+        globalThis.__shopifyOrderSyncWorkerActiveRunId = null;
+      }
+    }
+  };
+
+  globalThis.__shopifyOrderSyncWorkerInterval = setInterval(processQueue, intervalMs);
+  return globalThis.__shopifyOrderSyncWorkerInterval;
+}
+
+/**
+ * Stop the Shopify order sync worker
+ * Note: Does not clear activeRunId - let in-flight batches finish naturally
+ */
+export function stopShopifyOrderSyncWorker(): void {
+  if (globalThis.__shopifyOrderSyncWorkerInterval) {
+    clearInterval(globalThis.__shopifyOrderSyncWorkerInterval);
+    globalThis.__shopifyOrderSyncWorkerInterval = undefined;
+    // Don't clear activeRunId - let running batch finish and release the lock
+    log('Shopify order sync worker stopped');
+  }
 }

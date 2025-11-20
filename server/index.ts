@@ -130,6 +130,10 @@ app.use((req, res, next) => {
     // Start shipment sync worker to process shipment sync requests
     const { startShipmentSyncWorker } = await import("./shipment-sync-worker");
     startShipmentSyncWorker(10000); // Process shipment sync queue every 10 seconds
+    
+    // Start Shopify order sync worker to import missing orders
+    const { startShopifyOrderSyncWorker } = await import("./shopify-sync-worker");
+    startShopifyOrderSyncWorker(8000); // Process Shopify order sync queue every 8 seconds
   } else {
     log("Skipping background workers - Redis not configured");
   }

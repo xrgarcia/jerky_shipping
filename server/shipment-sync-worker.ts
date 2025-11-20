@@ -79,7 +79,45 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         // If rate limit was hit, check if we need to handle this message as success/failure before requeueing
         if (linkageResult.error || !linkageResult.order || !linkageResult.shipmentData) {
-          // Failed to link tracking to order
+          // Check if this is an order-not-found scenario (Shopify orders only)
+          const retryCount = message.retryCount || 0;
+          const isOrderNotFound = linkageResult.orderNumber && !linkageResult.order && linkageResult.error?.includes('Cannot link tracking');
+          
+          if (isOrderNotFound && retryCount < MAX_SHIPMENT_RETRY_COUNT) {
+            // Enqueue Shopify order sync to import the missing order
+            const shopifyOrderNumber = linkageResult.orderNumber!;
+            log(`📤 Order ${shopifyOrderNumber} not found, enqueueing Shopify order sync`);
+            
+            const shopifyMessage: ShopifyOrderSyncMessage = {
+              orderNumber: shopifyOrderNumber,
+              reason: 'shipment-webhook',
+              enqueuedAt: Date.now(),
+              triggeringShipmentTracking: trackingNumber,
+            };
+            await enqueueShopifyOrderSync(shopifyMessage);
+            
+            // Requeue this shipment sync message with incremented retry count
+            const retryMessage: ShipmentSyncMessage = {
+              ...message,
+              retryCount: retryCount + 1,
+            };
+            await requeueShipmentSyncMessages([retryMessage]);
+            log(`📥 Requeued shipment sync for tracking ${trackingNumber} (retry ${retryCount + 1}/${MAX_SHIPMENT_RETRY_COUNT})`);
+            processedCount++;
+            
+            // If we hit rate limit during this request, requeue remaining and stop
+            if (shouldStopBatch) {
+              const remainingMessages = messages.slice(i + 1);
+              if (remainingMessages.length > 0) {
+                await requeueShipmentSyncMessages(remainingMessages);
+                log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
+              }
+              break;
+            }
+            continue;
+          }
+          
+          // Failed to link tracking to order (either non-Shopify or max retries reached)
           await logShipmentSyncFailure({
             orderNumber: linkageResult.orderNumber || trackingNumber,
             reason,
@@ -89,7 +127,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               originalWebhook: message.originalWebhook || null,
             },
             responseData: linkageResult.shipmentData,
-            retryCount: 0,
+            retryCount: retryCount,
             failedAt: new Date(),
           });
           processedCount++;
@@ -185,17 +223,52 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         const order = await storage.getOrderByOrderNumber(orderNumber);
         
         if (!order) {
-          // Order not found - log to dead letter queue
+          // Order not found - check if we should trigger Shopify sync
+          const retryCount = message.retryCount || 0;
+          
+          if (retryCount < MAX_SHIPMENT_RETRY_COUNT) {
+            // Enqueue Shopify order sync to import the missing order
+            log(`📤 Order ${orderNumber} not found, enqueueing Shopify order sync`);
+            
+            const shopifyMessage: ShopifyOrderSyncMessage = {
+              orderNumber,
+              reason: 'shipment-webhook',
+              enqueuedAt: Date.now(),
+            };
+            await enqueueShopifyOrderSync(shopifyMessage);
+            
+            // Requeue this shipment sync message with incremented retry count
+            const retryMessage: ShipmentSyncMessage = {
+              ...message,
+              retryCount: retryCount + 1,
+            };
+            await requeueShipmentSyncMessages([retryMessage]);
+            log(`📥 Requeued shipment sync for order ${orderNumber} (retry ${retryCount + 1}/${MAX_SHIPMENT_RETRY_COUNT})`);
+            processedCount++;
+            
+            // If we hit rate limit during this request, requeue remaining and stop
+            if (shouldStopBatch) {
+              const remainingMessages = messages.slice(i + 1);
+              if (remainingMessages.length > 0) {
+                await requeueShipmentSyncMessages(remainingMessages);
+                log(`📥 Requeued ${remainingMessages.length} unprocessed message(s) due to rate limit`);
+              }
+              break;
+            }
+            continue;
+          }
+          
+          // Max retries reached - log to dead letter queue
           await logShipmentSyncFailure({
             orderNumber,
             reason,
-            errorMessage: `Order ${orderNumber} not found in database`,
+            errorMessage: `Order ${orderNumber} not found in database after ${retryCount} retries`,
             requestData: {
               queueMessage: message,
               originalWebhook: message.originalWebhook || null,
             },
             responseData: null,
-            retryCount: 0,
+            retryCount,
             failedAt: new Date(),
           });
           processedCount++;
