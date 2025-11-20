@@ -128,6 +128,14 @@ type ShopifyWebhook = {
   updated_at: string;
 };
 
+type ShipStationWebhook = {
+  webhook_id: string;
+  name: string;
+  event: string;
+  url: string;
+  store_id: string | null;
+};
+
 function getQueueHealth(size: number, oldestMessageAt: number | null): "healthy" | "warning" | "critical" {
   if (size === 0) return "healthy";
   
@@ -152,6 +160,7 @@ export default function OperationsPage() {
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
+  const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
   const { toast } = useToast();
 
   // Initial fetch of queue stats (no polling)
@@ -172,6 +181,11 @@ export default function OperationsPage() {
   // Fetch Shopify webhooks list
   const { data: webhooksData, isLoading: webhooksLoading } = useQuery<{ webhooks: ShopifyWebhook[] }>({
     queryKey: ["/api/operations/shopify-webhooks"],
+  });
+
+  // Fetch ShipStation webhooks list
+  const { data: shipStationWebhooksData, isLoading: shipStationWebhooksLoading } = useQuery<{ webhooks: ShipStationWebhook[] }>({
+    queryKey: ["/api/operations/shipstation-webhooks"],
   });
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
@@ -372,6 +386,28 @@ export default function OperationsPage() {
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete webhook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteShipStationWebhookMutation = useMutation({
+    mutationFn: async (webhookId: string) => {
+      const response = await apiRequest("DELETE", `/api/operations/shipstation-webhooks/${webhookId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Webhook Deleted",
+        description: "Successfully deleted ShipStation webhook",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shipstation-webhooks"] });
+      setShipStationWebhookToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete ShipStation webhook",
         variant: "destructive",
       });
     },
@@ -748,6 +784,73 @@ export default function OperationsPage() {
         </CardContent>
       </Card>
 
+      <Card data-testid="card-shipstation-webhooks">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            ShipStation Webhooks
+          </CardTitle>
+          <CardDescription>Registered webhooks for shipment tracking</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              {shipStationWebhooksLoading ? (
+                <p className="text-sm text-muted-foreground">Loading webhooks...</p>
+              ) : shipStationWebhooksData && shipStationWebhooksData.webhooks.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Registered Webhooks</h3>
+                  </div>
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[25%]">Name</TableHead>
+                          <TableHead className="w-[20%]">Event</TableHead>
+                          <TableHead className="w-[45%]">URL</TableHead>
+                          <TableHead className="w-[10%]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {shipStationWebhooksData.webhooks.map((webhook) => (
+                          <TableRow key={webhook.webhook_id} data-testid={`row-shipstation-webhook-${webhook.webhook_id}`}>
+                            <TableCell className="text-xs" data-testid={`text-name-${webhook.webhook_id}`}>
+                              {webhook.name}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs" data-testid={`text-event-${webhook.webhook_id}`}>
+                              {webhook.event}
+                            </TableCell>
+                            <TableCell className="text-xs truncate max-w-[200px]" title={webhook.url} data-testid={`text-url-${webhook.webhook_id}`}>
+                              {webhook.url}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShipStationWebhookToDelete(webhook)}
+                                data-testid={`button-delete-shipstation-webhook-${webhook.webhook_id}`}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Total: {shipStationWebhooksData.webhooks.length} webhook(s)
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No webhooks registered</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card data-testid="card-worker-status">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -957,6 +1060,40 @@ export default function OperationsPage() {
               className="bg-destructive hover:bg-destructive/90"
             >
               {deleteWebhookMutation.isPending ? "Deleting..." : "Delete Webhook"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!shipStationWebhookToDelete} onOpenChange={() => setShipStationWebhookToDelete(null)}>
+        <AlertDialogContent data-testid="dialog-delete-shipstation-webhook-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete ShipStation Webhook</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to delete this webhook?
+              </p>
+              {shipStationWebhookToDelete && (
+                <div className="rounded-md bg-muted p-3 space-y-1 text-sm font-mono">
+                  <p><strong>Name:</strong> {shipStationWebhookToDelete.name}</p>
+                  <p><strong>Event:</strong> {shipStationWebhookToDelete.event}</p>
+                  <p className="text-xs break-all"><strong>URL:</strong> {shipStationWebhookToDelete.url}</p>
+                </div>
+              )}
+              <p className="text-sm text-destructive">
+                <strong>Warning:</strong> This action cannot be undone. ShipStation will stop sending webhooks for this event.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-shipstation-webhook">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-shipstation-webhook"
+              onClick={() => shipStationWebhookToDelete && deleteShipStationWebhookMutation.mutate(shipStationWebhookToDelete.webhook_id)}
+              disabled={deleteShipStationWebhookMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteShipStationWebhookMutation.isPending ? "Deleting..." : "Delete Webhook"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
