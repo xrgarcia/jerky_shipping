@@ -848,9 +848,9 @@ Please analyze this failure and help me understand:
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Shipments Without Status
+              Shipped Without Tracking
             </CardTitle>
-            <CardDescription>Shipments missing status information</CardDescription>
+            <CardDescription>Shipped shipments missing tracking numbers</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold" data-testid="text-shipments-without-status">

@@ -1208,7 +1208,7 @@ export class DatabaseStorage implements IStorage {
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
     shipmentSyncFailures: number;
-    ordersWithoutOrderItems: number;
+    shopifyOrderSyncFailures: number;
   }> {
     // Query 1: Orders missing shipments
     const ordersMissingShipmentsResult = await db
