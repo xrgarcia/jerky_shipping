@@ -165,6 +165,36 @@ export async function reregisterAllWebhooks(
   const existingWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
   console.log(`Found ${existingWebhooks.length} existing webhook(s)`);
   
+  // CLEANUP: Delete orphaned webhooks that point to different base URLs
+  // This ensures each environment only manages its own webhooks
+  const requiredTopics = new Set(requiredWebhooks.map(w => w.topic));
+  const orphanedWebhooks = existingWebhooks.filter((webhook: any) => {
+    // Check if this webhook is for one of our topics
+    if (!requiredTopics.has(webhook.topic)) {
+      return false; // Not our topic, leave it alone (could be third-party integration)
+    }
+    
+    // Check if this webhook points to a different base URL
+    const webhookUrl = new URL(webhook.address);
+    const currentUrl = new URL(normalizedBaseUrl);
+    return webhookUrl.host !== currentUrl.host;
+  });
+  
+  if (orphanedWebhooks.length > 0) {
+    console.log(`\n🧹 Cleaning up ${orphanedWebhooks.length} orphaned webhook(s) from other environments:`);
+    for (const orphaned of orphanedWebhooks) {
+      try {
+        console.log(`   Deleting: ${orphaned.topic} -> ${orphaned.address} (ID: ${orphaned.id})`);
+        await deleteShopifyWebhook(shopDomain, accessToken, orphaned.id.toString());
+        console.log(`   ✓ Deleted orphaned webhook ${orphaned.id}`);
+      } catch (error: any) {
+        console.error(`   ✗ Failed to delete orphaned webhook ${orphaned.id}:`, error.message);
+        // Continue with other deletions even if one fails
+      }
+    }
+    console.log('');
+  }
+  
   // PER-TOPIC REPLACEMENT STRATEGY
   // For each webhook: (1) cache old, (2) delete old, (3) create new, (4) rollback if failed
   // This avoids Shopify's duplicate topic/address constraint
@@ -290,6 +320,36 @@ export async function ensureWebhooksRegistered(
   try {
     const existingWebhooks = await listShopifyWebhooks(shopDomain, accessToken);
     
+    // CLEANUP: Delete orphaned webhooks that point to different base URLs
+    // This ensures each environment only manages its own webhooks
+    const requiredTopics = new Set(requiredWebhooks.map(w => w.topic));
+    const orphanedWebhooks = existingWebhooks.filter((webhook: any) => {
+      // Check if this webhook is for one of our topics
+      if (!requiredTopics.has(webhook.topic)) {
+        return false; // Not our topic, leave it alone (could be third-party integration)
+      }
+      
+      // Check if this webhook points to a different base URL
+      const webhookUrl = new URL(webhook.address);
+      const currentUrl = new URL(normalizedBaseUrl);
+      return webhookUrl.host !== currentUrl.host;
+    });
+    
+    if (orphanedWebhooks.length > 0) {
+      console.log(`🧹 Cleaning up ${orphanedWebhooks.length} orphaned webhook(s) from other environments:`);
+      for (const orphaned of orphanedWebhooks) {
+        try {
+          console.log(`   Deleting: ${orphaned.topic} -> ${orphaned.address} (ID: ${orphaned.id})`);
+          await deleteShopifyWebhook(shopDomain, accessToken, orphaned.id.toString());
+          console.log(`   ✓ Deleted orphaned webhook ${orphaned.id}`);
+        } catch (error: any) {
+          console.error(`   ✗ Failed to delete orphaned webhook ${orphaned.id}:`, error.message);
+          // Continue with other deletions even if one fails
+        }
+      }
+    }
+    
+    // Register required webhooks for this environment
     for (const required of requiredWebhooks) {
       const exists = existingWebhooks.some(
         (webhook: any) => webhook.topic === required.topic && webhook.address === required.address

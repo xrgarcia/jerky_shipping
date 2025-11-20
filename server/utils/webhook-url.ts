@@ -17,11 +17,16 @@ export function getWebhookBaseUrl(): string | null {
     return 'https://jerkyshippping.replit.app';
   } else {
     // Development workspace - use REPLIT_DOMAINS
-    const devDomain = process.env.REPLIT_DOMAINS?.trim();
-    if (devDomain) {
-      // Ensure it has https:// prefix and no trailing slash
-      const url = devDomain.startsWith('http') ? devDomain : `https://${devDomain}`;
-      return url.replace(/\/$/, '');
+    // REPLIT_DOMAINS can be comma-separated, take only the FIRST domain
+    const devDomains = process.env.REPLIT_DOMAINS?.trim();
+    if (devDomains) {
+      // Split by comma and take first domain
+      const firstDomain = devDomains.split(',')[0].trim();
+      if (firstDomain) {
+        // Ensure it has https:// prefix and no trailing slash
+        const url = firstDomain.startsWith('http') ? firstDomain : `https://${firstDomain}`;
+        return url.replace(/\/$/, '');
+      }
     }
   }
 
