@@ -2,8 +2,8 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures } from "@shared/schema";
-import { eq, count, desc } from "drizzle-orm";
+import { users, shipmentSyncFailures, orders } from "@shared/schema";
+import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
 import { z } from "zod";
@@ -2808,6 +2808,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error purging failures:", error);
       res.status(500).json({ error: "Failed to purge failures table" });
+    }
+  });
+
+  // List all registered Shopify webhooks (diagnostic endpoint)
+  app.get("/api/operations/list-shopify-webhooks", requireAuth, async (req, res) => {
+    try {
+      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+      if (!shopDomain || !accessToken) {
+        return res.status(400).json({ 
+          error: "Missing Shopify credentials" 
+        });
+      }
+
+      const { listShopifyWebhooks } = await import("./utils/shopify-webhook.js");
+      const webhooks = await listShopifyWebhooks(shopDomain, accessToken);
+      
+      res.json({ 
+        success: true,
+        count: webhooks.length,
+        webhooks: webhooks.map((w: any) => ({
+          id: w.id,
+          topic: w.topic,
+          address: w.address,
+          createdAt: w.created_at,
+          updatedAt: w.updated_at,
+        }))
+      });
+    } catch (error: any) {
+      console.error("Error listing Shopify webhooks:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
