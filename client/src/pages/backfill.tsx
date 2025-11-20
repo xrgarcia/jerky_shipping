@@ -59,6 +59,16 @@ type BackfillJob = {
   startDate: string;
   endDate: string;
   status: "pending" | "in_progress" | "completed" | "failed";
+  // Fetch task tracking (new architecture)
+  totalFetchTasks: number;
+  completedFetchTasks: number;
+  failedFetchTasks: number;
+  // Per-source fetch task tracking
+  shopifyFetchCompleted: number;
+  shopifyFetchFailed: number;
+  shipstationFetchCompleted: number;
+  shipstationFetchFailed: number;
+  // Legacy order tracking
   totalOrders: number;
   processedOrders: number;
   failedOrders: number;
@@ -383,8 +393,8 @@ export default function BackfillPage() {
   };
 
   const getProgressPercentage = (job: BackfillJob) => {
-    if (job.totalOrders === 0) return 0;
-    return Math.round((job.processedOrders / job.totalOrders) * 100);
+    if (job.totalFetchTasks === 0) return 0;
+    return Math.round((job.completedFetchTasks / job.totalFetchTasks) * 100);
   };
 
   const getLastActivityText = (lastActivityAt: string | null) => {
@@ -661,24 +671,54 @@ export default function BackfillPage() {
                 </div>
               )}
 
+              {/* Overall Fetch Progress */}
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span>Progress</span>
-                  <span className="font-medium" data-testid="text-progress">
-                    {activeJob.processedOrders} / {activeJob.totalOrders} orders
+                  <span>Fetch Progress</span>
+                  <span className="font-medium" data-testid="text-fetch-progress">
+                    {activeJob.completedFetchTasks} / {activeJob.totalFetchTasks} tasks
                   </span>
                 </div>
                 <Progress value={getProgressPercentage(activeJob)} data-testid="progress-bar" />
                 <div className="text-xs text-muted-foreground mt-1">
                   {getProgressPercentage(activeJob)}% complete
+                  {activeJob.failedFetchTasks > 0 && (
+                    <span className="text-destructive ml-2">
+                      ({activeJob.failedFetchTasks} failed)
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {activeJob.failedOrders > 0 && (
-                <div className="text-sm">
-                  <span className="text-destructive font-medium" data-testid="text-failed-orders">
-                    {activeJob.failedOrders} failed
-                  </span>
+              {/* Per-source Progress Breakdown */}
+              {activeJob.totalFetchTasks > 0 && (
+                <div className="grid grid-cols-2 gap-4 text-sm border rounded-md p-3">
+                  <div>
+                    <div className="font-medium mb-1">Shopify</div>
+                    <div className="text-muted-foreground">
+                      <div data-testid="text-shopify-completed">
+                        {activeJob.shopifyFetchCompleted} completed
+                      </div>
+                      {activeJob.shopifyFetchFailed > 0 && (
+                        <div className="text-destructive" data-testid="text-shopify-failed">
+                          {activeJob.shopifyFetchFailed} failed
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-medium mb-1">ShipStation</div>
+                    <div className="text-muted-foreground">
+                      <div data-testid="text-shipstation-completed">
+                        {activeJob.shipstationFetchCompleted} completed
+                      </div>
+                      {activeJob.shipstationFetchFailed > 0 && (
+                        <div className="text-destructive" data-testid="text-shipstation-failed">
+                          {activeJob.shipstationFetchFailed} failed
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
