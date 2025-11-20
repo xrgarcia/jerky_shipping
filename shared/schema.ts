@@ -406,6 +406,11 @@ export const backfillJobs = pgTable("backfill_jobs", {
   totalFetchTasks: integer("total_fetch_tasks").notNull().default(0),
   completedFetchTasks: integer("completed_fetch_tasks").notNull().default(0),
   failedFetchTasks: integer("failed_fetch_tasks").notNull().default(0),
+  // Per-source fetch task tracking for UI breakdown
+  shopifyFetchCompleted: integer("shopify_fetch_completed").notNull().default(0),
+  shopifyFetchFailed: integer("shopify_fetch_failed").notNull().default(0),
+  shipstationFetchCompleted: integer("shipstation_fetch_completed").notNull().default(0),
+  shipstationFetchFailed: integer("shipstation_fetch_failed").notNull().default(0),
   // Legacy order tracking (kept for backward compatibility)
   totalOrders: integer("total_orders").notNull().default(0),
   processedOrders: integer("processed_orders").notNull().default(0),
