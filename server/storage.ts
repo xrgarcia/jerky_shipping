@@ -64,7 +64,7 @@ export interface OrderFilters {
 
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
-  status?: string[];
+  status?: string; // Single status for cascading filter
   statusDescription?: string;
   carrierCode?: string[];
   dateFrom?: Date; // Ship date range
@@ -131,7 +131,8 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
-  getDistinctStatusDescriptions(): Promise<string[]>;
+  getDistinctStatuses(): Promise<string[]>;
+  getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
@@ -824,10 +825,13 @@ export class DatabaseStorage implements IStorage {
   async getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }> {
     const {
       search,
-      status: statusFilters,
+      status: statusFilter,
+      statusDescription,
       carrierCode: carrierFilters,
       dateFrom,
       dateTo,
+      orphaned,
+      withoutOrders,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
@@ -844,14 +848,21 @@ export class DatabaseStorage implements IStorage {
         or(
           ilike(shipments.trackingNumber, `%${searchLower}%`),
           ilike(shipments.carrierCode, `%${searchLower}%`),
-          ilike(shipments.shipmentId, `%${searchLower}%`)
+          ilike(shipments.shipmentId, `%${searchLower}%`),
+          ilike(shipments.orderNumber, `%${searchLower}%`),
+          ilike(shipments.shipToName, `%${searchLower}%`)
         )
       );
     }
 
-    // Status filter
-    if (statusFilters && statusFilters.length > 0) {
-      conditions.push(inArray(shipments.status, statusFilters));
+    // Status filter (single value for cascading)
+    if (statusFilter) {
+      conditions.push(eq(shipments.status, statusFilter));
+    }
+
+    // Status description filter
+    if (statusDescription) {
+      conditions.push(eq(shipments.statusDescription, statusDescription));
     }
 
     // Carrier filter
@@ -865,6 +876,22 @@ export class DatabaseStorage implements IStorage {
     }
     if (dateTo) {
       conditions.push(lte(shipments.shipDate, dateTo));
+    }
+
+    // Orphaned filter (shipments missing tracking number, ship date, and shipment ID)
+    if (orphaned) {
+      conditions.push(
+        and(
+          or(isNull(shipments.trackingNumber), eq(shipments.trackingNumber, '')),
+          isNull(shipments.shipDate),
+          or(isNull(shipments.shipmentId), eq(shipments.shipmentId, ''))
+        )
+      );
+    }
+
+    // Without orders filter (shipments with no linked order)
+    if (withoutOrders) {
+      conditions.push(isNull(shipments.orderId));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -900,11 +927,28 @@ export class DatabaseStorage implements IStorage {
     return { shipments: result, total };
   }
 
-  async getDistinctStatusDescriptions(): Promise<string[]> {
+  async getDistinctStatuses(): Promise<string[]> {
+    const results = await db
+      .selectDistinct({ status: shipments.status })
+      .from(shipments)
+      .where(isNotNull(shipments.status))
+      .orderBy(shipments.status);
+    
+    return results.map(r => r.status).filter((s): s is string => s !== null);
+  }
+
+  async getDistinctStatusDescriptions(status?: string): Promise<string[]> {
+    const conditions = [isNotNull(shipments.statusDescription)];
+    
+    // Filter by status if provided
+    if (status) {
+      conditions.push(eq(shipments.status, status));
+    }
+    
     const results = await db
       .selectDistinct({ statusDescription: shipments.statusDescription })
       .from(shipments)
-      .where(isNotNull(shipments.statusDescription))
+      .where(and(...conditions))
       .orderBy(shipments.statusDescription);
     
     return results.map(r => r.statusDescription).filter((s): s is string => s !== null);

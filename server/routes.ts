@@ -734,10 +734,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get distinct status descriptions for filtering
+  // Get distinct statuses for filtering
+  app.get("/api/shipments/statuses", requireAuth, async (req, res) => {
+    try {
+      const statuses = await storage.getDistinctStatuses();
+      res.json({ statuses });
+    } catch (error) {
+      console.error("Error fetching statuses:", error);
+      res.status(500).json({ error: "Failed to fetch statuses" });
+    }
+  });
+
+  // Get distinct status descriptions for filtering (optionally filtered by status)
   app.get("/api/shipments/status-descriptions", requireAuth, async (req, res) => {
     try {
-      const statusDescriptions = await storage.getDistinctStatusDescriptions();
+      const status = req.query.status as string | undefined;
+      const statusDescriptions = await storage.getDistinctStatusDescriptions(status);
       res.json({ statusDescriptions });
     } catch (error) {
       console.error("Error fetching status descriptions:", error);
@@ -756,11 +768,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortOrder: req.query.sortOrder as any || 'desc',
       };
 
-      // Parse array parameters
+      // Parse status as single value (for cascading filter)
       if (req.query.status) {
-        filters.status = Array.isArray(req.query.status)
-          ? req.query.status
-          : [req.query.status];
+        filters.status = req.query.status as string;
       }
       if (req.query.statusDescription) {
         filters.statusDescription = req.query.statusDescription as string;

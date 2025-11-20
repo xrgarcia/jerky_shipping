@@ -374,7 +374,7 @@ export default function Shipments() {
 
   // Filter states
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string[]>([]);
+  const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
@@ -401,7 +401,7 @@ export default function Shipments() {
     
     // Always reset to defaults, then apply URL params
     setSearch(params.get('search') || '');
-    setStatus(params.getAll('status'));
+    setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
@@ -415,7 +415,7 @@ export default function Shipments() {
     
     // Open filters if any are active
     const hasActiveFilters = params.get('search') || 
-      params.getAll('status').length ||
+      params.get('status') ||
       params.get('statusDescription') ||
       params.getAll('carrierCode').length ||
       params.get('dateFrom') ||
@@ -438,7 +438,7 @@ export default function Shipments() {
     const params = new URLSearchParams();
     
     if (search) params.set('search', search);
-    status.forEach(s => params.append('status', s));
+    if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
@@ -567,7 +567,7 @@ export default function Shipments() {
     const params = new URLSearchParams();
     
     if (search) params.append('search', search);
-    status.forEach(s => params.append('status', s));
+    if (status) params.append('status', status); // Single status value
     if (statusDescription) params.append('statusDescription', statusDescription);
     carrierCode.forEach(c => params.append('carrierCode', c));
     
@@ -584,15 +584,32 @@ export default function Shipments() {
     return params.toString();
   };
 
-  // Fetch distinct status descriptions for the filter dropdown
+  // Fetch distinct statuses for the status filter dropdown
+  const { data: statusesData } = useQuery<{ statuses: string[] }>({
+    queryKey: ["/api/shipments/statuses"],
+  });
+
+  const statuses = statusesData?.statuses || [];
+
+  // Fetch distinct status descriptions for the sub status filter dropdown (filtered by status if selected)
   const { data: statusDescriptionsData } = useQuery<{ statusDescriptions: string[] }>({
-    queryKey: ["/api/shipments/status-descriptions"],
+    queryKey: ["/api/shipments/status-descriptions", { status }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      const url = `/api/shipments/status-descriptions?${params.toString()}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Failed to fetch status descriptions");
+      }
+      return response.json();
+    },
   });
 
   const statusDescriptions = statusDescriptionsData?.statusDescriptions || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder],
+    queryKey: ["/api/shipments", { search, status, statusDescription, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -622,7 +639,7 @@ export default function Shipments() {
 
   const clearFilters = () => {
     setSearch("");
-    setStatus([]);
+    setStatus("");
     setStatusDescription("");
     setCarrierCode([]);
     setDateFrom("");
@@ -634,7 +651,7 @@ export default function Shipments() {
 
   const activeFiltersCount = [
     search,
-    status.length > 0,
+    status,
     statusDescription,
     carrierCode.length > 0,
     dateFrom,
@@ -759,40 +776,71 @@ export default function Shipments() {
               </div>
 
               <CollapsibleContent className="pt-4 space-y-4">
-                {/* Status and Carrier Filters */}
+                {/* Status Filters */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Shipment Status</label>
-                    <div className="flex flex-wrap gap-2">
-                      {['pending', 'shipped', 'delivered', 'cancelled', 'exception'].map(s => (
-                        <Badge
-                          key={s}
-                          variant={status.includes(s) ? "default" : "outline"}
-                          className="cursor-pointer hover-elevate"
-                          onClick={() => toggleArrayFilter(s, status, setStatus)}
-                          data-testid={`filter-status-${s}`}
-                        >
-                          {s}
-                        </Badge>
-                      ))}
-                    </div>
+                    <label className="text-sm font-semibold">Status</label>
+                    <Select value={status || "all"} onValueChange={(val) => { 
+                      const newStatus = val === "all" ? "" : val;
+                      setStatus(newStatus);
+                      // Clear sub status when status changes to prevent invalid combinations
+                      setStatusDescription("");
+                      setPage(1); 
+                    }}>
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="status-all">All statuses</SelectItem>
+                        {statuses.map((s) => (
+                          <SelectItem key={s} value={s} data-testid={`status-${s}`}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Carrier</label>
-                    <div className="flex flex-wrap gap-2">
-                      {['usps', 'fedex', 'ups', 'dhl'].map(carrier => (
-                        <Badge
-                          key={carrier}
-                          variant={carrierCode.includes(carrier) ? "default" : "outline"}
-                          className="cursor-pointer hover-elevate"
-                          onClick={() => toggleArrayFilter(carrier, carrierCode, setCarrierCode)}
-                          data-testid={`filter-carrier-${carrier}`}
-                        >
-                          {carrier.toUpperCase()}
-                        </Badge>
-                      ))}
-                    </div>
+                    <label className="text-sm font-semibold">Sub Status</label>
+                    <Select 
+                      value={statusDescription || "all"} 
+                      onValueChange={(val) => { 
+                        setStatusDescription(val === "all" ? "" : val); 
+                        setPage(1); 
+                      }}
+                      disabled={!status && statusDescriptions.length === 0}
+                    >
+                      <SelectTrigger data-testid="select-sub-status">
+                        <SelectValue placeholder={status ? "All sub statuses" : "Select a status first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="sub-status-all">All sub statuses</SelectItem>
+                        {statusDescriptions.map((desc) => (
+                          <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
+                            {desc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Carrier Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Carrier</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['usps', 'fedex', 'ups', 'dhl'].map(carrier => (
+                      <Badge
+                        key={carrier}
+                        variant={carrierCode.includes(carrier) ? "default" : "outline"}
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => toggleArrayFilter(carrier, carrierCode, setCarrierCode)}
+                        data-testid={`filter-carrier-${carrier}`}
+                      >
+                        {carrier.toUpperCase()}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
 
@@ -885,24 +933,6 @@ export default function Shipments() {
                   <SelectContent>
                     <SelectItem value="desc" data-testid="sort-order-desc">Newest</SelectItem>
                     <SelectItem value="asc" data-testid="sort-order-asc">Oldest</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Status:</span>
-                <Select value={statusDescription || "all"} onValueChange={(val) => { setStatusDescription(val === "all" ? "" : val); setPage(1); }}>
-                  <SelectTrigger className="w-64" data-testid="select-status-description">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" data-testid="status-desc-all">All statuses</SelectItem>
-                    {statusDescriptions.map((desc) => (
-                      <SelectItem key={desc} value={desc} data-testid={`status-desc-${desc}`}>
-                        {desc}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
