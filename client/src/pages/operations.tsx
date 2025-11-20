@@ -119,6 +119,15 @@ type FailuresResponse = {
   totalPages: number;
 };
 
+type ShopifyWebhook = {
+  id: number;
+  topic: string;
+  address: string;
+  format: string;
+  created_at: string;
+  updated_at: string;
+};
+
 function getQueueHealth(size: number, oldestMessageAt: number | null): "healthy" | "warning" | "critical" {
   if (size === 0) return "healthy";
   
@@ -142,6 +151,7 @@ export default function OperationsPage() {
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
+  const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const { toast } = useToast();
 
   // Initial fetch of queue stats (no polling)
@@ -157,6 +167,11 @@ export default function OperationsPage() {
   // Fetch Shopify credential validation (cached for 10 minutes on backend)
   const { data: shopifyValidation, isLoading: validationLoading } = useQuery<ShopifyValidation>({
     queryKey: ["/api/operations/shopify-validation"],
+  });
+
+  // Fetch Shopify webhooks list
+  const { data: webhooksData, isLoading: webhooksLoading } = useQuery<{ webhooks: ShopifyWebhook[] }>({
+    queryKey: ["/api/operations/shopify-webhooks"],
   });
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
@@ -328,12 +343,35 @@ export default function OperationsPage() {
         description: data.message || `Successfully deleted ${data.deleted} and re-registered ${data.registered} webhook(s)`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-validation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-webhooks"] });
       setShowReregisterDialog(false);
     },
     onError: (error: any) => {
       toast({
         title: "Re-registration Failed",
         description: error.message || "Failed to re-register Shopify webhooks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWebhookMutation = useMutation({
+    mutationFn: async (webhookId: number) => {
+      const response = await apiRequest("DELETE", `/api/operations/shopify-webhooks/${webhookId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Webhook Deleted",
+        description: "Successfully deleted webhook",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-webhooks"] });
+      setWebhookToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete webhook",
         variant: "destructive",
       });
     },
@@ -643,6 +681,69 @@ export default function OperationsPage() {
                 Use this after rotating your Shopify API secret to update webhook signatures
               </p>
             </div>
+
+            {/* Webhooks List Section */}
+            <div className="pt-3 border-t space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Registered Webhooks</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-webhooks"] })}
+                  data-testid="button-refresh-webhooks"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
+              </div>
+              {webhooksLoading ? (
+                <p className="text-sm text-muted-foreground">Loading webhooks...</p>
+              ) : webhooksData?.webhooks && webhooksData.webhooks.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[30%]">Topic</TableHead>
+                          <TableHead className="w-[45%]">Address</TableHead>
+                          <TableHead className="w-[15%]">Created</TableHead>
+                          <TableHead className="w-[10%]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {webhooksData.webhooks.map((webhook) => (
+                          <TableRow key={webhook.id} data-testid={`row-webhook-${webhook.id}`}>
+                            <TableCell className="font-mono text-xs" data-testid={`text-topic-${webhook.id}`}>
+                              {webhook.topic}
+                            </TableCell>
+                            <TableCell className="text-xs truncate max-w-[200px]" title={webhook.address} data-testid={`text-address-${webhook.id}`}>
+                              {webhook.address}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground" data-testid={`text-created-${webhook.id}`}>
+                              {formatDistanceToNow(new Date(webhook.created_at), { addSuffix: true })}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setWebhookToDelete(webhook)}
+                                data-testid={`button-delete-webhook-${webhook.id}`}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Total: {webhooksData.webhooks.length} webhook(s)
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No webhooks registered</p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -823,6 +924,39 @@ export default function OperationsPage() {
               disabled={reregisterWebhooksMutation.isPending}
             >
               {reregisterWebhooksMutation.isPending ? "Re-registering..." : "Re-register Webhooks"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!webhookToDelete} onOpenChange={() => setWebhookToDelete(null)}>
+        <AlertDialogContent data-testid="dialog-delete-webhook-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Webhook</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to delete this webhook?
+              </p>
+              {webhookToDelete && (
+                <div className="rounded-md bg-muted p-3 space-y-1 text-sm font-mono">
+                  <p><strong>Topic:</strong> {webhookToDelete.topic}</p>
+                  <p className="text-xs break-all"><strong>Address:</strong> {webhookToDelete.address}</p>
+                </div>
+              )}
+              <p className="text-sm text-destructive">
+                <strong>Warning:</strong> This action cannot be undone. Shopify will stop sending webhooks for this topic.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-webhook">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-webhook"
+              onClick={() => webhookToDelete && deleteWebhookMutation.mutate(webhookToDelete.id)}
+              disabled={deleteWebhookMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteWebhookMutation.isPending ? "Deleting..." : "Delete Webhook"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
