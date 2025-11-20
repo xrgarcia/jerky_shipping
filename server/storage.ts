@@ -995,6 +995,28 @@ export class DatabaseStorage implements IStorage {
         shipmentData: shipments.shipmentData,
         createdAt: shipments.createdAt,
         updatedAt: shipments.updatedAt,
+        // Customer/shipping fields from shipments table (ShipStation data)
+        orderNumber: shipments.orderNumber,
+        orderDate: shipments.orderDate,
+        shipToName: shipments.shipToName,
+        shipToCompany: shipments.shipToCompany,
+        shipToEmail: shipments.shipToEmail,
+        shipToPhone: shipments.shipToPhone,
+        shipToAddressLine1: shipments.shipToAddressLine1,
+        shipToAddressLine2: shipments.shipToAddressLine2,
+        shipToAddressLine3: shipments.shipToAddressLine3,
+        shipToCity: shipments.shipToCity,
+        shipToState: shipments.shipToState,
+        shipToPostalCode: shipments.shipToPostalCode,
+        shipToCountry: shipments.shipToCountry,
+        totalWeight: shipments.totalWeight,
+        // Special flags
+        isGift: shipments.isGift,
+        isReturn: shipments.isReturn,
+        saturdayDelivery: shipments.saturdayDelivery,
+        containsAlcohol: shipments.containsAlcohol,
+        notesForGift: shipments.notesForGift,
+        notesFromBuyer: shipments.notesFromBuyer,
         // Order fields (will be null if no matching order)
         order: {
           id: orders.id,

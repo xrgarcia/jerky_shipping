@@ -30,14 +30,16 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
   
+  const shipmentIdOrUuid = shipment.shipmentId ?? shipment.id;
+
   const { data: items, isLoading: isLoadingItems } = useQuery<ShipmentItem[]>({
-    queryKey: ['/api/shipments', shipment.id, 'items'],
-    enabled: isExpanded,
+    queryKey: ['/api/shipments', shipmentIdOrUuid, 'items'],
+    enabled: isExpanded && !!shipmentIdOrUuid,
   });
 
   const { data: tags } = useQuery<ShipmentTag[]>({
-    queryKey: ['/api/shipments', shipment.id, 'tags'],
-    enabled: isExpanded,
+    queryKey: ['/api/shipments', shipmentIdOrUuid, 'tags'],
+    enabled: !!shipmentIdOrUuid,
   });
 
   const isOrphanedShipment = (shipment: ShipmentWithOrder) => {
@@ -79,108 +81,118 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
     <Card className="overflow-hidden" data-testid={`card-shipment-${shipment.id}`}>
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 space-y-3">
-            {/* Tracking & Order Info */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <Truck className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-              <CardTitle className="text-2xl font-mono font-bold truncate">
-                {shipment.trackingNumber || "No tracking"}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLocation(`/shipments/${shipment.id}`)}
-                className="ml-auto"
-                data-testid={`button-view-details-${shipment.id}`}
-              >
-                View Details
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-
-            {/* Order Number */}
-            {shipment.orderNumber && (
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <p className="text-lg font-semibold text-foreground">
-                  Order #{shipment.orderNumber}
-                </p>
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* PRIORITY 1: Customer Name - Largest */}
+            {shipment.shipToName && (
+              <div className="flex items-center gap-3">
+                <User className="h-7 w-7 text-muted-foreground flex-shrink-0" />
+                <CardTitle className="text-3xl font-bold">
+                  {shipment.shipToName}
+                </CardTitle>
               </div>
             )}
 
-            {/* Customer Info */}
-            <div className="space-y-1.5 pl-0">
-              {shipment.shipToName && (
+            {/* PRIORITY 2: Order Number & Age - Very Prominent */}
+            <div className="flex flex-wrap items-center gap-4">
+              {shipment.orderNumber && (
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="font-semibold text-foreground">{shipment.shipToName}</p>
+                  <Package className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <p className="text-xl font-bold text-foreground">
+                    #{shipment.orderNumber}
+                  </p>
                 </div>
               )}
               
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pl-6">
-                {shipment.shipToEmail && (
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5" />
-                    <span>{shipment.shipToEmail}</span>
-                  </div>
-                )}
-                {shipment.shipToPhone && (
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" />
-                    <span>{shipment.shipToPhone}</span>
-                  </div>
-                )}
-              </div>
-
-              {(shipment.shipToAddressLine1 || shipment.shipToCity || shipment.shipToState) && (
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <div className="flex flex-col">
-                    {shipment.shipToAddressLine1 && <span>{shipment.shipToAddressLine1}</span>}
-                    {shipment.shipToAddressLine2 && <span>{shipment.shipToAddressLine2}</span>}
-                    <span>
-                      {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode, shipment.shipToCountry]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
-                  </div>
+              {shipment.orderDate && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <p className="text-xl font-semibold">
+                    {formatRelativeTime(shipment.orderDate)}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Order Date & Age */}
-            {shipment.orderDate && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground pl-0">
-                <Clock className="h-4 w-4 flex-shrink-0" />
-                <span>
-                  Created: {new Date(shipment.orderDate).toLocaleString()}
-                </span>
-                <span className="text-xs">
-                  ({formatRelativeTime(shipment.orderDate)})
-                </span>
+            {/* Address */}
+            {(shipment.shipToAddressLine1 || shipment.shipToCity || shipment.shipToState) && (
+              <div className="flex items-start gap-2 text-base">
+                <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
+                <div className="flex flex-col">
+                  {shipment.shipToAddressLine1 && <span>{shipment.shipToAddressLine1}</span>}
+                  {shipment.shipToAddressLine2 && <span>{shipment.shipToAddressLine2}</span>}
+                  <span>
+                    {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </span>
+                </div>
               </div>
             )}
 
-            {/* Carrier & Service */}
-            <div className="flex flex-wrap items-center gap-3 text-sm">
+            {/* Contact Info */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {shipment.shipToEmail && (
+                <div className="flex items-center gap-1.5">
+                  <Mail className="h-4 w-4" />
+                  <span>{shipment.shipToEmail}</span>
+                </div>
+              )}
+              {shipment.shipToPhone && (
+                <div className="flex items-center gap-1.5">
+                  <Phone className="h-4 w-4" />
+                  <span>{shipment.shipToPhone}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Supporting Info: Tracking, Carrier, Weight - Smaller */}
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              {shipment.trackingNumber && (
+                <div className="flex items-center gap-1.5">
+                  <Truck className="h-4 w-4" />
+                  <span className="font-mono">{shipment.trackingNumber}</span>
+                </div>
+              )}
               {shipment.carrierCode && (
-                <Badge variant="outline" className="font-semibold uppercase">
+                <Badge variant="outline" className="text-xs uppercase">
                   {shipment.carrierCode}
                 </Badge>
               )}
               {shipment.serviceCode && (
-                <span className="text-muted-foreground">{shipment.serviceCode}</span>
+                <span className="text-xs">{shipment.serviceCode}</span>
               )}
               {shipment.totalWeight && (
-                <span className="text-muted-foreground">Weight: {shipment.totalWeight}</span>
+                <span className="text-xs">Weight: {shipment.totalWeight}</span>
               )}
             </div>
           </div>
 
-          {/* Status & Badges */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Status, Special Flags, Tags & Actions */}
+          <div className="flex flex-col items-end gap-3 flex-shrink-0 min-w-[200px]">
+            {/* View Details Button */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setLocation(`/shipments/${shipment.shipmentId ?? shipment.id}`)}
+              className="w-full"
+              data-testid={`button-view-details-${shipment.shipmentId ?? shipment.id}`}
+            >
+              View Details
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+
+            {/* Status Badge & Description */}
+            <div className="w-full space-y-2">
               {getStatusBadge(shipment.status)}
+              {shipment.statusDescription && (
+                <p className="text-xs text-muted-foreground text-right">
+                  {shipment.statusDescription}
+                </p>
+              )}
+            </div>
+
+            {/* Special Flags & Tags */}
+            <div className="flex flex-wrap items-center justify-end gap-2 w-full">
               {isOrphanedShipment(shipment) && (
                 <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400">
                   Orphaned
@@ -206,13 +218,14 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
                   Alcohol
                 </Badge>
               )}
+              
+              {/* Tags (visible on main card, not hidden in collapsible) */}
+              {tags && tags.length > 0 && tags.map((tag, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {tag.name}
+                </Badge>
+              ))}
             </div>
-            {/* Status Description */}
-            {shipment.statusDescription && (
-              <p className="text-xs text-muted-foreground text-right max-w-[200px]">
-                {shipment.statusDescription}
-              </p>
-            )}
           </div>
         </div>
       </CardHeader>
@@ -243,17 +256,6 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
               </div>
             ) : items && items.length > 0 ? (
               <div className="space-y-4">
-                {/* Tags Section */}
-                {tags && tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pb-2 border-b">
-                    {tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {tag.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                
                 {/* Gift Message and Buyer Notes */}
                 {(shipment.notesForGift || shipment.notesFromBuyer) && (
                   <div className="space-y-3 pb-4 border-b">

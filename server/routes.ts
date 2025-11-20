@@ -791,6 +791,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single shipment by ID (tries shipmentId first, then database UUID)
+  app.get("/api/shipments/:id", requireAuth, async (req, res) => {
+    try {
+      const idParam = req.params.id;
+      let shipment = null;
+
+      // Try lookup by ShipStation shipmentId first (e.g., "se-123456")
+      shipment = await storage.getShipmentByShipmentId(idParam);
+
+      // Fall back to database UUID if not found by shipmentId
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+
+      // Get order if linked
+      let order = null;
+      if (shipment.orderId) {
+        order = await storage.getOrder(shipment.orderId);
+      }
+
+      res.json({ ...shipment, order });
+    } catch (error) {
+      console.error("Error fetching shipment:", error);
+      res.status(500).json({ error: "Failed to fetch shipment" });
+    }
+  });
+
   // Get all products with variants
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
@@ -1019,10 +1050,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get shipment items for a specific shipment
+  // Get shipment items for a specific shipment (accepts shipmentId or UUID)
   app.get("/api/shipments/:shipmentId/items", requireAuth, async (req, res) => {
     try {
-      const items = await storage.getShipmentItems(req.params.shipmentId);
+      const idParam = req.params.shipmentId;
+      
+      // Try lookup by ShipStation shipmentId first
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      
+      // Fall back to database UUID
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Fetch items using the database ID
+      const items = await storage.getShipmentItems(shipment.id);
       res.json(items);
     } catch (error: any) {
       console.error(`Error fetching shipment items for ${req.params.shipmentId}:`, error);
@@ -1030,10 +1076,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get shipment tags for a specific shipment
+  // Get shipment tags for a specific shipment (accepts shipmentId or UUID)
   app.get("/api/shipments/:shipmentId/tags", requireAuth, async (req, res) => {
     try {
-      const tags = await storage.getShipmentTags(req.params.shipmentId);
+      const idParam = req.params.shipmentId;
+      
+      // Try lookup by ShipStation shipmentId first
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      
+      // Fall back to database UUID
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Fetch tags using the database ID
+      const tags = await storage.getShipmentTags(shipment.id);
       res.json(tags);
     } catch (error: any) {
       console.error(`Error fetching shipment tags for ${req.params.shipmentId}:`, error);
