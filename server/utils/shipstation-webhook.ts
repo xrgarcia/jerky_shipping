@@ -166,6 +166,9 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
 
   const baseUrl = normalizeWebhookUrl(webhookBaseUrl);
   const webhookUrl = `${baseUrl}/api/webhooks/shipstation/shipments`;
+  
+  // Determine environment for labeling webhooks
+  const envLabel = process.env.REPLIT_DEPLOYMENT === '1' ? 'PROD' : 'DEV';
 
   // All shipment events warehouse needs to track
   // ShipStation V2 API only supports these event types (created/updated/canceled don't exist in V2)
@@ -191,11 +194,50 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
     }
 
     const webhooks = await listResponse.json();
+    
+    // CLEANUP: Delete orphaned webhooks from other environments
+    // Since ShipStation uses same API key for all environments, we identify by name label + URL
+    const orphanedWebhooks = webhooks?.filter((webhook: any) => {
+      // Check if webhook name contains an environment label
+      const nameMatch = webhook.name?.match(/\[([A-Z]+)\]/);
+      const webhookEnv = nameMatch ? nameMatch[1] : null;
+      
+      // Also check if URL matches our base URL
+      try {
+        const webhookUrlObj = new URL(webhook.url);
+        const currentUrlObj = new URL(baseUrl);
+        const urlMatches = webhookUrlObj.host === currentUrlObj.host;
+        
+        // Webhook is orphaned if:
+        // 1. It has an environment label AND it's different from ours, OR
+        // 2. It points to a different URL host
+        return (webhookEnv && webhookEnv !== envLabel) || !urlMatches;
+      } catch (error: any) {
+        console.warn(`Skipping webhook with malformed URL: ${webhook.url} (${error.message})`);
+        return false;
+      }
+    }) || [];
+    
+    if (orphanedWebhooks.length > 0) {
+      console.log(`🧹 Cleaning up ${orphanedWebhooks.length} orphaned ShipStation webhook(s) from other environments:`);
+      for (const orphaned of orphanedWebhooks) {
+        try {
+          console.log(`   Deleting: ${orphaned.name} -> ${orphaned.url} (ID: ${orphaned.webhook_id})`);
+          await deleteShipStationWebhook(apiKey, orphaned.webhook_id);
+          console.log(`   ✓ Deleted orphaned webhook ${orphaned.webhook_id}`);
+        } catch (error: any) {
+          console.error(`   ✗ Failed to delete orphaned webhook ${orphaned.webhook_id}:`, error.message);
+          // Continue with other deletions even if one fails
+        }
+      }
+    }
 
     // Register each event type
     for (const event of events) {
+      const webhookName = `[${envLabel}] Warehouse Fulfillment - ${event}`;
+      
       const existingWebhook = webhooks?.find((w: any) => 
-        w.url === webhookUrl && w.event === event
+        w.url === webhookUrl && w.event === event && w.name === webhookName
       );
 
       if (existingWebhook) {
@@ -203,7 +245,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
         continue;
       }
 
-      // Register new webhook for this event
+      // Register new webhook for this event with environment label
       const registerResponse = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
         method: 'POST',
         headers: {
@@ -211,7 +253,7 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: `Warehouse Fulfillment - ${event}`,
+          name: webhookName,
           event: event,
           url: webhookUrl,
           store_id: null, // null means all stores
@@ -229,5 +271,42 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
   } catch (error) {
     console.error('Error managing ShipStation webhooks:', error);
     throw error;
+  }
+}
+
+/**
+ * List all ShipStation webhooks
+ */
+export async function listShipStationWebhooks(apiKey: string): Promise<any[]> {
+  const response = await fetch('https://api.shipstation.com/v2/environment/webhooks', {
+    method: 'GET',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list ShipStation webhooks: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Delete a ShipStation webhook by ID
+ */
+export async function deleteShipStationWebhook(apiKey: string, webhookId: string): Promise<void> {
+  const response = await fetch(`https://api.shipstation.com/v2/environment/webhooks/${webhookId}`, {
+    method: 'DELETE',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete ShipStation webhook ${webhookId}: ${response.statusText} - ${errorText}`);
   }
 }
