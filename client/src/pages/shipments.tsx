@@ -776,56 +776,6 @@ export default function Shipments() {
               </div>
 
               <CollapsibleContent className="pt-4 space-y-4">
-                {/* Status Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Status</label>
-                    <Select value={status || "all"} onValueChange={(val) => { 
-                      const newStatus = val === "all" ? "" : val;
-                      setStatus(newStatus);
-                      // Clear sub status when status changes to prevent invalid combinations
-                      setStatusDescription("");
-                      setPage(1); 
-                    }}>
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" data-testid="status-all">All statuses</SelectItem>
-                        {statuses.map((s) => (
-                          <SelectItem key={s} value={s} data-testid={`status-${s}`}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Sub Status</label>
-                    <Select 
-                      value={statusDescription || "all"} 
-                      onValueChange={(val) => { 
-                        setStatusDescription(val === "all" ? "" : val); 
-                        setPage(1); 
-                      }}
-                      disabled={!status && statusDescriptions.length === 0}
-                    >
-                      <SelectTrigger data-testid="select-sub-status">
-                        <SelectValue placeholder={status ? "All sub statuses" : "Select a status first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" data-testid="sub-status-all">All sub statuses</SelectItem>
-                        {statusDescriptions.map((desc) => (
-                          <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
-                            {desc}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 {/* Carrier Filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Carrier</label>
@@ -909,8 +859,53 @@ export default function Shipments() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Sort and Page Size */}
+            {/* Status Filters, Sort, and Page Size */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
+              {/* Status Filters */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Status:</span>
+                <Select value={status || "all"} onValueChange={(val) => { 
+                  const newStatus = val === "all" ? "" : val;
+                  setStatus(newStatus);
+                  // Clear sub status when status changes to prevent invalid combinations
+                  setStatusDescription("");
+                  setPage(1); 
+                }}>
+                  <SelectTrigger className="w-40" data-testid="select-status">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="status-all">All statuses</SelectItem>
+                    {statuses.map((s) => (
+                      <SelectItem key={s} value={s} data-testid={`status-${s}`}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select 
+                  value={statusDescription || "all"} 
+                  onValueChange={(val) => { 
+                    setStatusDescription(val === "all" ? "" : val); 
+                    setPage(1); 
+                  }}
+                  disabled={!status && statusDescriptions.length === 0}
+                >
+                  <SelectTrigger className="w-48" data-testid="select-sub-status">
+                    <SelectValue placeholder={status ? "All sub statuses" : "Select a status first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="sub-status-all">All sub statuses</SelectItem>
+                    {statusDescriptions.map((desc) => (
+                      <SelectItem key={desc} value={desc} data-testid={`sub-status-${desc}`}>
+                        {desc}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sort Options */}
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Sort by:</span>
