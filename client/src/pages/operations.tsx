@@ -141,6 +141,7 @@ export default function OperationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
+  const [showReregisterDialog, setShowReregisterDialog] = useState(false);
   const { toast } = useToast();
 
   // Initial fetch of queue stats (no polling)
@@ -311,6 +312,28 @@ export default function OperationsPage() {
       toast({
         title: "Clear Failed",
         description: "Failed to clear failures table",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reregisterWebhooksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/operations/reregister-shopify-webhooks");
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Webhooks Re-registered",
+        description: data.message || `Successfully deleted ${data.deleted} and re-registered ${data.registered} webhook(s)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-validation"] });
+      setShowReregisterDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Re-registration Failed",
+        description: error.message || "Failed to re-register Shopify webhooks",
         variant: "destructive",
       });
     },
@@ -605,6 +628,21 @@ export default function OperationsPage() {
                 )}
               </div>
             )}
+            <div className="pt-3 border-t">
+              <Button
+                onClick={() => setShowReregisterDialog(true)}
+                variant="outline"
+                size="sm"
+                className="w-full"
+                data-testid="button-reregister-webhooks"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Re-register Webhooks
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use this after rotating your Shopify API secret to update webhook signatures
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -750,6 +788,30 @@ export default function OperationsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showReregisterDialog} onOpenChange={setShowReregisterDialog}>
+        <AlertDialogContent data-testid="dialog-reregister-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-register Shopify Webhooks</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete ALL existing Shopify webhooks and re-register them with the current API secret.
+              Use this after rotating your SHOPIFY_API_SECRET to update webhook signatures.
+              <br /><br />
+              <strong>Warning:</strong> Webhooks will be temporarily unavailable during this process.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-reregister">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-reregister"
+              onClick={() => reregisterWebhooksMutation.mutate()}
+              disabled={reregisterWebhooksMutation.isPending}
+            >
+              {reregisterWebhooksMutation.isPending ? "Re-registering..." : "Re-register Webhooks"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
