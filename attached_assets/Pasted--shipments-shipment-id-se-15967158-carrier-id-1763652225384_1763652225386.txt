@@ -1,0 +1,4610 @@
+{
+    "shipments": [
+        {
+            "shipment_id": "se-15967158",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "2003682426968",
+            "shipment_number": "JK382526394",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:25.13Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Andrew Scoular",
+                "phone": "3212871955",
+                "email": "drewscoul@yahoo.com",
+                "company_name": null,
+                "address_line1": "400 E COLONIAL DR APT 1206",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "ORLANDO",
+                "state_province": "FL",
+                "postal_code": "32803-4513",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 5.99
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Chipotle Bourbon - 3 oz.",
+                    "sku": "JCB-BEJ-30-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4412982722648",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113108",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-chipotle-bourbon-13301536227416.jpg?v=1572020874",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 5.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2382105"
+                        }
+                    ],
+                    "product_id": "3604189",
+                    "fullfilment_sku": null,
+                    "upc": "811007022052"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 5.99
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967189",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "2001945788504",
+            "shipment_number": "JK382526370",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:39.207Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "David Cherry",
+                "phone": "+12143560364",
+                "email": "dj@petroveninc.com",
+                "company_name": "",
+                "address_line1": "4905 ELLENSBURG DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "DALLAS",
+                "state_province": "TX",
+                "postal_code": "75244-7625",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 36.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 93.94
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 36.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Chicken Jerky - Buffalo Wing / 12 Pack- (Max Savings!)",
+                    "sku": "JCB-CHJ-31-2-X12",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4409983664216",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113174",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-chicken-jerky-30448323087.jpg?v=1568049226",
+                    "weight": {
+                        "value": 36.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 88.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604294",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 93.94
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967192",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "2001792696408",
+            "shipment_number": "JK382526367",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:40.137Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Rebecca Call",
+                "phone": "6206150922",
+                "email": "beccamahoney0@gmail.com",
+                "company_name": null,
+                "address_line1": "201 E 7TH AVE",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "HUTCHINSON",
+                "state_province": "KS",
+                "postal_code": "67501-6256",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 4.95
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 3 oz.",
+                    "sku": "JCB-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4409712705624",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113177",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-original-12461797245016.jpg?v=1568048251",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2377463"
+                        }
+                    ],
+                    "product_id": "3604167",
+                    "fullfilment_sku": null,
+                    "upc": "811007020966"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967194",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Value",
+            "external_shipment_id": "2001788043352",
+            "shipment_number": "JK382526365",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:41.223Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Carla Newberry",
+                "phone": "4075951961",
+                "email": "B1BB2442AE974E2F995239FB1DD5DDB5@relay.walmart.com",
+                "company_name": null,
+                "address_line1": "1027 SPRING LOOP WAY",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "WINTER GARDEN",
+                "state_province": "FL",
+                "postal_code": "34787-2162",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 13.99
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 2.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Alligator Jerky - Original / 2 oz.",
+                    "sku": "JCB-ALJ-1-1",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4409704874072",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113180",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-alligator-jerky-29290027535.jpg?v=1570474413",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 13.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604132",
+                    "fullfilment_sku": null,
+                    "upc": "00811007020621"
+                }
+            ],
+            "notes_from_buyer": "Walmart Marketplace-Integration<br/>Order Source: Walmart Marketplace - Integration App<br/>Walmart Purchase Order Id: 2793650686322<br/>Walmart Customer Order Id: 6351943202089",
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 13.99
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967199",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "2001508466776",
+            "shipment_number": "JK382526360",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:44.187Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Brad Bair",
+                "phone": "2172424450",
+                "email": "bbair10@gmail.com",
+                "company_name": null,
+                "address_line1": "462 W WASHINGTON ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "MENDON",
+                "state_province": "IL",
+                "postal_code": "62351-1309",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 4.95
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 3 oz.",
+                    "sku": "JCB-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4409213386840",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113189",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-original-12461797245016.jpg?v=1568048251",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2376504"
+                        }
+                    ],
+                    "product_id": "3604167",
+                    "fullfilment_sku": null,
+                    "upc": "811007020966"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967203",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "2001400954968",
+            "shipment_number": "JK382526357",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:45.553Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Loretta dowell",
+                "phone": "3049940119",
+                "email": "dowellloretta@yahoo.com",
+                "company_name": null,
+                "address_line1": "125 ALLEN ST APT 11",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "NARROWS",
+                "state_province": "VA",
+                "postal_code": "24124-1100",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 4.95
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 3 oz.",
+                    "sku": "JCB-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4409022808152",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113195",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-original-12461797245016.jpg?v=1568048251",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2376165"
+                        }
+                    ],
+                    "product_id": "3604167",
+                    "fullfilment_sku": null,
+                    "upc": "811007020966"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967208",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "2001071439960",
+            "shipment_number": "JK382526353",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:47.827Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Patricia Gerber",
+                "phone": "3015731056",
+                "email": "patriciagerber15@gmail.com",
+                "company_name": null,
+                "address_line1": "16622 NATIONAL PIKE",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "HAGERSTOWN",
+                "state_province": "MD",
+                "postal_code": "21740-2157",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 5.99
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Chipotle Bourbon - 3 oz.",
+                    "sku": "JCB-BEJ-30-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4408472862808",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113211",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-chipotle-bourbon-13301536227416.jpg?v=1572020874",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 5.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2375316"
+                        }
+                    ],
+                    "product_id": "3604189",
+                    "fullfilment_sku": null,
+                    "upc": "811007022052"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 5.99
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967221",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "2000035151960",
+            "shipment_number": "JK382526342",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:52.923Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Greg Sayce",
+                "phone": "(774) 766-8745",
+                "email": "gsayce89@gmail.com",
+                "company_name": "",
+                "address_line1": "248 THOMPSON ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "MIDDLEBORO",
+                "state_province": "MA",
+                "postal_code": "02346-1612",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 33.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 50.91
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 33.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Carolina Reaper - 3 oz.",
+                    "sku": "JCB-BEJ-50-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406806085720",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113240",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-carolina-reaper-13344590102616.png?v=1572368553",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604212",
+                    "fullfilment_sku": null,
+                    "upc": "811007022328"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Flavored Pretzels - Chili Inferno / Quadruple the Snacks - 4 Packs - (More Savings!)",
+                    "sku": "BTR-FPC-8-X4",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406806118488",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113241",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/flavored-pretzels-29290423951.jpg?v=1568059507",
+                    "weight": {
+                        "value": 24.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 17.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604091",
+                    "fullfilment_sku": null,
+                    "upc": null
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Cajun Boil - 3 oz.",
+                    "sku": "JCB-BEJ-44-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406806151256",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113242",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-cajun-boil-6847620677720.jpg?v=1568049451",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604205",
+                    "fullfilment_sku": null,
+                    "upc": "811007022113"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Old Fashioned Style Beef Jerky - Peppered / 3 oz.",
+                    "sku": "OKJ-BEJ-3-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406806184024",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113243",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/old-fashioned-style-beef-jerky-30261011599.jpg?v=1568058152",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604506",
+                    "fullfilment_sku": null,
+                    "upc": "811007022229"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 50.91
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967226",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "1999846244440",
+            "shipment_number": "JK382526340",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:53.733Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Scott Barger",
+                "phone": "5133480733",
+                "email": "sbarger1075@gmail.com",
+                "company_name": null,
+                "address_line1": "401 HYDE PARK DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "HAMILTON",
+                "state_province": "OH",
+                "postal_code": "45013-3464",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 4.95
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 3 oz.",
+                    "sku": "JCB-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406469558360",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113250",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-original-12461797245016.jpg?v=1568048251",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2372421"
+                        }
+                    ],
+                    "product_id": "3604167",
+                    "fullfilment_sku": null,
+                    "upc": "811007020966"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967232",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": null,
+            "external_shipment_id": "1999671525464",
+            "shipment_number": "JK382526337",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:54.437Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Margaret Forari",
+                "phone": "4058226930",
+                "email": "magz4re@yahoo.com",
+                "company_name": null,
+                "address_line1": "4245 NW 17TH ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "OKLAHOMA CITY",
+                "state_province": "OK",
+                "postal_code": "73107-3617",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 4.95
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 3.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 3 oz.",
+                    "sku": "JCB-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4406169632856",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113257",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-original-12461797245016.jpg?v=1568048251",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "at_order_id",
+                            "value": "2371920"
+                        }
+                    ],
+                    "product_id": "3604167",
+                    "fullfilment_sku": null,
+                    "upc": "811007020966"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967237",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1999426551896",
+            "shipment_number": "JK382526332",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:56.6Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "STEVE JAQUES",
+                "phone": "9186306654",
+                "email": "jakeman0609@gmail.com",
+                "company_name": null,
+                "address_line1": "9625 E 107TH ST S",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "TULSA",
+                "state_province": "OK",
+                "postal_code": "74133-6388",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 41.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 114.51
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 41.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Sweet & Spicy - 3 oz.",
+                    "sku": "JCB-BEJ-4-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405734178904",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113267",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-sweet-spicy-29290154511.jpg?v=1536860237",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604203",
+                    "fullfilment_sku": null,
+                    "upc": "00811007020881"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Black Pepper - 1 Pound Bag - Double the Meat - 2 Packs - (Savings!)",
+                    "sku": "JCB-BEJ-3-11-X2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405734211672",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113268",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-black-pepper-1-pound-bag-166173802511.jpg?v=1572010373",
+                    "weight": {
+                        "value": 32.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 76.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604197",
+                    "fullfilment_sku": null,
+                    "upc": null
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Hot - 3 oz.",
+                    "sku": "JCB-BEJ-5-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405734244440",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113269",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-hot-30260422799.jpg?v=1536859984",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604220",
+                    "fullfilment_sku": null,
+                    "upc": "00811007020935"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Blackened Cajun - 3 oz.",
+                    "sku": "JCB-BEJ-74-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405734277208",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113270",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-blackened-cajun-12432360996952.png?v=1572020630",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604228",
+                    "fullfilment_sku": null,
+                    "upc": "811007023165"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 114.51
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 8.60
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967238",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1999364784216",
+            "shipment_number": "JK382526331",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:56.863Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Joseph L Porter",
+                "phone": "+17062175425",
+                "email": "jporter7754@charter.net",
+                "company_name": "",
+                "address_line1": "1035 MARIA DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "DALTON",
+                "state_province": "GA",
+                "postal_code": "30721-6484",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 48.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 224.93
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 48.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 2,
+                    "name": "All-Natural Elk Jerky - Hot - 12 Pack - (Max Savings!)",
+                    "sku": "JCB-ELJ-5-1-X12",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405619523672",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113271",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-elk-jerky-hot-30448521999.jpg?v=1536860776",
+                    "weight": {
+                        "value": 24.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 109.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604361",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 224.93
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967242",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1999223226456",
+            "shipment_number": "JK382526328",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:11:57.633Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Kathy Filardo",
+                "phone": "(732) 779-8008",
+                "email": "snapegirl51@gmail.com",
+                "company_name": "",
+                "address_line1": "4 CAMPANIA CT",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "MANCHESTER TOWNSHIP",
+                "state_province": "NJ",
+                "postal_code": "08759-8119",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 9.99
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 2.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Buffalo Jerky - Teriyaki / 2 oz.",
+                    "sku": "JCB-BUJ-2-1",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4405364752472",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113277",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-buffalo-jerky-30394701519.jpg?v=1568049271",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604280",
+                    "fullfilment_sku": null,
+                    "upc": "00811007021710"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Coupon:  FS7BDC4A74",
+                    "sku": "",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "discount",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113278",
+                    "allocation_status": null,
+                    "image_url": "http://images.shipstation.com/resource/1.gif",
+                    "weight": {
+                        "value": 0.0,
+                        "unit": "ounce"
+                    },
+                    "unit_price": -4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": null,
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 9.99
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967249",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998975369304",
+            "shipment_number": "JK382526323",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:00.703Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "LuAnne MIlford",
+                "phone": "+17316097273",
+                "email": "lmilford31@yahoo.com",
+                "company_name": "",
+                "address_line1": "145 FAWN DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "MIDDLETON",
+                "state_province": "TN",
+                "postal_code": "38052-4470",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 15.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 39.90
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 15.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Au Jus - 3 oz.",
+                    "sku": "JCB-BEJ-64-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404922712152",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113290",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-au-jus-87517691919.jpg?v=1568060611",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604223",
+                    "fullfilment_sku": null,
+                    "upc": "811007022601"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Soft and Tender Style Beef Jerky - Tequila Lime - 3 oz.",
+                    "sku": "BTJ-BEJ-68-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404922744920",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113291",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/soft-and-tender-style-beef-jerky-tequila-lime-3516254060612.jpg?v=1568052241",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604072",
+                    "fullfilment_sku": null,
+                    "upc": "811007022762"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Hickory - 3 oz.",
+                    "sku": "JCB-BEJ-20-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404922777688",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113292",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-hickory-30178440527.jpg?v=1536859887",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604173",
+                    "fullfilment_sku": null,
+                    "upc": "00811007021642"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Soft and Tender Style Beef Jerky - Original - 3 oz.",
+                    "sku": "BTJ-BEJ-1-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404922810456",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113293",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/soft-and-tender-style-beef-jerky-original-30179224655.jpg?v=1536863365",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604042",
+                    "fullfilment_sku": null,
+                    "upc": "00811007020270"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Soft and Tender Style Beef Jerky - Mesquite BBQ - 3 oz.",
+                    "sku": "BTJ-BEJ-39-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404922843224",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113294",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/soft-and-tender-style-beef-jerky-mesquite-bbq-12432599220312.jpg?v=1568048332",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604064",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Coupon:  JOMJ ZWK2 JCCC VC23",
+                    "sku": "",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "discount",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113295",
+                    "allocation_status": null,
+                    "image_url": "http://images.shipstation.com/resource/1.gif",
+                    "weight": {
+                        "value": 0.0,
+                        "unit": "ounce"
+                    },
+                    "unit_price": -5.00,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": null,
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 39.90
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967254",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998808481880",
+            "shipment_number": "JK382526320",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:02.17Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Jamie Land",
+                "phone": "7062245625",
+                "email": "JAMIE.S.LAND25@GMAIL.COM",
+                "company_name": "",
+                "address_line1": "1141 DEER TRL",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "BISHOP",
+                "state_province": "GA",
+                "postal_code": "30621-6114",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 6.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 22.94
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 6.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Bison Jerky Strips - 6 Sticks",
+                    "sku": "JCB-EXJS-BIS-X6",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404631011416",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113299",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/bison-jerky-strips-13368054251608.jpg?v=1572559188",
+                    "weight": {
+                        "value": 6.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 17.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604376",
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 22.94
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967255",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998797242456",
+            "shipment_number": "JK382526319",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:02.483Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Anna Rocca",
+                "phone": "(419) 233-0261",
+                "email": "teresaanna2012@hotmail.com",
+                "company_name": "",
+                "address_line1": "2103 W ELM ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "LIMA",
+                "state_province": "OH",
+                "postal_code": "45805-2655",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 46.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 126.48
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 46.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Alligator Jerky - Cajun / 2 oz.",
+                    "sku": "JCB-ALJ-28-1",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404611383384",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113300",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-alligator-jerky-29290027599.jpg?v=1570474413",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 13.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604137",
+                    "fullfilment_sku": null,
+                    "upc": "00811007022076"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Combo Packs - Exotic Jerky Combo / 1 Pack",
+                    "sku": "JCB-CMB-EXJC",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404611416152",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113301",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/combo-packs-29290924175.jpg?v=1568062787",
+                    "weight": {
+                        "value": 8.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 39.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604315",
+                    "fullfilment_sku": null,
+                    "upc": null
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Teriyaki / 12 Pack - (Max Savings!)",
+                    "sku": "JCB-BEJ-2-2-X12",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404611448920",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113302",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-30447271247.jpg?v=1568049288",
+                    "weight": {
+                        "value": 36.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 88.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604177",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Coupon:  15OFF",
+                    "sku": "",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "discount",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113303",
+                    "allocation_status": null,
+                    "image_url": "http://images.shipstation.com/resource/1.gif",
+                    "weight": {
+                        "value": 0.0,
+                        "unit": "ounce"
+                    },
+                    "unit_price": -21.44,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": null,
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 126.48
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967257",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998664826968",
+            "shipment_number": "JK382526318",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:02.84Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Jeff Wozencraft",
+                "phone": "9803488300",
+                "email": "jeffwozie@gmail.com",
+                "company_name": "",
+                "address_line1": "5300 PASEO BLVD APT 410",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "DORAL",
+                "state_province": "FL",
+                "postal_code": "33166-5347",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 39.91
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 12.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 4,
+                    "name": "Old Fashioned Style Beef Jerky - Hot - 3 oz.",
+                    "sku": "OKJ-BEJ-5-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4404381155416",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113305",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/old-fashioned-style-beef-jerky-hot-30260966735.jpg?v=1568057387",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604513",
+                    "fullfilment_sku": null,
+                    "upc": "811007021673"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Coupon:  JOM2 XXWN TWR2 1Z9K",
+                    "sku": "",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "discount",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113306",
+                    "allocation_status": null,
+                    "image_url": "http://images.shipstation.com/resource/1.gif",
+                    "weight": {
+                        "value": 0.0,
+                        "unit": "ounce"
+                    },
+                    "unit_price": -5.00,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": null,
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 39.91
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967259",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998368931928",
+            "shipment_number": "JK382526316",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:03.487Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "dustin kuehner",
+                "phone": "6086173081",
+                "email": "dustincake@gmail.com",
+                "company_name": "",
+                "address_line1": "N6448 ABRAHAM RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "PARDEEVILLE",
+                "state_province": "WI",
+                "postal_code": "53954-9508",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 6.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 24.93
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 6.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 2,
+                    "name": "Old Fashioned Style Beef Jerky - Hickory / 3 oz.",
+                    "sku": "OKJ-BEJ-20-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4403891601496",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113308",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/old-fashioned-style-beef-jerky-30260875919.jpg?v=1568058152",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604498",
+                    "fullfilment_sku": null,
+                    "upc": "811007021666"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 24.93
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967263",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998265122904",
+            "shipment_number": "JK382526314",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:04.23Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Tim Snider",
+                "phone": "7753154809",
+                "email": "clarissajbonde@gmail.com",
+                "company_name": null,
+                "address_line1": "5460 DESERT LN",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "STAGECOACH",
+                "state_province": "NV",
+                "postal_code": "89429-9273",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 14.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 37.94
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 14.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Ultimate Jerky Subscription Box - Variety of Flavors / Regular - 3 bags",
+                    "sku": "JCB-UJSB-REG",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4403729989720",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113312",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/ultimate-jerky-subscription-box-3814157189208.jpg?v=1568061726",
+                    "weight": {
+                        "value": 14.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 32.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "Recurring Order",
+                            "value": "Every 1 Month(s)"
+                        }
+                    ],
+                    "product_id": "3604474",
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": "** Recurring Order **<br/>Gift From: <br/>Gift Message: <br/>Delivery date: December 11th, 2019",
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 37.94
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967265",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1998264860760",
+            "shipment_number": "JK382526313",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:04.49Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Bob Nichols",
+                "phone": null,
+                "email": "bobems1215@gmail.com",
+                "company_name": null,
+                "address_line1": "650 TOFTREES AVE APT 108",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "STATE COLLEGE",
+                "state_province": "PA",
+                "postal_code": "16803-1977",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 14.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 37.94
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 14.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Ultimate Jerky Subscription Box - Variety of Flavors / Regular - 3 bags",
+                    "sku": "JCB-UJSB-REG",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4403729694808",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113314",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/ultimate-jerky-subscription-box-3814157189208.jpg?v=1568061726",
+                    "weight": {
+                        "value": 14.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 32.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [
+                        {
+                            "name": "Recurring Order",
+                            "value": "Every 1 Month(s)"
+                        }
+                    ],
+                    "product_id": "3604474",
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": "** Recurring Order **<br/>Delivery date: December 9th, 2019<br/>Gift From: <br/>Gift Message: ",
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 37.94
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967266",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Standard - 2 to 3 Business Days",
+            "external_shipment_id": "1998026309720",
+            "shipment_number": "JK382526312",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:04.757Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Sean Conover",
+                "phone": "+14074851295",
+                "email": "conover.sean.patrick@gmail.com",
+                "company_name": "",
+                "address_line1": "1414 ROBIN CT",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "LONGWOOD",
+                "state_province": "FL",
+                "postal_code": "32750-3130",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 39.85
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 12.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original / Quadruple the Meat - 4 Packs - (More Savings!)",
+                    "sku": "JCB-BEJ-1-2-X4",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4403342639192",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113315",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-30446899791.jpg?v=1568049288",
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 29.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604169",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 39.85
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 9.86
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967267",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1997765148760",
+            "shipment_number": "JK382526311",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:05.03Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Abby Creager",
+                "phone": "+1 330-204-7845",
+                "email": "creagerabby@gmail.com",
+                "company_name": null,
+                "address_line1": "76565 ZION RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "KIMBOLTON",
+                "state_province": "OH",
+                "postal_code": "43749-9560",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 42.94
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 12.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Carolina Reaper - Quadruple the Meat - 4 Packs - (More Savings!)",
+                    "sku": "JCB-BEJ-50-2-X4",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402890932312",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113316",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-carolina-reaper-30447520335.jpg?v=1572368553",
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 37.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604215",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 42.94
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967270",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Standard - 2 to 3 Business Days",
+            "external_shipment_id": "1997734740056",
+            "shipment_number": "JK382526309",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:06.12Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Geoffrey Steinke",
+                "phone": "3179190443",
+                "email": "Geoffreysteinke@gmail.com",
+                "company_name": "",
+                "address_line1": "8936 BRYANT LN APT 1B",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "INDIANAPOLIS",
+                "state_province": "IN",
+                "postal_code": "46250-1091",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 22.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 78.33
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 22.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Alligator Jerky - Original - 2 oz.",
+                    "sku": "JCB-ALJ-1-1",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402838208600",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113320",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-alligator-jerky-original-29290030095.jpg?v=1536858621",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 13.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604132",
+                    "fullfilment_sku": null,
+                    "upc": "00811007020621"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Bacon Jerky - Maple - Double the Meat - 2 Packs - (Savings!)",
+                    "sku": "JCB-BAJ-6-1-X2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402838241368",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113321",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/bacon-jerky-maple-30445812687.jpg?v=1568049525",
+                    "weight": {
+                        "value": 4.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 15.49,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604158",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Honey Teriyaki - 1 Pound Bag - 16 oz.",
+                    "sku": "JCB-BSJ-8-11",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402838274136",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113322",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-beef-jerky-honey-teriyaki-1-pound-bag-166288949263.jpg?v=1536859942",
+                    "weight": {
+                        "value": 16.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 38.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604274",
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 78.33
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 9.86
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967271",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1997713834072",
+            "shipment_number": "JK382526308",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:06.38Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Pearl Enwere",
+                "phone": "6129901515",
+                "email": "pgenwere4@msn.com",
+                "company_name": "",
+                "address_line1": "9670 FOREST LN APT 2015",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "DALLAS",
+                "state_province": "TX",
+                "postal_code": "75243-8642",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 34.99
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 12.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Hot Jerky Combo - Hot Jerky Combo - 4 flavors / Regular - 1 Pack",
+                    "sku": "JCB-CMB-HJC",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402800001112",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113323",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/hot-jerky-combo-29290935311.jpg?v=1568063267",
+                    "weight": {
+                        "value": 12.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 34.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604319",
+                    "fullfilment_sku": null,
+                    "upc": null
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Coupon:  FSFDFE8D3F",
+                    "sku": "",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "discount",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113324",
+                    "allocation_status": null,
+                    "image_url": "http://images.shipstation.com/resource/1.gif",
+                    "weight": {
+                        "value": 0.0,
+                        "unit": "ounce"
+                    },
+                    "unit_price": -4.95,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": null,
+                    "fullfilment_sku": null,
+                    "upc": null
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 34.99
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        },
+        {
+            "shipment_id": "se-15967272",
+            "carrier_id": null,
+            "service_code": null,
+            "requested_shipment_service": "Economy - 5 to 8 Business Days (Lowest Cost Shipping Materials and Method Available)",
+            "external_shipment_id": "1997651771480",
+            "shipment_number": "JK382526307",
+            "hold_until_date": null,
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2019-12-31T18:12:07.137Z",
+            "modified_at": "2019-12-31T18:27:53.64Z",
+            "shipment_status": "label_purchased",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Patricia Frost",
+                "phone": "(276) 728-3645",
+                "email": "pat.frost@mrcsb.state.va.us",
+                "company_name": "",
+                "address_line1": "1865 OAK GROVE RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "WOODLAWN",
+                "state_province": "VA",
+                "postal_code": "24381-5039",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": null,
+            "warehouse_id": null,
+            "return_to": null,
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": null,
+                "custom_field2": null,
+                "custom_field3": null,
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": null,
+                    "package_code": null,
+                    "package_name": null,
+                    "weight": {
+                        "value": 13.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 46.90
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 13.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Soft and Tender Style Beef Jerky - Sweet Picante - 3 oz.",
+                    "sku": "BTJ-BEJ-37-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402691670104",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113325",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/soft-and-tender-style-beef-jerky-sweet-picante-88009703439.jpg?v=1536863534",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604059",
+                    "fullfilment_sku": null,
+                    "upc": "00811007022038"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Buffalo Jerky - Teriyaki / 2 oz.",
+                    "sku": "JCB-BUJ-2-1",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402691702872",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113326",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-buffalo-jerky-30394701519.jpg?v=1568049271",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 9.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604280",
+                    "fullfilment_sku": null,
+                    "upc": "00811007021710"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Bacon Jerky - Honey Pepper / 2 oz.",
+                    "sku": "JCB-BAJ-12-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402691735640",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113327",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/bacon-jerky-13301451194456.jpg?v=1572020376",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604148",
+                    "fullfilment_sku": null,
+                    "upc": ""
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Chicken Jerky - Jamaican Jerk / 3 oz.",
+                    "sku": "JCB-CHJ-55-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402691768408",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113328",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-chicken-jerky-87635296271.jpg?v=1568049226",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604297",
+                    "fullfilment_sku": null,
+                    "upc": "811007022649"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Turkey Jerky - Teriyaki / 3 oz.",
+                    "sku": "JCB-TUJ-2-2",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "4402691801176",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "25113329",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/all-natural-turkey-jerky-13374722408536.jpg?v=1572614975",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 7.99,
+                    "tax_amount": null,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604464",
+                    "fullfilment_sku": null,
+                    "upc": "811007020799"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 46.90
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": null,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        }
+    ],
+    "total": 332487,
+    "page": 1,
+    "pages": 13300,
+    "links": {
+        "first": {
+            "href": "https://api.shipstation.com/v2/shipments?shipment_id=se-924054675&page=1&page_size=25"
+        },
+        "last": {
+            "href": "https://api.shipstation.com/v2/shipments?shipment_id=se-924054675&page=13300&page_size=25"
+        },
+        "prev": {},
+        "next": {
+            "href": "https://api.shipstation.com/v2/shipments?shipment_id=se-924054675&page=2&page_size=25"
+        }
+    }
+}

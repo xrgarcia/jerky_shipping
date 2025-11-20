@@ -181,6 +181,19 @@ export const shipments = pgTable("shipments", {
   shipDate: timestamp("ship_date"),
   estimatedDeliveryDate: timestamp("estimated_delivery_date"),
   actualDeliveryDate: timestamp("actual_delivery_date"),
+  // ShipStation ship_to customer data (extracted from shipmentData JSONB)
+  shipToName: text("ship_to_name"),
+  shipToPhone: text("ship_to_phone"),
+  shipToEmail: text("ship_to_email"),
+  shipToCompany: text("ship_to_company"),
+  shipToAddressLine1: text("ship_to_address_line1"),
+  shipToAddressLine2: text("ship_to_address_line2"),
+  shipToAddressLine3: text("ship_to_address_line3"),
+  shipToCity: text("ship_to_city"),
+  shipToState: text("ship_to_state"),
+  shipToPostalCode: text("ship_to_postal_code"),
+  shipToCountry: text("ship_to_country"),
+  shipToIsResidential: text("ship_to_is_residential"), // "yes", "no", or "unknown"
   shipmentData: jsonb("shipment_data"), // Store full ShipStation shipment payload
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

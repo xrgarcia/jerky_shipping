@@ -145,6 +145,33 @@ async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: an
   }
 }
 
+/**
+ * Extract ship_to customer data from ShipStation shipmentData
+ * Returns object with all ship_to fields or empty object if no ship_to data
+ */
+function extractShipToFields(shipmentData: any): Record<string, any> {
+  if (!shipmentData?.ship_to) {
+    return {};
+  }
+
+  const shipTo = shipmentData.ship_to;
+  
+  return {
+    shipToName: shipTo.name || null,
+    shipToPhone: shipTo.phone || null,
+    shipToEmail: shipTo.email || null,
+    shipToCompany: shipTo.company_name || null,
+    shipToAddressLine1: shipTo.address_line1 || null,
+    shipToAddressLine2: shipTo.address_line2 || null,
+    shipToAddressLine3: shipTo.address_line3 || null,
+    shipToCity: shipTo.city_locality || null,
+    shipToState: shipTo.state_province || null,
+    shipToPostalCode: shipTo.postal_code || null,
+    shipToCountry: shipTo.country_code || null,
+    shipToIsResidential: shipTo.address_residential_indicator || null,
+  };
+}
+
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
 /**
@@ -192,15 +219,20 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               ? cachedShipment.statusDescription 
               : statusDescription;
             
+            // Merge latest shipmentData for extraction
+            const mergedShipmentData = {
+              ...(cachedShipment.shipmentData || {}),
+              latestTracking: webhookTrackingData,
+            };
+            
             // Update shipment with latest tracking info from webhook
+            // NOTE: Don't extract ship_to in fast path - tracking webhooks don't include it
+            // and extracting empty data would overwrite existing customer columns
             await storage.updateShipment(cachedShipment.id, {
               status: finalStatus,
               statusDescription: finalDescription,
               shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
-              shipmentData: {
-                ...(cachedShipment.shipmentData || {}),
-                latestTracking: webhookTrackingData,
-              },
+              shipmentData: mergedShipmentData,
             });
             
             // Broadcast realtime update to WebSocket clients
@@ -295,6 +327,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               status,
               statusDescription,
               shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
+              ...extractShipToFields(shipmentData), // Extract ship_to customer data
               shipmentData: shipmentData,
             };
             
@@ -411,6 +444,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           status,
           statusDescription,
           shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
+          ...extractShipToFields(shipmentData), // Extract ship_to customer data
           shipmentData: shipmentData,
         };
         
@@ -514,6 +548,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             status,
             statusDescription,
             shipDate: shipDate ? new Date(shipDate) : null,
+            ...extractShipToFields(shipmentData), // Extract ship_to customer data
             shipmentData: shipmentData,
           };
 
