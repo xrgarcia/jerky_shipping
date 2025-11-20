@@ -544,9 +544,12 @@ export default function Shipments() {
                               </div>
                             )}
                             {shipment.shipDate && (
-                              <span>
-                                {new Date(shipment.shipDate).toLocaleString()}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">Shipped:</span>
+                                <span>
+                                  {new Date(shipment.shipDate).toLocaleString()}
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>
