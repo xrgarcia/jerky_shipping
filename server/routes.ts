@@ -18,6 +18,7 @@ import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQu
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
+import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -1228,6 +1229,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error.message || "Failed to sync from ShipStation",
         details: "Sync failed before completion. Please check server logs for details."
+      });
+    }
+  });
+
+  // Backfill shipmentStatus for existing shipments
+  app.post("/api/shipments/backfill-status", requireAuth, async (req, res) => {
+    try {
+      console.log("========== SHIPMENT STATUS BACKFILL STARTED ==========");
+      
+      // Query all shipments where shipmentStatus is NULL
+      const shipmentsToBackfill = await db
+        .select()
+        .from(shipments)
+        .where(sql`${shipments.shipmentStatus} IS NULL`);
+      
+      console.log(`Found ${shipmentsToBackfill.length} shipments needing shipmentStatus backfill`);
+      
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const errors: string[] = [];
+      
+      for (const shipment of shipmentsToBackfill) {
+        try {
+          // Extract shipmentStatus from stored shipmentData
+          const extractedStatus = extractShipmentStatus(shipment.shipmentData);
+          
+          if (extractedStatus) {
+            // Update shipment with extracted status
+            await db
+              .update(shipments)
+              .set({ shipmentStatus: extractedStatus })
+              .where(eq(shipments.id, shipment.id));
+            
+            updatedCount++;
+            
+            if (updatedCount % 100 === 0) {
+              console.log(`Backfilled ${updatedCount} shipments...`);
+            }
+          } else {
+            skippedCount++;
+          }
+        } catch (error: any) {
+          console.error(`Error backfilling shipment ${shipment.id}:`, error);
+          errors.push(`Shipment ${shipment.id}: ${error.message}`);
+        }
+      }
+      
+      console.log(`========== SHIPMENT STATUS BACKFILL COMPLETE ==========`);
+      console.log(`Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}`);
+      
+      res.json({
+        success: true,
+        totalShipments: shipmentsToBackfill.length,
+        updatedCount,
+        skippedCount,
+        errorCount: errors.length,
+        errors: errors.slice(0, 10), // Return first 10 errors for diagnostics
+        message: `Successfully backfilled shipmentStatus for ${updatedCount} shipments (${skippedCount} skipped, ${errors.length} errors)`
+      });
+    } catch (error: any) {
+      console.error("Error during shipmentStatus backfill:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to backfill shipmentStatus",
+        details: "Backfill failed before completion. Please check server logs for details."
       });
     }
   });

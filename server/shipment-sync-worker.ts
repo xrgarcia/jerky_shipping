@@ -97,7 +97,7 @@ async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
  * Returns the raw shipment lifecycle status from ShipStation (on_hold, pending, shipped, cancelled, etc.)
  * Searches common nesting patterns as ShipStation API varies payload structure
  */
-function extractShipmentStatus(shipmentData: any): string | null {
+export function extractShipmentStatus(shipmentData: any): string | null {
   if (!shipmentData) return null;
   
   // Check top-level fields first

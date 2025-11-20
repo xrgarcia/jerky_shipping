@@ -695,14 +695,40 @@ export default function Shipments() {
         description: `Enqueued ${data.enqueuedCount} jobs (${data.nonDeliveredShipments} non-delivered shipments + ${data.ordersWithoutShipments} unshipped orders). Processing in background...`,
       });
     },
+  });
+
+  const backfillStatusMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/shipments/backfill-status");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to backfill shipment status");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
+      toast({
+        title: "Backfill complete",
+        description: data.message || `Updated ${data.updatedCount} shipments, ${data.skippedCount} skipped`,
+      });
+    },
     onError: (error: Error) => {
       toast({
-        title: "Failed to sync shipments",
-        description: error.message,
         variant: "destructive",
+        title: "Backfill failed",
+        description: error.message,
       });
     },
   });
+
+  const syncShipmentsErrorHandler = (error: Error) => {
+    toast({
+      title: "Failed to sync shipments",
+      description: error.message,
+      variant: "destructive",
+    });
+  };
 
   const isOrphanedShipment = (shipment: ShipmentWithItemCount) => {
     // A shipment is orphaned if it's missing all key identifiers
@@ -781,6 +807,16 @@ export default function Shipments() {
                   >
                     <RefreshCw className={`h-4 w-4 ${syncShipmentsMutation.isPending ? 'animate-spin' : ''}`} />
                     {syncShipmentsMutation.isPending ? "Syncing..." : "Sync from ShipStation"}
+                  </Button>
+                  <Button
+                    data-testid="button-backfill-status"
+                    onClick={() => backfillStatusMutation.mutate()}
+                    disabled={backfillStatusMutation.isPending}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${backfillStatusMutation.isPending ? 'animate-spin' : ''}`} />
+                    {backfillStatusMutation.isPending ? "Backfilling..." : "Backfill Status"}
                   </Button>
                 </div>
               </div>
