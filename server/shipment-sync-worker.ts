@@ -15,6 +15,7 @@ import {
   getShopifyOrderSyncQueueLength,
   getOldestShopifyOrderSyncQueueMessage,
   enqueueShopifyOrderSync,
+  enqueueShipmentSync,
   removeShipmentSyncFromInflight,
   type ShipmentSyncMessage,
   type ShopifyOrderSyncMessage,
@@ -42,6 +43,22 @@ import { eq, inArray } from 'drizzle-orm';
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
   console.log(`${timestamp} [shipment-sync] ${message}`);
+}
+
+/**
+ * Check if an error is a rate limit error (429 status or rate limit message)
+ */
+function isRateLimitError(error: any): boolean {
+  // Check for 429 status code
+  if (error.response?.status === 429 || error.status === 429) {
+    return true;
+  }
+  
+  // Check for rate limit keywords in error message
+  const errorMessage = (error.message || '').toLowerCase();
+  return errorMessage.includes('rate limit') || 
+         errorMessage.includes('too many requests') ||
+         errorMessage.includes('429');
 }
 
 /**
@@ -202,6 +219,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     let fastPathError: Error | null = null;
+    let removedFromInflight = false; // Track if we already removed from in-flight
     
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId } = message;
@@ -617,47 +635,133 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
       // Combine fast-path and API fallback errors if both failed
       const trackingId = message.orderNumber || message.trackingNumber || 'unknown';
       
-      // Build structured error data
-      const errorData: any = {
-        apiError: {
-          message: error.message || 'Unknown error',
-          stack: error.stack || null,
+      // Check if this is a rate limit error - if so, requeue and wait
+      if (isRateLimitError(error)) {
+        log(`Rate limit error for ${trackingId}, attempting to requeue message`);
+        
+        try {
+          // CRITICAL: Remove from in-flight BEFORE requeueing to avoid dedupe blocking
+          await removeShipmentSyncFromInflight(message);
+          removedFromInflight = true;
+          
+          // Now requeue the message so it's not lost
+          const enqueued = await enqueueShipmentSync(message);
+          
+          if (!enqueued) {
+            // Enqueue returned false - message is already in queue/inflight elsewhere
+            // This is a race condition: we removed from inflight but another process enqueued it
+            // Log to DLQ as safety net to prevent message loss
+            log(`Failed to requeue ${trackingId}: already in queue, logging to DLQ as safety net`);
+            
+            await logShipmentSyncFailure({
+              orderNumber: trackingId,
+              reason: message.reason,
+              errorMessage: `Rate limit error + requeue blocked by dedupe (possible race condition)`,
+              requestData: {
+                queueMessage: message,
+                originalWebhook: message.originalWebhook || null,
+                errors: {
+                  rateLimitError: {
+                    message: error.message || 'Unknown rate limit error',
+                    stack: error.stack || null,
+                  },
+                },
+              },
+              responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
+              retryCount: 0,
+              failedAt: new Date(),
+            });
+            
+            processedCount++;
+          } else {
+            // Successfully requeued
+            log(`Message ${trackingId} requeued successfully`);
+            
+            // Extract reset time from error headers if available
+            const resetSeconds = error.response?.headers?.['x-rate-limit-reset'] || 60;
+            
+            // Wait for rate limit to reset before continuing with next message
+            await waitForRateLimitReset(resetSeconds);
+            
+            log(`Rate limit reset complete, continuing batch processing`);
+            // Don't increment processedCount - message will be reprocessed later
+          }
+        } catch (requeueError: any) {
+          // If requeueing infrastructure fails, log to dead letter queue as fallback
+          log(`Failed to requeue ${trackingId}: ${requeueError.message}, logging to DLQ`);
+          
+          await logShipmentSyncFailure({
+            orderNumber: trackingId,
+            reason: message.reason,
+            errorMessage: `Rate limit error + requeue failed: ${requeueError.message}`,
+            requestData: {
+              queueMessage: message,
+              originalWebhook: message.originalWebhook || null,
+              errors: {
+                rateLimitError: {
+                  message: error.message || 'Unknown rate limit error',
+                  stack: error.stack || null,
+                },
+                requeueError: {
+                  message: requeueError.message,
+                  stack: requeueError.stack || null,
+                }
+              },
+            },
+            responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
+            retryCount: 0,
+            failedAt: new Date(),
+          });
+          
+          processedCount++;
         }
-      };
-      
-      // If fast-path failed before API sync, include both errors
-      if (fastPathError) {
-        errorData.fastPathError = {
-          message: fastPathError.message,
-          stack: fastPathError.stack || null,
+      } else {
+        // Non-rate-limit error: log to dead letter queue
+        
+        // Build structured error data
+        const errorData: any = {
+          apiError: {
+            message: error.message || 'Unknown error',
+            stack: error.stack || null,
+          }
         };
+        
+        // If fast-path failed before API sync, include both errors
+        if (fastPathError) {
+          errorData.fastPathError = {
+            message: fastPathError.message,
+            stack: fastPathError.stack || null,
+          };
+        }
+        
+        // Create combined error message for logs
+        const errorMessage = fastPathError 
+          ? `Fast-path failed: ${fastPathError.message}; API fallback failed: ${error.message}`
+          : error.message || 'Unknown error';
+        
+        // Log failure to dead letter queue with structured errors
+        await logShipmentSyncFailure({
+          orderNumber: trackingId,
+          reason: message.reason,
+          errorMessage,
+          requestData: {
+            queueMessage: message,
+            originalWebhook: message.originalWebhook || null,
+            errors: errorData, // Structured error objects with stacks
+          },
+          responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
+          retryCount: 0,
+          failedAt: new Date(),
+        });
+        
+        log(`Failed to sync shipments for ${trackingId}: ${errorMessage}`);
+        processedCount++;
       }
-      
-      // Create combined error message for logs
-      const errorMessage = fastPathError 
-        ? `Fast-path failed: ${fastPathError.message}; API fallback failed: ${error.message}`
-        : error.message || 'Unknown error';
-      
-      // Log failure to dead letter queue with structured errors
-      await logShipmentSyncFailure({
-        orderNumber: trackingId,
-        reason: message.reason,
-        errorMessage,
-        requestData: {
-          queueMessage: message,
-          originalWebhook: message.originalWebhook || null,
-          errors: errorData, // Structured error objects with stacks
-        },
-        responseData: error.response ? JSON.parse(JSON.stringify(error.response)) : null,
-        retryCount: 0,
-        failedAt: new Date(),
-      });
-      
-      log(`Failed to sync shipments for ${trackingId}: ${errorMessage}`);
-      processedCount++;
     } finally {
-      // Always remove from in-flight set after processing (success or failure)
-      await removeShipmentSyncFromInflight(message);
+      // Only remove from in-flight if we haven't already (rate limit errors remove early to allow requeue)
+      if (!removedFromInflight) {
+        await removeShipmentSyncFromInflight(message);
+      }
     }
   }
 
