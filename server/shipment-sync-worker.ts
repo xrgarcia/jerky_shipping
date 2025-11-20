@@ -30,7 +30,7 @@ import {
   type InsertShipmentSyncFailure 
 } from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -83,34 +83,43 @@ async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: an
 
     // Extract and insert items
     if (shipmentData.items && Array.isArray(shipmentData.items)) {
-      const itemsToInsert = [];
+      // Batch fetch all order items to avoid N+1 queries
+      // Normalize to strings since ShipStation may return numeric IDs
+      const externalOrderItemIds = shipmentData.items
+        .map(item => item.external_order_item_id)
+        .filter(id => id != null)
+        .map(id => String(id));
 
-      for (const item of shipmentData.items) {
-        // Try to link to order_items if we have external_order_item_id
-        let orderItemId = null;
-        if (item.external_order_item_id) {
-          const matchingOrderItem = await db
-            .select()
-            .from(orderItems)
-            .where(eq(orderItems.shopifyLineItemId, item.external_order_item_id))
-            .limit(1);
+      const orderItemsMap = new Map<string, string>();
+      if (externalOrderItemIds.length > 0) {
+        const matchingOrderItems = await db
+          .select()
+          .from(orderItems)
+          .where(inArray(orderItems.shopifyLineItemId, externalOrderItemIds));
 
-          if (matchingOrderItem.length > 0) {
-            orderItemId = matchingOrderItem[0].id;
-          }
+        for (const orderItem of matchingOrderItems) {
+          // Normalize both sides to string for comparison
+          orderItemsMap.set(String(orderItem.shopifyLineItemId), orderItem.id);
         }
+      }
 
-        itemsToInsert.push({
+      // Build items to insert with batch-resolved order item IDs
+      const itemsToInsert = shipmentData.items.map((item: any) => {
+        // Normalize to string before lookup
+        const externalId = item.external_order_item_id ? String(item.external_order_item_id) : null;
+        const orderItemId = externalId ? (orderItemsMap.get(externalId) || null) : null;
+
+        return {
           shipmentId,
           orderItemId,
           sku: item.sku || null,
           name: item.name,
           quantity: item.quantity,
           unitPrice: item.unit_price?.toString() || null,
-          externalOrderItemId: item.external_order_item_id || null,
+          externalOrderItemId: externalId, // Store as string
           imageUrl: item.image_url || null,
-        });
-      }
+        };
+      });
 
       if (itemsToInsert.length > 0) {
         await db.insert(shipmentItems).values(itemsToInsert);

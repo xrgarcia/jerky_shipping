@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, Order } from "@shared/schema";
+import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
 
 interface ShipmentWithOrder extends Shipment {
   order: Order | null;
@@ -23,6 +23,204 @@ interface ShipmentsResponse {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+function ShipmentCard({ shipment }: { shipment: ShipmentWithOrder }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const { data: items, isLoading: isLoadingItems } = useQuery<ShipmentItem[]>({
+    queryKey: ['/api/shipments', shipment.id, 'items'],
+    enabled: isExpanded,
+  });
+
+  const { data: tags } = useQuery<ShipmentTag[]>({
+    queryKey: ['/api/shipments', shipment.id, 'tags'],
+    enabled: isExpanded,
+  });
+
+  const isOrphanedShipment = (shipment: ShipmentWithOrder) => {
+    return !shipment.trackingNumber && !shipment.shipDate && !shipment.shipmentId;
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    if (!status) {
+      return <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400">Unknown</Badge>;
+    }
+
+    const statusConfig: Record<string, { variant: "default" | "secondary" | "outline"; className?: string; label: string }> = {
+      "delivered": { variant: "default", className: "bg-green-600 hover:bg-green-700", label: "Delivered" },
+      "in_transit": { variant: "default", className: "bg-blue-600 hover:bg-blue-700", label: "In Transit" },
+      "shipped": { variant: "secondary", label: "Shipped" },
+      "cancelled": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400", label: "Cancelled" },
+    };
+
+    const config = statusConfig[status.toLowerCase()] || { variant: "outline" as const, label: status };
+    
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  return (
+    <Card className="overflow-hidden" data-testid={`card-shipment-${shipment.id}`}>
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-3">
+              <Truck className="h-6 w-6 text-muted-foreground" />
+              <CardTitle className="text-2xl font-mono font-bold">
+                {shipment.trackingNumber || "No tracking"}
+              </CardTitle>
+            </div>
+            <div className="space-y-1">
+              {shipment.order ? (
+                <>
+                  <Link href={`/orders/${shipment.order.id}`}>
+                    <p className="text-xl font-semibold text-foreground hover:underline">
+                      Order #{shipment.order.orderNumber}
+                    </p>
+                  </Link>
+                  <p className="text-lg text-muted-foreground">
+                    {shipment.order.customerName || shipment.order.customerEmail}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No order linked
+                </p>
+              )}
+              {shipment.shipmentId && (
+                <p className="text-sm font-mono text-muted-foreground">
+                  Shipment ID: {shipment.shipmentId}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-lg text-muted-foreground">
+              {shipment.carrierCode && (
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  <span className="font-semibold uppercase">{shipment.carrierCode}</span>
+                </div>
+              )}
+              {shipment.shipDate && (
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Shipped:</span>
+                  <span>
+                    {new Date(shipment.shipDate).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              {getStatusBadge(shipment.status)}
+              {isOrphanedShipment(shipment) && (
+                <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400">
+                  Orphaned
+                </Badge>
+              )}
+            </div>
+            {shipment.serviceCode && (
+              <p className="text-sm text-muted-foreground">
+                {shipment.serviceCode}
+              </p>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Collapsible Items Section */}
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-between px-6 py-3 border-t hover-elevate"
+            data-testid={`button-toggle-items-${shipment.id}`}
+          >
+            <div className="flex items-center gap-2">
+              <PackageOpen className="h-4 w-4" />
+              <span className="font-semibold">
+                {isExpanded ? "Hide Items" : "Show Items"}
+              </span>
+            </div>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-4 pb-6">
+            {isLoadingItems ? (
+              <div className="text-center py-6">
+                <div className="animate-pulse text-muted-foreground">Loading items...</div>
+              </div>
+            ) : items && items.length > 0 ? (
+              <div className="space-y-4">
+                {/* Tags Section */}
+                {tags && tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pb-2 border-b">
+                    {tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {tag.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Items Table */}
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold text-sm">SKU</th>
+                        <th className="text-left px-4 py-3 font-semibold text-sm">Product</th>
+                        <th className="text-center px-4 py-3 font-semibold text-sm">Quantity</th>
+                        <th className="text-right px-4 py-3 font-semibold text-sm">Unit Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {items.map((item, index) => (
+                        <tr key={index} className="hover-elevate">
+                          <td className="px-4 py-3">
+                            <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {item.sku || 'N/A'}
+                            </code>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {item.imageUrl && (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.name || 'Product'}
+                                  className="w-12 h-12 object-cover rounded border"
+                                />
+                              )}
+                              <span className="text-sm">{item.name || 'Unknown Product'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="font-semibold">{item.quantity}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {item.unitPrice ? `$${parseFloat(item.unitPrice).toFixed(2)}` : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                No items found for this shipment
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
 }
 
 export default function Shipments() {
@@ -627,80 +825,7 @@ export default function Shipments() {
             {/* Shipment Cards */}
             <div className="grid gap-4">
               {shipments.map((shipment) => (
-                <Link 
-                  key={shipment.id} 
-                  href={shipment.order ? `/orders/${shipment.order.id}` : "#"}
-                >
-                  <Card 
-                    className="hover-elevate active-elevate-2 cursor-pointer"
-                    data-testid={`card-shipment-${shipment.id}`}
-                  >
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-3">
-                            <Truck className="h-6 w-6 text-muted-foreground" />
-                            <CardTitle className="text-2xl font-mono font-bold">
-                              {shipment.trackingNumber || "No tracking"}
-                            </CardTitle>
-                          </div>
-                          <div className="space-y-1">
-                            {shipment.order ? (
-                              <>
-                                <p className="text-xl font-semibold text-foreground">
-                                  Order #{shipment.order.orderNumber}
-                                </p>
-                                <p className="text-lg text-muted-foreground">
-                                  {shipment.order.customerName}
-                                </p>
-                              </>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                No order linked
-                              </p>
-                            )}
-                            {shipment.shipmentId && (
-                              <p className="text-sm font-mono text-muted-foreground">
-                                Shipment ID: {shipment.shipmentId}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 mt-3 text-lg text-muted-foreground">
-                            {shipment.carrierCode && (
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4" />
-                                <span className="font-semibold uppercase">{shipment.carrierCode}</span>
-                              </div>
-                            )}
-                            {shipment.shipDate && (
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">Shipped:</span>
-                                <span>
-                                  {new Date(shipment.shipDate).toLocaleString()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge(shipment.status)}
-                            {isOrphanedShipment(shipment) && (
-                              <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400">
-                                Orphaned
-                              </Badge>
-                            )}
-                          </div>
-                          {shipment.serviceCode && (
-                            <p className="text-sm text-muted-foreground">
-                              {shipment.serviceCode}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                <ShipmentCard key={shipment.id} shipment={shipment} />
               ))}
             </div>
 

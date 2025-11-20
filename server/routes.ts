@@ -1019,6 +1019,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipment items for a specific shipment
+  app.get("/api/shipments/:shipmentId/items", requireAuth, async (req, res) => {
+    try {
+      const items = await storage.getShipmentItems(req.params.shipmentId);
+      res.json(items);
+    } catch (error: any) {
+      console.error(`Error fetching shipment items for ${req.params.shipmentId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment items" });
+    }
+  });
+
+  // Get shipment tags for a specific shipment
+  app.get("/api/shipments/:shipmentId/tags", requireAuth, async (req, res) => {
+    try {
+      const tags = await storage.getShipmentTags(req.params.shipmentId);
+      res.json(tags);
+    } catch (error: any) {
+      console.error(`Error fetching shipment tags for ${req.params.shipmentId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment tags" });
+    }
+  });
+
+  // Get shipment items for a specific order item (to show which shipments contain this item)
+  app.get("/api/order-items/:orderItemId/shipment-items", requireAuth, async (req, res) => {
+    try {
+      const shipmentItems = await storage.getShipmentItemsByOrderItemId(req.params.orderItemId);
+      res.json(shipmentItems);
+    } catch (error: any) {
+      console.error(`Error fetching shipment items for order item ${req.params.orderItemId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment items" });
+    }
+  });
+
+  // Get shipment items by external order item ID (Shopify line item ID)
+  app.get("/api/line-items/:lineItemId/shipment-items", requireAuth, async (req, res) => {
+    try {
+      const shipmentItems = await storage.getShipmentItemsByExternalOrderItemId(req.params.lineItemId);
+      res.json(shipmentItems);
+    } catch (error: any) {
+      console.error(`Error fetching shipment items for line item ${req.params.lineItemId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment items" });
+    }
+  });
+
   // Manual sync endpoint - enqueues async jobs for all non-delivered shipments and orders without shipments
   app.post("/api/shipments/sync", requireAuth, async (req, res) => {
     try {

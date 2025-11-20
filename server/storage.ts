@@ -131,6 +131,8 @@ export interface IStorage {
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
+  getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
+  getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -729,6 +731,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(shipmentTags.shipmentId, shipmentId))
       .orderBy(asc(shipmentTags.createdAt));
     return result;
+  }
+
+  async getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>> {
+    const result = await db
+      .select({
+        id: shipmentItems.id,
+        shipmentId: shipmentItems.shipmentId,
+        orderItemId: shipmentItems.orderItemId,
+        sku: shipmentItems.sku,
+        name: shipmentItems.name,
+        quantity: shipmentItems.quantity,
+        unitPrice: shipmentItems.unitPrice,
+        imageUrl: shipmentItems.imageUrl,
+        externalOrderItemId: shipmentItems.externalOrderItemId,
+        createdAt: shipmentItems.createdAt,
+        shipment: shipments,
+      })
+      .from(shipmentItems)
+      .leftJoin(shipments, eq(shipmentItems.shipmentId, shipments.id))
+      .where(eq(shipmentItems.orderItemId, orderItemId))
+      .orderBy(asc(shipmentItems.createdAt));
+    
+    return result.map(row => ({
+      id: row.id,
+      shipmentId: row.shipmentId,
+      orderItemId: row.orderItemId,
+      sku: row.sku,
+      name: row.name,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      imageUrl: row.imageUrl,
+      externalOrderItemId: row.externalOrderItemId,
+      createdAt: row.createdAt,
+      shipment: row.shipment!,
+    }));
+  }
+
+  async getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>> {
+    const result = await db
+      .select({
+        id: shipmentItems.id,
+        shipmentId: shipmentItems.shipmentId,
+        orderItemId: shipmentItems.orderItemId,
+        sku: shipmentItems.sku,
+        name: shipmentItems.name,
+        quantity: shipmentItems.quantity,
+        unitPrice: shipmentItems.unitPrice,
+        imageUrl: shipmentItems.imageUrl,
+        externalOrderItemId: shipmentItems.externalOrderItemId,
+        createdAt: shipmentItems.createdAt,
+        shipment: shipments,
+      })
+      .from(shipmentItems)
+      .leftJoin(shipments, eq(shipmentItems.shipmentId, shipments.id))
+      .where(eq(shipmentItems.externalOrderItemId, externalOrderItemId))
+      .orderBy(asc(shipmentItems.createdAt));
+    
+    return result.map(row => ({
+      id: row.id,
+      shipmentId: row.shipmentId,
+      orderItemId: row.orderItemId,
+      sku: row.sku,
+      name: row.name,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      imageUrl: row.imageUrl,
+      externalOrderItemId: row.externalOrderItemId,
+      createdAt: row.createdAt,
+      shipment: row.shipment!,
+    }));
   }
 
   async getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }> {

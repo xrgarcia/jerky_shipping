@@ -23,7 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Order, Shipment } from "@shared/schema";
+import type { Order, Shipment, ShipmentItem } from "@shared/schema";
 
 interface LineItem {
   id: number;
@@ -42,6 +42,35 @@ interface ShippingAddress {
   province?: string;
   zip?: string;
   country?: string;
+}
+
+function OrderItemShipmentInfo({ lineItemId }: { lineItemId: number | string }) {
+  const { data: shipmentItems, isLoading } = useQuery<Array<ShipmentItem & { shipment: Shipment }>>({
+    queryKey: ['/api/line-items', String(lineItemId), 'shipment-items'],
+  });
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground animate-pulse">Loading shipment info...</div>;
+  }
+
+  if (!shipmentItems || shipmentItems.length === 0) {
+    return <Badge variant="outline" className="text-orange-700 border-orange-500">Not Yet Shipped</Badge>;
+  }
+
+  const totalShipped = shipmentItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      <Badge variant="default" className="bg-green-600">
+        Shipped: {totalShipped} {totalShipped === 1 ? 'unit' : 'units'}
+      </Badge>
+      {shipmentItems.map((shipmentItem, index) => (
+        <Badge key={index} variant="secondary" className="text-xs">
+          {shipmentItem.quantity}x in {shipmentItem.shipment.trackingNumber || shipmentItem.shipment.shipmentId || 'Unknown'}
+        </Badge>
+      ))}
+    </div>
+  );
 }
 
 export default function OrderDetail() {
@@ -450,9 +479,10 @@ export default function OrderDetail() {
                               SKU: {item.sku}
                             </p>
                           )}
-                          <p className="text-xl text-muted-foreground">
+                          <p className="text-xl text-muted-foreground mb-3">
                             ${item.price} each
                           </p>
+                          <OrderItemShipmentInfo lineItemId={item.id} />
                         </div>
                         <div className="text-right">
                           <div className="bg-primary text-primary-foreground px-4 py-2 rounded-md">
