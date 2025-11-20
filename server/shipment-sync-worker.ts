@@ -16,6 +16,7 @@ import {
   getOldestShopifyOrderSyncQueueMessage,
   requeueShipmentSyncMessages,
   enqueueShopifyOrderSync,
+  removeShipmentSyncFromInflight,
   type ShipmentSyncMessage,
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
@@ -379,6 +380,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
       
       log(`❌ Failed to sync shipments for ${message.orderNumber || message.trackingNumber}: ${error.message}`);
       processedCount++;
+    } finally {
+      // Always remove from in-flight set after processing (success or failure)
+      await removeShipmentSyncFromInflight(message);
     }
     
     // If we should stop due to rate limits, requeue remaining unprocessed messages

@@ -69,6 +69,7 @@ export async function clearQueue(): Promise<number> {
 
 // Shipment Sync Queue operations
 const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync';
+const SHIPMENT_SYNC_INFLIGHT_KEY = 'shipstation:shipment-sync:inflight';
 
 export interface ShipmentSyncMessage {
   reason: 'backfill' | 'webhook' | 'manual';
@@ -82,17 +83,109 @@ export interface ShipmentSyncMessage {
   retryCount?: number; // Retry count to prevent infinite loops
 }
 
-export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<void> {
-  const redis = getRedisClient();
-  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+/**
+ * Generate a deduplication key for a shipment sync message
+ * Uses tracking number or order number to identify unique shipments
+ */
+function getShipmentSyncDedupeKey(message: ShipmentSyncMessage): string | null {
+  if (message.trackingNumber) {
+    return `tracking:${message.trackingNumber}`;
+  }
+  if (message.orderNumber) {
+    return `order:${message.orderNumber}`;
+  }
+  return null;
 }
 
-export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]): Promise<void> {
-  if (messages.length === 0) return;
+/**
+ * Enqueue a shipment sync message with deduplication
+ * Returns true if enqueued, false if already in queue
+ * Uses SADD's atomic return value to prevent race conditions
+ */
+export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<boolean> {
+  const redis = getRedisClient();
+  const dedupeKey = getShipmentSyncDedupeKey(message);
+  
+  // If no dedupe key (no tracking or order number), enqueue anyway
+  if (!dedupeKey) {
+    await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+    return true;
+  }
+  
+  // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+  const added = await redis.sadd(SHIPMENT_SYNC_INFLIGHT_KEY, dedupeKey);
+  
+  // If already existed, don't enqueue
+  if (added === 0) {
+    return false; // Already queued/processing
+  }
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue the message
+  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+  return true;
+}
+
+/**
+ * Enqueue multiple shipment sync messages with deduplication
+ * Returns count of messages successfully enqueued (deduplicated messages are skipped)
+ * Handles both in-batch duplicates and existing queue duplicates atomically
+ */
+export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]): Promise<number> {
+  if (messages.length === 0) return 0;
   
   const redis = getRedisClient();
-  const serialized = messages.map(msg => JSON.stringify(msg));
+  const toEnqueue: ShipmentSyncMessage[] = [];
+  const seenKeys = new Set<string>(); // Track duplicates within this batch
+  
+  for (const message of messages) {
+    const dedupeKey = getShipmentSyncDedupeKey(message);
+    
+    // If no dedupe key, always enqueue
+    if (!dedupeKey) {
+      toEnqueue.push(message);
+      continue;
+    }
+    
+    // Skip if already seen in this batch
+    if (seenKeys.has(dedupeKey)) {
+      continue;
+    }
+    
+    // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+    const added = await redis.sadd(SHIPMENT_SYNC_INFLIGHT_KEY, dedupeKey);
+    
+    if (added === 1) {
+      toEnqueue.push(message);
+      seenKeys.add(dedupeKey);
+    }
+  }
+  
+  if (toEnqueue.length === 0) return 0;
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue all messages
+  const serialized = toEnqueue.map(msg => JSON.stringify(msg));
   await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+  
+  return toEnqueue.length;
+}
+
+/**
+ * Remove a shipment sync message from the in-flight set
+ * Call this after processing completes (success or failure)
+ */
+export async function removeShipmentSyncFromInflight(message: ShipmentSyncMessage): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = getShipmentSyncDedupeKey(message);
+  
+  if (dedupeKey) {
+    await redis.srem(SHIPMENT_SYNC_INFLIGHT_KEY, dedupeKey);
+  }
 }
 
 export async function dequeueShipmentSync(): Promise<ShipmentSyncMessage | null> {
