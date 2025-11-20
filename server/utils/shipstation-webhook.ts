@@ -210,8 +210,13 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
         
         // Webhook is orphaned if:
         // 1. It has an environment label AND it's different from ours, OR
-        // 2. It points to a different URL host
-        return (webhookEnv && webhookEnv !== envLabel) || !urlMatches;
+        // 2. It points to a different URL host, OR
+        // 3. It has NO environment label at all (old webhook from before labeling system)
+        //    AND points to our URL (needs to be replaced with labeled version)
+        const hasNoLabel = !webhookEnv;
+        const needsReplacement = hasNoLabel && urlMatches; // Old webhook pointing to current URL
+        
+        return (webhookEnv && webhookEnv !== envLabel) || !urlMatches || needsReplacement;
       } catch (error: any) {
         console.warn(`Skipping webhook with malformed URL: ${webhook.url} (${error.message})`);
         return false;
