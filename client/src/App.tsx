@@ -12,6 +12,7 @@ import VerifyMagicLink from "@/pages/verify-magic-link";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Shipments from "@/pages/shipments";
+import ShipmentDetails from "@/pages/shipment-details";
 import Products from "@/pages/products";
 import Backfill from "@/pages/backfill";
 import PrintQueue from "@/pages/print-queue";
@@ -61,6 +62,7 @@ function AppContent() {
       </Route>
       <Route path="/orders" component={Orders} />
       <Route path="/orders/:id" component={OrderDetail} />
+      <Route path="/shipments/:id" component={ShipmentDetails} />
       <Route path="/shipments" component={Shipments} />
       <Route path="/products" component={Products} />
       <Route path="/sessions" component={Sessions} />
