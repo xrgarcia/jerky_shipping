@@ -100,9 +100,11 @@ export function broadcastPrintQueueUpdate(data: any): void {
 export type QueueStatusData = {
   shopifyQueue: number;
   shipmentSyncQueue: number;
+  shopifyOrderSyncQueue: number;
   shipmentFailureCount: number;
   shopifyQueueOldestAt: number | null;
   shipmentSyncQueueOldestAt: number | null;
+  shopifyOrderSyncQueueOldestAt: number | null;
   backfillActiveJob: any | null;
   dataHealth: {
     ordersMissingShipments: number;
@@ -119,12 +121,16 @@ export function broadcastQueueStatus(data: {
   shopifyQueueLength?: number;
   shipmentSyncQueue?: number;
   shipmentSyncQueueLength?: number;
+  shopifyOrderSyncQueue?: number;
+  shopifyOrderSyncQueueLength?: number;
   shipmentFailureCount?: number;
   failureCount?: number;
   shopifyQueueOldestAt?: number | null;
   shipmentSyncQueueOldestAt?: number | null;
+  shopifyOrderSyncQueueOldestAt?: number | null;
   oldestShopify?: { enqueuedAt?: number | null };
   oldestShipmentSync?: { enqueuedAt?: number | null };
+  oldestShopifyOrderSync?: { enqueuedAt?: number | null };
   backfillActiveJob?: any | null;
   activeBackfillJob?: any | null;
   dataHealth?: {
@@ -148,9 +154,11 @@ export function broadcastQueueStatus(data: {
   const canonicalData: QueueStatusData = {
     shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? 0,
     shipmentSyncQueue: data.shipmentSyncQueue ?? data.shipmentSyncQueueLength ?? 0,
+    shopifyOrderSyncQueue: data.shopifyOrderSyncQueue ?? data.shopifyOrderSyncQueueLength ?? 0,
     shipmentFailureCount: data.shipmentFailureCount ?? data.failureCount ?? 0,
     shopifyQueueOldestAt: data.shopifyQueueOldestAt ?? data.oldestShopify?.enqueuedAt ?? null,
     shipmentSyncQueueOldestAt: data.shipmentSyncQueueOldestAt ?? data.oldestShipmentSync?.enqueuedAt ?? null,
+    shopifyOrderSyncQueueOldestAt: data.shopifyOrderSyncQueueOldestAt ?? data.oldestShopifyOrderSync?.enqueuedAt ?? null,
     backfillActiveJob: data.backfillActiveJob ?? data.activeBackfillJob ?? null,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,

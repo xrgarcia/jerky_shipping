@@ -74,6 +74,10 @@ type QueueStats = {
     size: number;
     oldestMessageAt: number | null;
   };
+  shopifyOrderSyncQueue: {
+    size: number;
+    oldestMessageAt: number | null;
+  };
   failures: {
     total: number;
   };
@@ -349,6 +353,10 @@ Please analyze this failure and help me understand:
                 size: message.data.shipmentSyncQueue,
                 oldestMessageAt: message.data.shipmentSyncQueueOldestAt,
               },
+              shopifyOrderSyncQueue: {
+                size: message.data.shopifyOrderSyncQueue || 0,
+                oldestMessageAt: message.data.shopifyOrderSyncQueueOldestAt || null,
+              },
               failures: {
                 total: message.data.shipmentFailureCount,
               },
@@ -587,6 +595,11 @@ Please analyze this failure and help me understand:
     queueStats.shipmentSyncQueue.oldestMessageAt
   ) : "healthy";
 
+  const shopifyOrderSyncHealth = queueStats ? getQueueHealth(
+    queueStats.shopifyOrderSyncQueue.size,
+    queueStats.shopifyOrderSyncQueue.oldestMessageAt
+  ) : "healthy";
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -605,7 +618,7 @@ Please analyze this failure and help me understand:
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card data-testid="card-shopify-queue">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
@@ -698,6 +711,43 @@ Please analyze this failure and help me understand:
                 <Trash2 className="h-4 w-4 mr-2" />
                 Purge Queue
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-shopify-order-sync-queue">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-lg">Shopify Order Sync</CardTitle>
+              <CardDescription>Missing orders awaiting import</CardDescription>
+            </div>
+            <Badge
+              data-testid={`badge-health-${shopifyOrderSyncHealth}`}
+              variant={
+                shopifyOrderSyncHealth === "healthy" ? "default" :
+                shopifyOrderSyncHealth === "warning" ? "secondary" : "destructive"
+              }
+            >
+              {shopifyOrderSyncHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+              {shopifyOrderSyncHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+              {shopifyOrderSyncHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
+              {shopifyOrderSyncHealth}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold" data-testid="text-shopify-order-sync-queue-size">
+                  {statsLoading ? "-" : queueStats?.shopifyOrderSyncQueue.size.toLocaleString()}
+                </span>
+                <span className="text-muted-foreground">orders</span>
+              </div>
+              {queueStats?.shopifyOrderSyncQueue.oldestMessageAt && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  Oldest: {formatDistanceToNow(new Date(queueStats.shopifyOrderSyncQueue.oldestMessageAt), { addSuffix: true })}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

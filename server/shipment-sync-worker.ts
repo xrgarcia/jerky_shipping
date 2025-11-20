@@ -12,6 +12,8 @@ import {
   getQueueLength,
   getOldestShopifyQueueMessage,
   getOldestShipmentSyncQueueMessage,
+  getShopifyOrderSyncQueueLength,
+  getOldestShopifyOrderSyncQueueMessage,
   requeueShipmentSyncMessages,
   enqueueShopifyOrderSync,
   type ShipmentSyncMessage,
@@ -466,9 +468,11 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       // Broadcast queue status via WebSocket
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+      const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
       const failureCount = await storage.getShipmentSyncFailureCount();
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+      const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
       
       // Get active backfill job
       const allBackfillJobs = await storage.getAllBackfillJobs();
@@ -480,9 +484,11 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
         shipmentSyncQueue: shipmentSyncQueueLength,
+        shopifyOrderSyncQueue: shopifyOrderSyncQueueLength,
         shipmentFailureCount: failureCount,
         shopifyQueueOldestAt: oldestShopify.enqueuedAt,
         shipmentSyncQueueOldestAt: oldestShipmentSync.enqueuedAt,
+        shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync.enqueuedAt,
         backfillActiveJob: activeBackfillJob,
         dataHealth,
       });
