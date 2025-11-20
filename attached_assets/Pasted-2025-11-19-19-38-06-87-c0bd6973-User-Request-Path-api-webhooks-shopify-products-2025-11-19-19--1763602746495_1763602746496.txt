@@ -1,0 +1,212 @@
+2025-11-19 19:38:06.87
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:06.87
+c0bd6973
+User
+HMAC Header Present: true
+2025-11-19 19:38:06.87
+c0bd6973
+User
+Webhook ID: be29fe5c-5fa2-4603-9e15-b0d79c132dfe
+2025-11-19 19:38:06.87
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:06.87
+c0bd6973
+User
+=========================================================
+2025-11-19 19:38:06.87
+c0bd6973
+User
+Timestamp: 2025-11-20T01:38:06.871Z
+2025-11-19 19:38:07.58
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:07.58
+c0bd6973
+User
+Webhook ID: b0414d9c-8173-4b5f-b807-db86be948686
+2025-11-19 19:38:07.58
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:07.58
+c0bd6973
+User
+1:38:07 AM [express] POST /api/webhooks/shopify/products 401 in 0ms :: {"error":"Webhook verificatio…
+2025-11-19 19:38:08.78
+c0bd6973
+User
+1:38:08 AM [express] GET /api/print-queue 304 in 119ms :: {"jobs":[]}
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Timestamp: 2025-11-20T01:38:09.870Z
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Webhook ID: c1aff915-1ade-4d22-b39b-28ae2915b2ec
+2025-11-19 19:38:09.87
+c0bd6973
+User
+=========================================================
+2025-11-19 19:38:09.87
+c0bd6973
+User
+HMAC Header Present: true
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Body Size: 2831 bytes
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Topic: products/update
+2025-11-19 19:38:09.87
+c0bd6973
+User
+========== SHOPIFY WEBHOOK VERIFICATION FAILED ==========
+2025-11-19 19:38:09.87
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:09.87
+c0bd6973
+User
+1:38:09 AM [express] POST /api/webhooks/shopify/products 401 in 0ms :: {"error":"Webhook verificatio…
+2025-11-19 19:38:10.95
+c0bd6973
+User
+1:38:10 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Topic: products/update
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:11.64
+c0bd6973
+User
+HMAC Header Present: true
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Body Size: 5324 bytes
+2025-11-19 19:38:11.64
+c0bd6973
+User
+========== SHOPIFY WEBHOOK VERIFICATION FAILED ==========
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Webhook ID: 0ea65b24-b719-4650-8f50-e6c36acfa839
+2025-11-19 19:38:11.64
+c0bd6973
+User
+=========================================================
+2025-11-19 19:38:11.64
+c0bd6973
+User
+Timestamp: 2025-11-20T01:38:11.649Z
+2025-11-19 19:38:11.65
+c0bd6973
+User
+1:38:11 AM [express] POST /api/webhooks/shopify/products 401 in 1ms :: {"error":"Webhook verificatio…
+2025-11-19 19:38:12.38
+c0bd6973
+User
+HMAC Header Present: true
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Webhook ID: 4399b1a2-ecba-4f67-bd67-55f81c2d79c1
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Timestamp: 2025-11-20T01:38:12.383Z
+2025-11-19 19:38:12.38
+c0bd6973
+User
+========== SHOPIFY WEBHOOK VERIFICATION FAILED ==========
+2025-11-19 19:38:12.38
+c0bd6973
+User
+=========================================================
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Body Size: 10930 bytes
+2025-11-19 19:38:12.38
+c0bd6973
+User
+Topic: products/update
+2025-11-19 19:38:12.38
+c0bd6973
+User
+1:38:12 AM [express] POST /api/webhooks/shopify/products 401 in 0ms :: {"error":"Webhook verificatio…
+2025-11-19 19:38:13.11
+c0bd6973
+User
+1:38:13 AM [express] GET /api/print-queue 304 in 119ms :: {"jobs":[]}
+2025-11-19 19:38:15.30
+c0bd6973
+User
+1:38:15 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-19 19:38:17.46
+c0bd6973
+User
+1:38:17 AM [express] GET /api/print-queue 304 in 122ms :: {"jobs":[]}
+2025-11-19 19:38:19.63
+c0bd6973
+User
+1:38:19 AM [express] GET /api/print-queue 304 in 120ms :: {"jobs":[]}
+2025-11-19 19:38:21.80
+c0bd6973
+User
+1:38:21 AM [express] GET /api/print-queue 304 in 124ms :: {"jobs":[]}
+2025-11-19 19:38:26.50
+c0bd6973
+User
+Request Path: /api/webhooks/shopify/products
+2025-11-19 19:38:26.50
+c0bd6973
+User
+=========================================================
+2025-11-19 19:38:26.50
+c0bd6973
+User
+1:38:26 AM [express] POST /api/webhooks/shopify/products 401 in 1ms :: {"error":"Webhook verificatio…
+2025-11-19 19:38:26.50
+c0bd6973
+User
+Timestamp: 2025-11-20T01:38:26.501Z
+2025-11-19 19:38:26.50
+c0bd6973
+User
+Shop Domain: jerky-com.myshopify.com
+2025-11-19 19:38:26.50
+c0bd6973
+User
+Topic: products/update
