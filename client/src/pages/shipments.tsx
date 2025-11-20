@@ -230,10 +230,9 @@ export default function Shipments() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
-      const trackingMsg = data.trackingEnrichedCount > 0 ? `, ${data.trackingEnrichedCount} with tracking details` : '';
       toast({
-        title: "Shipments synced",
-        description: `Synced ${data.syncedCount} shipments (${data.createdCount} new, ${data.updatedCount} updated${trackingMsg})`,
+        title: "Sync jobs enqueued",
+        description: `Enqueued ${data.enqueuedCount} jobs (${data.nonDeliveredShipments} non-delivered shipments + ${data.ordersWithoutShipments} unshipped orders). Processing in background...`,
       });
     },
     onError: (error: Error) => {

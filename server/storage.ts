@@ -307,7 +307,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         id: orders.id,
-        shopifyOrderId: orders.shopifyOrderId,
         orderNumber: orders.orderNumber,
         customerName: orders.customerName,
         customerEmail: orders.customerEmail,
