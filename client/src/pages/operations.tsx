@@ -17,7 +17,8 @@ import {
   Package,
   Truck,
   ShoppingCart,
-  XCircle
+  XCircle,
+  Copy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -231,6 +232,53 @@ export default function OperationsPage() {
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
   const { toast } = useToast();
+
+  // Helper function to format failure for AI analysis
+  const formatFailureForAI = (failure: ShipmentSyncFailure) => {
+    return `SHIPMENT SYNC FAILURE ANALYSIS
+=====================================
+
+Order Number: ${failure.orderNumber}
+Failure ID: ${failure.id}
+Failed At: ${new Date(failure.failedAt).toLocaleString()}
+Created At: ${new Date(failure.createdAt).toLocaleString()}
+Retry Count: ${failure.retryCount}
+Reason: ${failure.reason}
+
+Error Message:
+${failure.errorMessage}
+
+Request Data:
+${JSON.stringify(failure.requestData, null, 2)}
+
+Response Data:
+${JSON.stringify(failure.responseData, null, 2)}
+
+=====================================
+Please analyze this failure and help me understand:
+1. What caused this shipment sync to fail?
+2. Is this a data issue, API issue, or integration issue?
+3. What steps should I take to fix it?
+`;
+  };
+
+  // Copy failure to clipboard for AI analysis
+  const copyFailureForAI = async (failure: ShipmentSyncFailure) => {
+    try {
+      const formattedText = formatFailureForAI(failure);
+      await navigator.clipboard.writeText(formattedText);
+      toast({
+        title: "Copied to clipboard",
+        description: "Failure details copied. You can now paste this in your AI chat for analysis.",
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Initial fetch of queue stats (no polling)
   const { data: initialQueueStats, isLoading: statsLoading } = useQuery<QueueStats>({
@@ -1286,6 +1334,18 @@ export default function OperationsPage() {
                               </pre>
                             </div>
                           )}
+                          <div className="pt-2">
+                            <Button
+                              onClick={() => copyFailureForAI(failure)}
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              data-testid={`button-copy-ai-${failure.id}`}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy for AI Analysis
+                            </Button>
+                          </div>
                         </CardContent>
                       </CollapsibleContent>
                     </Card>
