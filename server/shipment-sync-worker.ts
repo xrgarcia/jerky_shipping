@@ -86,9 +86,9 @@ async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: an
       // Batch fetch all order items to avoid N+1 queries
       // Normalize to strings since ShipStation may return numeric IDs
       const externalOrderItemIds = shipmentData.items
-        .map(item => item.external_order_item_id)
-        .filter(id => id != null)
-        .map(id => String(id));
+        .map((item: any) => item.external_order_item_id)
+        .filter((id: any) => id != null)
+        .map((id: any) => String(id));
 
       const orderItemsMap = new Map<string, string>();
       if (externalOrderItemIds.length > 0) {
@@ -199,6 +199,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
+    let fastPathError: Error | null = null;
     
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId } = message;
@@ -210,7 +211,6 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         // OPTIMIZATION: Check if we already have this shipment in our database
         const cachedShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
-        let fastPathError: Error | null = null;
         
         // If shipment exists AND is linked to an order, just update tracking status (skip API call)
         if (cachedShipment && cachedShipment.orderId && webhookTrackingData) {
