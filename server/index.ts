@@ -134,6 +134,18 @@ app.use((req, res, next) => {
     // Start Shopify order sync worker to import missing orders
     const { startShopifyOrderSyncWorker } = await import("./shopify-sync-worker");
     startShopifyOrderSyncWorker(8000); // Process Shopify order sync queue every 8 seconds
+    
+    // Resume any in-progress backfill jobs that were interrupted by server restart
+    setImmediate(async () => {
+      try {
+        const { BackfillService } = await import("./services/backfill-service");
+        const { storage } = await import("./storage");
+        const backfillService = new BackfillService(storage);
+        await backfillService.resumeInProgressJobs();
+      } catch (error) {
+        console.error("Failed to resume in-progress backfill jobs:", error);
+      }
+    });
   } else {
     log("Skipping background workers - Redis not configured");
   }

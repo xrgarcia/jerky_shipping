@@ -23,6 +23,35 @@ export class BackfillService {
   constructor(private storage: IStorage) {}
 
   /**
+   * Resume any in-progress backfill jobs that were interrupted by server restart
+   * Called automatically on server startup
+   */
+  async resumeInProgressJobs(): Promise<void> {
+    try {
+      // Get all jobs with status 'running'
+      const runningJobs = await this.storage.getRunningBackfillJobs();
+      
+      if (runningJobs.length === 0) {
+        console.log('[Backfill] No in-progress jobs to resume');
+        return;
+      }
+      
+      console.log(`[Backfill] Resuming ${runningJobs.length} in-progress job(s)`);
+      
+      // Resume each job in the background
+      for (const job of runningJobs) {
+        console.log(`[Backfill] Resuming job ${job.id} (${job.startDate} to ${job.endDate})`);
+        this.runBackfillJob(job.id).catch(error => {
+          console.error(`[Backfill ${job.id}] Resume failed:`, error);
+        });
+      }
+    } catch (error) {
+      console.error('[Backfill] Error resuming in-progress jobs:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Run a complete backfill job
    * Fetches and imports both Shopify orders and ShipStation shipments
    * Updates progress in real-time
