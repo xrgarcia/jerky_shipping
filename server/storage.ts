@@ -42,6 +42,9 @@ import {
   shipmentSyncFailures,
   type ShopifyOrderSyncFailure,
   shopifyOrderSyncFailures,
+  type PackingLog,
+  type InsertPackingLog,
+  packingLogs,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -182,6 +185,11 @@ export interface IStorage {
   getActivePrintJobs(): Promise<PrintQueue[]>;
   getPrintJobsByOrderId(orderId: string): Promise<PrintQueue[]>;
   deletePrintJob(id: string): Promise<void>;
+  
+  // Packing Logs
+  createPackingLog(log: InsertPackingLog): Promise<PackingLog>;
+  getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]>;
+  getPackingLogsByUser(userId: string, limit?: number): Promise<PackingLog[]>;
   
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
@@ -1551,6 +1559,29 @@ export class DatabaseStorage implements IStorage {
 
   async deletePrintJob(id: string): Promise<void> {
     await db.delete(printQueue).where(eq(printQueue.id, id));
+  }
+
+  // Packing Logs
+  async createPackingLog(log: InsertPackingLog): Promise<PackingLog> {
+    const result = await db.insert(packingLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]> {
+    return await db
+      .select()
+      .from(packingLogs)
+      .where(eq(packingLogs.shipmentId, shipmentId))
+      .orderBy(desc(packingLogs.createdAt));
+  }
+
+  async getPackingLogsByUser(userId: string, limit = 100): Promise<PackingLog[]> {
+    return await db
+      .select()
+      .from(packingLogs)
+      .where(eq(packingLogs.userId, userId))
+      .orderBy(desc(packingLogs.createdAt))
+      .limit(limit);
   }
 
   // Shipment Sync Failures

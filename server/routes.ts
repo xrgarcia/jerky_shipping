@@ -7,7 +7,7 @@ import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
 import { z } from "zod";
-import { insertUserSchema, insertMagicLinkTokenSchema } from "@shared/schema";
+import { insertUserSchema, insertMagicLinkTokenSchema, insertPackingLogSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3332,6 +3332,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error completing print job:", error);
       res.status(500).json({ error: "Failed to complete print job" });
+    }
+  });
+
+  // Packing endpoints
+  
+  // Get shipment by order number for packing workflow
+  app.get("/api/shipments/by-order-number/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      
+      // Query shipments - handles multiple results
+      const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
+      
+      if (shipmentResults.length === 0) {
+        return res.status(404).json({ 
+          error: "Order not found",
+          orderNumber 
+        });
+      }
+      
+      // Log warning if multiple shipments found (rare)
+      if (shipmentResults.length > 1) {
+        console.warn(`[Packing] Multiple shipments for order ${orderNumber}, using most recent (ID: ${shipmentResults[0].id})`);
+      }
+      
+      const shipment = shipmentResults[0]; // Most recent (sorted by createdAt DESC in storage method)
+      
+      // Get shipment items
+      const items = await storage.getShipmentItems(shipment.id);
+      
+      res.json({
+        ...shipment,
+        items
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error fetching shipment:", error);
+      res.status(500).json({ error: "Failed to fetch shipment" });
+    }
+  });
+
+  // Create packing log entry
+  app.post("/api/packing-logs", requireAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const logData = {
+        ...req.body,
+        userId: user.id // Ensure userId comes from authenticated session
+      };
+      
+      // Validate with Zod schema
+      const validated = insertPackingLogSchema.parse(logData);
+      
+      const log = await storage.createPackingLog(validated);
+      res.json({ success: true, log });
+    } catch (error: any) {
+      console.error("[Packing] Error creating packing log:", error);
+      res.status(500).json({ error: "Failed to create packing log" });
+    }
+  });
+  
+  // Get packing logs for a shipment (admin/debugging)
+  app.get("/api/packing-logs/shipment/:shipmentId", requireAuth, async (req, res) => {
+    try {
+      const logs = await storage.getPackingLogsByShipment(req.params.shipmentId);
+      res.json({ logs });
+    } catch (error: any) {
+      console.error("[Packing] Error fetching packing logs:", error);
+      res.status(500).json({ error: "Failed to fetch packing logs" });
+    }
+  });
+
+  // Complete order packing
+  app.post("/api/packing/complete", requireAuth, async (req, res) => {
+    try {
+      const { shipmentId } = req.body;
+      
+      // Get shipment
+      const shipment = await storage.getShipment(shipmentId);
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Check if shipment is linked to Shopify order
+      if (!shipment.orderId) {
+        console.warn(`[Packing] Shipment ${shipment.orderNumber} has no orderId - skipping print queue`);
+        return res.json({ 
+          success: true, 
+          printQueued: false,
+          message: "Order complete. Print label manually from shipment details.",
+          labelUrl: shipment.labelUrl
+        });
+      }
+      
+      // Create print job with shipment label URL
+      const printJob = await storage.createPrintJob({
+        orderId: shipment.orderId, // Non-null, safe to insert
+        labelUrl: shipment.labelUrl || null, // Use shipment's label URL if available
+        status: "queued"
+      });
+      
+      // Broadcast WebSocket update
+      broadcastPrintQueueUpdate({ 
+        type: "job_added", 
+        job: printJob 
+      });
+      
+      res.json({ 
+        success: true, 
+        printQueued: true, 
+        printJobId: printJob.id,
+        message: "Order complete! Label queued for printing."
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error completing order:", error);
+      res.status(500).json({ error: "Failed to complete order" });
     }
   });
 

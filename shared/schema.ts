@@ -508,3 +508,30 @@ export const insertShopifyOrderSyncFailureSchema = createInsertSchema(shopifyOrd
 
 export type InsertShopifyOrderSyncFailure = z.infer<typeof insertShopifyOrderSyncFailureSchema>;
 export type ShopifyOrderSyncFailure = typeof shopifyOrderSyncFailures.$inferSelect;
+
+// Packing logs table for QC audit trail
+export const packingLogs = pgTable("packing_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  orderNumber: text("order_number").notNull(),
+  action: text("action").notNull(), // 'scan_order', 'scan_product', 'qc_pass', 'qc_fail', 'complete_order'
+  productSku: text("product_sku"), // SKU scanned (null for scan_order/complete_order actions)
+  scannedCode: text("scanned_code"), // Actual barcode value
+  skuVaultProductId: text("skuvault_product_id"), // IdItem from SkuVault (null if not found)
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  shipmentIdIdx: sql`CREATE INDEX IF NOT EXISTS packing_logs_shipment_id_idx ON ${table} (shipment_id)`,
+  userIdIdx: sql`CREATE INDEX IF NOT EXISTS packing_logs_user_id_idx ON ${table} (user_id)`,
+  createdAtIdx: sql`CREATE INDEX IF NOT EXISTS packing_logs_created_at_idx ON ${table} (created_at)`,
+}));
+
+export const insertPackingLogSchema = createInsertSchema(packingLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPackingLog = z.infer<typeof insertPackingLogSchema>;
+export type PackingLog = typeof packingLogs.$inferSelect;
