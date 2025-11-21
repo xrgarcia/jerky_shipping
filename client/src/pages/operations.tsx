@@ -511,9 +511,11 @@ Please analyze this failure and help me understand:
   });
 
   // Fetch all backfill jobs
-  const { data: allBackfillJobs, isLoading: backfillJobsLoading } = useQuery<any[]>({
+  const { data: backfillJobsData, isLoading: backfillJobsLoading } = useQuery<{ jobs: any[] }>({
     queryKey: ["/api/backfill/jobs"],
   });
+  
+  const allBackfillJobs = backfillJobsData?.jobs || [];
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
   const queueStats = liveQueueStats || initialQueueStats;
