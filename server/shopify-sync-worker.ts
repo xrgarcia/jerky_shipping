@@ -127,7 +127,7 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
           productId: lineItem.product_id?.toString() || null,
           variantId: lineItem.variant_id?.toString() || null,
           quantity: lineItem.quantity,
-          title: lineItem.name,
+          title: lineItem.name || lineItem.title || 'Unknown Item',
           sku: lineItem.sku || null,
           price: lineItem.price,
         });
