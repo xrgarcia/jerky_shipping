@@ -388,7 +388,7 @@ export default function Shipments() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
-  const [shipmentStatus, setShipmentStatus] = useState<string[]>(["on_hold", "pending", "label_purchased"]); // Warehouse status filter (multi-select with defaults)
+  const [shipmentStatus, setShipmentStatus] = useState<string[]>(["on_hold", "pending"]); // Warehouse status filter (multi-select with defaults)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -417,7 +417,7 @@ export default function Shipments() {
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
     const shipmentStatusValues = params.getAll('shipmentStatus');
-    setShipmentStatus(shipmentStatusValues.length > 0 ? shipmentStatusValues : ["on_hold", "pending", "label_purchased"]);
+    setShipmentStatus(shipmentStatusValues.length > 0 ? shipmentStatusValues : ["on_hold", "pending"]);
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
