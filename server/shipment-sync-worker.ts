@@ -468,6 +468,67 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       log(`[${trackingNumber}] Updated shipment via label lookup (1 API call total)`);
                       processedCount++;
                       continue;
+                    } else {
+                      // Shipment doesn't exist in DB yet - fetch full data from ShipStation and create it
+                      log(`[${trackingNumber}] Shipment not in DB, fetching from ShipStation via shipment_id: ${resolvedShipmentId}`);
+                      
+                      const { fetchShipStationResource } = await import('./utils/shipstation-api');
+                      
+                      // Fetch shipment data using shipment_id
+                      const shipmentUrl = `https://api.shipstation.com/v2/shipments/${resolvedShipmentId}`;
+                      const fullShipmentData = await fetchShipStationResource(shipmentUrl);
+                      
+                      // Extract order number from full shipment data
+                      const orderNumber = extractOrderNumber(fullShipmentData);
+                      
+                      if (orderNumber) {
+                        log(`[${trackingNumber}] Extracted order number from shipment: ${orderNumber}`);
+                        
+                        // Lookup order
+                        const order = await storage.getOrderByOrderNumber(orderNumber);
+                        
+                        // Normalize status
+                        const { status, statusDescription } = normalizeShipmentStatus(fullShipmentData);
+                        
+                        // Create shipment record
+                        const shipmentRecord = {
+                          orderId: order?.id || null,
+                          shipmentId: String(resolvedShipmentId),
+                          orderNumber,
+                          orderDate: extractOrderDate(fullShipmentData),
+                          trackingNumber,
+                          carrierCode: fullShipmentData.carrier_code || fullShipmentData.carrierCode || null,
+                          serviceCode: fullShipmentData.service_code || fullShipmentData.serviceCode || null,
+                          status,
+                          statusDescription,
+                          shipmentStatus: extractShipmentStatus(fullShipmentData),
+                          shipDate: fullShipmentData.ship_date ? new Date(fullShipmentData.ship_date) : null,
+                          shipmentData: fullShipmentData,
+                        };
+                        
+                        // Extract customer data from ship_to
+                        extractShipToFields(fullShipmentData, shipmentRecord);
+                        
+                        // Extract enriched data
+                        extractEnrichedShipmentFields(fullShipmentData, shipmentRecord);
+                        
+                        const createdShipment = await storage.createShipment(shipmentRecord);
+                        
+                        // Populate items and tags
+                        await populateShipmentItemsAndTags(createdShipment.id, fullShipmentData);
+                        
+                        // Broadcast if linked to order
+                        if (order) {
+                          broadcastOrderUpdate(order);
+                        }
+                        
+                        log(`[${trackingNumber}] Created shipment via label lookup (2 API calls total)`);
+                        processedCount++;
+                        continue;
+                      } else {
+                        log(`[${trackingNumber}] No order number in fetched shipment data`);
+                        // Fall through to DLQ
+                      }
                     }
                   }
                 }
