@@ -232,6 +232,131 @@ function ClearFailuresButton() {
   );
 }
 
+function BackfillCancelButton({ jobId }: { jobId: string }) {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest({
+        url: `/api/backfill/jobs/${jobId}/cancel`,
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      toast({
+        title: "Job Cancelled",
+        description: "The backfill job has been cancelled successfully",
+      });
+      setShowDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to cancel backfill job",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={() => setShowDialog(true)}
+        data-testid="button-cancel-backfill"
+      >
+        <XCircle className="h-4 w-4 mr-2" />
+        Cancel Job
+      </Button>
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent data-testid="dialog-cancel-backfill">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Backfill Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop the backfill job. Progress will be saved, but incomplete imports will stop.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-cancel-backfill">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-cancel-backfill"
+            >
+              {cancelMutation.isPending ? "Cancelling..." : "Cancel Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function BackfillRestartButton({ jobId }: { jobId: string }) {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+
+  const restartMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest({
+        url: `/api/backfill/jobs/${jobId}/restart`,
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      toast({
+        title: "Job Restarted",
+        description: "A new backfill job has been started with the same date range",
+      });
+      setShowDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to restart backfill job",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => setShowDialog(true)}
+        data-testid="button-restart-backfill"
+      >
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Restart Job
+      </Button>
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent data-testid="dialog-restart-backfill">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart Backfill Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new backfill job with the same date range and start it immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-restart-backfill">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => restartMutation.mutate()}
+              data-testid="button-confirm-restart-backfill"
+            >
+              {restartMutation.isPending ? "Restarting..." : "Restart Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 export default function OperationsPage() {
   const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
@@ -1362,6 +1487,22 @@ Please analyze this failure and help me understand:
                     />
                   </div>
                 )}
+                
+                {/* Job Controls */}
+                <div className="flex gap-2 pt-2">
+                  {(displayJob.status === "running" || displayJob.status === "pending") && (
+                    <BackfillCancelButton jobId={displayJob.id} />
+                  )}
+                  {(displayJob.status === "failed" || displayJob.status === "completed") && (
+                    <BackfillRestartButton jobId={displayJob.id} />
+                  )}
+                  {displayJob.errorMessage && (
+                    <div className="w-full rounded-md bg-destructive/10 p-3">
+                      <p className="text-sm font-medium text-destructive">Error:</p>
+                      <p className="text-sm text-muted-foreground">{displayJob.errorMessage}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
