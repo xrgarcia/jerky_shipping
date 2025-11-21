@@ -405,7 +405,7 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       
       // Get active backfill job
       const allBackfillJobs = await storage.getAllBackfillJobs();
-      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
       
       // Get comprehensive data health metrics
       const dataHealth = await storage.getDataHealthMetrics();

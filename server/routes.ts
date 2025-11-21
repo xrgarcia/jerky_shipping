@@ -2467,7 +2467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get active/recent backfill jobs
       const allBackfillJobs = await storage.getAllBackfillJobs();
-      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending');
       const recentBackfillJobs = allBackfillJobs.slice(0, 5); // Last 5 jobs
 
       // Get comprehensive data health metrics
@@ -2514,7 +2514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       const allBackfillJobs = await storage.getAllBackfillJobs();
-      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
       const dataHealth = await storage.getDataHealthMetrics();
       
       broadcastQueueStatus({

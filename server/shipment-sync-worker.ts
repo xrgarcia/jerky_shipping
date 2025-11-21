@@ -983,7 +983,7 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       
       // Get active backfill job
       const allBackfillJobs = await storage.getAllBackfillJobs();
-      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'in_progress' || j.status === 'pending') || null;
+      const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
       
       // Get comprehensive data health metrics
       const dataHealth = await storage.getDataHealthMetrics();
