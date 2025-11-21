@@ -1,0 +1,25 @@
+for invalid 073608032322
+fetch("https://app.skuvault.com/products/product/getProductOrKitByCodeOrSkuOrPartNumber?SearchTerm=073608032322", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Google Chrome\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "cookie": "_ga=GA1.2.1523010414.1763405194; _gid=GA1.2.773646864.1763405194; _ga_1CJ41D2XVZ=GS2.2.s1763411421$o1$g1$t1763411520$j60$l0$h0; ss-pid=FJpIeroEYlA3Xhh7z6CP; ss-id=3ic5zW6DqGHpaYLhdrsH; last-visited-page-Admin=https%3A%2F%2Fv2.skuvault.com%2Fwave-pick; _ga_HGD4BZ2VQ4=GS2.2.s1763569173$o5$g0$t1763569173$j60$l0$h0; sv-zc=352444; sv-zd=372919; sv-t=sv-nMbwDy5wXF8ZedRgRVaB/S8JhKAHvmeKRpgXWTAeV74T0bkqrI742ZyXNy/D+2b1ooiGEjxLZ2j5cFXDFKNONV8Jp24J1zgtPBBGfrU7/AFAJYBZURbKEIJTzc8OLUO+UTg3iuw87PKEsLTyPUPQ5X7pXzEyFm4LBKAg2ohNBLIrD/7Kp5uBc25zZc9YyhJWUKq+ja965f+M4DmnE5R+Z7T/ZmE0SUPVoay7pB2M/6i/tcHlIyqTFhW3SVgIoXJBCIEel3VRfAFq7AGxyR3deKeeB+gkwHBLEQK5Z3OwbE3DbVrlLFAx/11npKCVCof2BjpiGpaCcBYckzwaZ7e9J6orS0LSV+0dlbwVaNTflOAzf1500GX/+RwXWzvyhAHhRAlI5tZfInU8RFw621gTG4o+HcTKz7P9AlzyH3x0nkDHYKFzf8BFBLDFXpVebn0KszZySt9ffErfUhpOxxPtAr81rW9LpQfY1BYGRq6sYBmmlvTCpHeXNWK8MpqbDgn523mI1TkMbhPWR7oTIEbx0zH6GYvuhpNsK3KsVMszxVWpvI4XVCERRZtO9HQjWJnM0UCjVaASDWzhaPc0v5IA4gxglcVyJgVRYJagCxRbwtW0c6SNFcHs6eeNphlQkzuFT3ABs8BtFHoqcwcbc0L1dPVP/pmgkItZzpIzgrr9CrcRUjlUhXl8q5weQnh/05YuPhIyj/NalYhBV/6eLt7anKBXJiCRSdW9UIDp/DzX2Lujegc7YSF0hN0Zm70r3qImdXYLEMKbH6E5h/oMiI7RuQtGiCHzVH74q2L8nAfgKe/XLoXpUKw0TvNQQSH9QYFwo7/pDLbHYgycz7n3Yp88gpsT29+lVZcKiJSiqTn5/Yd/c7clD7kGkOnWWApITG2CWrsB9pVmZEr60cX6tEo/vEtUexfqmXOI8pZR+6NLZBUtdPoXEKuS0/zH2f0mU3Q3uW1H3ZPAspPkV+EJBb8Vl/E7F9es8790FAodKZBtXIwPxdj+RjMKcXcqDvZ5KhV/K6HsGbTbcaMTMClJxgn/CblLtzmirYzjsom8CDqRIRTZnIVN44CGxhj9buuj/JA7tHIA+x08BrycvpUcML9rvo7/agaB23H5lfmLE4ruV5yHmM7hinMBvrG822ofNdn4B3pceYwfF63UITpdMBzN+MEvncr5hNDEy8hlGdnbXAlOX1QsHN20HKgTMz6eGtbCAVqT3QKIGlawpXmVAfoFvZvNiR+iV+flvASb1NvI0fUwsIQNP3PoE3Or5YiNZ+7QAjQT6gHMlsz7pUzTX8M+jPiYdvVVqf9KgzjfTAXrM2c=-NKWxeX2eBjpGz1923Z7b76UGRc6eBiN0dtQwx2IJ7BFGInkErccV8bx3RQF1OJ8C+23ynUjF2spFJq5n/GYWong5YhDGb25Gskhz4Yy+OD0Z39JPBcBq7cQa88iYfkgJRMfvqD4i10v80BDJQD1udF4HXh3W66qyFxCdoF5e3So=; sv-culture=en-US; last-visited-page-Ray=https%3A%2F%2Fapp.skuvault.com%2Fsales%2FQualityControl",
+    "Referer": "https://app.skuvault.com/sales/QualityControl"
+  },
+  "body": null,
+  "method": "GET"
+});
+
+response:
+
+{"Errors":[],"Messages":[],"Data":{"IsQuickCreation":false,"Id":"2838","Code":"073608032322","Sku":"JCB-SS-1-26","SkuJson":null,"FnSkuInfo":null,"Title":"Klement's Beef Snack Stick - .8 oz.","TitleJson":null,"ClassificationId":"0","ClassificationName":null,"BrandId":"0","BrandName":null,"PrimarySupplier":{"Id":"0","Name":null,"Cost":0.0,"LeadTime":0,"IsLeadTimeUsesGlobalValue":false,"PartNumber":null,"Active":false},"SupplierId":"0","Suppliers":[],"SupplierNames":[null],"Cost":{"a":0,"s":"$"},"SalePrice":{"a":0,"s":"$"},"RetailPrice":{"a":0,"s":"$"},"Weight":null,"WeightValue":null,"WeightUnit":null,"ReorderPoint":0,"IncrementalQuantity":0,"PartNumber":null,"QuantityOnHand":0,"QuantityOnHandCase":0,"QuantityPending":0,"IncomingQuantity":0,"QuantityAvailable":0,"ExternalQuantityAvailable":0,"PickedQuantity":0,"PickedQuantityCase":0,"TotalQuantity":0,"TotalCaseQuantity":0,"TotalNotCountedQuantity":0,"TotalSecondaryQuantity":0,"TotalSecondaryCaseQuantity":0,"TotalCountedCaseQuantity":0,"TotalNotCountedCaseQuantity":0,"TotalQuantityOnHold":null,"TotalQuantityCasedOnHold":0,"CreateDate":"0001-01-01T00:00:00.0000000Z","ModifiedDate":"0001-01-01T00:00:00.0000000Z","FbaInventory":null,"WfsInventory":null,"Attributes":[],"Pictures":[{"Url":"https://cdn.shopify.com/s/files/1/1866/5947/files/klements_beef_HEIC.jpg?v=1648243650"}],"WeightUnits":[],"AlternateCodes":[],"AlternateSkus":null,"IsKit":false,"IsAssembledProduct":false,"IsCasePack":false,"CorrespondingKitQuantity":0,"MinimumOrderQuantity":null,"MinimumOrderQuantityInfo":null,"Note":null,"StatusesIds":[],"StatusesNames":null,"LongDescription":null,"ShortDescription":null,"VariationParentSku":null,"DontSendQty":false,"CountAmazonChannelAccounts":0,"ExternalInventory":null,"IsSerialized":false,"IsFoundBySerialNumber":false,"IsLotted":false,"LotScanned":false,"LotPrioritySetting":"Global","LotPriorities":[],"ClientId":"0","ClientName":null},"Status":"Data"}
+
+
+
