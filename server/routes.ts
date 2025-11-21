@@ -1491,7 +1491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'shipstation',
         resourceType: req.body.resource_type,
         resourceUrl: req.body.resource_url,
-        trackingData: req.body.data, // Include tracking data for track webhooks
+        data: req.body.data, // Capture inline data for ALL webhook types (tracking, fulfillment, etc.)
         receivedAt: new Date().toISOString(),
       };
 

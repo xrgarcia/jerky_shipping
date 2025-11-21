@@ -268,15 +268,15 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
         }
       } else if (webhookData.type === 'shipstation') {
         // Track webhooks - queue for async processing by shipment sync worker
-        if (webhookData.resourceType === 'API_TRACK' && webhookData.trackingData) {
-          const trackingData = webhookData.trackingData;
+        if (webhookData.resourceType === 'API_TRACK' && webhookData.data) {
+          const trackingData = webhookData.data;
           const trackingNumber = trackingData.tracking_number;
           
           // Check if we already have this shipment
           const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
           
           if (existingShipment) {
-            // Update existing shipment with latest tracking data
+            // Update existing shipment with latest tracking data from webhook (no API call!)
             await storage.updateShipment(existingShipment.id, {
               carrierCode: trackingData.carrier_code || existingShipment.carrierCode,
               status: trackingData.status_code || 'unknown',
@@ -285,7 +285,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               shipmentData: trackingData,
             });
             
-            console.log(`Updated shipment ${existingShipment.id} with tracking ${trackingNumber}`);
+            console.log(`Updated shipment ${existingShipment.id} with tracking ${trackingNumber} from webhook`);
             
             // Broadcast update to connected clients
             if (existingShipment.orderId) {
@@ -295,26 +295,40 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               }
             }
           } else {
-            // No existing shipment - queue for async processing
-            console.log(`No shipment found for tracking ${trackingNumber} - queuing for shipment sync worker`);
+            // No existing shipment - queue for intelligent processing
+            // Shipment sync worker will try to: (1) extract shipment ID from label URL, (2) lookup by order number, (3) DLQ
+            console.log(`No shipment found for tracking ${trackingNumber} - queuing for intelligent shipment sync`);
             
             await enqueueShipmentSync({
               trackingNumber,
               labelUrl: trackingData.label_url, // Extract label URL for shipment ID extraction
-              shipmentId: trackingData.shipment_id, // Extract shipment ID if present
-              reason: 'webhook',
+              reason: 'webhook_tracking',
               enqueuedAt: Date.now(),
-              originalWebhook: webhookData, // Preserve original webhook for troubleshooting
+              webhookData: trackingData, // Pass webhook data directly (no API call needed!)
             });
           }
         } 
-        // Fulfillment webhooks - queue for async processing by shipment sync worker
+        // Fulfillment webhooks - intelligently use inline data or fallback to API
         else if (webhookData.resourceType === 'FULFILLMENT_V2') {
-          const resourceUrl = webhookData.resourceUrl;
-          const shipmentResponse = await fetchShipStationResource(resourceUrl);
-          const shipments = shipmentResponse.shipments || [];
+          let shipments = [];
+          
+          // OPTIMIZATION: Check if webhook contains inline shipment data (no API call needed!)
+          if (webhookData.data && Array.isArray(webhookData.data.shipments)) {
+            shipments = webhookData.data.shipments;
+            console.log(`Using inline shipment data from FULFILLMENT_V2 webhook (${shipments.length} shipments) - no API call!`);
+          } else if (webhookData.data && !Array.isArray(webhookData.data.shipments) && webhookData.data.shipment_id) {
+            // Single shipment case
+            shipments = [webhookData.data];
+            console.log(`Using inline single shipment data from FULFILLMENT_V2 webhook - no API call!`);
+          } else {
+            // FALLBACK: Webhook only contains resource URL, need to fetch
+            console.log(`FULFILLMENT_V2 webhook missing inline data - falling back to API call`);
+            const resourceUrl = webhookData.resourceUrl;
+            const shipmentResponse = await fetchShipStationResource(resourceUrl);
+            shipments = shipmentResponse.shipments || [];
+          }
 
-          // Queue each order number for shipment sync processing
+          // Queue each shipment for processing
           for (const shipmentData of shipments) {
             // ShipStation uses 'shipment_number' field for the order number
             const orderNumber = shipmentData.shipment_number;
@@ -324,12 +338,14 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               
               await enqueueShipmentSync({
                 orderNumber,
-                reason: 'webhook',
+                shipmentId: shipmentData.shipment_id,
+                trackingNumber: shipmentData.tracking_number,
+                reason: 'webhook_fulfillment',
                 enqueuedAt: Date.now(),
-                originalWebhook: webhookData, // Preserve original webhook for troubleshooting
+                webhookData: shipmentData, // Pass shipment data directly from webhook!
               });
             } else {
-              console.warn(`Shipment ${shipmentData.shipmentId} missing shipment_number field - cannot queue`);
+              console.warn(`Shipment ${shipmentData.shipment_id} missing shipment_number field - cannot queue`);
             }
           }
         }
