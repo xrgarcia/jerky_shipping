@@ -1653,14 +1653,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Start date and end date are required" });
       }
 
-      if (!process.env.SHOPIFY_SHOP_DOMAIN || !process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
-        return res.status(400).json({ error: "Shopify credentials not configured" });
-      }
-
-      if (!process.env.SHIPSTATION_API_KEY) {
-        return res.status(400).json({ error: "ShipStation credentials not configured" });
-      }
-
       const start = new Date(startDate);
       const end = new Date(endDate);
 
@@ -1670,74 +1662,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if there's already an active job
       const allJobs = await storage.getAllBackfillJobs();
-      const activeJob = allJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      const activeJob = allJobs.find(j => j.status === 'running' || j.status === 'pending');
       if (activeJob) {
         return res.status(400).json({ 
-          error: "A backfill job is already in progress. Please wait for it to complete or delete it before starting a new one." 
+          error: "A backfill job is already in progress. Please wait for it to complete or cancel it before starting a new one." 
         });
       }
 
-      // Generate daily fetch tasks (2 per day: Shopify + ShipStation)
-      const tasks: { source: 'shopify' | 'shipstation'; startDate: string; endDate: string }[] = [];
-      const currentDate = new Date(start);
-      
-      while (currentDate <= end) {
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(0, 0, 0, 0);
-        
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        // Don't go past the requested end date
-        const effectiveEnd = dayEnd > end ? end : dayEnd;
-        
-        // Create tasks for both sources
-        tasks.push({
-          source: 'shopify',
-          startDate: dayStart.toISOString(),
-          endDate: effectiveEnd.toISOString(),
-        });
-        
-        tasks.push({
-          source: 'shipstation',
-          startDate: dayStart.toISOString(),
-          endDate: effectiveEnd.toISOString(),
-        });
-        
-        // Move to next day
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      // Create backfill job with fetch task tracking
+      // Create backfill job
       const job = await storage.createBackfillJob({
         startDate: start,
         endDate: end,
-        status: "in_progress",
-        totalOrders: 0,
-        processedOrders: 0,
-        failedOrders: 0,
-        totalFetchTasks: tasks.length,
-        completedFetchTasks: 0,
-        failedFetchTasks: 0,
-        currentStage: "fetching_data",
-        lastActivityAt: new Date(),
-        errorLog: [],
+        status: "pending",
       });
 
-      // Enqueue all fetch tasks
-      const { enqueueBackfillFetchTaskBatch } = await import('./utils/queue');
-      await enqueueBackfillFetchTaskBatch(tasks.map(task => ({
-        ...task,
-        jobId: job.id,
-        enqueuedAt: Date.now(),
-      })));
+      console.log(`[Backfill ${job.id}] Starting backfill from ${start.toISOString()} to ${end.toISOString()}`);
 
-      console.log(`[Backfill ${job.id}] Created ${tasks.length} fetch tasks (${tasks.filter(t => t.source === 'shopify').length} Shopify, ${tasks.filter(t => t.source === 'shipstation').length} ShipStation)`);
+      // Start backfill in background (fire and forget)
+      const { BackfillService } = await import('./services/backfill-service');
+      const backfillService = new BackfillService(storage);
+      backfillService.runBackfillJob(job.id).catch(error => {
+        console.error(`[Backfill ${job.id}] Background job failed:`, error);
+      });
 
       res.json({ 
         success: true,
         job: await storage.getBackfillJob(job.id),
-        message: `Created ${tasks.length} fetch tasks. Workers will process them asynchronously.`,
+        message: `Backfill job started. Check progress at /api/backfill/jobs/${job.id}`,
       });
     } catch (error) {
       console.error("Error starting backfill:", error);
@@ -1794,15 +1745,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Job not found" });
       }
 
-      if (job.status !== "in_progress" && job.status !== "pending") {
-        return res.status(400).json({ error: "Only pending or in-progress jobs can be cancelled" });
+      if (job.status !== "running" && job.status !== "pending") {
+        return res.status(400).json({ error: "Only pending or running jobs can be cancelled" });
       }
 
       await storage.updateBackfillJob(req.params.id, {
-        status: "failed",
+        status: "cancelled",
         errorMessage: "Cancelled by user",
-        currentStage: "cancelled",
-        lastActivityAt: new Date(),
+        completedAt: new Date(),
       });
 
       res.json({ success: true });
@@ -1908,7 +1858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if there's already an active job
       const allJobs = await storage.getAllBackfillJobs();
-      const activeJob = allJobs.find(j => j.status === 'in_progress' || j.status === 'pending');
+      const activeJob = allJobs.find(j => j.status === 'running' || j.status === 'pending');
       if (activeJob) {
         return res.status(400).json({ 
           error: "A backfill job is already in progress. Please wait for it to complete or delete it before restarting." 
@@ -1923,101 +1873,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: start,
         endDate: end,
         status: "pending",
-        totalOrders: 0,
-        processedOrders: 0,
-        failedOrders: 0,
       });
 
-      // Fetch orders from Shopify with date filters
-      const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
-      const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+      console.log(`[Backfill ${job.id}] Restarting backfill from ${start.toISOString()} to ${end.toISOString()}`);
 
-      let allOrders: any[] = [];
-      let pageInfo: string | null = null;
-      let hasNextPage = true;
-
-      // Paginate through all orders in date range
-      while (hasNextPage) {
-        let url: string;
-        if (pageInfo) {
-          url = `https://${shopDomain}/admin/api/2024-01/orders.json?page_info=${pageInfo}`;
-        } else {
-          url = `https://${shopDomain}/admin/api/2024-01/orders.json?limit=250&status=any&created_at_min=${start.toISOString()}&created_at_max=${end.toISOString()}`;
-        }
-
-        const response = await fetch(url, {
-          headers: {
-            "X-Shopify-Access-Token": accessToken,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          await storage.updateBackfillJob(job.id, {
-            status: "failed",
-            errorMessage: `Shopify API error: ${errorText}`,
-          });
-          return res.status(500).json({ error: "Failed to fetch orders from Shopify" });
-        }
-
-        const data = await response.json();
-        allOrders = allOrders.concat(data.orders || []);
-
-        const linkHeader = response.headers.get("Link");
-        if (linkHeader && linkHeader.includes('rel="next"')) {
-          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-          if (nextMatch) {
-            const nextUrl = new URL(nextMatch[1]);
-            pageInfo = nextUrl.searchParams.get("page_info");
-          } else {
-            hasNextPage = false;
-          }
-        } else {
-          hasNextPage = false;
-        }
-
-        if (hasNextPage) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      // CRITICAL: Set totalOrders FIRST, before queuing orders
-      // This prevents race condition where worker finishes before totalOrders is set
-      await storage.updateBackfillJob(job.id, {
-        totalOrders: allOrders.length,
-        status: "in_progress",
+      // Start backfill in background (fire and forget)
+      const { BackfillService } = await import('./services/backfill-service');
+      const backfillService = new BackfillService(storage);
+      backfillService.runBackfillJob(job.id).catch(error => {
+        console.error(`[Backfill ${job.id}] Background job failed:`, error);
       });
-
-      // Now queue each order for async processing
-      // Wrap in try/catch to rollback if enqueue fails
-      try {
-        for (const shopifyOrder of allOrders) {
-          const webhookData = {
-            type: 'backfill',
-            jobId: job.id,
-            order: shopifyOrder,
-            receivedAt: new Date().toISOString(),
-          };
-          await enqueueWebhook(webhookData);
-        }
-      } catch (enqueueError: any) {
-        // Rollback: reset job completely so it can be retried
-        // Reset counters to prevent processedOrders > totalOrders from orphaned tasks
-        await storage.updateBackfillJob(job.id, {
-          totalOrders: 0,
-          processedOrders: 0,
-          failedOrders: 0,
-          status: "failed",
-          errorMessage: `Failed to queue orders: ${enqueueError.message}`,
-        });
-        console.error("Error queuing orders for backfill restart:", enqueueError);
-        return res.status(500).json({ error: "Failed to queue orders for processing" });
-      }
 
       res.json({ 
         success: true,
         job: await storage.getBackfillJob(job.id),
+        message: `Backfill job restarted. Check progress at /api/backfill/jobs/${job.id}`,
       });
     } catch (error) {
       console.error("Error restarting backfill:", error);

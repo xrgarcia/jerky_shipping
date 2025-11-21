@@ -57,11 +57,14 @@ type BackfillJob = {
   id: string;
   startDate: string;
   endDate: string;
-  status: "pending" | "in_progress" | "completed" | "failed";
-  totalOrders: number;
-  processedOrders: number;
-  failedOrders: number;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  shopifyOrdersTotal: number;
+  shopifyOrdersImported: number;
+  shipstationShipmentsTotal: number;
+  shipstationShipmentsImported: number;
   errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1291,32 +1294,44 @@ Please analyze this failure and help me understand:
                   </p>
                 </div>
                 <Badge 
-                  variant={queueStats.backfill.activeJob.status === "in_progress" ? "default" : "secondary"}
+                  variant={queueStats.backfill.activeJob.status === "running" ? "default" : "secondary"}
                   data-testid="badge-backfill-status"
                 >
-                  {queueStats.backfill.activeJob.status === "in_progress" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
+                  {queueStats.backfill.activeJob.status === "running" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
                   {queueStats.backfill.activeJob.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
                   {queueStats.backfill.activeJob.status}
                 </Badge>
               </div>
               
-              {queueStats.backfill.activeJob.totalOrders > 0 && (
+              {/* Shopify Orders Progress */}
+              {queueStats.backfill.activeJob.shopifyOrdersTotal > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
+                    <span className="text-muted-foreground">Shopify Orders</span>
                     <span className="font-medium">
-                      {queueStats.backfill.activeJob.processedOrders.toLocaleString()} / {queueStats.backfill.activeJob.totalOrders.toLocaleString()}
+                      {queueStats.backfill.activeJob.shopifyOrdersImported.toLocaleString()} / {queueStats.backfill.activeJob.shopifyOrdersTotal.toLocaleString()}
                     </span>
                   </div>
                   <Progress 
-                    value={(queueStats.backfill.activeJob.processedOrders / queueStats.backfill.activeJob.totalOrders) * 100}
-                    data-testid="progress-backfill"
+                    value={(queueStats.backfill.activeJob.shopifyOrdersImported / queueStats.backfill.activeJob.shopifyOrdersTotal) * 100}
+                    data-testid="progress-backfill-shopify"
                   />
-                  {queueStats.backfill.activeJob.failedOrders > 0 && (
-                    <p className="text-sm text-destructive">
-                      {queueStats.backfill.activeJob.failedOrders} failed orders
-                    </p>
-                  )}
+                </div>
+              )}
+              
+              {/* ShipStation Shipments Progress */}
+              {queueStats.backfill.activeJob.shipstationShipmentsTotal > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">ShipStation Shipments</span>
+                    <span className="font-medium">
+                      {queueStats.backfill.activeJob.shipstationShipmentsImported.toLocaleString()} / {queueStats.backfill.activeJob.shipstationShipmentsTotal.toLocaleString()}
+                    </span>
+                  </div>
+                  <Progress 
+                    value={(queueStats.backfill.activeJob.shipstationShipmentsImported / queueStats.backfill.activeJob.shipstationShipmentsTotal) * 100}
+                    data-testid="progress-backfill-shipstation"
+                  />
                 </div>
               )}
             </div>

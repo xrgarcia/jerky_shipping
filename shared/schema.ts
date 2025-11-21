@@ -405,27 +405,20 @@ export const backfillJobs = pgTable("backfill_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
-  status: text("status").notNull().default("pending"), // pending, in_progress, completed, failed
-  // Fetch task tracking (new architecture)
-  totalFetchTasks: integer("total_fetch_tasks").notNull().default(0),
-  completedFetchTasks: integer("completed_fetch_tasks").notNull().default(0),
-  failedFetchTasks: integer("failed_fetch_tasks").notNull().default(0),
-  // Per-source fetch task tracking for UI breakdown
-  shopifyFetchCompleted: integer("shopify_fetch_completed").notNull().default(0),
-  shopifyFetchFailed: integer("shopify_fetch_failed").notNull().default(0),
-  shipstationFetchCompleted: integer("shipstation_fetch_completed").notNull().default(0),
-  shipstationFetchFailed: integer("shipstation_fetch_failed").notNull().default(0),
-  // Legacy order tracking (kept for backward compatibility)
-  totalOrders: integer("total_orders").notNull().default(0),
-  processedOrders: integer("processed_orders").notNull().default(0),
-  failedOrders: integer("failed_orders").notNull().default(0),
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed, cancelled
+  // Shopify progress tracking
+  shopifyOrdersTotal: integer("shopify_orders_total").notNull().default(0),
+  shopifyOrdersImported: integer("shopify_orders_imported").notNull().default(0),
+  shopifyOrdersFailed: integer("shopify_orders_failed").notNull().default(0),
+  // ShipStation progress tracking
+  shipstationShipmentsTotal: integer("shipstation_shipments_total").notNull().default(0),
+  shipstationShipmentsImported: integer("shipstation_shipments_imported").notNull().default(0),
+  shipstationShipmentsFailed: integer("shipstation_shipments_failed").notNull().default(0),
+  // Error tracking
   errorMessage: text("error_message"),
-  lastProcessedOrderId: text("last_processed_order_id"),
-  // Observability fields for troubleshooting stuck jobs
-  lastActivityAt: timestamp("last_activity_at"), // Heartbeat timestamp updated every few seconds
-  currentStage: text("current_stage"), // generating_tasks, fetching, processing, completed
-  currentOrderIndex: integer("current_order_index"), // Which order (1-based) is being processed
-  errorLog: jsonb("error_log"), // Array of all errors encountered (even if job continues)
+  // Timestamps
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
