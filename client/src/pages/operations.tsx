@@ -60,8 +60,10 @@ type BackfillJob = {
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   shopifyOrdersTotal: number;
   shopifyOrdersImported: number;
+  shopifyOrdersFailed: number;
   shipstationShipmentsTotal: number;
   shipstationShipmentsImported: number;
+  shipstationShipmentsFailed: number;
   errorMessage: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -1275,7 +1277,7 @@ Please analyze this failure and help me understand:
         </CardContent>
       </Card>
 
-{(() => {
+      {(() => {
         const displayJob = queueStats?.backfill?.activeJob || queueStats?.backfill?.recentJobs?.[0];
         if (!displayJob) return null;
         
@@ -1326,7 +1328,7 @@ Please analyze this failure and help me understand:
                       <span className="text-muted-foreground">Shopify Orders</span>
                       <span className="font-medium">
                         {displayJob.shopifyOrdersImported.toLocaleString()} / {displayJob.shopifyOrdersTotal.toLocaleString()}
-                        {displayJob.shopifyOrdersFailed > 0 && (
+                        {(displayJob.shopifyOrdersFailed ?? 0) > 0 && (
                           <span className="text-destructive ml-1">
                             ({displayJob.shopifyOrdersFailed} failed)
                           </span>
@@ -1334,7 +1336,7 @@ Please analyze this failure and help me understand:
                       </span>
                     </div>
                     <Progress 
-                      value={(displayJob.shopifyOrdersImported / displayJob.shopifyOrdersTotal) * 100}
+                      value={displayJob.shopifyOrdersTotal > 0 ? (displayJob.shopifyOrdersImported / displayJob.shopifyOrdersTotal) * 100 : 0}
                       data-testid="progress-backfill-shopify"
                     />
                   </div>
@@ -1347,7 +1349,7 @@ Please analyze this failure and help me understand:
                       <span className="text-muted-foreground">ShipStation Shipments</span>
                       <span className="font-medium">
                         {displayJob.shipstationShipmentsImported.toLocaleString()} / {displayJob.shipstationShipmentsTotal.toLocaleString()}
-                        {displayJob.shipstationShipmentsFailed > 0 && (
+                        {(displayJob.shipstationShipmentsFailed ?? 0) > 0 && (
                           <span className="text-destructive ml-1">
                             ({displayJob.shipstationShipmentsFailed} failed)
                           </span>
@@ -1355,7 +1357,7 @@ Please analyze this failure and help me understand:
                       </span>
                     </div>
                     <Progress 
-                      value={(displayJob.shipstationShipmentsImported / displayJob.shipstationShipmentsTotal) * 100}
+                      value={displayJob.shipstationShipmentsTotal > 0 ? (displayJob.shipstationShipmentsImported / displayJob.shipstationShipmentsTotal) * 100 : 0}
                       data-testid="progress-backfill-shipstation"
                     />
                   </div>
