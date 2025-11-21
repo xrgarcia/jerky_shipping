@@ -419,7 +419,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                   log(`[${trackingNumber}] Attempting to resolve shipment via label_id: ${labelId}`);
                   
                   // Import getLabelByLabelId from shipstation-api
-                  const { getLabelByLabelId } = await import('./shipstation-api');
+                  const { getLabelByLabelId } = await import('./utils/shipstation-api');
                   
                   // Get label data which includes shipment_id
                   const labelData = await getLabelByLabelId(labelId);
