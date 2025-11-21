@@ -45,6 +45,9 @@ import {
   type PackingLog,
   type InsertPackingLog,
   packingLogs,
+  type ShipmentEvent,
+  type InsertShipmentEvent,
+  shipmentEvents,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -190,6 +193,12 @@ export interface IStorage {
   createPackingLog(log: InsertPackingLog): Promise<PackingLog>;
   getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]>;
   getPackingLogsByUser(userId: string, limit?: number): Promise<PackingLog[]>;
+  
+  // Shipment Events
+  createShipmentEvent(event: InsertShipmentEvent): Promise<ShipmentEvent>;
+  getShipmentEventsByOrderNumber(orderNumber: string): Promise<ShipmentEvent[]>;
+  getShipmentEventsByUser(username: string, limit?: number): Promise<ShipmentEvent[]>;
+  getShipmentEventsByDateRange(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
   
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
@@ -1582,6 +1591,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(packingLogs.userId, userId))
       .orderBy(desc(packingLogs.createdAt))
       .limit(limit);
+  }
+
+  // Shipment Events
+  async createShipmentEvent(event: InsertShipmentEvent): Promise<ShipmentEvent> {
+    const result = await db.insert(shipmentEvents).values(event).returning();
+    return result[0];
+  }
+
+  async getShipmentEventsByOrderNumber(orderNumber: string): Promise<ShipmentEvent[]> {
+    return await db
+      .select()
+      .from(shipmentEvents)
+      .where(eq(shipmentEvents.orderNumber, orderNumber))
+      .orderBy(desc(shipmentEvents.occurredAt));
+  }
+
+  async getShipmentEventsByUser(username: string, limit = 100): Promise<ShipmentEvent[]> {
+    return await db
+      .select()
+      .from(shipmentEvents)
+      .where(eq(shipmentEvents.username, username))
+      .orderBy(desc(shipmentEvents.occurredAt))
+      .limit(limit);
+  }
+
+  async getShipmentEventsByDateRange(startDate: Date, endDate: Date): Promise<ShipmentEvent[]> {
+    return await db
+      .select()
+      .from(shipmentEvents)
+      .where(
+        and(
+          gte(shipmentEvents.occurredAt, startDate),
+          lte(shipmentEvents.occurredAt, endDate)
+        )
+      )
+      .orderBy(desc(shipmentEvents.occurredAt));
   }
 
   // Shipment Sync Failures
