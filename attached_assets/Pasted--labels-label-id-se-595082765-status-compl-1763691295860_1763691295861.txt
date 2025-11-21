@@ -1,0 +1,2883 @@
+{
+    "labels": [
+        {
+            "label_id": "se-595082765",
+            "status": "completed",
+            "shipment_id": "se-923910990",
+            "external_shipment_id": "6854012666170-7842117681466",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:48:12.083Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 8.54
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650206217118858286",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302177480",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/h5LxLsdUjUmgSAluEMb_ig/label-595082765.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/h5LxLsdUjUmgSAluEMb_ig/label-595082765.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/h5LxLsdUjUmgSAluEMb_ig/label-595082765.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/h5LxLsdUjUmgSAluEMb_ig/label-595082765.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394138843,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 16.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650206217118858286",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/7WlA5lBzDkCUu_E5mk7oNg/labelpackage-394138843.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/7WlA5lBzDkCUu_E5mk7oNg/labelpackage-394138843.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/7WlA5lBzDkCUu_E5mk7oNg/labelpackage-394138843.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217118858286",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Courtney Peacock",
+                "phone": "6033405052",
+                "email": "sixpeacocks@gmail.com",
+                "company_name": null,
+                "address_line1": "107 SHORT FALLS RD",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "CHICHESTER",
+                "state_province": "NH",
+                "postal_code": "03258-6121",
+                "country_code": "US",
+                "address_residential_indicator": "unknown"
+            }
+        },
+        {
+            "label_id": "se-595081988",
+            "status": "completed",
+            "shipment_id": "se-924179843",
+            "external_shipment_id": "6855262273850-7843433087290",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:44:03.01Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 10.94
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082133954",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302177045",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/GjNakM_YMUmIgABtVWSlbA/label-595081988.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/GjNakM_YMUmIgABtVWSlbA/label-595081988.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/GjNakM_YMUmIgABtVWSlbA/label-595081988.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/GjNakM_YMUmIgABtVWSlbA/label-595081988.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394138113,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 54.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082133954",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/9AcfL2mVyEGlC81AL31AmA/labelpackage-394138113.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/9AcfL2mVyEGlC81AL31AmA/labelpackage-394138113.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/9AcfL2mVyEGlC81AL31AmA/labelpackage-394138113.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082133954",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "John Trice",
+                "phone": "+17168364115",
+                "email": "js.trice@verizon.net",
+                "company_name": null,
+                "address_line1": "4622 LEWIS DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "HAMBURG",
+                "state_province": "NY",
+                "postal_code": "14075-5402",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595081824",
+            "status": "completed",
+            "shipment_id": "se-924179824",
+            "external_shipment_id": "6855232225594-7843401007418",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:43:04.027Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.66
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [
+                {
+                    "rate_detail_type": "additional_fees",
+                    "carrier_description": "Demand Surcharge - Residential",
+                    "carrier_billing_code": "rate_modifier",
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 0.400
+                    },
+                    "billing_source": "carrier"
+                },
+                {
+                    "rate_detail_type": "shipping",
+                    "carrier_description": "Shipping",
+                    "carrier_billing_code": "BaseServiceCharge",
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 7.260
+                    },
+                    "billing_source": "carrier"
+                }
+            ],
+            "tracking_number": "1ZHH36200305433918",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176910",
+            "carrier_id": "se-971947",
+            "service_code": "ups_ground",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "ups",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/d5hvfP0MQEidh1Cxfc4sVQ/label-595081824.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/d5hvfP0MQEidh1Cxfc4sVQ/label-595081824.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/d5hvfP0MQEidh1Cxfc4sVQ/label-595081824.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/d5hvfP0MQEidh1Cxfc4sVQ/label-595081824.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394137968,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 19.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "1ZHH36200305433918",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/5ESwt71n7kOXkyr0pwYGpg/labelpackage-394137968.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/5ESwt71n7kOXkyr0pwYGpg/labelpackage-394137968.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/5ESwt71n7kOXkyr0pwYGpg/labelpackage-394137968.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "http://wwwapps.ups.com/WebTracking/processRequest?HTMLVersion=5.0&Requester=NES&AgreeToTermsAndConditions=yes&loc=en_US&tracknum=1ZHH36200305433918",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Michelle Moxon",
+                "phone": "3528171577",
+                "email": "moxonma352@gmail.com",
+                "company_name": "SECRETARY",
+                "address_line1": "2235 SE 14TH ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "OCALA",
+                "state_province": "FL",
+                "postal_code": "34471-2601",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595081746",
+            "status": "completed",
+            "shipment_id": "se-924179869",
+            "external_shipment_id": "6855228227898-7843396780346",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:42:43.463Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.57
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [
+                {
+                    "rate_detail_type": "additional_fees",
+                    "carrier_description": "Demand Surcharge - Residential",
+                    "carrier_billing_code": "rate_modifier",
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 0.400
+                    },
+                    "billing_source": "carrier"
+                },
+                {
+                    "rate_detail_type": "shipping",
+                    "carrier_description": "Shipping",
+                    "carrier_billing_code": "BaseServiceCharge",
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 7.170
+                    },
+                    "billing_source": "carrier"
+                }
+            ],
+            "tracking_number": "1ZHH36200300898702",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176870",
+            "carrier_id": "se-971947",
+            "service_code": "ups_ground",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "ups",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/KQ7dLJzDPEiPVGx5C7A3DQ/label-595081746.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/KQ7dLJzDPEiPVGx5C7A3DQ/label-595081746.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/KQ7dLJzDPEiPVGx5C7A3DQ/label-595081746.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/KQ7dLJzDPEiPVGx5C7A3DQ/label-595081746.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394137907,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 22.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "1ZHH36200300898702",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/zzpaHqfO-kOvLLMr9bGUcA/labelpackage-394137907.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/zzpaHqfO-kOvLLMr9bGUcA/labelpackage-394137907.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/zzpaHqfO-kOvLLMr9bGUcA/labelpackage-394137907.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "http://wwwapps.ups.com/WebTracking/processRequest?HTMLVersion=5.0&Requester=NES&AgreeToTermsAndConditions=yes&loc=en_US&tracknum=1ZHH36200300898702",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Debbie Batliner",
+                "phone": "+18166788188",
+                "email": "dbatliner@comcast.net",
+                "company_name": null,
+                "address_line1": "4088 SW MARLINE DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "LEES SUMMIT",
+                "state_province": "MO",
+                "postal_code": "64082-4723",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595081494",
+            "status": "completed",
+            "shipment_id": "se-924179817",
+            "external_shipment_id": "6855219839290-7843387474234",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:42:01.95Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 9.72
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650206217118855612",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176762",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/lzKz3yeqjkCvSsZfhWqTsQ/label-595081494.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/lzKz3yeqjkCvSsZfhWqTsQ/label-595081494.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/lzKz3yeqjkCvSsZfhWqTsQ/label-595081494.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/lzKz3yeqjkCvSsZfhWqTsQ/label-595081494.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394137765,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 69.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650206217118855612",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/xOva0JoodUGfsvqsyuq8Zg/labelpackage-394137765.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/xOva0JoodUGfsvqsyuq8Zg/labelpackage-394137765.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/xOva0JoodUGfsvqsyuq8Zg/labelpackage-394137765.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217118855612",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Johnny Falkner",
+                "phone": "+12196162617",
+                "email": "johnnyf123@sbcglobal.net",
+                "company_name": null,
+                "address_line1": "1702 N INDIANA ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "GRIFFITH",
+                "state_province": "IN",
+                "postal_code": "46319-1106",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595080807",
+            "status": "completed",
+            "shipment_id": "se-924248882",
+            "external_shipment_id": "bcc17633-9327-1ff2-067a-726ed9a8d398",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:39:26.133Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 32.18
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9405550206217068880710",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176492",
+            "carrier_id": "se-118080",
+            "service_code": "usps_priority_mail",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/W-Jtr9MtBk242W2l-Ha15w/label-595080807.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/W-Jtr9MtBk242W2l-Ha15w/label-595080807.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/W-Jtr9MtBk242W2l-Ha15w/label-595080807.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/W-Jtr9MtBk242W2l-Ha15w/label-595080807.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394137117,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 192.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9405550206217068880710",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/u8A6LzOubESBqtHx4GkUWg/labelpackage-394137117.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/u8A6LzOubESBqtHx4GkUWg/labelpackage-394137117.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/u8A6LzOubESBqtHx4GkUWg/labelpackage-394137117.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9405550206217068880710",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Amy Bannerman",
+                "phone": "8187677570",
+                "email": null,
+                "company_name": "GLENOAKS FOODS",
+                "address_line1": "11030 RANDALL ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "SUN VALLEY",
+                "state_province": "CA",
+                "postal_code": "91352-2621",
+                "country_code": "US",
+                "address_residential_indicator": "unknown"
+            }
+        },
+        {
+            "label_id": "se-595080313",
+            "status": "completed",
+            "shipment_id": "se-924179880",
+            "external_shipment_id": "6855204405562-7843370631482",
+            "external_order_id": "16599234478394",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:37:35.287Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 10.08
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082130991",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176276",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/nh2rQPThAkOuQmARsZNo6Q/label-595080313.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/nh2rQPThAkOuQmARsZNo6Q/label-595080313.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/nh2rQPThAkOuQmARsZNo6Q/label-595080313.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/nh2rQPThAkOuQmARsZNo6Q/label-595080313.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136659,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 40.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082130991",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/mkDulSgxrkKl6H3hXusy2A/labelpackage-394136659.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/mkDulSgxrkKl6H3hXusy2A/labelpackage-394136659.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/mkDulSgxrkKl6H3hXusy2A/labelpackage-394136659.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082130991",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Jodi Schoolcraft",
+                "phone": "+16264233941",
+                "email": "traceys1974@hotmail.com",
+                "company_name": "ALLFAST FASTENING SYSTEMS/TRIMAS",
+                "address_line1": "15200 DON JULIAN RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "CITY INDUSTRY",
+                "state_province": "CA",
+                "postal_code": "91745-1001",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            }
+        },
+        {
+            "label_id": "se-595080200",
+            "status": "completed",
+            "shipment_id": "se-924154081",
+            "external_shipment_id": "6855162888506-7843325411642",
+            "external_order_id": "16599152263482",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:36:45.963Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.36
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082130427",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176179",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/-uNxvoudq06fl1Sn4nqvJQ/label-595080200.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/-uNxvoudq06fl1Sn4nqvJQ/label-595080200.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/-uNxvoudq06fl1Sn4nqvJQ/label-595080200.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/-uNxvoudq06fl1Sn4nqvJQ/label-595080200.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136468,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 16.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082130427",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/U79f5T7Kck2_VFYmidhe4Q/labelpackage-394136468.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/U79f5T7Kck2_VFYmidhe4Q/labelpackage-394136468.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/U79f5T7Kck2_VFYmidhe4Q/labelpackage-394136468.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082130427",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Amy Ashley",
+                "phone": null,
+                "email": "amysunshine13@gmail.com",
+                "company_name": null,
+                "address_line1": "16223 E CHOLLA DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "FOUNTAIN HLS",
+                "state_province": "AZ",
+                "postal_code": "85268-4453",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079989",
+            "status": "completed",
+            "shipment_id": "se-924154051",
+            "external_shipment_id": "6855149781306-7843311255866",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:35:23.313Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 12.25
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9405550206217068879554",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176026",
+            "carrier_id": "se-118080",
+            "service_code": "usps_priority_mail",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/b4p84i8OrESclVdKmtnQOg/label-595079989.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/b4p84i8OrESclVdKmtnQOg/label-595079989.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/b4p84i8OrESclVdKmtnQOg/label-595079989.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/b4p84i8OrESclVdKmtnQOg/label-595079989.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136299,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 25.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9405550206217068879554",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/Q2Ptzp3QC0KgqWkb2GC4Mw/labelpackage-394136299.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/Q2Ptzp3QC0KgqWkb2GC4Mw/labelpackage-394136299.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/Q2Ptzp3QC0KgqWkb2GC4Mw/labelpackage-394136299.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9405550206217068879554",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Linda Le",
+                "phone": "+16193133031",
+                "email": "yuxiao61@yahoo.com",
+                "company_name": null,
+                "address_line1": "2744 NYE ST",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "SAN DIEGO",
+                "state_province": "CA",
+                "postal_code": "92111-5404",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079942",
+            "status": "completed",
+            "shipment_id": "se-924153875",
+            "external_shipment_id": "114-8800601-6729812",
+            "external_order_id": "146875928786641",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:35:12.757Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 6.18
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150105501264123597",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302176004",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/He9PUMTuDUCMdZyHwRL84g/label-595079942.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/He9PUMTuDUCMdZyHwRL84g/label-595079942.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/He9PUMTuDUCMdZyHwRL84g/label-595079942.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/He9PUMTuDUCMdZyHwRL84g/label-595079942.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136259,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 11.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150105501264123597",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/Bbc72DGYsk-rPoIFLFv3Vw/labelpackage-394136259.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/Bbc72DGYsk-rPoIFLFv3Vw/labelpackage-394136259.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/Bbc72DGYsk-rPoIFLFv3Vw/labelpackage-394136259.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150105501264123597",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Serena Mire",
+                "phone": "+1 314-282-9402 ext. 82309",
+                "email": "p13p11znbtfs4q5@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "33 JERICHO RD",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "RINDGE",
+                "state_province": "NH",
+                "postal_code": "03461-5623",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079898",
+            "status": "completed",
+            "shipment_id": "se-924204233",
+            "external_shipment_id": "114-5120830-4263426",
+            "external_order_id": "146885281707521",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:34:57.413Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.67
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082129308",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175977",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/-XRrxRIuzkm7ArAOqVriIQ/label-595079898.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/-XRrxRIuzkm7ArAOqVriIQ/label-595079898.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/-XRrxRIuzkm7ArAOqVriIQ/label-595079898.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/-XRrxRIuzkm7ArAOqVriIQ/label-595079898.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136229,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 18.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082129308",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/ubztrAKw_0qjiWiNvOybig/labelpackage-394136229.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/ubztrAKw_0qjiWiNvOybig/labelpackage-394136229.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/ubztrAKw_0qjiWiNvOybig/labelpackage-394136229.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082129308",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "A. Blakley",
+                "phone": "+1 415-851-9136 ext. 67103",
+                "email": "s8xkphb2ml0gr4n@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "3816 AYRSHIRE DR",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "YOUNGSTOWN",
+                "state_province": "OH",
+                "postal_code": "44511-1122",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079878",
+            "status": "completed",
+            "shipment_id": "se-924141232",
+            "external_shipment_id": "6855104889146-7843263250746",
+            "external_order_id": "16599031873850",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:34:48.643Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.67
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650206217118851577",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175956",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/cCRbvtbdLEibYMmyZ5TQSA/label-595079878.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/cCRbvtbdLEibYMmyZ5TQSA/label-595079878.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/cCRbvtbdLEibYMmyZ5TQSA/label-595079878.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/cCRbvtbdLEibYMmyZ5TQSA/label-595079878.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136212,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 18.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650206217118851577",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/K2HsIt2MIkGZngbAJtFN8g/labelpackage-394136212.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/K2HsIt2MIkGZngbAJtFN8g/labelpackage-394136212.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/K2HsIt2MIkGZngbAJtFN8g/labelpackage-394136212.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217118851577",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Zack Manning",
+                "phone": "+16147870161",
+                "email": "manningfamily03@gmail.com",
+                "company_name": null,
+                "address_line1": "1100 MIAMI DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "MARYSVILLE",
+                "state_province": "OH",
+                "postal_code": "43040-8170",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079864",
+            "status": "completed",
+            "shipment_id": "se-924224983",
+            "external_shipment_id": "113-0611101-1323466",
+            "external_order_id": "146888414975601",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:34:42.2Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 6.06
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150206217387214903",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175944",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/9nXwoxyvnkq-Ch0xZMlaNA/label-595079864.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/9nXwoxyvnkq-Ch0xZMlaNA/label-595079864.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/9nXwoxyvnkq-Ch0xZMlaNA/label-595079864.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/9nXwoxyvnkq-Ch0xZMlaNA/label-595079864.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136200,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 11.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150206217387214903",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/Kt-v3ENHMECLiHuNhfxyEw/labelpackage-394136200.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/Kt-v3ENHMECLiHuNhfxyEw/labelpackage-394136200.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/Kt-v3ENHMECLiHuNhfxyEw/labelpackage-394136200.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150206217387214903",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Brittaney Stevens",
+                "phone": "+1 213-442-1463 ext. 13432",
+                "email": "csg2cmg7x0pcglg@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "426 S MERIDIAN ST",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "JASONVILLE",
+                "state_province": "IN",
+                "postal_code": "47438-1911",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079801",
+            "status": "completed",
+            "shipment_id": "se-924224980",
+            "external_shipment_id": "112-9102532-4941008",
+            "external_order_id": "146890458399961",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:34:22.92Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 4.87
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150206217387214248",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175915",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/gRCGYSyL70GsNdUfF_gwpg/label-595079801.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/gRCGYSyL70GsNdUfF_gwpg/label-595079801.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/gRCGYSyL70GsNdUfF_gwpg/label-595079801.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/gRCGYSyL70GsNdUfF_gwpg/label-595079801.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136141,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150206217387214248",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/duI6t3bWJE2gWp7DwLmtqg/labelpackage-394136141.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/duI6t3bWJE2gWp7DwLmtqg/labelpackage-394136141.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/duI6t3bWJE2gWp7DwLmtqg/labelpackage-394136141.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150206217387214248",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "David Stratemeyer",
+                "phone": "+1 763-225-9463 ext. 94596",
+                "email": "9nx02gmjwg0qx6s@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "26036 REDBLUFF DR",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "CALABASAS",
+                "state_province": "CA",
+                "postal_code": "91302-1071",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079737",
+            "status": "completed",
+            "shipment_id": "se-924214125",
+            "external_shipment_id": "112-5940003-5821855",
+            "external_order_id": "146889585879081",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:33:58.163Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 5.15
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150105501264121579",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175873",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/fjQD-Ig9aU25oP306Cs9CA/label-595079737.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/fjQD-Ig9aU25oP306Cs9CA/label-595079737.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/fjQD-Ig9aU25oP306Cs9CA/label-595079737.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/fjQD-Ig9aU25oP306Cs9CA/label-595079737.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136084,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 5.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150105501264121579",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/Mr6Olvv-u0aZGf2iOOal8Q/labelpackage-394136084.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/Mr6Olvv-u0aZGf2iOOal8Q/labelpackage-394136084.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/Mr6Olvv-u0aZGf2iOOal8Q/labelpackage-394136084.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150105501264121579",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Paisley Warren",
+                "phone": "+1 415-851-9136 ext. 60309",
+                "email": "93wfnlft33ltmtw@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "4022 EAGLES NEST DR",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "VALRICO",
+                "state_province": "FL",
+                "postal_code": "33596-7206",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079715",
+            "status": "completed",
+            "shipment_id": "se-924224977",
+            "external_shipment_id": "112-5332522-2508250",
+            "external_order_id": "146892859467201",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:33:45.11Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 10.98
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9405550105501046293763",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175854",
+            "carrier_id": "se-118080",
+            "service_code": "usps_priority_mail",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/P88W-g_OgUyKpJk3XQOxrA/label-595079715.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/P88W-g_OgUyKpJk3XQOxrA/label-595079715.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/P88W-g_OgUyKpJk3XQOxrA/label-595079715.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/P88W-g_OgUyKpJk3XQOxrA/label-595079715.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394136063,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9405550105501046293763",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/3LvonQ8yDEKaDnHOUf26Ww/labelpackage-394136063.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/3LvonQ8yDEKaDnHOUf26Ww/labelpackage-394136063.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/3LvonQ8yDEKaDnHOUf26Ww/labelpackage-394136063.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9405550105501046293763",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "jaime bhattacharyya",
+                "phone": "+1 207-835-4259 ext. 84986",
+                "email": "62pl85w07358xjd@marketplace.amazon.com",
+                "company_name": "",
+                "address_line1": "1252 CODY PKWY",
+                "address_line2": "",
+                "address_line3": "",
+                "city_locality": "PLATTEVILLE",
+                "state_province": "WI",
+                "postal_code": "53818-1403",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079605",
+            "status": "completed",
+            "shipment_id": "se-924156812",
+            "external_shipment_id": "JK3825-112025-JT",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:33:17.03Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 8.31
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082128202",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175802",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/PGBhlGUPQki6XeVI7ZTnaw/label-595079605.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/PGBhlGUPQki6XeVI7ZTnaw/label-595079605.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/PGBhlGUPQki6XeVI7ZTnaw/label-595079605.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/PGBhlGUPQki6XeVI7ZTnaw/label-595079605.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135992,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 16.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082128202",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/iq0HXdEu30KFCi5x7inuCA/labelpackage-394135992.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/iq0HXdEu30KFCi5x7inuCA/labelpackage-394135992.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/iq0HXdEu30KFCi5x7inuCA/labelpackage-394135992.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082128202",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Jennifer Tabachnick",
+                "phone": null,
+                "email": null,
+                "company_name": null,
+                "address_line1": "352 CENTRAL PARK AVE APT D21",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "SCARSDALE",
+                "state_province": "NY",
+                "postal_code": "10583-1351",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079560",
+            "status": "completed",
+            "shipment_id": "se-924156820",
+            "external_shipment_id": "JK3825-111925-JF",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:32:57.8Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 4.95
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150206217387212626",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175765",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/9w-sFo1tpU2tsVFgeTmxVw/label-595079560.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/9w-sFo1tpU2tsVFgeTmxVw/label-595079560.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/9w-sFo1tpU2tsVFgeTmxVw/label-595079560.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/9w-sFo1tpU2tsVFgeTmxVw/label-595079560.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135959,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150206217387212626",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/Z4M5zRHy5UWpEEe__WRFWA/labelpackage-394135959.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/Z4M5zRHy5UWpEEe__WRFWA/labelpackage-394135959.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/Z4M5zRHy5UWpEEe__WRFWA/labelpackage-394135959.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150206217387212626",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Jacqueline Fuller",
+                "phone": null,
+                "email": null,
+                "company_name": null,
+                "address_line1": "25 WEDGWOOD RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "AUBURN",
+                "state_province": "ME",
+                "postal_code": "04210-4751",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079488",
+            "status": "completed",
+            "shipment_id": "se-924141115",
+            "external_shipment_id": "6855099941178-7843258040634",
+            "external_order_id": "16599021191482",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:32:34.403Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 6.66
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650105501082127809",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175729",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/Z-giaW731k-Af1zthBNZFg/label-595079488.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/Z-giaW731k-Af1zthBNZFg/label-595079488.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/Z-giaW731k-Af1zthBNZFg/label-595079488.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/Z-giaW731k-Af1zthBNZFg/label-595079488.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135903,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 16.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650105501082127809",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/mRgHzTLnQUmuUTXhQ5Vg0Q/labelpackage-394135903.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/mRgHzTLnQUmuUTXhQ5Vg0Q/labelpackage-394135903.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/mRgHzTLnQUmuUTXhQ5Vg0Q/labelpackage-394135903.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501082127809",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Miles Parker",
+                "phone": null,
+                "email": "amythorosthedragon@gmail.com",
+                "company_name": null,
+                "address_line1": "877 WESTMORELAND RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "COLORADO SPGS",
+                "state_province": "CO",
+                "postal_code": "80907-4622",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079487",
+            "status": "completed",
+            "shipment_id": "se-924245847",
+            "external_shipment_id": "3269301b-0fb7-3ffa-ec7d-eaa25b55e15d",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:32:34.28Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 27.80
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9405550105501046293329",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175728",
+            "carrier_id": "se-118080",
+            "service_code": "usps_priority_mail",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/FWN2ZrzIUUWp-LdjQKplhw/label-595079487.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/FWN2ZrzIUUWp-LdjQKplhw/label-595079487.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/FWN2ZrzIUUWp-LdjQKplhw/label-595079487.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/FWN2ZrzIUUWp-LdjQKplhw/label-595079487.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135902,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 160.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9405550105501046293329",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/qXuXRYLOQkCVYqlkxWZeMw/labelpackage-394135902.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/qXuXRYLOQkCVYqlkxWZeMw/labelpackage-394135902.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/qXuXRYLOQkCVYqlkxWZeMw/labelpackage-394135902.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9405550105501046293329",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Cherron Hart",
+                "phone": "7143811147",
+                "email": null,
+                "company_name": "SETTLERS JERKY INC.",
+                "address_line1": "307 PASEO SONRISA",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "WALNUT",
+                "state_province": "CA",
+                "postal_code": "91789-2721",
+                "country_code": "US",
+                "address_residential_indicator": "unknown"
+            }
+        },
+        {
+            "label_id": "se-595079480",
+            "status": "completed",
+            "shipment_id": "se-924156828",
+            "external_shipment_id": "JK3825-111925-DD",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:32:32.62Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 6.54
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650206217118850198",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175725",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/bXlEcDExv0eCyNoPh2GoPQ/label-595079480.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/bXlEcDExv0eCyNoPh2GoPQ/label-595079480.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/bXlEcDExv0eCyNoPh2GoPQ/label-595079480.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/bXlEcDExv0eCyNoPh2GoPQ/label-595079480.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135896,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 18.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650206217118850198",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/F8B7Tx3A40KiIUk8nUht7w/labelpackage-394135896.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/F8B7Tx3A40KiIUk8nUht7w/labelpackage-394135896.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/F8B7Tx3A40KiIUk8nUht7w/labelpackage-394135896.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217118850198",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "David Dunn",
+                "phone": null,
+                "email": null,
+                "company_name": null,
+                "address_line1": "3607 LE MANS CT",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "ARLINGTON",
+                "state_province": "TX",
+                "postal_code": "76016-2937",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079405",
+            "status": "completed",
+            "shipment_id": "se-924214329",
+            "external_shipment_id": "6855370801466-7843548725562",
+            "external_order_id": "16599580901690",
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:32:02.337Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 4.69
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9400150105501264119095",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175661",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/RmUYU_U1aUOgLdnR_smPAA/label-595079405.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/RmUYU_U1aUOgLdnR_smPAA/label-595079405.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/RmUYU_U1aUOgLdnR_smPAA/label-595079405.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/RmUYU_U1aUOgLdnR_smPAA/label-595079405.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135828,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 3.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9400150105501264119095",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/0s_nG99MFkGoW47CeVeRGg/labelpackage-394135828.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/0s_nG99MFkGoW47CeVeRGg/labelpackage-394135828.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/0s_nG99MFkGoW47CeVeRGg/labelpackage-394135828.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9400150105501264119095",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Abner Girouard",
+                "phone": "6413901370",
+                "email": "agirouard1913@gmail.com",
+                "company_name": null,
+                "address_line1": "5046 THRUSH AVE",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "NORTHWOOD",
+                "state_province": "IA",
+                "postal_code": "50459-8619",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079365",
+            "status": "completed",
+            "shipment_id": "se-924214320",
+            "external_shipment_id": "6855364673850-7843542237498",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:31:41.1Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 8.24
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "requested_comparison_amount": null,
+            "rate_details": [
+                {
+                    "rate_detail_type": "shipping",
+                    "carrier_description": "TransportationCharge",
+                    "carrier_billing_code": null,
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 8.240
+                    },
+                    "billing_source": "carrier"
+                }
+            ],
+            "tracking_number": "1Z6W14490391460217",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175621",
+            "carrier_id": "se-435388",
+            "service_code": "ups_ground",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "ups",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/H681j2E04EGWAdkgBs9nxw/label-595079365.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/H681j2E04EGWAdkgBs9nxw/label-595079365.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/H681j2E04EGWAdkgBs9nxw/label-595079365.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/H681j2E04EGWAdkgBs9nxw/label-595079365.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135792,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 13.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "1Z6W14490391460217",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/ltAgvZ3PHkeLHo0_Ihv0BA/labelpackage-394135792.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/ltAgvZ3PHkeLHo0_Ihv0BA/labelpackage-394135792.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/ltAgvZ3PHkeLHo0_Ihv0BA/labelpackage-394135792.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "http://wwwapps.ups.com/WebTracking/processRequest?HTMLVersion=5.0&Requester=NES&AgreeToTermsAndConditions=yes&loc=en_US&tracknum=1Z6W14490391460217",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "King Chester",
+                "phone": "9104746314",
+                "email": "Kingchester@yahoo.com",
+                "company_name": null,
+                "address_line1": "198 LONG PINE DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "LEESBURG",
+                "state_province": "GA",
+                "postal_code": "31763-3144",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079345",
+            "status": "completed",
+            "shipment_id": "se-924141177",
+            "external_shipment_id": "6855099023674-7843257024826",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:31:33.25Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 6.54
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "requested_comparison_amount": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "rate_details": [],
+            "tracking_number": "9434650206217118849758",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175608",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "usps",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/3C-HUasxD0WgRqkQHFSztQ/label-595079345.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/3C-HUasxD0WgRqkQHFSztQ/label-595079345.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/3C-HUasxD0WgRqkQHFSztQ/label-595079345.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/3C-HUasxD0WgRqkQHFSztQ/label-595079345.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135775,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 22.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 12.00,
+                        "width": 12.00,
+                        "height": 8.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "9434650206217118849758",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/5trnsyOt0ky1rj5h_sP_Ag/labelpackage-394135775.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/5trnsyOt0ky1rj5h_sP_Ag/labelpackage-394135775.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/5trnsyOt0ky1rj5h_sP_Ag/labelpackage-394135775.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217118849758",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Dirk Ruthrauff",
+                "phone": "4692123252",
+                "email": "brandilachelle@gmail.com",
+                "company_name": null,
+                "address_line1": "1618 MARQUETTE DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "RICHARDSON",
+                "state_province": "TX",
+                "postal_code": "75081-3808",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        },
+        {
+            "label_id": "se-595079266",
+            "status": "completed",
+            "shipment_id": "se-924214324",
+            "external_shipment_id": "6855352254778-7843528442170",
+            "external_order_id": null,
+            "ship_date": "2025-11-20T08:00:00Z",
+            "created_at": "2025-11-20T22:31:07.523Z",
+            "shipment_cost": {
+                "currency": "usd",
+                "amount": 7.19
+            },
+            "insurance_cost": {
+                "currency": "usd",
+                "amount": 0.0
+            },
+            "requested_comparison_amount": null,
+            "rate_details": [
+                {
+                    "rate_detail_type": "shipping",
+                    "carrier_description": "TransportationCharge",
+                    "carrier_billing_code": null,
+                    "carrier_memo": null,
+                    "amount": {
+                        "currency": "usd",
+                        "amount": 7.190
+                    },
+                    "billing_source": "carrier"
+                }
+            ],
+            "tracking_number": "1Z6W14490399252099",
+            "is_return_label": false,
+            "rma_number": null,
+            "is_international": false,
+            "batch_id": "se-302175562",
+            "carrier_id": "se-435388",
+            "service_code": "ups_ground",
+            "package_code": "package",
+            "voided": false,
+            "voided_at": null,
+            "label_format": "pdf",
+            "display_scheme": "label",
+            "label_layout": "4x6",
+            "trackable": true,
+            "label_image_id": null,
+            "carrier_code": "ups",
+            "carrier_weight": null,
+            "confirmation": "none",
+            "tracking_status": "in_transit",
+            "label_download": {
+                "pdf": "https://api.shipstation.com/v2/downloads/11/VA46reCiekuEjhmSPsrzbQ/label-595079266.pdf",
+                "png": "https://api.shipstation.com/v2/downloads/11/VA46reCiekuEjhmSPsrzbQ/label-595079266.png",
+                "zpl": "https://api.shipstation.com/v2/downloads/11/VA46reCiekuEjhmSPsrzbQ/label-595079266.zpl",
+                "href": "https://api.shipstation.com/v2/downloads/11/VA46reCiekuEjhmSPsrzbQ/label-595079266.pdf"
+            },
+            "form_download": null,
+            "qr_code_download": null,
+            "insurance_claim": null,
+            "paperless_download": null,
+            "packages": [
+                {
+                    "package_id": 394135703,
+                    "package_code": "package",
+                    "weight": {
+                        "value": 18.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 18.00,
+                        "width": 13.00,
+                        "height": 3.00
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "tracking_number": "1Z6W14490399252099",
+                    "label_download": {
+                        "pdf": "https://api.shipstation.com/v2/downloads/11/6t5vl4pQq02j42lY4vSJgQ/labelpackage-394135703.pdf",
+                        "png": "https://api.shipstation.com/v2/downloads/11/6t5vl4pQq02j42lY4vSJgQ/labelpackage-394135703.png",
+                        "zpl": "https://api.shipstation.com/v2/downloads/11/6t5vl4pQq02j42lY4vSJgQ/labelpackage-394135703.zpl"
+                    },
+                    "qr_code_download": null,
+                    "paperless_download": null,
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "sequence": 1,
+                    "alternative_identifiers": [],
+                    "has_label_documents": false,
+                    "has_form_documents": false,
+                    "has_qr_code_documents": false,
+                    "has_paperless_label_documents": false
+                }
+            ],
+            "charge_event": "carrier_default",
+            "alternative_identifiers": [],
+            "shipping_rule_id": null,
+            "tracking_url": "http://wwwapps.ups.com/WebTracking/processRequest?HTMLVersion=5.0&Requester=NES&AgreeToTermsAndConditions=yes&loc=en_US&tracknum=1Z6W14490399252099",
+            "ship_to": {
+                "geolocation": [],
+                "instructions": null,
+                "name": "Steve Burnett",
+                "phone": "+19182313002",
+                "email": "sburnett10@cox.net",
+                "company_name": null,
+                "address_line1": "17419 E 88TH ST N",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "OWASSO",
+                "state_province": "OK",
+                "postal_code": "74055-5637",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            }
+        }
+    ],
+    "total": 328866,
+    "page": 1,
+    "pages": 13155,
+    "links": {
+        "first": {
+            "href": "https://api.shipstation.com/v2/labels?label_id=se-593961362&page=1&page_size=25"
+        },
+        "last": {
+            "href": "https://api.shipstation.com/v2/labels?label_id=se-593961362&page=13155&page_size=25"
+        },
+        "prev": {},
+        "next": {
+            "href": "https://api.shipstation.com/v2/labels?label_id=se-593961362&page=2&page_size=25"
+        }
+    }
+}

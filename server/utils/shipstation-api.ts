@@ -103,6 +103,38 @@ export async function getLabelsForShipment(shipmentId: string): Promise<any[]> {
 }
 
 /**
+ * Get label data by label_id to retrieve shipment_id
+ * Used to link orphaned tracking updates to shipments
+ */
+export async function getLabelByLabelId(labelId: string): Promise<any> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/labels?label_id=${encodeURIComponent(labelId)}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const labels = data.labels || [];
+  
+  if (labels.length === 0) {
+    throw new Error(`No label found for label_id: ${labelId}`);
+  }
+  
+  return labels[0]; // Return the first (and typically only) label
+}
+
+/**
  * Create a label for a shipment
  * Returns label data including PDF URL
  */

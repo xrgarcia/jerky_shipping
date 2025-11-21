@@ -406,11 +406,82 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           const webhookOrderNumber = extractOrderNumber(webhookData);
           
           if (!webhookOrderNumber) {
-            // No order number in webhook data - log to DLQ for manual review
+            // No order number in webhook - try to resolve shipment via label_id before giving up
+            let resolvedShipment = null;
+            
+            if (labelUrl) {
+              try {
+                // Extract label_id from labelUrl (e.g., "https://api.shipengine.com/v1/labels/se-593961362" -> "se-593961362")
+                const labelIdMatch = labelUrl.match(/\/labels\/(se-[a-zA-Z0-9_-]+)(?:\?|$)/);
+                const labelId = labelIdMatch ? labelIdMatch[1] : null;
+                
+                if (labelId) {
+                  log(`[${trackingNumber}] Attempting to resolve shipment via label_id: ${labelId}`);
+                  
+                  // Import getLabelByLabelId from shipstation-api
+                  const { getLabelByLabelId } = await import('./shipstation-api');
+                  
+                  // Get label data which includes shipment_id
+                  const labelData = await getLabelByLabelId(labelId);
+                  const resolvedShipmentId = labelData.shipment_id;
+                  
+                  if (resolvedShipmentId) {
+                    log(`[${trackingNumber}] Got shipment_id from label API: ${resolvedShipmentId}`);
+                    
+                    // Look up shipment by shipment_id
+                    const dbShipment = await storage.getShipmentByShipmentId(String(resolvedShipmentId));
+                    
+                    if (dbShipment) {
+                      log(`[${trackingNumber}] Found shipment in DB via label lookup, updating tracking`);
+                      
+                      // Normalize status
+                      const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+                      
+                      // CRITICAL: Don't downgrade delivered shipments
+                      const finalStatus = dbShipment.status === 'delivered' ? 'delivered' : status;
+                      const finalDescription = dbShipment.status === 'delivered' 
+                        ? dbShipment.statusDescription 
+                        : statusDescription;
+                      
+                      // Update shipment with tracking info from webhook
+                      const updateData: any = {
+                        status: finalStatus,
+                        statusDescription: finalDescription,
+                        shipmentStatus: extractShipmentStatus(webhookData) || dbShipment.shipmentStatus,
+                        shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : dbShipment.shipDate,
+                        shipmentData: {
+                          ...(dbShipment.shipmentData || {}),
+                          latestTracking: webhookData,
+                        },
+                      };
+                      
+                      await storage.updateShipment(dbShipment.id, updateData);
+                      
+                      // Broadcast realtime update if shipment is linked to order
+                      if (dbShipment.orderId) {
+                        const order = await storage.getOrder(dbShipment.orderId);
+                        if (order) {
+                          broadcastOrderUpdate(order);
+                        }
+                      }
+                      
+                      log(`[${trackingNumber}] Updated shipment via label lookup (1 API call total)`);
+                      processedCount++;
+                      continue;
+                    }
+                  }
+                }
+              } catch (error: any) {
+                // Label lookup failed - continue to DLQ
+                log(`[${trackingNumber}] Label lookup failed: ${error.message}`);
+              }
+            }
+            
+            // Could not resolve via label lookup - log to DLQ for manual review
             await logShipmentSyncFailure({
               orderNumber: trackingNumber, // Use tracking number as identifier
               reason,
-              errorMessage: 'Tracking webhook has no order number - cannot link to order',
+              errorMessage: 'Tracking webhook has no order number and label lookup failed',
               requestData: {
                 queueMessage: message,
                 trackingNumber,
@@ -421,7 +492,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               retryCount: 0,
               failedAt: new Date(),
             });
-            log(`[${trackingNumber}] Logged to DLQ: no order number in webhook data`);
+            log(`[${trackingNumber}] Logged to DLQ: no order number in webhook data and label lookup failed`);
             processedCount++;
             continue;
           }
