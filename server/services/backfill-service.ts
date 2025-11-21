@@ -18,6 +18,7 @@ import {
 } from '../utils/shipment-extraction';
 import { extractShipmentStatus } from '../shipment-sync-worker';
 import { broadcastQueueStatus } from '../websocket';
+import { processOrderRefunds, processOrderLineItems } from '../utils/shopify-order-processing';
 
 export class BackfillService {
   constructor(private storage: IStorage) {}
@@ -364,6 +365,10 @@ export class BackfillService {
     } else {
       await this.storage.createOrder(orderData);
     }
+
+    // Process refunds and line items using same ETL pipeline as webhooks
+    await processOrderRefunds(this.storage, orderData.id, shopifyOrder);
+    await processOrderLineItems(this.storage, orderData.id, shopifyOrder);
   }
 
   /**
