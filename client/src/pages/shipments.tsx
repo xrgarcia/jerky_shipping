@@ -376,6 +376,8 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
 
 export default function Shipments() {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [warehouseStatusDropdownOpen, setWarehouseStatusDropdownOpen] = useState(false);
+  const warehouseStatusDropdownRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
@@ -477,6 +479,20 @@ export default function Shipments() {
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
   }, [search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
+
+  // Close warehouse status dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (warehouseStatusDropdownRef.current && !warehouseStatusDropdownRef.current.contains(event.target as Node)) {
+        setWarehouseStatusDropdownOpen(false);
+      }
+    };
+
+    if (warehouseStatusDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [warehouseStatusDropdownOpen]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -927,42 +943,45 @@ export default function Shipments() {
             {/* Warehouse Status, Sort and Page Size */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
               {/* Warehouse Status Dropdown */}
-              <div className="flex items-center gap-2 relative group">
+              <div className="flex items-center gap-2 relative" ref={warehouseStatusDropdownRef}>
                 <span className="text-sm font-semibold">Warehouse Status:</span>
                 <div className="relative">
                   <button 
+                    onClick={() => setWarehouseStatusDropdownOpen(!warehouseStatusDropdownOpen)}
                     className="px-3 py-2 border rounded-md text-sm hover-elevate active-elevate-2 flex items-center gap-2 bg-background"
                     data-testid="button-warehouse-status-dropdown"
                   >
                     {shipmentStatus.length > 0 ? `${shipmentStatus.length} selected` : "All"}
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className={`h-4 w-4 transition-transform ${warehouseStatusDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute left-0 mt-1 w-48 bg-background border rounded-md shadow-lg z-50 hidden group-hover:block p-2 space-y-2">
-                    {shipmentStatuses.map(s => {
-                      const value = s ?? "null";
-                      const label = s ?? "No Status";
-                      return (
-                        <div key={value} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`warehouse-status-${value}`}
-                            checked={shipmentStatus.includes(value)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setShipmentStatus([...shipmentStatus, value]);
-                              } else {
-                                setShipmentStatus(shipmentStatus.filter(v => v !== value));
-                              }
-                              setPage(1);
-                            }}
-                            data-testid={`checkbox-warehouse-status-${value}`}
-                          />
-                          <label htmlFor={`warehouse-status-${value}`} className="text-sm cursor-pointer">
-                            {label}
-                          </label>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {warehouseStatusDropdownOpen && (
+                    <div className="absolute left-0 mt-1 w-48 bg-background border rounded-md shadow-lg z-50 p-2 space-y-2">
+                      {shipmentStatuses.map(s => {
+                        const value = s ?? "null";
+                        const label = s ?? "No Status";
+                        return (
+                          <div key={value} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`warehouse-status-${value}`}
+                              checked={shipmentStatus.includes(value)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setShipmentStatus([...shipmentStatus, value]);
+                                } else {
+                                  setShipmentStatus(shipmentStatus.filter(v => v !== value));
+                                }
+                                setPage(1);
+                              }}
+                              data-testid={`checkbox-warehouse-status-${value}`}
+                            />
+                            <label htmlFor={`warehouse-status-${value}`} className="text-sm cursor-pointer">
+                              {label}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

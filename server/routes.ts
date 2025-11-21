@@ -787,9 +787,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.query.statusDescription) {
         filters.statusDescription = req.query.statusDescription as string;
       }
-      // Include shipmentStatus even if it's "null" (for filtering null values)
-      if (req.query.shipmentStatus !== undefined) {
-        filters.shipmentStatus = req.query.shipmentStatus as string;
+      // Parse shipmentStatus as array (can have multiple values)
+      if (req.query.shipmentStatus) {
+        filters.shipmentStatus = Array.isArray(req.query.shipmentStatus)
+          ? req.query.shipmentStatus
+          : [req.query.shipmentStatus];
       }
       if (req.query.carrierCode) {
         filters.carrierCode = Array.isArray(req.query.carrierCode)
