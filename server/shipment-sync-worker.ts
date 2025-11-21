@@ -406,14 +406,18 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const linkageResult = await linkTrackingToOrder(trackingData, storage);
         
-        // Check rate limit AFTER API call and wait if exhausted
+        // Check rate limit AFTER API call and break if exhausted
         if (linkageResult.rateLimit) {
           const { remaining, reset, limit } = linkageResult.rateLimit;
           log(`[${trackingNumber}] API call made, ${remaining}/${limit} calls remaining`);
           
-          // If we're out of quota, pause the worker until rate limit resets
+          // If we're out of quota, break out of batch processing
+          // The worker will wait before the next batch cycle
           if (remaining <= 0) {
+            log(`Rate limit exhausted after processing ${processedCount + 1} message(s). Breaking batch to wait for reset.`);
+            processedCount++; // Count this message as processed
             await waitForRateLimitReset(reset);
+            break; // Exit the batch loop - remaining messages will be processed in next cycle
           }
         }
         
