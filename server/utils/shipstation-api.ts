@@ -215,7 +215,7 @@ export async function getShipmentByShipmentId(shipmentId: string): Promise<ApiRe
 export async function getShipmentsByDateRange(
   startDate: Date,
   endDate: Date,
-  pageSize: number = 100
+  pageSize: number = 500 // Max page size for ShipStation V2 API
 ): Promise<ApiResponseWithRateLimit<any[]>> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
