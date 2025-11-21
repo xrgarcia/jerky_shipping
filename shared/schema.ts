@@ -350,6 +350,32 @@ export const insertShipmentTagSchema = createInsertSchema(shipmentTags).omit({
 export type InsertShipmentTag = z.infer<typeof insertShipmentTagSchema>;
 export type ShipmentTag = typeof shipmentTags.$inferSelect;
 
+// Shipment events table for comprehensive audit trail
+export const shipmentEvents = pgTable("shipment_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  username: text("username").notNull(), // Email of logged-in user
+  station: text("station").notNull(), // e.g., "packing", "shipping", "receiving"
+  eventName: text("event_name").notNull(), // e.g., "order_scanned", "product_scan_success"
+  orderNumber: text("order_number"), // Links to shipments.order_number
+  metadata: jsonb("metadata"), // Flexible JSON data for event-specific details
+}, (table) => ({
+  occurredAtIdx: sql`CREATE INDEX IF NOT EXISTS shipment_events_occurred_at_idx ON ${table} (occurred_at)`,
+  orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shipment_events_order_number_idx ON ${table} (order_number) WHERE order_number IS NOT NULL`,
+  eventNameIdx: sql`CREATE INDEX IF NOT EXISTS shipment_events_event_name_idx ON ${table} (event_name)`,
+  usernameIdx: sql`CREATE INDEX IF NOT EXISTS shipment_events_username_idx ON ${table} (username)`,
+}));
+
+export const insertShipmentEventSchema = createInsertSchema(shipmentEvents).omit({
+  id: true,
+}).extend({
+  occurredAt: z.coerce.date().optional(),
+  metadata: z.any().nullish(),
+});
+
+export type InsertShipmentEvent = z.infer<typeof insertShipmentEventSchema>;
+export type ShipmentEvent = typeof shipmentEvents.$inferSelect;
+
 // Products table for Shopify products
 export const products = pgTable("products", {
   id: varchar("id").primaryKey(), // Shopify product ID
