@@ -293,6 +293,26 @@ export default function OrderDetail() {
   const lineItems = (order.lineItems as LineItem[]) || [];
   const shippingAddress = (order.shippingAddress as ShippingAddress) || {};
 
+  // Helper to format monetary values
+  const formatMoney = (value: string | null | undefined): string => {
+    if (!value) return '0.00';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0.00';
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // Helper to parse monetary values for comparison
+  const parseMoney = (value: string | null | undefined): number => {
+    if (!value) return 0;
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Compare totals numerically
+  const originalTotal = parseMoney(order.orderTotal);
+  const currentTotal = parseMoney(order.currentTotalPrice || order.totalPrice);
+  const hasRefund = Math.abs(originalTotal - currentTotal) > 0.01; // Account for floating point
+
   return (
     <>
       <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
@@ -496,11 +516,35 @@ export default function OrderDetail() {
                     </CardContent>
                   </Card>
                 ))}
-                <div className="pt-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-2xl font-semibold">Total</p>
-                    <p className="text-4xl font-bold">${order.totalPrice}</p>
+                <div className="pt-4 space-y-3 border-t">
+                  <div className="grid grid-cols-2 gap-3 pt-3">
+                    <div className="flex justify-between text-lg">
+                      <span className="text-muted-foreground">Subtotal (Net):</span>
+                      <span className="font-semibold">${formatMoney(order.currentSubtotalPrice)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                      <span className="text-muted-foreground">Shipping:</span>
+                      <span className="font-semibold">${formatMoney(order.shippingTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                      <span className="text-muted-foreground">Tax:</span>
+                      <span className="font-semibold">${formatMoney(order.currentTotalTax)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                      <span className="text-muted-foreground">Discounts:</span>
+                      <span className="font-semibold text-red-600">${formatMoney(order.currentTotalDiscounts)}</span>
+                    </div>
                   </div>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <p className="text-2xl font-semibold">Total (Current):</p>
+                    <p className="text-4xl font-bold" data-testid="text-order-total">${formatMoney(order.currentTotalPrice || order.totalPrice)}</p>
+                  </div>
+                  {hasRefund && (
+                    <div className="flex items-center justify-between text-lg text-muted-foreground pt-2">
+                      <p>Original Total:</p>
+                      <p className="font-semibold line-through">${formatMoney(order.orderTotal)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
