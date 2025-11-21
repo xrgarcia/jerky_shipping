@@ -2001,6 +2001,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint to identify date boundary discrepancies
+  app.get("/api/reports/debug", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Parse YYYY-MM-DD strings as Central Time
+      const start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+      
+      const ordersInRange = await storage.getOrdersInDateRange(start, end);
+      
+      // Get boundary orders (first/last day)
+      const boundaryOrders = ordersInRange.filter(order => {
+        const orderDate = formatInTimeZone(order.createdAt, CST_TIMEZONE, 'yyyy-MM-dd');
+        return orderDate === startDate || orderDate === endDate;
+      });
+      
+      // Group by date
+      const byDate: { [key: string]: any[] } = {};
+      boundaryOrders.forEach(order => {
+        const dateKey = formatInTimeZone(order.createdAt, CST_TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+        const date = formatInTimeZone(order.createdAt, CST_TIMEZONE, 'yyyy-MM-dd');
+        if (!byDate[date]) byDate[date] = [];
+        byDate[date].push({
+          id: order.id,
+          name: order.name,
+          createdAt: dateKey,
+          createdAtUTC: order.createdAt.toISOString(),
+          financialStatus: order.financialStatus,
+          currentTotalPrice: order.currentTotalPrice,
+        });
+      });
+      
+      res.json({
+        totalOrders: ordersInRange.length,
+        boundaryDates: {
+          start: startDate,
+          end: endDate,
+        },
+        boundaryOrders: byDate,
+      });
+    } catch (error) {
+      console.error("Error in debug endpoint:", error);
+      res.status(500).json({ error: "Failed to generate debug data" });
+    }
+  });
+
   app.get("/api/reports/summary", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
@@ -2026,13 +2077,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(parsed) ? 0 : parsed;
       };
 
-      // Query refunds by refund date (not order creation date)
-      const refundsInRange = await storage.getRefundsInDateRange(start, end);
+      // Match Shopify's methodology: Get ALL refunds for orders in date range
+      // (not just refunds issued during the period)
+      const orderIds = ordersInRange.map(o => o.id);
+      const allRefundsForOrders = await storage.getRefundsByOrderIds(orderIds);
       
-      // Calculate returns value from actual refund amounts
+      // Calculate returns value from refunds
       let returnsValue = 0;
       const refundedOrderIds = new Set<string>();
-      refundsInRange.forEach((refund) => {
+      allRefundsForOrders.forEach((refund) => {
         returnsValue += parseAmount(refund.amount);
         refundedOrderIds.add(refund.orderId);
       });

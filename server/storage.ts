@@ -112,6 +112,7 @@ export interface IStorage {
   upsertOrderRefund(refund: InsertOrderRefund): Promise<OrderRefund>;
   getOrderRefunds(orderId: string): Promise<OrderRefund[]>;
   getRefundsInDateRange(startDate: Date, endDate: Date): Promise<OrderRefund[]>;
+  getRefundsByOrderIds(orderIds: string[]): Promise<OrderRefund[]>;
   getOrderRefundByShopifyId(shopifyRefundId: string): Promise<OrderRefund | undefined>;
 
   // Order Items
@@ -607,6 +608,19 @@ export class DatabaseStorage implements IStorage {
           lte(orderRefunds.refundedAt, endDate)
         )
       )
+      .orderBy(orderRefunds.refundedAt);
+    return result;
+  }
+
+  async getRefundsByOrderIds(orderIds: string[]): Promise<OrderRefund[]> {
+    if (orderIds.length === 0) {
+      return [];
+    }
+    
+    const result = await db
+      .select()
+      .from(orderRefunds)
+      .where(inArray(orderRefunds.orderId, orderIds))
       .orderBy(orderRefunds.refundedAt);
     return result;
   }
