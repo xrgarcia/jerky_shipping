@@ -111,42 +111,17 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
     try {
       if (webhookData.type === 'order-id') {
         const orderId = webhookData.orderId;
-        const jobId = webhookData.jobId;
         
         const order = await storage.getOrder(orderId);
         if (!order) {
           console.error(`Order ${orderId} not found in database during queue processing`);
-          
-          // If this is a backfill job, increment failed count so job can complete
-          if (jobId) {
-            await storage.incrementBackfillFailed(jobId, 1);
-            
-            const job = await storage.getBackfillJob(jobId);
-            if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
-              await storage.updateBackfillJob(jobId, {
-                status: "completed",
-              });
-            }
-          }
-          
           processedCount++;
           continue;
         }
         
-        if (jobId) {
-          await storage.incrementBackfillProgress(jobId, 1);
-          
-          const job = await storage.getBackfillJob(jobId);
-          if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
-            await storage.updateBackfillJob(jobId, {
-              status: "completed",
-            });
-          }
-        }
-        
         broadcastOrderUpdate(order);
         processedCount++;
-      } else if (webhookData.type === 'shopify' || webhookData.type === 'backfill') {
+      } else if (webhookData.type === 'shopify') {
         const shopifyOrder = webhookData.order;
         const orderData = {
           id: shopifyOrder.id.toString(),
@@ -218,20 +193,6 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
         } catch (shipmentCheckError) {
           // Don't fail order processing if shipment check fails
           console.error('[background-worker] Failed to check/enqueue shipments:', shipmentCheckError);
-        }
-
-        // Update backfill job progress if this is a backfill webhook
-        // Count every order processed (new or updated) because the queue ensures no duplicates per job
-        if (webhookData.type === 'backfill' && webhookData.jobId) {
-          await storage.incrementBackfillProgress(webhookData.jobId, 1);
-          
-          // Check if job is complete (only if totalOrders has been set)
-          const job = await storage.getBackfillJob(webhookData.jobId);
-          if (job && job.totalOrders > 0 && job.processedOrders + job.failedOrders >= job.totalOrders) {
-            await storage.updateBackfillJob(webhookData.jobId, {
-              status: "completed",
-            });
-          }
         }
 
         broadcastOrderUpdate(orderData);
@@ -327,9 +288,11 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
             console.log(`Updated shipment ${existingShipment.id} with tracking ${trackingNumber}`);
             
             // Broadcast update to connected clients
-            const order = await storage.getOrder(existingShipment.orderId);
-            if (order) {
-              broadcastOrderUpdate(order);
+            if (existingShipment.orderId) {
+              const order = await storage.getOrder(existingShipment.orderId);
+              if (order) {
+                broadcastOrderUpdate(order);
+              }
             }
           } else {
             // No existing shipment - queue for async processing
