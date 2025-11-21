@@ -19,6 +19,9 @@ import {
 import { extractShipmentStatus } from '../shipment-sync-worker';
 import { broadcastQueueStatus } from '../websocket';
 import { processOrderRefunds, processOrderLineItems } from '../utils/shopify-order-processing';
+import { db } from '../db';
+import { shipmentItems, shipmentTags, orderItems } from '@shared/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 export class BackfillService {
   constructor(private storage: IStorage) {}
@@ -407,10 +410,94 @@ export class BackfillService {
 
     // Upsert (create or update)
     const existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
+    let finalShipmentId: string;
     if (existing) {
       await this.storage.updateShipment(existing.id, shipmentRecord);
+      finalShipmentId = existing.id;
     } else {
-      await this.storage.createShipment(shipmentRecord);
+      const created = await this.storage.createShipment(shipmentRecord);
+      finalShipmentId = created.id;
+    }
+    
+    // CRITICAL: Populate shipment_items and shipment_tags from shipmentData
+    // Uses same ETL flow as webhooks to ensure consistency
+    await this.populateShipmentItemsAndTags(finalShipmentId, shipmentData);
+  }
+
+  /**
+   * Populate normalized shipment_items and shipment_tags tables from shipmentData JSONB
+   * SAME ETL FLOW as shipment-sync-worker to ensure consistency
+   * Deletes existing entries and re-creates from current shipmentData
+   */
+  private async populateShipmentItemsAndTags(shipmentId: string, shipmentData: any): Promise<void> {
+    if (!shipmentData) return;
+
+    try {
+      // Delete existing entries for this shipment (ensure clean state)
+      await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
+      await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipmentId));
+
+      // Extract and insert items
+      if (shipmentData.items && Array.isArray(shipmentData.items)) {
+        // Batch fetch all order items to avoid N+1 queries
+        // Normalize to strings since ShipStation may return numeric IDs
+        const externalOrderItemIds = shipmentData.items
+          .map((item: any) => item.external_order_item_id)
+          .filter((id: any) => id != null)
+          .map((id: any) => String(id));
+
+        const orderItemsMap = new Map<string, string>();
+        if (externalOrderItemIds.length > 0) {
+          const matchingOrderItems = await db
+            .select()
+            .from(orderItems)
+            .where(inArray(orderItems.shopifyLineItemId, externalOrderItemIds));
+
+          for (const orderItem of matchingOrderItems) {
+            // Normalize both sides to string for comparison
+            orderItemsMap.set(String(orderItem.shopifyLineItemId), orderItem.id);
+          }
+        }
+
+        // Build items to insert with batch-resolved order item IDs
+        const itemsToInsert = shipmentData.items.map((item: any) => {
+          // Normalize to string before lookup
+          const externalId = item.external_order_item_id ? String(item.external_order_item_id) : null;
+          const orderItemId = externalId ? (orderItemsMap.get(externalId) || null) : null;
+
+          return {
+            shipmentId,
+            orderItemId,
+            sku: item.sku || null,
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unit_price?.toString() || null,
+            externalOrderItemId: externalId, // Store as string
+            imageUrl: item.image_url || null,
+          };
+        });
+
+        if (itemsToInsert.length > 0) {
+          await db.insert(shipmentItems).values(itemsToInsert);
+        }
+      }
+
+      // Extract and insert tags
+      if (shipmentData.tags && Array.isArray(shipmentData.tags)) {
+        const tagsToInsert = shipmentData.tags.map((tag: any) => ({
+          shipmentId,
+          name: tag.name,
+          color: tag.color || null,
+          tagId: tag.tag_id || null,
+        }));
+
+        if (tagsToInsert.length > 0) {
+          await db.insert(shipmentTags).values(tagsToInsert);
+        }
+      }
+    } catch (error) {
+      console.log(`[Backfill] Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
+      // Don't throw - this is a non-critical operation that shouldn't break the main flow
     }
   }
 
