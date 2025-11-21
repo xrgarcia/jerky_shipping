@@ -554,7 +554,7 @@ export default function OrderDetail() {
                   
                   <div className="flex items-center justify-between pt-3 border-t">
                     <p className="text-2xl font-semibold">
-                      {refunds.length > 0 ? 'Current Balance:' : 'Total (Current):'}
+                      {refunds.length > 0 ? 'Total Paid:' : 'Total (Current):'}
                     </p>
                     <p className="text-4xl font-bold" data-testid="text-order-total">
                       ${formatMoney(
