@@ -513,6 +513,13 @@ Please analyze this failure and help me understand:
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
   const queueStats = liveQueueStats || initialQueueStats;
 
+  // Initialize liveQueueStats with initialQueueStats when it first loads
+  useEffect(() => {
+    if (initialQueueStats && !liveQueueStats) {
+      setLiveQueueStats(initialQueueStats);
+    }
+  }, [initialQueueStats, liveQueueStats]);
+
   // WebSocket connection for real-time updates
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -544,7 +551,7 @@ Please analyze this failure and help me understand:
           
           if (message.type === 'queue_status' && message.data) {
             // Update live queue stats from WebSocket with backfill data directly from broadcast
-            setLiveQueueStats({
+            setLiveQueueStats((prev) => ({
               shopifyQueue: {
                 size: message.data.shopifyQueue,
                 oldestMessageAt: message.data.shopifyQueueOldestAt,
@@ -562,10 +569,11 @@ Please analyze this failure and help me understand:
               },
               backfill: {
                 activeJob: message.data.backfillActiveJob || null,
-                recentJobs: [],
+                // Preserve recentJobs from initial API load since WebSocket doesn't send them
+                recentJobs: prev?.backfill?.recentJobs || [],
               },
               dataHealth: message.data.dataHealth,
-            });
+            }));
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
