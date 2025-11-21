@@ -1275,69 +1275,96 @@ Please analyze this failure and help me understand:
         </CardContent>
       </Card>
 
-      {queueStats?.backfill?.activeJob && (
-        <Card data-testid="card-backfill-status">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Active Backfill Job
-            </CardTitle>
-            <CardDescription>Historical order backfill in progress</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Date Range</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(queueStats.backfill.activeJob.startDate).toLocaleDateString()} - {new Date(queueStats.backfill.activeJob.endDate).toLocaleDateString()}
-                  </p>
+{(() => {
+        const displayJob = queueStats?.backfill?.activeJob || queueStats?.backfill?.recentJobs?.[0];
+        if (!displayJob) return null;
+        
+        const isActive = displayJob.status === "running" || displayJob.status === "pending";
+        
+        return (
+          <Card data-testid="card-backfill-status">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                {isActive ? "Active Backfill Job" : "Most Recent Backfill Job"}
+              </CardTitle>
+              <CardDescription>
+                {isActive ? "Historical order backfill in progress" : "Last completed backfill"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Date Range</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(displayJob.startDate).toLocaleDateString()} - {new Date(displayJob.endDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={
+                      displayJob.status === "running" ? "default" : 
+                      displayJob.status === "completed" ? "default" :
+                      displayJob.status === "failed" ? "destructive" :
+                      displayJob.status === "cancelled" ? "secondary" :
+                      "secondary"
+                    }
+                    data-testid="badge-backfill-status"
+                  >
+                    {displayJob.status === "running" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
+                    {displayJob.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
+                    {displayJob.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {displayJob.status === "failed" && <XCircle className="h-3 w-3 mr-1" />}
+                    {displayJob.status}
+                  </Badge>
                 </div>
-                <Badge 
-                  variant={queueStats.backfill.activeJob.status === "running" ? "default" : "secondary"}
-                  data-testid="badge-backfill-status"
-                >
-                  {queueStats.backfill.activeJob.status === "running" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
-                  {queueStats.backfill.activeJob.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
-                  {queueStats.backfill.activeJob.status}
-                </Badge>
+                
+                {/* Shopify Orders Progress */}
+                {displayJob.shopifyOrdersTotal > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Shopify Orders</span>
+                      <span className="font-medium">
+                        {displayJob.shopifyOrdersImported.toLocaleString()} / {displayJob.shopifyOrdersTotal.toLocaleString()}
+                        {displayJob.shopifyOrdersFailed > 0 && (
+                          <span className="text-destructive ml-1">
+                            ({displayJob.shopifyOrdersFailed} failed)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(displayJob.shopifyOrdersImported / displayJob.shopifyOrdersTotal) * 100}
+                      data-testid="progress-backfill-shopify"
+                    />
+                  </div>
+                )}
+                
+                {/* ShipStation Shipments Progress */}
+                {displayJob.shipstationShipmentsTotal > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">ShipStation Shipments</span>
+                      <span className="font-medium">
+                        {displayJob.shipstationShipmentsImported.toLocaleString()} / {displayJob.shipstationShipmentsTotal.toLocaleString()}
+                        {displayJob.shipstationShipmentsFailed > 0 && (
+                          <span className="text-destructive ml-1">
+                            ({displayJob.shipstationShipmentsFailed} failed)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(displayJob.shipstationShipmentsImported / displayJob.shipstationShipmentsTotal) * 100}
+                      data-testid="progress-backfill-shipstation"
+                    />
+                  </div>
+                )}
               </div>
-              
-              {/* Shopify Orders Progress */}
-              {queueStats.backfill.activeJob.shopifyOrdersTotal > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Shopify Orders</span>
-                    <span className="font-medium">
-                      {queueStats.backfill.activeJob.shopifyOrdersImported.toLocaleString()} / {queueStats.backfill.activeJob.shopifyOrdersTotal.toLocaleString()}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={(queueStats.backfill.activeJob.shopifyOrdersImported / queueStats.backfill.activeJob.shopifyOrdersTotal) * 100}
-                    data-testid="progress-backfill-shopify"
-                  />
-                </div>
-              )}
-              
-              {/* ShipStation Shipments Progress */}
-              {queueStats.backfill.activeJob.shipstationShipmentsTotal > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">ShipStation Shipments</span>
-                    <span className="font-medium">
-                      {queueStats.backfill.activeJob.shipstationShipmentsImported.toLocaleString()} / {queueStats.backfill.activeJob.shipstationShipmentsTotal.toLocaleString()}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={(queueStats.backfill.activeJob.shipstationShipmentsImported / queueStats.backfill.activeJob.shipstationShipmentsTotal) * 100}
-                    data-testid="progress-backfill-shipstation"
-                  />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Card data-testid="card-clear-order-data" className="border-destructive">
         <CardHeader>

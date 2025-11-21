@@ -415,7 +415,6 @@ export class BackfillService {
             orphanedShipments: 0,
             shipmentsWithoutStatus: 0,
             shipmentSyncFailures: 0,
-            shopifyOrderSyncFailures: 0,
           },
         });
       }
