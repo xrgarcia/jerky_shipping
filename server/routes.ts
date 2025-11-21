@@ -7,7 +7,7 @@ import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
 import { z } from "zod";
-import { insertUserSchema, insertMagicLinkTokenSchema, insertPackingLogSchema } from "@shared/schema";
+import { insertUserSchema, insertMagicLinkTokenSchema, insertPackingLogSchema, insertShipmentEventSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3405,6 +3405,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Packing] Error fetching packing logs:", error);
       res.status(500).json({ error: "Failed to fetch packing logs" });
+    }
+  });
+
+  // Create shipment event (audit trail)
+  app.post("/api/shipment-events", requireAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const eventData = {
+        ...req.body,
+        username: user.email // Ensure username comes from authenticated session
+      };
+      
+      // Validate with Zod schema
+      const validated = insertShipmentEventSchema.parse(eventData);
+      
+      const event = await storage.createShipmentEvent(validated);
+      res.json({ success: true, event });
+    } catch (error: any) {
+      console.error("[ShipmentEvents] Error creating shipment event:", error);
+      res.status(500).json({ error: "Failed to create shipment event" });
+    }
+  });
+
+  // Get shipment events for an order number
+  app.get("/api/shipment-events/order/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getShipmentEventsByOrderNumber(req.params.orderNumber);
+      res.json(events);
+    } catch (error: any) {
+      console.error("[ShipmentEvents] Error fetching shipment events:", error);
+      res.status(500).json({ error: "Failed to fetch shipment events" });
     }
   });
 
