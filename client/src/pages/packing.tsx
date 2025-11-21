@@ -514,10 +514,10 @@ export default function Packing() {
         <h1 className="text-3xl font-bold">Packing Station</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column: Scanning Interface */}
-        <div className="space-y-6">
-          {/* Order Scanner */}
+      <div className="space-y-6">
+        {/* Row 1: Scan Order + Shipping Label */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Scan Order Barcode */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -558,124 +558,9 @@ export default function Packing() {
             </CardContent>
           </Card>
 
-          {/* Product Scanner */}
-          {currentShipment && !packingComplete && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Scan Products
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProductScan} className="space-y-4">
-                  <Input
-                    ref={productInputRef}
-                    type="text"
-                    placeholder="Scan product barcode..."
-                    value={productScan}
-                    onChange={(e) => setProductScan(e.target.value)}
-                    disabled={validateProductMutation.isPending}
-                    className="text-2xl h-16 text-center font-mono"
-                    data-testid="input-product-scan"
-                  />
-                  {validateProductMutation.isPending && (
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Validating...</span>
-                    </div>
-                  )}
-                </form>
-
-                {/* Progress Summary */}
-                <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-3xl font-bold">
-                      {totalScanned} / {totalExpected}
-                    </div>
-                    {allItemsScanned && (
-                      <CheckCircle2 className="h-8 w-8 text-green-600" />
-                    )}
-                  </div>
-                  {!allItemsScanned && (
-                    <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Scan Statistics */}
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div>
-                      <div className="text-2xl font-bold">{successfulScans}</div>
-                      <div className="text-sm text-muted-foreground">Valid</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <div>
-                      <div className="text-2xl font-bold">{failedScans}</div>
-                      <div className="text-sm text-muted-foreground">Rejected</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={handleCompletePacking}
-                  disabled={!allItemsScanned || completePackingMutation.isPending}
-                  className="w-full mt-6"
-                  size="lg"
-                  data-testid="button-complete-packing"
-                >
-                  {completePackingMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Completing...
-                    </>
-                  ) : allItemsScanned ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Complete Packing
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      Scan All Items First
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Packing Complete Message */}
-          {packingComplete && (
-            <Card className="border-green-600">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-4">
-                  <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
-                  <div>
-                    <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
-                    <p className="text-muted-foreground mt-2">Loading next order...</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right Column: Shipment Details & Progress */}
-        <div className="space-y-6">
+          {/* Shipping Label */}
           {currentShipment ? (
-            <>
-              {/* Shipping Label Details */}
-              <Card>
+            <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5" />
@@ -788,117 +673,268 @@ export default function Packing() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Items Progress */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Items to Pack</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {Array.from(skuProgress.entries()).map(([key, progress]) => (
-                      <div
-                        key={key}
-                        className={`p-3 rounded-lg border ${
-                          progress.scanned >= progress.expected
-                            ? "border-green-600 bg-green-50 dark:bg-green-950/20"
-                            : progress.requiresManualVerification
-                            ? "border-orange-600 bg-orange-50 dark:bg-orange-950/20"
-                            : "border-border"
-                        }`}
-                        data-testid={`progress-${progress.sku}`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{progress.name}</div>
-                            <div className="text-sm text-muted-foreground font-mono">{progress.sku}</div>
-                            {progress.requiresManualVerification && progress.scanned < progress.expected && (
-                              <Badge variant="outline" className="mt-1 text-orange-600 border-orange-600">
-                                Manual Verification Required
-                              </Badge>
-                            )}
-                          </div>
-                          {progress.scanned >= progress.expected ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 ml-2" />
-                          ) : progress.requiresManualVerification ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleManualVerify(key)}
-                              className="flex-shrink-0 ml-2"
-                              data-testid={`button-manual-verify-${key}`}
-                            >
-                              Verify
-                            </Button>
-                          ) : (
-                            <div className="text-lg font-bold flex-shrink-0 ml-2">
-                              {progress.scanned}/{progress.expected}
-                            </div>
-                          )}
-                        </div>
-                        {progress.scanned < progress.expected && !progress.requiresManualVerification && (
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Packing Logs */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Scan History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {packingLogs && packingLogs.length > 0 ? (
-                      packingLogs.map((log) => (
-                        <div
-                          key={log.id}
-                          className="flex items-start gap-3 p-3 rounded-lg border"
-                          data-testid={`log-${log.id}`}
-                        >
-                          {log.success ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            {log.productSku && <div className="font-medium">{log.productSku}</div>}
-                            <div className="text-sm text-muted-foreground font-mono truncate">{log.scannedCode}</div>
-                            {log.errorMessage && <div className="text-sm text-red-600 mt-1">{log.errorMessage}</div>}
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {new Date(log.createdAt).toLocaleTimeString()}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No scans yet. Start scanning products.
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
           ) : (
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center py-12 text-muted-foreground">
-                  <Scan className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">Scan an order barcode to begin packing</p>
+                <div className="text-center text-muted-foreground">
+                  <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Scan an order to view shipping label</p>
                 </div>
               </CardContent>
             </Card>
           )}
         </div>
+
+        {/* Row 2: QC Section (Product Scanning & Items Progress) */}
+        {currentShipment && !packingComplete && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Quality Control
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Product Scanner Input */}
+              <form onSubmit={handleProductScan}>
+                <Input
+                  ref={productInputRef}
+                  type="text"
+                  placeholder="Scan product barcode..."
+                  value={productScan}
+                  onChange={(e) => setProductScan(e.target.value)}
+                  disabled={validateProductMutation.isPending}
+                  className="text-2xl h-16 text-center font-mono"
+                  data-testid="input-product-scan"
+                />
+                {validateProductMutation.isPending && (
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Validating...</span>
+                  </div>
+                )}
+              </form>
+
+              {/* Overall Progress */}
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-3xl font-bold">
+                    {totalScanned} / {totalExpected}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <div>
+                        <div className="text-2xl font-bold">{successfulScans}</div>
+                        <div className="text-xs text-muted-foreground">Valid</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <div className="text-2xl font-bold">{failedScans}</div>
+                        <div className="text-xs text-muted-foreground">Rejected</div>
+                      </div>
+                    </div>
+                    {allItemsScanned && (
+                      <CheckCircle2 className="h-8 w-8 text-green-600" />
+                    )}
+                  </div>
+                </div>
+                {!allItemsScanned && (
+                  <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Items to Pack - Organized by Status */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Items to Pack</h3>
+                
+                <div className="space-y-3">
+                  {Array.from(skuProgress.entries()).map(([key, progress]) => {
+                    const isComplete = progress.scanned >= progress.expected;
+                    const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
+                    
+                    return (
+                      <div
+                        key={key}
+                        className={`p-4 rounded-lg border-2 transition-all ${
+                          isComplete
+                            ? "border-green-600 bg-green-50 dark:bg-green-950/20"
+                            : progress.requiresManualVerification
+                            ? "border-orange-600 bg-orange-50 dark:bg-orange-950/20"
+                            : isPartial
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/20"
+                            : "border-border"
+                        }`}
+                        data-testid={`progress-${progress.sku}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-lg truncate">{progress.name}</div>
+                            <div className="text-sm text-muted-foreground font-mono">
+                              {progress.sku}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4">
+                            {isComplete ? (
+                              <div className="flex items-center gap-2 text-green-600">
+                                <CheckCircle2 className="h-6 w-6 flex-shrink-0" />
+                                <span className="font-bold text-sm">Complete</span>
+                              </div>
+                            ) : progress.requiresManualVerification ? (
+                              <AlertCircle className="h-6 w-6 text-orange-600 flex-shrink-0" />
+                            ) : null}
+                            <span className="text-2xl font-bold whitespace-nowrap">
+                              {progress.scanned} / {progress.expected}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Show manual verification button for null-SKU items */}
+                        {progress.requiresManualVerification && progress.scanned < progress.expected && (
+                          <Button
+                            onClick={() => handleManualVerify(key)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full mb-3 border-orange-600 text-orange-600 hover:bg-orange-50"
+                            data-testid={`button-manual-verify-${progress.sku}`}
+                          >
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            Verify Manually (Supervisor)
+                          </Button>
+                        )}
+
+                        {/* Progress Bar */}
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                            <span>
+                              {isComplete ? "All units scanned" : `${progress.remaining} remaining`}
+                            </span>
+                            <span>{Math.round((progress.scanned / progress.expected) * 100)}%</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                isComplete
+                                  ? "bg-green-600"
+                                  : progress.requiresManualVerification
+                                  ? "bg-orange-600"
+                                  : "bg-blue-600"
+                              }`}
+                              style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Complete Packing Button */}
+              <Button
+                onClick={handleCompletePacking}
+                disabled={!allItemsScanned || completePackingMutation.isPending}
+                className="w-full"
+                size="lg"
+                data-testid="button-complete-packing"
+              >
+                {completePackingMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Completing...
+                  </>
+                ) : allItemsScanned ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Complete Packing
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Scan All Items First
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Packing Complete Message */}
+        {packingComplete && (
+          <Card className="border-green-600">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
+                <div>
+                  <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
+                  <p className="text-muted-foreground mt-2">Loading next order...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Row 3: Scan History */}
+        {currentShipment && packingLogs && packingLogs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Scan History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {packingLogs.slice().reverse().map((log) => (
+                  <div
+                    key={log.id}
+                    className={`p-3 rounded-lg border ${
+                      log.success
+                        ? "border-green-200 bg-green-50 dark:bg-green-950/20"
+                        : "border-red-200 bg-red-50 dark:bg-red-950/20"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {log.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                          )}
+                          <span className="font-medium text-sm">
+                            {log.action === "product_scanned" ? "Product Scan" : "Manual Verification"}
+                          </span>
+                        </div>
+                        <div className="text-sm space-y-1">
+                          {log.productSku && (
+                            <div className="font-mono text-muted-foreground">{log.productSku}</div>
+                          )}
+                          {log.scannedCode && (
+                            <div className="font-mono text-xs text-muted-foreground">
+                              Code: {log.scannedCode}
+                            </div>
+                          )}
+                          {log.errorMessage && (
+                            <div className="text-red-600 text-xs">{log.errorMessage}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(log.createdAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
