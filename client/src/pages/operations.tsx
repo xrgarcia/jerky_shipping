@@ -482,6 +482,28 @@ Please analyze this failure and help me understand:
     },
   });
 
+  const purgeShopifyOrderSyncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/operations/purge-shopify-order-sync-queue");
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Queue Purged",
+        description: `Cleared ${data.clearedCount} messages from Shopify order sync queue`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      setPurgeAction(null);
+    },
+    onError: () => {
+      toast({
+        title: "Purge Failed",
+        description: "Failed to purge Shopify order sync queue",
+        variant: "destructive",
+      });
+    },
+  });
+
   const purgeFailuresMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/operations/purge-failures");
@@ -624,6 +646,8 @@ Please analyze this failure and help me understand:
       purgeShopifyMutation.mutate();
     } else if (purgeAction === "shipment") {
       purgeShipmentSyncMutation.mutate();
+    } else if (purgeAction === "shopify-order-sync") {
+      purgeShopifyOrderSyncMutation.mutate();
     } else if (purgeAction === "failures") {
       purgeFailuresMutation.mutate();
     } else if (purgeAction === "shopify-order-sync-failures") {
@@ -794,6 +818,17 @@ Please analyze this failure and help me understand:
                   Oldest: {formatDistanceToNow(new Date(queueStats.shopifyOrderSyncQueue.oldestMessageAt), { addSuffix: true })}
                 </div>
               )}
+              <Button
+                data-testid="button-purge-shopify-order-sync"
+                variant="outline"
+                size="sm"
+                onClick={() => setPurgeAction("shopify-order-sync")}
+                disabled={!queueStats || queueStats.shopifyOrderSyncQueue.size === 0}
+                className="w-full"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Purge Queue
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1338,6 +1373,7 @@ Please analyze this failure and help me understand:
             <AlertDialogDescription>
               {purgeAction === "shopify" && "This will permanently delete all messages in the Shopify queue. This action cannot be undone."}
               {purgeAction === "shipment" && "This will permanently delete all messages in the shipment sync queue. This action cannot be undone."}
+              {purgeAction === "shopify-order-sync" && "This will permanently delete all messages in the Shopify order sync queue. This action cannot be undone."}
               {purgeAction === "failures" && "This will permanently delete all failure records. This action cannot be undone."}
               {purgeAction === "shopify-order-sync-failures" && "This will permanently delete all Shopify order sync failure records. This action cannot be undone."}
             </AlertDialogDescription>

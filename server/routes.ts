@@ -14,7 +14,7 @@ import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -2739,6 +2739,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error purging shipment sync queue:", error);
       res.status(500).json({ error: "Failed to purge shipment sync queue" });
+    }
+  });
+
+  app.post("/api/operations/purge-shopify-order-sync-queue", requireAuth, async (req, res) => {
+    try {
+      const clearedCount = await clearShopifyOrderSyncQueue();
+      res.json({ success: true, clearedCount });
+    } catch (error) {
+      console.error("Error purging Shopify order sync queue:", error);
+      res.status(500).json({ error: "Failed to purge Shopify order sync queue" });
     }
   });
 
