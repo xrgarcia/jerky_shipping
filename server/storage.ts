@@ -662,7 +662,30 @@ export class DatabaseStorage implements IStorage {
 
   // Shipments
   async createShipment(shipment: InsertShipment): Promise<Shipment> {
-    const result = await db.insert(shipments).values(shipment).returning();
+    // Upsert: insert new shipment or update existing if shipment_id conflicts
+    // Only update fields that are present and defined (prevents NULL overwrites)
+    // Immutable fields (id, createdAt, shipmentId) are excluded from updates
+    const { id, createdAt, shipmentId: _, updatedAt: __, ...mutableFields } = shipment as any;
+    
+    // Build update set with only fields that have actual values
+    const updateSet: any = { updatedAt: new Date() };
+    Object.keys(mutableFields).forEach(key => {
+      const value = (mutableFields as any)[key];
+      // Only include fields that are explicitly provided (even if null)
+      // Skip undefined values to preserve existing data
+      if (value !== undefined) {
+        updateSet[key] = value;
+      }
+    });
+    
+    const result = await db
+      .insert(shipments)
+      .values(shipment)
+      .onConflictDoUpdate({
+        target: shipments.shipmentId,
+        set: updateSet,
+      })
+      .returning();
     return result[0];
   }
 

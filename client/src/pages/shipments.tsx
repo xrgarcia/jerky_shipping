@@ -55,6 +55,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
       "delivered": { variant: "default", className: "bg-green-600 hover:bg-green-700", label: "Delivered" },
       "in_transit": { variant: "default", className: "bg-blue-600 hover:bg-blue-700", label: "In Transit" },
       "shipped": { variant: "secondary", label: "Shipped" },
+      "pending": { variant: "outline", className: "border-gray-500 text-gray-700 dark:text-gray-400", label: "Awaiting Label" },
       "cancelled": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400", label: "Cancelled" },
     };
 

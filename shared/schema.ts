@@ -237,6 +237,8 @@ export const shipments = pgTable("shipments", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_number_idx ON ${table} (order_number) WHERE order_number IS NOT NULL`,
+  // Unique constraint: same ShipStation shipment ID cannot appear twice in database
+  uniqueShipmentIdIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS shipments_shipment_id_idx ON ${table} (shipment_id) WHERE shipment_id IS NOT NULL`,
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
