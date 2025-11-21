@@ -760,6 +760,8 @@ export default function Packing() {
                   {Array.from(skuProgress.entries()).map(([key, progress]) => {
                     const isComplete = progress.scanned >= progress.expected;
                     const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
+                    // Find the matching shipment item to get the image URL
+                    const shipmentItem = currentShipment?.items.find(item => item.id === progress.itemId);
                     
                     return (
                       <div
@@ -775,14 +777,24 @@ export default function Packing() {
                         }`}
                         data-testid={`progress-${progress.sku}`}
                       >
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-4 mb-3">
+                          {/* Product Image */}
+                          {shipmentItem?.imageUrl && (
+                            <img
+                              src={shipmentItem.imageUrl}
+                              alt={progress.name}
+                              className="w-20 h-20 object-cover rounded-md border flex-shrink-0"
+                            />
+                          )}
+                          
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-lg truncate">{progress.name}</div>
                             <div className="text-sm text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 ml-4">
+                          
+                          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                             {isComplete ? (
                               <div className="flex items-center gap-2 text-green-600">
                                 <CheckCircle2 className="h-6 w-6 flex-shrink-0" />
