@@ -20,6 +20,7 @@ import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus }
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
+import { qcPassItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
 
@@ -1108,6 +1109,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`Error fetching SkuVault session details for picklist ${req.params.picklistId}:`, error);
       res.status(500).json({ 
         error: "Failed to fetch session details",
+        message: error.message 
+      });
+    }
+  });
+
+  // ========== SkuVault Quality Control ==========
+
+  // Look up a product by barcode/SKU/part number for QC validation
+  app.get("/api/skuvault/qc/product/:searchTerm", requireAuth, async (req, res) => {
+    try {
+      const { searchTerm } = req.params;
+      console.log(`Looking up product for QC: ${searchTerm}`);
+      
+      const product = await skuVaultService.getProductByCode(searchTerm);
+      
+      if (!product) {
+        return res.status(404).json({ 
+          error: "Product not found",
+          message: `No product found with code/SKU: ${searchTerm}` 
+        });
+      }
+      
+      res.json({ product });
+    } catch (error: any) {
+      console.error("Error looking up product for QC:", error);
+      
+      // Handle SkuVaultError with detailed message
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to lookup product",
+        message: error.message 
+      });
+    }
+  });
+
+  // Mark an item as QC passed
+  app.post("/api/skuvault/qc/pass-item", requireAuth, async (req, res) => {
+    try {
+      // Validate and parse request body with Zod schema (with coercion for form inputs)
+      const parseResult = qcPassItemRequestSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          message: "Request body validation failed",
+          details: parseResult.error.format()
+        });
+      }
+      
+      console.log("Marking item as QC passed:", parseResult.data);
+      const result = await skuVaultService.passQCItem(parseResult.data);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error marking item as QC passed:", error);
+      
+      // Handle SkuVaultError with detailed message
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to mark item as QC passed",
         message: error.message 
       });
     }

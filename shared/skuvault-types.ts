@@ -338,3 +338,51 @@ export const sessionFiltersSchema = z.object({
   limit: z.number().min(1).max(100).optional(),
   skip: z.number().min(0).optional(),
 });
+
+/**
+ * Quality Control Types
+ * Used for QC operations to validate products and mark them as inspected
+ */
+
+/**
+ * Response from product lookup by code/SKU/part number
+ * Used to validate scanned barcodes during QC process
+ */
+export const productLookupResponseSchema = z.object({
+  IdItem: z.string().nullable().optional(),
+  Sku: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  Description: z.string().nullable().optional(),
+  IsKit: z.boolean().nullable().optional(),
+  WeightPound: z.number().nullable().optional(),
+  ProductPictures: z.array(z.string()).nullable().optional(),
+});
+
+export type ProductLookupResponse = z.infer<typeof productLookupResponseSchema>;
+
+/**
+ * Request payload for marking an item as QC passed
+ * Coerces Quantity to number to handle string inputs from forms
+ */
+export const qcPassItemRequestSchema = z.object({
+  IdItem: z.string(),
+  Quantity: z.coerce.number().min(1),
+  IdSale: z.string(),
+  Note: z.string().nullable().optional(),
+  ScannedCode: z.string(),
+  SerialNumber: z.string().nullable().optional().default(""),
+});
+
+export type QCPassItemRequest = z.infer<typeof qcPassItemRequestSchema>;
+
+/**
+ * Response from QC pass item endpoint
+ */
+export const qcPassItemResponseSchema = z.object({
+  success: z.boolean().nullable().optional(),
+  message: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+export type QCPassItemResponse = z.infer<typeof qcPassItemResponseSchema>;

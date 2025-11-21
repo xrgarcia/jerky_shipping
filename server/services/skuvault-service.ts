@@ -23,7 +23,12 @@ import {
   type SessionData,
   SessionState,
   type SessionFilters,
-  MatchType
+  MatchType,
+  productLookupResponseSchema,
+  type ProductLookupResponse,
+  type QCPassItemRequest,
+  qcPassItemResponseSchema,
+  type QCPassItemResponse
 } from '@shared/skuvault-types';
 
 interface SkuVaultConfig {
@@ -700,6 +705,223 @@ export class SkuVaultService {
       remainingSeconds,
       endTime,
     };
+  }
+
+  /**
+   * Quality Control Methods
+   * 
+   * NOTE: QC endpoints use app.skuvault.com instead of lmdb.skuvault.com
+   * These methods use cookie-based authentication (sv-t cookie from login)
+   * instead of the Token-based auth used by the wave picking API.
+   * 
+   * If authentication issues occur, we may need to adjust the implementation.
+   */
+
+  /**
+   * Make authenticated request to app.skuvault.com for QC operations
+   * Uses cookie-based authentication (sv-t cookie set during login)
+   * Includes all necessary headers to match browser AJAX requests
+   */
+  private async makeQCRequest<T>(
+    method: 'GET' | 'POST',
+    endpoint: string,
+    data?: any
+  ): Promise<T> {
+    // Apply rate limiting before request
+    await this.applyRateLimit();
+    
+    try {
+      // Build full URL to app.skuvault.com
+      const url = `https://app.skuvault.com${endpoint}`;
+      
+      // Build headers to match browser AJAX requests
+      const headers: Record<string, string> = {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://app.skuvault.com/sales/QualityControl',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Origin': 'https://app.skuvault.com',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+      };
+      
+      if (method === 'POST') {
+        headers['Content-Type'] = 'application/json;charset=UTF-8';
+      }
+      
+      const response = await this.client.request<T>({
+        method,
+        url,
+        data,
+        headers,
+      });
+      return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      
+      // If 401, try re-authenticating once
+      if (axiosError.response?.status === 401) {
+        console.log('[SkuVault QC] Received 401, attempting re-authentication...');
+        await this.tokenCache.clear();
+        this.isAuthenticated = false;
+        
+        const loginSuccess = await this.login();
+        if (!loginSuccess) {
+          const errorMsg = 'Re-authentication failed after 401 response';
+          console.error(`[SkuVault QC] ${errorMsg}`);
+          throw new SkuVaultError(errorMsg, 401);
+        }
+        
+        // Retry the request once (rate limiting already applied above)
+        try {
+          const retryUrl = `https://app.skuvault.com${endpoint}`;
+          const retryHeaders: Record<string, string> = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://app.skuvault.com/sales/QualityControl',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Origin': 'https://app.skuvault.com',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+          };
+          
+          if (method === 'POST') {
+            retryHeaders['Content-Type'] = 'application/json;charset=UTF-8';
+          }
+          
+          const retryResponse = await this.client.request<T>({
+            method,
+            url: retryUrl,
+            data,
+            headers: retryHeaders,
+          });
+          return retryResponse.data;
+        } catch (retryError) {
+          const retryAxiosError = retryError as AxiosError;
+          const errorMessage = retryAxiosError.response?.data 
+            ? JSON.stringify(retryAxiosError.response.data)
+            : retryAxiosError.message;
+          console.error(`[SkuVault QC] Retry failed after re-authentication: ${errorMessage}`);
+          throw new SkuVaultError(
+            `QC request failed after re-authentication: ${errorMessage}`,
+            retryAxiosError.response?.status || 500,
+            retryAxiosError.response?.data
+          );
+        }
+      }
+      
+      // Handle other errors by wrapping in SkuVaultError
+      const errorMessage = axiosError.response?.data 
+        ? JSON.stringify(axiosError.response.data)
+        : axiosError.message;
+      console.error(`[SkuVault QC] Request error: ${errorMessage}`);
+      throw new SkuVaultError(
+        `QC request failed: ${errorMessage}`,
+        axiosError.response?.status || 500,
+        axiosError.response?.data
+      );
+    }
+  }
+
+  /**
+   * Look up a product by barcode, SKU, or part number
+   * Used to validate scanned codes during QC process
+   * 
+   * @param searchTerm - Barcode, SKU, or part number to search for
+   * @returns Product information if found, null if not found
+   */
+  async getProductByCode(searchTerm: string): Promise<ProductLookupResponse | null> {
+    // Check credentials before attempting to authenticate
+    if (!this.config.username || !this.config.password) {
+      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
+    }
+
+    // Ensure we're authenticated
+    if (!this.isAuthenticated) {
+      const loginSuccess = await this.login();
+      if (!loginSuccess) {
+        throw new Error('Authentication failed');
+      }
+    }
+
+    try {
+      const endpoint = `/products/product/getProductOrKitByCodeOrSkuOrPartNumber?SearchTerm=${encodeURIComponent(searchTerm)}`;
+      console.log(`[SkuVault QC] Looking up product with search term: ${searchTerm}`);
+      
+      const response = await this.makeQCRequest<any>('GET', endpoint);
+      
+      // If no product found, SkuVault may return null or empty object
+      if (!response || !response.IdItem) {
+        console.log(`[SkuVault QC] No product found for search term: ${searchTerm}`);
+        return null;
+      }
+      
+      // Validate response with Zod schema
+      const validatedResponse = productLookupResponseSchema.parse(response);
+      
+      console.log(`[SkuVault QC] Product found: ${validatedResponse.Sku} (IdItem: ${validatedResponse.IdItem})`);
+      return validatedResponse;
+
+    } catch (error) {
+      console.error(`[SkuVault QC] Error looking up product ${searchTerm}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark an item as QC passed for a specific order
+   * 
+   * @param itemData - QC pass item request data
+   * @returns Response indicating success or failure
+   */
+  async passQCItem(itemData: QCPassItemRequest): Promise<QCPassItemResponse> {
+    // Check credentials before attempting to authenticate
+    if (!this.config.username || !this.config.password) {
+      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
+    }
+
+    // Ensure we're authenticated
+    if (!this.isAuthenticated) {
+      const loginSuccess = await this.login();
+      if (!loginSuccess) {
+        throw new Error('Authentication failed');
+      }
+    }
+
+    try {
+      const endpoint = '/sales/QualityControl/passItem';
+      console.log(`[SkuVault QC] Marking item as QC passed:`, {
+        IdItem: itemData.IdItem,
+        Quantity: itemData.Quantity,
+        IdSale: itemData.IdSale,
+        ScannedCode: itemData.ScannedCode,
+      });
+      
+      const response = await this.makeQCRequest<any>('POST', endpoint, itemData);
+      
+      // SkuVault QC endpoints may return various response formats
+      // Try to parse it, or create a success response
+      let validatedResponse: QCPassItemResponse;
+      try {
+        validatedResponse = qcPassItemResponseSchema.parse(response);
+      } catch {
+        // If response doesn't match schema, assume success if no error was thrown
+        validatedResponse = {
+          success: true,
+          message: 'Item marked as QC passed',
+          error: null,
+        };
+      }
+      
+      console.log(`[SkuVault QC] Item QC passed successfully`);
+      return validatedResponse;
+
+    } catch (error) {
+      console.error(`[SkuVault QC] Error passing QC item:`, error);
+      throw error;
+    }
   }
 
   /**
