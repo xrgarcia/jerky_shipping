@@ -595,12 +595,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.hasRefund = req.query.hasRefund === 'true';
       }
 
-      // Parse date parameters
+      // Parse date parameters - make dateTo inclusive (end of day) using Central Time
       if (req.query.dateFrom) {
-        filters.dateFrom = new Date(req.query.dateFrom as string);
+        const dateFromStr = req.query.dateFrom as string;
+        // Parse YYYY-MM-DD as Central Time start of day (00:00:00 CST)
+        filters.dateFrom = fromZonedTime(`${dateFromStr} 00:00:00`, CST_TIMEZONE);
+        if (isNaN(filters.dateFrom.getTime())) {
+          return res.status(400).json({ error: "Invalid dateFrom format. Expected YYYY-MM-DD" });
+        }
       }
       if (req.query.dateTo) {
-        filters.dateTo = new Date(req.query.dateTo as string);
+        const dateToStr = req.query.dateTo as string;
+        // Parse as Central Time end of day (23:59:59.999 CST) to make range inclusive
+        filters.dateTo = fromZonedTime(`${dateToStr} 23:59:59.999`, CST_TIMEZONE);
+        if (isNaN(filters.dateTo.getTime())) {
+          return res.status(400).json({ error: "Invalid dateTo format. Expected YYYY-MM-DD" });
+        }
       }
 
       // Parse price range
@@ -799,12 +809,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : [req.query.carrierCode];
       }
 
-      // Parse date parameters
+      // Parse date parameters - make dateTo inclusive (end of day) using Central Time
       if (req.query.dateFrom) {
-        filters.dateFrom = new Date(req.query.dateFrom as string);
+        const dateFromStr = req.query.dateFrom as string;
+        // Parse YYYY-MM-DD as Central Time start of day (00:00:00 CST)
+        filters.dateFrom = fromZonedTime(`${dateFromStr} 00:00:00`, CST_TIMEZONE);
+        if (isNaN(filters.dateFrom.getTime())) {
+          return res.status(400).json({ error: "Invalid dateFrom format. Expected YYYY-MM-DD" });
+        }
       }
       if (req.query.dateTo) {
-        filters.dateTo = new Date(req.query.dateTo as string);
+        const dateToStr = req.query.dateTo as string;
+        // Parse as Central Time end of day (23:59:59.999 CST) to make range inclusive
+        filters.dateTo = fromZonedTime(`${dateToStr} 23:59:59.999`, CST_TIMEZONE);
+        if (isNaN(filters.dateTo.getTime())) {
+          return res.status(400).json({ error: "Invalid dateTo format. Expected YYYY-MM-DD" });
+        }
       }
 
       // Parse orphaned filter
