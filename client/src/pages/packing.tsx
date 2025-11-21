@@ -113,7 +113,26 @@ export default function Packing() {
   useEffect(() => {
     if (currentShipment?.items) {
       const progress = new Map<string, SkuProgress>();
-      currentShipment.items.forEach((item) => {
+      
+      // Filter out non-physical items (discounts, adjustments, fees)
+      const physicalItems = currentShipment.items.filter((item) => {
+        // Exclude items with negative prices (discounts/adjustments)
+        const unitPrice = item.unitPrice ? parseFloat(item.unitPrice) : 0;
+        if (unitPrice < 0) {
+          console.log(`[Packing] Filtering out discount/adjustment item: ${item.name} (price: ${unitPrice})`);
+          return false;
+        }
+        
+        // Exclude items with no SKU AND no name (malformed data)
+        if (!item.sku && !item.name) {
+          console.log(`[Packing] Filtering out malformed item with no SKU or name`);
+          return false;
+        }
+        
+        return true;
+      });
+      
+      physicalItems.forEach((item) => {
         // Use item ID as key to handle duplicate SKUs properly
         const key = item.id;
         if (item.sku) {
