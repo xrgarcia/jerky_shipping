@@ -2051,7 +2051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!byDate[date]) byDate[date] = [];
         byDate[date].push({
           id: order.id,
-          name: order.name,
+          orderNumber: order.orderNumber,
           createdAt: dateKey,
           createdAtUTC: order.createdAt.toISOString(),
           financialStatus: order.financialStatus,
@@ -2070,6 +2070,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in debug endpoint:", error);
       res.status(500).json({ error: "Failed to generate debug data" });
+    }
+  });
+
+  // Debug endpoint to fetch raw Shopify order data for field comparison
+  app.get("/api/reports/shopify-fields", requireAuth, async (req, res) => {
+    try {
+      const { date } = req.query;
+      
+      if (!date) {
+        return res.status(400).json({ error: "date parameter required (YYYY-MM-DD)" });
+      }
+
+      // Get a sample order from the specified date
+      const start = fromZonedTime(`${date} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${date} 23:59:59.999`, CST_TIMEZONE);
+      const ordersInRange = await storage.getOrdersInDateRange(start, end);
+      
+      if (ordersInRange.length === 0) {
+        return res.status(404).json({ error: "No orders found for this date" });
+      }
+
+      // Get first 5 orders
+      const sampleOrders = ordersInRange.slice(0, 5);
+      const shopifyOrderData = [];
+
+      for (const order of sampleOrders) {
+        try {
+          const rawShopifyOrder = await fetchShopifyOrder(order.id);
+          shopifyOrderData.push({
+            orderNumber: order.orderNumber,
+            dbFields: {
+              currentTotalPrice: order.currentTotalPrice,
+              currentSubtotalPrice: order.currentSubtotalPrice,
+              currentTotalTax: order.currentTotalTax,
+              shippingTotal: order.shippingTotal,
+              currentTotalDiscounts: order.currentTotalDiscounts,
+            },
+            shopifyFields: {
+              total_price: rawShopifyOrder.total_price,
+              subtotal_price: rawShopifyOrder.subtotal_price,
+              current_total_price: rawShopifyOrder.current_total_price,
+              current_subtotal_price: rawShopifyOrder.current_subtotal_price,
+              total_tax: rawShopifyOrder.total_tax,
+              current_total_tax: rawShopifyOrder.current_total_tax,
+              total_discounts: rawShopifyOrder.total_discounts,
+              current_total_discounts: rawShopifyOrder.current_total_discounts,
+              total_shipping_price_set: rawShopifyOrder.total_shipping_price_set,
+              total_line_items_price: rawShopifyOrder.total_line_items_price,
+              total_price_set: rawShopifyOrder.total_price_set,
+              subtotal_price_set: rawShopifyOrder.subtotal_price_set,
+              current_total_price_set: rawShopifyOrder.current_total_price_set,
+              current_subtotal_price_set: rawShopifyOrder.current_subtotal_price_set,
+              total_tax_set: rawShopifyOrder.total_tax_set,
+              current_total_tax_set: rawShopifyOrder.current_total_tax_set,
+              total_discounts_set: rawShopifyOrder.total_discounts_set,
+              current_total_discounts_set: rawShopifyOrder.current_total_discounts_set,
+            },
+          });
+        } catch (error: any) {
+          console.error(`Error fetching Shopify order ${order.id}:`, error);
+          shopifyOrderData.push({
+            orderNumber: order.orderNumber,
+            error: error.message,
+          });
+        }
+      }
+
+      res.json({
+        date,
+        sampleCount: shopifyOrderData.length,
+        orders: shopifyOrderData,
+      });
+    } catch (error) {
+      console.error("Error in shopify-fields endpoint:", error);
+      res.status(500).json({ error: "Failed to fetch Shopify order data" });
     }
   });
 
