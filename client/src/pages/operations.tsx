@@ -176,10 +176,7 @@ function ClearFailuresButton() {
 
   const clearFailuresMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest({
-        url: "/api/operations/shipment-sync-failures",
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", "/api/operations/shipment-sync-failures");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
@@ -238,10 +235,7 @@ function BackfillCancelButton({ jobId }: { jobId: string }) {
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest({
-        url: `/api/backfill/jobs/${jobId}/cancel`,
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/backfill/jobs/${jobId}/cancel`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
@@ -301,10 +295,7 @@ function BackfillRestartButton({ jobId }: { jobId: string }) {
 
   const restartMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest({
-        url: `/api/backfill/jobs/${jobId}/restart`,
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/backfill/jobs/${jobId}/restart`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
@@ -364,10 +355,7 @@ function BackfillDeleteButton({ jobId }: { jobId: string }) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest({
-        url: `/api/backfill/jobs/${jobId}`,
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/backfill/jobs/${jobId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
