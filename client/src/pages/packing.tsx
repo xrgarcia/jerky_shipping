@@ -16,6 +16,9 @@ import {
   MapPin,
   Loader2,
   AlertCircle,
+  User,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 type ShipmentItem = {
@@ -42,6 +45,19 @@ type ShipmentWithItems = {
   createdAt: string;
   orderId: string | null;
   labelUrl: string | null;
+  // Customer shipping details
+  shipToName: string | null;
+  shipToPhone: string | null;
+  shipToEmail: string | null;
+  shipToCompany: string | null;
+  shipToAddressLine1: string | null;
+  shipToAddressLine2: string | null;
+  shipToAddressLine3: string | null;
+  shipToCity: string | null;
+  shipToState: string | null;
+  shipToPostalCode: string | null;
+  shipToCountry: string | null;
+  shipToIsResidential: string | null;
   items: ShipmentItem[];
 };
 
@@ -289,7 +305,7 @@ export default function Packing() {
             || (qcResponse as any).Errors?.join(", ")
             || qcResponse.message 
             || "QC pass rejected by SkuVault";
-          throw new Error(qcPassError);
+          throw new Error(qcPassError || "QC pass failed");
         }
         
         qcPassSuccess = true;
@@ -658,59 +674,118 @@ export default function Packing() {
         <div className="space-y-6">
           {currentShipment ? (
             <>
-              {/* Shipment Details */}
+              {/* Shipping Label Details */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Shipment Details</span>
-                    <Badge variant="outline" data-testid="badge-order-number">
-                      {currentShipment.orderNumber}
-                    </Badge>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Shipping Label
                   </CardTitle>
+                  <Badge variant="outline" className="w-fit" data-testid="badge-order-number">
+                    {currentShipment.orderNumber}
+                  </Badge>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {currentShipment.trackingNumber && (
-                    <div className="flex items-start gap-3">
-                      <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-sm text-muted-foreground">Tracking</div>
-                        <div className="font-mono" data-testid="text-tracking">
-                          {currentShipment.trackingNumber}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {currentShipment.carrier && (
-                    <div className="flex items-start gap-3">
-                      <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-sm text-muted-foreground">Shipping Method</div>
-                        <div>
-                          {currentShipment.carrier} {currentShipment.serviceCode}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {currentShipment.shipTo && (
-                    <div className="flex items-start gap-3">
-                      <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-sm text-muted-foreground">Ship To</div>
-                        <div className="whitespace-pre-line text-sm">{currentShipment.shipTo}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {currentShipment.statusDescription && (
+                  {/* Customer Name */}
+                  {currentShipment.shipToName && (
                     <div>
-                      <div className="text-sm text-muted-foreground">Status</div>
-                      <Badge variant="secondary" data-testid="badge-status">
-                        {currentShipment.statusDescription}
-                      </Badge>
+                      <p className="text-sm text-muted-foreground mb-1">Ship To</p>
+                      <p className="text-xl font-semibold" data-testid="text-ship-to-name">
+                        {currentShipment.shipToName}
+                      </p>
                     </div>
                   )}
+
+                  {/* Contact Information */}
+                  {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
+                    <div className="space-y-2">
+                      {currentShipment.shipToEmail && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <a href={`mailto:${currentShipment.shipToEmail}`} className="hover:underline text-sm">
+                            {currentShipment.shipToEmail}
+                          </a>
+                        </div>
+                      )}
+                      {currentShipment.shipToPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <a href={`tel:${currentShipment.shipToPhone}`} className="hover:underline text-sm">
+                            {currentShipment.shipToPhone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Shipping Address */}
+                  {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
+                    <div>
+                      <div className="flex items-start gap-2 mb-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                        <p className="text-sm text-muted-foreground">Address</p>
+                      </div>
+                      <div className="pl-6 space-y-1">
+                        {currentShipment.shipToCompany && (
+                          <p className="font-semibold">{currentShipment.shipToCompany}</p>
+                        )}
+                        {currentShipment.shipToAddressLine1 && <p>{currentShipment.shipToAddressLine1}</p>}
+                        {currentShipment.shipToAddressLine2 && <p>{currentShipment.shipToAddressLine2}</p>}
+                        {currentShipment.shipToAddressLine3 && <p>{currentShipment.shipToAddressLine3}</p>}
+                        <p>
+                          {[currentShipment.shipToCity, currentShipment.shipToState, currentShipment.shipToPostalCode]
+                            .filter(Boolean)
+                            .join(', ')}
+                        </p>
+                        {currentShipment.shipToCountry && <p>{currentShipment.shipToCountry}</p>}
+                        {currentShipment.shipToIsResidential && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {currentShipment.shipToIsResidential === 'yes' 
+                              ? 'Residential Address' 
+                              : currentShipment.shipToIsResidential === 'no' 
+                              ? 'Commercial Address' 
+                              : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Shipping Method & Tracking */}
+                  <div className="pt-4 border-t space-y-3">
+                    {currentShipment.carrier && (
+                      <div className="flex items-start gap-3">
+                        <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div className="flex-1">
+                          <div className="text-sm text-muted-foreground">Shipping Method</div>
+                          <div className="font-medium">
+                            {currentShipment.carrier} {currentShipment.serviceCode}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {currentShipment.trackingNumber && (
+                      <div className="flex items-start gap-3">
+                        <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div className="flex-1">
+                          <div className="text-sm text-muted-foreground">Tracking Number</div>
+                          <div className="font-mono text-sm" data-testid="text-tracking">
+                            {currentShipment.trackingNumber}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {currentShipment.statusDescription && (
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">Status</div>
+                        <Badge variant="secondary" data-testid="badge-status">
+                          {currentShipment.statusDescription}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
