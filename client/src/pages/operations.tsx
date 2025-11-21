@@ -308,6 +308,7 @@ function BackfillRestartButton({ jobId }: { jobId: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
       toast({
         title: "Job Restarted",
         description: "A new backfill job has been started with the same date range",
@@ -349,6 +350,70 @@ function BackfillRestartButton({ jobId }: { jobId: string }) {
               data-testid="button-confirm-restart-backfill"
             >
               {restartMutation.isPending ? "Restarting..." : "Restart Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function BackfillDeleteButton({ jobId }: { jobId: string }) {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest({
+        url: `/api/backfill/jobs/${jobId}`,
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
+      toast({
+        title: "Job Deleted",
+        description: "The backfill job has been deleted successfully",
+      });
+      setShowDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete backfill job",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowDialog(true)}
+        data-testid="button-delete-backfill"
+      >
+        <Trash2 className="h-4 w-4 mr-2" />
+        Delete
+      </Button>
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent data-testid="dialog-delete-backfill">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Backfill Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this backfill job record. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-backfill">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-backfill"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Job"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -443,6 +508,11 @@ Please analyze this failure and help me understand:
   // Fetch ShipStation webhooks list
   const { data: shipStationWebhooksData, isLoading: shipStationWebhooksLoading } = useQuery<{ webhooks: ShipStationWebhook[] }>({
     queryKey: ["/api/operations/shipstation-webhooks"],
+  });
+
+  // Fetch all backfill jobs
+  const { data: allBackfillJobs, isLoading: backfillJobsLoading } = useQuery<any[]>({
+    queryKey: ["/api/backfill/jobs"],
   });
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
@@ -1508,6 +1578,86 @@ Please analyze this failure and help me understand:
           </Card>
         );
       })()}
+
+      {/* All Backfill Jobs List */}
+      <Card data-testid="card-all-backfill-jobs">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            All Backfill Jobs
+          </CardTitle>
+          <CardDescription>
+            View and manage all historical backfill jobs
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {backfillJobsLoading ? (
+            <div className="text-center py-4 text-muted-foreground">Loading jobs...</div>
+          ) : !allBackfillJobs || allBackfillJobs.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">No backfill jobs found</div>
+          ) : (
+            <div className="space-y-2">
+              {allBackfillJobs.map((job) => (
+                <div 
+                  key={job.id} 
+                  className="flex items-center justify-between p-3 rounded-md border"
+                  data-testid={`job-item-${job.id}`}
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant={
+                          job.status === "running" ? "default" : 
+                          job.status === "completed" ? "default" :
+                          job.status === "failed" ? "destructive" :
+                          job.status === "cancelled" ? "secondary" :
+                          "secondary"
+                        }
+                        data-testid={`badge-job-status-${job.id}`}
+                      >
+                        {job.status === "running" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
+                        {job.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
+                        {job.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                        {job.status === "failed" && <XCircle className="h-3 w-3 mr-1" />}
+                        {job.status}
+                      </Badge>
+                      <span className="font-medium text-sm">
+                        {new Date(job.startDate).toLocaleDateString()} - {new Date(job.endDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>Shopify: {job.shopifyOrdersImported}/{job.shopifyOrdersTotal}</span>
+                      <span>ShipStation: {job.shipstationShipmentsImported}/{job.shipstationShipmentsTotal}</span>
+                      {job.startedAt && (
+                        <span>Started: {new Date(job.startedAt).toLocaleString()}</span>
+                      )}
+                      {job.completedAt && (
+                        <span>Completed: {new Date(job.completedAt).toLocaleString()}</span>
+                      )}
+                    </div>
+                    {job.errorMessage && (
+                      <div className="text-xs text-destructive mt-1">
+                        Error: {job.errorMessage}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    {(job.status === "running" || job.status === "pending") && (
+                      <BackfillCancelButton jobId={job.id} />
+                    )}
+                    {(job.status === "failed" || job.status === "completed" || job.status === "cancelled") && (
+                      <>
+                        <BackfillRestartButton jobId={job.id} />
+                        <BackfillDeleteButton jobId={job.id} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card data-testid="card-clear-order-data" className="border-destructive">
         <CardHeader>
