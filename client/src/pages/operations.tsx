@@ -179,7 +179,7 @@ function ClearFailuresButton() {
       return await apiRequest("DELETE", "/api/operations/shipment-sync-failures");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       toast({
         title: "Success",
         description: "All shipment sync failures have been cleared",
@@ -238,7 +238,7 @@ function BackfillCancelButton({ jobId }: { jobId: string }) {
       return await apiRequest("POST", `/api/backfill/jobs/${jobId}/cancel`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       toast({
         title: "Job Cancelled",
         description: "The backfill job has been cancelled successfully",
@@ -298,7 +298,7 @@ function BackfillRestartButton({ jobId }: { jobId: string }) {
       return await apiRequest("POST", `/api/backfill/jobs/${jobId}/restart`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
       toast({
         title: "Job Restarted",
@@ -358,7 +358,7 @@ function BackfillDeleteButton({ jobId }: { jobId: string }) {
       return await apiRequest("DELETE", `/api/backfill/jobs/${jobId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       queryClient.invalidateQueries({ queryKey: ["/api/backfill/jobs"] });
       toast({
         title: "Job Deleted",
@@ -420,6 +420,7 @@ export default function OperationsPage() {
   const [shopifyOrderSyncCurrentPage, setShopifyOrderSyncCurrentPage] = useState(1);
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
@@ -473,9 +474,13 @@ Please analyze this failure and help me understand:
     }
   };
 
-  // Initial fetch of queue stats (no polling)
+  // Initial fetch of queue stats (bootstrap only - WebSocket takes over after)
   const { data: initialQueueStats, isLoading: statsLoading } = useQuery<QueueStats>({
     queryKey: ["/api/operations/queue-stats"],
+    staleTime: Infinity, // Never refetch - WebSocket provides real-time updates
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch environment info (static, no polling)
@@ -530,6 +535,7 @@ Please analyze this failure and help me understand:
       ws.onopen = () => {
         console.log('WebSocket connected (Operations)');
         reconnectAttempts = 0;
+        setIsWebSocketConnected(true);
       };
 
       ws.onmessage = (event) => {
@@ -572,6 +578,7 @@ Please analyze this failure and help me understand:
 
       ws.onclose = (event) => {
         console.log('WebSocket disconnected', event.code, event.reason);
+        setIsWebSocketConnected(false);
         
         if (isMounted) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
@@ -638,7 +645,7 @@ Please analyze this failure and help me understand:
         title: "Queue Purged",
         description: `Cleared ${data.clearedCount} messages from Shopify queue`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       setPurgeAction(null);
     },
     onError: () => {
@@ -660,7 +667,7 @@ Please analyze this failure and help me understand:
         title: "Queue Purged",
         description: `Cleared ${data.clearedCount} messages from shipment sync queue`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       setPurgeAction(null);
     },
     onError: () => {
@@ -682,7 +689,7 @@ Please analyze this failure and help me understand:
         title: "Queue Purged",
         description: `Cleared ${data.clearedCount} messages from Shopify order sync queue`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       setPurgeAction(null);
     },
     onError: () => {
@@ -704,7 +711,7 @@ Please analyze this failure and help me understand:
         title: "Failures Cleared",
         description: "All shipment sync failures have been cleared",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       queryClient.invalidateQueries({ queryKey: ["/api/operations/failures"] });
       setPurgeAction(null);
       setShowFailuresDialog(false);
@@ -727,7 +734,7 @@ Please analyze this failure and help me understand:
         title: "Failures Cleared",
         description: "All Shopify order sync failures have been cleared",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       queryClient.invalidateQueries({ queryKey: ["/api/operations/shopify-order-sync-failures"] });
       setPurgeAction(null);
       setShowShopifyOrderSyncFailuresDialog(false);
@@ -751,7 +758,7 @@ Please analyze this failure and help me understand:
         title: "Order Data Cleared",
         description: "All order data has been successfully cleared",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+      // WebSocket will update queue stats automatically
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setShowClearOrderDataDialog(false);
     },
@@ -867,15 +874,25 @@ Please analyze this failure and help me understand:
           <h1 className="text-3xl font-bold">Operations Dashboard</h1>
           <p className="text-muted-foreground">Monitor queue health and manage system operations</p>
         </div>
-        <Button
-          data-testid="button-refresh-stats"
-          variant="outline"
-          size="sm"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] })}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isWebSocketConnected && (
+            <Badge variant="default" className="gap-1">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              Live Updates
+            </Badge>
+          )}
+          <Button
+            data-testid="button-refresh-stats"
+            variant="outline"
+            size="sm"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] })}
+            disabled={isWebSocketConnected}
+            title={isWebSocketConnected ? "Real-time updates active via WebSocket" : "Manually refresh queue stats"}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
