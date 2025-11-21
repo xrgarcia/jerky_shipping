@@ -3401,7 +3401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/packing-logs/shipment/:shipmentId", requireAuth, async (req, res) => {
     try {
       const logs = await storage.getPackingLogsByShipment(req.params.shipmentId);
-      res.json({ logs });
+      res.json(logs); // Return array directly to match frontend expectation
     } catch (error: any) {
       console.error("[Packing] Error fetching packing logs:", error);
       res.status(500).json({ error: "Failed to fetch packing logs" });
