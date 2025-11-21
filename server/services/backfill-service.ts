@@ -397,10 +397,27 @@ export class BackfillService {
    */
   private async broadcastJobProgress(jobId: string): Promise<void> {
     try {
-      // For now, just log progress - we can add WebSocket support later
       const job = await this.storage.getBackfillJob(jobId);
       if (job) {
         console.log(`[Backfill] Progress update: Shopify ${job.shopifyOrdersImported}/${job.shopifyOrdersTotal}, ShipStation ${job.shipstationShipmentsImported}/${job.shipstationShipmentsTotal}`);
+        
+        // Broadcast via WebSocket
+        broadcastQueueStatus({
+          shopifyQueue: 0,
+          shipmentSyncQueue: 0,
+          shipmentFailureCount: 0,
+          shopifyQueueOldestAt: null,
+          shipmentSyncQueueOldestAt: null,
+          backfillActiveJob: job,
+          dataHealth: {
+            ordersMissingShipments: 0,
+            shipmentsWithoutOrders: 0,
+            orphanedShipments: 0,
+            shipmentsWithoutStatus: 0,
+            shipmentSyncFailures: 0,
+            shopifyOrderSyncFailures: 0,
+          },
+        });
       }
     } catch (error) {
       // Don't fail the backfill if broadcast fails
