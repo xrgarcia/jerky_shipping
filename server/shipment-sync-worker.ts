@@ -301,12 +301,15 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
     let removedFromInflight = false; // Track if we already removed from in-flight
     
     try {
-      const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId } = message;
+      const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId, webhookData } = message;
+      
+      // OPTIMIZATION: If this message came from a webhook and includes inline data, use it directly (no API call!)
+      const isWebhookMessage = reason === 'webhook_tracking' || reason === 'webhook_fulfillment';
       
       // Determine which path to use: tracking number or order number
       if (trackingNumber) {
         // PATH A: Tracking number path
-        log(`Processing tracking number: ${trackingNumber}`);
+        log(`Processing tracking number: ${trackingNumber}${isWebhookMessage ? ' (webhook)' : ''}`);
         
         // OPTIMIZATION: Check if we already have this shipment in our database
         const cachedShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
@@ -395,7 +398,95 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           }
         }
         
-        // Proceed with API call (either because shipment doesn't exist, isn't linked, or fast-path failed)
+        // INTELLIGENT WEBHOOK PROCESSING: Skip API call if we have webhook data
+        if (isWebhookMessage && webhookData) {
+          log(`[${trackingNumber}] Processing from webhook data (no API call)`);
+          
+          // Try to extract order number from webhook data
+          const webhookOrderNumber = extractOrderNumber(webhookData);
+          
+          if (!webhookOrderNumber) {
+            // No order number in webhook data - log to DLQ for manual review
+            await logShipmentSyncFailure({
+              orderNumber: trackingNumber, // Use tracking number as identifier
+              reason,
+              errorMessage: 'Tracking webhook has no order number - cannot link to order',
+              requestData: {
+                queueMessage: message,
+                trackingNumber,
+                labelUrl,
+                shipmentId,
+              },
+              responseData: webhookData,
+              retryCount: 0,
+              failedAt: new Date(),
+            });
+            log(`[${trackingNumber}] Logged to DLQ: no order number in webhook data`);
+            processedCount++;
+            continue;
+          }
+          
+          // We have an order number - lookup order and create/update shipment
+          const order = await storage.getOrderByOrderNumber(webhookOrderNumber);
+          
+          // Validate shipment ID
+          const rawShipmentId = webhookData.shipment_id || webhookData.shipmentId || shipmentId;
+          if (!rawShipmentId) {
+            await logShipmentSyncFailure({
+              orderNumber: webhookOrderNumber,
+              reason,
+              errorMessage: 'Webhook shipment data missing shipment_id field',
+              requestData: { queueMessage: message },
+              responseData: webhookData,
+              retryCount: 0,
+              failedAt: new Date(),
+            });
+            processedCount++;
+            continue;
+          }
+          
+          // Normalize status
+          const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+          
+          const shipmentRecord = {
+            orderId: order?.id || null, // Nullable for multi-channel orders
+            shipmentId: String(rawShipmentId),
+            orderNumber: webhookOrderNumber,
+            orderDate: extractOrderDate(webhookData),
+            trackingNumber: trackingNumber,
+            carrierCode: webhookData.carrier_code || webhookData.carrierCode || null,
+            serviceCode: webhookData.service_code || webhookData.serviceCode || null,
+            status,
+            statusDescription,
+            shipmentStatus: extractShipmentStatus(webhookData),
+            shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : null,
+            shipmentData: webhookData,
+          };
+          
+          let finalShipmentId: string;
+          if (cachedShipment) {
+            await storage.updateShipment(cachedShipment.id, shipmentRecord);
+            finalShipmentId = cachedShipment.id;
+            log(`[${trackingNumber}] Updated shipment from webhook (0 API calls)`);
+          } else {
+            const createdShipment = await storage.createShipment(shipmentRecord);
+            finalShipmentId = createdShipment.id;
+            log(`[${trackingNumber}] Created shipment from webhook (0 API calls)`);
+          }
+          
+          // Populate items and tags if available
+          await populateShipmentItemsAndTags(finalShipmentId, webhookData);
+          
+          // Broadcast update
+          if (order) {
+            broadcastOrderUpdate(order);
+          }
+          
+          processedCount++;
+          continue; // Success - skip API call!
+        }
+        
+        // FALLBACK: Proceed with API call (for backfill, manual sync, or webhook without inline data)
         log(`[${trackingNumber}] ${cachedShipment ? 'Shipment exists but not linked to order' : 'New shipment'}, calling ShipStation API`);
         
         const trackingData: TrackingData = {
@@ -588,9 +679,85 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
       } else if (orderNumber) {
         // PATH B: Order number path
-        log(`Processing order number: ${orderNumber}${shipmentId ? ` (shipmentId: ${shipmentId})` : ''}`);
+        log(`Processing order number: ${orderNumber}${shipmentId ? ` (shipmentId: ${shipmentId})` : ''}${isWebhookMessage ? ' (webhook)' : ''}`);
         
-        // Fetch shipments from ShipStation (regardless of order existence)
+        // INTELLIGENT WEBHOOK PROCESSING: Skip API call if we have webhook data
+        if (isWebhookMessage && webhookData) {
+          log(`[${orderNumber}] Processing from webhook data (no API call)`);
+          
+          // Validate shipment ID
+          const rawShipmentId = webhookData.shipment_id || webhookData.shipmentId || shipmentId;
+          if (!rawShipmentId) {
+            await logShipmentSyncFailure({
+              orderNumber,
+              reason,
+              errorMessage: 'Webhook shipment data missing shipment_id field',
+              requestData: { queueMessage: message },
+              responseData: webhookData,
+              retryCount: 0,
+              failedAt: new Date(),
+            });
+            processedCount++;
+            continue;
+          }
+          
+          const shipmentTrackingNumber = webhookData.tracking_number || webhookData.trackingNumber || trackingNumber || null;
+          
+          // Find order (may be null for multi-channel)
+          const order = await storage.getOrderByOrderNumber(orderNumber);
+          
+          // Check if shipment exists
+          const existingShipment = shipmentTrackingNumber 
+            ? await storage.getShipmentByTrackingNumber(shipmentTrackingNumber)
+            : await storage.getShipmentByShipmentId(String(rawShipmentId));
+          
+          // Normalize status
+          const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+          
+          const shipmentRecord = {
+            orderId: order?.id || null, // Nullable for multi-channel
+            shipmentId: String(rawShipmentId),
+            orderNumber: extractOrderNumber(webhookData) || orderNumber,
+            orderDate: extractOrderDate(webhookData),
+            trackingNumber: shipmentTrackingNumber,
+            carrierCode: webhookData.carrier_code || webhookData.carrierCode || null,
+            serviceCode: webhookData.service_code || webhookData.serviceCode || null,
+            status,
+            statusDescription,
+            shipmentStatus: extractShipmentStatus(webhookData),
+            shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : null,
+            ...extractShipToFields(webhookData), // Extract customer data
+            ...extractReturnGiftFields(webhookData), // Extract return/gift data
+            totalWeight: extractTotalWeight(webhookData), // Extract weight
+            ...extractAdvancedOptions(webhookData), // Extract advanced options
+            shipmentData: webhookData,
+          };
+          
+          let finalShipmentId: string;
+          if (existingShipment) {
+            await storage.updateShipment(existingShipment.id, shipmentRecord);
+            finalShipmentId = existingShipment.id;
+            log(`[${orderNumber}] Updated shipment from webhook (0 API calls)`);
+          } else {
+            const createdShipment = await storage.createShipment(shipmentRecord);
+            finalShipmentId = createdShipment.id;
+            log(`[${orderNumber}] Created shipment from webhook (0 API calls)`);
+          }
+          
+          // Populate items and tags
+          await populateShipmentItemsAndTags(finalShipmentId, webhookData);
+          
+          // Broadcast update
+          if (order) {
+            broadcastOrderUpdate(order);
+          }
+          
+          processedCount++;
+          continue; // Success - skip API call!
+        }
+        
+        // FALLBACK: Fetch shipments from ShipStation API (for backfill, manual sync, or webhook without inline data)
+        log(`[${orderNumber}] Calling ShipStation API to fetch shipments`);
         const { data: shipments, rateLimit } = await getShipmentsByOrderNumber(orderNumber);
         
         log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
