@@ -894,8 +894,21 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         log(`[${orderNumber}] ${shipments.length} shipment(s) found, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
         
-        // Log to dead letter queue for troubleshooting when 0 shipments found
+        // Handle 0 shipments found scenario
         if (shipments.length === 0) {
+          // Check if this came from a Shopify webhook (order updated but not shipped yet)
+          const isShopifyWebhook = message.reason === 'webhook' && 
+                                    message.originalWebhook?.source === 'shopify';
+          
+          if (isShopifyWebhook) {
+            // This is expected - Shopify order updated but hasn't shipped yet
+            // Log quietly and continue (no DLQ entry)
+            log(`[${orderNumber}] Order not shipped yet (Shopify webhook-triggered check, 0 shipments found)`);
+            processedCount++;
+            continue;
+          }
+          
+          // For other contexts (backfill, manual sync), log to DLQ for investigation
           await logShipmentSyncFailure({
             orderNumber: orderNumber,
             reason: message.reason,
@@ -917,6 +930,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             failedAt: new Date(),
           });
           log(`Logged to failures: 0 shipments found for ${orderNumber} (rate limit: ${rateLimit.remaining}/${rateLimit.limit})`);
+          processedCount++;
+          continue;
         }
         
         // If shipmentId is provided, filter to only that specific shipment
