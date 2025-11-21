@@ -199,6 +199,14 @@ export default function Packing() {
 
       setCurrentShipment(shipment);
       setPackingComplete(false);
+      
+      // Log order loaded event
+      logShipmentEvent("order_loaded", {
+        shipmentId: shipment.id,
+        itemCount: shipment.items.length,
+        orderNumber: shipment.orderNumber,
+      }, shipment.orderNumber);
+      
       toast({
         title: "Order Loaded",
         description: `${shipment.items.length} item(s) ready for packing`,
@@ -363,6 +371,15 @@ export default function Packing() {
         errorMessage: null,
       });
 
+      // Log shipment event for successful scan
+      logShipmentEvent("product_scan_success", {
+        sku: product.sku,
+        barcode: scannedCode,
+        itemId: matchingItemKey,
+        scannedCount: progress.scanned + 1,
+        expectedCount: progress.expected,
+      });
+
       // Update progress (using item ID as key, tracking remaining units)
       const newProgress = new Map(skuProgress);
       newProgress.set(matchingItemKey!, {
@@ -388,6 +405,12 @@ export default function Packing() {
         scannedCode,
         skuVaultProductId: null,
         success: false,
+        errorMessage: error.message,
+      });
+
+      // Log shipment event for failed scan
+      logShipmentEvent("product_scan_failed", {
+        scannedCode,
         errorMessage: error.message,
       });
 
@@ -425,6 +448,21 @@ export default function Packing() {
     });
   };
 
+  // Log shipment event (audit trail for analytics)
+  const logShipmentEvent = async (eventName: string, metadata?: any, orderNumber?: string) => {
+    try {
+      await apiRequest("POST", "/api/shipment-events", {
+        station: "packing",
+        eventName,
+        orderNumber: orderNumber || currentShipment?.orderNumber || null,
+        metadata,
+      });
+    } catch (error) {
+      console.error("[Packing] Failed to log shipment event:", error);
+      // Don't block user workflow if event logging fails
+    }
+  };
+
   // Complete packing and queue print job
   const completePackingMutation = useMutation({
     mutationFn: async () => {
@@ -435,6 +473,14 @@ export default function Packing() {
     },
     onSuccess: (result) => {
       setPackingComplete(true);
+      
+      // Log packing completed event
+      const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
+      logShipmentEvent("packing_completed", {
+        totalScans,
+        printQueued: result.printQueued,
+      });
+      
       toast({
         title: "Packing Complete",
         description: result.printQueued ? "Label queued for printing" : result.message || "Order complete",
@@ -461,6 +507,8 @@ export default function Packing() {
   const handleOrderScan = (e: React.FormEvent) => {
     e.preventDefault();
     if (orderScan.trim()) {
+      // Log order scan event
+      logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
       loadShipmentMutation.mutate(orderScan.trim());
     }
   };
@@ -503,6 +551,14 @@ export default function Packing() {
     
     // Wait for all log entries to be created
     await Promise.all(logPromises);
+
+    // Log shipment event for manual verification
+    logShipmentEvent("manual_verification", {
+      itemId: progress.itemId,
+      sku: progress.sku,
+      name: progress.name,
+      quantity: progress.expected,
+    });
 
     // Mark as verified (scanned)
     const newProgress = new Map(skuProgress);
