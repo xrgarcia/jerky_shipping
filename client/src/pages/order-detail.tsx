@@ -9,7 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search, Truck, Package, Clock } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Mail, Phone, ChevronLeft, ChevronRight, Search, Truck, Package, Clock, DollarSign } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Command,
@@ -23,7 +23,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Order, Shipment, ShipmentItem } from "@shared/schema";
+import type { Order, Shipment, ShipmentItem, OrderRefund } from "@shared/schema";
 
 interface LineItem {
   id: number;
@@ -80,7 +80,7 @@ export default function OrderDetail() {
   const [searchOpen, setSearchOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: orderData, isLoading } = useQuery<{ order: Order; shipments: Shipment[] }>({
+  const { data: orderData, isLoading } = useQuery<{ order: Order; shipments: Shipment[]; refunds: OrderRefund[] }>({
     queryKey: ["/api/orders", orderId],
     enabled: !!orderId,
   });
@@ -107,6 +107,7 @@ export default function OrderDetail() {
 
   const order = orderData?.order;
   const shipments = orderData?.shipments || [];
+  const refunds = orderData?.refunds || [];
   const allOrders = allOrdersData?.orders || [];
   const printJobs = printJobsData?.printJobs || [];
 
@@ -535,16 +536,34 @@ export default function OrderDetail() {
                       <span className="font-semibold text-red-600">${formatMoney(order.currentTotalDiscounts)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-3 border-t">
-                    <p className="text-2xl font-semibold">Total (Current):</p>
-                    <p className="text-4xl font-bold" data-testid="text-order-total">${formatMoney(order.currentTotalPrice || order.totalPrice)}</p>
-                  </div>
-                  {hasRefund && (
-                    <div className="flex items-center justify-between text-lg text-muted-foreground pt-2">
-                      <p>Original Total:</p>
-                      <p className="font-semibold line-through">${formatMoney(order.orderTotal)}</p>
-                    </div>
+                  
+                  {refunds.length > 0 && (
+                    <>
+                      <div className="flex items-center justify-between pt-3 border-t text-lg text-muted-foreground">
+                        <p>Original Total:</p>
+                        <p className="font-semibold">${formatMoney(order.orderTotal)}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-lg">
+                        <p className="text-red-600 dark:text-red-400">Refunded:</p>
+                        <p className="font-semibold text-red-600 dark:text-red-400" data-testid="text-refunded-amount">
+                          -${formatMoney(refunds.reduce((sum, r) => sum + parseMoney(r.amount), 0).toFixed(2))}
+                        </p>
+                      </div>
+                    </>
                   )}
+                  
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <p className="text-2xl font-semibold">
+                      {refunds.length > 0 ? 'Current Balance:' : 'Total (Current):'}
+                    </p>
+                    <p className="text-4xl font-bold" data-testid="text-order-total">
+                      ${formatMoney(
+                        refunds.length > 0
+                          ? (parseMoney(order.orderTotal) - refunds.reduce((sum, r) => sum + parseMoney(r.amount), 0)).toFixed(2)
+                          : (order.currentTotalPrice || order.totalPrice)
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -669,6 +688,93 @@ export default function OrderDetail() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {refunds.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <DollarSign className="h-6 w-6" />
+                Refunds ({refunds.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {refunds.map((refund) => (
+                  <Card key={refund.id} className="bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50">
+                    <CardContent className="pt-6">
+                      <div className="grid gap-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-3">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                Refund Amount
+                              </p>
+                              <p className="text-3xl font-bold text-red-600 dark:text-red-400" data-testid={`text-refund-amount-${refund.id}`}>
+                                ${formatMoney(refund.amount)}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                  Refunded At
+                                </p>
+                                <p className="text-lg">
+                                  {new Date(refund.refundedAt).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                              {refund.processedAt && (
+                                <div>
+                                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                    Processed At
+                                  </p>
+                                  <p className="text-lg">
+                                    {new Date(refund.processedAt).toLocaleDateString("en-US", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                    })}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            {refund.note && (
+                              <div className="pt-2 border-t">
+                                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                                  Refund Note
+                                </p>
+                                <p className="text-lg" data-testid={`text-refund-note-${refund.id}`}>
+                                  {refund.note}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {/* Refund Summary */}
+                <div className="pt-4 mt-4 border-t border-red-200 dark:border-red-900/50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xl font-semibold">Total Refunded:</p>
+                    <p className="text-3xl font-bold text-red-600 dark:text-red-400" data-testid="text-total-refunded">
+                      ${formatMoney(refunds.reduce((sum, r) => sum + parseMoney(r.amount), 0).toFixed(2))}
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
