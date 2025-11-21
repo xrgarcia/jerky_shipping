@@ -2756,11 +2756,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Execute all deletions in a transaction to ensure atomicity
       await db.transaction(async (tx) => {
-        // Delete child tables first (foreign key constraints)
+        // Delete in correct order respecting foreign key constraints:
+        // 1. shipment_items (references both shipments and order_items)
+        // 2. shipment_tags (references shipments)
+        // 3. orderItems (references orders)
+        // 4. shipments (references orders)
+        // 5. orderRefunds (references orders)
+        // 6. orders (parent table)
+        await tx.delete(shipmentItems);
+        await tx.delete(shipmentTags);
         await tx.delete(orderItems);
         await tx.delete(shipments);
         await tx.delete(orderRefunds);
-        // Then delete parent table
         await tx.delete(orders);
       });
       
