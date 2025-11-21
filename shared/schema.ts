@@ -68,9 +68,10 @@ export const orders = pgTable("orders", {
   // Price fields (all monetary values are strings from Shopify API)
   totalPrice: text("total_price").notNull().default('0'), // Legacy field, same as orderTotal
   orderTotal: text("order_total").notNull().default('0'), // total_price from Shopify
+  totalLineItemsPrice: text("total_line_items_price").notNull().default('0'), // GROSS SALES: Sum of line items before ANY discounts
   subtotalPrice: text("subtotal_price").notNull().default('0'), // Price before discounts and shipping
   currentTotalPrice: text("current_total_price").notNull().default('0'), // Total after refunds/adjustments
-  currentSubtotalPrice: text("current_subtotal_price").notNull().default('0'), // Subtotal after adjustments
+  currentSubtotalPrice: text("current_subtotal_price").notNull().default('0'), // NET SALES: Subtotal after all discounts (Gross - Discounts)
   shippingTotal: text("shipping_total").notNull().default('0'), // total_shipping_price_set.shop_money.amount
   totalDiscounts: text("total_discounts").notNull().default('0'), // Total discounts applied
   currentTotalDiscounts: text("current_total_discounts").notNull().default('0'), // Discounts after adjustments

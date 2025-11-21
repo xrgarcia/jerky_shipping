@@ -7,9 +7,10 @@ export function extractShopifyOrderPrices(shopifyOrder: any) {
   return {
     totalPrice: shopifyOrder.total_price || '0', // Legacy field for backwards compatibility
     orderTotal: shopifyOrder.total_price || '0',
+    totalLineItemsPrice: shopifyOrder.total_line_items_price || '0', // GROSS SALES: Before ANY discounts
     subtotalPrice: shopifyOrder.subtotal_price || '0',
     currentTotalPrice: shopifyOrder.current_total_price || '0',
-    currentSubtotalPrice: shopifyOrder.current_subtotal_price || '0',
+    currentSubtotalPrice: shopifyOrder.current_subtotal_price || '0', // NET SALES: After all discounts
     shippingTotal: shopifyOrder.total_shipping_price_set?.shop_money?.amount || '0',
     totalDiscounts: shopifyOrder.total_discounts || '0',
     currentTotalDiscounts: shopifyOrder.current_total_discounts || '0',

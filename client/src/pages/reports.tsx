@@ -23,8 +23,9 @@ interface ReportSummary {
   fulfilledOrders: number;
   refundedOrders: number;
   totalRevenue: string;
+  totalGrossSales: string;
+  totalNetSales: string;
   totalShipping: string;
-  totalSubtotal: string;
   totalTax: string;
   totalDiscounts: string;
   returnsValue: string;
@@ -292,15 +293,15 @@ export default function Reports() {
 
               <Card data-testid="card-product-value">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-lg font-semibold">Product Value</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Net Sales</CardTitle>
                   <Package className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold" data-testid="text-product-value">
-                    {formatCurrency(summary.totalSubtotal)}
+                    {formatCurrency(summary.totalNetSales)}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Before shipping & tax
+                    Products after discounts
                   </p>
                 </CardContent>
               </Card>
@@ -328,8 +329,16 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-base">Product Sales</span>
-                    <span className="text-lg font-semibold">{formatCurrency(summary.totalSubtotal)}</span>
+                    <span className="text-base">Gross Sales</span>
+                    <span className="text-lg font-semibold" data-testid="text-gross-sales-breakdown">{formatCurrency(summary.totalGrossSales)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-muted-foreground pl-4">- Discounts</span>
+                    <span className="text-base font-semibold text-red-600">-{formatCurrency(summary.totalDiscounts)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-base font-semibold">Net Sales</span>
+                    <span className="text-lg font-semibold" data-testid="text-net-sales-breakdown">{formatCurrency(summary.totalNetSales)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-base">Shipping</span>
@@ -339,17 +348,13 @@ export default function Reports() {
                     <span className="text-base">Tax</span>
                     <span className="text-lg font-semibold">{formatCurrency(summary.totalTax)}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-base">Discounts</span>
-                    <span className="text-lg font-semibold text-red-600">-{formatCurrency(summary.totalDiscounts)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-base">Refunds</span>
-                    <span className="text-lg font-semibold text-red-600" data-testid="text-refunds-breakdown">-{formatCurrency(summary.returnsValue)}</span>
-                  </div>
                   <div className="flex justify-between items-center pt-3 border-t">
                     <span className="text-lg font-bold">Total Revenue</span>
                     <span className="text-xl font-bold">{formatCurrency(summary.totalRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="text-base text-muted-foreground">Refunds</span>
+                    <span className="text-base font-semibold text-red-600" data-testid="text-refunds-breakdown">-{formatCurrency(summary.returnsValue)}</span>
                   </div>
                 </CardContent>
               </Card>

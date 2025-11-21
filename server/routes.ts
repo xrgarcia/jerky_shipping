@@ -2195,7 +2195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use currentTotalPrice which already accounts for refunds at the order level
       let totalRevenue = 0;
       let totalShipping = 0;
-      let totalSubtotal = 0;
+      let totalGrossSales = 0;
+      let totalNetSales = 0;
       let totalTax = 0;
       let totalDiscounts = 0;
       const dailyTotals: { [key: string]: number } = {};
@@ -2203,14 +2204,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fulfillmentCounts: { [key: string]: number } = {};
 
       ordersInRange.forEach((order) => {
-        // Match Shopify's sales breakdown:
-        // - currentSubtotalPrice = Net sales (after discounts/refunds, before shipping/tax)
+        // Shopify Analytics sales breakdown:
+        // - totalLineItemsPrice = GROSS SALES (sum of line items before ANY discounts)
+        // - currentTotalDiscounts = Discounts applied
+        // - currentSubtotalPrice = NET SALES (Gross - Discounts, before shipping/tax)
         // - shippingTotal = Shipping charges
         // - currentTotalTax = Taxes
-        // - currentTotalPrice = Total sales (net + shipping + taxes)
-        totalRevenue += parseAmount(order.currentTotalPrice); // Total sales
+        // - currentTotalPrice = TOTAL REVENUE (Net + Shipping + Taxes)
+        totalRevenue += parseAmount(order.currentTotalPrice); // Total revenue
         totalShipping += parseAmount(order.shippingTotal); // Shipping charges
-        totalSubtotal += parseAmount(order.currentSubtotalPrice); // Net sales
+        totalGrossSales += parseAmount(order.totalLineItemsPrice); // Gross sales (before discounts)
+        totalNetSales += parseAmount(order.currentSubtotalPrice); // Net sales (after discounts)
         totalTax += parseAmount(order.currentTotalTax); // Taxes
         totalDiscounts += parseAmount(order.currentTotalDiscounts);
 
@@ -2239,11 +2243,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalOrders: ordersInRange.length,
         fulfilledOrders: activeOrders.length, // Orders not fully refunded
         refundedOrders: fullyRefundedOrders.length, // Fully refunded orders
-        totalRevenue: totalRevenue.toFixed(2), // Total sales (currentTotalPrice = net + shipping + tax, already includes refunds)
+        totalRevenue: totalRevenue.toFixed(2), // Total revenue (Net sales + Shipping + Taxes)
+        totalGrossSales: totalGrossSales.toFixed(2), // GROSS SALES: Product revenue before discounts
+        totalNetSales: totalNetSales.toFixed(2), // NET SALES: Product revenue after discounts (Gross - Discounts)
         totalShipping: totalShipping.toFixed(2), // Shipping charges
-        totalSubtotal: totalSubtotal.toFixed(2), // Net sales (currentSubtotalPrice = after discounts/refunds, before shipping/tax)
         totalTax: totalTax.toFixed(2), // Taxes
-        totalDiscounts: totalDiscounts.toFixed(2),
+        totalDiscounts: totalDiscounts.toFixed(2), // Discounts applied
         returnsValue: returnsValue.toFixed(2), // Refunds issued during this period (for reference)
         averageOrderValue: activeOrders.length > 0 ? (totalRevenue / activeOrders.length).toFixed(2) : '0.00',
         averageShipping: activeOrders.length > 0 ? (totalShipping / activeOrders.length).toFixed(2) : '0.00',
