@@ -1463,6 +1463,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Shopify refund webhook endpoint - receives refund events
+  app.post("/api/webhooks/shopify/refunds", async (req, res) => {
+    try {
+      const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
+      const shopifySecret = process.env.SHOPIFY_API_SECRET;
+      const topic = req.headers['x-shopify-topic'] as string;
+      const webhookId = req.headers['x-shopify-webhook-id'] as string;
+
+      if (!shopifySecret) {
+        console.error("SHOPIFY_API_SECRET not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+
+      const rawBody = req.rawBody as Buffer;
+      if (!verifyShopifyWebhook(rawBody, hmacHeader, shopifySecret)) {
+        console.error("========== SHOPIFY REFUND WEBHOOK VERIFICATION FAILED ==========");
+        console.error(`Timestamp: ${new Date().toISOString()}`);
+        console.error(`Topic: ${topic || 'unknown'}`);
+        console.error(`Webhook ID: ${webhookId || 'unknown'}`);
+        console.error(`Request Path: ${req.path}`);
+        console.error(`Shop Domain: ${req.headers['x-shopify-shop-domain'] || 'unknown'}`);
+        console.error(`HMAC Header Present: ${!!hmacHeader}`);
+        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
+        console.error("====================================================================");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+
+      const refundPayload = req.body;
+      
+      // Process refund immediately (no queueing needed - refunds are lightweight)
+      try {
+        const orderId = refundPayload.order_id?.toString();
+        
+        if (!orderId) {
+          console.error("Refund webhook missing order_id:", refundPayload);
+          return res.status(400).json({ error: "Missing order_id in refund webhook" });
+        }
+
+        // Check if order exists in our database
+        const order = await storage.getOrder(orderId);
+        
+        if (!order) {
+          console.warn(`Received refund for unknown order ${orderId} - skipping (order may not be synced yet)`);
+          return res.status(200).json({ success: true, message: "Order not found - refund skipped" });
+        }
+
+        // Calculate total refund amount from transactions
+        const totalAmount = refundPayload.transactions?.reduce((sum: number, txn: any) => {
+          return sum + parseFloat(txn.amount || '0');
+        }, 0) || 0;
+
+        const refundData = {
+          orderId: order.id,
+          shopifyRefundId: refundPayload.id.toString(),
+          amount: totalAmount.toFixed(2),
+          note: refundPayload.note || null,
+          refundedAt: new Date(refundPayload.created_at),
+          processedAt: refundPayload.processed_at ? new Date(refundPayload.processed_at) : null,
+        };
+
+        await storage.upsertOrderRefund(refundData);
+        
+        console.log(`✓ Refund ${refundPayload.id} processed for order ${order.orderNumber} (${totalAmount.toFixed(2)})`);
+        
+      } catch (error) {
+        console.error("Error processing refund webhook:", error);
+        // Return 200 to prevent Shopify from retrying (we log the error for investigation)
+        return res.status(200).json({ success: false, error: "Processing error logged" });
+      }
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error handling refund webhook:", error);
+      res.status(500).json({ error: "Failed to process refund webhook" });
+    }
+  });
+
   // ShipStation webhook endpoint - receives shipment updates and queues them
   app.post("/api/webhooks/shipstation/shipments", async (req, res) => {
     try {

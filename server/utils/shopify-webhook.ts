@@ -156,6 +156,7 @@ export async function reregisterAllWebhooks(
   const requiredWebhooks = [
     { topic: 'orders/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
     { topic: 'orders/updated', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
+    { topic: 'refunds/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/refunds` },
     { topic: 'products/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
     { topic: 'products/update', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
     { topic: 'products/delete', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
@@ -318,6 +319,7 @@ export async function ensureWebhooksRegistered(
   const requiredWebhooks = [
     { topic: 'orders/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
     { topic: 'orders/updated', address: `${normalizedBaseUrl}/api/webhooks/shopify/orders` },
+    { topic: 'refunds/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/refunds` },
     { topic: 'products/create', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
     { topic: 'products/update', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
     { topic: 'products/delete', address: `${normalizedBaseUrl}/api/webhooks/shopify/products` },
