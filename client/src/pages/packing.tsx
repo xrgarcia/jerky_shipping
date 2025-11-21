@@ -1,0 +1,830 @@
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  PackageCheck,
+  Scan,
+  CheckCircle2,
+  XCircle,
+  Package,
+  Truck,
+  MapPin,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+
+type ShipmentItem = {
+  id: string;
+  shipmentId: string;
+  orderItemId: string | null;
+  sku: string | null;
+  name: string;
+  quantity: number;
+  unitPrice: string | null;
+  imageUrl: string | null;
+};
+
+type ShipmentWithItems = {
+  id: string;
+  shipmentId: string | null;
+  orderNumber: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  serviceCode: string | null;
+  statusDescription: string | null;
+  shipTo: string | null;
+  totalWeight: string | null;
+  createdAt: string;
+  orderId: string | null;
+  labelUrl: string | null;
+  items: ShipmentItem[];
+};
+
+type PackingLog = {
+  id: string;
+  action: string;
+  productSku: string | null;
+  scannedCode: string | null;
+  success: boolean;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+type SkuVaultProduct = {
+  id: number;
+  sku: string;
+  description: string;
+  code: string;
+};
+
+type SkuProgress = {
+  itemId: string; // Shipment item database ID
+  sku: string;
+  normalizedSku: string; // For matching scans
+  name: string;
+  expected: number;
+  scanned: number;
+  remaining: number; // Tracks remaining units to scan for this specific item
+  requiresManualVerification?: boolean; // For items without SKU
+};
+
+export default function Packing() {
+  const { toast } = useToast();
+  const orderInputRef = useRef<HTMLInputElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
+  const [orderScan, setOrderScan] = useState("");
+  const [productScan, setProductScan] = useState("");
+  const [currentShipment, setCurrentShipment] = useState<ShipmentWithItems | null>(null);
+  // Use item ID as key to handle duplicate SKUs properly
+  const [skuProgress, setSkuProgress] = useState<Map<string, SkuProgress>>(new Map());
+  const [packingComplete, setPackingComplete] = useState(false);
+  
+  // Helper to normalize SKUs for comparison (uppercase, trimmed)
+  const normalizeSku = (sku: string) => sku.trim().toUpperCase();
+
+  // Focus order input on mount
+  useEffect(() => {
+    orderInputRef.current?.focus();
+  }, []);
+
+  // Initialize SKU progress when shipment loads (keyed by item ID to handle duplicate SKUs)
+  useEffect(() => {
+    if (currentShipment?.items) {
+      const progress = new Map<string, SkuProgress>();
+      currentShipment.items.forEach((item) => {
+        // Use item ID as key to handle duplicate SKUs properly
+        const key = item.id;
+        if (item.sku) {
+          progress.set(key, {
+            itemId: item.id,
+            sku: item.sku, // Keep original for display
+            normalizedSku: normalizeSku(item.sku), // For matching scans
+            name: item.name,
+            expected: item.quantity,
+            scanned: 0,
+            remaining: item.quantity, // Track remaining units for this specific item
+            requiresManualVerification: false,
+          });
+        } else {
+          progress.set(key, {
+            itemId: item.id,
+            sku: "NO SKU",
+            normalizedSku: "",
+            name: item.name,
+            expected: item.quantity,
+            scanned: 0,
+            remaining: item.quantity,
+            requiresManualVerification: true,
+          });
+        }
+      });
+      setSkuProgress(progress);
+    } else {
+      setSkuProgress(new Map());
+    }
+  }, [currentShipment]);
+
+  // Load packing logs for current shipment
+  const { data: packingLogs } = useQuery<PackingLog[]>({
+    queryKey: currentShipment ? ["/api/packing-logs/shipment", currentShipment.id] : [],
+    enabled: !!currentShipment,
+  });
+
+  // Load shipment by order number (includes items from backend)
+  const loadShipmentMutation = useMutation({
+    mutationFn: async (orderNumber: string) => {
+      const response = await apiRequest("GET", `/api/shipments/by-order-number/${encodeURIComponent(orderNumber)}`);
+      return (await response.json()) as ShipmentWithItems;
+    },
+    onSuccess: (shipment) => {
+      if (!shipment.items || shipment.items.length === 0) {
+        toast({
+          title: "No Items Found",
+          description: "This shipment has no items to pack",
+          variant: "destructive",
+        });
+        setOrderScan("");
+        return;
+      }
+
+      // Warn about items without SKUs - they'll require manual verification
+      const itemsWithoutSku = shipment.items.filter((item) => !item.sku);
+      if (itemsWithoutSku.length > 0) {
+        toast({
+          title: "Manual Verification Required",
+          description: `${itemsWithoutSku.length} item(s) without SKU. Verify manually before completing.`,
+        });
+      }
+
+      setCurrentShipment(shipment);
+      setPackingComplete(false);
+      toast({
+        title: "Order Loaded",
+        description: `${shipment.items.length} item(s) ready for packing`,
+      });
+      // Focus product input after loading shipment
+      setTimeout(() => productInputRef.current?.focus(), 100);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Order Not Found",
+        description: error.message,
+        variant: "destructive",
+      });
+      setOrderScan("");
+    },
+  });
+
+  // Pass QC item in SkuVault
+  const passQcItemMutation = useMutation({
+    mutationFn: async (params: {
+      skuVaultProductId: number;
+      scannedCode: string;
+      orderNumber: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/skuvault/qc/pass-item", {
+        IdItem: params.skuVaultProductId.toString(),
+        Quantity: 1,
+        IdSale: params.orderNumber,
+        ScannedCode: params.scannedCode,
+        Note: null,
+        SerialNumber: "",
+      });
+      return (await response.json()) as { success?: boolean; message?: string; error?: string };
+    },
+  });
+
+  // Validate product with SkuVault QC
+  const validateProductMutation = useMutation({
+    mutationFn: async (scannedCode: string) => {
+      const response = await apiRequest("GET", `/api/skuvault/qc/product/${encodeURIComponent(scannedCode)}`);
+      return (await response.json()) as SkuVaultProduct;
+    },
+    onSuccess: async (product, scannedCode) => {
+      // Normalize scanned SKU for comparison
+      const normalizedSku = normalizeSku(product.sku);
+      
+      // Find first item with matching SKU that still has remaining units
+      let matchingItemKey: string | null = null;
+      let matchingProgress: SkuProgress | null = null;
+      
+      for (const [key, progress] of Array.from(skuProgress.entries())) {
+        if (progress.normalizedSku === normalizedSku && progress.remaining > 0) {
+          matchingItemKey = key;
+          matchingProgress = progress;
+          break; // Use first item with remaining units
+        }
+      }
+
+      const progress = matchingProgress;
+      
+      if (!progress) {
+        // SKU not in shipment
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: product.sku,
+          scannedCode,
+          skuVaultProductId: product.id,
+          success: false,
+          errorMessage: `SKU ${product.sku} not in this shipment`,
+        });
+
+        toast({
+          title: "Wrong Product",
+          description: `${product.sku} is not in this shipment`,
+          variant: "destructive",
+        });
+
+        setProductScan("");
+        productInputRef.current?.focus();
+        return;
+      }
+
+      // Check if already scanned expected quantity
+      if (progress.scanned >= progress.expected) {
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: product.sku,
+          scannedCode,
+          skuVaultProductId: product.id,
+          success: false,
+          errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.sku}`,
+        });
+
+        toast({
+          title: "Already Scanned",
+          description: `All ${progress.expected} units of ${product.sku} already scanned`,
+          variant: "destructive",
+        });
+
+        setProductScan("");
+        productInputRef.current?.focus();
+        return;
+      }
+
+      // Mark as QC passed in SkuVault
+      let qcPassSuccess = false;
+      let qcPassError: string | null = null;
+      try {
+        const qcResponse = await passQcItemMutation.mutateAsync({
+          skuVaultProductId: product.id,
+          scannedCode, // Send original scanned code, not normalized
+          orderNumber: currentShipment!.orderNumber,
+        });
+        
+        // Strictly validate QC response - require explicit success
+        // SkuVault may return lowercase 'success' or uppercase 'Success'
+        const isSuccess = qcResponse.success === true || (qcResponse as any).Success === true;
+        const hasError = qcResponse.error || (qcResponse as any).Errors?.length > 0;
+        
+        if (!isSuccess || hasError) {
+          // Extract error message from various possible formats
+          qcPassError = qcResponse.error 
+            || (qcResponse as any).Errors?.join(", ")
+            || qcResponse.message 
+            || "QC pass rejected by SkuVault";
+          throw new Error(qcPassError);
+        }
+        
+        qcPassSuccess = true;
+      } catch (error: any) {
+        console.error("Failed to pass QC item in SkuVault:", error);
+        qcPassError = error.message || "QC pass failed";
+        
+        // QC pass failure is critical - reject the scan
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: product.sku,
+          scannedCode,
+          skuVaultProductId: product.id,
+          success: false,
+          errorMessage: `QC pass failed: ${qcPassError}`,
+        });
+
+        toast({
+          title: "QC Pass Failed",
+          description: `SkuVault rejected: ${qcPassError}`,
+          variant: "destructive",
+        });
+
+        setProductScan("");
+        productInputRef.current?.focus();
+        return; // Do not increment progress if QC pass fails
+      }
+
+      // QC pass succeeded - log successful scan and update progress
+      await createPackingLog({
+        action: "product_scanned",
+        productSku: product.sku,
+        scannedCode,
+        skuVaultProductId: product.id,
+        success: true,
+        errorMessage: null,
+      });
+
+      // Update progress (using item ID as key, tracking remaining units)
+      const newProgress = new Map(skuProgress);
+      newProgress.set(matchingItemKey!, {
+        ...progress,
+        scanned: progress.scanned + 1,
+        remaining: progress.remaining - 1, // Decrement remaining for this specific item
+      });
+      setSkuProgress(newProgress);
+
+      toast({
+        title: "Product Validated & QC Passed",
+        description: `${product.sku} (${progress.scanned + 1}/${progress.expected})`,
+      });
+
+      setProductScan("");
+      productInputRef.current?.focus();
+    },
+    onError: async (error: Error, scannedCode) => {
+      // Log failed scan
+      await createPackingLog({
+        action: "product_scanned",
+        productSku: null,
+        scannedCode,
+        skuVaultProductId: null,
+        success: false,
+        errorMessage: error.message,
+      });
+
+      toast({
+        title: "Product Not Found",
+        description: error.message,
+        variant: "destructive",
+      });
+
+      setProductScan("");
+      productInputRef.current?.focus();
+    },
+  });
+
+  // Create packing log entry
+  const createPackingLog = async (log: {
+    action: string;
+    productSku: string | null;
+    scannedCode: string;
+    skuVaultProductId: number | null;
+    success: boolean;
+    errorMessage: string | null;
+  }) => {
+    if (!currentShipment) return;
+
+    await apiRequest("POST", "/api/packing-logs", {
+      shipmentId: currentShipment.id,
+      orderNumber: currentShipment.orderNumber,
+      ...log,
+    });
+
+    // Invalidate packing logs to refresh the list
+    queryClient.invalidateQueries({
+      queryKey: ["/api/packing-logs/shipment", currentShipment.id],
+    });
+  };
+
+  // Complete packing and queue print job
+  const completePackingMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/packing/complete", {
+        shipmentId: currentShipment!.id,
+      });
+      return (await response.json()) as { success: boolean; printQueued: boolean; message?: string };
+    },
+    onSuccess: (result) => {
+      setPackingComplete(true);
+      toast({
+        title: "Packing Complete",
+        description: result.printQueued ? "Label queued for printing" : result.message || "Order complete",
+      });
+
+      // Reset for next order
+      setTimeout(() => {
+        setCurrentShipment(null);
+        setPackingComplete(false);
+        setOrderScan("");
+        setSkuProgress(new Map());
+        orderInputRef.current?.focus();
+      }, 2000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOrderScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (orderScan.trim()) {
+      loadShipmentMutation.mutate(orderScan.trim());
+    }
+  };
+
+  const handleProductScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (productScan.trim() && currentShipment) {
+      validateProductMutation.mutate(productScan.trim());
+    }
+  };
+
+  const handleCompletePacking = () => {
+    completePackingMutation.mutate();
+  };
+
+  const handleManualVerify = async (progressKey: string) => {
+    const progress = skuProgress.get(progressKey);
+    if (!progress || !progress.requiresManualVerification) {
+      console.error("Invalid manual verification attempt");
+      return;
+    }
+
+    // Generate unique timestamp for this batch of manual verifications
+    const batchTimestamp = Date.now();
+    
+    // Log each unit as manually verified with unique identifier
+    const logPromises = [];
+    for (let i = 0; i < progress.expected; i++) {
+      logPromises.push(
+        createPackingLog({
+          action: "manual_verification",
+          productSku: progress.sku,
+          scannedCode: `MANUAL_${batchTimestamp}_ITEM_${progress.itemId}_UNIT_${i + 1}`,
+          skuVaultProductId: null,
+          success: true,
+          errorMessage: `Manual verification by supervisor - Item: ${progress.name} (${progress.sku}), Unit ${i + 1} of ${progress.expected}`,
+        })
+      );
+    }
+    
+    // Wait for all log entries to be created
+    await Promise.all(logPromises);
+
+    // Mark as verified (scanned)
+    const newProgress = new Map(skuProgress);
+    newProgress.set(progressKey, {
+      ...progress,
+      scanned: progress.expected,
+      remaining: 0,
+    });
+    setSkuProgress(newProgress);
+
+    toast({
+      title: "Manual Verification Complete",
+      description: `${progress.name} (${progress.expected} unit${progress.expected > 1 ? 's' : ''}) verified by supervisor`,
+    });
+  };
+
+  // Calculate completion status
+  const allItemsScanned = Array.from(skuProgress.values()).every((p) => p.scanned >= p.expected);
+  const totalExpected = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.expected, 0);
+  const totalScanned = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
+  const successfulScans = packingLogs?.filter((log) => log.success && log.action === "product_scanned").length || 0;
+  const failedScans = packingLogs?.filter((log) => !log.success && log.action === "product_scanned").length || 0;
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="flex items-center gap-3 mb-6">
+        <PackageCheck className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-bold">Packing Station</h1>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left Column: Scanning Interface */}
+        <div className="space-y-6">
+          {/* Order Scanner */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-5 w-5" />
+                Scan Order Barcode
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleOrderScan} className="space-y-4">
+                <Input
+                  ref={orderInputRef}
+                  type="text"
+                  placeholder="Scan order number..."
+                  value={orderScan}
+                  onChange={(e) => setOrderScan(e.target.value)}
+                  disabled={loadShipmentMutation.isPending || !!currentShipment}
+                  className="text-2xl h-16 text-center font-mono"
+                  data-testid="input-order-scan"
+                />
+                {currentShipment && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setCurrentShipment(null);
+                      setOrderScan("");
+                      setPackingComplete(false);
+                      setSkuProgress(new Map());
+                      orderInputRef.current?.focus();
+                    }}
+                    className="w-full"
+                    data-testid="button-clear-order"
+                  >
+                    Scan Different Order
+                  </Button>
+                )}
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Product Scanner */}
+          {currentShipment && !packingComplete && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Scan Products
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleProductScan} className="space-y-4">
+                  <Input
+                    ref={productInputRef}
+                    type="text"
+                    placeholder="Scan product barcode..."
+                    value={productScan}
+                    onChange={(e) => setProductScan(e.target.value)}
+                    disabled={validateProductMutation.isPending}
+                    className="text-2xl h-16 text-center font-mono"
+                    data-testid="input-product-scan"
+                  />
+                  {validateProductMutation.isPending && (
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Validating...</span>
+                    </div>
+                  )}
+                </form>
+
+                {/* Progress Summary */}
+                <div className="mt-6 p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-3xl font-bold">
+                      {totalScanned} / {totalExpected}
+                    </div>
+                    {allItemsScanned && (
+                      <CheckCircle2 className="h-8 w-8 text-green-600" />
+                    )}
+                  </div>
+                  {!allItemsScanned && (
+                    <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Scan Statistics */}
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold">{successfulScans}</div>
+                      <div className="text-sm text-muted-foreground">Valid</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-red-600" />
+                    <div>
+                      <div className="text-2xl font-bold">{failedScans}</div>
+                      <div className="text-sm text-muted-foreground">Rejected</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleCompletePacking}
+                  disabled={!allItemsScanned || completePackingMutation.isPending}
+                  className="w-full mt-6"
+                  size="lg"
+                  data-testid="button-complete-packing"
+                >
+                  {completePackingMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Completing...
+                    </>
+                  ) : allItemsScanned ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Complete Packing
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Scan All Items First
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Packing Complete Message */}
+          {packingComplete && (
+            <Card className="border-green-600">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
+                  <div>
+                    <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
+                    <p className="text-muted-foreground mt-2">Loading next order...</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right Column: Shipment Details & Progress */}
+        <div className="space-y-6">
+          {currentShipment ? (
+            <>
+              {/* Shipment Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Shipment Details</span>
+                    <Badge variant="outline" data-testid="badge-order-number">
+                      {currentShipment.orderNumber}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {currentShipment.trackingNumber && (
+                    <div className="flex items-start gap-3">
+                      <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-sm text-muted-foreground">Tracking</div>
+                        <div className="font-mono" data-testid="text-tracking">
+                          {currentShipment.trackingNumber}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentShipment.carrier && (
+                    <div className="flex items-start gap-3">
+                      <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-sm text-muted-foreground">Shipping Method</div>
+                        <div>
+                          {currentShipment.carrier} {currentShipment.serviceCode}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentShipment.shipTo && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-sm text-muted-foreground">Ship To</div>
+                        <div className="whitespace-pre-line text-sm">{currentShipment.shipTo}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentShipment.statusDescription && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Status</div>
+                      <Badge variant="secondary" data-testid="badge-status">
+                        {currentShipment.statusDescription}
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Items Progress */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Items to Pack</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {Array.from(skuProgress.entries()).map(([key, progress]) => (
+                      <div
+                        key={key}
+                        className={`p-3 rounded-lg border ${
+                          progress.scanned >= progress.expected
+                            ? "border-green-600 bg-green-50 dark:bg-green-950/20"
+                            : progress.requiresManualVerification
+                            ? "border-orange-600 bg-orange-50 dark:bg-orange-950/20"
+                            : "border-border"
+                        }`}
+                        data-testid={`progress-${progress.sku}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{progress.name}</div>
+                            <div className="text-sm text-muted-foreground font-mono">{progress.sku}</div>
+                            {progress.requiresManualVerification && progress.scanned < progress.expected && (
+                              <Badge variant="outline" className="mt-1 text-orange-600 border-orange-600">
+                                Manual Verification Required
+                              </Badge>
+                            )}
+                          </div>
+                          {progress.scanned >= progress.expected ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 ml-2" />
+                          ) : progress.requiresManualVerification ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleManualVerify(key)}
+                              className="flex-shrink-0 ml-2"
+                              data-testid={`button-manual-verify-${key}`}
+                            >
+                              Verify
+                            </Button>
+                          ) : (
+                            <div className="text-lg font-bold flex-shrink-0 ml-2">
+                              {progress.scanned}/{progress.expected}
+                            </div>
+                          )}
+                        </div>
+                        {progress.scanned < progress.expected && !progress.requiresManualVerification && (
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Packing Logs */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Scan History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {packingLogs && packingLogs.length > 0 ? (
+                      packingLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border"
+                          data-testid={`log-${log.id}`}
+                        >
+                          {log.success ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            {log.productSku && <div className="font-medium">{log.productSku}</div>}
+                            <div className="text-sm text-muted-foreground font-mono truncate">{log.scannedCode}</div>
+                            {log.errorMessage && <div className="text-sm text-red-600 mt-1">{log.errorMessage}</div>}
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {new Date(log.createdAt).toLocaleTimeString()}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No scans yet. Start scanning products.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12 text-muted-foreground">
+                  <Scan className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg">Scan an order barcode to begin packing</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
