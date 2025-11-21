@@ -121,15 +121,15 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
       
       // Create order items
       for (const lineItem of shopifyOrder.line_items) {
-        await storage.createOrderItem({
+        await storage.upsertOrderItem({
           shopifyLineItemId: lineItem.id.toString(),
           orderId: orderData.id,
           productId: lineItem.product_id?.toString() || null,
           variantId: lineItem.variant_id?.toString() || null,
           quantity: lineItem.quantity,
-          name: lineItem.name,
+          title: lineItem.name,
           sku: lineItem.sku || null,
-          price: parseFloat(lineItem.price),
+          price: lineItem.price,
         });
       }
       

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -236,9 +236,9 @@ export const shipments = pgTable("shipments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-  orderNumberIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_number_idx ON ${table} (order_number) WHERE order_number IS NOT NULL`,
+  orderNumberIdx: index("shipments_order_number_idx").on(table.orderNumber),
   // Unique constraint: same ShipStation shipment ID cannot appear twice in database
-  uniqueShipmentIdIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS shipments_shipment_id_idx ON ${table} (shipment_id) WHERE shipment_id IS NOT NULL`,
+  uniqueShipmentIdIdx: uniqueIndex("shipments_shipment_id_idx").on(table.shipmentId),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
