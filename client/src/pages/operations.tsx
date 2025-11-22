@@ -586,7 +586,10 @@ Please analyze this failure and help me understand:
               },
               dataHealth: message.data.dataHealth,
               onHoldWorkerStatus: message.data.onHoldWorkerStatus || 'sleeping',
-              onHoldWorkerStats: message.data.onHoldWorkerStats,
+              // Only update onHoldWorkerStats if defined, otherwise preserve previous value
+              onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
+                ? message.data.onHoldWorkerStats 
+                : prev?.onHoldWorkerStats,
             }));
           }
         } catch (error) {
@@ -918,7 +921,7 @@ Please analyze this failure and help me understand:
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card data-testid="card-shopify-queue">
+        <Card data-testid="card-shopify-queue" className="min-h-[280px]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Queue</CardTitle>
@@ -966,7 +969,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shipment-sync-queue">
+        <Card data-testid="card-shipment-sync-queue" className="min-h-[280px]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shipment Sync Queue</CardTitle>
@@ -1014,7 +1017,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shopify-order-sync-queue">
+        <Card data-testid="card-shopify-order-sync-queue" className="min-h-[280px]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Order Sync</CardTitle>
@@ -1065,7 +1068,7 @@ Please analyze this failure and help me understand:
 
       <div className="grid gap-4 md:grid-cols-3">
         <Link href="/orders?hasShipment=false">
-          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer min-h-[220px]">
+          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-lg">Orders Missing Shipments</CardTitle>
@@ -1118,7 +1121,7 @@ Please analyze this failure and help me understand:
         </Link>
 
         <Link href="/shipments?withoutOrders=true">
-          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer min-h-[220px]">
+          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Truck className="h-5 w-5" />
@@ -1134,7 +1137,7 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Card data-testid="card-onhold-worker-last-run" className="min-h-[220px]">
+        <Card data-testid="card-onhold-worker-last-run" className="min-h-[280px]">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -1160,7 +1163,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shipments-without-status" className="min-h-[220px]">
+        <Card data-testid="card-shipments-without-status" className="min-h-[280px]">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
@@ -1175,7 +1178,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shipment-sync-failures" className="min-h-[220px]">
+        <Card data-testid="card-shipment-sync-failures" className="min-h-[280px]">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <XCircle className="h-5 w-5" />
@@ -1216,7 +1219,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shopify-order-sync-failures" className="min-h-[220px]">
+        <Card data-testid="card-shopify-order-sync-failures" className="min-h-[280px]">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
