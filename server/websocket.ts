@@ -109,6 +109,7 @@ export type QueueStatusData = {
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
   dataHealth: {
     ordersMissingShipments: number;
+    oldestOrderMissingShipmentAt: string | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
@@ -137,6 +138,7 @@ export function broadcastQueueStatus(data: {
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
   dataHealth?: {
     ordersMissingShipments?: number;
+    oldestOrderMissingShipmentAt?: string | null;
     shipmentsWithoutOrders?: number;
     orphanedShipments?: number;
     shipmentsWithoutStatus?: number;
@@ -174,6 +176,7 @@ export function broadcastQueueStatus(data: {
     onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,
+      oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? null,
       shipmentsWithoutOrders: data.dataHealth?.shipmentsWithoutOrders ?? 0,
       orphanedShipments: data.dataHealth?.orphanedShipments ?? 0,
       shipmentsWithoutStatus: data.dataHealth?.shipmentsWithoutStatus ?? 0,
