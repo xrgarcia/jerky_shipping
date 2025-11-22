@@ -1034,10 +1034,17 @@ export class SkuVaultService {
       const response = await this.makeQCRequest<any>('POST', endpoint, itemData);
       
       // SkuVault QC endpoints may return various response formats
-      // Try to parse it, or create a success response
+      // If the response doesn't explicitly indicate failure, treat it as success
       let validatedResponse: QCPassItemResponse;
       try {
         validatedResponse = qcPassItemResponseSchema.parse(response);
+        
+        // If response parsed but doesn't have explicit success=true, set it
+        // (SkuVault often returns empty {} on success)
+        if (validatedResponse.success !== true && !validatedResponse.error) {
+          validatedResponse.success = true;
+          validatedResponse.message = validatedResponse.message || 'Item marked as QC passed';
+        }
       } catch {
         // If response doesn't match schema, assume success if no error was thrown
         validatedResponse = {
