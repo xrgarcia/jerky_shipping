@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
     - **Shipment Details Page**: Warehouse-optimized detail view showing comprehensive shipment metadata, customer information, shipping details, special instructions, and itemized product lists.
     - **Dual-ID Routing**: All shipment-related API endpoints and frontend navigation support both ShipStation IDs and database UUIDs for seamless operation.
     - **Reports Page**: Business analytics dashboard with date range filtering, interactive charts, and metrics for Gross Sales and Net Sales, aligned to Central Standard Time.
-    - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets. The "Orders Missing Shipments" metric excludes refunded and restocked orders using case-insensitive filtering, and is clickable to navigate to the Orders page with the "Has Shipment: No" filter applied.
+    - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets. The "Orders Missing Shipments" metric excludes refunded, restocked, and voided orders using case-insensitive filtering, and is clickable to navigate to the Orders page with the "Has Shipment: No" filter applied (which applies the same exclusions).
     - **Print Queue System**: Manages shipping label printing workflow with real-time status updates via WebSockets.
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, and notifications.
 - **Monorepo Structure**: Client, server, and shared code co-located.
