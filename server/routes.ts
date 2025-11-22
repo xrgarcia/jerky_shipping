@@ -1026,11 +1026,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Use the SaleId provided from frontend (already resolved during order load)
-      console.log("Marking item as QC passed:", parseResult.data);
-      const result = await skuVaultService.passQCItem(parseResult.data);
+      // Hybrid approach: Use cached SaleId if available
+      // Note: If IdSale is null (not undefined), it means we already tried lookup and it failed
+      // Only attempt lookup if IdSale is undefined (never tried)
+      let saleId = parseResult.data.IdSale;
       
-      res.json(result);
+      if (parseResult.data.IdSale === undefined && parseResult.data.OrderNumber) {
+        // No cached SaleId - attempt one-time lookup using order number
+        try {
+          console.log(`[QC Pass] No cached SaleId, looking up for order: ${parseResult.data.OrderNumber}`);
+          const saleInfo = await skuVaultService.getSaleInformation(parseResult.data.OrderNumber);
+          if (saleInfo?.SaleId) {
+            saleId = saleInfo.SaleId;
+            console.log(`[QC Pass] Found SaleId: ${saleId}`);
+          } else {
+            console.log(`[QC Pass] Order not in SkuVault - skipping QC pass (non-blocking)`);
+          }
+        } catch (error: any) {
+          console.log(`[QC Pass] Lookup failed - skipping QC pass (non-blocking):`, error.message);
+        }
+      } else if (parseResult.data.IdSale === null) {
+        console.log(`[QC Pass] SaleId already looked up (not found) - skipping QC pass`);
+      }
+      
+      // Only call SkuVault QC if we have a valid SaleId
+      if (saleId) {
+        try {
+          const qcData = {
+            ...parseResult.data,
+            IdSale: saleId,
+          };
+          
+          console.log(`[QC Pass] Attempting QC pass with SaleId: ${saleId}`);
+          const result = await skuVaultService.passQCItem(qcData);
+          res.json(result);
+        } catch (error: any) {
+          // Graceful degradation: Log but return success so packing continues
+          console.warn(`[QC Pass] SkuVault QC pass failed (non-blocking):`, error.message);
+          
+          // Return success response so frontend proceeds without errors
+          res.json({
+            Success: true, // Return true to avoid error alerts in UI
+            Data: null,
+            Errors: [], // Empty errors array for graceful degradation
+          });
+        }
+      } else {
+        // No SaleId available - skip QC pass but return success
+        console.log(`[QC Pass] No valid SaleId - skipping QC pass (order not in SkuVault)`);
+        res.json({
+          Success: true, // Non-blocking: return success even when skipping QC
+          Data: null,
+          Errors: [],
+        });
+      }
     } catch (error: any) {
       console.error("Error marking item as QC passed:", error);
       

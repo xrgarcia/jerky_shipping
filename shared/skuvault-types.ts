@@ -368,7 +368,8 @@ export type ProductLookupResponse = z.infer<typeof productLookupResponseSchema>;
 export const qcPassItemRequestSchema = z.object({
   IdItem: z.string(),
   Quantity: z.coerce.number().min(1),
-  IdSale: z.string(),
+  IdSale: z.string().nullable().optional(), // Cached SaleId (may be null)
+  OrderNumber: z.string().optional(), // Fallback for backend lookup
   Note: z.string().nullable().optional(),
   ScannedCode: z.string(),
   SerialNumber: z.string().nullable().optional().default(""),

@@ -240,12 +240,14 @@ export default function Packing() {
     mutationFn: async (params: {
       skuVaultProductId: string;
       scannedCode: string;
-      saleId: string; // Use cached SaleId from shipment data
+      saleId: string | null;
+      orderNumber: string;
     }) => {
       const response = await apiRequest("POST", "/api/skuvault/qc/pass-item", {
         IdItem: params.skuVaultProductId,
         Quantity: 1,
-        IdSale: params.saleId, // Use the proper SaleId (already resolved)
+        IdSale: params.saleId, // Cached SaleId (or null if not found in SkuVault)
+        OrderNumber: params.orderNumber, // Fallback for backend lookup if needed
         ScannedCode: params.scannedCode,
         Note: null,
         SerialNumber: "",
@@ -329,12 +331,11 @@ export default function Packing() {
       let qcPassSuccess = false;
       let qcPassError: string | null = null;
       try {
-        // Use cached SaleId if available, otherwise fall back to order number
-        const saleId = currentShipment!.saleId || currentShipment!.orderNumber;
         const qcResponse = await passQcItemMutation.mutateAsync({
           skuVaultProductId: product.IdItem || "0",
           scannedCode, // Send original scanned code, not normalized
-          saleId, // Use cached SaleId (already resolved during order load)
+          saleId: currentShipment!.saleId, // Cached SaleId (null if not found)
+          orderNumber: currentShipment!.orderNumber, // Fallback for backend
         });
         
         // Validate QC response - SkuVault returns: {"Data": null, "Errors": [], "Success": true}
