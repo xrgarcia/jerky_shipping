@@ -1,0 +1,267 @@
+{
+    "shipments": [
+        {
+            "shipment_id": "se-924665462",
+            "carrier_id": "se-118080",
+            "service_code": "usps_ground_advantage",
+            "requested_shipment_service": "Economy - 7 to 10 Business Days",
+            "external_shipment_id": "6857689792826-7845981716794",
+            "shipment_number": "JK3825346033",
+            "hold_until_date": "2026-11-21T08:00:00Z",
+            "ship_date": null,
+            "ship_by_date": null,
+            "created_at": "2025-11-21T21:37:07.18Z",
+            "modified_at": "2025-11-21T21:48:46.67Z",
+            "shipment_status": "on_hold",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Raymond (Gene) Garcia",
+                "phone": "+14693635128",
+                "email": "ray.garcia.jr@gmail.com",
+                "company_name": "SLASHBIN",
+                "address_line1": "3901 KENNEDY RANCH RD",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "ROANOKE",
+                "state_province": "TX",
+                "postal_code": "76262-1509",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": {
+                "instructions": null,
+                "name": "JERKY. COM",
+                "phone": "8779753759",
+                "email": "talktous@jerky.com",
+                "company_name": "Over 100 Kinds of Jerky",
+                "address_line1": "4132 Will Rogers Pkwy  ",
+                "address_line2": "Suite #1000",
+                "address_line3": "",
+                "city_locality": "Oklahoma City",
+                "state_province": "OK",
+                "postal_code": "73108",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            },
+            "warehouse_id": "se-228129",
+            "return_to": {
+                "instructions": null,
+                "name": "JERKY. COM",
+                "phone": "8779753759",
+                "email": "talktous@jerky.com",
+                "company_name": "Over 100 Kinds of Jerky",
+                "address_line1": "4132 Will Rogers Pkwy  ",
+                "address_line2": "Suite #1000",
+                "address_line3": "",
+                "city_locality": "Oklahoma City",
+                "state_province": "OK",
+                "postal_code": "73108",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            },
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": "none",
+                "custom_field2": "9",
+                "custom_field3": "",
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [
+                {
+                    "tag_id": 0,
+                    "name": "All Orders",
+                    "color": null
+                },
+                {
+                    "tag_id": 0,
+                    "name": "TEST ORDER - DO NOT SHIP",
+                    "color": null
+                }
+            ],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": "se-3",
+                    "package_code": "package",
+                    "package_name": "Package",
+                    "weight": {
+                        "value": 6.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 6.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Elk Jerky - Hot - 1.75 oz.",
+                    "sku": "JCB-ELJ-5-17",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "16605265396026",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "1652421635",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/files/hotelkjerky.png?v=1713204394",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 0.00,
+                    "tax_amount": 0.00,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "9627475",
+                    "fullfilment_sku": null,
+                    "upc": "811007027019"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "All-Natural Beef Jerky - Original - 2.5 oz.",
+                    "sku": "JCB-BEJ-1-16",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "16605265428794",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "1652421636",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/files/originalbeefjerky.png?v=1711752277",
+                    "weight": {
+                        "value": 2.50,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 0.00,
+                    "tax_amount": 0.00,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "8370440",
+                    "fullfilment_sku": null,
+                    "upc": "811007027040"
+                },
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Bacon Jerky - Maple - 1.75 oz.",
+                    "sku": "JCB-BAJ-6-17",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "16605265461562",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "1652421637",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/files/maplebaconjerky.png?v=1713213634",
+                    "weight": {
+                        "value": 2.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 0.00,
+                    "tax_amount": 0.00,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "16203641",
+                    "fullfilment_sku": null,
+                    "upc": "811007027811"
+                }
+            ],
+            "notes_from_buyer": "TEST ORDER",
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 6.91
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 6.91
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": 2,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        }
+    ],
+    "total": 1,
+    "page": 1,
+    "pages": 1,
+    "links": {
+        "first": {
+            "href": "https://api.shipstation.com/v2/shipments?shipment_number=JK3825346033&page=1&page_size=25"
+        },
+        "last": {
+            "href": "https://api.shipstation.com/v2/shipments?shipment_number=JK3825346033&page=1&page_size=25"
+        },
+        "prev": {},
+        "next": {}
+    }
+}

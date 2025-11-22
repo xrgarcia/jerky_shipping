@@ -171,9 +171,12 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
   const envLabel = process.env.REPLIT_DEPLOYMENT === '1' ? 'PROD' : 'DEV';
 
   // All shipment events warehouse needs to track
-  // ShipStation V2 API only supports these event types (created/updated/canceled don't exist in V2)
+  // ShipStation V2 API supports all fulfillment lifecycle events
   const events = [
-    'fulfillment_shipped_v2',    // Shipment created/shipped
+    'fulfillment_created_v2',    // Shipment created (includes on_hold, pending, etc.)
+    'fulfillment_updated_v2',    // Shipment details updated
+    'fulfillment_shipped_v2',    // Shipment shipped
+    'fulfillment_canceled_v2',   // Shipment cancelled
     'fulfillment_rejected_v2',   // Fulfillment rejected by carrier/marketplace
     'track',                     // Tracking updates (most important for warehouse!)
     'batch',                     // Batch operations
