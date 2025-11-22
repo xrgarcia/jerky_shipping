@@ -506,6 +506,8 @@ export class DatabaseStorage implements IStorage {
           .from(shipments)
           .where(isNotNull(shipments.orderId));
         conditions.push(sql`${orders.id} NOT IN ${orderIdsWithShipments}`);
+        // Also exclude refunded and restocked orders when filtering for orders missing shipments
+        conditions.push(sql`(${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked'))`);
       }
 
       if (shipmentStatus && shipmentStatus.length > 0) {
