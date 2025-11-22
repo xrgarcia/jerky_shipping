@@ -18,6 +18,7 @@ import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQu
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
+import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { qcPassItemRequestSchema } from "@shared/skuvault-types";
@@ -56,76 +57,6 @@ const SESSION_DURATION_DAYS = 30;
 // 3. Configure Admin API scopes: read_orders, read_products, read_customers
 // 4. Install the app and reveal the Admin API access token
 // 5. Add these secrets: SHOPIFY_SHOP_DOMAIN (e.g., yourstore.myshopify.com) and SHOPIFY_ADMIN_ACCESS_TOKEN
-
-async function processOrderRefunds(orderId: string, shopifyOrder: any) {
-  const refunds = shopifyOrder.refunds || [];
-  
-  for (const refund of refunds) {
-    try {
-      const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
-        return sum + parseFloat(txn.amount || '0');
-      }, 0) || 0;
-
-      const refundData = {
-        orderId: orderId,
-        shopifyRefundId: refund.id.toString(),
-        amount: totalAmount.toFixed(2),
-        note: refund.note || null,
-        refundedAt: new Date(refund.created_at),
-        processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
-      };
-
-      await storage.upsertOrderRefund(refundData);
-    } catch (error) {
-      console.error(`Error processing refund ${refund.id} for order ${orderId}:`, error);
-    }
-  }
-}
-
-async function processOrderLineItems(orderId: string, shopifyOrder: any) {
-  const lineItems = shopifyOrder.line_items || [];
-  
-  for (const item of lineItems) {
-    try {
-      const unitPrice = parseFloat(item.price || '0');
-      const quantity = item.quantity || 0;
-      const preDiscountPrice = (unitPrice * quantity).toFixed(2);
-      const totalDiscount = item.total_discount || '0.00';
-      const finalLinePrice = (parseFloat(preDiscountPrice) - parseFloat(totalDiscount)).toFixed(2);
-      
-      const taxAmount = item.tax_lines?.reduce((sum: number, taxLine: any) => {
-        return sum + parseFloat(taxLine.price || '0');
-      }, 0) || 0;
-
-      const itemData = {
-        orderId: orderId,
-        shopifyLineItemId: item.id.toString(),
-        title: item.title || item.name || 'Unknown Item',
-        sku: item.sku || null,
-        variantId: item.variant_id ? item.variant_id.toString() : null,
-        productId: item.product_id ? item.product_id.toString() : null,
-        quantity: quantity,
-        currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
-        price: item.price || '0.00',
-        totalDiscount: totalDiscount,
-        priceSetJson: item.price_set || null,
-        totalDiscountSetJson: item.total_discount_set || null,
-        taxLinesJson: item.tax_lines || null,
-        taxable: item.taxable !== undefined ? item.taxable : null,
-        requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
-        priceSetAmount: item.price_set?.shop_money?.amount || '0',
-        totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
-        totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
-        preDiscountPrice: preDiscountPrice,
-        finalLinePrice: finalLinePrice,
-      };
-
-      await storage.upsertOrderItem(itemData);
-    } catch (error) {
-      console.error(`Error processing line item ${item.id} for order ${orderId}:`, error);
-    }
-  }
-}
 
 async function fetchShopifyOrders(limit: number = 50, pageInfo?: string) {
   const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
@@ -464,85 +395,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createOrder(orderData);
         }
 
-        // Process refunds for this order
-        if (shopifyOrder.refunds && shopifyOrder.refunds.length > 0) {
-          for (const refund of shopifyOrder.refunds) {
-            try {
-              const totalAmount = refund.transactions?.reduce((sum: number, txn: any) => {
-                return sum + parseFloat(txn.amount || '0');
-              }, 0) || 0;
-
-              const refundData = {
-                orderId: orderData.id,
-                shopifyRefundId: refund.id.toString(),
-                amount: totalAmount.toFixed(2),
-                note: refund.note || null,
-                refundedAt: new Date(refund.created_at),
-                processedAt: refund.processed_at ? new Date(refund.processed_at) : null,
-              };
-
-              await storage.upsertOrderRefund(refundData);
-            } catch (refundError) {
-              console.error(`Error processing refund for order ${orderData.id}:`, refundError);
-            }
-          }
-        }
-
-        // Process line items for this order
-        if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
-          for (const item of shopifyOrder.line_items) {
-            try {
-              // Calculate derived price fields
-              const unitPrice = parseFloat(item.price || '0');
-              const quantity = item.quantity || 0;
-              const preDiscountPrice = (unitPrice * quantity).toFixed(2);
-              const totalDiscount = item.total_discount || '0.00';
-              const finalLinePrice = (parseFloat(preDiscountPrice) - parseFloat(totalDiscount)).toFixed(2);
-              
-              // Sum all tax amounts from tax_lines array
-              const taxAmount = item.tax_lines?.reduce((sum: number, taxLine: any) => {
-                return sum + parseFloat(taxLine.price || '0');
-              }, 0) || 0;
-
-              const itemData = {
-                orderId: orderData.id,
-                shopifyLineItemId: item.id.toString(),
-                title: item.title || item.name || 'Unknown Item',
-                sku: item.sku || null,
-                variantId: item.variant_id ? item.variant_id.toString() : null,
-                productId: item.product_id ? item.product_id.toString() : null,
-                quantity: quantity,
-                currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
-                
-                // Core price fields (text strings for consistency)
-                price: item.price || '0.00',
-                totalDiscount: totalDiscount,
-                
-                // Full Shopify JSON structures (preserves currency and complete data)
-                priceSetJson: item.price_set || null,
-                totalDiscountSetJson: item.total_discount_set || null,
-                taxLinesJson: item.tax_lines || null,
-                
-                // Tax information
-                taxable: item.taxable !== undefined ? item.taxable : null,
-                
-                // Shipping information
-                requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
-                
-                // Calculated/extracted fields for easy querying
-                priceSetAmount: item.price_set?.shop_money?.amount || '0',
-                totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
-                totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
-                preDiscountPrice: preDiscountPrice,
-                finalLinePrice: finalLinePrice,
-              };
-
-              await storage.upsertOrderItem(itemData);
-            } catch (itemError) {
-              console.error(`Error processing line item for order ${orderData.id}:`, itemError);
-            }
-          }
-        }
+        // Process refunds and line items using centralized ETL service
+        await shopifyOrderETL.processOrder(shopifyOrder);
 
         syncCount++;
       }
@@ -2661,73 +2515,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const shopifyOrder = data.order;
 
-            // Process line items if they exist
-            let itemsPersisted = 0;
+            // Process refunds and line items using centralized ETL service
+            await shopifyOrderETL.processOrder(shopifyOrder);
+            
+            // Track persistence for reporting
             if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
-              for (const item of shopifyOrder.line_items) {
-                try {
-                  // Calculate derived price fields
-                  const unitPrice = parseFloat(item.price || '0');
-                  const quantity = item.quantity || 0;
-                  const preDiscountPrice = (unitPrice * quantity).toFixed(2);
-                  const totalDiscount = item.total_discount || '0.00';
-                  const finalLinePrice = (parseFloat(preDiscountPrice) - parseFloat(totalDiscount)).toFixed(2);
-                  
-                  // Sum all tax amounts from tax_lines array
-                  const taxAmount = item.tax_lines?.reduce((sum: number, taxLine: any) => {
-                    return sum + parseFloat(taxLine.price || '0');
-                  }, 0) || 0;
-
-                  const itemData = {
-                    orderId: order.id,
-                    shopifyLineItemId: item.id.toString(),
-                    title: item.title || item.name || 'Unknown Item',
-                    sku: item.sku || null,
-                    variantId: item.variant_id ? item.variant_id.toString() : null,
-                    productId: item.product_id ? item.product_id.toString() : null,
-                    quantity: quantity,
-                    currentQuantity: item.current_quantity !== undefined ? item.current_quantity : null,
-                    
-                    // Core price fields (text strings for consistency)
-                    price: item.price || '0.00',
-                    totalDiscount: totalDiscount,
-                    
-                    // Full Shopify JSON structures (preserves currency and complete data)
-                    priceSetJson: item.price_set || null,
-                    totalDiscountSetJson: item.total_discount_set || null,
-                    taxLinesJson: item.tax_lines || null,
-                    
-                    // Tax information
-                    taxable: item.taxable !== undefined ? item.taxable : null,
-                    
-                    // Shipping information
-                    requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
-                    
-                    // Calculated/extracted fields for easy querying
-                    priceSetAmount: item.price_set?.shop_money?.amount || '0',
-                    totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
-                    totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
-                    preDiscountPrice: preDiscountPrice,
-                    finalLinePrice: finalLinePrice,
-                  };
-
-                  await storage.upsertOrderItem(itemData);
-                  itemsPersisted++;
-                } catch (itemError: any) {
-                  console.error(`Error persisting line item for order ${order.id}:`, itemError.message);
-                }
-              }
-              
-              if (shopifyOrder.line_items.length > 0 && itemsPersisted === 0) {
-                console.error(`Failed to persist any line items for order ${order.id} (${shopifyOrder.line_items.length} items found)`);
-                failedCount++;
-                failedOrderIds.push(order.orderNumber);
-              } else if (itemsPersisted > 0) {
-                persistedCount++;
-              }
+              persistedCount++;
+              itemsFound += shopifyOrder.line_items.length;
             }
-
-            itemsFound += itemsPersisted;
 
             // Rate limiting: pause every 40 requests
             if (fetchedCount % 40 === 0) {
