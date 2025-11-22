@@ -1446,6 +1446,16 @@ Please analyze this failure and help me understand:
                 Running
               </Badge>
             </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">On-Hold Poll Worker</p>
+                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 5 minute intervals</p>
+              </div>
+              <Badge variant="default" data-testid="badge-onhold-worker">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Running
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
