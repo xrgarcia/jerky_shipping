@@ -324,7 +324,7 @@ export default function Packing() {
         return;
       }
 
-      // Mark as QC passed in SkuVault
+      // Mark as QC passed in SkuVault (optional - if order doesn't exist in SkuVault, we still proceed)
       let qcPassSuccess = false;
       let qcPassError: string | null = null;
       try {
@@ -346,32 +346,16 @@ export default function Packing() {
         
         qcPassSuccess = true;
       } catch (error: any) {
-        console.error("Failed to pass QC item in SkuVault:", error);
+        console.warn("SkuVault QC pass failed (non-fatal):", error);
         qcPassError = error.message || "QC pass failed";
         
-        // QC pass failure is critical - reject the scan
-        await createPackingLog({
-          action: "product_scanned",
-          productSku: product.Sku || "",
-          scannedCode,
-          skuVaultProductId: product.IdItem || null,
-          success: false,
-          errorMessage: `QC pass failed: ${qcPassError}`,
-          skuVaultRawResponse: rawResponse,
-        });
-
-        toast({
-          title: "QC Pass Failed",
-          description: `SkuVault rejected: ${qcPassError}`,
-          variant: "destructive",
-        });
-
-        setProductScan("");
-        productInputRef.current?.focus();
-        return; // Do not increment progress if QC pass fails
+        // QC pass failure is non-fatal - we already validated the product exists in SkuVault
+        // This typically happens when the order doesn't exist in SkuVault (e.g., Shopify/ShipStation orders)
+        // Log the attempt but allow the scan to proceed
+        console.log(`[Packing] QC pass skipped for ${product.Sku}: ${qcPassError} (order may not be in SkuVault)`);
       }
 
-      // QC pass succeeded - log successful scan and update progress
+      // Log successful scan (product validated via lookup, QC pass is optional enhancement)
       await createPackingLog({
         action: "product_scanned",
         productSku: product.Sku || "",
@@ -401,8 +385,10 @@ export default function Packing() {
       setSkuProgress(newProgress);
 
       toast({
-        title: "Product Validated & QC Passed",
-        description: `${product.Sku} (${progress.scanned + 1}/${progress.expected})`,
+        title: qcPassSuccess ? "Product Validated & QC Passed" : "Product Validated",
+        description: qcPassSuccess 
+          ? `${product.Sku} (${progress.scanned + 1}/${progress.expected})`
+          : `${product.Sku} (${progress.scanned + 1}/${progress.expected}) - QC pass skipped`,
       });
 
       setProductScan("");
