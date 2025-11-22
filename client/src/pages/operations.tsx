@@ -1201,6 +1201,54 @@ Please analyze this failure and help me understand:
         </Card>
       </div>
 
+      <Card data-testid="card-worker-status">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Worker Status
+          </CardTitle>
+          <CardDescription>Background workers processing queues</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Shopify Webhook Worker</p>
+                <p className="text-sm text-muted-foreground">Processes 50 webhooks per batch, 5s intervals</p>
+              </div>
+              <Badge variant="default" data-testid="badge-shopify-worker">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Running
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Shipment Sync Worker</p>
+                <p className="text-sm text-muted-foreground">Processes 50 shipments per batch, 10s intervals</p>
+              </div>
+              <Badge variant="default" data-testid="badge-shipment-worker">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Running
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">On-Hold Poll Worker</p>
+                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 1 minute intervals</p>
+              </div>
+              <Badge 
+                variant={queueStats?.onHoldWorkerStatus === 'running' ? 'default' : 'secondary'} 
+                data-testid={`badge-onhold-worker-${queueStats?.onHoldWorkerStatus || 'unknown'}`}
+              >
+                {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
+                {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
+                {queueStats?.onHoldWorkerStatus === 'running' ? 'Running' : queueStats?.onHoldWorkerStatus === 'sleeping' ? 'Sleeping' : 'Unknown'}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card data-testid="card-shopify-credentials">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
@@ -1413,54 +1461,6 @@ Please analyze this failure and help me understand:
               ) : (
                 <p className="text-sm text-muted-foreground">No webhooks registered</p>
               )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card data-testid="card-worker-status">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Worker Status
-          </CardTitle>
-          <CardDescription>Background workers processing queues</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Shopify Webhook Worker</p>
-                <p className="text-sm text-muted-foreground">Processes 50 webhooks per batch, 5s intervals</p>
-              </div>
-              <Badge variant="default" data-testid="badge-shopify-worker">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Running
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Shipment Sync Worker</p>
-                <p className="text-sm text-muted-foreground">Processes 50 shipments per batch, 10s intervals</p>
-              </div>
-              <Badge variant="default" data-testid="badge-shipment-worker">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Running
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">On-Hold Poll Worker</p>
-                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 1 minute intervals</p>
-              </div>
-              <Badge 
-                variant={queueStats?.onHoldWorkerStatus === 'running' ? 'default' : 'secondary'} 
-                data-testid={`badge-onhold-worker-${queueStats?.onHoldWorkerStatus || 'unknown'}`}
-              >
-                {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'running' ? 'Running' : queueStats?.onHoldWorkerStatus === 'sleeping' ? 'Sleeping' : 'Unknown'}
-              </Badge>
             </div>
           </div>
         </CardContent>
