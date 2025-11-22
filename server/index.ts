@@ -136,8 +136,10 @@ app.use((req, res, next) => {
     startShopifyOrderSyncWorker(8000); // Process Shopify order sync queue every 8 seconds
     
     // Clear any stale poll mutex from previous server instance before starting worker
+    log("Clearing any stale poll mutex...");
     const { workerCoordinator } = await import("./worker-coordinator");
     await workerCoordinator.releasePollMutex();
+    log("Poll mutex cleared successfully");
     
     // Start on-hold shipments polling worker (supplements webhooks which don't fire for on_hold)
     const { startOnHoldPollWorker } = await import("./onhold-poll-worker");
