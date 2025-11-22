@@ -128,6 +128,15 @@ type ShopifyValidation = {
   shopName?: string;
 };
 
+type SkuVaultValidation = {
+  isValid: boolean;
+  credentialsConfigured: boolean;
+  tokenValid: boolean;
+  lastRefreshed: string | null;
+  errors: string[];
+  lastChecked: string;
+};
+
 type ShipmentSyncFailure = {
   id: string;
   orderNumber: string;
@@ -502,6 +511,11 @@ Please analyze this failure and help me understand:
     queryKey: ["/api/operations/shopify-validation"],
   });
 
+  // Fetch SkuVault credential validation and token status
+  const { data: skuVaultValidation, isLoading: skuVaultValidationLoading } = useQuery<SkuVaultValidation>({
+    queryKey: ["/api/operations/skuvault-validation"],
+  });
+
   // Fetch Shopify webhooks list
   const { data: webhooksData, isLoading: webhooksLoading } = useQuery<{ webhooks: ShopifyWebhook[] }>({
     queryKey: ["/api/operations/shopify-webhooks"],
@@ -814,6 +828,27 @@ Please analyze this failure and help me understand:
       toast({
         title: "Re-registration Failed",
         description: error.message || "Failed to re-register Shopify webhooks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rotateSkuVaultTokenMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/operations/skuvault-rotate-token");
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Token Rotated",
+        description: data.message || "SkuVault token rotated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/skuvault-validation"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Rotation Failed",
+        description: error.message || "Failed to rotate SkuVault token",
         variant: "destructive",
       });
     },
@@ -1331,6 +1366,91 @@ Please analyze this failure and help me understand:
                   ? 'Awaiting Backfill'
                   : 'Unknown'}
               </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-skuvault-credentials">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              SkuVault Credentials
+            </CardTitle>
+            <CardDescription>Session token status</CardDescription>
+          </div>
+          <Badge
+            data-testid="badge-skuvault-validation"
+            variant={skuVaultValidation?.isValid ? "default" : "destructive"}
+          >
+            {skuVaultValidationLoading ? (
+              "Checking..."
+            ) : skuVaultValidation?.isValid ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Valid
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Invalid
+              </>
+            )}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {skuVaultValidationLoading ? (
+              <p className="text-sm text-muted-foreground">Checking credentials...</p>
+            ) : skuVaultValidation?.isValid ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Session token valid
+                </div>
+                {skuVaultValidation.lastRefreshed && (
+                  <p className="text-xs text-muted-foreground">
+                    Token refreshed: {formatDistanceToNow(new Date(skuVaultValidation.lastRefreshed), { addSuffix: true })}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Last checked: {formatDistanceToNow(new Date(skuVaultValidation.lastChecked), { addSuffix: true })}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-destructive">Configuration Issues:</p>
+                <ul className="space-y-1">
+                  {skuVaultValidation?.errors.map((error, idx) => (
+                    <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                      <span data-testid={`text-skuvault-error-${idx}`}>{error}</span>
+                    </li>
+                  ))}
+                </ul>
+                {skuVaultValidation?.lastChecked && (
+                  <p className="text-xs text-muted-foreground">
+                    Last checked: {formatDistanceToNow(new Date(skuVaultValidation.lastChecked), { addSuffix: true })}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="pt-3 border-t">
+              <Button
+                onClick={() => rotateSkuVaultTokenMutation.mutate()}
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={!skuVaultValidation?.credentialsConfigured || rotateSkuVaultTokenMutation.isPending}
+                data-testid="button-rotate-skuvault-token"
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", rotateSkuVaultTokenMutation.isPending && "animate-spin")} />
+                {rotateSkuVaultTokenMutation.isPending ? "Rotating Token..." : "Rotate Token"}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Force a fresh login to SkuVault and refresh the session token
+              </p>
             </div>
           </div>
         </CardContent>

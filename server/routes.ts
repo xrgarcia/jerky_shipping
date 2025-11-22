@@ -2696,6 +2696,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SkuVault credential validation and token status
+  app.get("/api/operations/skuvault-validation", requireAuth, async (req, res) => {
+    try {
+      const metadata = await skuVaultService.getTokenMetadata();
+      
+      const errors: string[] = [];
+      if (!metadata.credentialsConfigured) {
+        errors.push('SKUVAULT_USERNAME or SKUVAULT_PASSWORD not configured');
+      }
+      
+      res.json({
+        isValid: metadata.isValid && metadata.credentialsConfigured,
+        credentialsConfigured: metadata.credentialsConfigured,
+        tokenValid: metadata.isValid,
+        lastRefreshed: metadata.lastRefreshed,
+        errors,
+        lastChecked: new Date(),
+      });
+    } catch (error) {
+      console.error("Error validating SkuVault credentials:", error);
+      res.status(500).json({ 
+        isValid: false,
+        credentialsConfigured: false,
+        tokenValid: false,
+        lastRefreshed: null,
+        errors: ["Failed to validate credentials"],
+        lastChecked: new Date(),
+      });
+    }
+  });
+
+  // Rotate SkuVault token
+  app.post("/api/operations/skuvault-rotate-token", requireAuth, async (req, res) => {
+    try {
+      await skuVaultService.rotateToken();
+      
+      // Get updated metadata
+      const metadata = await skuVaultService.getTokenMetadata();
+      
+      res.json({
+        success: true,
+        message: "Token rotated successfully",
+        lastRefreshed: metadata.lastRefreshed,
+      });
+    } catch (error) {
+      console.error("Error rotating SkuVault token:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to rotate token",
+      });
+    }
+  });
+
   app.get("/api/operations/environment", requireAuth, async (req, res) => {
     try {
       // Return safe environment info (no secrets)

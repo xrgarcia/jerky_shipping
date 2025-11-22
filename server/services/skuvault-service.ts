@@ -56,16 +56,22 @@ export class SkuVaultError extends Error {
 /**
  * Redis-based token cache for SkuVault session token
  * Stores sv-t cookie value with 24-hour TTL for persistence across server restarts
+ * Tracks last refresh timestamp for monitoring
  * Gracefully degrades if Redis is unavailable (forces re-login)
  */
 class TokenCache {
   private readonly REDIS_KEY = 'skuvault:session:token';
+  private readonly TIMESTAMP_KEY = 'skuvault:session:token:timestamp';
   private readonly TTL_SECONDS = 86400; // 24 hours
 
   async set(token: string): Promise<void> {
     try {
       const redis = getRedisClient();
+      const now = new Date().toISOString();
+      
+      // Store token and timestamp atomically
       await redis.set(this.REDIS_KEY, token, { ex: this.TTL_SECONDS });
+      await redis.set(this.TIMESTAMP_KEY, now, { ex: this.TTL_SECONDS });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.warn(`[SkuVault] Redis unavailable for token cache (token will not persist): ${errorMsg}`);
@@ -85,10 +91,23 @@ class TokenCache {
     }
   }
 
+  async getLastRefreshed(): Promise<string | null> {
+    try {
+      const redis = getRedisClient();
+      const timestamp = await redis.get<string>(this.TIMESTAMP_KEY);
+      return timestamp;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for timestamp retrieval: ${errorMsg}`);
+      return null;
+    }
+  }
+
   async clear(): Promise<void> {
     try {
       const redis = getRedisClient();
       await redis.del(this.REDIS_KEY);
+      await redis.del(this.TIMESTAMP_KEY);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.warn(`[SkuVault] Redis unavailable for token cache clear: ${errorMsg}`);
@@ -989,6 +1008,43 @@ export class SkuVaultService {
       console.error(`[SkuVault QC] Error passing QC item:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Get token metadata for operations dashboard
+   * Returns authentication status and last refresh timestamp
+   */
+  async getTokenMetadata(): Promise<{
+    isValid: boolean;
+    lastRefreshed: string | null;
+    credentialsConfigured: boolean;
+  }> {
+    const isValid = await this.tokenCache.isValid();
+    const lastRefreshed = await this.tokenCache.getLastRefreshed();
+    const credentialsConfigured = !!(this.config.username && this.config.password);
+
+    return {
+      isValid,
+      lastRefreshed,
+      credentialsConfigured,
+    };
+  }
+
+  /**
+   * Force token rotation (manual refresh)
+   * Clears existing token and performs fresh login
+   */
+  async rotateToken(): Promise<void> {
+    console.log('[SkuVault] Manual token rotation requested');
+    
+    // Clear existing token
+    await this.tokenCache.clear();
+    this.isAuthenticated = false;
+    
+    // Perform fresh login
+    await this.ensureAuthenticated();
+    
+    console.log('[SkuVault] Token rotation complete');
   }
 
   /**

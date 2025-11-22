@@ -64,7 +64,7 @@ Preferred communication style: Simple, everyday language.
 
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, utilizing webhooks.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling and a multi-tier fallback strategy.
--   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning. Features automatic authentication with Redis-backed token caching (24hr TTL), mutex-protected login to prevent concurrent authentication attempts, and graceful degradation when Redis is unavailable.
+-   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning. Features automatic authentication with Redis-backed token caching (24hr TTL), mutex-protected login to prevent concurrent authentication attempts, and graceful degradation when Redis is unavailable. Operations dashboard displays SkuVault credentials status with token last-refreshed timestamp and manual token rotation capability.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Nodemailer**: For sending magic link authentication emails.
 -   **Neon Database**: Serverless PostgreSQL database.
