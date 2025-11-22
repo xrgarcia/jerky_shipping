@@ -78,24 +78,35 @@ export async function pollOnHoldShipments(): Promise<number> {
     return 0;
   }
 
-  // Use mutex to prevent overlapping executions
-  return await workerCoordinator.withPollMutex(async () => {
-    // Check if backfill job is active
+  // Check coordinator status before attempting mutex acquisition
+  try {
     const backfillActive = await workerCoordinator.isBackfillActive();
     
     if (backfillActive) {
       const jobId = await workerCoordinator.getActiveBackfillJobId();
       log(`Backfill job ${jobId} is active - pausing poll worker`);
-      workerStatus = 'awaiting_backfill_job';
-      await broadcastWorkerStatus();
+      try {
+        workerStatus = 'awaiting_backfill_job';
+        await broadcastWorkerStatus();
+      } finally {
+        // Reset to sleeping after broadcasting degraded status
+        workerStatus = 'sleeping';
+        await broadcastWorkerStatus();
+      }
       return 0;
     }
+  } catch (error) {
+    log(`Failed to check coordinator status: ${error}`);
+  }
 
+  // Use mutex to prevent overlapping executions
+  const result = await workerCoordinator.withPollMutex(async () => {
     try {
       workerStatus = 'running';
       await broadcastWorkerStatus();  // Notify frontend of status change
-    // Get the most recent on_hold shipment from our database
-    const mostRecentOnHold = await db
+      
+      // Get the most recent on_hold shipment from our database
+      const mostRecentOnHold = await db
       .select()
       .from(shipments)
       .where(eq(shipments.shipmentStatus, 'on_hold'))
@@ -200,7 +211,24 @@ export async function pollOnHoldShipments(): Promise<number> {
       workerStatus = 'sleeping';
       await broadcastWorkerStatus();  // Notify frontend of status change
     }
-  }) || 0; // Return 0 if mutex was not acquired
+  });
+
+  // Handle case where mutex could not be acquired (Redis error or already locked)
+  if (result === null) {
+    log('Poll mutex not acquired (Redis error or already locked) - setting degraded status');
+    try {
+      // Set degraded status and broadcast it so UI reflects the issue
+      workerStatus = 'awaiting_backfill_job'; // Use this as degraded status (skipping poll)
+      await broadcastWorkerStatus();
+    } finally {
+      // Reset to sleeping after broadcasting degraded status
+      workerStatus = 'sleeping';
+      await broadcastWorkerStatus();
+    }
+    return 0;
+  }
+
+  return result;
 }
 
 /**
