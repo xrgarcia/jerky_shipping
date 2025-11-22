@@ -1656,12 +1656,12 @@ export class DatabaseStorage implements IStorage {
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   }> {
-    // Query 1: Orders missing shipments
+    // Query 1: Orders missing shipments (excluding refunded orders)
     const ordersMissingShipmentsResult = await db
       .select({ count: count() })
       .from(orders)
       .leftJoin(shipments, eq(orders.id, shipments.orderId))
-      .where(sql`${shipments.id} IS NULL`);
+      .where(sql`${shipments.id} IS NULL AND (${orders.financialStatus} IS NULL OR ${orders.financialStatus} != 'refunded')`);
     
     // Query 2: Shipments without orders (orphaned by order relationship)
     const shipmentsWithoutOrdersResult = await db
