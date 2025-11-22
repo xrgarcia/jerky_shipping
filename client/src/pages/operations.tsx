@@ -420,7 +420,7 @@ function BackfillDeleteButton({ jobId }: { jobId: string }) {
 }
 
 export default function OperationsPage() {
-  const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "failures" | "shopify-order-sync-failures" | null>(null);
+  const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "shopify-order-sync" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
   const [showShopifyOrderSyncFailuresDialog, setShowShopifyOrderSyncFailuresDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
