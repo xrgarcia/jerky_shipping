@@ -28,9 +28,10 @@ Preferred communication style: Simple, everyday language.
 - **Core Features**:
     - **Product Catalog**: Synchronized via Shopify webhooks, warehouse-optimized interface.
     - **SkuVault Sessions**: Displays wave picking sessions from SkuVault with advanced search and filtering.
-    - **SkuVault QC Integration**: Quality Control API integration for product scanning and validation during fulfillment.
+    - **SkuVault QC Integration**: Quality Control API integration for product scanning and validation during fulfillment. Comprehensive audit logging captures raw SkuVault API responses in `packing_logs.skuVaultRawResponse` (JSONB) for debugging integration issues and regulatory compliance.
     - **Packing Page**: Single-warehouse MVP for order fulfillment with SkuVault QC validation, scan-first workflow, individual unit scanning, and comprehensive audit trails. Integrates with the print queue. All packing activities are logged to shipment_events table for performance analytics.
     - **Shipment Events Audit Trail**: Comprehensive event logging system tracking all packing station activities (order_scanned, order_loaded, product_scan_success, product_scan_failed, manual_verification, packing_completed) with timestamps and metadata for performance analytics and management reporting.
+    - **SkuVault API Audit Logging**: Complete raw API response capture in packing logs (JSONB column) for every product validation request. Enables debugging of integration issues, provides complete audit trail for quality control compliance, and facilitates troubleshooting of product synchronization gaps between systems.
     - **Order Backfill System**: Fault-tolerant, task-based architecture for importing historical Shopify orders and ShipStation shipments, with Redis-queued processing, progress tracking, and WebSocket updates.
     - **Background Worker**: Asynchronous webhook processor with mutex-based concurrency control.
     - **Shipment Sync Worker**: Dual-path asynchronous processor for enriching shipment data from ShipStation, handling tracking and order numbers. Optimizes webhook processing by treating them as patch operations and includes robust rate limit handling.
