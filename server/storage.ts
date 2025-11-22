@@ -1665,13 +1665,22 @@ export class DatabaseStorage implements IStorage {
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   }> {
-    // Query 1: Orders missing shipments (excluding refunded, restocked, and voided orders, and orders with refunds)
+    // Query 1: Orders missing shipments (excluding refunded, restocked, and voided orders, orders with refunds, and orders with only non-shippable items)
     const ordersMissingShipmentsResult = await db
       .select({ count: count() })
       .from(orders)
       .leftJoin(shipments, eq(orders.id, shipments.orderId))
       .leftJoin(orderRefunds, eq(orders.id, orderRefunds.orderId))
-      .where(sql`${shipments.id} IS NULL AND ${orderRefunds.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`);
+      .where(sql`
+        ${shipments.id} IS NULL 
+        AND ${orderRefunds.id} IS NULL 
+        AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))
+        AND EXISTS (
+          SELECT 1 FROM ${orderItems} 
+          WHERE ${orderItems.orderId} = ${orders.id} 
+          AND (${orderItems.requiresShipping} IS TRUE OR ${orderItems.requiresShipping} IS NULL)
+        )
+      `);
     
     // Query 1a: Get oldest order missing shipment
     const oldestOrderResult = await db
@@ -1679,7 +1688,16 @@ export class DatabaseStorage implements IStorage {
       .from(orders)
       .leftJoin(shipments, eq(orders.id, shipments.orderId))
       .leftJoin(orderRefunds, eq(orders.id, orderRefunds.orderId))
-      .where(sql`${shipments.id} IS NULL AND ${orderRefunds.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`)
+      .where(sql`
+        ${shipments.id} IS NULL 
+        AND ${orderRefunds.id} IS NULL 
+        AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))
+        AND EXISTS (
+          SELECT 1 FROM ${orderItems} 
+          WHERE ${orderItems.orderId} = ${orders.id} 
+          AND (${orderItems.requiresShipping} IS TRUE OR ${orderItems.requiresShipping} IS NULL)
+        )
+      `)
       .orderBy(orders.createdAt)
       .limit(1);
     
