@@ -387,3 +387,55 @@ export const qcPassItemResponseSchema = z.object({
 });
 
 export type QCPassItemResponse = z.infer<typeof qcPassItemResponseSchema>;
+
+/**
+ * Sale item within a SkuVault sale
+ */
+export const saleItemSchema = z.object({
+  Code: z.string().nullable().optional(),
+  Sku: z.string().nullable().optional(),
+  FnSku: z.string().nullable().optional(),
+  LotNumbers: z.any().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  Quantity: z.number().nullable().optional(),
+  PassedStatus: z.string().nullable().optional(),
+  UnitPrice: z.object({
+    a: z.number().nullable().optional(),
+    s: z.string().nullable().optional(),
+  }).nullable().optional(),
+  Id: z.string().nullable().optional(),
+  Picture: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+});
+
+export type SaleItem = z.infer<typeof saleItemSchema>;
+
+/**
+ * Sale information from SkuVault
+ * Response from /sales/Sale/getSaleInformation?Id={SaleId}
+ */
+export const saleInformationSchema = z.object({
+  SaleId: z.string().nullable().optional(),
+  AccountId: z.string().nullable().optional(),
+  Source: z.string().nullable().optional(),
+  Channel: z.string().nullable().optional(),
+  MarketplaceId: z.string().nullable().optional(),
+  OrderId: z.string().nullable().optional(), // Contains order number (e.g., "138162-JK3825346033")
+  Status: z.string().nullable().optional(),
+  PassedStatus: z.string().nullable().optional(),
+  Items: z.array(saleItemSchema).nullable().optional(),
+});
+
+export type SaleInformation = z.infer<typeof saleInformationSchema>;
+
+/**
+ * Response wrapper for sale information endpoint
+ * SkuVault returns: {"Errors": [], "Messages": [], "Data": {...}}
+ */
+export const saleInformationResponseSchema = z.object({
+  Errors: z.array(z.string()).nullable().optional(),
+  Messages: z.array(z.string()).nullable().optional(),
+  Data: saleInformationSchema.nullable().optional(),
+});
+
+export type SaleInformationResponse = z.infer<typeof saleInformationResponseSchema>;

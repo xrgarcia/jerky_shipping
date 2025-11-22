@@ -28,7 +28,10 @@ import {
   type ProductLookupResponse,
   type QCPassItemRequest,
   qcPassItemResponseSchema,
-  type QCPassItemResponse
+  type QCPassItemResponse,
+  saleInformationResponseSchema,
+  type SaleInformation,
+  type SaleInformationResponse
 } from '@shared/skuvault-types';
 
 interface SkuVaultConfig {
@@ -1043,6 +1046,43 @@ export class SkuVaultService {
     } catch (error) {
       console.error(`[SkuVault QC] Error passing QC item:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Get sale information by SaleId or order number
+   * Endpoint: GET /sales/Sale/getSaleInformation?Id={id}
+   * 
+   * @param id - SaleId (e.g., "1-352444-5-13038-138162-JK3825346033") or order number to try
+   * @returns Sale information if found, null otherwise
+   */
+  async getSaleInformation(id: string): Promise<SaleInformation | null> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/sales/Sale/getSaleInformation?Id=${encodeURIComponent(id)}`;
+      console.log(`[SkuVault Sale] Looking up sale with id:`, id);
+      
+      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      
+      // Parse and validate the response
+      const validatedResponse = saleInformationResponseSchema.parse(response);
+      
+      if (validatedResponse.Data) {
+        console.log(`[SkuVault Sale] Found sale:`, {
+          SaleId: validatedResponse.Data.SaleId,
+          OrderId: validatedResponse.Data.OrderId,
+          Status: validatedResponse.Data.Status,
+        });
+        return validatedResponse.Data;
+      }
+      
+      console.log(`[SkuVault Sale] No sale found for id:`, id);
+      return null;
+
+    } catch (error) {
+      console.error(`[SkuVault Sale] Error looking up sale:`, error);
+      return null; // Return null instead of throwing to allow graceful degradation
     }
   }
 
