@@ -8,7 +8,7 @@ import {
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from './utils/shopify-utils';
-import { processOrderRefunds, processOrderLineItems } from './utils/shopify-order-processing';
+import { shopifyOrderETL } from './services/shopify-order-etl-service';
 import { shopifyOrderSyncFailures, type InsertShopifyOrderSyncFailure } from '@shared/schema';
 
 function log(message: string) {
@@ -120,9 +120,8 @@ export async function processShopifyOrderSyncBatch(batchSize: number): Promise<n
       // Create the order in the database
       await storage.createOrder(orderData);
       
-      // Process refunds and line items using same ETL pipeline as webhooks and backfill
-      await processOrderRefunds(storage, orderData.id, shopifyOrder);
-      await processOrderLineItems(storage, orderData.id, shopifyOrder);
+      // Process refunds and line items using centralized ETL service
+      await shopifyOrderETL.processOrder(shopifyOrder);
       
       log(`✓ Successfully imported order ${orderNumber} from Shopify`);
       processedCount++;
