@@ -508,6 +508,11 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${orders.id} NOT IN ${orderIdsWithShipments}`);
         // Also exclude refunded, restocked, and voided orders when filtering for orders missing shipments
         conditions.push(sql`(${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`);
+        // Also exclude orders that have refunds in the order_refunds table
+        const orderIdsWithRefunds = db
+          .selectDistinct({ orderId: orderRefunds.orderId })
+          .from(orderRefunds);
+        conditions.push(sql`${orders.id} NOT IN ${orderIdsWithRefunds}`);
       }
 
       if (shipmentStatus && shipmentStatus.length > 0) {
@@ -1658,12 +1663,13 @@ export class DatabaseStorage implements IStorage {
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   }> {
-    // Query 1: Orders missing shipments (excluding refunded, restocked, and voided orders)
+    // Query 1: Orders missing shipments (excluding refunded, restocked, and voided orders, and orders with refunds)
     const ordersMissingShipmentsResult = await db
       .select({ count: count() })
       .from(orders)
       .leftJoin(shipments, eq(orders.id, shipments.orderId))
-      .where(sql`${shipments.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`);
+      .leftJoin(orderRefunds, eq(orders.id, orderRefunds.orderId))
+      .where(sql`${shipments.id} IS NULL AND ${orderRefunds.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`);
     
     // Query 2: Shipments without orders (orphaned by order relationship)
     const shipmentsWithoutOrdersResult = await db
