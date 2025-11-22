@@ -378,11 +378,12 @@ export type QCPassItemRequest = z.infer<typeof qcPassItemRequestSchema>;
 
 /**
  * Response from QC pass item endpoint
+ * SkuVault returns: {"Data": null, "Errors": [], "Success": true}
  */
 export const qcPassItemResponseSchema = z.object({
-  success: z.boolean().nullable().optional(),
-  message: z.string().nullable().optional(),
-  error: z.string().nullable().optional(),
+  Success: z.boolean().nullable().optional(),
+  Data: z.any().nullable().optional(),
+  Errors: z.array(z.string()).nullable().optional(),
 });
 
 export type QCPassItemResponse = z.infer<typeof qcPassItemResponseSchema>;
