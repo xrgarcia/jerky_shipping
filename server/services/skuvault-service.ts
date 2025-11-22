@@ -31,7 +31,9 @@ import {
   type QCPassItemResponse,
   saleInformationResponseSchema,
   type SaleInformation,
-  type SaleInformationResponse
+  type SaleInformationResponse,
+  pickedQuantityResponseSchema,
+  type PickedQuantityResponse
 } from '@shared/skuvault-types';
 
 interface SkuVaultConfig {
@@ -1082,6 +1084,40 @@ export class SkuVaultService {
 
     } catch (error) {
       console.error(`[SkuVault Sale] Error looking up sale:`, error);
+      return null; // Return null instead of throwing to allow graceful degradation
+    }
+  }
+
+  /**
+   * Get picked quantity for a product in a specific sale
+   * Endpoint: GET /inventory/item/getPickedQuantityForProductBySaleId?CodeOrSku={sku}&SaleId={saleId}
+   * 
+   * Returns how many units have already been picked/QC'd in SkuVault for this product in this sale
+   * Used for sync validation - prevents duplicate scans across systems
+   * 
+   * @param codeOrSku - Product barcode, SKU, or code
+   * @param saleId - Full SkuVault SaleId (e.g., "1-352444-5-13038-138162-JK3825346033")
+   * @returns Number of units already picked, or null if error/not found
+   */
+  async getPickedQuantityForProduct(codeOrSku: string, saleId: string): Promise<number | null> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/inventory/item/getPickedQuantityForProductBySaleId?CodeOrSku=${encodeURIComponent(codeOrSku)}&SaleId=${encodeURIComponent(saleId)}`;
+      console.log(`[SkuVault Sync] Checking picked quantity:`, { codeOrSku, saleId });
+      
+      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      
+      // Parse and validate the response
+      const validatedResponse = pickedQuantityResponseSchema.parse(response);
+      
+      const pickedQuantity = validatedResponse.Data ?? 0;
+      console.log(`[SkuVault Sync] Picked quantity for ${codeOrSku}: ${pickedQuantity}`);
+      
+      return pickedQuantity;
+
+    } catch (error) {
+      console.error(`[SkuVault Sync] Error getting picked quantity:`, error);
       return null; // Return null instead of throwing to allow graceful degradation
     }
   }

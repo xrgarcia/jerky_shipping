@@ -390,6 +390,20 @@ export const qcPassItemResponseSchema = z.object({
 export type QCPassItemResponse = z.infer<typeof qcPassItemResponseSchema>;
 
 /**
+ * Response from getPickedQuantityForProductBySaleId endpoint
+ * Returns how many units of a product have been picked/QC'd in SkuVault for a sale
+ * SkuVault returns: {"Errors": [], "Messages": [], "Data": 0, "Status": "Blank"}
+ */
+export const pickedQuantityResponseSchema = z.object({
+  Errors: z.array(z.string()).nullable().optional(),
+  Messages: z.array(z.string()).nullable().optional(),
+  Data: z.number().nullable().optional(), // Number of units already picked in SkuVault
+  Status: z.string().nullable().optional(),
+});
+
+export type PickedQuantityResponse = z.infer<typeof pickedQuantityResponseSchema>;
+
+/**
  * Sale item within a SkuVault sale
  */
 export const saleItemSchema = z.object({
