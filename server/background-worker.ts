@@ -1,7 +1,7 @@
 import { dequeueWebhook, getQueueLength, getShipmentSyncQueueLength, enqueueShipmentSync, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage } from "./utils/queue";
 import { fetchShipStationResource } from "./utils/shipstation-api";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { processOrderRefunds, processOrderLineItems } from "./utils/shopify-order-processing";
+import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
 import { log } from "./vite";
@@ -60,11 +60,8 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
           await storage.createOrder(orderData);
         }
 
-        // Process refunds from Shopify order
-        await processOrderRefunds(storage, orderData.id, shopifyOrder);
-
-        // Process line items from Shopify order
-        await processOrderLineItems(storage, orderData.id, shopifyOrder);
+        // Process refunds and line items using centralized ETL service
+        await shopifyOrderETL.processOrder(shopifyOrder);
 
         // Check for shipments and link them if needed
         // This provides recovery when ShipStation webhooks are missed or delayed
