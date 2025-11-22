@@ -83,7 +83,20 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  // CRITICAL: Unique index on order_number for constant lookups from webhooks and UI
+  orderNumberIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS orders_order_number_idx ON ${table} (order_number)`,
+  // B-tree indexes for date range filters and default sorts (DESC for recent-first queries)
+  createdAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_created_at_idx ON ${table} (created_at DESC NULLS LAST)`,
+  updatedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_updated_at_idx ON ${table} (updated_at DESC NULLS LAST)`,
+  // Composite index for status + date dashboard queries
+  fulfillmentStatusCreatedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_fulfillment_status_created_at_idx ON ${table} (fulfillment_status, created_at)`,
+  // Index for sync monitoring queries
+  lastSyncedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_last_synced_at_idx ON ${table} (last_synced_at)`,
+  // GIN trigram indexes for ILIKE search on order numbers and customer names
+  orderNumberTrigramIdx: sql`CREATE INDEX IF NOT EXISTS orders_order_number_trgm_idx ON ${table} USING gin (order_number gin_trgm_ops)`,
+  customerNameTrigramIdx: sql`CREATE INDEX IF NOT EXISTS orders_customer_name_trgm_idx ON ${table} USING gin (customer_name gin_trgm_ops)`,
+}));
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   lastSyncedAt: true,
@@ -243,6 +256,18 @@ export const shipments = pgTable("shipments", {
   orderNumberIdx: index("shipments_order_number_idx").on(table.orderNumber),
   // Unique constraint: same ShipStation shipment ID cannot appear twice in database
   uniqueShipmentIdIdx: uniqueIndex("shipments_shipment_id_idx").on(table.shipmentId),
+  // CRITICAL: Unique index on tracking_number for fast webhook/API lookups
+  trackingNumberIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS shipments_tracking_number_idx ON ${table} (tracking_number) WHERE tracking_number IS NOT NULL`,
+  // Foreign key index for order lookups
+  orderIdIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_id_idx ON ${table} (order_id) WHERE order_id IS NOT NULL`,
+  // Composite index for webhook reconciliation (order_number + carrier filtering)
+  orderNumberCarrierIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_number_carrier_idx ON ${table} (order_number, carrier_code) WHERE order_number IS NOT NULL`,
+  // Index for date range filtering/sorting
+  shipDateIdx: sql`CREATE INDEX IF NOT EXISTS shipments_ship_date_idx ON ${table} (ship_date DESC NULLS LAST)`,
+  // Partial index for common status queries (most warehouse queries filter by these statuses)
+  statusIdx: sql`CREATE INDEX IF NOT EXISTS shipments_status_idx ON ${table} (status) WHERE status IN ('delivered', 'in_transit', 'exception', 'pending')`,
+  // Partial index for orphaned shipments (missing both order linkage and tracking)
+  orphanedIdx: sql`CREATE INDEX IF NOT EXISTS shipments_orphaned_idx ON ${table} (created_at) WHERE order_id IS NULL AND tracking_number IS NULL`,
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -321,6 +346,8 @@ export const shipmentItems = pgTable("shipment_items", {
   shipmentIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_shipment_id_idx ON ${table} (shipment_id)`,
   orderItemIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_order_item_id_idx ON ${table} (order_item_id) WHERE order_item_id IS NOT NULL`,
   skuIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_sku_idx ON ${table} (sku) WHERE sku IS NOT NULL`,
+  // Index for webhook reconciliation via ShipStation's external order item ID reference
+  externalOrderItemIdIdx: sql`CREATE INDEX IF NOT EXISTS shipment_items_external_order_item_id_idx ON ${table} (external_order_item_id) WHERE external_order_item_id IS NOT NULL`,
 }));
 
 export const insertShipmentItemSchema = createInsertSchema(shipmentItems).omit({
@@ -451,7 +478,12 @@ export const backfillJobs = pgTable("backfill_jobs", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  // Index for resume checks and status monitoring
+  statusIdx: sql`CREATE INDEX IF NOT EXISTS backfill_jobs_status_idx ON ${table} (status)`,
+  // Index for job timeline queries
+  createdAtIdx: sql`CREATE INDEX IF NOT EXISTS backfill_jobs_created_at_idx ON ${table} (created_at DESC NULLS LAST)`,
+}));
 
 export const insertBackfillJobSchema = createInsertSchema(backfillJobs).omit({
   id: true,
@@ -471,7 +503,10 @@ export const printQueue = pgTable("print_queue", {
   error: text("error"), // Error message if status is failed
   queuedAt: timestamp("queued_at").notNull().defaultNow(),
   printedAt: timestamp("printed_at"),
-});
+}, (table) => ({
+  // Composite index for polling worker queries (status + time ordering)
+  statusQueuedAtIdx: sql`CREATE INDEX IF NOT EXISTS print_queue_status_queued_at_idx ON ${table} (status, queued_at)`,
+}));
 
 export const insertPrintQueueSchema = createInsertSchema(printQueue).omit({
   id: true,
