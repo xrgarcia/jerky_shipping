@@ -1026,27 +1026,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Try to look up the sale in SkuVault to get the proper SaleId
-      let saleId = parseResult.data.IdSale; // Start with provided order number
-      
-      console.log(`[QC Pass] Looking up sale for order number: ${saleId}`);
-      const saleInfo = await skuVaultService.getSaleInformation(saleId);
-      
-      if (saleInfo?.SaleId) {
-        // Found the sale - use the proper SaleId for QC pass
-        console.log(`[QC Pass] Found SaleId: ${saleInfo.SaleId} for order: ${saleId}`);
-        saleId = saleInfo.SaleId;
-      } else {
-        console.log(`[QC Pass] Sale not found in SkuVault, will attempt QC pass with order number: ${saleId}`);
-      }
-      
-      const qcData = {
-        ...parseResult.data,
-        IdSale: saleId, // Use the resolved SaleId or fall back to order number
-      };
-      
-      console.log("Marking item as QC passed:", qcData);
-      const result = await skuVaultService.passQCItem(qcData);
+      // Use the SaleId provided from frontend (already resolved during order load)
+      console.log("Marking item as QC passed:", parseResult.data);
+      const result = await skuVaultService.passQCItem(parseResult.data);
       
       res.json(result);
     } catch (error: any) {
@@ -3266,9 +3248,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get shipment items
       const items = await storage.getShipmentItems(shipment.id);
       
+      // Try to lookup SkuVault SaleId for this order (cache for frontend)
+      let saleId: string | null = null;
+      try {
+        console.log(`[Packing] Looking up SkuVault SaleId for order: ${orderNumber}`);
+        const saleInfo = await skuVaultService.getSaleInformation(orderNumber);
+        if (saleInfo?.SaleId) {
+          saleId = saleInfo.SaleId;
+          console.log(`[Packing] Found SkuVault SaleId: ${saleId}`);
+        } else {
+          console.log(`[Packing] Order not found in SkuVault (may not be synced yet)`);
+        }
+      } catch (error: any) {
+        console.warn(`[Packing] Failed to lookup SkuVault SaleId for ${orderNumber}:`, error.message);
+      }
+      
       res.json({
         ...shipment,
-        items
+        items,
+        saleId // Include SkuVault SaleId for QC scanning (null if not found)
       });
     } catch (error: any) {
       console.error("[Packing] Error fetching shipment:", error);
