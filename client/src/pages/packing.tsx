@@ -182,6 +182,45 @@ export default function Packing() {
     enabled: !!currentShipment,
   });
 
+  // Restore SKU progress from historical packing logs when they load
+  useEffect(() => {
+    if (!packingLogs || packingLogs.length === 0 || skuProgress.size === 0) return;
+    
+    // Count successful scans for each SKU from historical logs
+    const scanCounts = new Map<string, number>();
+    
+    packingLogs.forEach((log) => {
+      // Only count successful product scans (not manual verifications or failed scans)
+      if (log.success && log.action === "product_scanned" && log.productSku) {
+        const normalizedSku = normalizeSku(log.productSku);
+        scanCounts.set(normalizedSku, (scanCounts.get(normalizedSku) || 0) + 1);
+      }
+    });
+    
+    // Update skuProgress with historical scan counts
+    if (scanCounts.size > 0) {
+      setSkuProgress((prevProgress) => {
+        const updatedProgress = new Map(prevProgress);
+        
+        updatedProgress.forEach((progress, key) => {
+          const historicalScans = scanCounts.get(progress.normalizedSku) || 0;
+          if (historicalScans > 0) {
+            const newScanned = Math.min(historicalScans, progress.expected);
+            updatedProgress.set(key, {
+              ...progress,
+              scanned: newScanned,
+              remaining: progress.expected - newScanned,
+            });
+          }
+        });
+        
+        return updatedProgress;
+      });
+      
+      console.log(`[Packing] Restored progress from ${packingLogs.length} historical log(s)`);
+    }
+  }, [packingLogs, skuProgress.size]); // Re-run when logs load or when skuProgress is initialized
+
   // Load shipment by order number (includes items from backend)
   const loadShipmentMutation = useMutation({
     mutationFn: async (orderNumber: string) => {
@@ -979,7 +1018,7 @@ export default function Packing() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {packingLogs.slice().reverse().map((log) => (
+                {packingLogs.map((log) => (
                   <div
                     key={log.id}
                     className={`p-3 rounded-lg border ${
