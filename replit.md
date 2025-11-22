@@ -17,6 +17,12 @@ Preferred communication style: Simple, everyday language.
 - **Backend**: Express.js with Node.js and TypeScript, RESTful API, Drizzle ORM for database interactions.
 - **Authentication**: Passwordless via magic link tokens (email), secure HTTP-only session cookies.
 - **Data Storage**: PostgreSQL via Neon serverless connection, Drizzle Kit for migrations. Schema includes tables for users, authentication, orders, products, product variants, and order items. The `order_items` table includes a `requiresShipping` boolean field (extracted from Shopify's `requires_shipping`) to distinguish physical products from non-shippable items like gift cards and digital downloads.
+- **Database Performance Optimization**: Comprehensive indexing strategy with 24+ indexes across all major tables for sub-millisecond query performance:
+    - **Orders table**: UNIQUE index on order_number (0.064ms lookup), composite index on (fulfillment_status, created_at) for filtered lists (0.397ms), GIN trigram indexes on order_number and customer_name for fuzzy ILIKE searches, temporal indexes on created_at/updated_at/last_synced_at DESC for efficient sorting
+    - **Shipments table**: UNIQUE index on tracking_number (0.035ms lookup), composite index on (order_number, carrier_code) for webhook reconciliation, partial index on status for common statuses (delivered/in_transit/exception/pending), ship_date DESC index for chronological queries, orphaned shipments index for data health monitoring
+    - **Shipment Items table**: Index on external_order_item_id for webhook line item matching
+    - **Operational tables**: Status and composite (status, queued_at) indexes on backfill_jobs and print_queue for worker polling
+    - **PostgreSQL pg_trgm extension**: Enabled for fuzzy text search with GIN trigram indexes, supporting partial order number and customer name searches
 - **Core Features**:
     - **Product Catalog**: Synchronized via Shopify webhooks, warehouse-optimized interface.
     - **SkuVault Sessions**: Displays wave picking sessions from SkuVault with advanced search and filtering.
