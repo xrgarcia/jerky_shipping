@@ -34,6 +34,11 @@ export function getOnHoldWorkerStatus(): 'sleeping' | 'running' | 'awaiting_back
 }
 
 export function getOnHoldWorkerStats() {
+  // Don't return stats until first poll completes (prevents "Never" on startup)
+  if (workerStats.lastCompletedAt === null) {
+    return undefined;
+  }
+  
   return {
     ...workerStats,
     status: workerStatus,
