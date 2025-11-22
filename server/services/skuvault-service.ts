@@ -824,8 +824,15 @@ export class SkuVaultService {
   /**
    * Strip anti-XSSI prefix from SkuVault API responses and parse JSON
    * SkuVault prepends ")]}',\n\r" to JSON responses for security (Cross-Site Script Inclusion prevention)
+   * If HTML is returned (session expired), throws error to trigger re-authentication
    */
   private stripAntiXSSIPrefix(responseText: string): any {
+    // Check if response is HTML (indicates session expiration/not authenticated)
+    const trimmedResponse = responseText.trim().toLowerCase();
+    if (trimmedResponse.startsWith('<!doctype') || trimmedResponse.startsWith('<html')) {
+      throw new Error('Received HTML response instead of JSON - session likely expired');
+    }
+    
     const prefix = ")]}',\n\r";
     if (responseText.startsWith(prefix)) {
       const cleanedJson = responseText.substring(prefix.length);
@@ -883,10 +890,14 @@ export class SkuVaultService {
       return this.stripAntiXSSIPrefix(response.data);
     } catch (error) {
       const axiosError = error as AxiosError;
+      const initialError = error instanceof Error ? error.message : String(error);
       
-      // If 401, try re-authenticating once (using mutex)
-      if (axiosError.response?.status === 401) {
-        console.log('[SkuVault QC] Received 401, attempting re-authentication...');
+      // If 401 OR HTML response (session expired), try re-authenticating once (using mutex)
+      const isSessionExpired = axiosError.response?.status === 401 || 
+                               initialError.includes('Received HTML response');
+      
+      if (isSessionExpired) {
+        console.log('[SkuVault QC] Session expired (401 or HTML response), attempting re-authentication...');
         await this.tokenCache.clear();
         this.isAuthenticated = false;
         
