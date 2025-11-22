@@ -152,11 +152,11 @@ app.use((req, res, next) => {
     const { startShopifyOrderSyncWorker } = await import("./shopify-sync-worker");
     startShopifyOrderSyncWorker(8000); // Process Shopify order sync queue every 8 seconds
     
-    // Clear any stale poll mutex from previous server instance before starting worker
-    log("Clearing any stale poll mutex...");
+    // Clear all coordination locks from previous server instance to prevent phantom locks
+    log("Clearing all worker coordination locks...");
     const { workerCoordinator } = await import("./worker-coordinator");
-    await workerCoordinator.releasePollMutex();
-    log("Poll mutex cleared successfully");
+    await workerCoordinator.clearAllLocks();
+    log("Worker coordination locks cleared successfully");
     
     // Start on-hold shipments polling worker (supplements webhooks which don't fire for on_hold)
     const { startOnHoldPollWorker } = await import("./onhold-poll-worker");

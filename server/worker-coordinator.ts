@@ -163,6 +163,29 @@ export class WorkerCoordinator {
       // Don't throw - best effort cleanup
     }
   }
+
+  /**
+   * Clean up all coordination locks on server startup
+   * This prevents phantom locks from previous server crashes from blocking workers
+   * Called once during server initialization
+   */
+  async clearAllLocks(): Promise<void> {
+    try {
+      const redis = getRedisClient();
+      
+      // Clear all coordination state to start fresh
+      await Promise.all([
+        redis.del(BACKFILL_LOCK_KEY),
+        redis.del(BACKFILL_JOB_KEY),
+        redis.del(POLL_MUTEX_KEY),
+      ]);
+      
+      console.log(`[WorkerCoordinator] Cleared all coordination locks on startup`);
+    } catch (error) {
+      console.error(`[WorkerCoordinator] Failed to clear locks on startup:`, error);
+      // Don't throw - server should continue starting up
+    }
+  }
 }
 
 // Singleton instance
