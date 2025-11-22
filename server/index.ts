@@ -82,9 +82,9 @@ app.use((req, res, next) => {
   try {
     const { broadcastQueueStatus } = await import("./websocket");
     const dataHealth = await storage.getDataHealthMetrics();
-    const { getShopifyQueueLength, getShipmentSyncQueueLength, getShopifyOrderSyncQueueLength } = await import("./utils/queue");
+    const { getQueueLength, getShipmentSyncQueueLength, getShopifyOrderSyncQueueLength } = await import("./utils/queue");
     broadcastQueueStatus({
-      shopifyQueue: await getShopifyQueueLength(),
+      shopifyQueue: await getQueueLength(),
       shipmentSyncQueue: await getShipmentSyncQueueLength(),
       shopifyOrderSyncQueue: await getShopifyOrderSyncQueueLength(),
       dataHealth,
