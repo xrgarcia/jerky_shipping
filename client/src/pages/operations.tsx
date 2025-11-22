@@ -533,7 +533,7 @@ Please analyze this failure and help me understand:
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}/ws?room=operations`;
       
       try {
         ws = new WebSocket(wsUrl);

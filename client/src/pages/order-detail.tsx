@@ -196,7 +196,7 @@ export default function OrderDetail() {
 
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}/ws?room=orders`;
       
       try {
         ws = new WebSocket(wsUrl);

@@ -1778,10 +1778,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only pending or running jobs can be cancelled" });
       }
 
+      // Update job status first
       await storage.updateBackfillJob(req.params.id, {
         status: "cancelled",
         errorMessage: "Cancelled by user",
         completedAt: new Date(),
+      });
+
+      // CRITICAL: Clean up worker coordination state to prevent mutex deadlock
+      const { workerCoordinator } = await import("./worker-coordinator");
+      await workerCoordinator.cancelBackfill(req.params.id);
+      
+      // Broadcast queue status update to notify all clients that backfill is done
+      const { broadcastQueueStatus } = await import("./websocket");
+      const dataHealth = await storage.getDataHealthMetrics();
+      broadcastQueueStatus({
+        backfillActiveJob: null, // No active job after cancellation
+        dataHealth,
       });
 
       res.json({ success: true });

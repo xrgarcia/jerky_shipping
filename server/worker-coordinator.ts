@@ -133,6 +133,36 @@ export class WorkerCoordinator {
       await this.releasePollMutex();
     }
   }
+
+  /**
+   * Cancel a backfill job and clean up all coordination state
+   * This is critical when a user cancels a job - it prevents mutex deadlocks
+   * Called by the /api/backfill/jobs/:id/cancel endpoint
+   */
+  async cancelBackfill(jobId: string): Promise<void> {
+    try {
+      const redis = getRedisClient();
+      
+      // Verify this is the active job before clearing locks
+      const activeJobId = await redis.get<string>(BACKFILL_JOB_KEY);
+      if (activeJobId !== jobId) {
+        console.log(`[WorkerCoordinator] Job ${jobId} is not active (active: ${activeJobId}), skipping lock cleanup`);
+        return;
+      }
+      
+      // Clear all backfill coordination state
+      await Promise.all([
+        redis.del(BACKFILL_LOCK_KEY),
+        redis.del(BACKFILL_JOB_KEY),
+        redis.del(POLL_MUTEX_KEY), // Also release poll mutex to allow workers to resume
+      ]);
+      
+      console.log(`[WorkerCoordinator] Cancelled backfill job ${jobId} - all locks released`);
+    } catch (error) {
+      console.error(`[WorkerCoordinator] Failed to cancel backfill job ${jobId}:`, error);
+      // Don't throw - best effort cleanup
+    }
+  }
 }
 
 // Singleton instance

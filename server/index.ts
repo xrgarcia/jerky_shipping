@@ -6,6 +6,7 @@ import path from "path";
 import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
 import { ensureShipStationWebhooksRegistered } from "./utils/shipstation-webhook";
 import { setupWebSocket } from "./websocket";
+import { storage } from "./storage";
 
 const app = express();
 
@@ -76,6 +77,22 @@ app.use((req, res, next) => {
   // Set up WebSocket server
   setupWebSocket(server);
   log("WebSocket server initialized");
+
+  // Broadcast initial queue status to ensure clients get fresh data immediately after restart
+  try {
+    const { broadcastQueueStatus } = await import("./websocket");
+    const dataHealth = await storage.getDataHealthMetrics();
+    const { getShopifyQueueLength, getShipmentSyncQueueLength, getShopifyOrderSyncQueueLength } = await import("./utils/queue");
+    broadcastQueueStatus({
+      shopifyQueue: await getShopifyQueueLength(),
+      shipmentSyncQueue: await getShipmentSyncQueueLength(),
+      shopifyOrderSyncQueue: await getShopifyOrderSyncQueueLength(),
+      dataHealth,
+    });
+    log("Initial queue status broadcast sent");
+  } catch (error) {
+    console.error("Failed to broadcast initial queue status:", error);
+  }
 
   // Determine webhook base URL based on environment
   const { getWebhookBaseUrl } = await import("./utils/webhook-url.js");
