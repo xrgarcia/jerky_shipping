@@ -79,6 +79,9 @@ export async function processOrderLineItems(storage: IStorage, orderId: string, 
         // Tax information
         taxable: item.taxable !== undefined ? item.taxable : null,
         
+        // Shipping information
+        requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
+        
         // Calculated/extracted fields for easy querying
         priceSetAmount: item.price_set?.shop_money?.amount || '0',
         totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
