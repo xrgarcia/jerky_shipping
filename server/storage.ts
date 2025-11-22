@@ -1682,7 +1682,7 @@ export class DatabaseStorage implements IStorage {
       .where(sql`
         ${shipments.id} IS NULL 
         AND ${orderRefunds.id} IS NULL 
-        AND (${orders.financialStatus} IS NULL OR ${orders.financialStatus} NOT ILIKE ANY(ARRAY['refunded', 'restocked', 'voided']))
+        AND (${orders.financialStatus} IS NULL OR NOT (${orders.financialStatus} ILIKE ANY(ARRAY['refunded', 'restocked', 'voided'])))
         AND EXISTS (
           SELECT 1 FROM ${orderItems} 
           WHERE ${orderItems.orderId} = ${orders.id} 
@@ -1699,7 +1699,7 @@ export class DatabaseStorage implements IStorage {
       .where(sql`
         ${shipments.id} IS NULL 
         AND ${orderRefunds.id} IS NULL 
-        AND (${orders.financialStatus} IS NULL OR ${orders.financialStatus} NOT ILIKE ANY(ARRAY['refunded', 'restocked', 'voided']))
+        AND (${orders.financialStatus} IS NULL OR NOT (${orders.financialStatus} ILIKE ANY(ARRAY['refunded', 'restocked', 'voided'])))
         AND EXISTS (
           SELECT 1 FROM ${orderItems} 
           WHERE ${orderItems.orderId} = ${orders.id} 
