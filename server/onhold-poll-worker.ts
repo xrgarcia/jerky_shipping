@@ -21,8 +21,23 @@ const log = (message: string) => console.log(`[onhold-poll] ${message}`);
 // Global worker status - now includes awaiting_backfill_job
 let workerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
 
+// Worker statistics
+let workerStats = {
+  totalProcessedCount: 0,
+  lastProcessedCount: 0,
+  workerStartedAt: new Date(),
+  lastCompletedAt: null as Date | null,
+};
+
 export function getOnHoldWorkerStatus(): 'sleeping' | 'running' | 'awaiting_backfill_job' {
   return workerStatus;
+}
+
+export function getOnHoldWorkerStats() {
+  return {
+    ...workerStats,
+    status: workerStatus,
+  };
 }
 
 // Helper to broadcast queue stats with worker status
@@ -51,6 +66,12 @@ async function broadcastWorkerStatus() {
       shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
       backfillActiveJob: activeBackfillJob,
       onHoldWorkerStatus: workerStatus,
+      onHoldWorkerStats: {
+        totalProcessedCount: workerStats.totalProcessedCount,
+        lastProcessedCount: workerStats.lastProcessedCount,
+        workerStartedAt: workerStats.workerStartedAt.toISOString(),
+        lastCompletedAt: workerStats.lastCompletedAt?.toISOString() || null,
+      },
       dataHealth,
     });
   } catch (error) {
@@ -181,7 +202,7 @@ export async function pollOnHoldShipments(): Promise<number> {
           orderNumber,
           shipmentId,
           trackingNumber,
-          reason: 'onhold_poll',
+          reason: 'manual',
           enqueuedAt: Date.now(),
           webhookData: shipmentData, // Pass shipment data directly (no API call needed!)
         });
@@ -203,6 +224,11 @@ export async function pollOnHoldShipments(): Promise<number> {
       log(`No new on_hold shipments to queue`);
     }
     
+      // Update worker statistics
+      workerStats.lastProcessedCount = totalQueued;
+      workerStats.totalProcessedCount += totalQueued;
+      workerStats.lastCompletedAt = new Date();
+      
       return totalQueued;
     } catch (error: any) {
       log(`Error polling on_hold shipments: ${error.message}`);

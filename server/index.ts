@@ -104,15 +104,8 @@ app.use((req, res, next) => {
       .then(rows => rows[0]?.count || 0);
     const allBackfillJobs = await storage.getAllBackfillJobs();
     const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
-    const dataHealthRaw = await storage.getDataHealthMetrics();
-    
-    // Convert Date to string for WebSocket broadcast
-    const dataHealth = {
-      ...dataHealthRaw,
-      oldestOrderMissingShipmentAt: dataHealthRaw.oldestOrderMissingShipmentAt 
-        ? dataHealthRaw.oldestOrderMissingShipmentAt.toISOString() 
-        : null
-    };
+    // Data health metrics are already in the correct format (dates as ISO strings)
+    const dataHealth = await storage.getDataHealthMetrics();
     
     broadcastQueueStatus({
       shopifyQueue: shopifyQueueLength,

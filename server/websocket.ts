@@ -171,6 +171,12 @@ export type QueueStatusData = {
   shopifyOrderSyncQueueOldestAt: number | null;
   backfillActiveJob: any | null;
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
+  onHoldWorkerStats?: {
+    totalProcessedCount: number;
+    lastProcessedCount: number;
+    workerStartedAt: string;
+    lastCompletedAt: string | null;
+  };
   dataHealth: {
     ordersMissingShipments: number;
     oldestOrderMissingShipmentAt: string | null;
@@ -200,6 +206,12 @@ export function broadcastQueueStatus(data: {
   backfillActiveJob?: any | null;
   activeBackfillJob?: any | null;
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
+  onHoldWorkerStats?: {
+    totalProcessedCount: number;
+    lastProcessedCount: number;
+    workerStartedAt: string;
+    lastCompletedAt: string | null;
+  };
   dataHealth?: {
     ordersMissingShipments?: number;
     oldestOrderMissingShipmentAt?: string | null;
@@ -230,6 +242,15 @@ export function broadcastQueueStatus(data: {
     // Worker not initialized yet
   }
 
+  // Get worker stats if available
+  let workerStats = undefined;
+  try {
+    const { getOnHoldWorkerStats } = require('./onhold-poll-worker');
+    workerStats = getOnHoldWorkerStats();
+  } catch (error) {
+    // Worker not initialized yet
+  }
+
   // Normalize to canonical format
   const canonicalData: QueueStatusData = {
     shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? 0,
@@ -241,6 +262,7 @@ export function broadcastQueueStatus(data: {
     shopifyOrderSyncQueueOldestAt: data.shopifyOrderSyncQueueOldestAt ?? data.oldestShopifyOrderSync?.enqueuedAt ?? null,
     backfillActiveJob: data.backfillActiveJob ?? data.activeBackfillJob ?? null,
     onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
+    onHoldWorkerStats: data.onHoldWorkerStats ?? workerStats,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,
       oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? null,

@@ -102,6 +102,12 @@ type QueueStats = {
     shopifyOrderSyncFailures: number;
   };
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
+  onHoldWorkerStats?: {
+    totalProcessedCount: number;
+    lastProcessedCount: number;
+    workerStartedAt: string;
+    lastCompletedAt: string | null;
+  };
 };
 
 type EnvironmentInfo = {
@@ -580,6 +586,7 @@ Please analyze this failure and help me understand:
               },
               dataHealth: message.data.dataHealth,
               onHoldWorkerStatus: message.data.onHoldWorkerStatus || 'sleeping',
+              onHoldWorkerStats: message.data.onHoldWorkerStats,
             }));
           }
         } catch (error) {
@@ -1127,22 +1134,31 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Link href="/shipments?orphaned=true">
-          <Card data-testid="card-orphaned-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Orphaned Shipments
-              </CardTitle>
-              <CardDescription>Missing tracking, ship date, and shipment ID</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-orphaned-shipments">
-                {!hasQueueData ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
+        <Card data-testid="card-onhold-worker-last-run">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              On-Hold Worker - Last Run
+            </CardTitle>
+            <CardDescription>Time since last successful completion</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="text-3xl font-bold" data-testid="text-onhold-worker-last-run">
+                {!hasQueueData || !queueStats?.onHoldWorkerStats?.lastCompletedAt 
+                  ? "Never" 
+                  : formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.lastCompletedAt), { addSuffix: true })}
               </div>
-            </CardContent>
-          </Card>
-        </Link>
+              {queueStats?.onHoldWorkerStats && (
+                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                  <div>Last processed: {queueStats.onHoldWorkerStats.lastProcessedCount.toLocaleString()} orders</div>
+                  <div>Total processed: {queueStats.onHoldWorkerStats.totalProcessedCount.toLocaleString()} orders</div>
+                  <div>Running since: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.workerStartedAt), { addSuffix: true })}</div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <Card data-testid="card-shipments-without-status">
           <CardHeader>
@@ -1280,6 +1296,16 @@ Please analyze this failure and help me understand:
                     ? 'Paused while backfill job is running' 
                     : 'Polls ShipStation for on_hold shipments, 1 minute intervals'}
                 </p>
+                {queueStats?.onHoldWorkerStats && (
+                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
+                    <div>Last processed: {queueStats.onHoldWorkerStats.lastProcessedCount.toLocaleString()} orders</div>
+                    <div>Total processed: {queueStats.onHoldWorkerStats.totalProcessedCount.toLocaleString()} orders</div>
+                    <div>Started: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.workerStartedAt), { addSuffix: true })}</div>
+                    {queueStats.onHoldWorkerStats.lastCompletedAt && (
+                      <div>Last run: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.lastCompletedAt), { addSuffix: true })}</div>
+                    )}
+                  </div>
+                )}
               </div>
               <Badge 
                 variant={

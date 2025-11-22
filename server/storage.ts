@@ -213,7 +213,7 @@ export interface IStorage {
   // Data Health Metrics
   getDataHealthMetrics(): Promise<{
     ordersMissingShipments: number;
-    oldestOrderMissingShipmentAt: Date | null;
+    oldestOrderMissingShipmentAt: string | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
@@ -1666,7 +1666,7 @@ export class DatabaseStorage implements IStorage {
   // Data Health Metrics - Batched queries for comprehensive metrics
   async getDataHealthMetrics(): Promise<{
     ordersMissingShipments: number;
-    oldestOrderMissingShipmentAt: Date | null;
+    oldestOrderMissingShipmentAt: string | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
@@ -1744,7 +1744,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       ordersMissingShipments: ordersMissingShipmentsResult[0]?.count || 0,
-      oldestOrderMissingShipmentAt: oldestOrderResult[0]?.createdAt ? new Date(oldestOrderResult[0].createdAt) : null,
+      oldestOrderMissingShipmentAt: oldestOrderResult[0]?.createdAt ? new Date(oldestOrderResult[0].createdAt).toISOString() : null,
       shipmentsWithoutOrders: shipmentsWithoutOrdersResult[0]?.count || 0,
       orphanedShipments: orphanedShipmentsResult[0]?.count || 0,
       shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,

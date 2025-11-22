@@ -2596,11 +2596,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get comprehensive data health metrics
       const dataHealthMetrics = await storage.getDataHealthMetrics();
 
-      // Get on-hold worker status
+      // Get on-hold worker status and stats
       let onHoldWorkerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
+      let onHoldWorkerStats = undefined;
       try {
-        const { getOnHoldWorkerStatus } = await import("./onhold-poll-worker");
+        const { getOnHoldWorkerStatus, getOnHoldWorkerStats } = await import("./onhold-poll-worker");
         onHoldWorkerStatus = getOnHoldWorkerStatus();
+        onHoldWorkerStats = getOnHoldWorkerStats();
       } catch (error) {
         // Worker not initialized yet
       }
@@ -2627,6 +2629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         dataHealth: dataHealthMetrics,
         onHoldWorkerStatus,
+        onHoldWorkerStats,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);
