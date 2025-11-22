@@ -186,39 +186,53 @@ export default function Packing() {
   useEffect(() => {
     if (!packingLogs || packingLogs.length === 0 || skuProgress.size === 0) return;
     
-    // Count successful scans for each SKU from historical logs
-    const scanCounts = new Map<string, number>();
+    // Process logs chronologically (reverse since backend returns newest first)
+    const chronologicalLogs = [...packingLogs].reverse();
     
-    packingLogs.forEach((log) => {
-      // Only count successful product scans (not manual verifications or failed scans)
-      if (log.success && log.action === "product_scanned" && log.productSku) {
-        const normalizedSku = normalizeSku(log.productSku);
-        scanCounts.set(normalizedSku, (scanCounts.get(normalizedSku) || 0) + 1);
-      }
-    });
-    
-    // Update skuProgress with historical scan counts
-    if (scanCounts.size > 0) {
-      setSkuProgress((prevProgress) => {
-        const updatedProgress = new Map(prevProgress);
-        
-        updatedProgress.forEach((progress, key) => {
-          const historicalScans = scanCounts.get(progress.normalizedSku) || 0;
-          if (historicalScans > 0) {
-            const newScanned = Math.min(historicalScans, progress.expected);
-            updatedProgress.set(key, {
-              ...progress,
-              scanned: newScanned,
-              remaining: progress.expected - newScanned,
-            });
-          }
+    setSkuProgress((prevProgress) => {
+      // Reset all counters to 0 to make restoration idempotent
+      const updatedProgress = new Map<string, SkuProgress>();
+      prevProgress.forEach((progress, key) => {
+        updatedProgress.set(key, {
+          ...progress,
+          scanned: 0,
+          remaining: progress.expected,
         });
-        
-        return updatedProgress;
       });
       
-      console.log(`[Packing] Restored progress from ${packingLogs.length} historical log(s)`);
-    }
+      // Process each log in chronological order
+      chronologicalLogs.forEach((log) => {
+        // Count successful product scans AND manual verifications
+        if (log.success && (log.action === "product_scanned" || log.action === "manual_verification")) {
+          if (!log.productSku) return;
+          
+          // Handle SKU-less items: logs store "NO SKU" but progress map uses empty string
+          const isNoSku = log.productSku === "NO SKU";
+          const normalizedSku = isNoSku ? "" : normalizeSku(log.productSku);
+          
+          // Find the first item with this SKU that still has remaining capacity
+          for (const [key, progress] of Array.from(updatedProgress.entries())) {
+            const skuMatches = isNoSku 
+              ? progress.requiresManualVerification && progress.normalizedSku === ""
+              : progress.normalizedSku === normalizedSku;
+              
+            if (skuMatches && progress.scanned < progress.expected) {
+              // Increment this specific item's scan count
+              updatedProgress.set(key, {
+                ...progress,
+                scanned: progress.scanned + 1,
+                remaining: progress.remaining - 1,
+              });
+              break; // Only increment one item per scan
+            }
+          }
+        }
+      });
+      
+      return updatedProgress;
+    });
+    
+    console.log(`[Packing] Restored progress from ${packingLogs.length} historical log(s)`);
   }, [packingLogs, skuProgress.size]); // Re-run when logs load or when skuProgress is initialized
 
   // Load shipment by order number (includes items from backend)
