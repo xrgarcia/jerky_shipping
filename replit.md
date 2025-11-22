@@ -40,11 +40,13 @@ Preferred communication style: Simple, everyday language.
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, and notifications.
 - **Monorepo Structure**: Client, server, and shared code co-located.
 - **Async Product Bootstrap**: Products synchronize asynchronously on server startup.
-- **On-Hold Poll Worker**: Polls ShipStation for on-hold shipments every 1 minute (supplements webhooks which don't fire for on_hold status). Displays real-time running/sleeping status on Operations dashboard.
+- **On-Hold Poll Worker**: Polls ShipStation for on-hold shipments every 1 minute (supplements webhooks which don't fire for on_hold status). Displays real-time running/sleeping/awaiting_backfill_job status on Operations dashboard.
+- **Worker Coordination System**: Production-ready coordination between on-hold poll worker and backfill jobs to prevent API conflicts. Uses Redis-backed mutex with comprehensive error handling, fail-safe defaults, and status recovery broadcasts. WorkerCoordinator utility manages coordination state with lock tracking, TTL safety nets, and graceful degradation. All degraded states (backfill active, mutex contention, Redis errors) emit recovery signals to ensure UI stays synchronized.
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback on failure.
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
+- **Worker Coordination Resilience**: All coordinator operations wrapped in error handling with fail-safe semantics (skip poll on error, continue backfill on coordination failure). Status recovery pattern ensures UI receives both degraded and recovery broadcasts, preventing stuck states.
 
 ## External Dependencies
 
