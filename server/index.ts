@@ -78,15 +78,52 @@ app.use((req, res, next) => {
   setupWebSocket(server);
   log("WebSocket server initialized");
 
-  // Broadcast initial queue status to ensure clients get fresh data immediately after restart
+  // Broadcast comprehensive initial queue status to ensure clients get fresh data immediately after restart
   try {
     const { broadcastQueueStatus } = await import("./websocket");
-    const dataHealth = await storage.getDataHealthMetrics();
-    const { getQueueLength, getShipmentSyncQueueLength, getShopifyOrderSyncQueueLength } = await import("./utils/queue");
+    const { 
+      getQueueLength, 
+      getShipmentSyncQueueLength, 
+      getShopifyOrderSyncQueueLength,
+      getOldestShopifyQueueMessage,
+      getOldestShipmentSyncQueueMessage,
+      getOldestShopifyOrderSyncQueueMessage
+    } = await import("./utils/queue");
+    const { shipmentSyncFailures } = await import("@shared/schema");
+    const { db } = await import("./db");
+    const { count } = await import("drizzle-orm");
+    
+    const shopifyQueueLength = await getQueueLength();
+    const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+    const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
+    const oldestShopify = await getOldestShopifyQueueMessage();
+    const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+    const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
+    const failureCount = await db.select({ count: count() })
+      .from(shipmentSyncFailures)
+      .then(rows => rows[0]?.count || 0);
+    const allBackfillJobs = await storage.getAllBackfillJobs();
+    const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
+    const dataHealthRaw = await storage.getDataHealthMetrics();
+    
+    // Convert Date to string for WebSocket broadcast
+    const dataHealth = {
+      ...dataHealthRaw,
+      oldestOrderMissingShipmentAt: dataHealthRaw.oldestOrderMissingShipmentAt 
+        ? dataHealthRaw.oldestOrderMissingShipmentAt.toISOString() 
+        : null
+    };
+    
     broadcastQueueStatus({
-      shopifyQueue: await getQueueLength(),
-      shipmentSyncQueue: await getShipmentSyncQueueLength(),
-      shopifyOrderSyncQueue: await getShopifyOrderSyncQueueLength(),
+      shopifyQueue: shopifyQueueLength,
+      shipmentSyncQueue: shipmentSyncQueueLength,
+      shopifyOrderSyncQueue: shopifyOrderSyncQueueLength,
+      shipmentFailureCount: failureCount,
+      shopifyQueueOldestAt: oldestShopify?.enqueuedAt || null,
+      shipmentSyncQueueOldestAt: oldestShipmentSync?.enqueuedAt || null,
+      shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
+      backfillActiveJob: activeBackfillJob,
+      onHoldWorkerStatus: 'sleeping', // Worker hasn't started yet, default to sleeping
       dataHealth,
     });
     log("Initial queue status broadcast sent");
