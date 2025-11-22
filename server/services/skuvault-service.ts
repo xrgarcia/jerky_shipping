@@ -56,25 +56,44 @@ export class SkuVaultError extends Error {
 /**
  * Redis-based token cache for SkuVault session token
  * Stores sv-t cookie value with 24-hour TTL for persistence across server restarts
+ * Gracefully degrades if Redis is unavailable (forces re-login)
  */
 class TokenCache {
   private readonly REDIS_KEY = 'skuvault:session:token';
   private readonly TTL_SECONDS = 86400; // 24 hours
 
   async set(token: string): Promise<void> {
-    const redis = getRedisClient();
-    await redis.set(this.REDIS_KEY, token, { ex: this.TTL_SECONDS });
+    try {
+      const redis = getRedisClient();
+      await redis.set(this.REDIS_KEY, token, { ex: this.TTL_SECONDS });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for token cache (token will not persist): ${errorMsg}`);
+      // Graceful degradation: continue without caching
+    }
   }
 
   async get(): Promise<string | null> {
-    const redis = getRedisClient();
-    const token = await redis.get<string>(this.REDIS_KEY);
-    return token;
+    try {
+      const redis = getRedisClient();
+      const token = await redis.get<string>(this.REDIS_KEY);
+      return token;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for token cache (forcing re-authentication): ${errorMsg}`);
+      return null; // Force re-authentication
+    }
   }
 
   async clear(): Promise<void> {
-    const redis = getRedisClient();
-    await redis.del(this.REDIS_KEY);
+    try {
+      const redis = getRedisClient();
+      await redis.del(this.REDIS_KEY);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for token cache clear: ${errorMsg}`);
+      // Graceful degradation: continue without clearing
+    }
   }
 
   async isValid(): Promise<boolean> {
@@ -86,32 +105,45 @@ class TokenCache {
 /**
  * Redis-based lockout cache for SkuVault account lockouts
  * Stores lockout end timestamp when account is temporarily locked
+ * Gracefully degrades if Redis is unavailable (assumes no lockout)
  */
 class LockoutCache {
   private readonly REDIS_KEY = 'skuvault:lockout:endtime';
 
   async setLockout(durationMinutes: number): Promise<void> {
-    const redis = getRedisClient();
-    const endTime = Date.now() + (durationMinutes * 60 * 1000);
-    const ttlSeconds = durationMinutes * 60;
-    
-    await redis.set(this.REDIS_KEY, endTime.toString(), { ex: ttlSeconds });
-    console.log(`[SkuVault] Lockout set for ${durationMinutes} minutes (until ${new Date(endTime).toISOString()})`);
+    try {
+      const redis = getRedisClient();
+      const endTime = Date.now() + (durationMinutes * 60 * 1000);
+      const ttlSeconds = durationMinutes * 60;
+      
+      await redis.set(this.REDIS_KEY, endTime.toString(), { ex: ttlSeconds });
+      console.log(`[SkuVault] Lockout set for ${durationMinutes} minutes (until ${new Date(endTime).toISOString()})`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for lockout cache (lockout will not persist): ${errorMsg}`);
+      // Graceful degradation: continue without storing lockout
+    }
   }
 
   async getLockoutEndTime(): Promise<number | null> {
-    const redis = getRedisClient();
-    const endTimeStr = await redis.get<string>(this.REDIS_KEY);
-    if (!endTimeStr) return null;
-    
-    const endTime = parseInt(endTimeStr, 10);
-    // If lockout has expired, return null
-    if (endTime <= Date.now()) {
-      await this.clear();
-      return null;
+    try {
+      const redis = getRedisClient();
+      const endTimeStr = await redis.get<string>(this.REDIS_KEY);
+      if (!endTimeStr) return null;
+      
+      const endTime = parseInt(endTimeStr, 10);
+      // If lockout has expired, return null
+      if (endTime <= Date.now()) {
+        await this.clear();
+        return null;
+      }
+      
+      return endTime;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for lockout cache (assuming no lockout): ${errorMsg}`);
+      return null; // Assume no lockout (degraded but functional)
     }
-    
-    return endTime;
   }
 
   async getRemainingSeconds(): Promise<number> {
@@ -129,8 +161,14 @@ class LockoutCache {
   }
 
   async clear(): Promise<void> {
-    const redis = getRedisClient();
-    await redis.del(this.REDIS_KEY);
+    try {
+      const redis = getRedisClient();
+      await redis.del(this.REDIS_KEY);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[SkuVault] Redis unavailable for lockout cache clear: ${errorMsg}`);
+      // Graceful degradation: continue without clearing
+    }
   }
 }
 
@@ -260,16 +298,16 @@ export class SkuVaultService {
     try {
       console.log('[SkuVault] Initializing authentication...');
       
-      // Check if credentials are configured
-      if (!this.config.username || !this.config.password) {
-        console.warn('[SkuVault] SKUVAULT_USERNAME and SKUVAULT_PASSWORD not configured, skipping initialization');
-        return;
-      }
-
-      // Check if we have a valid cached token
+      // Always check if we have a valid cached token (even if credentials missing)
       if (await this.tokenCache.isValid()) {
         console.log('[SkuVault] Found valid token in Redis, marking as authenticated');
         this.isAuthenticated = true;
+        return;
+      }
+
+      // Check if credentials are configured before attempting login
+      if (!this.config.username || !this.config.password) {
+        console.warn('[SkuVault] No cached token and credentials not configured, authentication will be required on first request');
         return;
       }
 
@@ -446,7 +484,7 @@ export class SkuVaultService {
           : JSON.stringify(loginResponse.data);
         
         // Look for validation messages in the HTML
-        const validationMatch = responseText.match(/class="validation-summary-errors"[^>]*>(.*?)<\/div>/s);
+        const validationMatch = responseText.match(/class="validation-summary-errors"[^>]*>([\s\S]*?)<\/div>/);
         const fieldErrorMatch = responseText.match(/class="field-validation-error"[^>]*>(.*?)<\/span>/);
         
         let errorMessage = '';
@@ -682,7 +720,7 @@ export class SkuVaultService {
       status: parseSessionState(session.state),
       createdDate: session.date || null,
       assignedUser: session.assigned?.name || null,
-      userId: session.assigned?.userId || null,
+      userId: session.assigned?.userId?.toString() || null,
       skuCount: session.skuCount || null,
       orderCount: session.orderCount || null,
       totalQuantity: session.totalQuantity || null,

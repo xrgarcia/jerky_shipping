@@ -215,15 +215,13 @@ app.use((req, res, next) => {
     log("Skipping background workers - Redis not configured");
   }
 
-  // Initialize SkuVault authentication (if Redis is available and credentials configured)
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      const { skuVaultService } = await import("./services/skuvault-service");
-      await skuVaultService.initializeAuthentication();
-    } catch (error) {
-      console.error("Failed to initialize SkuVault authentication:", error);
-      // Continue server startup even if SkuVault auth fails
-    }
+  // Initialize SkuVault authentication (always runs to check for cached tokens)
+  try {
+    const { skuVaultService } = await import("./services/skuvault-service");
+    await skuVaultService.initializeAuthentication();
+  } catch (error) {
+    console.error("Failed to initialize SkuVault authentication:", error);
+    // Continue server startup even if SkuVault auth fails
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
