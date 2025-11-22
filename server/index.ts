@@ -135,6 +135,10 @@ app.use((req, res, next) => {
     const { startShopifyOrderSyncWorker } = await import("./shopify-sync-worker");
     startShopifyOrderSyncWorker(8000); // Process Shopify order sync queue every 8 seconds
     
+    // Start on-hold shipments polling worker (supplements webhooks which don't fire for on_hold)
+    const { startOnHoldPollWorker } = await import("./onhold-poll-worker");
+    startOnHoldPollWorker(300000); // Poll for on_hold shipments every 5 minutes
+    
     // Resume any in-progress backfill jobs that were interrupted by server restart
     setImmediate(async () => {
       try {
