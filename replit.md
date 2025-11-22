@@ -23,7 +23,7 @@ Preferred communication style: Simple, everyday language.
     - **Order Items table**: Composite index on (order_id, requires_shipping) for efficient shippable item filtering in data health metrics
     - **Shipment Items table**: Index on external_order_item_id for webhook line item matching
     - **Operational tables**: Status and composite (status, queued_at) indexes on backfill_jobs and print_queue for worker polling
-    - **PostgreSQL pg_trgm extension**: Enabled for fuzzy text search with GIN trigram indexes, supporting partial order number and customer name searches
+    - **PostgreSQL pg_trgm extension**: Automatically initialized on server startup for fuzzy text search with GIN trigram indexes, supporting partial order number and customer name searches. Extension creation is handled in `server/db.ts` for both development and production environments.
     - **Data Health Metrics Optimization**: Critical queries optimized to use ILIKE instead of LOWER() for case-insensitive comparisons, enabling index usage. Query execution times: orders missing shipments (~96ms), shipments without orders (~39ms), orphaned shipments (~21ms)
 - **Core Features**:
     - **Product Catalog**: Synchronized via Shopify webhooks, warehouse-optimized interface.

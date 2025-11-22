@@ -6,7 +6,8 @@ import path from "path";
 import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
 import { ensureShipStationWebhooksRegistered } from "./utils/shipstation-webhook";
 import { setupWebSocket } from "./websocket";
-import { storage } from "./storage";
+import { initializeDatabase } from "./db";
+// Note: storage imported lazily after initializeDatabase() to ensure pg_trgm extension exists
 
 const app = express();
 
@@ -55,6 +56,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize database extensions (must happen before any database operations)
+  await initializeDatabase();
+  
+  // Import storage after extension initialization to ensure pg_trgm exists for queries
+  const { storage } = await import("./storage");
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
