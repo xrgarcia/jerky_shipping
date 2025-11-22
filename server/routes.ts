@@ -1026,8 +1026,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log("Marking item as QC passed:", parseResult.data);
-      const result = await skuVaultService.passQCItem(parseResult.data);
+      // Try to look up the sale in SkuVault to get the proper SaleId
+      let saleId = parseResult.data.IdSale; // Start with provided order number
+      
+      console.log(`[QC Pass] Looking up sale for order number: ${saleId}`);
+      const saleInfo = await skuVaultService.getSaleInformation(saleId);
+      
+      if (saleInfo?.SaleId) {
+        // Found the sale - use the proper SaleId for QC pass
+        console.log(`[QC Pass] Found SaleId: ${saleInfo.SaleId} for order: ${saleId}`);
+        saleId = saleInfo.SaleId;
+      } else {
+        console.log(`[QC Pass] Sale not found in SkuVault, will attempt QC pass with order number: ${saleId}`);
+      }
+      
+      const qcData = {
+        ...parseResult.data,
+        IdSale: saleId, // Use the resolved SaleId or fall back to order number
+      };
+      
+      console.log("Marking item as QC passed:", qcData);
+      const result = await skuVaultService.passQCItem(qcData);
       
       res.json(result);
     } catch (error: any) {
