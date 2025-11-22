@@ -200,6 +200,7 @@ export class SkuVaultService {
   private isAuthenticated: boolean = false;
   private lastRequestTime: number = 0;
   private readonly RATE_LIMIT_DELAY_MS = 2000; // 2 seconds between requests
+  private loginMutex: Promise<boolean> | null = null; // Prevent concurrent login attempts
 
   constructor() {
     // Load configuration from environment
@@ -248,6 +249,74 @@ export class SkuVaultService {
     }
     
     this.lastRequestTime = Date.now();
+  }
+
+  /**
+   * Initialize authentication on server startup
+   * Checks Redis for valid token and auto-authenticates if needed
+   * Should be called once when server starts
+   */
+  async initializeAuthentication(): Promise<void> {
+    try {
+      console.log('[SkuVault] Initializing authentication...');
+      
+      // Check if credentials are configured
+      if (!this.config.username || !this.config.password) {
+        console.warn('[SkuVault] SKUVAULT_USERNAME and SKUVAULT_PASSWORD not configured, skipping initialization');
+        return;
+      }
+
+      // Check if we have a valid cached token
+      if (await this.tokenCache.isValid()) {
+        console.log('[SkuVault] Found valid token in Redis, marking as authenticated');
+        this.isAuthenticated = true;
+        return;
+      }
+
+      // No valid token, perform initial login
+      console.log('[SkuVault] No valid token found, performing initial login...');
+      await this.ensureAuthenticated();
+      console.log('[SkuVault] Authentication initialization complete');
+    } catch (error) {
+      console.error('[SkuVault] Failed to initialize authentication:', error);
+      // Don't throw - let individual requests handle re-authentication
+    }
+  }
+
+  /**
+   * Ensure we're authenticated, with mutex protection to prevent concurrent logins
+   * Automatically called by service methods before making API requests
+   */
+  private async ensureAuthenticated(): Promise<void> {
+    // Check credentials before attempting authentication
+    if (!this.config.username || !this.config.password) {
+      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
+    }
+
+    // If already authenticated, we're good
+    if (this.isAuthenticated) {
+      return;
+    }
+
+    // If there's already a login in progress, wait for it
+    if (this.loginMutex) {
+      console.log('[SkuVault] Login already in progress, waiting...');
+      await this.loginMutex;
+      return;
+    }
+
+    // Start login and store the promise
+    this.loginMutex = this.login();
+    
+    try {
+      const success = await this.loginMutex;
+      if (!success) {
+        throw new Error('Authentication failed');
+      }
+    } finally {
+      // Clear the mutex
+      this.loginMutex = null;
+    }
   }
 
   /**
@@ -486,16 +555,14 @@ export class SkuVaultService {
     } catch (error) {
       const axiosError = error as AxiosError;
       
-      // If 401, clear token and retry once with re-authentication
+      // If 401, clear token and retry once with re-authentication (using mutex)
       if (axiosError.response?.status === 401) {
         console.log('[SkuVault] Received 401, re-authenticating...');
         await this.tokenCache.clear();
         this.isAuthenticated = false;
         
-        const loginSuccess = await this.login();
-        if (!loginSuccess) {
-          throw new Error('Re-authentication failed');
-        }
+        // Use ensureAuthenticated to benefit from mutex protection
+        await this.ensureAuthenticated();
         
         // Retry the request with new token (rate limiting already applied above)
         const retryHeaders = await this.getApiHeaders();
@@ -526,18 +593,8 @@ export class SkuVaultService {
    * @returns Array of parsed sessions
    */
   async getSessions(filters?: SessionFilters): Promise<ParsedSession[]> {
-    // Check credentials before attempting to authenticate
-    if (!this.config.username || !this.config.password) {
-      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
-    }
-
-    // Ensure we're authenticated
-    if (!this.isAuthenticated) {
-      const loginSuccess = await this.login();
-      if (!loginSuccess) {
-        throw new Error('Authentication failed');
-      }
-    }
+    // Ensure we're authenticated (automatically handled by initialization on startup)
+    await this.ensureAuthenticated();
 
     try {
       // Build base payload with defaults
@@ -647,18 +704,8 @@ export class SkuVaultService {
    * @returns DirectionsResponse with picklist info, directions, and history
    */
   async getSessionDirections(picklistId: string): Promise<any> {
-    // Check credentials before attempting to authenticate
-    if (!this.config.username || !this.config.password) {
-      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
-    }
-
-    // Ensure we're authenticated
-    if (!this.isAuthenticated) {
-      const loginSuccess = await this.login();
-      if (!loginSuccess) {
-        throw new Error('Authentication failed');
-      }
-    }
+    // Ensure we're authenticated (automatically handled by initialization on startup)
+    await this.ensureAuthenticated();
 
     try {
       const url = `${this.config.apiBaseUrl}/wavepicking/get/${picklistId}/directions`;
@@ -727,6 +774,9 @@ export class SkuVaultService {
     endpoint: string,
     data?: any
   ): Promise<T> {
+    // Ensure we're authenticated before making request
+    await this.ensureAuthenticated();
+    
     // Apply rate limiting before request
     await this.applyRateLimit();
     
@@ -760,18 +810,14 @@ export class SkuVaultService {
     } catch (error) {
       const axiosError = error as AxiosError;
       
-      // If 401, try re-authenticating once
+      // If 401, try re-authenticating once (using mutex)
       if (axiosError.response?.status === 401) {
         console.log('[SkuVault QC] Received 401, attempting re-authentication...');
         await this.tokenCache.clear();
         this.isAuthenticated = false;
         
-        const loginSuccess = await this.login();
-        if (!loginSuccess) {
-          const errorMsg = 'Re-authentication failed after 401 response';
-          console.error(`[SkuVault QC] ${errorMsg}`);
-          throw new SkuVaultError(errorMsg, 401);
-        }
+        // Use ensureAuthenticated to benefit from mutex protection
+        await this.ensureAuthenticated();
         
         // Retry the request once (rate limiting already applied above)
         try {
@@ -833,18 +879,8 @@ export class SkuVaultService {
    * @returns Product information and raw API response (for audit logging)
    */
   async getProductByCode(searchTerm: string): Promise<{ product: ProductLookupResponse | null; rawResponse: any }> {
-    // Check credentials before attempting to authenticate
-    if (!this.config.username || !this.config.password) {
-      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
-    }
-
-    // Ensure we're authenticated
-    if (!this.isAuthenticated) {
-      const loginSuccess = await this.login();
-      if (!loginSuccess) {
-        throw new Error('Authentication failed');
-      }
-    }
+    // Ensure we're authenticated (automatically handled by initialization on startup)
+    await this.ensureAuthenticated();
 
     try {
       const endpoint = `/products/product/getProductOrKitByCodeOrSkuOrPartNumber?SearchTerm=${encodeURIComponent(searchTerm)}`;
@@ -880,18 +916,8 @@ export class SkuVaultService {
    * @returns Response indicating success or failure
    */
   async passQCItem(itemData: QCPassItemRequest): Promise<QCPassItemResponse> {
-    // Check credentials before attempting to authenticate
-    if (!this.config.username || !this.config.password) {
-      throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
-    }
-
-    // Ensure we're authenticated
-    if (!this.isAuthenticated) {
-      const loginSuccess = await this.login();
-      if (!loginSuccess) {
-        throw new Error('Authentication failed');
-      }
-    }
+    // Ensure we're authenticated (automatically handled by initialization on startup)
+    await this.ensureAuthenticated();
 
     try {
       const endpoint = '/sales/QualityControl/passItem';
