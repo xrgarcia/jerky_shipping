@@ -132,7 +132,7 @@ const formatCountdown = (seconds: number): string => {
 export default function Sessions() {
   const { toast } = useToast();
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
-  const [hasAuthenticated, setHasAuthenticated] = useState(false);
+  const [hasAuthenticated, setHasAuthenticated] = useState(true); // Auto-authenticate on mount
   const [selectedPicklistId, setSelectedPicklistId] = useState<string | null>(null);
   
   // Search and filter state
@@ -266,6 +266,23 @@ export default function Sessions() {
       queryClient.invalidateQueries({ queryKey: ["/api/skuvault/lockout-status"] });
     },
   });
+
+  // Handle authentication errors - if sessions query fails with auth error, allow manual re-auth
+  useEffect(() => {
+    if (error && hasAuthenticated) {
+      // If we get an error while authenticated, it might be an auth error
+      // Allow user to manually reconnect
+      const errorMessage = (error as Error).message || '';
+      if (errorMessage.includes('401') || errorMessage.includes('auth') || errorMessage.includes('Unauthorized')) {
+        setHasAuthenticated(false);
+        toast({
+          title: "Authentication Required",
+          description: "Please connect to SkuVault to view sessions.",
+          variant: "default",
+        });
+      }
+    }
+  }, [error, hasAuthenticated, toast]);
 
   const sessions = data?.sessions || [];
 
@@ -547,10 +564,10 @@ export default function Sessions() {
                       Session #{session.sessionId}
                     </CardTitle>
                     <Badge 
-                      className={getStatusColor(session.status)}
+                      className={getStatusColor(session.status ?? null)}
                       data-testid={`badge-status-${session.sessionId}`}
                     >
-                      {formatStatus(session.status)}
+                      {formatStatus(session.status ?? null)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -630,7 +647,7 @@ export default function Sessions() {
                         variant="outline"
                         size="sm"
                         className="w-full"
-                        onClick={() => setSelectedPicklistId(session.picklistId)}
+                        onClick={() => setSelectedPicklistId(session.picklistId ?? null)}
                         data-testid={`button-view-details-${session.sessionId}`}
                       >
                         <Package className="h-4 w-4 mr-2" />
