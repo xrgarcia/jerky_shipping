@@ -514,6 +514,14 @@ export class DatabaseStorage implements IStorage {
           .selectDistinct({ orderId: orderRefunds.orderId })
           .from(orderRefunds);
         conditions.push(sql`${orders.id} NOT IN ${orderIdsWithRefunds}`);
+        // Also exclude orders with only non-shippable items (gift cards, digital products)
+        conditions.push(sql`
+          EXISTS (
+            SELECT 1 FROM ${orderItems} 
+            WHERE ${orderItems.orderId} = ${orders.id} 
+            AND (${orderItems.requiresShipping} IS TRUE OR ${orderItems.requiresShipping} IS NULL)
+          )
+        `);
       }
 
       if (shipmentStatus && shipmentStatus.length > 0) {
