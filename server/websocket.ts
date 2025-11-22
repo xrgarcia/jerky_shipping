@@ -84,7 +84,6 @@ export function setupWebSocket(server: Server): void {
         });
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(message);
-          console.log(`Sent cached queue status to newly connected operations client`);
         }
       } catch (error) {
         console.error('Failed to send cached queue status to new client:', error);

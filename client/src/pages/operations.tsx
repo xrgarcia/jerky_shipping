@@ -515,6 +515,9 @@ Please analyze this failure and help me understand:
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
   const queueStats = liveQueueStats || initialQueueStats;
+  
+  // Show loading state only if we have no data at all (neither from WebSocket nor initial API)
+  const hasQueueData = !!queueStats;
 
   // Initialize liveQueueStats with initialQueueStats when it first loads
   useEffect(() => {
@@ -931,7 +934,7 @@ Please analyze this failure and help me understand:
             <div className="space-y-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold" data-testid="text-shopify-queue-size">
-                  {statsLoading ? "-" : queueStats?.shopifyQueue.size.toLocaleString()}
+                  {!hasQueueData ? "-" : queueStats?.shopifyQueue.size.toLocaleString()}
                 </span>
                 <span className="text-muted-foreground">messages</span>
               </div>
@@ -979,7 +982,7 @@ Please analyze this failure and help me understand:
             <div className="space-y-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold" data-testid="text-shipment-queue-size">
-                  {statsLoading ? "-" : queueStats?.shipmentSyncQueue.size.toLocaleString()}
+                  {!hasQueueData ? "-" : queueStats?.shipmentSyncQueue.size.toLocaleString()}
                 </span>
                 <span className="text-muted-foreground">messages</span>
               </div>
@@ -1027,7 +1030,7 @@ Please analyze this failure and help me understand:
             <div className="space-y-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold" data-testid="text-shopify-order-sync-queue-size">
-                  {statsLoading ? "-" : queueStats?.shopifyOrderSyncQueue.size.toLocaleString()}
+                  {!hasQueueData ? "-" : queueStats?.shopifyOrderSyncQueue.size.toLocaleString()}
                 </span>
                 <span className="text-muted-foreground">orders</span>
               </div>
@@ -1092,7 +1095,7 @@ Please analyze this failure and help me understand:
               <div className="space-y-3">
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
-                    {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
+                    {!hasQueueData ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
                   </span>
                   <span className="text-muted-foreground">orders</span>
                 </div>
@@ -1118,7 +1121,7 @@ Please analyze this failure and help me understand:
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
-                {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -1135,7 +1138,7 @@ Please analyze this failure and help me understand:
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold" data-testid="text-orphaned-shipments">
-                {statsLoading ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.orphanedShipments ?? 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -1151,7 +1154,7 @@ Please analyze this failure and help me understand:
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold" data-testid="text-shipments-without-status">
-              {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
+              {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -1167,7 +1170,7 @@ Please analyze this failure and help me understand:
           <CardContent>
             <div className="space-y-3">
               <div className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
-                {statsLoading ? "-" : (queueStats?.dataHealth?.shipmentSyncFailures ?? 0).toLocaleString()}
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentSyncFailures ?? 0).toLocaleString()}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1208,7 +1211,7 @@ Please analyze this failure and help me understand:
           <CardContent>
             <div className="space-y-3">
               <div className="text-3xl font-bold" data-testid="text-shopify-order-sync-failures">
-                {statsLoading ? "-" : (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0).toLocaleString()}
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0).toLocaleString()}
               </div>
               <div className="flex gap-2">
                 <Button
