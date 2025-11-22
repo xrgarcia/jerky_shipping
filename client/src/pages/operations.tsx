@@ -1056,40 +1056,53 @@ Please analyze this failure and help me understand:
       <div className="grid gap-4 md:grid-cols-3">
         <Link href="/orders?hasShipment=false">
           <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Orders Missing Shipments
-                {queueStats?.dataHealth?.oldestOrderMissingShipmentAt && (() => {
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Orders Missing Shipments</CardTitle>
+                <CardDescription>Orders without shipment records</CardDescription>
+              </div>
+              {(() => {
+                const ordersMissingHealth = (() => {
+                  if (!queueStats?.dataHealth?.ordersMissingShipments) return "healthy";
+                  if (!queueStats?.dataHealth?.oldestOrderMissingShipmentAt) return "healthy";
+                  
                   const ageMinutes = (Date.now() - new Date(queueStats.dataHealth.oldestOrderMissingShipmentAt).getTime()) / (1000 * 60);
-                  const ragStatus = ageMinutes <= 75 ? 'green' : ageMinutes <= 90 ? 'amber' : 'red';
-                  return (
-                    <Badge 
-                      variant={ragStatus === 'green' ? 'default' : ragStatus === 'amber' ? 'secondary' : 'destructive'}
-                      className={cn(
-                        "ml-auto",
-                        ragStatus === 'green' && "bg-green-600 hover:bg-green-700",
-                        ragStatus === 'amber' && "bg-amber-500 hover:bg-amber-600"
-                      )}
-                      data-testid={`badge-rag-${ragStatus}`}
-                    >
-                      {ragStatus.toUpperCase()}
-                    </Badge>
-                  );
-                })()}
-              </CardTitle>
-              <CardDescription>Orders without shipment records</CardDescription>
+                  if (ageMinutes > 90) return "critical";
+                  if (ageMinutes > 75) return "warning";
+                  return "healthy";
+                })();
+                
+                return (
+                  <Badge
+                    data-testid={`badge-health-${ordersMissingHealth}`}
+                    variant={
+                      ordersMissingHealth === "healthy" ? "default" :
+                      ordersMissingHealth === "warning" ? "secondary" : "destructive"
+                    }
+                  >
+                    {ordersMissingHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {ordersMissingHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                    {ordersMissingHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
+                    {ordersMissingHealth}
+                  </Badge>
+                );
+              })()}
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
-                {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
-              </div>
-              {queueStats?.dataHealth?.oldestOrderMissingShipmentAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                  <Clock className="h-4 w-4" />
-                  Oldest: {formatDistanceToNow(new Date(queueStats.dataHealth.oldestOrderMissingShipmentAt), { addSuffix: true })}
+              <div className="space-y-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
+                    {statsLoading ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">orders</span>
                 </div>
-              )}
+                {queueStats?.dataHealth?.oldestOrderMissingShipmentAt && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Oldest: {formatDistanceToNow(new Date(queueStats.dataHealth.oldestOrderMissingShipmentAt), { addSuffix: true })}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </Link>
