@@ -215,10 +215,10 @@ export async function pollOnHoldShipments(): Promise<number> {
 
   // Handle case where mutex could not be acquired (Redis error or already locked)
   if (result === null) {
-    log('Poll mutex not acquired (Redis error or already locked) - setting degraded status');
-    // Set degraded status and broadcast it so UI reflects the issue
-    // Don't reset to sleeping immediately - let it stay in degraded state until next successful poll
-    workerStatus = 'awaiting_backfill_job'; // Use this as degraded status (skipping poll)
+    log('Poll mutex not acquired (Redis error or already locked) - will retry next cycle');
+    // Keep status as sleeping - mutex contention is normal, not a degraded state
+    // The UI should just show that the worker is sleeping between poll attempts
+    workerStatus = 'sleeping';
     await broadcastWorkerStatus();
     return 0;
   }
