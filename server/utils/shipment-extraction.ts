@@ -1,5 +1,10 @@
 /**
- * Utility functions for extracting fields from ShipStation webhook payloads
+ * DEPRECATED: These utility functions have been moved to ShipStationShipmentETLService
+ * This file is only kept for legacy backfill scripts in server/scripts/
+ * 
+ * For all new code, use: server/services/shipstation-shipment-etl-service.ts
+ * 
+ * Legacy utility functions for extracting fields from ShipStation webhook payloads
  * These functions normalize and extract data from shipmentData JSONB
  */
 

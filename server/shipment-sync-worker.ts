@@ -23,22 +23,11 @@ import {
 import { getShipmentsByOrderNumber } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
 import { 
-  extractOrderNumber,
-  extractOrderDate,
-  extractShipToFields,
-  extractReturnGiftFields,
-  extractTotalWeight,
-  extractAdvancedOptions,
-} from './utils/shipment-extraction';
-import { 
   shipmentSyncFailures, 
-  shipmentItems, 
-  shipmentTags, 
-  orderItems,
   type InsertShipmentSyncFailure 
 } from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
-import { eq, inArray } from 'drizzle-orm';
+import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -92,192 +81,6 @@ async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
   }
 }
 
-/**
- * Extract ShipStation shipment_status field
- * Returns the raw shipment lifecycle status from ShipStation (on_hold, pending, shipped, cancelled, etc.)
- * Searches common nesting patterns as ShipStation API varies payload structure
- */
-export function extractShipmentStatus(shipmentData: any): string | null {
-  if (!shipmentData) return null;
-  
-  // Check top-level fields first
-  if (shipmentData.shipment_status) return shipmentData.shipment_status;
-  if (shipmentData.shipmentStatus) return shipmentData.shipmentStatus;
-  
-  // Check top-level advancedOptions (recent API versions, both camelCase and snake_case)
-  if (shipmentData.advancedOptions?.shipmentStatus) {
-    return shipmentData.advancedOptions.shipmentStatus;
-  }
-  if (shipmentData.advancedOptions?.shipment_status) {
-    return shipmentData.advancedOptions.shipment_status;
-  }
-  if (shipmentData.advanced_options?.shipment_status) {
-    return shipmentData.advanced_options.shipment_status;
-  }
-  if (shipmentData.advanced_options?.shipmentStatus) {
-    return shipmentData.advanced_options.shipmentStatus;
-  }
-  
-  // Check nested shipment object (common in webhook payloads)
-  if (shipmentData.shipment) {
-    if (shipmentData.shipment.shipment_status) return shipmentData.shipment.shipment_status;
-    if (shipmentData.shipment.shipmentStatus) return shipmentData.shipment.shipmentStatus;
-    
-    // Check advancedOptions within nested shipment
-    if (shipmentData.shipment.advancedOptions?.shipmentStatus) {
-      return shipmentData.shipment.advancedOptions.shipmentStatus;
-    }
-    if (shipmentData.shipment.advancedOptions?.shipment_status) {
-      return shipmentData.shipment.advancedOptions.shipment_status;
-    }
-    if (shipmentData.shipment.advanced_options?.shipment_status) {
-      return shipmentData.shipment.advanced_options.shipment_status;
-    }
-    if (shipmentData.shipment.advanced_options?.shipmentStatus) {
-      return shipmentData.shipment.advanced_options.shipmentStatus;
-    }
-    
-    // Check double-nested shipment.shipment (some webhook variants)
-    if (shipmentData.shipment.shipment) {
-      if (shipmentData.shipment.shipment.shipment_status) return shipmentData.shipment.shipment.shipment_status;
-      if (shipmentData.shipment.shipment.shipmentStatus) return shipmentData.shipment.shipment.shipmentStatus;
-      
-      // Check advancedOptions within double-nested shipment
-      if (shipmentData.shipment.shipment.advancedOptions?.shipmentStatus) {
-        return shipmentData.shipment.shipment.advancedOptions.shipmentStatus;
-      }
-      if (shipmentData.shipment.shipment.advancedOptions?.shipment_status) {
-        return shipmentData.shipment.shipment.advancedOptions.shipment_status;
-      }
-      if (shipmentData.shipment.shipment.advanced_options?.shipment_status) {
-        return shipmentData.shipment.shipment.advanced_options.shipment_status;
-      }
-      if (shipmentData.shipment.shipment.advanced_options?.shipmentStatus) {
-        return shipmentData.shipment.shipment.advanced_options.shipmentStatus;
-      }
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Normalize ShipStation status codes to our internal status values
- * - Voided → "cancelled"
- * - DE (Delivered tracking code) → "delivered"
- * - Any other tracking code → "in_transit"
- * - on_hold shipment_status → "pending"
- * - Default → "shipped"
- */
-function normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
-  // Check if shipment is voided first
-  if (shipmentData.voided) {
-    return { status: 'cancelled', statusDescription: 'Shipment voided' };
-  }
-  
-  // Check for tracking status code (from tracking webhooks) - highest priority
-  const statusCode = shipmentData.status_code || shipmentData.statusCode;
-  if (statusCode) {
-    if (statusCode === 'DE') {
-      return {
-        status: 'delivered',
-        statusDescription: shipmentData.status_description || shipmentData.statusDescription || 'Delivered'
-      };
-    }
-    return {
-      status: 'in_transit',
-      statusDescription: shipmentData.status_description || shipmentData.statusDescription || 'In transit'
-    };
-  }
-  
-  // Check for ShipStation shipment_status (from API queries)
-  const shipmentStatus = extractShipmentStatus(shipmentData);
-  if (shipmentStatus === 'on_hold') {
-    return { status: 'pending', statusDescription: 'On hold - awaiting warehouse processing' };
-  }
-  if (shipmentStatus === 'cancelled') {
-    return { status: 'cancelled', statusDescription: 'Shipment cancelled' };
-  }
-  
-  // Default for newly created shipments without tracking updates
-  return { status: 'shipped', statusDescription: 'Shipment created' };
-}
-
-/**
- * Populate normalized shipment_items and shipment_tags tables from shipmentData JSONB
- * Deletes existing entries and re-creates from current shipmentData to ensure consistency
- */
-async function populateShipmentItemsAndTags(shipmentId: string, shipmentData: any) {
-  if (!shipmentData) return;
-
-  try {
-    // Delete existing entries for this shipment (ensure clean state)
-    await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
-    await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipmentId));
-
-    // Extract and insert items
-    if (shipmentData.items && Array.isArray(shipmentData.items)) {
-      // Batch fetch all order items to avoid N+1 queries
-      // Normalize to strings since ShipStation may return numeric IDs
-      const externalOrderItemIds = shipmentData.items
-        .map((item: any) => item.external_order_item_id)
-        .filter((id: any) => id != null)
-        .map((id: any) => String(id));
-
-      const orderItemsMap = new Map<string, string>();
-      if (externalOrderItemIds.length > 0) {
-        const matchingOrderItems = await db
-          .select()
-          .from(orderItems)
-          .where(inArray(orderItems.shopifyLineItemId, externalOrderItemIds));
-
-        for (const orderItem of matchingOrderItems) {
-          // Normalize both sides to string for comparison
-          orderItemsMap.set(String(orderItem.shopifyLineItemId), orderItem.id);
-        }
-      }
-
-      // Build items to insert with batch-resolved order item IDs
-      const itemsToInsert = shipmentData.items.map((item: any) => {
-        // Normalize to string before lookup
-        const externalId = item.external_order_item_id ? String(item.external_order_item_id) : null;
-        const orderItemId = externalId ? (orderItemsMap.get(externalId) || null) : null;
-
-        return {
-          shipmentId,
-          orderItemId,
-          sku: item.sku || null,
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.unit_price?.toString() || null,
-          externalOrderItemId: externalId, // Store as string
-          imageUrl: item.image_url || null,
-        };
-      });
-
-      if (itemsToInsert.length > 0) {
-        await db.insert(shipmentItems).values(itemsToInsert);
-      }
-    }
-
-    // Extract and insert tags
-    if (shipmentData.tags && Array.isArray(shipmentData.tags)) {
-      const tagsToInsert = shipmentData.tags.map((tag: any) => ({
-        shipmentId,
-        name: tag.name,
-        color: tag.color || null,
-        tagId: tag.tag_id || null,
-      }));
-
-      if (tagsToInsert.length > 0) {
-        await db.insert(shipmentTags).values(tagsToInsert);
-      }
-    }
-  } catch (error) {
-    log(`Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
-    // Don't throw - this is a non-critical operation that shouldn't break the main flow
-  }
-}
 
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
@@ -320,62 +123,31 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           try {
             log(`[${trackingNumber}] Found existing shipment linked to order, updating status without API call`);
             
-            // Normalize status using helper
-            const { status, statusDescription } = normalizeShipmentStatus(webhookTrackingData);
-            
-            // CRITICAL: Don't downgrade delivered shipments to in_transit
-            // Once delivered, always delivered (terminal status)
-            const finalStatus = cachedShipment.status === 'delivered' ? 'delivered' : status;
-            const finalDescription = cachedShipment.status === 'delivered' 
-              ? cachedShipment.statusDescription 
-              : statusDescription;
-            
-            // Merge latest shipmentData for extraction
+            // Merge latest shipmentData for processing
             const mergedShipmentData = {
               ...(cachedShipment.shipmentData || {}),
               latestTracking: webhookTrackingData,
             };
             
-            // Extract order_number with multiple fallbacks:
-            // 1. From merged shipmentData (includes tracking webhook + cached data)
-            // 2. Directly from cached shipmentData JSONB (in case field was missed)
-            // 3. From cached order_number column (backfilled or previously extracted)
-            const extractedOrderNumber = 
-              extractOrderNumber(mergedShipmentData) || 
-              cachedShipment.shipmentData?.shipment_number || 
-              cachedShipment.shipmentData?.shipmentNumber ||
-              cachedShipment.orderNumber;
+            // Build updated shipment record using ETL service
+            const updatedRecord = shipStationShipmentETL.buildShipmentRecord(mergedShipmentData, cachedShipment.orderId);
             
-            // Extract order_date with multiple fallbacks:
-            // 1. From merged shipmentData (includes tracking webhook + cached data)
-            // 2. Directly from cached shipmentData JSONB (create_date/createDate)
-            // 3. From cached order_date column (backfilled or previously extracted)
-            const extractedOrderDate = 
-              extractOrderDate(mergedShipmentData) || 
-              (cachedShipment.shipmentData?.create_date ? new Date(cachedShipment.shipmentData.create_date) : null) ||
-              (cachedShipment.shipmentData?.createDate ? new Date(cachedShipment.shipmentData.createDate) : null) ||
-              cachedShipment.orderDate;
+            // CRITICAL: Don't downgrade delivered shipments to in_transit
+            // Once delivered, always delivered (terminal status)
+            const finalStatus = cachedShipment.status === 'delivered' ? 'delivered' : updatedRecord.status;
+            const finalDescription = cachedShipment.status === 'delivered' 
+              ? cachedShipment.statusDescription 
+              : updatedRecord.statusDescription;
             
-            // Build update object
+            // Build update object, preserving critical backfilled data
             const updateData: any = {
+              ...updatedRecord,
               status: finalStatus,
               statusDescription: finalDescription,
-              shipmentStatus: extractShipmentStatus(mergedShipmentData) || cachedShipment.shipmentStatus,
-              shipDate: webhookTrackingData.ship_date ? new Date(webhookTrackingData.ship_date) : cachedShipment.shipDate,
-              shipmentData: mergedShipmentData,
+              // Preserve backfilled values if ETL service couldn't extract them
+              orderNumber: updatedRecord.orderNumber || cachedShipment.orderNumber,
+              orderDate: updatedRecord.orderDate || cachedShipment.orderDate,
             };
-            
-            // Always explicitly set order_number (extracted, cached, or preserve existing)
-            // This ensures backfilled values are maintained even if webhook lacks shipment_number
-            if (extractedOrderNumber) {
-              updateData.orderNumber = extractedOrderNumber;
-            }
-            
-            // Always explicitly set order_date (extracted, cached, or preserve existing)
-            // This ensures backfilled values are maintained even if webhook lacks create_date
-            if (extractedOrderDate) {
-              updateData.orderDate = extractedOrderDate;
-            }
             
             // Update shipment with latest tracking info from webhook
             // NOTE: Don't extract ship_to in fast path - tracking webhooks don't include it
@@ -403,8 +175,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         if (hasInlineData && webhookData) {
           log(`[${trackingNumber}] Processing from inline data (no API call)`);
           
-          // Try to extract order number from webhook data
-          const webhookOrderNumber = extractOrderNumber(webhookData);
+          // Try to extract order number from webhook data using ETL service
+          const tempRecord = shipStationShipmentETL.buildShipmentRecord(webhookData, null);
+          const webhookOrderNumber = tempRecord.orderNumber;
           
           if (!webhookOrderNumber) {
             // No order number in webhook - try to resolve shipment via label_id before giving up
@@ -435,25 +208,26 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                     if (dbShipment) {
                       log(`[${trackingNumber}] Found shipment in DB via label lookup, updating tracking`);
                       
-                      // Normalize status
-                      const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+                      // Merge latest tracking data
+                      const mergedData = {
+                        ...(dbShipment.shipmentData || {}),
+                        latestTracking: webhookData,
+                      };
+                      
+                      // Build updated record using ETL service
+                      const updatedRecord = shipStationShipmentETL.buildShipmentRecord(mergedData, dbShipment.orderId);
                       
                       // CRITICAL: Don't downgrade delivered shipments
-                      const finalStatus = dbShipment.status === 'delivered' ? 'delivered' : status;
+                      const finalStatus = dbShipment.status === 'delivered' ? 'delivered' : updatedRecord.status;
                       const finalDescription = dbShipment.status === 'delivered' 
                         ? dbShipment.statusDescription 
-                        : statusDescription;
+                        : updatedRecord.statusDescription;
                       
                       // Update shipment with tracking info from webhook
                       const updateData: any = {
+                        ...updatedRecord,
                         status: finalStatus,
                         statusDescription: finalDescription,
-                        shipmentStatus: extractShipmentStatus(webhookData) || dbShipment.shipmentStatus,
-                        shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : dbShipment.shipDate,
-                        shipmentData: {
-                          ...(dbShipment.shipmentData || {}),
-                          latestTracking: webhookData,
-                        },
                       };
                       
                       await storage.updateShipment(dbShipment.id, updateData);
@@ -479,8 +253,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       const shipmentUrl = `https://api.shipstation.com/v2/shipments/${resolvedShipmentId}`;
                       const fullShipmentData = await fetchShipStationResource(shipmentUrl);
                       
-                      // Extract order number from full shipment data
-                      const orderNumber = extractOrderNumber(fullShipmentData);
+                      // Build shipment record using ETL service to extract order number and other fields
+                      const tempRecord = shipStationShipmentETL.buildShipmentRecord(fullShipmentData, null);
+                      const orderNumber = tempRecord.orderNumber;
                       
                       if (orderNumber) {
                         log(`[${trackingNumber}] Extracted order number from shipment: ${orderNumber}`);
@@ -488,35 +263,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                         // Lookup order
                         const order = await storage.getOrderByOrderNumber(orderNumber);
                         
-                        // Normalize status
-                        const { status, statusDescription } = normalizeShipmentStatus(fullShipmentData);
-                        
-                        // Create shipment record
-                        const shipmentRecord = {
-                          orderId: order?.id || null,
-                          shipmentId: String(resolvedShipmentId),
-                          orderNumber,
-                          orderDate: extractOrderDate(fullShipmentData),
-                          trackingNumber,
-                          carrierCode: fullShipmentData.carrier_code || fullShipmentData.carrierCode || null,
-                          serviceCode: fullShipmentData.service_code || fullShipmentData.serviceCode || null,
-                          status,
-                          statusDescription,
-                          shipmentStatus: extractShipmentStatus(fullShipmentData),
-                          shipDate: fullShipmentData.ship_date ? new Date(fullShipmentData.ship_date) : null,
-                          shipmentData: fullShipmentData,
-                        };
-                        
-                        // Extract customer data from ship_to
-                        extractShipToFields(fullShipmentData, shipmentRecord);
-                        
-                        // Extract enriched data
-                        extractEnrichedShipmentFields(fullShipmentData, shipmentRecord);
-                        
-                        const createdShipment = await storage.createShipment(shipmentRecord);
-                        
-                        // Populate items and tags
-                        await populateShipmentItemsAndTags(createdShipment.id, fullShipmentData);
+                        // Use ETL service to process complete shipment (creates record + items + tags)
+                        const finalShipmentId = await shipStationShipmentETL.processShipment(fullShipmentData, order?.id || null);
                         
                         // Broadcast if linked to order
                         if (order) {
@@ -578,37 +326,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             continue;
           }
           
-          // Normalize status
-          const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+          // Use ETL service to process complete shipment (creates/updates record + items + tags)
+          const finalShipmentId = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
           
-          const shipmentRecord = {
-            orderId: order?.id || null, // Nullable for multi-channel orders
-            shipmentId: String(rawShipmentId),
-            orderNumber: webhookOrderNumber,
-            orderDate: extractOrderDate(webhookData),
-            trackingNumber: trackingNumber,
-            carrierCode: webhookData.carrier_code || webhookData.carrierCode || null,
-            serviceCode: webhookData.service_code || webhookData.serviceCode || null,
-            status,
-            statusDescription,
-            shipmentStatus: extractShipmentStatus(webhookData),
-            shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : null,
-            shipmentData: webhookData,
-          };
-          
-          let finalShipmentId: string;
           if (cachedShipment) {
-            await storage.updateShipment(cachedShipment.id, shipmentRecord);
-            finalShipmentId = cachedShipment.id;
             log(`[${trackingNumber}] Updated shipment from webhook (0 API calls)`);
           } else {
-            const createdShipment = await storage.createShipment(shipmentRecord);
-            finalShipmentId = createdShipment.id;
             log(`[${trackingNumber}] Created shipment from webhook (0 API calls)`);
           }
-          
-          // Populate items and tags if available
-          await populateShipmentItemsAndTags(finalShipmentId, webhookData);
           
           // Broadcast update
           if (order) {
@@ -675,40 +400,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // Create shipment without order linkage (orderId will be null)
             const existingShipmentOrphan = await storage.getShipmentByTrackingNumber(trackingNumber);
             
-            // Normalize status using helper
-            const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
+            // Use ETL service to process complete shipment (creates/updates record + items + tags)
+            const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, null);
             
-            const shipmentRecord = {
-              orderId: null, // No order linkage
-              shipmentId: String(rawShipmentId),
-              orderNumber: extractOrderNumber(shipmentData),
-              orderDate: extractOrderDate(shipmentData),
-              trackingNumber: trackingNumber,
-              carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
-              serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
-              status,
-              statusDescription,
-              shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-              ...extractShipToFields(shipmentData), // Extract ship_to customer data
-              ...extractReturnGiftFields(shipmentData), // Extract return and gift data
-              totalWeight: extractTotalWeight(shipmentData), // Extract total weight
-              ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
-              shipmentData: shipmentData,
-            };
-            
-            let finalShipmentId: string;
             if (existingShipmentOrphan) {
-              await storage.updateShipment(existingShipmentOrphan.id, shipmentRecord);
-              finalShipmentId = existingShipmentOrphan.id;
               log(`[${trackingNumber}] Updated shipment without order linkage`);
             } else {
-              const createdShipment = await storage.createShipment(shipmentRecord);
-              finalShipmentId = createdShipment.id;
               log(`[${trackingNumber}] Created shipment without order linkage`);
             }
-            
-            // Populate normalized shipment items and tags tables
-            await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
             
             // Fire-and-forget: Trigger Shopify order sync if we found an order number
             if (linkageResult.orderNumber) {
@@ -769,41 +468,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
         const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
         
-        // Normalize status using helper
-        const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
+        // Use ETL service to process complete shipment (creates/updates record + items + tags)
+        const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, order.id);
         
-        const shipmentRecord = {
-          orderId: order.id,
-          shipmentId: String(rawShipmentId),
-          orderNumber: extractOrderNumber(shipmentData),
-          orderDate: extractOrderDate(shipmentData),
-          trackingNumber: trackingNumber,
-          carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
-          serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
-          status,
-          statusDescription,
-          shipmentStatus: extractShipmentStatus(shipmentData),
-          shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-          ...extractShipToFields(shipmentData), // Extract ship_to customer data
-          ...extractReturnGiftFields(shipmentData), // Extract return and gift data
-          totalWeight: extractTotalWeight(shipmentData), // Extract total weight
-          ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
-          shipmentData: shipmentData,
-        };
-        
-        let finalShipmentId: string;
         if (existingShipment) {
-          await storage.updateShipment(existingShipment.id, shipmentRecord);
-          finalShipmentId = existingShipment.id;
           log(`[${trackingNumber}] Updated shipment for order ${order.orderNumber}`);
         } else {
-          const createdShipment = await storage.createShipment(shipmentRecord);
-          finalShipmentId = createdShipment.id;
           log(`[${trackingNumber}] Created shipment for order ${order.orderNumber}`);
         }
-        
-        // Populate normalized shipment items and tags tables
-        await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
         
         // Broadcast order update via WebSocket
         broadcastOrderUpdate(order);
@@ -844,41 +516,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             ? await storage.getShipmentByTrackingNumber(shipmentTrackingNumber)
             : await storage.getShipmentByShipmentId(String(rawShipmentId));
           
-          // Normalize status
-          const { status, statusDescription } = normalizeShipmentStatus(webhookData);
+          // Use ETL service to process complete shipment (creates/updates record + items + tags)
+          const finalShipmentId = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
           
-          const shipmentRecord = {
-            orderId: order?.id || null, // Nullable for multi-channel
-            shipmentId: String(rawShipmentId),
-            orderNumber: extractOrderNumber(webhookData) || orderNumber,
-            orderDate: extractOrderDate(webhookData),
-            trackingNumber: shipmentTrackingNumber,
-            carrierCode: webhookData.carrier_code || webhookData.carrierCode || null,
-            serviceCode: webhookData.service_code || webhookData.serviceCode || null,
-            status,
-            statusDescription,
-            shipmentStatus: extractShipmentStatus(webhookData),
-            shipDate: webhookData.ship_date ? new Date(webhookData.ship_date) : null,
-            ...extractShipToFields(webhookData), // Extract customer data
-            ...extractReturnGiftFields(webhookData), // Extract return/gift data
-            totalWeight: extractTotalWeight(webhookData), // Extract weight
-            ...extractAdvancedOptions(webhookData), // Extract advanced options
-            shipmentData: webhookData,
-          };
-          
-          let finalShipmentId: string;
           if (existingShipment) {
-            await storage.updateShipment(existingShipment.id, shipmentRecord);
-            finalShipmentId = existingShipment.id;
             log(`[${orderNumber}] Updated shipment from webhook (0 API calls)`);
           } else {
-            const createdShipment = await storage.createShipment(shipmentRecord);
-            finalShipmentId = createdShipment.id;
             log(`[${orderNumber}] Created shipment from webhook (0 API calls)`);
           }
-          
-          // Populate items and tags
-          await populateShipmentItemsAndTags(finalShipmentId, webhookData);
           
           // Broadcast update
           if (order) {
@@ -1019,41 +664,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           
           const existingShipment = await storage.getShipmentByShipmentId(shipmentId);
           
-          // Normalize status using helper
-          const { status, statusDescription } = normalizeShipmentStatus(shipmentData);
-          
-          const shipmentRecord = {
-            orderId: order?.id || null, // Nullable order linkage
-            shipmentId: shipmentId,
-            orderNumber: extractOrderNumber(shipmentData),
-            orderDate: extractOrderDate(shipmentData),
-            trackingNumber: trackingNumber,
-            carrierCode: carrierCode,
-            serviceCode: serviceCode,
-            status,
-            statusDescription,
-            shipmentStatus: extractShipmentStatus(shipmentData),
-            shipDate: shipDate ? new Date(shipDate) : null,
-            ...extractShipToFields(shipmentData), // Extract ship_to customer data
-            ...extractReturnGiftFields(shipmentData), // Extract return and gift data
-            totalWeight: extractTotalWeight(shipmentData), // Extract total weight
-            ...extractAdvancedOptions(shipmentData), // Extract all advanced_options fields
-            shipmentData: shipmentData,
-          };
+          // Use ETL service to process complete shipment (creates/updates record + items + tags)
+          const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
 
-          let finalShipmentId: string;
           if (existingShipment) {
-            await storage.updateShipment(existingShipment.id, shipmentRecord);
-            finalShipmentId = existingShipment.id;
             log(`[${orderNumber}] Updated shipment ${shipmentId}${order ? ` for order ${order.orderNumber}` : ' (no order linkage)'}`);
           } else {
-            const createdShipment = await storage.createShipment(shipmentRecord);
-            finalShipmentId = createdShipment.id;
             log(`[${orderNumber}] Created shipment ${shipmentId}${order ? ` for order ${order.orderNumber}` : ' (no order linkage)'}`);
           }
-          
-          // Populate normalized shipment items and tags tables
-          await populateShipmentItemsAndTags(finalShipmentId, shipmentData);
         }
         
         // Fire-and-forget: Trigger Shopify order sync if order not found

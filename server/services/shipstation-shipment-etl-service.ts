@@ -1,0 +1,505 @@
+/**
+ * ShipStationShipmentETLService
+ * 
+ * Centralized service for extracting, transforming, and loading ShipStation shipment data.
+ * Follows OOP principles with dependency injection for storage.
+ * Used by all acquisition paths: webhooks, backfill jobs, on-hold polling, and manual sync.
+ * 
+ * This is the SINGLE SOURCE OF TRUTH for ShipStation shipment ETL transformations.
+ */
+
+import { storage } from '../storage';
+import type { IStorage } from '../storage';
+import type { InsertShipment, InsertShipmentItem, InsertShipmentTag } from '@shared/schema';
+import { db } from '../db';
+import { shipmentItems, shipmentTags, orderItems } from '@shared/schema';
+import { eq, inArray } from 'drizzle-orm';
+
+export class ShipStationShipmentETLService {
+  constructor(private readonly storage: IStorage) {}
+
+  /**
+   * Main orchestration method: Process a complete ShipStation shipment
+   * Handles shipment record creation/update, items, and tags
+   * Automatically links to order if orderId not provided but order number exists
+   * Preserves existing orderId on updates to prevent de-linking
+   * Returns the final shipment database ID
+   */
+  async processShipment(shipmentData: any, orderId: string | null = null): Promise<string> {
+    // Validate shipment ID first
+    const shipmentId = this.extractShipmentId(shipmentData);
+    if (!shipmentId) {
+      throw new Error('Shipment data missing shipment_id field');
+    }
+    
+    // Check if shipment already exists
+    const existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
+    
+    // If no orderId provided, try to link to existing order using order number
+    let resolvedOrderId = orderId;
+    if (!resolvedOrderId) {
+      // CRITICAL: Preserve existing orderId to prevent de-linking on updates
+      if (existing && existing.orderId) {
+        resolvedOrderId = existing.orderId;
+      } else {
+        // Try to find order by order number
+        const orderNumber = this.extractOrderNumber(shipmentData);
+        if (orderNumber) {
+          const order = await this.storage.getOrderByOrderNumber(orderNumber);
+          if (order) {
+            resolvedOrderId = order.id;
+          }
+        }
+      }
+    }
+    
+    // Build the normalized shipment record with resolved order ID
+    const shipmentRecord = this.buildShipmentRecord(shipmentData, resolvedOrderId);
+    
+    // Upsert (create or update) the shipment
+    let finalShipmentId: string;
+    
+    if (existing) {
+      await this.storage.updateShipment(existing.id, shipmentRecord);
+      finalShipmentId = existing.id;
+    } else {
+      const created = await this.storage.createShipment(shipmentRecord);
+      finalShipmentId = created.id;
+    }
+    
+    // Process normalized items and tags
+    await this.processShipmentItems(finalShipmentId, shipmentData);
+    await this.processShipmentTags(finalShipmentId, shipmentData);
+    
+    return finalShipmentId;
+  }
+
+  /**
+   * Build a normalized shipment record from raw ShipStation data
+   * Handles both API responses and webhook payloads
+   */
+  buildShipmentRecord(shipmentData: any, orderId: string | null = null): InsertShipment {
+    // Extract core identifiers
+    const shipmentId = this.extractShipmentId(shipmentData);
+    const trackingNumber = this.extractTrackingNumber(shipmentData);
+    const orderNumber = this.extractOrderNumber(shipmentData);
+    
+    // Extract status information
+    const { status, statusDescription } = this.normalizeShipmentStatus(shipmentData);
+    const shipmentStatus = this.extractShipmentStatus(shipmentData);
+    
+    // Extract carrier and service
+    const carrierCode = this.extractCarrierCode(shipmentData);
+    const serviceCode = this.extractServiceCode(shipmentData);
+    
+    // Extract dates
+    const orderDate = this.extractOrderDate(shipmentData);
+    const shipDate = this.extractShipDate(shipmentData);
+    
+    // Build complete record
+    return {
+      orderId,
+      shipmentId: shipmentId?.toString() || null,
+      orderNumber,
+      orderDate,
+      trackingNumber,
+      carrierCode,
+      serviceCode,
+      status,
+      statusDescription,
+      shipmentStatus,
+      shipDate,
+      ...this.extractShipToFields(shipmentData),
+      ...this.extractReturnGiftFields(shipmentData),
+      totalWeight: this.extractTotalWeight(shipmentData),
+      ...this.extractAdvancedOptions(shipmentData),
+      shipmentData,
+    };
+  }
+
+  /**
+   * Process shipment items - normalize into shipment_items table
+   * Deletes existing entries and re-creates from current shipmentData
+   */
+  async processShipmentItems(shipmentId: string, shipmentData: any): Promise<void> {
+    if (!shipmentData || !shipmentData.items || !Array.isArray(shipmentData.items)) {
+      return;
+    }
+
+    try {
+      // Delete existing entries for this shipment (ensure clean state)
+      await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
+
+      // Batch fetch all order items to avoid N+1 queries
+      const externalOrderItemIds = shipmentData.items
+        .map((item: any) => item.external_order_item_id)
+        .filter((id: any) => id != null)
+        .map((id: any) => String(id));
+
+      const orderItemsMap = new Map<string, string>();
+      if (externalOrderItemIds.length > 0) {
+        const matchingOrderItems = await db
+          .select()
+          .from(orderItems)
+          .where(inArray(orderItems.shopifyLineItemId, externalOrderItemIds));
+
+        for (const orderItem of matchingOrderItems) {
+          orderItemsMap.set(String(orderItem.shopifyLineItemId), orderItem.id);
+        }
+      }
+
+      // Build items to insert with batch-resolved order item IDs
+      const itemsToInsert: InsertShipmentItem[] = shipmentData.items.map((item: any) => {
+        const externalId = item.external_order_item_id ? String(item.external_order_item_id) : null;
+        const orderItemId = externalId ? (orderItemsMap.get(externalId) || null) : null;
+
+        return {
+          shipmentId,
+          orderItemId,
+          sku: item.sku || null,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unit_price?.toString() || null,
+          totalPrice: item.total_price?.toString() || null,
+          itemData: item,
+        };
+      });
+
+      if (itemsToInsert.length > 0) {
+        await db.insert(shipmentItems).values(itemsToInsert);
+      }
+    } catch (error) {
+      console.error(`[ShipStationShipmentETL] Error processing items for shipment ${shipmentId}:`, error);
+    }
+  }
+
+  /**
+   * Process shipment tags - normalize into shipment_tags table
+   * Deletes existing entries and re-creates from current shipmentData
+   * Preserves tags with tagId even if name is missing (ShipStation legacy auto-tagging)
+   */
+  async processShipmentTags(shipmentId: string, shipmentData: any): Promise<void> {
+    if (!shipmentData || !shipmentData.tags || !Array.isArray(shipmentData.tags)) {
+      return;
+    }
+
+    try {
+      // Delete existing entries for this shipment (ensure clean state)
+      await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipmentId));
+
+      // Build tags to insert, preserving tags with tagId even if name is missing
+      const tagsToInsert: InsertShipmentTag[] = shipmentData.tags
+        .filter((tag: any) => tag && (tag.name || tag.tag_id)) // Include tags with name OR tagId
+        .map((tag: any) => ({
+          shipmentId,
+          tagId: tag.tag_id?.toString() || null,
+          tagName: tag.name || `Tag ${tag.tag_id}`, // Default name for legacy tags with ID only
+        }));
+
+      if (tagsToInsert.length > 0) {
+        await db.insert(shipmentTags).values(tagsToInsert);
+      }
+    } catch (error) {
+      console.error(`[ShipStationShipmentETL] Error processing tags for shipment ${shipmentId}:`, error);
+    }
+  }
+
+  // =================================================================
+  // PRIVATE EXTRACTION METHODS
+  // All field-level extraction logic encapsulated below
+  // =================================================================
+
+  /**
+   * Extract shipment ID from ShipStation data
+   */
+  private extractShipmentId(shipmentData: any): string | null {
+    return shipmentData?.shipment_id || shipmentData?.shipmentId || null;
+  }
+
+  /**
+   * Extract tracking number from ShipStation data
+   */
+  private extractTrackingNumber(shipmentData: any): string | null {
+    return shipmentData?.tracking_number || shipmentData?.trackingNumber || null;
+  }
+
+  /**
+   * Extract order_number from shipmentData
+   * Returns the customer-facing order number (e.g., "JK3825345229")
+   * Handles multiple ShipStation API response formats
+   */
+  private extractOrderNumber(shipmentData: any): string | null {
+    // Try shipment_number / shipmentNumber (most common in webhooks)
+    if (shipmentData?.shipment_number) return shipmentData.shipment_number;
+    if (shipmentData?.shipmentNumber) return shipmentData.shipmentNumber;
+    
+    // Try order_number (common in API responses)
+    if (shipmentData?.order_number) return shipmentData.order_number;
+    if (shipmentData?.orderNumber) return shipmentData.orderNumber;
+    
+    // Try nested shipment object (some webhook variants)
+    if (shipmentData?.shipment?.shipment_number) return shipmentData.shipment.shipment_number;
+    if (shipmentData?.shipment?.shipmentNumber) return shipmentData.shipment.shipmentNumber;
+    if (shipmentData?.shipment?.order_number) return shipmentData.shipment.order_number;
+    if (shipmentData?.shipment?.orderNumber) return shipmentData.shipment.orderNumber;
+    
+    return null;
+  }
+
+  /**
+   * Extract order_date from shipmentData
+   * Returns the ShipStation shipment creation timestamp (ISO 8601 format)
+   */
+  private extractOrderDate(shipmentData: any): Date | null {
+    const dateStr = shipmentData?.create_date || shipmentData?.createDate || 
+                    shipmentData?.created_at || shipmentData?.createdAt;
+    
+    if (!dateStr) {
+      return null;
+    }
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      return date;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Extract carrier code from ShipStation data
+   */
+  private extractCarrierCode(shipmentData: any): string | null {
+    return shipmentData?.carrier_code || shipmentData?.carrierCode || null;
+  }
+
+  /**
+   * Extract service code from ShipStation data
+   */
+  private extractServiceCode(shipmentData: any): string | null {
+    return shipmentData?.service_code || shipmentData?.serviceCode || null;
+  }
+
+  /**
+   * Extract ship date from ShipStation data
+   */
+  private extractShipDate(shipmentData: any): Date | null {
+    const dateStr = shipmentData?.ship_date || shipmentData?.shipDate;
+    if (!dateStr) {
+      return null;
+    }
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      return date;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Extract ship_to customer fields from shipmentData
+   */
+  private extractShipToFields(shipmentData: any) {
+    const shipTo = shipmentData?.ship_to || {};
+    return {
+      shipToName: shipTo.name || null,
+      shipToPhone: shipTo.phone || null,
+      shipToEmail: shipTo.email || null,
+      shipToCompany: shipTo.company || null,
+      shipToAddressLine1: shipTo.address_line1 || null,
+      shipToAddressLine2: shipTo.address_line2 || null,
+      shipToAddressLine3: shipTo.address_line3 || null,
+      shipToCity: shipTo.city_locality || null,
+      shipToState: shipTo.state_province || null,
+      shipToPostalCode: shipTo.postal_code || null,
+      shipToCountry: shipTo.country_code || null,
+      shipToIsResidential: shipTo.address_residential_indicator || null,
+    };
+  }
+
+  /**
+   * Extract return and gift information from shipmentData
+   */
+  private extractReturnGiftFields(shipmentData: any) {
+    return {
+      isReturn: shipmentData?.is_return ?? null,
+      isGift: shipmentData?.is_gift ?? null,
+      notesForGift: shipmentData?.gift_message || null,
+      notesFromBuyer: shipmentData?.customer_notes || null,
+    };
+  }
+
+  /**
+   * Extract total_weight from shipmentData
+   * Concatenates value and unit into a single string (e.g., "2.5 pounds")
+   */
+  private extractTotalWeight(shipmentData: any): string | null {
+    const totalWeight = shipmentData?.total_weight;
+    if (!totalWeight || typeof totalWeight !== 'object') {
+      return null;
+    }
+    
+    const value = totalWeight.value;
+    const unit = totalWeight.unit;
+    
+    if (value !== null && value !== undefined && unit) {
+      return `${value} ${unit}`;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extract all advanced_options fields from shipmentData
+   */
+  private extractAdvancedOptions(shipmentData: any) {
+    const advOpts = shipmentData?.advanced_options || {};
+    
+    return {
+      billToAccount: advOpts.bill_to_account || null,
+      billToCountryCode: advOpts.bill_to_country_code || null,
+      billToParty: advOpts.bill_to_party || null,
+      billToPostalCode: advOpts.bill_to_postal_code || null,
+      billToName: advOpts.bill_to_name || null,
+      billToAddressLine1: advOpts.bill_to_address_line1 || null,
+      containsAlcohol: advOpts.contains_alcohol ?? null,
+      deliveredDutyPaid: advOpts.delivered_duty_paid ?? null,
+      nonMachinable: advOpts.non_machinable ?? null,
+      saturdayDelivery: advOpts.saturday_delivery ?? null,
+      dryIce: advOpts.dry_ice ?? null,
+      dryIceWeight: advOpts.dry_ice_weight || null,
+      fedexFreight: advOpts.fedex_freight || null,
+      thirdPartyConsignee: advOpts.third_party_consignee ?? null,
+      guaranteedDutiesAndTaxes: advOpts.guaranteed_duties_and_taxes ?? null,
+      ancillaryEndorsementsOption: advOpts.ancillary_endorsements_option || null,
+      freightClass: advOpts.freight_class || null,
+      customField1: advOpts.custom_field1 || null,
+      customField2: advOpts.custom_field2 || null,
+      customField3: advOpts.custom_field3 || null,
+      collectOnDelivery: advOpts.collect_on_delivery || null,
+      returnPickupAttempts: advOpts.return_pickup_attempts || null,
+      additionalHandling: advOpts.additional_handling ?? null,
+      ownDocumentUpload: advOpts.own_document_upload ?? null,
+      limitedQuantity: advOpts.limited_quantity ?? null,
+      eventNotification: advOpts.event_notification ?? null,
+      importServices: advOpts.import_services ?? null,
+      overrideHoliday: advOpts.override_holiday ?? null,
+    };
+  }
+
+  /**
+   * Extract the raw shipment lifecycle status from ShipStation
+   * Searches common nesting patterns as ShipStation API varies payload structure
+   */
+  private extractShipmentStatus(shipmentData: any): string | null {
+    if (!shipmentData) return null;
+    
+    // Check top-level fields first
+    if (shipmentData.shipment_status) return shipmentData.shipment_status;
+    if (shipmentData.shipmentStatus) return shipmentData.shipmentStatus;
+    
+    // Check top-level advancedOptions (recent API versions, both camelCase and snake_case)
+    if (shipmentData.advancedOptions?.shipmentStatus) {
+      return shipmentData.advancedOptions.shipmentStatus;
+    }
+    if (shipmentData.advancedOptions?.shipment_status) {
+      return shipmentData.advancedOptions.shipment_status;
+    }
+    if (shipmentData.advanced_options?.shipment_status) {
+      return shipmentData.advanced_options.shipment_status;
+    }
+    if (shipmentData.advanced_options?.shipmentStatus) {
+      return shipmentData.advanced_options.shipmentStatus;
+    }
+    
+    // Check nested shipment object (common in webhook payloads)
+    if (shipmentData.shipment) {
+      if (shipmentData.shipment.shipment_status) return shipmentData.shipment.shipment_status;
+      if (shipmentData.shipment.shipmentStatus) return shipmentData.shipment.shipmentStatus;
+      
+      // Check advancedOptions within nested shipment
+      if (shipmentData.shipment.advancedOptions?.shipmentStatus) {
+        return shipmentData.shipment.advancedOptions.shipmentStatus;
+      }
+      if (shipmentData.shipment.advancedOptions?.shipment_status) {
+        return shipmentData.shipment.advancedOptions.shipment_status;
+      }
+      if (shipmentData.shipment.advanced_options?.shipment_status) {
+        return shipmentData.shipment.advanced_options.shipment_status;
+      }
+      if (shipmentData.shipment.advanced_options?.shipmentStatus) {
+        return shipmentData.shipment.advanced_options.shipmentStatus;
+      }
+      
+      // Check double-nested shipment.shipment (some webhook variants)
+      if (shipmentData.shipment.shipment) {
+        if (shipmentData.shipment.shipment.shipment_status) {
+          return shipmentData.shipment.shipment.shipment_status;
+        }
+        if (shipmentData.shipment.shipment.shipmentStatus) {
+          return shipmentData.shipment.shipment.shipmentStatus;
+        }
+        
+        // Check advancedOptions within double-nested shipment
+        if (shipmentData.shipment.shipment.advancedOptions?.shipmentStatus) {
+          return shipmentData.shipment.shipment.advancedOptions.shipmentStatus;
+        }
+        if (shipmentData.shipment.shipment.advancedOptions?.shipment_status) {
+          return shipmentData.shipment.shipment.advancedOptions.shipment_status;
+        }
+        if (shipmentData.shipment.shipment.advanced_options?.shipment_status) {
+          return shipmentData.shipment.shipment.advanced_options.shipment_status;
+        }
+        if (shipmentData.shipment.shipment.advanced_options?.shipmentStatus) {
+          return shipmentData.shipment.shipment.advanced_options.shipmentStatus;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Normalize ShipStation status to our internal status values
+   * Handles voided, delivered, in_transit, on_hold, etc.
+   */
+  private normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
+    const voided = shipmentData.voided ?? false;
+    const shipmentStatus = this.extractShipmentStatus(shipmentData);
+    
+    // Handle voided shipments first
+    if (voided) {
+      return { status: 'cancelled', statusDescription: 'Shipment voided' };
+    }
+    
+    // Handle tracking updates (tracking webhooks use different fields)
+    const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
+    if (trackingStatus === 'DE' || trackingStatus === 'delivered') {
+      return { status: 'delivered', statusDescription: 'Package delivered' };
+    }
+    if (trackingStatus && trackingStatus !== 'UN') {
+      return { status: 'in_transit', statusDescription: shipmentData.status_description || 'Package in transit' };
+    }
+    
+    // Handle ShipStation lifecycle statuses
+    if (shipmentStatus === 'on_hold') {
+      return { status: 'pending', statusDescription: 'On hold - awaiting warehouse processing' };
+    }
+    if (shipmentStatus === 'cancelled') {
+      return { status: 'cancelled', statusDescription: 'Shipment cancelled' };
+    }
+    
+    // Default for newly created shipments without tracking updates
+    return { status: 'shipped', statusDescription: 'Shipment created' };
+  }
+}
+
+// Export singleton instance for convenience
+export const shipStationShipmentETL = new ShipStationShipmentETLService(storage);

@@ -7,21 +7,10 @@
 import type { IStorage } from '../storage';
 import { getShipmentsByDateRange } from '../utils/shipstation-api';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from '../utils/shopify-utils';
-import type { InsertOrder, InsertShipment, BackfillJob } from '@shared/schema';
-import { 
-  extractOrderNumber,
-  extractOrderDate,
-  extractShipToFields,
-  extractReturnGiftFields,
-  extractTotalWeight,
-  extractAdvancedOptions,
-} from '../utils/shipment-extraction';
-import { extractShipmentStatus } from '../shipment-sync-worker';
+import type { InsertOrder, BackfillJob } from '@shared/schema';
 import { broadcastQueueStatus } from '../websocket';
 import { shopifyOrderETL } from './shopify-order-etl-service';
-import { db } from '../db';
-import { shipmentItems, shipmentTags, orderItems } from '@shared/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { shipStationShipmentETL } from './shipstation-shipment-etl-service';
 import { workerCoordinator } from '../worker-coordinator';
 
 export class BackfillService {
@@ -384,141 +373,17 @@ export class BackfillService {
   }
 
   /**
-   * Save a ShipStation shipment to database
-   * Uses same transformation logic as webhook processing
+   * Save a ShipStation shipment to database using centralized ETL service
+   * The ETL service automatically links shipments to orders if they exist
    */
   private async saveShipStationShipment(shipmentData: any): Promise<void> {
-    // Extract shipmentId
-    const shipmentId = shipmentData.shipment_id || shipmentData.shipmentId;
-    if (!shipmentId) {
-      console.log(`[Backfill] Skipping shipment with missing ID`);
-      return;
-    }
-
-    // Normalize status
-    const shipmentStatus = extractShipmentStatus(shipmentData);
-    const voided = shipmentData.voided ?? false;
-    const status = voided ? 'cancelled' : (shipmentStatus === 'on_hold' ? 'pending' : 'shipped');
-    const statusDescription = voided ? 'Shipment voided' : (shipmentStatus === 'on_hold' ? 'On hold - awaiting warehouse processing' : 'Shipment created');
-
-    // Build shipment record
-    const shipmentRecord: InsertShipment = {
-      orderId: null, // Will be linked later if order exists
-      shipmentId: String(shipmentId),
-      orderNumber: extractOrderNumber(shipmentData),
-      orderDate: extractOrderDate(shipmentData),
-      trackingNumber: shipmentData.tracking_number || shipmentData.trackingNumber || null,
-      carrierCode: shipmentData.carrier_code || shipmentData.carrierCode || null,
-      serviceCode: shipmentData.service_code || shipmentData.serviceCode || null,
-      status,
-      statusDescription,
-      shipmentStatus,
-      shipDate: shipmentData.ship_date ? new Date(shipmentData.ship_date) : null,
-      ...extractShipToFields(shipmentData),
-      ...extractReturnGiftFields(shipmentData),
-      totalWeight: extractTotalWeight(shipmentData),
-      ...extractAdvancedOptions(shipmentData),
-      shipmentData,
-    };
-
-    // Try to link to existing order if we have an order number
-    if (shipmentRecord.orderNumber) {
-      const order = await this.storage.getOrderByOrderNumber(shipmentRecord.orderNumber);
-      if (order) {
-        shipmentRecord.orderId = order.id;
-      }
-    }
-
-    // Upsert (create or update)
-    const existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
-    let finalShipmentId: string;
-    if (existing) {
-      await this.storage.updateShipment(existing.id, shipmentRecord);
-      finalShipmentId = existing.id;
-    } else {
-      const created = await this.storage.createShipment(shipmentRecord);
-      finalShipmentId = created.id;
-    }
-    
-    // CRITICAL: Populate shipment_items and shipment_tags from shipmentData
-    // Uses same ETL flow as webhooks to ensure consistency
-    await this.populateShipmentItemsAndTags(finalShipmentId, shipmentData);
-  }
-
-  /**
-   * Populate normalized shipment_items and shipment_tags tables from shipmentData JSONB
-   * SAME ETL FLOW as shipment-sync-worker to ensure consistency
-   * Deletes existing entries and re-creates from current shipmentData
-   */
-  private async populateShipmentItemsAndTags(shipmentId: string, shipmentData: any): Promise<void> {
-    if (!shipmentData) return;
-
     try {
-      // Delete existing entries for this shipment (ensure clean state)
-      await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
-      await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipmentId));
-
-      // Extract and insert items
-      if (shipmentData.items && Array.isArray(shipmentData.items)) {
-        // Batch fetch all order items to avoid N+1 queries
-        // Normalize to strings since ShipStation may return numeric IDs
-        const externalOrderItemIds = shipmentData.items
-          .map((item: any) => item.external_order_item_id)
-          .filter((id: any) => id != null)
-          .map((id: any) => String(id));
-
-        const orderItemsMap = new Map<string, string>();
-        if (externalOrderItemIds.length > 0) {
-          const matchingOrderItems = await db
-            .select()
-            .from(orderItems)
-            .where(inArray(orderItems.shopifyLineItemId, externalOrderItemIds));
-
-          for (const orderItem of matchingOrderItems) {
-            // Normalize both sides to string for comparison
-            orderItemsMap.set(String(orderItem.shopifyLineItemId), orderItem.id);
-          }
-        }
-
-        // Build items to insert with batch-resolved order item IDs
-        const itemsToInsert = shipmentData.items.map((item: any) => {
-          // Normalize to string before lookup
-          const externalId = item.external_order_item_id ? String(item.external_order_item_id) : null;
-          const orderItemId = externalId ? (orderItemsMap.get(externalId) || null) : null;
-
-          return {
-            shipmentId,
-            orderItemId,
-            sku: item.sku || null,
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.unit_price?.toString() || null,
-            externalOrderItemId: externalId, // Store as string
-            imageUrl: item.image_url || null,
-          };
-        });
-
-        if (itemsToInsert.length > 0) {
-          await db.insert(shipmentItems).values(itemsToInsert);
-        }
-      }
-
-      // Extract and insert tags
-      if (shipmentData.tags && Array.isArray(shipmentData.tags)) {
-        const tagsToInsert = shipmentData.tags.map((tag: any) => ({
-          shipmentId,
-          name: tag.name,
-          color: tag.color || null,
-          tagId: tag.tag_id || null,
-        }));
-
-        if (tagsToInsert.length > 0) {
-          await db.insert(shipmentTags).values(tagsToInsert);
-        }
-      }
+      // Use centralized ETL service to process the shipment
+      // It will automatically link to order if order number exists in database
+      await shipStationShipmentETL.processShipment(shipmentData);
     } catch (error) {
-      console.log(`[Backfill] Error populating shipment items/tags for ${shipmentId}: ${error instanceof Error ? error.message : String(error)}`);
-      // Don't throw - this is a non-critical operation that shouldn't break the main flow
+      console.error(`[Backfill] Error saving shipment:`, error);
+      throw error;
     }
   }
 
