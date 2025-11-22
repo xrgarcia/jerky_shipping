@@ -91,6 +91,8 @@ export const orders = pgTable("orders", {
   updatedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_updated_at_idx ON ${table} (updated_at DESC NULLS LAST)`,
   // Composite index for status + date dashboard queries
   fulfillmentStatusCreatedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_fulfillment_status_created_at_idx ON ${table} (fulfillment_status, created_at)`,
+  // Index for data health metrics query (orders missing shipments filter)
+  financialStatusIdx: sql`CREATE INDEX IF NOT EXISTS orders_financial_status_idx ON ${table} (financial_status)`,
   // Index for sync monitoring queries
   lastSyncedAtIdx: sql`CREATE INDEX IF NOT EXISTS orders_last_synced_at_idx ON ${table} (last_synced_at)`,
   // GIN trigram indexes for ILIKE search on order numbers and customer names
@@ -171,6 +173,8 @@ export const orderItems = pgTable("order_items", {
   variantIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_variant_id_idx ON ${table} (variant_id)`,
   productIdIdx: sql`CREATE INDEX IF NOT EXISTS order_items_product_id_idx ON ${table} (product_id)`,
   skuIdx: sql`CREATE INDEX IF NOT EXISTS order_items_sku_idx ON ${table} (sku) WHERE sku IS NOT NULL`,
+  // Index for data health metrics query (filter non-shippable items in EXISTS clause)
+  requiresShippingIdx: sql`CREATE INDEX IF NOT EXISTS order_items_requires_shipping_idx ON ${table} (order_id, requires_shipping)`,
   // Unique constraint: same line item ID cannot appear twice in database
   uniqueLineItemIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS order_items_shopify_line_item_id_idx ON ${table} (shopify_line_item_id)`,
 }));
@@ -258,8 +262,8 @@ export const shipments = pgTable("shipments", {
   uniqueShipmentIdIdx: uniqueIndex("shipments_shipment_id_idx").on(table.shipmentId),
   // CRITICAL: Unique index on tracking_number for fast webhook/API lookups
   trackingNumberIdx: sql`CREATE UNIQUE INDEX IF NOT EXISTS shipments_tracking_number_idx ON ${table} (tracking_number) WHERE tracking_number IS NOT NULL`,
-  // Foreign key index for order lookups
-  orderIdIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_id_idx ON ${table} (order_id) WHERE order_id IS NOT NULL`,
+  // Foreign key index for order lookups - COVERS ALL VALUES including NULL for data health metrics
+  orderIdIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_id_idx ON ${table} (order_id)`,
   // Composite index for webhook reconciliation (order_number + carrier filtering)
   orderNumberCarrierIdx: sql`CREATE INDEX IF NOT EXISTS shipments_order_number_carrier_idx ON ${table} (order_number, carrier_code) WHERE order_number IS NOT NULL`,
   // Index for date range filtering/sorting
