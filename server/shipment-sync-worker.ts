@@ -303,13 +303,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId, webhookData } = message;
       
-      // OPTIMIZATION: If this message came from a webhook and includes inline data, use it directly (no API call!)
-      const isWebhookMessage = reason === 'webhook_tracking' || reason === 'webhook_fulfillment';
+      // OPTIMIZATION: If this message includes inline webhookData, we can use it directly (no API call!)
+      // This applies to webhooks AND polling workers that fetch data upfront
+      const hasInlineData = !!webhookData;
       
       // Determine which path to use: tracking number or order number
       if (trackingNumber) {
         // PATH A: Tracking number path
-        log(`Processing tracking number: ${trackingNumber}${isWebhookMessage ? ' (webhook)' : ''}`);
+        log(`Processing tracking number: ${trackingNumber}${hasInlineData ? ' (inline data)' : ''}`);
         
         // OPTIMIZATION: Check if we already have this shipment in our database
         const cachedShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
@@ -398,9 +399,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           }
         }
         
-        // INTELLIGENT WEBHOOK PROCESSING: Skip API call if we have webhook data
-        if (isWebhookMessage && webhookData) {
-          log(`[${trackingNumber}] Processing from webhook data (no API call)`);
+        // INTELLIGENT INLINE DATA PROCESSING: Skip API call if we have inline data
+        if (hasInlineData && webhookData) {
+          log(`[${trackingNumber}] Processing from inline data (no API call)`);
           
           // Try to extract order number from webhook data
           const webhookOrderNumber = extractOrderNumber(webhookData);
@@ -811,11 +812,11 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         
       } else if (orderNumber) {
         // PATH B: Order number path
-        log(`Processing order number: ${orderNumber}${shipmentId ? ` (shipmentId: ${shipmentId})` : ''}${isWebhookMessage ? ' (webhook)' : ''}`);
+        log(`Processing order number: ${orderNumber}${shipmentId ? ` (shipmentId: ${shipmentId})` : ''}${hasInlineData ? ' (inline data)' : ''}`);
         
-        // INTELLIGENT WEBHOOK PROCESSING: Skip API call if we have webhook data
-        if (isWebhookMessage && webhookData) {
-          log(`[${orderNumber}] Processing from webhook data (no API call)`);
+        // INTELLIGENT INLINE DATA PROCESSING: Skip API call if we have inline data
+        if (hasInlineData && webhookData) {
+          log(`[${orderNumber}] Processing from inline data (no API call)`);
           
           // Validate shipment ID
           const rawShipmentId = webhookData.shipment_id || webhookData.shipmentId || shipmentId;
