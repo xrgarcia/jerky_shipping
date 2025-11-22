@@ -1049,34 +1049,6 @@ Please analyze this failure and help me understand:
             </div>
           </CardContent>
         </Card>
-
-        <Card data-testid="card-onhold-worker">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-lg">On-Hold Poll Worker</CardTitle>
-              <CardDescription>Polls for on-hold shipments every 1 minute</CardDescription>
-            </div>
-            <Badge
-              data-testid={`badge-onhold-status-${queueStats?.onHoldWorkerStatus || 'sleeping'}`}
-              variant={queueStats?.onHoldWorkerStatus === 'running' ? 'default' : 'secondary'}
-            >
-              {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
-              {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
-              {queueStats?.onHoldWorkerStatus === 'running' ? 'Running' : 'Sleeping'}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {queueStats?.onHoldWorkerStatus === 'running' 
-                    ? 'Currently polling ShipStation for on-hold shipments...' 
-                    : 'Worker is sleeping until next poll cycle'}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -1479,11 +1451,15 @@ Please analyze this failure and help me understand:
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">On-Hold Poll Worker</p>
-                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 5 minute intervals</p>
+                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 1 minute intervals</p>
               </div>
-              <Badge variant="default" data-testid="badge-onhold-worker">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Running
+              <Badge 
+                variant={queueStats?.onHoldWorkerStatus === 'running' ? 'default' : 'secondary'} 
+                data-testid={`badge-onhold-worker-${queueStats?.onHoldWorkerStatus || 'unknown'}`}
+              >
+                {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
+                {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
+                {queueStats?.onHoldWorkerStatus === 'running' ? 'Running' : queueStats?.onHoldWorkerStatus === 'sleeping' ? 'Sleeping' : 'Unknown'}
               </Badge>
             </div>
           </div>
