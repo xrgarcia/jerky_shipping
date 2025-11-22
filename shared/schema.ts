@@ -589,6 +589,7 @@ export const packingLogs = pgTable("packing_logs", {
   skuVaultProductId: text("skuvault_product_id"), // IdItem from SkuVault (null if not found)
   success: boolean("success").notNull(),
   errorMessage: text("error_message"),
+  skuVaultRawResponse: jsonb("skuvault_raw_response"), // Full SkuVault API response for debugging/audit
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   shipmentIdIdx: index("packing_logs_shipment_id_idx").on(table.shipmentId),
@@ -599,6 +600,8 @@ export const packingLogs = pgTable("packing_logs", {
 export const insertPackingLogSchema = createInsertSchema(packingLogs).omit({
   id: true,
   createdAt: true,
+}).extend({
+  skuVaultRawResponse: z.any().nullish(), // Allow any JSON structure from SkuVault API
 });
 
 export type InsertPackingLog = z.infer<typeof insertPackingLogSchema>;

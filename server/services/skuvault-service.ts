@@ -830,9 +830,9 @@ export class SkuVaultService {
    * Used to validate scanned codes during QC process
    * 
    * @param searchTerm - Barcode, SKU, or part number to search for
-   * @returns Product information if found, null if not found
+   * @returns Product information and raw API response (for audit logging)
    */
-  async getProductByCode(searchTerm: string): Promise<ProductLookupResponse | null> {
+  async getProductByCode(searchTerm: string): Promise<{ product: ProductLookupResponse | null; rawResponse: any }> {
     // Check credentials before attempting to authenticate
     if (!this.config.username || !this.config.password) {
       throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
@@ -852,17 +852,20 @@ export class SkuVaultService {
       
       const response = await this.makeQCRequest<any>('GET', endpoint);
       
+      // Log the raw response for debugging and audit purposes
+      console.log(`[SkuVault QC] Raw API response for "${searchTerm}":`, JSON.stringify(response, null, 2));
+      
       // If no product found, SkuVault may return null or empty object
       if (!response || !response.IdItem) {
         console.log(`[SkuVault QC] No product found for search term: ${searchTerm}`);
-        return null;
+        return { product: null, rawResponse: response };
       }
       
       // Validate response with Zod schema
       const validatedResponse = productLookupResponseSchema.parse(response);
       
       console.log(`[SkuVault QC] Product found: ${validatedResponse.Sku} (IdItem: ${validatedResponse.IdItem})`);
-      return validatedResponse;
+      return { product: validatedResponse, rawResponse: response };
 
     } catch (error) {
       console.error(`[SkuVault QC] Error looking up product ${searchTerm}:`, error);

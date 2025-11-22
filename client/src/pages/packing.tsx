@@ -78,6 +78,11 @@ type SkuVaultProduct = {
   code: string;
 };
 
+type SkuVaultProductResponse = {
+  product: SkuVaultProduct;
+  rawResponse: any; // Raw SkuVault API response for audit logging
+};
+
 type SkuProgress = {
   itemId: string; // Shipment item database ID
   sku: string;
@@ -247,9 +252,10 @@ export default function Packing() {
   const validateProductMutation = useMutation({
     mutationFn: async (scannedCode: string) => {
       const response = await apiRequest("GET", `/api/skuvault/qc/product/${encodeURIComponent(scannedCode)}`);
-      return (await response.json()) as SkuVaultProduct;
+      return (await response.json()) as SkuVaultProductResponse;
     },
-    onSuccess: async (product, scannedCode) => {
+    onSuccess: async (data, scannedCode) => {
+      const { product, rawResponse } = data;
       // Normalize scanned SKU for comparison
       const normalizedSku = normalizeSku(product.sku);
       
@@ -276,6 +282,7 @@ export default function Packing() {
           skuVaultProductId: product.id,
           success: false,
           errorMessage: `SKU ${product.sku} not in this shipment`,
+          skuVaultRawResponse: rawResponse,
         });
 
         toast({
@@ -298,6 +305,7 @@ export default function Packing() {
           skuVaultProductId: product.id,
           success: false,
           errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.sku}`,
+          skuVaultRawResponse: rawResponse,
         });
 
         toast({
@@ -348,6 +356,7 @@ export default function Packing() {
           skuVaultProductId: product.id,
           success: false,
           errorMessage: `QC pass failed: ${qcPassError}`,
+          skuVaultRawResponse: rawResponse,
         });
 
         toast({
@@ -369,6 +378,7 @@ export default function Packing() {
         skuVaultProductId: product.id,
         success: true,
         errorMessage: null,
+        skuVaultRawResponse: rawResponse,
       });
 
       // Log shipment event for successful scan
@@ -433,6 +443,7 @@ export default function Packing() {
     skuVaultProductId: number | null;
     success: boolean;
     errorMessage: string | null;
+    skuVaultRawResponse?: any; // Raw SkuVault API response for audit logging
   }) => {
     if (!currentShipment) return;
 

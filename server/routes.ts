@@ -980,16 +980,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { searchTerm } = req.params;
       console.log(`Looking up product for QC: ${searchTerm}`);
       
-      const product = await skuVaultService.getProductByCode(searchTerm);
+      const { product, rawResponse } = await skuVaultService.getProductByCode(searchTerm);
       
       if (!product) {
         return res.status(404).json({ 
           error: "Product not found",
-          message: `No product found with code/SKU: ${searchTerm}` 
+          message: `No product found with code/SKU: ${searchTerm}`,
+          rawResponse // Include raw response for audit logging
         });
       }
       
-      res.json({ product });
+      res.json({ 
+        product,
+        rawResponse // Include raw response for audit logging
+      });
     } catch (error: any) {
       console.error("Error looking up product for QC:", error);
       
