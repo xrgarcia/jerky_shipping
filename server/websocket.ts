@@ -73,6 +73,23 @@ export function setupWebSocket(server: Server): void {
     clientRooms.set(ws, room);
     
     console.log(`WebSocket client connected to room: ${room}`);
+    
+    // Send cached queue status to newly connected operations clients
+    if (room === 'operations' && globalThis.__lastQueueStatus?.['queue']) {
+      try {
+        const cachedData = JSON.parse(globalThis.__lastQueueStatus['queue']);
+        const message = JSON.stringify({
+          type: 'queue_status',
+          data: cachedData,
+        });
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+          console.log(`Sent cached queue status to newly connected operations client`);
+        }
+      } catch (error) {
+        console.error('Failed to send cached queue status to new client:', error);
+      }
+    }
 
     ws.on('close', () => {
       // Remove client from room
