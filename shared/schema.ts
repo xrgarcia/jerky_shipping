@@ -141,6 +141,9 @@ export const orderItems = pgTable("order_items", {
   taxable: boolean("taxable"), // Whether the item is taxable
   taxLinesJson: jsonb("tax_lines_json"), // Full tax_lines array with jurisdiction details
   
+  // Shipping information
+  requiresShipping: boolean("requires_shipping"), // Whether the item requires physical shipping (false for gift cards, digital items)
+  
   // Calculated/aggregated fields for easy reporting queries
   priceSetAmount: text("price_set_amount").notNull().default('0'), // Extracted shop_money.amount from price_set for easy queries
   totalDiscountSetAmount: text("total_discount_set_amount").notNull().default('0'), // Extracted shop_money.amount from total_discount_set
