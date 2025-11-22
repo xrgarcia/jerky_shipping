@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 - **Frontend**: React with TypeScript (Vite), Wouter for routing, TanStack Query for server state management.
 - **Backend**: Express.js with Node.js and TypeScript, RESTful API, Drizzle ORM for database interactions.
 - **Authentication**: Passwordless via magic link tokens (email), secure HTTP-only session cookies.
-- **Data Storage**: PostgreSQL via Neon serverless connection, Drizzle Kit for migrations. Schema includes tables for users, authentication, orders, products, and product variants.
+- **Data Storage**: PostgreSQL via Neon serverless connection, Drizzle Kit for migrations. Schema includes tables for users, authentication, orders, products, product variants, and order items. The `order_items` table includes a `requiresShipping` boolean field (extracted from Shopify's `requires_shipping`) to distinguish physical products from non-shippable items like gift cards and digital downloads.
 - **Core Features**:
     - **Product Catalog**: Synchronized via Shopify webhooks, warehouse-optimized interface.
     - **SkuVault Sessions**: Displays wave picking sessions from SkuVault with advanced search and filtering.
@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
     - **Shipment Details Page**: Warehouse-optimized detail view showing comprehensive shipment metadata, customer information, shipping details, special instructions, and itemized product lists.
     - **Dual-ID Routing**: All shipment-related API endpoints and frontend navigation support both ShipStation IDs and database UUIDs for seamless operation.
     - **Reports Page**: Business analytics dashboard with date range filtering, interactive charts, and metrics for Gross Sales and Net Sales, aligned to Central Standard Time.
-    - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets. The "Orders Missing Shipments" metric excludes orders with refunded/restocked/voided financial status (case-insensitive) AND orders with refunds in the order_refunds table, ensuring accurate counts of orders legitimately requiring fulfillment. The metric is clickable to navigate to the Orders page with the "Has Shipment: No" filter applied (which applies the same exclusions).
+    - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets. The "Orders Missing Shipments" metric excludes orders with refunded/restocked/voided financial status (case-insensitive), orders with refunds in the order_refunds table, AND orders containing only non-shippable items (gift cards, digital products). Uses Shopify's `requires_shipping` field from each line item to automatically identify orders that don't need physical shipment. The metric is clickable to navigate to the Orders page with the "Has Shipment: No" filter applied (which applies the same exclusions).
     - **Print Queue System**: Manages shipping label printing workflow with real-time status updates via WebSockets.
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, and notifications.
 - **Monorepo Structure**: Client, server, and shared code co-located.
