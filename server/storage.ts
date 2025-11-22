@@ -213,6 +213,7 @@ export interface IStorage {
   // Data Health Metrics
   getDataHealthMetrics(): Promise<{
     ordersMissingShipments: number;
+    oldestOrderMissingShipmentAt: Date | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
@@ -1657,6 +1658,7 @@ export class DatabaseStorage implements IStorage {
   // Data Health Metrics - Batched queries for comprehensive metrics
   async getDataHealthMetrics(): Promise<{
     ordersMissingShipments: number;
+    oldestOrderMissingShipmentAt: Date | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
     shipmentsWithoutStatus: number;
@@ -1670,6 +1672,16 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(shipments, eq(orders.id, shipments.orderId))
       .leftJoin(orderRefunds, eq(orders.id, orderRefunds.orderId))
       .where(sql`${shipments.id} IS NULL AND ${orderRefunds.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`);
+    
+    // Query 1a: Get oldest order missing shipment
+    const oldestOrderResult = await db
+      .select({ createdAt: orders.createdAt })
+      .from(orders)
+      .leftJoin(shipments, eq(orders.id, shipments.orderId))
+      .leftJoin(orderRefunds, eq(orders.id, orderRefunds.orderId))
+      .where(sql`${shipments.id} IS NULL AND ${orderRefunds.id} IS NULL AND (${orders.financialStatus} IS NULL OR LOWER(${orders.financialStatus}) NOT IN ('refunded', 'restocked', 'voided'))`)
+      .orderBy(orders.createdAt)
+      .limit(1);
     
     // Query 2: Shipments without orders (orphaned by order relationship)
     const shipmentsWithoutOrdersResult = await db
@@ -1706,6 +1718,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       ordersMissingShipments: ordersMissingShipmentsResult[0]?.count || 0,
+      oldestOrderMissingShipmentAt: oldestOrderResult[0]?.createdAt ? new Date(oldestOrderResult[0].createdAt) : null,
       shipmentsWithoutOrders: shipmentsWithoutOrdersResult[0]?.count || 0,
       orphanedShipments: orphanedShipmentsResult[0]?.count || 0,
       shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,
