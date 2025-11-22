@@ -117,6 +117,7 @@ app.use((req, res, next) => {
       shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
       backfillActiveJob: activeBackfillJob,
       onHoldWorkerStatus: 'sleeping', // Worker hasn't started yet, default to sleeping
+      onHoldWorkerStats: undefined, // Worker hasn't started yet, will be populated after first run
       dataHealth,
     });
     log("Initial queue status broadcast sent");
