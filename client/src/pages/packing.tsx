@@ -284,7 +284,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
+          skuVaultProductId: product.IdItem || null,
           success: false,
           errorMessage: `SKU ${product.Sku} not in this shipment`,
           skuVaultRawResponse: rawResponse,
@@ -307,7 +307,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
+          skuVaultProductId: product.IdItem || null,
           success: false,
           errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.Sku}`,
           skuVaultRawResponse: rawResponse,
@@ -354,7 +354,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
+          skuVaultProductId: product.IdItem || null,
           success: false,
           errorMessage: `QC pass failed: ${qcPassError}`,
           skuVaultRawResponse: rawResponse,
@@ -376,7 +376,7 @@ export default function Packing() {
         action: "product_scanned",
         productSku: product.Sku || "",
         scannedCode,
-        skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
+        skuVaultProductId: product.IdItem || null,
         success: true,
         errorMessage: null,
         skuVaultRawResponse: rawResponse,
@@ -441,7 +441,7 @@ export default function Packing() {
     action: string;
     productSku: string | null;
     scannedCode: string;
-    skuVaultProductId: number | null;
+    skuVaultProductId: string | null;
     success: boolean;
     errorMessage: string | null;
     skuVaultRawResponse?: any; // Raw SkuVault API response for audit logging
