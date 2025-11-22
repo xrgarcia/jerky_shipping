@@ -22,6 +22,7 @@ import { processOrderRefunds, processOrderLineItems } from '../utils/shopify-ord
 import { db } from '../db';
 import { shipmentItems, shipmentTags, orderItems } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
+import { workerCoordinator } from '../worker-coordinator';
 
 export class BackfillService {
   constructor(private storage: IStorage) {}
@@ -59,8 +60,11 @@ export class BackfillService {
    * Run a complete backfill job
    * Fetches and imports both Shopify orders and ShipStation shipments
    * Updates progress in real-time
+   * Signals other workers to pause during execution
    */
   async runBackfillJob(jobId: string): Promise<void> {
+    let coordinatorLockAcquired = false;
+    
     try {
       // Get job details
       const job = await this.storage.getBackfillJob(jobId);
@@ -69,6 +73,15 @@ export class BackfillService {
       }
 
       console.log(`[Backfill] Starting job ${jobId} (${job.startDate} to ${job.endDate})`);
+
+      // Signal coordinator that backfill is starting
+      try {
+        await workerCoordinator.beginBackfill(jobId);
+        coordinatorLockAcquired = true;
+      } catch (error) {
+        console.error(`[Backfill] Failed to acquire coordinator lock:`, error);
+        // Continue anyway - coordination failure shouldn't block backfill
+      }
 
       // Mark job as running
       await this.storage.updateBackfillJob(jobId, {
@@ -107,6 +120,15 @@ export class BackfillService {
       });
       this.broadcastJobProgress(jobId);
       throw error;
+    } finally {
+      // Only signal coordinator if we successfully acquired the lock
+      if (coordinatorLockAcquired) {
+        try {
+          await workerCoordinator.endBackfill();
+        } catch (error) {
+          console.error(`[Backfill] Failed to release coordinator lock:`, error);
+        }
+      }
     }
   }
 

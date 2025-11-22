@@ -14,13 +14,14 @@ import {
 } from './utils/queue';
 import { shipmentSyncFailures } from '@shared/schema';
 import { count } from 'drizzle-orm';
+import { workerCoordinator } from './worker-coordinator';
 
 const log = (message: string) => console.log(`[onhold-poll] ${message}`);
 
-// Global worker status
-let workerStatus: 'sleeping' | 'running' = 'sleeping';
+// Global worker status - now includes awaiting_backfill_job
+let workerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
 
-export function getOnHoldWorkerStatus(): 'sleeping' | 'running' {
+export function getOnHoldWorkerStatus(): 'sleeping' | 'running' | 'awaiting_backfill_job' {
   return workerStatus;
 }
 
@@ -63,10 +64,11 @@ async function broadcastWorkerStatus() {
  * This worker supplements webhooks which don't fire for on_hold shipments
  * 
  * Strategy:
- * 1. Get the most recent on_hold shipment from our database
- * 2. Use that date as the floor (or default to 30 days ago)
- * 3. Fetch ALL pages of on_hold shipments since that date
- * 4. Queue each shipment with inline data (0 API calls per shipment!)
+ * 1. Check if backfill job is active - if so, pause and wait
+ * 2. Get the most recent on_hold shipment from our database
+ * 3. Use that date as the floor (or default to 30 days ago)
+ * 4. Fetch ALL pages of on_hold shipments since that date
+ * 5. Queue each shipment with inline data (0 API calls per shipment!)
  */
 export async function pollOnHoldShipments(): Promise<number> {
   const apiKey = process.env.SHIPSTATION_API_KEY;
@@ -76,9 +78,22 @@ export async function pollOnHoldShipments(): Promise<number> {
     return 0;
   }
 
-  try {
-    workerStatus = 'running';
-    await broadcastWorkerStatus();  // Notify frontend of status change
+  // Use mutex to prevent overlapping executions
+  return await workerCoordinator.withPollMutex(async () => {
+    // Check if backfill job is active
+    const backfillActive = await workerCoordinator.isBackfillActive();
+    
+    if (backfillActive) {
+      const jobId = await workerCoordinator.getActiveBackfillJobId();
+      log(`Backfill job ${jobId} is active - pausing poll worker`);
+      workerStatus = 'awaiting_backfill_job';
+      await broadcastWorkerStatus();
+      return 0;
+    }
+
+    try {
+      workerStatus = 'running';
+      await broadcastWorkerStatus();  // Notify frontend of status change
     // Get the most recent on_hold shipment from our database
     const mostRecentOnHold = await db
       .select()
@@ -177,14 +192,15 @@ export async function pollOnHoldShipments(): Promise<number> {
       log(`No new on_hold shipments to queue`);
     }
     
-    return totalQueued;
-  } catch (error: any) {
-    log(`Error polling on_hold shipments: ${error.message}`);
-    return 0;
-  } finally {
-    workerStatus = 'sleeping';
-    await broadcastWorkerStatus();  // Notify frontend of status change
-  }
+      return totalQueued;
+    } catch (error: any) {
+      log(`Error polling on_hold shipments: ${error.message}`);
+      return 0;
+    } finally {
+      workerStatus = 'sleeping';
+      await broadcastWorkerStatus();  // Notify frontend of status change
+    }
+  }) || 0; // Return 0 if mutex was not acquired
 }
 
 /**

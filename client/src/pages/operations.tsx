@@ -20,7 +20,8 @@ import {
   ShoppingCart,
   XCircle,
   Copy,
-  AlertTriangle
+  AlertTriangle,
+  Pause
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,7 +100,7 @@ type QueueStats = {
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   };
-  onHoldWorkerStatus?: 'sleeping' | 'running';
+  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
 };
 
 type EnvironmentInfo = {
@@ -1232,17 +1233,34 @@ Please analyze this failure and help me understand:
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="font-medium">On-Hold Poll Worker</p>
-                <p className="text-sm text-muted-foreground">Polls ShipStation for on_hold shipments, 1 minute intervals</p>
+                <p className="text-sm text-muted-foreground">
+                  {queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job' 
+                    ? 'Paused while backfill job is running' 
+                    : 'Polls ShipStation for on_hold shipments, 1 minute intervals'}
+                </p>
               </div>
               <Badge 
-                variant={queueStats?.onHoldWorkerStatus === 'running' ? 'default' : 'secondary'} 
+                variant={
+                  queueStats?.onHoldWorkerStatus === 'running' 
+                    ? 'default' 
+                    : queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job'
+                    ? 'outline'
+                    : 'secondary'
+                } 
                 data-testid={`badge-onhold-worker-${queueStats?.onHoldWorkerStatus || 'unknown'}`}
               >
                 {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
                 {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'running' ? 'Running' : queueStats?.onHoldWorkerStatus === 'sleeping' ? 'Sleeping' : 'Unknown'}
+                {queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job' && <Pause className="h-3 w-3 mr-1" />}
+                {queueStats?.onHoldWorkerStatus === 'running' 
+                  ? 'Running' 
+                  : queueStats?.onHoldWorkerStatus === 'sleeping' 
+                  ? 'Sleeping' 
+                  : queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job'
+                  ? 'Awaiting Backfill'
+                  : 'Unknown'}
               </Badge>
             </div>
           </div>

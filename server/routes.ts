@@ -2782,7 +2782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataHealthMetrics = await storage.getDataHealthMetrics();
 
       // Get on-hold worker status
-      let onHoldWorkerStatus: 'sleeping' | 'running' = 'sleeping';
+      let onHoldWorkerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
       try {
         const { getOnHoldWorkerStatus } = await import("./onhold-poll-worker");
         onHoldWorkerStatus = getOnHoldWorkerStatus();

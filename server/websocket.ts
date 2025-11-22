@@ -106,7 +106,7 @@ export type QueueStatusData = {
   shipmentSyncQueueOldestAt: number | null;
   shopifyOrderSyncQueueOldestAt: number | null;
   backfillActiveJob: any | null;
-  onHoldWorkerStatus?: 'sleeping' | 'running';
+  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
   dataHealth: {
     ordersMissingShipments: number;
     shipmentsWithoutOrders: number;
@@ -134,7 +134,7 @@ export function broadcastQueueStatus(data: {
   oldestShopifyOrderSync?: { enqueuedAt?: number | null };
   backfillActiveJob?: any | null;
   activeBackfillJob?: any | null;
-  onHoldWorkerStatus?: 'sleeping' | 'running';
+  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
   dataHealth?: {
     ordersMissingShipments?: number;
     shipmentsWithoutOrders?: number;
@@ -153,7 +153,7 @@ export function broadcastQueueStatus(data: {
   }
 
   // Get current on-hold worker status
-  let currentOnHoldStatus: 'sleeping' | 'running' = 'sleeping';
+  let currentOnHoldStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
   try {
     const { getOnHoldWorkerStatus } = require('./onhold-poll-worker');
     currentOnHoldStatus = getOnHoldWorkerStatus();
