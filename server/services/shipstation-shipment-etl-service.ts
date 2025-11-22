@@ -189,11 +189,25 @@ export class ShipStationShipmentETLService {
 
       // Build tags to insert, preserving tags with tagId even if name is missing
       const tagsToInsert: InsertShipmentTag[] = shipmentData.tags
-        .filter((tag: any) => tag && (tag.name || tag.tag_id)) // Include tags with name OR tagId
+        .filter((tag: any) => {
+          // Skip null/undefined tags
+          if (!tag) return false;
+          
+          // Skip tags with both null/empty name AND null tagId
+          const hasName = tag.name && tag.name.trim().length > 0;
+          const hasTagId = tag.tag_id !== null && tag.tag_id !== undefined;
+          
+          if (!hasName && !hasTagId) {
+            console.log(`[ShipStationShipmentETL] Skipping tag with null name and tagId for shipment ${shipmentId}`);
+            return false;
+          }
+          
+          return true;
+        })
         .map((tag: any) => ({
           shipmentId,
           tagId: tag.tag_id?.toString() || null,
-          tagName: tag.name || `Tag ${tag.tag_id}`, // Default name for legacy tags with ID only
+          name: tag.name && tag.name.trim() ? tag.name.trim() : `Tag ${tag.tag_id}`, // Default name for legacy tags with ID only
         }));
 
       if (tagsToInsert.length > 0) {
