@@ -822,6 +822,20 @@ export class SkuVaultService {
    */
 
   /**
+   * Strip anti-XSSI prefix from SkuVault API responses and parse JSON
+   * SkuVault prepends ")]}',\n\r" to JSON responses for security (Cross-Site Script Inclusion prevention)
+   */
+  private stripAntiXSSIPrefix(responseText: string): any {
+    const prefix = ")]}',\n\r";
+    if (responseText.startsWith(prefix)) {
+      const cleanedJson = responseText.substring(prefix.length);
+      return JSON.parse(cleanedJson);
+    }
+    // If no prefix found, try parsing as-is
+    return JSON.parse(responseText);
+  }
+
+  /**
    * Make authenticated request to app.skuvault.com for QC operations
    * Uses cookie-based authentication (sv-t cookie set during login)
    * Includes all necessary headers to match browser AJAX requests
@@ -857,13 +871,16 @@ export class SkuVaultService {
         headers['Content-Type'] = 'application/json;charset=UTF-8';
       }
       
-      const response = await this.client.request<T>({
+      const response = await this.client.request({
         method,
         url,
         data,
         headers,
+        responseType: 'text', // Get response as text to manually strip anti-XSSI prefix
       });
-      return response.data;
+      
+      // Strip anti-XSSI prefix and parse JSON
+      return this.stripAntiXSSIPrefix(response.data);
     } catch (error) {
       const axiosError = error as AxiosError;
       
@@ -894,13 +911,16 @@ export class SkuVaultService {
             retryHeaders['Content-Type'] = 'application/json;charset=UTF-8';
           }
           
-          const retryResponse = await this.client.request<T>({
+          const retryResponse = await this.client.request({
             method,
             url: retryUrl,
             data,
             headers: retryHeaders,
+            responseType: 'text', // Get response as text to manually strip anti-XSSI prefix
           });
-          return retryResponse.data;
+          
+          // Strip anti-XSSI prefix and parse JSON
+          return this.stripAntiXSSIPrefix(retryResponse.data);
         } catch (retryError) {
           const retryAxiosError = retryError as AxiosError;
           const errorMessage = retryAxiosError.response?.data 
