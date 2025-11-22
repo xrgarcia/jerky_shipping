@@ -72,10 +72,14 @@ type PackingLog = {
 };
 
 type SkuVaultProduct = {
-  id: number;
-  sku: string;
-  description: string;
-  code: string;
+  IdItem?: string | null;
+  Sku?: string | null;
+  Description?: string | null;
+  Code?: string | null;
+  PartNumber?: string | null;
+  IsKit?: boolean | null;
+  WeightPound?: number | null;
+  ProductPictures?: string[] | null;
 };
 
 type SkuVaultProductResponse = {
@@ -256,8 +260,8 @@ export default function Packing() {
     },
     onSuccess: async (data, scannedCode) => {
       const { product, rawResponse } = data;
-      // Normalize scanned SKU for comparison
-      const normalizedSku = normalizeSku(product.sku);
+      // Normalize scanned SKU for comparison (handle undefined Sku)
+      const normalizedSku = normalizeSku(product.Sku || "");
       
       // Find first item with matching SKU that still has remaining units
       let matchingItemKey: string | null = null;
@@ -277,17 +281,17 @@ export default function Packing() {
         // SKU not in shipment
         await createPackingLog({
           action: "product_scanned",
-          productSku: product.sku,
+          productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.id,
+          skuVaultProductId: product.IdItem || "",
           success: false,
-          errorMessage: `SKU ${product.sku} not in this shipment`,
+          errorMessage: `SKU ${product.Sku} not in this shipment`,
           skuVaultRawResponse: rawResponse,
         });
 
         toast({
           title: "Wrong Product",
-          description: `${product.sku} is not in this shipment`,
+          description: `${product.Sku} is not in this shipment`,
           variant: "destructive",
         });
 
@@ -300,17 +304,17 @@ export default function Packing() {
       if (progress.scanned >= progress.expected) {
         await createPackingLog({
           action: "product_scanned",
-          productSku: product.sku,
+          productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.id,
+          skuVaultProductId: product.IdItem || "",
           success: false,
-          errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.sku}`,
+          errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.Sku}`,
           skuVaultRawResponse: rawResponse,
         });
 
         toast({
           title: "Already Scanned",
-          description: `All ${progress.expected} units of ${product.sku} already scanned`,
+          description: `All ${progress.expected} units of ${product.Sku} already scanned`,
           variant: "destructive",
         });
 
@@ -324,7 +328,7 @@ export default function Packing() {
       let qcPassError: string | null = null;
       try {
         const qcResponse = await passQcItemMutation.mutateAsync({
-          skuVaultProductId: product.id,
+          skuVaultProductId: parseInt(product.IdItem || "0"),
           scannedCode, // Send original scanned code, not normalized
           orderNumber: currentShipment!.orderNumber,
         });
@@ -351,9 +355,9 @@ export default function Packing() {
         // QC pass failure is critical - reject the scan
         await createPackingLog({
           action: "product_scanned",
-          productSku: product.sku,
+          productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.id,
+          skuVaultProductId: product.IdItem || "",
           success: false,
           errorMessage: `QC pass failed: ${qcPassError}`,
           skuVaultRawResponse: rawResponse,
@@ -373,9 +377,9 @@ export default function Packing() {
       // QC pass succeeded - log successful scan and update progress
       await createPackingLog({
         action: "product_scanned",
-        productSku: product.sku,
+        productSku: product.Sku || "",
         scannedCode,
-        skuVaultProductId: product.id,
+        skuVaultProductId: product.IdItem || "",
         success: true,
         errorMessage: null,
         skuVaultRawResponse: rawResponse,
@@ -383,7 +387,7 @@ export default function Packing() {
 
       // Log shipment event for successful scan
       logShipmentEvent("product_scan_success", {
-        sku: product.sku,
+        sku: product.Sku || "",
         barcode: scannedCode,
         itemId: matchingItemKey,
         scannedCount: progress.scanned + 1,
@@ -401,7 +405,7 @@ export default function Packing() {
 
       toast({
         title: "Product Validated & QC Passed",
-        description: `${product.sku} (${progress.scanned + 1}/${progress.expected})`,
+        description: `${product.Sku} (${progress.scanned + 1}/${progress.expected})`,
       });
 
       setProductScan("");
