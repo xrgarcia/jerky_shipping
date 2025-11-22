@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { QCPassItemResponse } from "@shared/skuvault-types";
 import {
   PackageCheck,
   Scan,
@@ -236,19 +237,19 @@ export default function Packing() {
   // Pass QC item in SkuVault
   const passQcItemMutation = useMutation({
     mutationFn: async (params: {
-      skuVaultProductId: number;
+      skuVaultProductId: string;
       scannedCode: string;
       orderNumber: string;
     }) => {
       const response = await apiRequest("POST", "/api/skuvault/qc/pass-item", {
-        IdItem: params.skuVaultProductId.toString(),
+        IdItem: params.skuVaultProductId,
         Quantity: 1,
         IdSale: params.orderNumber,
         ScannedCode: params.scannedCode,
         Note: null,
         SerialNumber: "",
       });
-      return (await response.json()) as { success?: boolean; message?: string; error?: string };
+      return (await response.json()) as QCPassItemResponse;
     },
   });
 
@@ -283,7 +284,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem || "",
+          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
           success: false,
           errorMessage: `SKU ${product.Sku} not in this shipment`,
           skuVaultRawResponse: rawResponse,
@@ -306,7 +307,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem || "",
+          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
           success: false,
           errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.Sku}`,
           skuVaultRawResponse: rawResponse,
@@ -328,23 +329,19 @@ export default function Packing() {
       let qcPassError: string | null = null;
       try {
         const qcResponse = await passQcItemMutation.mutateAsync({
-          skuVaultProductId: parseInt(product.IdItem || "0"),
+          skuVaultProductId: product.IdItem || "0",
           scannedCode, // Send original scanned code, not normalized
           orderNumber: currentShipment!.orderNumber,
         });
         
-        // Strictly validate QC response - require explicit success
-        // SkuVault may return lowercase 'success' or uppercase 'Success'
-        const isSuccess = qcResponse.success === true || (qcResponse as any).Success === true;
-        const hasError = qcResponse.error || (qcResponse as any).Errors?.length > 0;
+        // Validate QC response - SkuVault returns: {"Data": null, "Errors": [], "Success": true}
+        const isSuccess = qcResponse.Success === true;
+        const hasErrors = qcResponse.Errors && qcResponse.Errors.length > 0;
         
-        if (!isSuccess || hasError) {
-          // Extract error message from various possible formats
-          qcPassError = qcResponse.error 
-            || (qcResponse as any).Errors?.join(", ")
-            || qcResponse.message 
-            || "QC pass rejected by SkuVault";
-          throw new Error(qcPassError || "QC pass failed");
+        if (!isSuccess || hasErrors) {
+          // Extract error message from Errors array
+          qcPassError = qcResponse.Errors?.join(", ") || "QC pass rejected by SkuVault";
+          throw new Error(qcPassError);
         }
         
         qcPassSuccess = true;
@@ -357,7 +354,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
-          skuVaultProductId: product.IdItem || "",
+          skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
           success: false,
           errorMessage: `QC pass failed: ${qcPassError}`,
           skuVaultRawResponse: rawResponse,
@@ -379,7 +376,7 @@ export default function Packing() {
         action: "product_scanned",
         productSku: product.Sku || "",
         scannedCode,
-        skuVaultProductId: product.IdItem || "",
+        skuVaultProductId: product.IdItem ? parseInt(product.IdItem) : null,
         success: true,
         errorMessage: null,
         skuVaultRawResponse: rawResponse,
