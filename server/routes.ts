@@ -112,6 +112,7 @@ async function processOrderLineItems(orderId: string, shopifyOrder: any) {
         totalDiscountSetJson: item.total_discount_set || null,
         taxLinesJson: item.tax_lines || null,
         taxable: item.taxable !== undefined ? item.taxable : null,
+        requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
         priceSetAmount: item.price_set?.shop_money?.amount || '0',
         totalDiscountSetAmount: item.total_discount_set?.shop_money?.amount || '0',
         totalTaxAmount: taxAmount > 0 ? taxAmount.toFixed(2) : '0',
@@ -524,6 +525,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Tax information
                 taxable: item.taxable !== undefined ? item.taxable : null,
+                
+                // Shipping information
+                requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
                 
                 // Calculated/extracted fields for easy querying
                 priceSetAmount: item.price_set?.shop_money?.amount || '0',
@@ -2695,6 +2699,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     
                     // Tax information
                     taxable: item.taxable !== undefined ? item.taxable : null,
+                    
+                    // Shipping information
+                    requiresShipping: item.requires_shipping !== undefined ? item.requires_shipping : null,
                     
                     // Calculated/extracted fields for easy querying
                     priceSetAmount: item.price_set?.shop_money?.amount || '0',
