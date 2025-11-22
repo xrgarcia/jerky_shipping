@@ -979,14 +979,29 @@ export class SkuVaultService {
       // Log the raw response for debugging and audit purposes
       console.log(`[SkuVault QC] Raw API response for "${searchTerm}":`, JSON.stringify(response, null, 2));
       
-      // If no product found, SkuVault may return null or empty object
-      if (!response || !response.IdItem) {
+      // SkuVault wraps product data in a Data field: { Errors: [], Messages: [], Data: {...product...} }
+      const productData = response?.Data;
+      
+      // If no product found, SkuVault returns null/empty Data
+      if (!productData || !productData.Id) {
         console.log(`[SkuVault QC] No product found for search term: ${searchTerm}`);
         return { product: null, rawResponse: response };
       }
       
-      // Validate response with Zod schema
-      const validatedResponse = productLookupResponseSchema.parse(response);
+      // Map SkuVault API field names to our schema (Id -> IdItem for consistency with QC pass endpoint)
+      const mappedProduct = {
+        IdItem: productData.Id,
+        Sku: productData.Sku,
+        Code: productData.Code,
+        PartNumber: productData.PartNumber,
+        Description: productData.Title,
+        IsKit: productData.IsKit,
+        WeightPound: productData.WeightValue,
+        ProductPictures: productData.Pictures?.map((p: any) => p.Url) || [],
+      };
+      
+      // Validate mapped product data with Zod schema
+      const validatedResponse = productLookupResponseSchema.parse(mappedProduct);
       
       console.log(`[SkuVault QC] Product found: ${validatedResponse.Sku} (IdItem: ${validatedResponse.IdItem})`);
       return { product: validatedResponse, rawResponse: response };
