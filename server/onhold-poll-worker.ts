@@ -3,8 +3,60 @@ import { enqueueShipmentSync } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
 import { desc, eq } from 'drizzle-orm';
+import { broadcastQueueStatus } from './websocket';
+import { 
+  getQueueLength, 
+  getShipmentSyncQueueLength,
+  getShopifyOrderSyncQueueLength,
+  getOldestShopifyQueueMessage,
+  getOldestShipmentSyncQueueMessage,
+  getOldestShopifyOrderSyncQueueMessage
+} from './utils/queue';
+import { shipmentSyncFailures } from '@shared/schema';
+import { count } from 'drizzle-orm';
 
 const log = (message: string) => console.log(`[onhold-poll] ${message}`);
+
+// Global worker status
+let workerStatus: 'sleeping' | 'running' = 'sleeping';
+
+export function getOnHoldWorkerStatus(): 'sleeping' | 'running' {
+  return workerStatus;
+}
+
+// Helper to broadcast queue stats with worker status
+async function broadcastWorkerStatus() {
+  try {
+    const shopifyQueueLength = await getQueueLength();
+    const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+    const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
+    const oldestShopify = await getOldestShopifyQueueMessage();
+    const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+    const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
+    const failureCount = await db.select({ count: count() })
+      .from(shipmentSyncFailures)
+      .then(rows => rows[0]?.count || 0);
+    const allBackfillJobs = await storage.getAllBackfillJobs();
+    const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
+    const dataHealth = await storage.getDataHealthMetrics();
+
+    broadcastQueueStatus({
+      shopifyQueue: shopifyQueueLength,
+      shipmentSyncQueue: shipmentSyncQueueLength,
+      shopifyOrderSyncQueue: shopifyOrderSyncQueueLength,
+      shipmentFailureCount: failureCount,
+      shopifyQueueOldestAt: oldestShopify?.enqueuedAt || null,
+      shipmentSyncQueueOldestAt: oldestShipmentSync?.enqueuedAt || null,
+      shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
+      backfillActiveJob: activeBackfillJob,
+      onHoldWorkerStatus: workerStatus,
+      dataHealth,
+    });
+  } catch (error) {
+    // Don't crash the worker if broadcast fails
+    log(`Error broadcasting worker status: ${error}`);
+  }
+}
 
 /**
  * Poll ShipStation for on_hold shipments and enqueue them for processing
@@ -25,6 +77,8 @@ export async function pollOnHoldShipments(): Promise<number> {
   }
 
   try {
+    workerStatus = 'running';
+    await broadcastWorkerStatus();  // Notify frontend of status change
     // Get the most recent on_hold shipment from our database
     const mostRecentOnHold = await db
       .select()
@@ -127,6 +181,9 @@ export async function pollOnHoldShipments(): Promise<number> {
   } catch (error: any) {
     log(`Error polling on_hold shipments: ${error.message}`);
     return 0;
+  } finally {
+    workerStatus = 'sleeping';
+    await broadcastWorkerStatus();  // Notify frontend of status change
   }
 }
 

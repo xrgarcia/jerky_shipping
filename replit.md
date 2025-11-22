@@ -40,6 +40,7 @@ Preferred communication style: Simple, everyday language.
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, and notifications.
 - **Monorepo Structure**: Client, server, and shared code co-located.
 - **Async Product Bootstrap**: Products synchronize asynchronously on server startup.
+- **On-Hold Poll Worker**: Polls ShipStation for on-hold shipments every 1 minute (supplements webhooks which don't fire for on_hold status). Displays real-time running/sleeping status on Operations dashboard.
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback on failure.

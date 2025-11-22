@@ -106,6 +106,7 @@ export type QueueStatusData = {
   shipmentSyncQueueOldestAt: number | null;
   shopifyOrderSyncQueueOldestAt: number | null;
   backfillActiveJob: any | null;
+  onHoldWorkerStatus?: 'sleeping' | 'running';
   dataHealth: {
     ordersMissingShipments: number;
     shipmentsWithoutOrders: number;
@@ -133,6 +134,7 @@ export function broadcastQueueStatus(data: {
   oldestShopifyOrderSync?: { enqueuedAt?: number | null };
   backfillActiveJob?: any | null;
   activeBackfillJob?: any | null;
+  onHoldWorkerStatus?: 'sleeping' | 'running';
   dataHealth?: {
     ordersMissingShipments?: number;
     shipmentsWithoutOrders?: number;
@@ -150,6 +152,15 @@ export function broadcastQueueStatus(data: {
     return;
   }
 
+  // Get current on-hold worker status
+  let currentOnHoldStatus: 'sleeping' | 'running' = 'sleeping';
+  try {
+    const { getOnHoldWorkerStatus } = require('./onhold-poll-worker');
+    currentOnHoldStatus = getOnHoldWorkerStatus();
+  } catch (error) {
+    // Worker not initialized yet
+  }
+
   // Normalize to canonical format
   const canonicalData: QueueStatusData = {
     shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? 0,
@@ -160,6 +171,7 @@ export function broadcastQueueStatus(data: {
     shipmentSyncQueueOldestAt: data.shipmentSyncQueueOldestAt ?? data.oldestShipmentSync?.enqueuedAt ?? null,
     shopifyOrderSyncQueueOldestAt: data.shopifyOrderSyncQueueOldestAt ?? data.oldestShopifyOrderSync?.enqueuedAt ?? null,
     backfillActiveJob: data.backfillActiveJob ?? data.activeBackfillJob ?? null,
+    onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,
       shipmentsWithoutOrders: data.dataHealth?.shipmentsWithoutOrders ?? 0,

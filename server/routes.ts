@@ -2781,6 +2781,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get comprehensive data health metrics
       const dataHealthMetrics = await storage.getDataHealthMetrics();
 
+      // Get on-hold worker status
+      let onHoldWorkerStatus: 'sleeping' | 'running' = 'sleeping';
+      try {
+        const { getOnHoldWorkerStatus } = await import("./onhold-poll-worker");
+        onHoldWorkerStatus = getOnHoldWorkerStatus();
+      } catch (error) {
+        // Worker not initialized yet
+      }
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -2802,6 +2811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recentJobs: recentBackfillJobs,
         },
         dataHealth: dataHealthMetrics,
+        onHoldWorkerStatus,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);
