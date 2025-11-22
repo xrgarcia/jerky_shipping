@@ -40,6 +40,7 @@ Preferred communication style: Simple, everyday language.
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, and notifications.
 - **Monorepo Structure**: Client, server, and shared code co-located.
 - **Async Product Bootstrap**: Products synchronize asynchronously on server startup.
+- **Centralized ETL Architecture**: `ShopifyOrderETLService` class centralizes all Shopify order transformations (orders, refunds, line items) following OOP principles with dependency injection. Single source of truth used by all ingestion paths: webhooks, sync workers, backfill jobs, and API endpoints. Eliminates code duplication and ensures consistent data processing across the entire system.
 - **On-Hold Poll Worker**: Polls ShipStation for on-hold shipments every 1 minute (supplements webhooks which don't fire for on_hold status). Displays real-time running/sleeping/awaiting_backfill_job status on Operations dashboard.
 - **Worker Coordination System**: Production-ready coordination between on-hold poll worker and backfill jobs to prevent API conflicts. Uses Redis-backed mutex with comprehensive error handling, fail-safe defaults, and status recovery broadcasts. WorkerCoordinator utility manages coordination state with lock tracking, TTL safety nets, and graceful degradation. All degraded states (backfill active, mutex contention, Redis errors) emit recovery signals to ensure UI stays synchronized.
 
