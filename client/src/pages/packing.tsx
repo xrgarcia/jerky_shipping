@@ -1265,8 +1265,12 @@ export default function Packing() {
                     />
                   </form>
 
-                  {/* Feedback Area - State-dependent content */}
-                  <div className="p-4 min-h-[120px] flex items-center">
+                  {/* Feedback Area - State-dependent content - Click to refocus input */}
+                  <div 
+                    className="p-4 min-h-[120px] flex items-center cursor-pointer"
+                    onClick={() => productInputRef.current?.focus()}
+                    data-testid="feedback-area"
+                  >
                     {validateProductMutation.isPending ? (
                       // VALIDATING STATE - Large spinner + explicit status message
                       <div className="flex flex-col items-center gap-3 w-full">
