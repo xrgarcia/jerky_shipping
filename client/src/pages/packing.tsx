@@ -1186,8 +1186,8 @@ export default function Packing() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-              {/* Scan Feedback Strip */}
-              {scanFeedback && (
+              {/* Scan Feedback Strip - Only show when not complete */}
+              {!allItemsScanned && scanFeedback && (
                 <div
                   className={`p-4 rounded-lg border-2 transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
                     scanFeedback.type === "success"
@@ -1269,63 +1269,62 @@ export default function Packing() {
                 </div>
               )}
 
-              {/* Product Scanner Input */}
-              <form onSubmit={handleProductScan}>
-                <Input
-                  ref={productInputRef}
-                  type="text"
-                  placeholder="Scan product barcode..."
-                  value={productScan}
-                  onChange={(e) => setProductScan(e.target.value)}
-                  onFocus={handleFirstInteraction}
-                  disabled={validateProductMutation.isPending}
-                  className="text-2xl h-16 text-center font-mono"
-                  data-testid="input-product-scan"
-                />
-                {validateProductMutation.isPending && (
-                  <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Validating...</span>
-                  </div>
-                )}
-              </form>
+              {/* Product Scanner Input - Only show when not complete */}
+              {!allItemsScanned && (
+                <form onSubmit={handleProductScan}>
+                  <Input
+                    ref={productInputRef}
+                    type="text"
+                    placeholder="Scan product barcode..."
+                    value={productScan}
+                    onChange={(e) => setProductScan(e.target.value)}
+                    onFocus={handleFirstInteraction}
+                    disabled={validateProductMutation.isPending}
+                    className="text-2xl h-16 text-center font-mono"
+                    data-testid="input-product-scan"
+                  />
+                  {validateProductMutation.isPending && (
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Validating...</span>
+                    </div>
+                  )}
+                </form>
+              )}
 
-              {/* Overall Progress */}
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold">
-                    {totalScanned} / {totalExpected}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <div>
-                        <div className="text-2xl font-bold">{successfulScans}</div>
-                        <div className="text-xs text-muted-foreground">Valid</div>
+              {/* Overall Progress - Only show when not complete */}
+              {!allItemsScanned && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-3xl font-bold">
+                      {totalScanned} / {totalExpected}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <div>
+                          <div className="text-2xl font-bold">{successfulScans}</div>
+                          <div className="text-xs text-muted-foreground">Valid</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-5 w-5 text-red-600" />
+                        <div>
+                          <div className="text-2xl font-bold">{failedScans}</div>
+                          <div className="text-xs text-muted-foreground">Rejected</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                      <div>
-                        <div className="text-2xl font-bold">{failedScans}</div>
-                        <div className="text-xs text-muted-foreground">Rejected</div>
-                      </div>
-                    </div>
-                    {allItemsScanned && (
-                      <CheckCircle2 className="h-8 w-8 text-green-600" />
-                    )}
                   </div>
-                </div>
-                {!allItemsScanned && (
                   <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary transition-all"
                       style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Items to Pack - Dual-Stack: Pending (top) + Completed (bottom) */}
               <div className="space-y-4" data-testid="items-to-pack-section">
