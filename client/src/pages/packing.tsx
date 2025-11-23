@@ -106,6 +106,14 @@ type PackingLog = {
   createdAt: string;
 };
 
+type ShipmentEvent = {
+  id: string;
+  eventName: string;
+  metadata: any;
+  createdAt: string;
+  skuvaultImport?: boolean; // True if imported from SkuVault PassedItems
+};
+
 type SkuVaultProduct = {
   IdItem?: string | null;
   Sku?: string | null;
@@ -379,6 +387,12 @@ export default function Packing() {
   // Load packing logs for current shipment
   const { data: packingLogs } = useQuery<PackingLog[]>({
     queryKey: currentShipment ? ["/api/packing-logs/shipment", currentShipment.id] : [],
+    enabled: !!currentShipment,
+  });
+
+  // Load shipment events for current order (includes SkuVault imports)
+  const { data: shipmentEvents } = useQuery<ShipmentEvent[]>({
+    queryKey: currentShipment ? ["/api/shipment-events/order", currentShipment.orderNumber] : [],
     enabled: !!currentShipment,
   });
 
@@ -1688,11 +1702,47 @@ export default function Packing() {
           </>
         )}
 
-        {/* Scan History - Shows when order is loaded AND has logs */}
-        {currentShipment && packingLogs && packingLogs.length > 0 && (() => {
-          const successfulScans = packingLogs.filter(log => log.success).length;
-          const failedScans = packingLogs.filter(log => !log.success).length;
-          const totalScans = packingLogs.length;
+        {/* Events Timeline - Shows when order is loaded AND has events or logs */}
+        {currentShipment && ((packingLogs && packingLogs.length > 0) || (shipmentEvents && shipmentEvents.length > 0)) && (() => {
+          // Merge logs and events, sorted by timestamp (newest first)
+          type TimelineEntry = {
+            id: string;
+            type: 'log' | 'event';
+            timestamp: string;
+            data: PackingLog | ShipmentEvent;
+          };
+
+          const timeline: TimelineEntry[] = [];
+          
+          if (packingLogs) {
+            packingLogs.forEach(log => {
+              timeline.push({
+                id: log.id,
+                type: 'log',
+                timestamp: log.createdAt,
+                data: log
+              });
+            });
+          }
+          
+          if (shipmentEvents) {
+            shipmentEvents.forEach(event => {
+              timeline.push({
+                id: event.id,
+                type: 'event',
+                timestamp: event.createdAt,
+                data: event
+              });
+            });
+          }
+          
+          // Sort by timestamp (newest first)
+          timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          
+          // Calculate stats from logs only (not events)
+          const successfulScans = packingLogs?.filter(log => log.success).length || 0;
+          const failedScans = packingLogs?.filter(log => !log.success).length || 0;
+          const totalScans = (packingLogs?.length || 0);
           const accuracy = totalScans > 0 ? Math.round((successfulScans / totalScans) * 100) : 0;
           
           return (
@@ -1708,65 +1758,104 @@ export default function Packing() {
                   data-testid="trigger-scan-history"
                 >
                   <div className="flex items-center justify-between w-full pr-2">
-                    <span className="font-semibold">Scan History</span>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="text-green-600 font-semibold">{successfulScans}</span>
+                    <span className="font-semibold">Events Timeline</span>
+                    {totalScans > 0 && (
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-green-600 font-semibold">{successfulScans}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <XCircle className="h-4 w-4 text-red-600" />
+                          <span className="text-red-600 font-semibold">{failedScans}</span>
+                        </div>
+                        <Badge variant="secondary" className="ml-2">
+                          {accuracy}% accuracy
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-red-600 font-semibold">{failedScans}</span>
-                      </div>
-                      <Badge variant="secondary" className="ml-2">
-                        {accuracy}% accuracy
-                      </Badge>
-                    </div>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-6 pb-4">
                   <div className="space-y-2 max-h-96 overflow-y-auto" data-testid="list-scan-history">
-                    {packingLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className={`p-3 rounded-lg border ${
-                          log.success
-                            ? "border-green-200 bg-green-50 dark:bg-green-950/20"
-                            : "border-red-200 bg-red-50 dark:bg-red-950/20"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {log.success ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                              )}
-                              <span className="font-medium text-sm">
-                                {log.action === "product_scanned" ? "Product Scan" : "Manual Verification"}
-                              </span>
-                            </div>
-                            <div className="text-sm space-y-1">
-                              {log.productSku && (
-                                <div className="font-mono text-muted-foreground">{log.productSku}</div>
-                              )}
-                              {log.scannedCode && (
-                                <div className="font-mono text-xs text-muted-foreground">
-                                  Code: {log.scannedCode}
+                    {timeline.map((entry) => {
+                      if (entry.type === 'log') {
+                        const log = entry.data as PackingLog;
+                        return (
+                          <div
+                            key={entry.id}
+                            className={`p-3 rounded-lg border ${
+                              log.success
+                                ? "border-green-200 bg-green-50 dark:bg-green-950/20"
+                                : "border-red-200 bg-red-50 dark:bg-red-950/20"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {log.success ? (
+                                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                  ) : (
+                                    <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                                  )}
+                                  <span className="font-medium text-sm">
+                                    {log.action === "product_scanned" ? "Product Scan" : "Manual Verification"}
+                                  </span>
                                 </div>
-                              )}
-                              {log.errorMessage && (
-                                <div className="text-red-600 text-xs">{log.errorMessage}</div>
-                              )}
+                                <div className="text-sm space-y-1">
+                                  {log.productSku && (
+                                    <div className="font-mono text-muted-foreground">{log.productSku}</div>
+                                  )}
+                                  {log.scannedCode && (
+                                    <div className="font-mono text-xs text-muted-foreground">
+                                      Code: {log.scannedCode}
+                                    </div>
+                                  )}
+                                  {log.errorMessage && (
+                                    <div className="text-red-600 text-xs">{log.errorMessage}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                {new Date(log.createdAt).toLocaleTimeString()}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(log.createdAt).toLocaleTimeString()}
+                        );
+                      } else {
+                        const event = entry.data as ShipmentEvent;
+                        return (
+                          <div
+                            key={entry.id}
+                            className="p-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Zap className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                  <span className="font-medium text-sm">
+                                    {event.eventName === "product_scan_success" ? "Product Scanned" : event.eventName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </span>
+                                  {event.skuvaultImport && (
+                                    <Badge variant="outline" className="ml-2 text-xs border-blue-400 text-blue-700 dark:text-blue-300">
+                                      SkuVault
+                                    </Badge>
+                                  )}
+                                </div>
+                                {event.metadata?.sku && (
+                                  <div className="text-sm space-y-1">
+                                    <div className="font-mono text-muted-foreground">{event.metadata.sku}</div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                {new Date(event.createdAt).toLocaleTimeString()}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      }
+                    })}
                   </div>
                 </AccordionContent>
               </AccordionItem>
