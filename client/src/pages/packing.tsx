@@ -438,8 +438,8 @@ export default function Packing() {
         });
 
         toast({
-          title: "Wrong Product",
-          description: `${product.Sku} is not in this shipment`,
+          title: "Wrong Item - Check Order",
+          description: `${product.Sku} not in this order`,
           variant: "destructive",
         });
 
