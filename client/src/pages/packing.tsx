@@ -1105,7 +1105,10 @@ export default function Packing() {
                           currentShipment.shipToAddressLine1,
                           currentShipment.shipToCity,
                           currentShipment.shipToState,
-                          currentShipment.shipToPostalCode
+                          currentShipment.shipToPostalCode,
+                          currentShipment.carrier && currentShipment.serviceCode 
+                            ? `${currentShipment.carrier} ${currentShipment.serviceCode}`
+                            : currentShipment.carrier
                         ].filter(Boolean).join(', ')}
                       </span>
                     )}
