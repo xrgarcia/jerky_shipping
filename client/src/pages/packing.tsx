@@ -1041,28 +1041,6 @@ export default function Packing() {
                     {currentShipment.shipToName || 'N/A'}
                   </div>
                 </div>
-                <div className="h-12 w-[2px] bg-border" />
-                <div className="min-w-[200px]">
-                  <div className="text-xs text-muted-foreground font-semibold mb-1">Gift Message</div>
-                  <div className="text-sm" data-testid="text-gift-message">
-                    {currentShipment.isGift && currentShipment.notesForGift ? (
-                      <span className="italic text-pink-600">"{currentShipment.notesForGift}"</span>
-                    ) : (
-                      <span className="text-muted-foreground">None</span>
-                    )}
-                  </div>
-                </div>
-                <div className="h-12 w-[2px] bg-border" />
-                <div className="min-w-[200px]">
-                  <div className="text-xs text-muted-foreground font-semibold mb-1">Buyer Notes</div>
-                  <div className="text-sm" data-testid="text-buyer-notes">
-                    {currentShipment.notesFromBuyer ? (
-                      <span className="text-blue-600">{currentShipment.notesFromBuyer}</span>
-                    ) : (
-                      <span className="text-muted-foreground">None</span>
-                    )}
-                  </div>
-                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1116,98 +1094,128 @@ export default function Packing() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="space-y-4 pt-2 pb-4">
-                    {/* Contact Information */}
-                    {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
-                      <div className="space-y-2">
-                        {currentShipment.shipToEmail && (
-                          <div className="flex items-center gap-2">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                            <a href={`mailto:${currentShipment.shipToEmail}`} className="hover:underline text-sm">
-                              {currentShipment.shipToEmail}
-                            </a>
-                          </div>
-                        )}
-                        {currentShipment.shipToPhone && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <a href={`tel:${currentShipment.shipToPhone}`} className="hover:underline text-sm">
-                              {currentShipment.shipToPhone}
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Shipping Address */}
-                    {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
-                      <div>
-                        <div className="flex items-start gap-2 mb-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                          <p className="text-sm text-muted-foreground">Address</p>
-                        </div>
-                        <div className="pl-6 space-y-1 text-sm">
-                          {currentShipment.shipToCompany && (
-                            <p className="font-semibold">{currentShipment.shipToCompany}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 pb-4">
+                    {/* Left Column: Shipping Information */}
+                    <div className="space-y-4">
+                      {/* Contact Information */}
+                      {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
+                        <div className="space-y-2">
+                          {currentShipment.shipToEmail && (
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              <a href={`mailto:${currentShipment.shipToEmail}`} className="hover:underline text-sm">
+                                {currentShipment.shipToEmail}
+                              </a>
+                            </div>
                           )}
-                          {currentShipment.shipToAddressLine1 && <p>{currentShipment.shipToAddressLine1}</p>}
-                          {currentShipment.shipToAddressLine2 && <p>{currentShipment.shipToAddressLine2}</p>}
-                          {currentShipment.shipToAddressLine3 && <p>{currentShipment.shipToAddressLine3}</p>}
-                          <p>
-                            {[currentShipment.shipToCity, currentShipment.shipToState, currentShipment.shipToPostalCode]
-                              .filter(Boolean)
-                              .join(', ')}
-                          </p>
-                          {currentShipment.shipToCountry && <p>{currentShipment.shipToCountry}</p>}
-                          {currentShipment.shipToIsResidential && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {currentShipment.shipToIsResidential === 'yes' 
-                                ? 'Residential Address' 
-                                : currentShipment.shipToIsResidential === 'no' 
-                                ? 'Commercial Address' 
-                                : ''}
+                          {currentShipment.shipToPhone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <a href={`tel:${currentShipment.shipToPhone}`} className="hover:underline text-sm">
+                                {currentShipment.shipToPhone}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Shipping Address */}
+                      {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
+                        <div>
+                          <div className="flex items-start gap-2 mb-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                            <p className="text-sm text-muted-foreground">Address</p>
+                          </div>
+                          <div className="pl-6 space-y-1 text-sm">
+                            {currentShipment.shipToCompany && (
+                              <p className="font-semibold">{currentShipment.shipToCompany}</p>
+                            )}
+                            {currentShipment.shipToAddressLine1 && <p>{currentShipment.shipToAddressLine1}</p>}
+                            {currentShipment.shipToAddressLine2 && <p>{currentShipment.shipToAddressLine2}</p>}
+                            {currentShipment.shipToAddressLine3 && <p>{currentShipment.shipToAddressLine3}</p>}
+                            <p>
+                              {[currentShipment.shipToCity, currentShipment.shipToState, currentShipment.shipToPostalCode]
+                                .filter(Boolean)
+                                .join(', ')}
                             </p>
+                            {currentShipment.shipToCountry && <p>{currentShipment.shipToCountry}</p>}
+                            {currentShipment.shipToIsResidential && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {currentShipment.shipToIsResidential === 'yes' 
+                                  ? 'Residential Address' 
+                                  : currentShipment.shipToIsResidential === 'no' 
+                                  ? 'Commercial Address' 
+                                  : ''}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Shipping Method & Tracking */}
+                      {(currentShipment.carrier || currentShipment.trackingNumber) && (
+                        <div className="pt-3 border-t space-y-2">
+                          {currentShipment.carrier && (
+                            <div className="flex items-start gap-2">
+                              <Truck className="h-4 w-4 text-muted-foreground mt-0.5" />
+                              <div className="flex-1 text-sm">
+                                <div className="text-muted-foreground">Carrier</div>
+                                <div className="font-medium">
+                                  {currentShipment.carrier} {currentShipment.serviceCode}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {currentShipment.trackingNumber && (
+                            <div className="flex items-start gap-2">
+                              <Package className="h-4 w-4 text-muted-foreground mt-0.5" />
+                              <div className="flex-1 text-sm">
+                                <div className="text-muted-foreground">Tracking</div>
+                                <div className="font-mono text-xs" data-testid="text-tracking">
+                                  {currentShipment.trackingNumber}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {currentShipment.statusDescription && (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" data-testid="badge-status">
+                                {currentShipment.statusDescription}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Column: Order Notes */}
+                    <div className="space-y-4 md:border-l md:pl-6">
+                      {/* Gift Message */}
+                      <div>
+                        <div className="text-xs text-muted-foreground font-semibold mb-2">Gift Message</div>
+                        <div className="text-sm" data-testid="text-gift-message">
+                          {currentShipment.isGift && currentShipment.notesForGift ? (
+                            <span className="italic text-pink-600">"{currentShipment.notesForGift}"</span>
+                          ) : (
+                            <span className="text-muted-foreground">None</span>
                           )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Shipping Method & Tracking */}
-                    {(currentShipment.carrier || currentShipment.trackingNumber) && (
-                      <div className="pt-3 border-t space-y-2">
-                        {currentShipment.carrier && (
-                          <div className="flex items-start gap-2">
-                            <Truck className="h-4 w-4 text-muted-foreground mt-0.5" />
-                            <div className="flex-1 text-sm">
-                              <div className="text-muted-foreground">Carrier</div>
-                              <div className="font-medium">
-                                {currentShipment.carrier} {currentShipment.serviceCode}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {currentShipment.trackingNumber && (
-                          <div className="flex items-start gap-2">
-                            <Package className="h-4 w-4 text-muted-foreground mt-0.5" />
-                            <div className="flex-1 text-sm">
-                              <div className="text-muted-foreground">Tracking</div>
-                              <div className="font-mono text-xs" data-testid="text-tracking">
-                                {currentShipment.trackingNumber}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {currentShipment.statusDescription && (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" data-testid="badge-status">
-                              {currentShipment.statusDescription}
-                            </Badge>
-                          </div>
-                        )}
+                      {/* Buyer Notes */}
+                      <div>
+                        <div className="text-xs text-muted-foreground font-semibold mb-2">Buyer Notes</div>
+                        <div className="text-sm" data-testid="text-buyer-notes">
+                          {currentShipment.notesFromBuyer ? (
+                            <span className="text-blue-600">{currentShipment.notesFromBuyer}</span>
+                          ) : (
+                            <span className="text-muted-foreground">None</span>
+                          )}
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
