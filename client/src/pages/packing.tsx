@@ -1038,16 +1038,28 @@ export default function Packing() {
                     {currentShipment.shipToName || 'N/A'}
                   </div>
                 </div>
-                {currentShipment.isGift && (
-                  <>
-                    <div className="h-12 w-[2px] bg-border" />
-                    <div className="flex items-center">
-                      <Badge variant="outline" className="border-pink-600 text-pink-600 bg-pink-50 dark:bg-pink-950/20">
-                        🎁 Gift Order
-                      </Badge>
-                    </div>
-                  </>
-                )}
+                <div className="h-12 w-[2px] bg-border" />
+                <div className="min-w-[200px]">
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Gift Message</div>
+                  <div className="text-sm" data-testid="text-gift-message">
+                    {currentShipment.isGift && currentShipment.notesForGift ? (
+                      <span className="italic text-pink-600">"{currentShipment.notesForGift}"</span>
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                  </div>
+                </div>
+                <div className="h-12 w-[2px] bg-border" />
+                <div className="min-w-[200px]">
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Buyer Notes</div>
+                  <div className="text-sm" data-testid="text-buyer-notes">
+                    {currentShipment.notesFromBuyer ? (
+                      <span className="text-blue-600">{currentShipment.notesFromBuyer}</span>
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1089,30 +1101,6 @@ export default function Packing() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4 pt-2 pb-4">
-                    {/* Gift Message - DEMO: Always show with sample text */}
-                    {(currentShipment.isGift && currentShipment.notesForGift) || true ? (
-                      <div className="p-3 bg-pink-50 dark:bg-pink-950/20 border border-pink-600 rounded-md">
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className="text-pink-600 font-semibold text-sm">🎁 Gift Message:</span>
-                        </div>
-                        <p className="text-sm pl-5 text-foreground italic">
-                          "{currentShipment.notesForGift || 'Happy Birthday! Hope you enjoy this special gift. Love, Mom'}"
-                        </p>
-                      </div>
-                    ) : null}
-
-                    {/* Notes from Buyer - DEMO: Always show with sample text */}
-                    {currentShipment.notesFromBuyer || true ? (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-600 rounded-md">
-                        <div className="flex items-start gap-2 mb-1">
-                          <span className="text-blue-600 font-semibold text-sm">💬 Customer Notes:</span>
-                        </div>
-                        <p className="text-sm pl-5 text-foreground">
-                          {currentShipment.notesFromBuyer || 'Please pack carefully - this is a gift. Include extra napkins if possible. Thanks!'}
-                        </p>
-                      </div>
-                    ) : null}
-
                     {/* Contact Information */}
                     {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
                       <div className="space-y-2">
