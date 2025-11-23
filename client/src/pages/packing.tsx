@@ -516,6 +516,9 @@ export default function Packing() {
         title: "History Cleared",
         description: "Packing history reset. You can now rescan this order.",
       });
+      
+      // Set focus back to product scan input
+      setTimeout(() => productInputRef.current?.focus(), 0);
     },
     onError: (error: Error) => {
       toast({
