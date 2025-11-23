@@ -1094,10 +1094,17 @@ export default function Packing() {
             <Accordion type="single" collapsible>
               <AccordionItem value="shipping-details" className="border rounded-lg px-4">
                 <AccordionTrigger className="hover:no-underline">
-                  <span className="text-sm font-medium flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Shipping Details
-                  </span>
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Shipping Details
+                    </span>
+                    {currentShipment.shipToAddressLine1 && (
+                      <span className="text-xl font-bold font-mono text-muted-foreground">
+                        {currentShipment.shipToAddressLine1}
+                      </span>
+                    )}
+                  </div>
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4 pt-2 pb-4">
