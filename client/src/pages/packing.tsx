@@ -488,6 +488,7 @@ export default function Packing() {
               scanned: 0,
               remaining: item.quantity,
               requiresManualVerification: false,
+              imageUrl: item.imageUrl,
             });
           } else {
             progress.set(key, {
@@ -499,6 +500,7 @@ export default function Packing() {
               scanned: 0,
               remaining: item.quantity,
               requiresManualVerification: true,
+              imageUrl: item.imageUrl,
             });
           }
         });
