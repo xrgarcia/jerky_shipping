@@ -394,6 +394,12 @@ export default function Packing() {
   const { data: shipmentEvents } = useQuery<ShipmentEvent[]>({
     queryKey: currentShipment ? ["/api/shipment-events/order", currentShipment.orderNumber] : [],
     enabled: !!currentShipment,
+    queryFn: async ({ queryKey }) => {
+      // Extract order number from queryKey (queryKey[1] is the order number)
+      const orderNumber = queryKey[1] as string;
+      const response = await apiRequest("GET", `/api/shipment-events/order/${encodeURIComponent(orderNumber)}`);
+      return await response.json();
+    },
   });
 
   // Restore SKU progress from historical packing logs when they load
@@ -1824,6 +1830,19 @@ export default function Packing() {
                         );
                       } else {
                         const event = entry.data as ShipmentEvent;
+                        // Format event name for display
+                        const getEventDisplayName = (eventName: string) => {
+                          const nameMap: Record<string, string> = {
+                            'product_scan_success': 'Product Scanned',
+                            'order_scanned': 'Order Scanned',
+                            'order_loaded': 'Order Loaded',
+                            'product_scan_failed': 'Scan Failed',
+                            'manual_verification': 'Manual Verification',
+                            'packing_completed': 'Packing Completed',
+                          };
+                          return nameMap[eventName] || eventName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        };
+                        
                         return (
                           <div
                             key={entry.id}
@@ -1834,7 +1853,7 @@ export default function Packing() {
                                 <div className="flex items-center gap-2 mb-1">
                                   <Zap className="h-4 w-4 text-blue-600 flex-shrink-0" />
                                   <span className="font-medium text-sm">
-                                    {event.eventName === "product_scan_success" ? "Product Scanned" : event.eventName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    {getEventDisplayName(event.eventName)}
                                   </span>
                                   {event.skuvaultImport && (
                                     <Badge variant="outline" className="ml-2 text-xs border-blue-400 text-blue-700 dark:text-blue-300">
@@ -1842,11 +1861,19 @@ export default function Packing() {
                                     </Badge>
                                   )}
                                 </div>
-                                {event.metadata?.sku && (
-                                  <div className="text-sm space-y-1">
+                                <div className="text-sm space-y-1">
+                                  {event.metadata?.sku && (
                                     <div className="font-mono text-muted-foreground">{event.metadata.sku}</div>
-                                  </div>
-                                )}
+                                  )}
+                                  {event.metadata?.message && (
+                                    <div className="text-xs text-muted-foreground">{event.metadata.message}</div>
+                                  )}
+                                  {!event.metadata?.sku && !event.metadata?.message && event.metadata && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {JSON.stringify(event.metadata).slice(0, 100)}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
                                 {new Date(event.createdAt).toLocaleTimeString()}
