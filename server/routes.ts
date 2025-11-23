@@ -1098,6 +1098,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get picked quantity for a product in a specific sale (SkuVault sync)
+  app.get("/api/skuvault/qc/picked-quantity", requireAuth, async (req, res) => {
+    try {
+      const { codeOrSku, saleId } = req.query;
+      
+      if (!codeOrSku || !saleId) {
+        return res.status(400).json({ 
+          error: "Missing required parameters",
+          message: "Both codeOrSku and saleId are required"
+        });
+      }
+      
+      // Call SkuVault to get picked quantity
+      const pickedQuantity = await skuVaultService.getPickedQuantityForProduct(
+        String(codeOrSku),
+        String(saleId)
+      );
+      
+      // Return null if error (graceful degradation)
+      res.json({ pickedQuantity });
+    } catch (error: any) {
+      console.error("Error getting picked quantity:", error);
+      
+      // Graceful degradation - return null on error
+      res.json({ pickedQuantity: null });
+    }
+  });
+
   // Get shipment items for a specific shipment (accepts shipmentId or UUID)
   app.get("/api/shipments/:shipmentId/items", requireAuth, async (req, res) => {
     try {

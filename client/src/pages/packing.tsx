@@ -309,6 +309,20 @@ export default function Packing() {
     },
   });
 
+  // Get picked quantity from SkuVault (for sync validation)
+  const getPickedQuantityMutation = useMutation({
+    mutationFn: async (params: {
+      codeOrSku: string;
+      saleId: string;
+    }) => {
+      const response = await apiRequest(
+        "GET", 
+        `/api/skuvault/qc/picked-quantity?codeOrSku=${encodeURIComponent(params.codeOrSku)}&saleId=${encodeURIComponent(params.saleId)}`
+      );
+      return (await response.json()) as { pickedQuantity: number | null };
+    },
+  });
+
   // Validate product with SkuVault QC
   const validateProductMutation = useMutation({
     mutationFn: async (scannedCode: string) => {
@@ -357,21 +371,71 @@ export default function Packing() {
         return;
       }
 
-      // Check if already scanned expected quantity
-      if (progress.scanned >= progress.expected) {
+      // Sync with SkuVault picked quantity (call FIRST before proceeding with scan)
+      let syncedFromSkuVault = false;
+      let currentProgress = progress; // Track latest progress (including potential SkuVault sync)
+      
+      if (currentShipment?.saleId && product.Sku) {
+        try {
+          const { pickedQuantity } = await getPickedQuantityMutation.mutateAsync({
+            codeOrSku: product.Sku,
+            saleId: currentShipment.saleId,
+          });
+          
+          if (pickedQuantity !== null && pickedQuantity > progress.scanned) {
+            // SkuVault has more picks than us - sync our progress
+            const previousCount = progress.scanned;
+            
+            // Update currentProgress to reflect SkuVault's state
+            currentProgress = {
+              ...progress,
+              scanned: pickedQuantity,
+              remaining: progress.expected - pickedQuantity,
+            };
+            
+            // Update React state
+            const newProgress = new Map(skuProgress);
+            newProgress.set(matchingItemKey!, currentProgress);
+            setSkuProgress(newProgress);
+            
+            // Log sync event
+            await logShipmentEvent("skuvault_picked_quantity_sync", {
+              sku: product.Sku,
+              barcode: scannedCode,
+              itemId: matchingItemKey,
+              previousCount,
+              skuVaultPickedCount: pickedQuantity,
+              syncedCount: pickedQuantity - previousCount,
+            });
+            
+            syncedFromSkuVault = true;
+            
+            toast({
+              title: "Synced with SkuVault",
+              description: `Updated ${product.Sku} from ${previousCount} to ${pickedQuantity} scanned (SkuVault already picked ${pickedQuantity - previousCount} units)`,
+            });
+          }
+        } catch (error) {
+          console.warn("[Packing] SkuVault sync check failed (non-blocking):", error);
+          // Graceful degradation - continue with normal scan flow
+        }
+      }
+      
+      // Check if already scanned expected quantity (after potential SkuVault sync)
+      if (currentProgress.scanned >= currentProgress.expected) {
         await createPackingLog({
           action: "product_scanned",
           productSku: product.Sku || "",
           scannedCode,
           skuVaultProductId: product.IdItem || null,
           success: false,
-          errorMessage: `Already scanned ${progress.scanned}/${progress.expected} units of ${product.Sku}`,
+          errorMessage: `Already scanned ${currentProgress.scanned}/${currentProgress.expected} units of ${product.Sku}`,
           skuVaultRawResponse: rawResponse,
         });
 
         toast({
           title: "Already Scanned",
-          description: `All ${progress.expected} units of ${product.Sku} already scanned`,
+          description: `All ${currentProgress.expected} units of ${product.Sku} already scanned`,
           variant: "destructive",
         });
 
@@ -428,24 +492,25 @@ export default function Packing() {
         sku: product.Sku || "",
         barcode: scannedCode,
         itemId: matchingItemKey,
-        scannedCount: progress.scanned + 1,
-        expectedCount: progress.expected,
+        scannedCount: currentProgress.scanned + 1,
+        expectedCount: currentProgress.expected,
+        syncedFromSkuVault,
       });
 
       // Update progress (using item ID as key, tracking remaining units)
       const newProgress = new Map(skuProgress);
       newProgress.set(matchingItemKey!, {
-        ...progress,
-        scanned: progress.scanned + 1,
-        remaining: progress.remaining - 1, // Decrement remaining for this specific item
+        ...currentProgress,
+        scanned: currentProgress.scanned + 1,
+        remaining: currentProgress.remaining - 1, // Decrement remaining for this specific item
       });
       setSkuProgress(newProgress);
 
       toast({
         title: qcPassSuccess ? "Product Validated & QC Passed" : "Product Validated",
         description: qcPassSuccess 
-          ? `${product.Sku} (${progress.scanned + 1}/${progress.expected})`
-          : `${product.Sku} (${progress.scanned + 1}/${progress.expected}) - QC pass skipped`,
+          ? `${product.Sku} (${currentProgress.scanned + 1}/${currentProgress.expected})`
+          : `${product.Sku} (${currentProgress.scanned + 1}/${currentProgress.expected}) - QC pass skipped`,
       });
 
       setProductScan("");
