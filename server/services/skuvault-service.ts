@@ -1123,6 +1123,70 @@ export class SkuVaultService {
   }
 
   /**
+   * Get QC Sales data by order number
+   * Endpoint: GET /sales/QualityControl/getQCSales?SearchTerm={orderNumber}
+   * 
+   * Returns QC sale data including:
+   * - Sale ID (eliminates need for separate lookup)
+   * - Expected items to scan
+   * - Items already passed QC in SkuVault
+   * - Items that failed QC
+   * 
+   * @param orderNumber - ShipStation order number to search for
+   * @returns QCSale if found, null if not found or error
+   */
+  async getQCSalesByOrderNumber(orderNumber: string): Promise<import('@shared/skuvault-types').QCSale | null> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
+      console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
+      
+      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      
+      // Parse and validate the response
+      const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
+      const validatedResponse = qcSalesResponseSchema.parse(response);
+      
+      // Check for errors in the response
+      if (validatedResponse.Errors && validatedResponse.Errors.length > 0) {
+        console.error(`[SkuVault QC Sales] Errors in response:`, validatedResponse.Errors);
+        throw new SkuVaultError(
+          `SkuVault errors: ${validatedResponse.Errors.join(', ')}`,
+          400,
+          validatedResponse.Errors
+        );
+      }
+      
+      // Extract the first QC sale from the array
+      const qcSales = validatedResponse.Data?.QcSales;
+      if (!qcSales || qcSales.length === 0) {
+        console.log(`[SkuVault QC Sales] No QC sale found for order:`, orderNumber);
+        return null;
+      }
+      
+      const qcSale = qcSales[0]; // Take first match
+      console.log(`[SkuVault QC Sales] Found QC sale:`, {
+        SaleId: qcSale.SaleId,
+        OrderId: qcSale.OrderId,
+        Status: qcSale.Status,
+        TotalItems: qcSale.TotalItems,
+        PassedItems: qcSale.PassedItems?.length ?? 0,
+        FailedItems: qcSale.FailedItems?.length ?? 0,
+      });
+      
+      return qcSale;
+
+    } catch (error) {
+      if (error instanceof SkuVaultError) {
+        throw error; // Re-throw SkuVault errors
+      }
+      console.error(`[SkuVault QC Sales] Error looking up order:`, error);
+      return null; // Return null for other errors to allow graceful degradation
+    }
+  }
+
+  /**
    * Get token metadata for operations dashboard
    * Returns authentication status and last refresh timestamp
    */
