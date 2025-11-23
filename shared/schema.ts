@@ -393,6 +393,7 @@ export const shipmentEvents = pgTable("shipment_events", {
   eventName: text("event_name").notNull(), // e.g., "order_scanned", "product_scan_success"
   orderNumber: text("order_number"), // Links to shipments.order_number
   metadata: jsonb("metadata"), // Flexible JSON data for event-specific details
+  skuvaultImport: boolean("skuvault_import").notNull().default(false), // True if event was imported from SkuVault PassedItems
 }, (table) => ({
   occurredAtIdx: index("shipment_events_occurred_at_idx").on(table.occurredAt),
   orderNumberIdx: index("shipment_events_order_number_idx").on(table.orderNumber).where(sql`${table.orderNumber} IS NOT NULL`),
