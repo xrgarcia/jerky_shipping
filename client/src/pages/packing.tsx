@@ -1239,18 +1239,20 @@ export default function Packing() {
                         )}
                       </div>
                       
+                      {/* Product Image (large and prominent) */}
+                      {scanFeedback.imageUrl && (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={scanFeedback.imageUrl}
+                            alt={scanFeedback.productName || "Product"}
+                            className="w-24 h-24 object-cover rounded-md border-2"
+                          />
+                        </div>
+                      )}
+                      
                       {/* Feedback Details */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-3">
-                          {/* Product Image (if available) */}
-                          {scanFeedback.imageUrl && (
-                            <img
-                              src={scanFeedback.imageUrl}
-                              alt={scanFeedback.productName || "Product"}
-                              className="w-16 h-16 object-cover rounded-md border flex-shrink-0"
-                            />
-                          )}
-                          
                           {/* Text Content */}
                           <div className="flex-1 min-w-0">
                             <div className={`text-2xl font-bold mb-1 ${
@@ -1372,7 +1374,7 @@ export default function Packing() {
                             <img
                               src={shipmentItem.imageUrl}
                               alt={progress.name}
-                              className="w-20 h-20 object-cover rounded-md border flex-shrink-0"
+                              className="w-28 h-28 object-cover rounded-md border-2 flex-shrink-0"
                             />
                           )}
                           
