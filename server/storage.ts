@@ -193,6 +193,7 @@ export interface IStorage {
   createPackingLog(log: InsertPackingLog): Promise<PackingLog>;
   getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]>;
   getPackingLogsByUser(userId: string, limit?: number): Promise<PackingLog[]>;
+  deletePackingLogsByShipment(shipmentId: string): Promise<void>;
   
   // Shipment Events
   createShipmentEvent(event: InsertShipmentEvent): Promise<ShipmentEvent>;
@@ -1607,6 +1608,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(packingLogs.userId, userId))
       .orderBy(desc(packingLogs.createdAt))
       .limit(limit);
+  }
+
+  async deletePackingLogsByShipment(shipmentId: string): Promise<void> {
+    await db.delete(packingLogs).where(eq(packingLogs.shipmentId, shipmentId));
   }
 
   // Shipment Events

@@ -309,6 +309,75 @@ export default function Packing() {
     },
   });
 
+  // Clear packing history (for testing/re-scanning)
+  const clearHistoryMutation = useMutation({
+    mutationFn: async (shipmentId: string) => {
+      const response = await apiRequest("DELETE", `/api/packing-logs/shipment/${shipmentId}`);
+      return (await response.json()) as { success: boolean; message: string };
+    },
+    onSuccess: () => {
+      // Reset local progress state
+      if (currentShipment) {
+        // Rebuild initial progress from shipment items (same logic as initial load)
+        const progress = new Map<string, SkuProgress>();
+        
+        const physicalItems = currentShipment.items.filter((item) => {
+          if (!item.shipmentItemId) {
+            console.warn("Skipping item without shipmentItemId:", item);
+            return false;
+          }
+          return true;
+        });
+        
+        physicalItems.forEach((item) => {
+          const key = item.id;
+          if (item.sku) {
+            progress.set(key, {
+              itemId: item.id,
+              sku: item.sku,
+              normalizedSku: normalizeSku(item.sku),
+              name: item.name,
+              expected: item.quantity,
+              scanned: 0,
+              remaining: item.quantity,
+              requiresManualVerification: false,
+            });
+          } else {
+            progress.set(key, {
+              itemId: item.id,
+              sku: "NO SKU",
+              normalizedSku: "",
+              name: item.name,
+              expected: item.quantity,
+              scanned: 0,
+              remaining: item.quantity,
+              requiresManualVerification: true,
+            });
+          }
+        });
+        
+        setSkuProgress(progress);
+      }
+      
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({
+        queryKey: ["/api/packing-logs/shipment", currentShipment?.id],
+      });
+      
+      toast({
+        title: "History Cleared",
+        description: "Packing history reset. You can now rescan this order.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Get picked quantity from SkuVault (for sync validation)
   const getPickedQuantityMutation = useMutation({
     mutationFn: async (params: {
@@ -733,21 +802,33 @@ export default function Packing() {
                   data-testid="input-order-scan"
                 />
                 {currentShipment && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setCurrentShipment(null);
-                      setOrderScan("");
-                      setPackingComplete(false);
-                      setSkuProgress(new Map());
-                      orderInputRef.current?.focus();
-                    }}
-                    className="w-full"
-                    data-testid="button-clear-order"
-                  >
-                    Scan Different Order
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setCurrentShipment(null);
+                        setOrderScan("");
+                        setPackingComplete(false);
+                        setSkuProgress(new Map());
+                        orderInputRef.current?.focus();
+                      }}
+                      className="w-full"
+                      data-testid="button-clear-order"
+                    >
+                      Scan Different Order
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => clearHistoryMutation.mutate(currentShipment.id)}
+                      disabled={clearHistoryMutation.isPending}
+                      className="w-full"
+                      data-testid="button-clear-history"
+                    >
+                      {clearHistoryMutation.isPending ? "Clearing..." : "Clear History & Rescan"}
+                    </Button>
+                  </div>
                 )}
               </form>
             </CardContent>

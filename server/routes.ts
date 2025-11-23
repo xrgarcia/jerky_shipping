@@ -3387,6 +3387,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete packing logs for a shipment (testing/re-scanning)
+  app.delete("/api/packing-logs/shipment/:shipmentId", requireAuth, async (req, res) => {
+    try {
+      await storage.deletePackingLogsByShipment(req.params.shipmentId);
+      res.json({ success: true, message: "Packing logs cleared" });
+    } catch (error: any) {
+      console.error("[Packing] Error deleting packing logs:", error);
+      res.status(500).json({ error: "Failed to delete packing logs" });
+    }
+  });
+
   // Create shipment event (audit trail)
   app.post("/api/shipment-events", requireAuth, async (req, res) => {
     try {
