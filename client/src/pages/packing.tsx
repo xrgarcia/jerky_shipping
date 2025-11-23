@@ -1393,22 +1393,25 @@ export default function Packing() {
                   pendingItems.sort((a, b) => b[1].remaining - a[1].remaining);
                   
                   // Render function for item cards
-                  const renderItem = ([key, progress]: [string, SkuProgress]) => {
+                  const renderItem = ([key, progress]: [string, SkuProgress], index: number) => {
                     const isComplete = progress.scanned >= progress.expected;
                     const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
                     const shipmentItem = currentShipment?.items.find(item => item.id === progress.itemId);
+                    const isFirstPending = index === 0 && !isComplete;
                     
                     return (
                       <div
                         key={key}
-                        className={`p-4 rounded-lg border-2 transition-all ${
+                        className={`p-4 rounded-lg transition-all ${
                           isComplete
-                            ? "border-green-600 bg-green-50 dark:bg-green-950/20"
+                            ? "border-2 border-green-600 bg-green-50 dark:bg-green-950/20"
                             : progress.requiresManualVerification
-                            ? "border-orange-600 bg-orange-50 dark:bg-orange-950/20"
+                            ? "border-2 border-orange-600 bg-orange-50 dark:bg-orange-950/20"
+                            : isFirstPending
+                            ? "border-4 border-primary bg-primary/5"
                             : isPartial
-                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/20"
-                            : "border-border"
+                            ? "border-2 border-blue-600 bg-blue-50 dark:bg-blue-950/20"
+                            : "border-2 border-border"
                         }`}
                         data-testid={`progress-${progress.sku}`}
                       >
@@ -1423,7 +1426,15 @@ export default function Packing() {
                           )}
                           
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-xl truncate">{progress.name}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-semibold text-xl truncate">{progress.name}</div>
+                              {isFirstPending && (
+                                <Badge variant="default" className="flex-shrink-0 text-xs">
+                                  <Zap className="h-3 w-3 mr-1" />
+                                  Scan Next
+                                </Badge>
+                              )}
+                            </div>
                             <div className="text-lg text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
