@@ -1143,22 +1143,34 @@ export class SkuVaultService {
       const url = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
       console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
       
-      let response = await this.makeAuthenticatedRequest<any>('GET', url);
+      // Apply rate limiting
+      await this.applyRateLimit();
       
-      // Debug: Log the raw response type and first 100 chars
-      console.log(`[SkuVault QC Sales] Raw response type:`, typeof response);
-      console.log(`[SkuVault QC Sales] Raw response preview:`, typeof response === 'string' ? response.substring(0, 100) : JSON.stringify(response).substring(0, 100));
+      // Make request manually to control response parsing (axios auto-parses JSON but can't handle anti-XSSI prefix)
+      const headers = await this.getApiHeaders();
+      const response = await this.client.request({
+        method: 'GET',
+        url,
+        headers,
+        transformResponse: [], // Prevent axios from auto-parsing - we'll handle it manually
+      });
+      
+      // Response.data will be a raw string since we disabled transformResponse
+      let rawData = response.data as string;
+      console.log(`[SkuVault QC Sales] Raw response (first 200 chars):`, rawData.substring(0, 200));
       
       // SkuVault returns responses with anti-XSSI prefix - strip it if present
-      if (typeof response === 'string' && response.startsWith(")]}',")) {
-        response = response.substring(6); // Remove ")]}',\n"
-        console.log(`[SkuVault QC Sales] Stripped anti-XSSI prefix from response`);
-        response = JSON.parse(response);
+      if (rawData.startsWith(")]}',")) {
+        rawData = rawData.substring(6); // Remove ")]}',\n"
+        console.log(`[SkuVault QC Sales] Stripped anti-XSSI prefix`);
       }
+      
+      // Parse JSON
+      const parsedData = JSON.parse(rawData);
       
       // Parse and validate the response
       const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
-      const validatedResponse = qcSalesResponseSchema.parse(response);
+      const validatedResponse = qcSalesResponseSchema.parse(parsedData);
       
       // Check for errors in the response
       if (validatedResponse.Errors && validatedResponse.Errors.length > 0) {

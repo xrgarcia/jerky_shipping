@@ -1,0 +1,17 @@
+fetch("https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=JK3825344258", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Google Chrome\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "cookie": "_ga=GA1.2.1523010414.1763405194; _ga_1CJ41D2XVZ=GS2.2.s1763411421$o1$g1$t1763411520$j60$l0$h0; ss-pid=FJpIeroEYlA3Xhh7z6CP; ss-id=3ic5zW6DqGHpaYLhdrsH; last-visited-page-Admin=https%3A%2F%2Fv2.skuvault.com%2Fwave-pick; sv-zc=352444; sv-zd=372919; sv-culture=en-US; _gid=GA1.2.1322335173.1763828317; last-visited-page-Ray=https%3A%2F%2Fapp.skuvault.com%2Fsales%2Fqualitycontrol; sv-t=sv-/WJT9Y6pfy4bmtFXHRJxIa7aiD2YkajFLdtSIVHTK0/F29IB0bIqy8LQHP19DkPOMWaew4O8rysBDwxOrmID67RdlI8cYSn4weS3Sv0v4nksrLMWUhoEHUcxF++r2M53l/K8PbQSGNOqk+j12mg3ihPIE23aQl2vTVHoshYV87Ial6VzQ3i9wjQZs/JVQG0qkQJ4+VQCAaeuGGftWMuZDWQVkYxPCx+U96KvAFJPG8fFAtBDC0fU/fxQKYpq6DhCcEqTdySU2CMSDGUNkVp9WL1nHOGNXiXpZAqn+AfXzOKYsUIJWewjtTtQ6OjAEeUhGDoOkGOCvK3WRsHcxxD7b2kHiucFwSB5LbT9WAATTNl3bLpCUkJPkkHFUE3FMpXWPghfxtUGBipQ23dtCFjsC2tw0X4/L2J5J3BtDZTV5DF9yUB/6IU2y5+Ox9M0XKbB4tu8cCxx3sE1hcSEKgXfurPpWvDd/G1isvbKPFPcUOvG3UP/COztFSwl9x3K1UTAGUW+bFjZzIrvZv6EqqAoKuS6EQeurqH76DnSLEqUlqEzWoHtK/VqOQ4Yk/VEWhKBodpP+i3M9cr9/ylf8motKlnXDYcA4Xtv9sru3yuoSOrwjIYdxM1MZPCPt3E0t2RmYhF2qVrMZSFcnY5DJ/SUAwaf7qmeLCNthYpDv/cZgPWg4KOofq4V6kEllyAwT5khqgVCXkI5hqlqWrCqymP71aSaqS4OgxEDYZkgYAtTYROgjwxk6DI/Q23d7lBIFZdBdHVcmbqItJrJoSo4QPoKPAmbjIKuvN2HTO0xj6AKCubyhRgJaoWIXjd2lasogbTyvkqRqrdnEhMUHbXtB68Ni+fvZIP4wYf6cQQrpCPN6MdPoiBToEbTZfnkXUwLtSztDNcjS6uMg+ikFblfjpEJmQaiAXPFry7kUFKtq/dyMh6x4eQF8/DLVqi/JUwb6oMqZVFzimdCYCciBrfzUPLD/sCB7vzAAB+lSsEaoBTtBN8r6tZ+S1IzqMreJdlMumC+Jck8V7stgIx49uRWXlsC+4bUpKoD5m9YMNwDTTEricZPSsO0oylz4qCHP5p7JtP4oczBXU/gVH9vPQGiYAFvfStPlhUbDno+Fpxea8yoLfQ8x1GnZJm6rfrO0tOQmFDO8/jWgbjVxSdZ7/ewniZrdyCZUZVyVL2Yx5gHhI1oP2lbaIuF+2Rpvh0X38dc150Pcnl2Zv7Yv0HviAgSI7v4mFZAkSoIB045x8KULMNPUe4b9PF3kzqXMXLyQEvg+m7nvGCLWyd2m1rNSM9Mc9a6MoIlukkJXSL6BtyIF+9o0dY=-feOTOQs9JHjSkyAaMXYwmLHVZstz+p0dEu+QZ/uTDb/VsteaQy3sP7jmKwsIc77/w32FasP4olk8eD75AhwaJdoFT8ZaRstovu7ue60bO/uP9RtHwZqyogifHT4LhThVPtFDLCj9uQMaP6IyIi8qQxQcKJ78CL2y1A267CDYeFY=; _ga_HGD4BZ2VQ4=GS2.2.s1763861393$o8$g0$t1763861393$j60$l0$h0",
+    "Referer": "https://app.skuvault.com/sales/qualitycontrol"
+  },
+  "body": null,
+  "method": "GET"
+});
