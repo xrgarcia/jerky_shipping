@@ -411,22 +411,26 @@ export default function Packing() {
       // Normalize scanned SKU for comparison (handle undefined Sku)
       const normalizedSku = normalizeSku(product.Sku || "");
       
-      // Find first item with matching SKU that still has remaining units
+      // STEP 1: Find ANY matching SKU (regardless of remaining quantity)
       let matchingItemKey: string | null = null;
       let matchingProgress: SkuProgress | null = null;
       
       for (const [key, progress] of Array.from(skuProgress.entries())) {
-        if (progress.normalizedSku === normalizedSku && progress.remaining > 0) {
-          matchingItemKey = key;
-          matchingProgress = progress;
-          break; // Use first item with remaining units
+        if (progress.normalizedSku === normalizedSku) {
+          // Found a matching SKU - prioritize items with remaining units
+          if (!matchingProgress || progress.remaining > 0) {
+            matchingItemKey = key;
+            matchingProgress = progress;
+            if (progress.remaining > 0) {
+              break; // Use first item with remaining units
+            }
+          }
         }
       }
-
-      const progress = matchingProgress;
       
-      if (!progress) {
-        // SKU not in shipment
+      // STEP 2: Check if SKU exists in order at all
+      if (!matchingProgress) {
+        // SKU not in this order at all
         await createPackingLog({
           action: "product_scanned",
           productSku: product.Sku || "",
@@ -447,6 +451,30 @@ export default function Packing() {
         setTimeout(() => productInputRef.current?.focus(), 0);
         return;
       }
+      
+      // STEP 3: Check if already fully scanned (duplicate scan)
+      if (matchingProgress.remaining === 0) {
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: product.Sku || "",
+          scannedCode,
+          skuVaultProductId: product.IdItem || null,
+          success: false,
+          errorMessage: `Already scanned ${matchingProgress.scanned}/${matchingProgress.expected} units of ${product.Sku}`,
+          skuVaultRawResponse: rawResponse,
+        });
+
+        toast({
+          title: "Already Complete - Scan Next",
+          description: `${product.Sku} (${matchingProgress.scanned}/${matchingProgress.expected} scanned) ✓`,
+        });
+
+        setProductScan("");
+        setTimeout(() => productInputRef.current?.focus(), 0);
+        return;
+      }
+
+      const progress = matchingProgress;
 
       // Sync with SkuVault picked quantity (call FIRST before proceeding with scan)
       let syncedFromSkuVault = false;
