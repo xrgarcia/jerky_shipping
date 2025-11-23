@@ -1198,6 +1198,9 @@ export class SkuVaultService {
           // Parse JSON if it's a string
           const parsedData = typeof responseData === 'string' ? JSON.parse(responseData) : responseData;
           
+          // Log the full response for debugging
+          console.log(`[SkuVault QC Sales] Parsed 404 response:`, JSON.stringify(parsedData, null, 2));
+          
           // Validate the parsed response
           const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
           const validatedResponse = qcSalesResponseSchema.parse(parsedData);
