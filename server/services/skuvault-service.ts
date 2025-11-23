@@ -1145,6 +1145,10 @@ export class SkuVaultService {
       
       let response = await this.makeAuthenticatedRequest<any>('GET', url);
       
+      // Debug: Log the raw response type and first 100 chars
+      console.log(`[SkuVault QC Sales] Raw response type:`, typeof response);
+      console.log(`[SkuVault QC Sales] Raw response preview:`, typeof response === 'string' ? response.substring(0, 100) : JSON.stringify(response).substring(0, 100));
+      
       // SkuVault returns responses with anti-XSSI prefix - strip it if present
       if (typeof response === 'string' && response.startsWith(")]}',")) {
         response = response.substring(6); // Remove ")]}',\n"
