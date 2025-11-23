@@ -1143,7 +1143,14 @@ export class SkuVaultService {
       const url = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
       console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
       
-      const response = await this.makeAuthenticatedRequest<any>('GET', url);
+      let response = await this.makeAuthenticatedRequest<any>('GET', url);
+      
+      // SkuVault returns responses with anti-XSSI prefix - strip it if present
+      if (typeof response === 'string' && response.startsWith(")]}',")) {
+        response = response.substring(6); // Remove ")]}',\n"
+        console.log(`[SkuVault QC Sales] Stripped anti-XSSI prefix from response`);
+        response = JSON.parse(response);
+      }
       
       // Parse and validate the response
       const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
