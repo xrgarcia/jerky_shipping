@@ -1062,10 +1062,10 @@ export class SkuVaultService {
     await this.ensureAuthenticated();
 
     try {
-      const endpoint = `/sales/Sale/getSaleInformation?Id=${encodeURIComponent(id)}`;
+      const url = `${this.config.apiBaseUrl}/sales/Sale/getSaleInformation?Id=${encodeURIComponent(id)}`;
       console.log(`[SkuVault Sale] Looking up sale with id:`, id);
       
-      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
       // Parse and validate the response
       const validatedResponse = saleInformationResponseSchema.parse(response);
@@ -1103,10 +1103,10 @@ export class SkuVaultService {
     await this.ensureAuthenticated();
 
     try {
-      const endpoint = `/inventory/item/getPickedQuantityForProductBySaleId?CodeOrSku=${encodeURIComponent(codeOrSku)}&SaleId=${encodeURIComponent(saleId)}`;
+      const url = `${this.config.apiBaseUrl}/inventory/item/getPickedQuantityForProductBySaleId?CodeOrSku=${encodeURIComponent(codeOrSku)}&SaleId=${encodeURIComponent(saleId)}`;
       console.log(`[SkuVault Sync] Checking picked quantity:`, { codeOrSku, saleId });
       
-      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
       // Parse and validate the response
       const validatedResponse = pickedQuantityResponseSchema.parse(response);
@@ -1139,10 +1139,10 @@ export class SkuVaultService {
     await this.ensureAuthenticated();
 
     try {
-      const endpoint = `/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
+      const url = `${this.config.apiBaseUrl}/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
       console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
       
-      const response = await this.makeAuthenticatedRequest<any>('GET', endpoint);
+      const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
       // Parse and validate the response
       const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
