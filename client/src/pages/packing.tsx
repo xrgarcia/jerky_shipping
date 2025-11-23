@@ -1274,23 +1274,24 @@ export default function Packing() {
               {/* Product Scanner Input - Only show when not complete */}
               {!allItemsScanned && (
                 <form onSubmit={handleProductScan}>
-                  <Input
-                    ref={productInputRef}
-                    type="text"
-                    placeholder="Scan product barcode..."
-                    value={productScan}
-                    onChange={(e) => setProductScan(e.target.value)}
-                    onFocus={handleFirstInteraction}
-                    disabled={validateProductMutation.isPending}
-                    className="text-2xl h-16 text-center font-mono"
-                    data-testid="input-product-scan"
-                  />
-                  {validateProductMutation.isPending && (
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Validating...</span>
-                    </div>
-                  )}
+                  <div className="relative">
+                    <Input
+                      ref={productInputRef}
+                      type="text"
+                      placeholder="Scan product barcode..."
+                      value={productScan}
+                      onChange={(e) => setProductScan(e.target.value)}
+                      onFocus={handleFirstInteraction}
+                      disabled={validateProductMutation.isPending}
+                      className="text-2xl h-16 text-center font-mono pr-12"
+                      data-testid="input-product-scan"
+                    />
+                    {validateProductMutation.isPending && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
                 </form>
               )}
 
