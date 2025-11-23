@@ -160,8 +160,8 @@ export class ShipStationShipmentETLService {
           name: item.name,
           quantity: item.quantity,
           unitPrice: item.unit_price?.toString() || null,
-          totalPrice: item.total_price?.toString() || null,
-          itemData: item,
+          externalOrderItemId: externalId,
+          imageUrl: item.image_url || null,
         };
       });
 
