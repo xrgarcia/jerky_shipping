@@ -570,6 +570,7 @@ export default function Packing() {
       setSkuProgress(new Map());
       setScanFeedback(null);
       setPackingComplete(false);
+      setOrderScan(""); // Clear the order scan input
       
       // Set focus to order scan input
       setTimeout(() => orderInputRef.current?.focus(), 100);
@@ -1073,6 +1074,12 @@ export default function Packing() {
                   className="text-2xl h-16 text-center font-mono"
                   data-testid="input-order-scan"
                 />
+                {loadShipmentMutation.isPending && (
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Loading order...</span>
+                  </div>
+                )}
               </form>
             </CardContent>
           </Card>
