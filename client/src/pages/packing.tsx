@@ -71,6 +71,7 @@ type ShipmentWithItems = {
   shipTo: string | null;
   totalWeight: string | null;
   createdAt: string;
+  orderDate: string | null; // ShipStation createDate - when the order/label was created
   orderId: string | null;
   labelUrl: string | null;
   // Customer shipping details
@@ -171,6 +172,29 @@ export default function Packing() {
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
+  
+  // Helper to format order age
+  const formatOrderAge = (orderDate: string | null): string => {
+    if (!orderDate) return 'N/A';
+    
+    const now = new Date();
+    const order = new Date(orderDate);
+    const diffMs = now.getTime() - order.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      return `${diffDays}d ${diffHours % 24}h`;
+    } else if (diffHours > 0) {
+      return `${diffHours}h ${diffMins % 60}m`;
+    } else if (diffMins > 0) {
+      return `${diffMins}m ${diffSecs % 60}s`;
+    } else {
+      return `${diffSecs}s`;
+    }
+  };
 
   // Audio feedback - Reuse single AudioContext to avoid browser limits
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1101,6 +1125,13 @@ export default function Packing() {
                   <div className="text-xs text-muted-foreground font-semibold mb-1">Ship To</div>
                   <div className="text-lg font-semibold" data-testid="text-ship-to-name">
                     {currentShipment.shipToName || 'N/A'}
+                  </div>
+                </div>
+                <div className="h-12 w-[2px] bg-border" />
+                <div>
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Order Age</div>
+                  <div className="text-lg font-semibold font-mono" data-testid="text-order-age">
+                    {formatOrderAge(currentShipment.orderDate)}
                   </div>
                 </div>
               </div>
