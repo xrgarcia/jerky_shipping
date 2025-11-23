@@ -1099,9 +1099,14 @@ export default function Packing() {
                       <Package className="h-4 w-4" />
                       Shipping Details
                     </span>
-                    {currentShipment.shipToAddressLine1 && (
+                    {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
                       <span className="text-xl font-bold font-mono text-muted-foreground">
-                        {currentShipment.shipToAddressLine1}
+                        {[
+                          currentShipment.shipToAddressLine1,
+                          currentShipment.shipToCity,
+                          currentShipment.shipToState,
+                          currentShipment.shipToPostalCode
+                        ].filter(Boolean).join(', ')}
                       </span>
                     )}
                   </div>
