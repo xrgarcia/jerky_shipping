@@ -3351,6 +3351,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate order for packing - cross-validates ShipStation and SkuVault data
+  app.get("/api/packing/validate-order/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const user = req.user;
+      
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // 1. Fetch shipment from ShipStation (via our database)
+      const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
+      
+      if (shipmentResults.length === 0) {
+        return res.status(404).json({ 
+          error: "Order not found",
+          orderNumber 
+        });
+      }
+      
+      if (shipmentResults.length > 1) {
+        console.warn(`[Packing Validation] Multiple shipments for order ${orderNumber}, using most recent (ID: ${shipmentResults[0].id})`);
+      }
+      
+      const shipment = shipmentResults[0];
+      const shipmentItems = await storage.getShipmentItems(shipment.id);
+      
+      // 2. Fetch QC Sales data from SkuVault
+      let qcSale: import('@shared/skuvault-types').QCSale | null = null;
+      let saleId: string | null = null;
+      const validationWarnings: string[] = [];
+      
+      try {
+        console.log(`[Packing Validation] Fetching SkuVault QC Sale for order: ${orderNumber}`);
+        qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        
+        if (qcSale) {
+          saleId = qcSale.SaleId ?? null;
+          console.log(`[Packing Validation] Found SkuVault QC Sale:`, {
+            SaleId: saleId,
+            Status: qcSale.Status,
+            TotalItems: qcSale.TotalItems,
+            PassedItems: qcSale.PassedItems?.length ?? 0,
+          });
+          
+          // 3. Cross-validate items between ShipStation and SkuVault
+          const skuVaultSkus = new Set((qcSale.Items ?? []).map(item => item.Sku).filter(Boolean));
+          const shipStationSkus = new Set(shipmentItems.map(item => item.sku).filter(Boolean));
+          
+          // Check for items in ShipStation but not in SkuVault
+          const missingInSkuVault = shipmentItems.filter(item => item.sku && !skuVaultSkus.has(item.sku));
+          if (missingInSkuVault.length > 0) {
+            const skus = missingInSkuVault.map(i => i.sku).join(', ');
+            validationWarnings.push(`Items in ShipStation but not in SkuVault: ${skus}`);
+          }
+          
+          // Check for items in SkuVault but not in ShipStation
+          const missingInShipStation = (qcSale.Items ?? []).filter(item => item.Sku && !shipStationSkus.has(item.Sku));
+          if (missingInShipStation.length > 0) {
+            const skus = missingInShipStation.map(i => i.Sku).join(', ');
+            validationWarnings.push(`Items in SkuVault but not in ShipStation: ${skus}`);
+          }
+          
+          // 4. Match PassedItems to shipment items and check quantities
+          const passedItems = qcSale.PassedItems ?? [];
+          const passedItemsBySku = new Map<string, number>(); // Track quantities by SKU
+          
+          passedItems.forEach(passedItem => {
+            if (passedItem.Sku) {
+              const sku = passedItem.Sku.trim().toUpperCase();
+              const qty = passedItem.Quantity || 0;
+              passedItemsBySku.set(sku, (passedItemsBySku.get(sku) || 0) + qty);
+            }
+          });
+          
+          // Check for quantity mismatches
+          const shipmentItemsBySku = new Map<string, number>();
+          shipmentItems.forEach(item => {
+            if (item.sku) {
+              const sku = item.sku.trim().toUpperCase();
+              shipmentItemsBySku.set(sku, (shipmentItemsBySku.get(sku) || 0) + item.quantity);
+            }
+          });
+          
+          // Warn about quantity discrepancies
+          shipmentItemsBySku.forEach((expectedQty, sku) => {
+            const passedQty = passedItemsBySku.get(sku) || 0;
+            if (passedQty > 0 && passedQty !== expectedQty) {
+              validationWarnings.push(`SKU ${sku}: SkuVault has ${passedQty} passed, ShipStation expects ${expectedQty}`);
+            }
+          });
+          
+          // 5. Backfill shipment_events from PassedItems with item ID resolution
+          if (passedItems.length > 0) {
+            console.log(`[Packing Validation] Backfilling ${passedItems.length} shipment events from SkuVault PassedItems`);
+            
+            for (const passedItem of passedItems) {
+              try {
+                // Match SkuVault PassedItem to shipment item by SKU
+                const matchedShipmentItem = shipmentItems.find(item => 
+                  item.sku && passedItem.Sku && 
+                  item.sku.trim().toUpperCase() === passedItem.Sku.trim().toUpperCase()
+                );
+                
+                if (!matchedShipmentItem) {
+                  console.warn(`[Packing Validation] No shipment item found for SKU ${passedItem.Sku}`);
+                  continue;
+                }
+                
+                await storage.createShipmentEvent({
+                  occurredAt: new Date(), // Use current time (SkuVault timestamps unreliable)
+                  username: passedItem.UserName || `SkuVault User ${passedItem.UserId || 'Unknown'}`,
+                  station: "skuvault_qc",
+                  eventName: "product_scan_success",
+                  orderNumber: orderNumber,
+                  skuvaultImport: true, // Mark as imported from SkuVault
+                  metadata: {
+                    sku: passedItem.Sku,
+                    quantity: passedItem.Quantity,
+                    shipmentItemId: matchedShipmentItem.id, // Link to our shipment item
+                    skuvaultItemId: passedItem.ItemId,
+                    skuvaultUserId: passedItem.UserId,
+                    originalTimestamp: passedItem.DateTimeUtc,
+                    importedAt: new Date().toISOString(),
+                  },
+                });
+              } catch (error: any) {
+                console.error(`[Packing Validation] Error backfilling event for item ${passedItem.ItemId}:`, error.message);
+              }
+            }
+            
+            console.log(`[Packing Validation] Successfully backfilled ${passedItems.length} shipment events`);
+          }
+        } else {
+          console.log(`[Packing Validation] Order not found in SkuVault (may not be synced yet)`);
+          validationWarnings.push("Order not found in SkuVault - QC validation unavailable");
+        }
+      } catch (error: any) {
+        console.error(`[Packing Validation] Error fetching SkuVault data:`, error.message);
+        validationWarnings.push(`SkuVault error: ${error.message}`);
+      }
+      
+      // 5. Return combined data
+      res.json({
+        ...shipment,
+        items: shipmentItems,
+        saleId, // SkuVault Sale ID for QC scanning
+        qcSale, // Full SkuVault QC Sale data (includes PassedItems, Items, etc.)
+        validationWarnings, // Array of warnings if items don't match
+      });
+    } catch (error: any) {
+      console.error("[Packing Validation] Error validating order:", error);
+      res.status(500).json({ error: "Failed to validate order" });
+    }
+  });
+
   // Create packing log entry
   app.post("/api/packing-logs", requireAuth, async (req, res) => {
     try {

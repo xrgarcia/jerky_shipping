@@ -41,6 +41,25 @@ type ShipmentItem = {
   imageUrl: string | null;
 };
 
+type QCSale = {
+  TotalItems?: number | null;
+  Status?: string | null;
+  SaleId?: string | null;
+  OrderId?: string | null;
+  PassedItems?: Array<{
+    Sku?: string | null;
+    Quantity?: number | null;
+    ItemId?: string | null;
+    Picture?: string | null;
+  }> | null;
+  Items?: Array<{
+    Sku?: string | null;
+    Quantity?: number | null;
+    Id?: string | null;
+    Picture?: string | null;
+  }> | null;
+};
+
 type ShipmentWithItems = {
   id: string;
   shipmentId: string | null;
@@ -73,6 +92,8 @@ type ShipmentWithItems = {
   notesFromBuyer: string | null;
   items: ShipmentItem[];
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
+  qcSale?: QCSale | null; // SkuVault QC Sale data (includes PassedItems, expected Items)
+  validationWarnings?: string[]; // Warnings if items don't match between systems
 };
 
 type PackingLog = {
@@ -111,6 +132,7 @@ type SkuProgress = {
   remaining: number; // Tracks remaining units to scan for this specific item
   requiresManualVerification?: boolean; // For items without SKU
   imageUrl?: string | null; // Product image URL
+  skuvaultSynced?: boolean; // True if this item was found in SkuVault PassedItems
 };
 
 type ScanFeedback = {
@@ -262,6 +284,18 @@ export default function Packing() {
     if (currentShipment?.items) {
       const progress = new Map<string, SkuProgress>();
       
+      // Get SKUs and quantities that are already passed in SkuVault for this order
+      const skuvaultPassedQuantities = new Map<string, number>(); // SKU -> total quantity passed
+      if (currentShipment.qcSale?.PassedItems) {
+        currentShipment.qcSale.PassedItems.forEach((passedItem) => {
+          if (passedItem.Sku) {
+            const normalizedSku = normalizeSku(passedItem.Sku);
+            const qty = passedItem.Quantity || 0;
+            skuvaultPassedQuantities.set(normalizedSku, (skuvaultPassedQuantities.get(normalizedSku) || 0) + qty);
+          }
+        });
+      }
+      
       // Filter out non-physical items (discounts, adjustments, fees)
       const physicalItems = currentShipment.items.filter((item) => {
         // Exclude items with negative prices (discounts/adjustments)
@@ -280,21 +314,47 @@ export default function Packing() {
         return true;
       });
       
+      // Track how many units we've allocated from SkuVault for each SKU
+      const skuvaultAllocated = new Map<string, number>();
+      
+      if (skuvaultPassedQuantities.size > 0) {
+        console.log(`[Packing] Found ${skuvaultPassedQuantities.size} unique SKUs already passed in SkuVault`);
+      }
+      
       physicalItems.forEach((item) => {
         // Use item ID as key to handle duplicate SKUs properly
         const key = item.id;
         if (item.sku) {
+          const normalized = normalizeSku(item.sku);
+          
+          // Check how many units SkuVault has passed for this SKU
+          const totalPassedInSkuvault = skuvaultPassedQuantities.get(normalized) || 0;
+          const alreadyAllocated = skuvaultAllocated.get(normalized) || 0;
+          const availableFromSkuvault = Math.max(0, totalPassedInSkuvault - alreadyAllocated);
+          
+          // Determine how many of this item's units were scanned in SkuVault
+          const scannedInSkuvault = Math.min(item.quantity, availableFromSkuvault);
+          skuvaultAllocated.set(normalized, alreadyAllocated + scannedInSkuvault);
+          
+          // Mark as synced ONLY if ALL units for this item were passed in SkuVault
+          const skuvaultSynced = scannedInSkuvault === item.quantity;
+          
           progress.set(key, {
             itemId: item.id,
             sku: item.sku, // Keep original for display
-            normalizedSku: normalizeSku(item.sku), // For matching scans
+            normalizedSku: normalized, // For matching scans
             name: item.name,
             expected: item.quantity,
-            scanned: 0,
-            remaining: item.quantity, // Track remaining units for this specific item
+            scanned: scannedInSkuvault, // Start with what was scanned in SkuVault
+            remaining: item.quantity - scannedInSkuvault, // Only remaining units need scanning
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
+            skuvaultSynced, // Flag if already scanned in SkuVault
           });
+          
+          if (scannedInSkuvault > 0) {
+            console.log(`[Packing] Item ${item.sku} has ${scannedInSkuvault}/${item.quantity} units already scanned in SkuVault`);
+          }
         } else {
           progress.set(key, {
             itemId: item.id,
@@ -306,6 +366,7 @@ export default function Packing() {
             remaining: item.quantity,
             requiresManualVerification: true,
             imageUrl: item.imageUrl,
+            skuvaultSynced: false,
           });
         }
       });
@@ -374,10 +435,10 @@ export default function Packing() {
     console.log(`[Packing] Restored progress from ${packingLogs.length} historical log(s)`);
   }, [packingLogs, skuProgress.size]); // Re-run when logs load or when skuProgress is initialized
 
-  // Load shipment by order number (includes items from backend)
+  // Load shipment by order number (includes items from backend + SkuVault validation)
   const loadShipmentMutation = useMutation({
     mutationFn: async (orderNumber: string) => {
-      const response = await apiRequest("GET", `/api/shipments/by-order-number/${encodeURIComponent(orderNumber)}`);
+      const response = await apiRequest("GET", `/api/packing/validate-order/${encodeURIComponent(orderNumber)}`);
       return (await response.json()) as ShipmentWithItems;
     },
     onSuccess: (shipment) => {
@@ -400,6 +461,17 @@ export default function Packing() {
         });
       }
 
+      // Display validation warnings from SkuVault cross-validation
+      if (shipment.validationWarnings && shipment.validationWarnings.length > 0) {
+        shipment.validationWarnings.forEach((warning) => {
+          toast({
+            title: "SkuVault Validation",
+            description: warning,
+            variant: "default",
+          });
+        });
+      }
+
       setCurrentShipment(shipment);
       setPackingComplete(false);
       
@@ -408,12 +480,25 @@ export default function Packing() {
         shipmentId: shipment.id,
         itemCount: shipment.items.length,
         orderNumber: shipment.orderNumber,
+        skuvaultSaleId: shipment.saleId,
+        hasSkuvaultData: !!shipment.qcSale,
+        skuvaultPassedItems: shipment.qcSale?.PassedItems?.length ?? 0,
       }, shipment.orderNumber);
       
-      toast({
-        title: "Order Loaded",
-        description: `${shipment.items.length} item(s) ready for packing`,
-      });
+      // Show how many items are already scanned in SkuVault
+      const passedItemsCount = shipment.qcSale?.PassedItems?.length ?? 0;
+      if (passedItemsCount > 0) {
+        toast({
+          title: "Order Loaded",
+          description: `${shipment.items.length} item(s) ready • ${passedItemsCount} already scanned in SkuVault`,
+        });
+      } else {
+        toast({
+          title: "Order Loaded",
+          description: `${shipment.items.length} item(s) ready for packing`,
+        });
+      }
+      
       // Focus product input after loading shipment
       setTimeout(() => productInputRef.current?.focus(), 100);
     },
@@ -1439,12 +1524,18 @@ export default function Packing() {
                           )}
                           
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <div className="font-semibold text-xl truncate">{progress.name}</div>
-                              {isFirstPending && (
+                              {isFirstPending && !isComplete && (
                                 <Badge variant="default" className="flex-shrink-0 text-xs">
                                   <Zap className="h-3 w-3 mr-1" />
                                   Scan Next
+                                </Badge>
+                              )}
+                              {progress.skuvaultSynced && (
+                                <Badge variant="secondary" className="flex-shrink-0 text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  SkuVault
                                 </Badge>
                               )}
                             </div>
