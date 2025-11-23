@@ -1089,29 +1089,29 @@ export default function Packing() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4 pt-2 pb-4">
-                    {/* Gift Message */}
-                    {currentShipment.isGift && currentShipment.notesForGift && (
+                    {/* Gift Message - DEMO: Always show with sample text */}
+                    {(currentShipment.isGift && currentShipment.notesForGift) || true ? (
                       <div className="p-3 bg-pink-50 dark:bg-pink-950/20 border border-pink-600 rounded-md">
                         <div className="flex items-start gap-2 mb-1">
                           <span className="text-pink-600 font-semibold text-sm">🎁 Gift Message:</span>
                         </div>
                         <p className="text-sm pl-5 text-foreground italic">
-                          "{currentShipment.notesForGift}"
+                          "{currentShipment.notesForGift || 'Happy Birthday! Hope you enjoy this special gift. Love, Mom'}"
                         </p>
                       </div>
-                    )}
+                    ) : null}
 
-                    {/* Notes from Buyer */}
-                    {currentShipment.notesFromBuyer && (
+                    {/* Notes from Buyer - DEMO: Always show with sample text */}
+                    {currentShipment.notesFromBuyer || true ? (
                       <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-600 rounded-md">
                         <div className="flex items-start gap-2 mb-1">
                           <span className="text-blue-600 font-semibold text-sm">💬 Customer Notes:</span>
                         </div>
                         <p className="text-sm pl-5 text-foreground">
-                          {currentShipment.notesFromBuyer}
+                          {currentShipment.notesFromBuyer || 'Please pack carefully - this is a gift. Include extra napkins if possible. Thanks!'}
                         </p>
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Contact Information */}
                     {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
