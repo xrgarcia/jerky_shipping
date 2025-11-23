@@ -27,6 +27,7 @@ import {
   Mail,
   Phone,
   ChevronDown,
+  Zap,
 } from "lucide-react";
 
 type ShipmentItem = {
@@ -1371,6 +1372,61 @@ export default function Packing() {
                   </div>
                 </div>
               )}
+
+              {/* Quick Pick Card - Show suggested next item */}
+              {(() => {
+                const pendingItemsPreview: Array<[string, SkuProgress]> = [];
+                Array.from(skuProgress.entries()).forEach(([key, progress]) => {
+                  if (progress.scanned < progress.expected) {
+                    pendingItemsPreview.push([key, progress]);
+                  }
+                });
+                pendingItemsPreview.sort((a, b) => b[1].remaining - a[1].remaining);
+                
+                if (pendingItemsPreview.length === 0) return null;
+                
+                const [key, suggestedItem] = pendingItemsPreview[0];
+                
+                return (
+                  <Card className="border-2 border-primary bg-primary/5" data-testid="card-quick-pick">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Zap className="h-6 w-6 text-primary" />
+                        <div>
+                          <h3 className="text-2xl font-bold">Quick Pick</h3>
+                          <p className="text-sm text-muted-foreground">or scan any item below</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-6">
+                        {/* Large Product Image */}
+                        {suggestedItem.imageUrl && (
+                          <img
+                            src={suggestedItem.imageUrl}
+                            alt={suggestedItem.name}
+                            className="w-40 h-40 object-cover rounded-lg border-4 border-border flex-shrink-0"
+                          />
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="text-2xl font-bold mb-2 truncate">{suggestedItem.name}</div>
+                          <div className="text-xl text-muted-foreground font-mono mb-3">
+                            {suggestedItem.sku}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-4xl font-bold text-primary">
+                              {suggestedItem.remaining} {suggestedItem.remaining === 1 ? "unit" : "units"}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              ({suggestedItem.scanned} / {suggestedItem.expected} scanned)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Items to Pack - Dual-Stack: Pending (top) + Completed (bottom) */}
               <div className="space-y-4" data-testid="items-to-pack-section">
