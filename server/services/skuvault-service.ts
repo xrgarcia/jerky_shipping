@@ -1181,6 +1181,56 @@ export class SkuVaultService {
       if (error instanceof SkuVaultError) {
         throw error; // Re-throw SkuVault errors
       }
+      
+      // SkuVault QC endpoint returns 404 with valid JSON data wrapped in anti-XSSI prefix
+      const axiosError = error as any;
+      if (axiosError?.response?.status === 404 && axiosError?.response?.data) {
+        try {
+          console.log(`[SkuVault QC Sales] Got 404 response, attempting to parse body`);
+          let responseData = axiosError.response.data;
+          
+          // Strip anti-XSSI prefix if present
+          if (typeof responseData === 'string' && responseData.startsWith(")]}',")) {
+            responseData = responseData.substring(6); // Remove ")]}',\n"
+            console.log(`[SkuVault QC Sales] Stripped anti-XSSI prefix from response`);
+          }
+          
+          // Parse JSON if it's a string
+          const parsedData = typeof responseData === 'string' ? JSON.parse(responseData) : responseData;
+          
+          // Validate the parsed response
+          const { qcSalesResponseSchema } = await import('@shared/skuvault-types');
+          const validatedResponse = qcSalesResponseSchema.parse(parsedData);
+          
+          // Check for errors in the parsed response
+          if (validatedResponse.Errors && validatedResponse.Errors.length > 0) {
+            console.error(`[SkuVault QC Sales] Errors in 404 response:`, validatedResponse.Errors);
+            return null;
+          }
+          
+          // Extract the first QC sale from the array
+          const qcSales = validatedResponse.Data?.QcSales;
+          if (!qcSales || qcSales.length === 0) {
+            console.log(`[SkuVault QC Sales] No QC sale found in 404 response for order:`, orderNumber);
+            return null;
+          }
+          
+          const qcSale = qcSales[0]; // Take first match
+          console.log(`[SkuVault QC Sales] Successfully parsed QC sale from 404 response:`, {
+            SaleId: qcSale.SaleId,
+            OrderId: qcSale.OrderId,
+            Status: qcSale.Status,
+            TotalItems: qcSale.TotalItems,
+            PassedItems: qcSale.PassedItems?.length ?? 0,
+            FailedItems: qcSale.FailedItems?.length ?? 0,
+          });
+          
+          return qcSale;
+        } catch (parseError) {
+          console.error(`[SkuVault QC Sales] Failed to parse 404 response body:`, parseError);
+        }
+      }
+      
       console.error(`[SkuVault QC Sales] Error looking up order:`, error);
       return null; // Return null for other errors to allow graceful degradation
     }
