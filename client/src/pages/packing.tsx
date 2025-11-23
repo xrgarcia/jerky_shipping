@@ -1379,7 +1379,7 @@ export default function Packing() {
                   {/* Progress Bar */}
                   <div className="mt-3 h-3 bg-background rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all"
+                      className="h-full bg-muted-foreground/50 transition-all"
                       style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
                     />
                   </div>
@@ -1417,14 +1417,14 @@ export default function Packing() {
                         key={key}
                         className={`p-4 rounded-lg transition-all ${
                           isComplete
-                            ? "border-2 border-green-600 bg-green-50 dark:bg-green-950/20"
+                            ? "border-2 border-muted-foreground/30 bg-muted/30"
                             : progress.requiresManualVerification
                             ? "border-2 border-orange-600 bg-orange-50 dark:bg-orange-950/20"
                             : isFirstPending
-                            ? "border-4 border-primary bg-primary/5"
+                            ? "border-2 border-muted-foreground/30 bg-muted/20 border-l-8 border-l-primary"
                             : isPartial
-                            ? "border-2 border-blue-600 bg-blue-50 dark:bg-blue-950/20"
-                            : "border-2 border-border"
+                            ? "border-2 border-muted-foreground/30 bg-muted/20"
+                            : "border-2 border-muted-foreground/20 bg-muted/10"
                         }`}
                         data-testid={`progress-${progress.sku}`}
                       >
@@ -1455,9 +1455,9 @@ export default function Packing() {
                           
                           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                             {isComplete ? (
-                              <div className="flex items-center gap-2 text-green-600">
+                              <div className="flex items-center gap-2 text-muted-foreground">
                                 <CheckCircle2 className="h-6 w-6 flex-shrink-0" />
-                                <span className="font-bold text-sm">Complete</span>
+                                <span className="font-medium text-sm">Complete</span>
                               </div>
                             ) : progress.requiresManualVerification ? (
                               <AlertCircle className="h-6 w-6 text-orange-600 flex-shrink-0" />
@@ -1493,11 +1493,9 @@ export default function Packing() {
                           <div className="h-2 bg-muted rounded-full overflow-hidden">
                             <div
                               className={`h-full transition-all ${
-                                isComplete
-                                  ? "bg-green-600"
-                                  : progress.requiresManualVerification
+                                progress.requiresManualVerification
                                   ? "bg-orange-600"
-                                  : "bg-blue-600"
+                                  : "bg-muted-foreground/50"
                               }`}
                               style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
                             />
@@ -1523,8 +1521,8 @@ export default function Packing() {
                       
                       {/* Success Message - Only shown when all complete */}
                       {pendingItems.length === 0 && completedItems.length > 0 && (
-                        <div className="text-center py-6 text-green-600" data-testid="message-all-complete">
-                          <CheckCircle2 className="h-12 w-12 mx-auto mb-2" />
+                        <div className="text-center py-6" data-testid="message-all-complete">
+                          <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
                           <p className="font-semibold text-lg">All items scanned!</p>
                           <p className="text-sm text-muted-foreground">Review completed items below</p>
                         </div>
@@ -1536,7 +1534,7 @@ export default function Packing() {
                           <AccordionItem value="completed-items" className="border rounded-lg px-4" data-testid="accordion-completed-items">
                             <AccordionTrigger className="hover:no-underline" data-testid="trigger-completed-items">
                               <span className="text-sm font-medium flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                                 Completed Items ({completedItems.length})
                               </span>
                             </AccordionTrigger>
