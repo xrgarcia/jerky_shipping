@@ -1159,6 +1159,25 @@ export class SkuVaultService {
       let rawData = response.data as string;
       console.log(`[SkuVault QC Sales] Raw response (first 200 chars):`, rawData.substring(0, 200));
       
+      // Check if response is HTML (session expired - SkuVault redirects to login page)
+      if (rawData.trim().startsWith('<!doctype') || rawData.trim().startsWith('<html')) {
+        console.log('[SkuVault QC Sales] Received HTML response (session expired), re-authenticating...');
+        await this.tokenCache.clear();
+        this.isAuthenticated = false;
+        await this.ensureAuthenticated();
+        
+        // Retry the request with new token
+        const retryHeaders = await this.getApiHeaders();
+        const retryResponse = await this.client.request({
+          method: 'GET',
+          url,
+          headers: retryHeaders,
+          transformResponse: [],
+        });
+        rawData = retryResponse.data as string;
+        console.log(`[SkuVault QC Sales] Retry response (first 200 chars):`, rawData.substring(0, 200));
+      }
+      
       // SkuVault returns responses with anti-XSSI prefix - strip it if present
       if (rawData.startsWith(")]}',")) {
         rawData = rawData.substring(6); // Remove ")]}',\n"
