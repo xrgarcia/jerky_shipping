@@ -454,3 +454,105 @@ export const saleInformationResponseSchema = z.object({
 });
 
 export type SaleInformationResponse = z.infer<typeof saleInformationResponseSchema>;
+
+/**
+ * Quality Control Sales Types
+ * Used for the getQCSales endpoint to fetch orders and their QC status
+ */
+
+/**
+ * Item that has already been QC'd and passed in SkuVault
+ */
+export const qcPassedItemSchema = z.object({
+  KitId: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(), // Barcode
+  ScannedCode: z.string().nullable().optional(),
+  LotNumber: z.string().nullable().optional(),
+  Sku: z.string().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+  Quantity: z.number().nullable().optional(),
+  Picture: z.string().nullable().optional(),
+  DateTimeUtc: z.string().nullable().optional(), // When it was scanned (may be "0001-01-01T00:00:00.0000000Z" placeholder)
+  ItemId: z.string().nullable().optional(), // SkuVault Item ID
+  UserId: z.string().nullable().optional(),
+  UserName: z.string().nullable().optional(),
+  OperationType: z.string().nullable().optional(),
+  Note: z.string().nullable().optional(),
+  FailReasonName: z.string().nullable().optional(),
+  PassFail: z.string().nullable().optional(), // "Passed"
+  SerialNumbers: z.array(z.string()).nullable().optional(),
+});
+
+export type QCPassedItem = z.infer<typeof qcPassedItemSchema>;
+
+/**
+ * Item that failed QC in SkuVault (same structure as PassedItem)
+ */
+export const qcFailedItemSchema = qcPassedItemSchema;
+export type QCFailedItem = z.infer<typeof qcFailedItemSchema>;
+
+/**
+ * Expected item in the order (not yet scanned or in progress)
+ */
+export const qcExpectedItemSchema = z.object({
+  Code: z.string().nullable().optional(), // Barcode
+  Sku: z.string().nullable().optional(),
+  FnSku: z.string().nullable().optional(),
+  LotNumbers: z.array(z.string()).nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  Quantity: z.number().nullable().optional(),
+  PassedStatus: z.string().nullable().optional(), // "Undefined", "Passed", etc.
+  UnitPrice: z.object({
+    a: z.number().nullable().optional(),
+    s: z.string().nullable().optional(), // Currency symbol
+  }).nullable().optional(),
+  Id: z.string().nullable().optional(), // SkuVault Item ID
+  Picture: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+});
+
+export type QCExpectedItem = z.infer<typeof qcExpectedItemSchema>;
+
+/**
+ * A single QC Sale (order) with its items and status
+ */
+export const qcSaleSchema = z.object({
+  TotalItems: z.number().nullable().optional(),
+  Status: z.string().nullable().optional(), // "Completed", "In Progress", etc.
+  SaleId: z.string().nullable().optional(), // e.g., "1-352444-5-13038-138162-JK3825346033"
+  OrderId: z.string().nullable().optional(), // e.g., "138162-JK3825346033"
+  AccountId: z.string().nullable().optional(),
+  SaleDate: z.string().nullable().optional(), // ISO timestamp
+  ContainsNFProducts: z.boolean().nullable().optional(),
+  AllItemsPassedExceptNFP: z.boolean().nullable().optional(),
+  isSingleWarehouse: z.boolean().nullable().optional(),
+  isTransferSale: z.boolean().nullable().optional(),
+  PassedItems: z.array(qcPassedItemSchema).nullable().optional(),
+  FailedItems: z.array(qcFailedItemSchema).nullable().optional(),
+  Items: z.array(qcExpectedItemSchema).nullable().optional(), // All expected items
+});
+
+export type QCSale = z.infer<typeof qcSaleSchema>;
+
+/**
+ * Data payload from getQCSales response
+ */
+export const qcSalesDataSchema = z.object({
+  MergeBinsFlag: z.boolean().nullable().optional(),
+  QcSales: z.array(qcSaleSchema).nullable().optional(),
+});
+
+export type QCSalesData = z.infer<typeof qcSalesDataSchema>;
+
+/**
+ * Response wrapper for getQCSales endpoint
+ * SkuVault returns: {"Errors": [], "Messages": [], "Data": {...}}
+ */
+export const qcSalesResponseSchema = z.object({
+  Errors: z.array(z.string()).nullable().optional(),
+  Messages: z.array(z.string()).nullable().optional(),
+  Data: qcSalesDataSchema.nullable().optional(),
+});
+
+export type QCSalesResponse = z.infer<typeof qcSalesResponseSchema>;
