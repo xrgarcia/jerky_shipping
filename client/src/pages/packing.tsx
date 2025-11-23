@@ -560,79 +560,19 @@ export default function Packing() {
       return (await response.json()) as { success: boolean; message: string };
     },
     onSuccess: () => {
-      // Invalidate both packing logs and shipment events queries
-      if (currentShipment) {
-        queryClient.invalidateQueries({ queryKey: ["/api/packing-logs/shipment", currentShipment.id] });
-        queryClient.invalidateQueries({ queryKey: ["/api/shipment-events/order", currentShipment.orderNumber] });
-      }
-      
-      // Reset local progress state
-      if (currentShipment) {
-        // Rebuild initial progress from shipment items (same logic as initial load)
-        const progress = new Map<string, SkuProgress>();
-        
-        // Filter out non-physical items (discounts, adjustments, fees) - same as initial load
-        const physicalItems = currentShipment.items.filter((item) => {
-          // Exclude items with negative prices (discounts/adjustments)
-          const unitPrice = item.unitPrice ? parseFloat(item.unitPrice) : 0;
-          if (unitPrice < 0) {
-            return false;
-          }
-          
-          // Exclude items with no SKU AND no name (malformed data)
-          if (!item.sku && !item.name) {
-            return false;
-          }
-          
-          return true;
-        });
-        
-        physicalItems.forEach((item) => {
-          const key = item.id;
-          if (item.sku) {
-            progress.set(key, {
-              itemId: item.id,
-              sku: item.sku,
-              normalizedSku: normalizeSku(item.sku),
-              name: item.name,
-              expected: item.quantity,
-              scanned: 0,
-              remaining: item.quantity,
-              requiresManualVerification: false,
-              imageUrl: item.imageUrl,
-            });
-          } else {
-            progress.set(key, {
-              itemId: item.id,
-              sku: "NO SKU",
-              normalizedSku: "",
-              name: item.name,
-              expected: item.quantity,
-              scanned: 0,
-              remaining: item.quantity,
-              requiresManualVerification: true,
-              imageUrl: item.imageUrl,
-            });
-          }
-        });
-        
-        setSkuProgress(progress);
-        // Clear scan feedback to start fresh
-        setScanFeedback(null);
-      }
-      
-      // Invalidate queries to refresh the list
-      queryClient.invalidateQueries({
-        queryKey: ["/api/packing-logs/shipment", currentShipment?.id],
-      });
-      
       toast({
         title: "History Cleared",
-        description: "Packing history reset. You can now rescan this order.",
+        description: "Returning to scan order page...",
       });
       
-      // Set focus back to product scan input
-      setTimeout(() => productInputRef.current?.focus(), 0);
+      // Clear current shipment to return to scan order page
+      setCurrentShipment(null);
+      setSkuProgress(new Map());
+      setScanFeedback(null);
+      setPackingComplete(false);
+      
+      // Set focus to order scan input
+      setTimeout(() => orderInputRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
       toast({
