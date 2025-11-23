@@ -285,4 +285,28 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* Pulsing border animation for scan validation */
+  @keyframes pulse-border {
+    0%, 100% {
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 0 hsla(var(--primary) / 0.7);
+    }
+    50% {
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 8px hsla(var(--primary) / 0);
+    }
+  }
+
+  .animate-pulse-border {
+    animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-border {
+      animation: none;
+      border-color: hsl(var(--primary));
+    }
+  }
 }
