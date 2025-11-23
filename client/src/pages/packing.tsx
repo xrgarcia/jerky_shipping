@@ -499,6 +499,8 @@ export default function Packing() {
         });
         
         setSkuProgress(progress);
+        // Clear scan feedback to start fresh
+        setScanFeedback(null);
       }
       
       // Invalidate queries to refresh the list
