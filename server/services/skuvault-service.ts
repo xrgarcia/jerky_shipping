@@ -1139,7 +1139,8 @@ export class SkuVaultService {
     await this.ensureAuthenticated();
 
     try {
-      const url = `${this.config.apiBaseUrl}/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
+      // QC Sales endpoint is only available on app.skuvault.com, not lmdb.skuvault.com
+      const url = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
       console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
       
       const response = await this.makeAuthenticatedRequest<any>('GET', url);
