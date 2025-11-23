@@ -1309,16 +1309,16 @@ export default function Packing() {
                               {scanFeedback.title}
                             </div>
                             {scanFeedback.productName && (
-                              <div className="text-lg font-semibold text-foreground mb-1 truncate">
+                              <div className="text-xl font-semibold text-foreground mb-1 truncate">
                                 {scanFeedback.productName}
                               </div>
                             )}
                             {scanFeedback.sku && (
-                              <div className="text-sm font-mono text-muted-foreground">
+                              <div className="text-lg font-mono text-muted-foreground">
                                 {scanFeedback.sku}
                               </div>
                             )}
-                            <div className="text-sm text-muted-foreground mt-1">
+                            <div className="text-lg text-muted-foreground mt-1">
                               {scanFeedback.message}
                             </div>
                           </div>
@@ -1478,8 +1478,8 @@ export default function Packing() {
                           )}
                           
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-lg truncate">{progress.name}</div>
-                            <div className="text-sm text-muted-foreground font-mono">
+                            <div className="font-semibold text-xl truncate">{progress.name}</div>
+                            <div className="text-lg text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
                           </div>
