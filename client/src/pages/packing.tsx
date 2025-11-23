@@ -69,6 +69,7 @@ type ShipmentWithItems = {
   // Gift information
   isGift: boolean | null;
   notesForGift: string | null;
+  notesFromBuyer: string | null;
   items: ShipmentItem[];
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
 };
@@ -1096,6 +1097,18 @@ export default function Packing() {
                         </div>
                         <p className="text-sm pl-5 text-foreground italic">
                           "{currentShipment.notesForGift}"
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Notes from Buyer */}
+                    {currentShipment.notesFromBuyer && (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-600 rounded-md">
+                        <div className="flex items-start gap-2 mb-1">
+                          <span className="text-blue-600 font-semibold text-sm">💬 Customer Notes:</span>
+                        </div>
+                        <p className="text-sm pl-5 text-foreground">
+                          {currentShipment.notesFromBuyer}
                         </p>
                       </div>
                     )}
