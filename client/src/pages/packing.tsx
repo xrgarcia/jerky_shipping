@@ -1823,7 +1823,7 @@ export default function Packing() {
                                 </div>
                               </div>
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                {new Date(log.createdAt).toLocaleTimeString()}
+                                {new Date(log.createdAt).toLocaleString()}
                               </div>
                             </div>
                           </div>
@@ -1876,7 +1876,7 @@ export default function Packing() {
                                 </div>
                               </div>
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                {new Date(event.occurredAt).toLocaleTimeString()}
+                                {new Date(event.occurredAt).toLocaleString()}
                               </div>
                             </div>
                           </div>
