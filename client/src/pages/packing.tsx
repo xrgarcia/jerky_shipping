@@ -1750,8 +1750,9 @@ export default function Packing() {
                                 : "border-red-200 bg-red-50 dark:bg-red-950/20"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
+                            <div className="grid grid-cols-[1fr,auto,auto] gap-4 items-start">
+                              {/* Column 1: Event Details */}
+                              <div className="min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   {log.success ? (
                                     <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
@@ -1776,6 +1777,13 @@ export default function Packing() {
                                   )}
                                 </div>
                               </div>
+                              
+                              {/* Column 2: User */}
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                System
+                              </div>
+                              
+                              {/* Column 3: Timestamp */}
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
                                 {new Date(log.createdAt).toLocaleString()}
                               </div>
@@ -1802,8 +1810,9 @@ export default function Packing() {
                             key={entry.id}
                             className="p-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
+                            <div className="grid grid-cols-[1fr,auto,auto] gap-4 items-start">
+                              {/* Column 1: Event Details */}
+                              <div className="min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <Zap className="h-4 w-4 text-blue-600 flex-shrink-0" />
                                   <span className="font-medium text-sm">
@@ -1827,13 +1836,15 @@ export default function Packing() {
                                       {JSON.stringify(event.metadata).slice(0, 100)}
                                     </div>
                                   )}
-                                  {event.username && (
-                                    <div className="text-xs text-muted-foreground">
-                                      User: {event.username}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
+                              
+                              {/* Column 2: User */}
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                {event.username || 'N/A'}
+                              </div>
+                              
+                              {/* Column 3: Timestamp */}
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
                                 {new Date(event.occurredAt).toLocaleString()}
                               </div>
