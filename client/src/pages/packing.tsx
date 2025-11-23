@@ -1026,22 +1026,22 @@ export default function Packing() {
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
-                  <div className="text-xs text-muted-foreground">Order</div>
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Order</div>
                   <div className="text-xl font-bold font-mono" data-testid="badge-order-number">
                     {currentShipment.orderNumber}
                   </div>
                 </div>
-                <div className="h-8 w-px bg-border" />
+                <div className="h-12 w-[2px] bg-border" />
                 <div>
-                  <div className="text-xs text-muted-foreground">Ship To</div>
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Ship To</div>
                   <div className="text-lg font-semibold" data-testid="text-ship-to-name">
                     {currentShipment.shipToName || 'N/A'}
                   </div>
                 </div>
                 {currentShipment.isGift && (
                   <>
-                    <div className="h-8 w-px bg-border" />
-                    <div>
+                    <div className="h-12 w-[2px] bg-border" />
+                    <div className="flex items-center">
                       <Badge variant="outline" className="border-pink-600 text-pink-600 bg-pink-50 dark:bg-pink-950/20">
                         🎁 Gift Order
                       </Badge>
