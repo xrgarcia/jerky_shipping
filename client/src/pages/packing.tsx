@@ -444,7 +444,7 @@ export default function Packing() {
         });
 
         setProductScan("");
-        productInputRef.current?.focus();
+        setTimeout(() => productInputRef.current?.focus(), 0);
         return;
       }
 
@@ -517,7 +517,7 @@ export default function Packing() {
         });
 
         setProductScan("");
-        productInputRef.current?.focus();
+        setTimeout(() => productInputRef.current?.focus(), 0);
         return;
       }
 
@@ -591,7 +591,7 @@ export default function Packing() {
       });
 
       setProductScan("");
-      productInputRef.current?.focus();
+      setTimeout(() => productInputRef.current?.focus(), 0);
     },
     onError: async (error: Error, scannedCode) => {
       // Log failed scan
@@ -617,7 +617,7 @@ export default function Packing() {
       });
 
       setProductScan("");
-      productInputRef.current?.focus();
+      setTimeout(() => productInputRef.current?.focus(), 0);
     },
   });
 
@@ -770,6 +770,9 @@ export default function Packing() {
       title: "Manual Verification Complete",
       description: `${progress.name} (${progress.expected} unit${progress.expected > 1 ? 's' : ''}) verified by supervisor`,
     });
+    
+    // Return focus to product input
+    setTimeout(() => productInputRef.current?.focus(), 0);
   };
 
   // Calculate completion status
