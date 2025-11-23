@@ -200,6 +200,7 @@ export interface IStorage {
   getShipmentEventsByOrderNumber(orderNumber: string): Promise<ShipmentEvent[]>;
   getShipmentEventsByUser(username: string, limit?: number): Promise<ShipmentEvent[]>;
   getShipmentEventsByDateRange(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
+  deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void>;
   
   // Shipment Sync Failures
   getShipmentSyncFailureCount(): Promise<number>;
@@ -1648,6 +1649,10 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(shipmentEvents.occurredAt));
+  }
+
+  async deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void> {
+    await db.delete(shipmentEvents).where(eq(shipmentEvents.orderNumber, orderNumber));
   }
 
   // Shipment Sync Failures

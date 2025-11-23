@@ -3543,14 +3543,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete packing logs for a shipment (testing/re-scanning)
+  // Delete packing logs and shipment events for a shipment (testing/re-scanning)
   app.delete("/api/packing-logs/shipment/:shipmentId", requireAuth, async (req, res) => {
     try {
+      // Get shipment to find order number
+      const shipment = await storage.getShipment(req.params.shipmentId);
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Delete both packing logs and shipment events
       await storage.deletePackingLogsByShipment(req.params.shipmentId);
-      res.json({ success: true, message: "Packing logs cleared" });
+      await storage.deleteShipmentEventsByOrderNumber(shipment.orderNumber);
+      
+      res.json({ success: true, message: "Packing history cleared" });
     } catch (error: any) {
-      console.error("[Packing] Error deleting packing logs:", error);
-      res.status(500).json({ error: "Failed to delete packing logs" });
+      console.error("[Packing] Error deleting packing history:", error);
+      res.status(500).json({ error: "Failed to delete packing history" });
     }
   });
 

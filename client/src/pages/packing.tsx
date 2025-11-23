@@ -560,6 +560,12 @@ export default function Packing() {
       return (await response.json()) as { success: boolean; message: string };
     },
     onSuccess: () => {
+      // Invalidate both packing logs and shipment events queries
+      if (currentShipment) {
+        queryClient.invalidateQueries({ queryKey: ["/api/packing-logs/shipment", currentShipment.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/shipment-events/order", currentShipment.orderNumber] });
+      }
+      
       // Reset local progress state
       if (currentShipment) {
         // Rebuild initial progress from shipment items (same logic as initial load)
