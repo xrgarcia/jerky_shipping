@@ -511,9 +511,8 @@ export default function Packing() {
         });
 
         toast({
-          title: "Already Scanned",
-          description: `All ${currentProgress.expected} units of ${product.Sku} already scanned`,
-          variant: "destructive",
+          title: "Already Complete - Scan Next",
+          description: `${product.Sku} (${currentProgress.scanned}/${currentProgress.expected} scanned) ✓`,
         });
 
         setProductScan("");
