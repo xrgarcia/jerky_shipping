@@ -109,6 +109,7 @@ type PackingLog = {
 type ShipmentEvent = {
   id: string;
   eventName: string;
+  username: string; // Email of user who performed the action
   metadata: any;
   occurredAt: string; // Database field is occurredAt, not createdAt
   skuvaultImport?: boolean; // True if imported from SkuVault PassedItems
@@ -1824,6 +1825,11 @@ export default function Packing() {
                                   {!event.metadata?.sku && !event.metadata?.message && event.metadata && (
                                     <div className="text-xs text-muted-foreground">
                                       {JSON.stringify(event.metadata).slice(0, 100)}
+                                    </div>
+                                  )}
+                                  {event.username && (
+                                    <div className="text-xs text-muted-foreground">
+                                      User: {event.username}
                                     </div>
                                   )}
                                 </div>
