@@ -321,11 +321,19 @@ export default function Packing() {
         // Rebuild initial progress from shipment items (same logic as initial load)
         const progress = new Map<string, SkuProgress>();
         
+        // Filter out non-physical items (discounts, adjustments, fees) - same as initial load
         const physicalItems = currentShipment.items.filter((item) => {
-          if (!item.shipmentItemId) {
-            console.warn("Skipping item without shipmentItemId:", item);
+          // Exclude items with negative prices (discounts/adjustments)
+          const unitPrice = item.unitPrice ? parseFloat(item.unitPrice) : 0;
+          if (unitPrice < 0) {
             return false;
           }
+          
+          // Exclude items with no SKU AND no name (malformed data)
+          if (!item.sku && !item.name) {
+            return false;
+          }
+          
           return true;
         });
         
