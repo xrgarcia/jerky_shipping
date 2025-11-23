@@ -587,8 +587,8 @@ export default function Packing() {
 
         showScanFeedback(
           "error",
-          "WRONG ITEM",
-          `${product.Sku} not in this order`,
+          "WRONG ITEM - Not in this order",
+          `Set aside → Scan any remaining item below`,
           {
             sku: product.Sku || "",
             productName: product.Description || undefined,
@@ -821,7 +821,7 @@ export default function Packing() {
       showScanFeedback(
         "error",
         "PRODUCT NOT FOUND",
-        error.message,
+        "Check barcode → Scan any remaining item below",
         {
           sku: scannedCode,
         }
