@@ -1094,7 +1094,7 @@ export default function Packing() {
             <Accordion type="single" collapsible>
               <AccordionItem value="shipping-details" className="border rounded-lg px-4">
                 <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-4 w-full pr-4">
                     <span className="text-sm font-medium flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       Shipping Details
