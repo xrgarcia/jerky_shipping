@@ -8,6 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { QCPassItemResponse } from "@shared/skuvault-types";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   PackageCheck,
   Scan,
   CheckCircle2,
@@ -20,6 +26,7 @@ import {
   User,
   Mail,
   Phone,
+  ChevronDown,
 } from "lucide-react";
 
 type ShipmentItem = {
@@ -810,205 +817,208 @@ export default function Packing() {
   const failedScans = packingLogs?.filter((log) => !log.success && log.action === "product_scanned").length || 0;
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-3 mb-6">
-        <PackageCheck className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">Packing Station</h1>
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="flex items-center gap-3 mb-4">
+        <PackageCheck className="h-7 w-7 text-primary" />
+        <h1 className="text-2xl font-bold">Packing Station</h1>
       </div>
 
-      <div className="space-y-6">
-        {/* Row 1: Scan Order + Shipping Label */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Scan Order Barcode */}
+      <div className="space-y-4">
+        {!currentShipment ? (
+          /* No Order Loaded - Show Scan Order Input */
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-5 w-5" />
-                Scan Order Barcode
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleOrderScan} className="space-y-4">
+            <CardContent className="pt-6">
+              <form onSubmit={handleOrderScan} className="space-y-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Scan className="h-4 w-4" />
+                  Scan Order Barcode
+                </label>
                 <Input
                   ref={orderInputRef}
                   type="text"
                   placeholder="Scan order number..."
                   value={orderScan}
                   onChange={(e) => setOrderScan(e.target.value)}
-                  disabled={loadShipmentMutation.isPending || !!currentShipment}
+                  disabled={loadShipmentMutation.isPending}
                   className="text-2xl h-16 text-center font-mono"
                   data-testid="input-order-scan"
                 />
-                {currentShipment && (
-                  <div className="space-y-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setCurrentShipment(null);
-                        setOrderScan("");
-                        setPackingComplete(false);
-                        setSkuProgress(new Map());
-                        orderInputRef.current?.focus();
-                      }}
-                      className="w-full"
-                      data-testid="button-clear-order"
-                    >
-                      Scan Different Order
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => clearHistoryMutation.mutate(currentShipment.id)}
-                      disabled={clearHistoryMutation.isPending}
-                      className="w-full"
-                      data-testid="button-clear-history"
-                    >
-                      {clearHistoryMutation.isPending ? "Clearing..." : "Clear History & Rescan"}
-                    </Button>
-                  </div>
-                )}
               </form>
             </CardContent>
           </Card>
-
-          {/* Shipping Label */}
-          {currentShipment ? (
-            <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Shipping Label
-                  </CardTitle>
-                  <Badge variant="outline" className="w-fit" data-testid="badge-order-number">
+        ) : (
+          /* Order Loaded - Show Header and QC or Completion */
+          <>
+            {/* Compact Order Info Header */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div>
+                  <div className="text-xs text-muted-foreground">Order</div>
+                  <div className="text-xl font-bold font-mono" data-testid="badge-order-number">
                     {currentShipment.orderNumber}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Customer Name */}
-                  {currentShipment.shipToName && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Ship To</p>
-                      <p className="text-xl font-semibold" data-testid="text-ship-to-name">
-                        {currentShipment.shipToName}
-                      </p>
-                    </div>
-                  )}
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Ship To</div>
+                  <div className="text-lg font-semibold" data-testid="text-ship-to-name">
+                    {currentShipment.shipToName || 'N/A'}
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Items</div>
+                  <div className="text-lg font-bold">
+                    {totalScanned} / {totalExpected}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentShipment(null);
+                    setOrderScan("");
+                    setPackingComplete(false);
+                    setSkuProgress(new Map());
+                    orderInputRef.current?.focus();
+                  }}
+                  data-testid="button-clear-order"
+                >
+                  Change Order
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => clearHistoryMutation.mutate(currentShipment.id)}
+                  disabled={clearHistoryMutation.isPending}
+                  data-testid="button-clear-history"
+                >
+                  {clearHistoryMutation.isPending ? "Clearing..." : "Clear History"}
+                </Button>
+              </div>
+            </div>
 
-                  {/* Contact Information */}
-                  {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
-                    <div className="space-y-2">
-                      {currentShipment.shipToEmail && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <a href={`mailto:${currentShipment.shipToEmail}`} className="hover:underline text-sm">
-                            {currentShipment.shipToEmail}
-                          </a>
-                        </div>
-                      )}
-                      {currentShipment.shipToPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <a href={`tel:${currentShipment.shipToPhone}`} className="hover:underline text-sm">
-                            {currentShipment.shipToPhone}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Shipping Address */}
-                  {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
-                    <div>
-                      <div className="flex items-start gap-2 mb-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                        <p className="text-sm text-muted-foreground">Address</p>
-                      </div>
-                      <div className="pl-6 space-y-1">
-                        {currentShipment.shipToCompany && (
-                          <p className="font-semibold">{currentShipment.shipToCompany}</p>
-                        )}
-                        {currentShipment.shipToAddressLine1 && <p>{currentShipment.shipToAddressLine1}</p>}
-                        {currentShipment.shipToAddressLine2 && <p>{currentShipment.shipToAddressLine2}</p>}
-                        {currentShipment.shipToAddressLine3 && <p>{currentShipment.shipToAddressLine3}</p>}
-                        <p>
-                          {[currentShipment.shipToCity, currentShipment.shipToState, currentShipment.shipToPostalCode]
-                            .filter(Boolean)
-                            .join(', ')}
-                        </p>
-                        {currentShipment.shipToCountry && <p>{currentShipment.shipToCountry}</p>}
-                        {currentShipment.shipToIsResidential && (
-                          <p className="text-sm text-muted-foreground mt-2">
-                            {currentShipment.shipToIsResidential === 'yes' 
-                              ? 'Residential Address' 
-                              : currentShipment.shipToIsResidential === 'no' 
-                              ? 'Commercial Address' 
-                              : ''}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Shipping Method & Tracking */}
-                  <div className="pt-4 border-t space-y-3">
-                    {currentShipment.carrier && (
-                      <div className="flex items-start gap-3">
-                        <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">Shipping Method</div>
-                          <div className="font-medium">
-                            {currentShipment.carrier} {currentShipment.serviceCode}
+            {/* Collapsible Shipping Details */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="shipping-details" className="border rounded-lg px-4">
+                <AccordionTrigger className="hover:no-underline">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Shipping Details
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4 pt-2 pb-4">
+                    {/* Contact Information */}
+                    {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
+                      <div className="space-y-2">
+                        {currentShipment.shipToEmail && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <a href={`mailto:${currentShipment.shipToEmail}`} className="hover:underline text-sm">
+                              {currentShipment.shipToEmail}
+                            </a>
                           </div>
-                        </div>
+                        )}
+                        {currentShipment.shipToPhone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <a href={`tel:${currentShipment.shipToPhone}`} className="hover:underline text-sm">
+                              {currentShipment.shipToPhone}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {currentShipment.trackingNumber && (
-                      <div className="flex items-start gap-3">
-                        <Truck className="h-5 w-5 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <div className="text-sm text-muted-foreground">Tracking Number</div>
-                          <div className="font-mono text-sm" data-testid="text-tracking">
-                            {currentShipment.trackingNumber}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {currentShipment.statusDescription && (
+                    {/* Shipping Address */}
+                    {(currentShipment.shipToAddressLine1 || currentShipment.shipToCity) && (
                       <div>
-                        <div className="text-sm text-muted-foreground mb-1">Status</div>
-                        <Badge variant="secondary" data-testid="badge-status">
-                          {currentShipment.statusDescription}
-                        </Badge>
+                        <div className="flex items-start gap-2 mb-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                          <p className="text-sm text-muted-foreground">Address</p>
+                        </div>
+                        <div className="pl-6 space-y-1 text-sm">
+                          {currentShipment.shipToCompany && (
+                            <p className="font-semibold">{currentShipment.shipToCompany}</p>
+                          )}
+                          {currentShipment.shipToAddressLine1 && <p>{currentShipment.shipToAddressLine1}</p>}
+                          {currentShipment.shipToAddressLine2 && <p>{currentShipment.shipToAddressLine2}</p>}
+                          {currentShipment.shipToAddressLine3 && <p>{currentShipment.shipToAddressLine3}</p>}
+                          <p>
+                            {[currentShipment.shipToCity, currentShipment.shipToState, currentShipment.shipToPostalCode]
+                              .filter(Boolean)
+                              .join(', ')}
+                          </p>
+                          {currentShipment.shipToCountry && <p>{currentShipment.shipToCountry}</p>}
+                          {currentShipment.shipToIsResidential && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {currentShipment.shipToIsResidential === 'yes' 
+                                ? 'Residential Address' 
+                                : currentShipment.shipToIsResidential === 'no' 
+                                ? 'Commercial Address' 
+                                : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Shipping Method & Tracking */}
+                    {(currentShipment.carrier || currentShipment.trackingNumber) && (
+                      <div className="pt-3 border-t space-y-2">
+                        {currentShipment.carrier && (
+                          <div className="flex items-start gap-2">
+                            <Truck className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <div className="flex-1 text-sm">
+                              <div className="text-muted-foreground">Carrier</div>
+                              <div className="font-medium">
+                                {currentShipment.carrier} {currentShipment.serviceCode}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {currentShipment.trackingNumber && (
+                          <div className="flex items-start gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <div className="flex-1 text-sm">
+                              <div className="text-muted-foreground">Tracking</div>
+                              <div className="font-mono text-xs" data-testid="text-tracking">
+                                {currentShipment.trackingNumber}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {currentShipment.statusDescription && (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" data-testid="badge-status">
+                              {currentShipment.statusDescription}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center text-muted-foreground">
-                  <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Scan an order to view shipping label</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-        {/* Row 2: QC Section (Product Scanning & Items Progress) */}
-        {currentShipment && !packingComplete && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Quality Control
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+            {/* QC Card - Product Scanning - Only show when not complete */}
+            {!packingComplete && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Package className="h-5 w-5" />
+                    Quality Control
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
               {/* Product Scanner Input */}
               <form onSubmit={handleProductScan}>
                 <Input
@@ -1189,26 +1199,28 @@ export default function Packing() {
                   </>
                 )}
               </Button>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Packing Complete Message - Only show when complete */}
+            {packingComplete && (
+              <Card className="border-green-600">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-4">
+                    <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
+                    <div>
+                      <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
+                      <p className="text-muted-foreground mt-2">Loading next order...</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
 
-        {/* Packing Complete Message */}
-        {packingComplete && (
-          <Card className="border-green-600">
-            <CardContent className="pt-6">
-              <div className="text-center space-y-4">
-                <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
-                <div>
-                  <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
-                  <p className="text-muted-foreground mt-2">Loading next order...</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Row 3: Scan History */}
+        {/* Scan History - Shows when order is loaded AND has logs */}
         {currentShipment && packingLogs && packingLogs.length > 0 && (
           <Card>
             <CardHeader>
