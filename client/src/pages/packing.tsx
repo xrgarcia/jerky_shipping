@@ -110,7 +110,7 @@ type ShipmentEvent = {
   id: string;
   eventName: string;
   metadata: any;
-  createdAt: string;
+  occurredAt: string; // Database field is occurredAt, not createdAt
   skuvaultImport?: boolean; // True if imported from SkuVault PassedItems
 };
 
@@ -1736,7 +1736,7 @@ export default function Packing() {
               timeline.push({
                 id: event.id,
                 type: 'event',
-                timestamp: event.createdAt,
+                timestamp: event.occurredAt,
                 data: event
               });
             });
@@ -1876,7 +1876,7 @@ export default function Packing() {
                                 </div>
                               </div>
                               <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                {new Date(event.createdAt).toLocaleTimeString()}
+                                {new Date(event.occurredAt).toLocaleTimeString()}
                               </div>
                             </div>
                           </div>
