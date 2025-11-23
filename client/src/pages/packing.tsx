@@ -1370,9 +1370,9 @@ export default function Packing() {
                       >
                         <div className="flex items-start gap-4 mb-3">
                           {/* Product Image */}
-                          {shipmentItem?.imageUrl && (
+                          {progress.imageUrl && (
                             <img
-                              src={shipmentItem.imageUrl}
+                              src={progress.imageUrl}
                               alt={progress.name}
                               className="w-28 h-28 object-cover rounded-md border-2 flex-shrink-0"
                             />
