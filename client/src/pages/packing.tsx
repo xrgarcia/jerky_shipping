@@ -1188,86 +1188,98 @@ export default function Packing() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-              {/* Scan Feedback Strip - Only show when not complete */}
-              {!allItemsScanned && scanFeedback && (
+              {/* Scan Feedback Strip - Always visible to prevent UI bouncing */}
+              {!allItemsScanned && (
                 <div
-                  className={`p-4 rounded-lg border-2 transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
-                    scanFeedback.type === "success"
-                      ? "bg-green-50 dark:bg-green-950/30 border-green-600"
-                      : scanFeedback.type === "error"
-                      ? "bg-red-50 dark:bg-red-950/30 border-red-600"
-                      : "bg-blue-50 dark:bg-blue-950/30 border-blue-600"
+                  className={`p-4 rounded-lg border-2 transition-all min-h-[100px] flex items-center ${
+                    scanFeedback
+                      ? scanFeedback.type === "success"
+                        ? "bg-green-50 dark:bg-green-950/30 border-green-600"
+                        : scanFeedback.type === "error"
+                        ? "bg-red-50 dark:bg-red-950/30 border-red-600"
+                        : "bg-blue-50 dark:bg-blue-950/30 border-blue-600"
+                      : "bg-muted/30 border-muted-foreground/20"
                   }`}
                   data-testid="scan-feedback-strip"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Status Icon */}
-                    <div className="flex-shrink-0">
-                      {scanFeedback.type === "success" ? (
-                        <CheckCircle2 className="h-10 w-10 text-green-600" />
-                      ) : scanFeedback.type === "error" ? (
-                        <XCircle className="h-10 w-10 text-red-600" />
-                      ) : (
-                        <AlertCircle className="h-10 w-10 text-blue-600" />
-                      )}
-                    </div>
-                    
-                    {/* Feedback Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-3">
-                        {/* Product Image (if available) */}
-                        {scanFeedback.imageUrl && (
-                          <img
-                            src={scanFeedback.imageUrl}
-                            alt={scanFeedback.productName || "Product"}
-                            className="w-16 h-16 object-cover rounded-md border flex-shrink-0"
-                          />
+                  {scanFeedback ? (
+                    <div className="flex items-center gap-4 w-full">
+                      {/* Status Icon */}
+                      <div className="flex-shrink-0">
+                        {scanFeedback.type === "success" ? (
+                          <CheckCircle2 className="h-10 w-10 text-green-600" />
+                        ) : scanFeedback.type === "error" ? (
+                          <XCircle className="h-10 w-10 text-red-600" />
+                        ) : (
+                          <AlertCircle className="h-10 w-10 text-blue-600" />
                         )}
-                        
-                        {/* Text Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-2xl font-bold mb-1 ${
-                            scanFeedback.type === "success"
-                              ? "text-green-900 dark:text-green-100"
-                              : scanFeedback.type === "error"
-                              ? "text-red-900 dark:text-red-100"
-                              : "text-blue-900 dark:text-blue-100"
-                          }`}>
-                            {scanFeedback.title}
-                          </div>
-                          {scanFeedback.productName && (
-                            <div className="text-lg font-semibold text-foreground mb-1 truncate">
-                              {scanFeedback.productName}
-                            </div>
+                      </div>
+                      
+                      {/* Feedback Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-3">
+                          {/* Product Image (if available) */}
+                          {scanFeedback.imageUrl && (
+                            <img
+                              src={scanFeedback.imageUrl}
+                              alt={scanFeedback.productName || "Product"}
+                              className="w-16 h-16 object-cover rounded-md border flex-shrink-0"
+                            />
                           )}
-                          {scanFeedback.sku && (
-                            <div className="text-sm font-mono text-muted-foreground">
-                              {scanFeedback.sku}
-                            </div>
-                          )}
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {scanFeedback.message}
-                          </div>
-                        </div>
-                        
-                        {/* Scanned Count (if available) */}
-                        {scanFeedback.scannedCount !== undefined && scanFeedback.expectedCount !== undefined && (
-                          <div className="flex-shrink-0 text-right">
-                            <div className={`text-3xl font-bold ${
+                          
+                          {/* Text Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-2xl font-bold mb-1 ${
                               scanFeedback.type === "success"
                                 ? "text-green-900 dark:text-green-100"
                                 : scanFeedback.type === "error"
                                 ? "text-red-900 dark:text-red-100"
                                 : "text-blue-900 dark:text-blue-100"
                             }`}>
-                              {scanFeedback.scannedCount} / {scanFeedback.expectedCount}
+                              {scanFeedback.title}
                             </div>
-                            <div className="text-xs text-muted-foreground">units</div>
+                            {scanFeedback.productName && (
+                              <div className="text-lg font-semibold text-foreground mb-1 truncate">
+                                {scanFeedback.productName}
+                              </div>
+                            )}
+                            {scanFeedback.sku && (
+                              <div className="text-sm font-mono text-muted-foreground">
+                                {scanFeedback.sku}
+                              </div>
+                            )}
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {scanFeedback.message}
+                            </div>
                           </div>
-                        )}
+                          
+                          {/* Scanned Count (if available) */}
+                          {scanFeedback.scannedCount !== undefined && scanFeedback.expectedCount !== undefined && (
+                            <div className="flex-shrink-0 text-right">
+                              <div className={`text-3xl font-bold ${
+                                scanFeedback.type === "success"
+                                  ? "text-green-900 dark:text-green-100"
+                                  : scanFeedback.type === "error"
+                                  ? "text-red-900 dark:text-red-100"
+                                  : "text-blue-900 dark:text-blue-100"
+                              }`}>
+                                {scanFeedback.scannedCount} / {scanFeedback.expectedCount}
+                              </div>
+                              <div className="text-xs text-muted-foreground">units</div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3 w-full text-muted-foreground">
+                      <Package className="h-8 w-8" />
+                      <div>
+                        <div className="text-lg font-medium">Ready to scan</div>
+                        <div className="text-sm">Scan a product barcode to begin quality control</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1298,33 +1310,46 @@ export default function Packing() {
               {/* Overall Progress - Only show when not complete */}
               {!allItemsScanned && (
                 <div className="p-4 bg-muted rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-2">Overall Progress</div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-3xl font-bold">
-                      {totalScanned} / {totalExpected}
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-3xl font-bold">
+                        {totalExpected - totalScanned} {totalExpected - totalScanned === 1 ? "Item" : "Items"} Remaining
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {totalScanned} of {totalExpected} scanned
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <CheckCircle2 className="h-6 w-6 text-green-600" />
                         <div>
-                          <div className="text-2xl font-bold">{successfulScans}</div>
-                          <div className="text-xs text-muted-foreground">Valid</div>
+                          <div className="text-3xl font-bold text-green-600">{successfulScans}</div>
+                          <div className="text-xs text-muted-foreground font-semibold">VALID</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <XCircle className="h-5 w-5 text-red-600" />
+                        <XCircle className="h-6 w-6 text-red-600" />
                         <div>
-                          <div className="text-2xl font-bold">{failedScans}</div>
-                          <div className="text-xs text-muted-foreground">Rejected</div>
+                          <div className="text-3xl font-bold text-red-600">{failedScans}</div>
+                          <div className="text-xs text-muted-foreground font-semibold">REJECTED</div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
+                  
+                  {/* Segmented Progress Bar */}
+                  <div className="mt-2 h-3 bg-background rounded-full overflow-hidden flex">
+                    {/* Green segment for valid scans */}
                     <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${totalExpected > 0 ? (totalScanned / totalExpected) * 100 : 0}%` }}
+                      className="h-full bg-green-600 transition-all"
+                      style={{ width: `${totalExpected > 0 ? (successfulScans / totalExpected) * 100 : 0}%` }}
                     />
+                    {/* Red segment for rejected scans */}
+                    <div
+                      className="h-full bg-red-600 transition-all"
+                      style={{ width: `${totalExpected > 0 ? (failedScans / totalExpected) * 100 : 0}%` }}
+                    />
+                    {/* Remaining space (unscanned) stays as background color */}
                   </div>
                 </div>
               )}
