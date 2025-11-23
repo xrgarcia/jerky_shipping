@@ -1531,58 +1531,90 @@ export default function Packing() {
         )}
 
         {/* Scan History - Shows when order is loaded AND has logs */}
-        {currentShipment && packingLogs && packingLogs.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Scan History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {packingLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className={`p-3 rounded-lg border ${
-                      log.success
-                        ? "border-green-200 bg-green-50 dark:bg-green-950/20"
-                        : "border-red-200 bg-red-50 dark:bg-red-950/20"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {log.success ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                          )}
-                          <span className="font-medium text-sm">
-                            {log.action === "product_scanned" ? "Product Scan" : "Manual Verification"}
-                          </span>
-                        </div>
-                        <div className="text-sm space-y-1">
-                          {log.productSku && (
-                            <div className="font-mono text-muted-foreground">{log.productSku}</div>
-                          )}
-                          {log.scannedCode && (
-                            <div className="font-mono text-xs text-muted-foreground">
-                              Code: {log.scannedCode}
-                            </div>
-                          )}
-                          {log.errorMessage && (
-                            <div className="text-red-600 text-xs">{log.errorMessage}</div>
-                          )}
-                        </div>
+        {currentShipment && packingLogs && packingLogs.length > 0 && (() => {
+          const successfulScans = packingLogs.filter(log => log.success).length;
+          const failedScans = packingLogs.filter(log => !log.success).length;
+          const totalScans = packingLogs.length;
+          const accuracy = totalScans > 0 ? Math.round((successfulScans / totalScans) * 100) : 0;
+          
+          return (
+            <Accordion 
+              type="single" 
+              collapsible 
+              defaultValue={allItemsScanned ? undefined : "scan-history"}
+              data-testid="accordion-scan-history"
+            >
+              <AccordionItem value="scan-history">
+                <AccordionTrigger 
+                  className="px-6 hover:no-underline"
+                  data-testid="trigger-scan-history"
+                >
+                  <div className="flex items-center justify-between w-full pr-2">
+                    <span className="font-semibold">Scan History</span>
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600 font-semibold">{successfulScans}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleTimeString()}
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-red-600 font-semibold">{failedScans}</span>
                       </div>
+                      <Badge variant="secondary" className="ml-2">
+                        {accuracy}% accuracy
+                      </Badge>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </AccordionTrigger>
+                <AccordionContent className="px-6 pb-4">
+                  <div className="space-y-2 max-h-96 overflow-y-auto" data-testid="list-scan-history">
+                    {packingLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className={`p-3 rounded-lg border ${
+                          log.success
+                            ? "border-green-200 bg-green-50 dark:bg-green-950/20"
+                            : "border-red-200 bg-red-50 dark:bg-red-950/20"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              {log.success ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                              )}
+                              <span className="font-medium text-sm">
+                                {log.action === "product_scanned" ? "Product Scan" : "Manual Verification"}
+                              </span>
+                            </div>
+                            <div className="text-sm space-y-1">
+                              {log.productSku && (
+                                <div className="font-mono text-muted-foreground">{log.productSku}</div>
+                              )}
+                              {log.scannedCode && (
+                                <div className="font-mono text-xs text-muted-foreground">
+                                  Code: {log.scannedCode}
+                                </div>
+                              )}
+                              {log.errorMessage && (
+                                <div className="text-red-600 text-xs">{log.errorMessage}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(log.createdAt).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          );
+        })()}
       </div>
     </div>
   );
