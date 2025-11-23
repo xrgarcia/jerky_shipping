@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,19 @@ type SkuProgress = {
   scanned: number;
   remaining: number; // Tracks remaining units to scan for this specific item
   requiresManualVerification?: boolean; // For items without SKU
+  imageUrl?: string | null; // Product image URL
+};
+
+type ScanFeedback = {
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+  sku?: string;
+  productName?: string;
+  imageUrl?: string | null;
+  scannedCount?: number;
+  expectedCount?: number;
+  timestamp: number;
 };
 
 export default function Packing() {
@@ -118,9 +131,121 @@ export default function Packing() {
   // Use item ID as key to handle duplicate SKUs properly
   const [skuProgress, setSkuProgress] = useState<Map<string, SkuProgress>>(new Map());
   const [packingComplete, setPackingComplete] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
+
+  // Audio feedback - Reuse single AudioContext to avoid browser limits
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioResumedRef = useRef(false);
+
+  const getAudioContext = async () => {
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.warn("AudioContext creation failed:", error);
+        return null;
+      }
+    }
+    
+    // Resume context if suspended (browser autoplay policy)
+    if (audioContextRef.current.state === "suspended" && !audioResumedRef.current) {
+      try {
+        await audioContextRef.current.resume();
+        audioResumedRef.current = true;
+      } catch (error) {
+        console.warn("AudioContext resume failed:", error);
+      }
+    }
+    
+    return audioContextRef.current;
+  };
+
+  // Resume audio context on first user interaction (field focus/input)
+  const handleFirstInteraction = useCallback(async () => {
+    if (!audioResumedRef.current) {
+      await getAudioContext();
+    }
+  }, []);
+
+  const playBeep = async (frequency: number, duration: number) => {
+    try {
+      const audioContext = await getAudioContext();
+      if (!audioContext || audioContext.state !== "running") return;
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = frequency;
+      oscillator.type = "sine";
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + duration);
+    } catch (error) {
+      console.warn("Audio playback failed:", error);
+    }
+  };
+
+  const playSuccessBeep = () => playBeep(800, 0.15); // High-pitched, short
+  const playErrorBeep = () => playBeep(200, 0.3); // Low-pitched, longer
+
+  // Haptic feedback - Trigger vibration
+  const vibrate = (pattern: number | number[]) => {
+    try {
+      if ("vibrate" in navigator) {
+        navigator.vibrate(pattern);
+      }
+    } catch (error) {
+      console.warn("Vibration failed:", error);
+    }
+  };
+
+  // Helper to show scan feedback with multi-channel feedback
+  const showScanFeedback = (
+    type: "success" | "error" | "info",
+    title: string,
+    message: string,
+    options?: {
+      sku?: string;
+      productName?: string;
+      imageUrl?: string | null;
+      scannedCount?: number;
+      expectedCount?: number;
+    }
+  ) => {
+    // Visual feedback
+    setScanFeedback({
+      type,
+      title,
+      message,
+      sku: options?.sku,
+      productName: options?.productName,
+      imageUrl: options?.imageUrl,
+      scannedCount: options?.scannedCount,
+      expectedCount: options?.expectedCount,
+      timestamp: Date.now(),
+    });
+
+    // Audio feedback
+    if (type === "success") {
+      playSuccessBeep();
+      vibrate(100); // Short vibration
+    } else if (type === "error") {
+      playErrorBeep();
+      vibrate([100, 50, 100]); // Double vibration pattern
+    } else {
+      playSuccessBeep();
+      vibrate(50); // Brief vibration
+    }
+  };
 
   // Focus order input on mount
   useEffect(() => {
@@ -163,6 +288,7 @@ export default function Packing() {
             scanned: 0,
             remaining: item.quantity, // Track remaining units for this specific item
             requiresManualVerification: false,
+            imageUrl: item.imageUrl,
           });
         } else {
           progress.set(key, {
@@ -174,6 +300,7 @@ export default function Packing() {
             scanned: 0,
             remaining: item.quantity,
             requiresManualVerification: true,
+            imageUrl: item.imageUrl,
           });
         }
       });
@@ -448,11 +575,16 @@ export default function Packing() {
           skuVaultRawResponse: rawResponse,
         });
 
-        toast({
-          title: "Wrong Item - Check Order",
-          description: `${product.Sku} not in this order`,
-          variant: "destructive",
-        });
+        showScanFeedback(
+          "error",
+          "WRONG ITEM",
+          `${product.Sku} not in this order`,
+          {
+            sku: product.Sku || "",
+            productName: product.Description || undefined,
+            imageUrl: product.ProductPictures?.[0] || null,
+          }
+        );
 
         setProductScan("");
         setTimeout(() => productInputRef.current?.focus(), 0);
@@ -471,10 +603,18 @@ export default function Packing() {
           skuVaultRawResponse: rawResponse,
         });
 
-        toast({
-          title: "Already Complete - Scan Next",
-          description: `${product.Sku} (${matchingProgress.scanned}/${matchingProgress.expected} scanned) ✓`,
-        });
+        showScanFeedback(
+          "info",
+          "ALREADY COMPLETE",
+          "This item is fully scanned. Scan next item.",
+          {
+            sku: matchingProgress.sku,
+            productName: matchingProgress.name,
+            imageUrl: matchingProgress.imageUrl,
+            scannedCount: matchingProgress.scanned,
+            expectedCount: matchingProgress.expected,
+          }
+        );
 
         setProductScan("");
         setTimeout(() => productInputRef.current?.focus(), 0);
@@ -522,10 +662,18 @@ export default function Packing() {
             
             syncedFromSkuVault = true;
             
-            toast({
-              title: "Synced with SkuVault",
-              description: `Updated ${product.Sku} from ${previousCount} to ${pickedQuantity} scanned (SkuVault already picked ${pickedQuantity - previousCount} units)`,
-            });
+            showScanFeedback(
+              "info",
+              "SYNCED WITH SKUVAULT",
+              `Updated from ${previousCount} to ${pickedQuantity} scanned (SkuVault already picked ${pickedQuantity - previousCount} units)`,
+              {
+                sku: product.Sku,
+                productName: product.Description || undefined,
+                imageUrl: progress.imageUrl,
+                scannedCount: pickedQuantity,
+                expectedCount: progress.expected,
+              }
+            );
           }
         } catch (error) {
           console.warn("[Packing] SkuVault sync check failed (non-blocking):", error);
@@ -545,10 +693,18 @@ export default function Packing() {
           skuVaultRawResponse: rawResponse,
         });
 
-        toast({
-          title: "Already Complete - Scan Next",
-          description: `${product.Sku} (${currentProgress.scanned}/${currentProgress.expected} scanned) ✓`,
-        });
+        showScanFeedback(
+          "info",
+          "ALREADY COMPLETE",
+          "This item is fully scanned. Scan next item.",
+          {
+            sku: currentProgress.sku,
+            productName: currentProgress.name,
+            imageUrl: currentProgress.imageUrl,
+            scannedCount: currentProgress.scanned,
+            expectedCount: currentProgress.expected,
+          }
+        );
 
         setProductScan("");
         setTimeout(() => productInputRef.current?.focus(), 0);
@@ -617,12 +773,20 @@ export default function Packing() {
       });
       setSkuProgress(newProgress);
 
-      toast({
-        title: qcPassSuccess ? "Product Validated & QC Passed" : "Product Validated",
-        description: qcPassSuccess 
-          ? `${product.Sku} (${currentProgress.scanned + 1}/${currentProgress.expected})`
-          : `${product.Sku} (${currentProgress.scanned + 1}/${currentProgress.expected}) - QC pass skipped`,
-      });
+      showScanFeedback(
+        "success",
+        qcPassSuccess ? "SCAN ACCEPTED" : "SCAN ACCEPTED",
+        qcPassSuccess 
+          ? "Product validated & QC passed in SkuVault"
+          : "Product validated (QC pass skipped - order not in SkuVault)",
+        {
+          sku: product.Sku || "",
+          productName: product.Description || currentProgress.name,
+          imageUrl: currentProgress.imageUrl,
+          scannedCount: currentProgress.scanned + 1,
+          expectedCount: currentProgress.expected,
+        }
+      );
 
       setProductScan("");
       setTimeout(() => productInputRef.current?.focus(), 0);
@@ -644,11 +808,14 @@ export default function Packing() {
         errorMessage: error.message,
       });
 
-      toast({
-        title: "Product Not Found",
-        description: error.message,
-        variant: "destructive",
-      });
+      showScanFeedback(
+        "error",
+        "PRODUCT NOT FOUND",
+        error.message,
+        {
+          sku: scannedCode,
+        }
+      );
 
       setProductScan("");
       setTimeout(() => productInputRef.current?.focus(), 0);
@@ -1019,6 +1186,89 @@ export default function Packing() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+              {/* Scan Feedback Strip */}
+              {scanFeedback && (
+                <div
+                  className={`p-4 rounded-lg border-2 transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+                    scanFeedback.type === "success"
+                      ? "bg-green-50 dark:bg-green-950/30 border-green-600"
+                      : scanFeedback.type === "error"
+                      ? "bg-red-50 dark:bg-red-950/30 border-red-600"
+                      : "bg-blue-50 dark:bg-blue-950/30 border-blue-600"
+                  }`}
+                  data-testid="scan-feedback-strip"
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Status Icon */}
+                    <div className="flex-shrink-0">
+                      {scanFeedback.type === "success" ? (
+                        <CheckCircle2 className="h-10 w-10 text-green-600" />
+                      ) : scanFeedback.type === "error" ? (
+                        <XCircle className="h-10 w-10 text-red-600" />
+                      ) : (
+                        <AlertCircle className="h-10 w-10 text-blue-600" />
+                      )}
+                    </div>
+                    
+                    {/* Feedback Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-3">
+                        {/* Product Image (if available) */}
+                        {scanFeedback.imageUrl && (
+                          <img
+                            src={scanFeedback.imageUrl}
+                            alt={scanFeedback.productName || "Product"}
+                            className="w-16 h-16 object-cover rounded-md border flex-shrink-0"
+                          />
+                        )}
+                        
+                        {/* Text Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-2xl font-bold mb-1 ${
+                            scanFeedback.type === "success"
+                              ? "text-green-900 dark:text-green-100"
+                              : scanFeedback.type === "error"
+                              ? "text-red-900 dark:text-red-100"
+                              : "text-blue-900 dark:text-blue-100"
+                          }`}>
+                            {scanFeedback.title}
+                          </div>
+                          {scanFeedback.productName && (
+                            <div className="text-lg font-semibold text-foreground mb-1 truncate">
+                              {scanFeedback.productName}
+                            </div>
+                          )}
+                          {scanFeedback.sku && (
+                            <div className="text-sm font-mono text-muted-foreground">
+                              {scanFeedback.sku}
+                            </div>
+                          )}
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {scanFeedback.message}
+                          </div>
+                        </div>
+                        
+                        {/* Scanned Count (if available) */}
+                        {scanFeedback.scannedCount !== undefined && scanFeedback.expectedCount !== undefined && (
+                          <div className="flex-shrink-0 text-right">
+                            <div className={`text-3xl font-bold ${
+                              scanFeedback.type === "success"
+                                ? "text-green-900 dark:text-green-100"
+                                : scanFeedback.type === "error"
+                                ? "text-red-900 dark:text-red-100"
+                                : "text-blue-900 dark:text-blue-100"
+                            }`}>
+                              {scanFeedback.scannedCount} / {scanFeedback.expectedCount}
+                            </div>
+                            <div className="text-xs text-muted-foreground">units</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Product Scanner Input */}
               <form onSubmit={handleProductScan}>
                 <Input
@@ -1027,6 +1277,7 @@ export default function Packing() {
                   placeholder="Scan product barcode..."
                   value={productScan}
                   onChange={(e) => setProductScan(e.target.value)}
+                  onFocus={handleFirstInteraction}
                   disabled={validateProductMutation.isPending}
                   className="text-2xl h-16 text-center font-mono"
                   data-testid="input-product-scan"
@@ -1076,15 +1327,29 @@ export default function Packing() {
                 )}
               </div>
 
-              {/* Items to Pack - Organized by Status */}
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Items to Pack</h3>
-                
-                <div className="space-y-3">
-                  {Array.from(skuProgress.entries()).map(([key, progress]) => {
+              {/* Items to Pack - Dual-Stack: Pending (top) + Completed (bottom) */}
+              <div className="space-y-4" data-testid="items-to-pack-section">
+                {(() => {
+                  // Split items into pending and completed arrays
+                  const pendingItems: Array<[string, SkuProgress]> = [];
+                  const completedItems: Array<[string, SkuProgress]> = [];
+                  
+                  Array.from(skuProgress.entries()).forEach(([key, progress]) => {
+                    const isComplete = progress.scanned >= progress.expected;
+                    if (isComplete) {
+                      completedItems.push([key, progress]);
+                    } else {
+                      pendingItems.push([key, progress]);
+                    }
+                  });
+                  
+                  // Sort pending by remaining (most remaining first - prioritize work)
+                  pendingItems.sort((a, b) => b[1].remaining - a[1].remaining);
+                  
+                  // Render function for item cards
+                  const renderItem = ([key, progress]: [string, SkuProgress]) => {
                     const isComplete = progress.scanned >= progress.expected;
                     const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
-                    // Find the matching shipment item to get the image URL
                     const shipmentItem = currentShipment?.items.find(item => item.id === progress.itemId);
                     
                     return (
@@ -1170,8 +1435,52 @@ export default function Packing() {
                         </div>
                       </div>
                     );
-                  })}
-                </div>
+                  };
+                  
+                  return (
+                    <>
+                      {/* Pending Items Section - Only shown when items remain */}
+                      {pendingItems.length > 0 && (
+                        <div data-testid="section-pending-items">
+                          <h3 className="font-semibold text-lg mb-3" data-testid="heading-pending-items">
+                            Items to Pack ({pendingItems.length} remaining)
+                          </h3>
+                          <div className="space-y-3" data-testid="list-pending-items">
+                            {pendingItems.map(renderItem)}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Success Message - Only shown when all complete */}
+                      {pendingItems.length === 0 && completedItems.length > 0 && (
+                        <div className="text-center py-6 text-green-600" data-testid="message-all-complete">
+                          <CheckCircle2 className="h-12 w-12 mx-auto mb-2" />
+                          <p className="font-semibold text-lg">All items scanned!</p>
+                          <p className="text-sm text-muted-foreground">Review completed items below</p>
+                        </div>
+                      )}
+                      
+                      {/* Completed Items Section - Collapsible */}
+                      {completedItems.length > 0 && (
+                        <Accordion type="single" collapsible data-testid="accordion-completed-items-container">
+                          <AccordionItem value="completed-items" className="border rounded-lg px-4" data-testid="accordion-completed-items">
+                            <AccordionTrigger className="hover:no-underline" data-testid="trigger-completed-items">
+                              <span className="text-sm font-medium flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                Completed Items ({completedItems.length})
+                              </span>
+                            </AccordionTrigger>
+                            <AccordionContent data-testid="content-completed-items">
+                              <div className="space-y-3 pt-2 pb-4" data-testid="list-completed-items">
+                                {completedItems.map(renderItem)}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Complete Packing Button */}
