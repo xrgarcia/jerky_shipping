@@ -66,6 +66,9 @@ type ShipmentWithItems = {
   shipToPostalCode: string | null;
   shipToCountry: string | null;
   shipToIsResidential: string | null;
+  // Gift information
+  isGift: boolean | null;
+  notesForGift: string | null;
   items: ShipmentItem[];
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
 };
@@ -1034,13 +1037,16 @@ export default function Packing() {
                     {currentShipment.shipToName || 'N/A'}
                   </div>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div>
-                  <div className="text-xs text-muted-foreground">Items</div>
-                  <div className="text-lg font-bold">
-                    {totalScanned} / {totalExpected}
-                  </div>
-                </div>
+                {currentShipment.isGift && (
+                  <>
+                    <div className="h-8 w-px bg-border" />
+                    <div>
+                      <Badge variant="outline" className="border-pink-600 text-pink-600 bg-pink-50 dark:bg-pink-950/20">
+                        🎁 Gift Order
+                      </Badge>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1082,6 +1088,18 @@ export default function Packing() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4 pt-2 pb-4">
+                    {/* Gift Message */}
+                    {currentShipment.isGift && currentShipment.notesForGift && (
+                      <div className="p-3 bg-pink-50 dark:bg-pink-950/20 border border-pink-600 rounded-md">
+                        <div className="flex items-start gap-2 mb-1">
+                          <span className="text-pink-600 font-semibold text-sm">🎁 Gift Message:</span>
+                        </div>
+                        <p className="text-sm pl-5 text-foreground italic">
+                          "{currentShipment.notesForGift}"
+                        </p>
+                      </div>
+                    )}
+
                     {/* Contact Information */}
                     {(currentShipment.shipToEmail || currentShipment.shipToPhone) && (
                       <div className="space-y-2">
