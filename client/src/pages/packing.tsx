@@ -1135,7 +1135,7 @@ export default function Packing() {
 
             {/* Collapsible Shipping Details */}
             <Accordion type="single" collapsible>
-              <AccordionItem value="shipping-details" className="border rounded-lg px-4">
+              <AccordionItem value="shipping-details" className="border rounded-lg px-4 bg-muted/50">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-4 w-full pr-4">
                     <span className="text-sm font-medium flex items-center gap-2">
@@ -1427,7 +1427,7 @@ export default function Packing() {
 
               {/* Overall Progress - Only show when not complete */}
               {!allItemsScanned && (
-                <div className="p-4 bg-muted rounded-lg">
+                <div className="p-4 bg-muted/50 rounded-lg">
                   <div className="text-3xl font-bold">
                     {totalExpected - totalScanned} {totalExpected - totalScanned === 1 ? "Item" : "Items"} Remaining
                   </div>
@@ -1476,14 +1476,14 @@ export default function Packing() {
                         key={key}
                         className={`p-4 rounded-lg transition-all ${
                           isComplete
-                            ? "border-2 border-muted-foreground/30 bg-muted/30"
+                            ? "border-2 border-muted-foreground/30 bg-muted/50"
                             : progress.requiresManualVerification
                             ? "border-2 border-orange-600 bg-orange-50 dark:bg-orange-950/20"
                             : isFirstPending
-                            ? "border-2 border-muted-foreground/30 bg-muted/20 border-l-8 border-l-primary"
+                            ? "border-2 border-muted-foreground/30 bg-card border-l-8 border-l-primary"
                             : isPartial
-                            ? "border-2 border-muted-foreground/30 bg-muted/20"
-                            : "border-2 border-muted-foreground/20 bg-muted/10"
+                            ? "border-2 border-muted-foreground/30 bg-card"
+                            : "border-2 border-muted-foreground/20 bg-card"
                         }`}
                         data-testid={`progress-${progress.sku}`}
                       >
