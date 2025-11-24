@@ -67,6 +67,7 @@ export default function PORecommendations() {
   });
 
   const updateSearchParam = (key: string, value: string | null) => {
+    console.log('[updateSearchParam] Called with:', { key, value });
     const params = new URLSearchParams(location.split('?')[1] || '');
     if (value) {
       params.set(key, value);
@@ -74,7 +75,9 @@ export default function PORecommendations() {
       params.delete(key);
     }
     const newSearch = params.toString();
-    setLocation(`/po-recommendations${newSearch ? `?${newSearch}` : ''}`);
+    const newLocation = `/po-recommendations${newSearch ? `?${newSearch}` : ''}`;
+    console.log('[updateSearchParam] Setting new location:', newLocation);
+    setLocation(newLocation);
   };
 
   const handleSort = (column: string) => {
