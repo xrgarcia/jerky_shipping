@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,20 +28,64 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar } from "lucide-rea
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
 export default function PORecommendations() {
-  const [location, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const [, setLocation] = useLocation();
+  const searchParams = useSearch();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastSyncedSearchRef = useRef<string>('');
   
-  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
   const [selectedSku, setSelectedSku] = useState<{ sku: string; stockCheckDate: string } | null>(null);
 
-  const supplier = searchParams.get('supplier') || undefined;
-  const stockCheckDate = searchParams.get('stockCheckDate') || undefined;
-  const search = searchParams.get('search') || undefined;
-  const sortBy = searchParams.get('sortBy') || 'sku';
-  const sortOrder = (searchParams.get('sortOrder') || 'asc') as 'asc' | 'desc';
+  // Filter states
+  const [supplier, setSupplier] = useState<string>('');
+  const [stockCheckDate, setStockCheckDate] = useState<string>('');
+  const [search, setSearch] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('sku');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Initialize state from URL params
+  useEffect(() => {
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    if (lastSyncedSearchRef.current === currentSearch && isInitialized) {
+      return;
+    }
+    
+    const params = new URLSearchParams(currentSearch);
+    
+    setSupplier(params.get('supplier') || '');
+    setStockCheckDate(params.get('stockCheckDate') || '');
+    setSearch(params.get('search') || '');
+    setSortBy(params.get('sortBy') || 'sku');
+    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'asc');
+    
+    lastSyncedSearchRef.current = currentSearch;
+    setIsInitialized(true);
+  }, [searchParams]);
+
+  // Update URL when state changes
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const params = new URLSearchParams();
+    
+    if (supplier) params.set('supplier', supplier);
+    if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
+    if (search) params.set('search', search);
+    if (sortBy !== 'sku') params.set('sortBy', sortBy);
+    if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
+    
+    const newSearch = params.toString();
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    
+    if (currentSearch !== newSearch) {
+      lastSyncedSearchRef.current = newSearch;
+      const newUrl = newSearch ? `?${newSearch}` : '';
+      window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
+    }
+  }, [supplier, stockCheckDate, search, sortBy, sortOrder, isInitialized]);
 
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: ['/api/reporting/po-recommendations', { supplier, stockCheckDate, search, sortBy, sortOrder }],
+    queryKey: ['/api/reporting/po-recommendations', supplier, stockCheckDate, search, sortBy, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (supplier) params.set('supplier', supplier);
@@ -52,12 +96,8 @@ export default function PORecommendations() {
       const qs = params.toString();
       const url = `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
       
-      const response = await fetch(url, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendations');
-      }
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch recommendations');
       return response.json();
     },
   });
@@ -71,33 +111,12 @@ export default function PORecommendations() {
     enabled: !!selectedSku,
   });
 
-  const updateSearchParam = (key: string, value: string | null) => {
-    const params = new URLSearchParams(location.split('?')[1] || '');
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
-    }
-    const newSearch = params.toString();
-    setLocation(`/po-recommendations${newSearch ? `?${newSearch}` : ''}`);
-  };
-
   const handleSort = (column: string) => {
     if (sortBy === column) {
-      updateSearchParam('sortOrder', sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
-      updateSearchParam('sortBy', column);
-      updateSearchParam('sortOrder', 'asc');
-    }
-  };
-
-  const handleSearch = () => {
-    updateSearchParam('search', searchInput || null);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
+      setSortBy(column);
+      setSortOrder('asc');
     }
   };
 
@@ -109,8 +128,11 @@ export default function PORecommendations() {
   };
 
   const clearFilters = () => {
-    setSearchInput('');
-    setLocation('/po-recommendations');
+    setSupplier('');
+    setStockCheckDate('');
+    setSearch('');
+    setSortBy('sku');
+    setSortOrder('asc');
   };
 
   const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
@@ -154,7 +176,7 @@ export default function PORecommendations() {
         <div className="flex flex-wrap items-center gap-2">
           <Select 
             value={supplier || 'all'} 
-            onValueChange={(value) => updateSearchParam('supplier', value === 'all' ? null : value)}
+            onValueChange={(value) => setSupplier(value === 'all' ? '' : value)}
           >
             <SelectTrigger className="w-48" data-testid="select-supplier">
               <SelectValue placeholder="All Suppliers" />
@@ -169,16 +191,15 @@ export default function PORecommendations() {
 
           <Input
             placeholder="Search SKU, title, or supplier..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-80"
             data-testid="input-search"
           />
           <Button 
-            onClick={handleSearch} 
             size="icon"
             data-testid="button-search"
+            className="opacity-0 pointer-events-none"
           >
             <Search className="h-4 w-4" />
           </Button>
