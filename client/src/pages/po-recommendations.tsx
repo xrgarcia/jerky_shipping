@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, X } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar } from "lucide-react";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
 export default function PORecommendations() {
@@ -123,10 +123,26 @@ export default function PORecommendations() {
     );
   };
 
+  const dataTimestamp = recommendations.length > 0 
+    ? new Date(recommendations[0].stock_check_date).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+    : null;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col gap-4 p-4 border-b">
-        <h1 className="text-2xl font-semibold" data-testid="text-page-title">PO Recommendations</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold" data-testid="text-page-title">PO Recommendations</h1>
+          {dataTimestamp && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-data-timestamp">
+              <Calendar className="h-4 w-4" />
+              <span>Data as of: <span className="font-medium text-foreground">{dataTimestamp}</span></span>
+            </div>
+          )}
+        </div>
         
         <div className="flex flex-wrap items-center gap-2">
           <Select value={supplier || 'all'} onValueChange={(value) => updateSearchParam('supplier', value === 'all' ? null : value)}>
@@ -171,12 +187,13 @@ export default function PORecommendations() {
       </div>
 
       <div className="flex-1 overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
-            <div className="text-muted-foreground">Loading recommendations...</div>
-          </div>
-        ) : (
-          <Table>
+        <div className="w-full overflow-x-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
+              <div className="text-muted-foreground">Loading recommendations...</div>
+            </div>
+          ) : (
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>
@@ -215,8 +232,32 @@ export default function PORecommendations() {
                 <TableHead className="text-right">
                   <SortableHeader column="quantity_incoming">Qty Incoming</SortableHeader>
                 </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="kit_driven_velocity">Kit Velocity</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="individual_velocity">Individual Velocity</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="case_adjustment_applied">Case Adjustment</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="moq_applied">MOQ Applied</SortableHeader>
+                </TableHead>
                 <TableHead>
-                  <SortableHeader column="next_holiday_count_down_in_days">Next Holiday</SortableHeader>
+                  <SortableHeader column="is_assembled_product">Assembled</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader column="next_holiday_count_down_in_days">Next Holiday Days</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="next_holiday_recommended_quantity">Holiday Rec Qty</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader column="next_holiday_season">Holiday Season</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader column="next_holiday_start_date">Holiday Start</SortableHeader>
                 </TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -224,7 +265,7 @@ export default function PORecommendations() {
             <TableBody>
               {recommendations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-muted-foreground" data-testid="text-no-results">
+                  <TableCell colSpan={22} className="text-center text-muted-foreground" data-testid="text-no-results">
                     No recommendations found
                   </TableCell>
                 </TableRow>
@@ -243,15 +284,19 @@ export default function PORecommendations() {
                     <TableCell className="text-right" data-testid={`text-forecast-${rec.sku}`}>{rec.ninety_day_forecast ? parseFloat(rec.ninety_day_forecast).toFixed(0) : '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-days-cover-${rec.sku}`}>{rec.current_days_cover ? parseFloat(rec.current_days_cover).toFixed(1) : '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-qty-incoming-${rec.sku}`}>{rec.quantity_incoming?.toLocaleString() || '-'}</TableCell>
-                    <TableCell data-testid={`text-next-holiday-${rec.sku}`}>
-                      {rec.next_holiday_season && (
-                        <div className="text-sm">
-                          <div>{rec.next_holiday_season}</div>
-                          {rec.next_holiday_count_down_in_days !== null && (
-                            <div className="text-muted-foreground">{rec.next_holiday_count_down_in_days}d</div>
-                          )}
-                        </div>
-                      )}
+                    <TableCell className="text-right" data-testid={`text-kit-velocity-${rec.sku}`}>{rec.kit_driven_velocity ? parseFloat(rec.kit_driven_velocity).toFixed(2) : '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-individual-velocity-${rec.sku}`}>{rec.individual_velocity ? parseFloat(rec.individual_velocity).toFixed(2) : '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-case-adjustment-${rec.sku}`}>{rec.case_adjustment_applied?.toLocaleString() || '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-moq-applied-${rec.sku}`}>{rec.moq_applied?.toLocaleString() || '-'}</TableCell>
+                    <TableCell data-testid={`text-assembled-${rec.sku}`}>{rec.is_assembled_product ? 'Yes' : 'No'}</TableCell>
+                    <TableCell data-testid={`text-next-holiday-days-${rec.sku}`}>{rec.next_holiday_count_down_in_days || '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-holiday-rec-qty-${rec.sku}`}>{rec.next_holiday_recommended_quantity?.toLocaleString() || '-'}</TableCell>
+                    <TableCell data-testid={`text-holiday-season-${rec.sku}`}>{rec.next_holiday_season || '-'}</TableCell>
+                    <TableCell data-testid={`text-holiday-start-${rec.sku}`}>
+                      {rec.next_holiday_start_date 
+                        ? new Date(rec.next_holiday_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : '-'
+                      }
                     </TableCell>
                     <TableCell>
                       <Button
@@ -268,7 +313,8 @@ export default function PORecommendations() {
               )}
             </TableBody>
           </Table>
-        )}
+          )}
+        </div>
       </div>
 
       <Dialog open={!!selectedSku} onOpenChange={(open) => !open && setSelectedSku(null)}>
