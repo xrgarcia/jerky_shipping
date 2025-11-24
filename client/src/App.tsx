@@ -21,6 +21,7 @@ import Profile from "@/pages/profile";
 import Reports from "@/pages/reports";
 import Sessions from "@/pages/sessions";
 import Operations from "@/pages/operations";
+import PORecommendations from "@/pages/po-recommendations";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -72,6 +73,7 @@ function AppContent() {
       <Route path="/operations" component={Operations} />
       <Route path="/print-queue" component={PrintQueue} />
       <Route path="/reports" component={Reports} />
+      <Route path="/po-recommendations" component={PORecommendations} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
