@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { reportingStorage } from "./reporting-storage";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
@@ -3645,6 +3646,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Packing] Error completing order:", error);
       res.status(500).json({ error: "Failed to complete order" });
+    }
+  });
+
+  // Reporting API endpoints
+  app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
+    try {
+      const { supplier, stockCheckDate, search, sortBy, sortOrder } = req.query;
+      
+      let effectiveStockCheckDate = stockCheckDate as string | undefined;
+      
+      // If no stockCheckDate specified, use latest
+      if (!effectiveStockCheckDate) {
+        const latestDate = await reportingStorage.getLatestStockCheckDate();
+        if (latestDate) {
+          effectiveStockCheckDate = latestDate.toISOString().split('T')[0];
+        }
+      }
+      
+      const recommendations = await reportingStorage.getPORecommendations({
+        supplier: supplier as string | undefined,
+        stockCheckDate: effectiveStockCheckDate,
+        search: search as string | undefined,
+        sortBy: sortBy as any,
+        sortOrder: sortOrder as 'asc' | 'desc' | undefined
+      });
+      
+      res.json(recommendations);
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching PO recommendations:", error);
+      res.status(500).json({ error: "Failed to fetch PO recommendations" });
+    }
+  });
+
+  app.get("/api/reporting/po-recommendations/latest-date", requireAuth, async (req, res) => {
+    try {
+      const latestDate = await reportingStorage.getLatestStockCheckDate();
+      res.json({ latestDate });
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching latest stock check date:", error);
+      res.status(500).json({ error: "Failed to fetch latest stock check date" });
+    }
+  });
+
+  app.get("/api/reporting/po-recommendation-steps/:sku/:stockCheckDate", requireAuth, async (req, res) => {
+    try {
+      const { sku, stockCheckDate } = req.params;
+      const steps = await reportingStorage.getPORecommendationSteps(
+        sku, 
+        new Date(stockCheckDate)
+      );
+      res.json(steps);
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching PO recommendation steps:", error);
+      res.status(500).json({ error: "Failed to fetch PO recommendation steps" });
     }
   });
 
