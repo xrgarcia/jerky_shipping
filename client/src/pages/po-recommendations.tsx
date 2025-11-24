@@ -186,79 +186,79 @@ export default function PORecommendations() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-scroll">
+      <div className="flex-1 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
             <div className="text-muted-foreground">Loading recommendations...</div>
           </div>
         ) : (
-          <Table>
+          <Table containerClassName="h-full overflow-scroll" className="min-w-[2000px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="sku">SKU</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="supplier">Supplier</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="title">Title</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="lead_time">Lead Time</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="current_total_stock">Current Stock</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="recommended_quantity">Recommended Qty</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="base_velocity">Base Velocity</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="projected_velocity">Projected Velocity</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="growth_rate">Growth Rate</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="ninety_day_forecast">90-Day Forecast</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="current_days_cover">Days Cover</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="quantity_incoming">Qty Incoming</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="kit_driven_velocity">Kit Velocity</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="individual_velocity">Individual Velocity</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="case_adjustment_applied">Case Adjustment</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="moq_applied">MOQ Applied</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="is_assembled_product">Assembled</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="next_holiday_count_down_in_days">Next Holiday Days</SortableHeader>
                 </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-10">
+                <TableHead className="text-right sticky top-0 bg-background z-20">
                   <SortableHeader column="next_holiday_recommended_quantity">Holiday Rec Qty</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="next_holiday_season">Holiday Season</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10">
+                <TableHead className="sticky top-0 bg-background z-20">
                   <SortableHeader column="next_holiday_start_date">Holiday Start</SortableHeader>
                 </TableHead>
-                <TableHead className="sticky top-0 bg-background z-10"></TableHead>
+                <TableHead className="sticky top-0 bg-background z-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
