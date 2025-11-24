@@ -18,7 +18,6 @@ interface PrintJob {
 
 export function PrintQueueBar() {
   const { toast } = useToast();
-  const printedJobsRef = useRef<Set<string>>(new Set());
   const isPrintingRef = useRef<boolean>(false);
 
   const { data: jobsData } = useQuery<{ jobs: PrintJob[] }>({
@@ -65,37 +64,53 @@ export function PrintQueueBar() {
   const jobs = jobsData?.jobs || [];
   const activeJobs = jobs.filter(j => j.status === "queued" || j.status === "printing");
 
-  // Auto-print effect - triggers when a job gets a labelUrl
+  // Auto-print effect - triggers ONCE when a job has labelUrl and is still 'queued'
+  // Uses server-side status as source of truth to prevent duplicate triggers
   useEffect(() => {
     // Guard: prevent multiple concurrent print attempts
     if (isPrintingRef.current) {
       return;
     }
 
+    // Only trigger for jobs that are QUEUED with a labelUrl
+    // Once we mark it as 'printing' on the server, it won't match this filter anymore
     const jobsNeedingPrint = activeJobs.filter(
-      job => job.labelUrl && 
-             job.status === 'queued' && 
-             !printedJobsRef.current.has(job.id)
+      job => job.labelUrl && job.status === 'queued'
     );
 
     if (jobsNeedingPrint.length > 0) {
-      const jobToPrint = jobsNeedingPrint[0]; // Print one at a time
+      const jobToPrint = jobsNeedingPrint[0];
       autoPrintLabel(jobToPrint);
     }
   }, [activeJobs]);
 
-  const autoPrintLabel = useCallback((job: PrintJob) => {
-    // Double-check guards
-    if (isPrintingRef.current || printedJobsRef.current.has(job.id)) {
+  const autoPrintLabel = useCallback(async (job: PrintJob) => {
+    // Double-check guard
+    if (isPrintingRef.current) {
       return;
     }
 
     // Mark as printing immediately to prevent re-entry
     isPrintingRef.current = true;
-    printedJobsRef.current.add(job.id);
 
     try {
-      // Open PDF in new tab - simple and reliable
+      // FIRST: Mark as printing on the server to prevent re-triggers
+      // Use fetch directly since apiRequest throws on non-2xx
+      const markResponse = await fetch(`/api/print-queue/${job.id}/printing`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      // Invalidate query cache regardless of response to get fresh status
+      queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
+      
+      if (!markResponse.ok) {
+        // Already in printing status or error - don't re-open the label
+        isPrintingRef.current = false;
+        return;
+      }
+
+      // THEN: Open PDF in new tab
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
       const printWindow = window.open(proxyUrl, '_blank');
       
@@ -106,8 +121,6 @@ export function PrintQueueBar() {
           duration: 8000,
         });
       } else {
-        // Pop-up blocked
-        printedJobsRef.current.delete(job.id);
         toast({
           title: "Pop-up blocked",
           description: "Please allow pop-ups for this site, then click 'Print Now'",
@@ -117,8 +130,6 @@ export function PrintQueueBar() {
       }
     } catch (error) {
       console.error('Auto-print error:', error);
-      printedJobsRef.current.delete(job.id);
-      
       toast({
         title: "Failed to open label",
         description: "Click 'Print Now' to try again",
@@ -128,7 +139,7 @@ export function PrintQueueBar() {
       // Allow next print after a delay
       setTimeout(() => {
         isPrintingRef.current = false;
-      }, 2000);
+      }, 3000);
     }
   }, [toast]);
 

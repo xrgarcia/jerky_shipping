@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -20,7 +20,6 @@ type PrintJob = {
 
 export default function PrintQueuePage() {
   const { toast } = useToast();
-  const printedJobsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -101,43 +100,6 @@ export default function PrintQueuePage() {
     refetchInterval: 2000,
   });
 
-  useEffect(() => {
-    if (jobsData?.jobs) {
-      const keysToRemove: string[] = [];
-      
-      printedJobsRef.current.forEach(id => {
-        const job = jobsData.jobs.find(j => j.id === id);
-        if (!job || job.status !== "printing") {
-          keysToRemove.push(id);
-        }
-      });
-      
-      keysToRemove.forEach(id => printedJobsRef.current.delete(id));
-    }
-  }, [jobsData]);
-
-  const markPrintingMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      const response = await apiRequest("POST", `/api/print-queue/${jobId}/printing`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to mark as printing");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
-    },
-    onError: (error: Error, variables: string) => {
-      printedJobsRef.current.delete(variables);
-      toast({
-        title: "Failed to start printing",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const markCompleteMutation = useMutation({
     mutationFn: async (jobId: string) => {
       const response = await apiRequest("POST", `/api/print-queue/${jobId}/complete`);
@@ -165,63 +127,8 @@ export default function PrintQueuePage() {
     },
   });
 
-  useEffect(() => {
-    if (!jobsData?.jobs) return;
-
-    const queuedJobs = jobsData.jobs.filter(
-      (job) => job.status === "queued" && !printedJobsRef.current.has(job.id)
-    );
-
-    queuedJobs.forEach(async (job) => {
-      try {
-        await markPrintingMutation.mutateAsync(job.id);
-        
-        printedJobsRef.current.add(job.id);
-        
-        const iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        iframe.src = job.labelUrl;
-        document.body.appendChild(iframe);
-
-        iframe.onload = () => {
-          setTimeout(() => {
-            try {
-              iframe.contentWindow?.print();
-              
-              setTimeout(() => {
-                markCompleteMutation.mutate(job.id);
-                document.body.removeChild(iframe);
-              }, 1000);
-            } catch (error) {
-              console.error("Error printing:", error);
-              toast({
-                title: "Print failed",
-                description: "Failed to print label. Please try again.",
-                variant: "destructive",
-              });
-              setTimeout(() => {
-                document.body.removeChild(iframe);
-              }, 500);
-            }
-          }, 500);
-        };
-
-        iframe.onerror = () => {
-          console.error("Error loading label PDF");
-          toast({
-            title: "Failed to load label",
-            description: "Could not load the label PDF.",
-            variant: "destructive",
-          });
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 500);
-        };
-      } catch (error) {
-        console.error("Failed to mark as printing:", error);
-      }
-    });
-  }, [jobsData, markCompleteMutation, markPrintingMutation, toast]);
+  // Note: Auto-print is handled by PrintQueueBar component on the packing page
+  // This page is for viewing/managing the queue, not auto-printing
 
   const jobs = jobsData?.jobs || [];
 
