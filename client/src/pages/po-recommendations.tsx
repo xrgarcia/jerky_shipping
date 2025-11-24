@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
 export default function PORecommendations() {
@@ -42,6 +42,10 @@ export default function PORecommendations() {
   const [isAssembledProduct, setIsAssembledProduct] = useState<string>('false');
   const [sortBy, setSortBy] = useState<string>('ninety_day_forecast');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Pagination states
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(100);
 
   // Initialize state from URL params
   useEffect(() => {
@@ -59,6 +63,8 @@ export default function PORecommendations() {
     setIsAssembledProduct(params.get('isAssembledProduct') || 'false');
     setSortBy(params.get('sortBy') || 'ninety_day_forecast');
     setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'asc');
+    setPage(parseInt(params.get('page') || '1'));
+    setPageSize(parseInt(params.get('pageSize') || '100'));
     
     lastSyncedSearchRef.current = currentSearch;
     setIsInitialized(true);
@@ -76,6 +82,8 @@ export default function PORecommendations() {
     if (isAssembledProduct !== 'false') params.set('isAssembledProduct', isAssembledProduct);
     if (sortBy !== 'ninety_day_forecast') params.set('sortBy', sortBy);
     if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
+    if (page !== 1) params.set('page', page.toString());
+    if (pageSize !== 100) params.set('pageSize', pageSize.toString());
     
     const newSearch = params.toString();
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
@@ -85,7 +93,7 @@ export default function PORecommendations() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
     }
-  }, [supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder, isInitialized]);
+  }, [supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
 
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
     queryKey: ['/api/reporting/po-recommendations', supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder],
@@ -123,6 +131,20 @@ export default function PORecommendations() {
       setSortOrder('asc');
     }
   };
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (isInitialized) {
+      setPage(1);
+    }
+  }, [supplier, search, isAssembledProduct, isInitialized]);
+  
+  // Calculate pagination
+  const totalRecords = recommendations.length;
+  const totalPages = Math.ceil(totalRecords / pageSize);
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalRecords);
+  const paginatedRecommendations = recommendations.slice(startIndex, endIndex);
 
   const openStepsModal = (sku: string, stockCheckDate: Date) => {
     setSelectedSku({ 
@@ -138,6 +160,7 @@ export default function PORecommendations() {
     setIsAssembledProduct('false');
     setSortBy('ninety_day_forecast');
     setSortOrder('asc');
+    setPage(1);
   };
 
   const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
@@ -179,34 +202,40 @@ export default function PORecommendations() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <Select 
-            value={supplier || 'all'} 
-            onValueChange={(value) => setSupplier(value === 'all' ? '' : value)}
-          >
-            <SelectTrigger className="w-48" data-testid="select-supplier">
-              <SelectValue placeholder="All Suppliers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Suppliers</SelectItem>
-              {suppliers.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground px-1">Supplier</label>
+            <Select 
+              value={supplier || 'all'} 
+              onValueChange={(value) => setSupplier(value === 'all' ? '' : value)}
+            >
+              <SelectTrigger className="w-48" data-testid="select-supplier">
+                <SelectValue placeholder="All Suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {suppliers.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select 
-            value={isAssembledProduct} 
-            onValueChange={setIsAssembledProduct}
-          >
-            <SelectTrigger className="w-48" data-testid="select-is-assembled-product">
-              <SelectValue placeholder="Is Assembled Product" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="true">True</SelectItem>
-              <SelectItem value="false">False</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground px-1">Is Assembled Product</label>
+            <Select 
+              value={isAssembledProduct} 
+              onValueChange={setIsAssembledProduct}
+            >
+              <SelectTrigger className="w-48" data-testid="select-is-assembled-product">
+                <SelectValue placeholder="Is Assembled Product" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="true">True</SelectItem>
+                <SelectItem value="false">False</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <Input
             placeholder="Search SKU, title, or supplier..."
@@ -312,14 +341,14 @@ export default function PORecommendations() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recommendations.length === 0 ? (
+              {totalRecords === 0 ? (
                 <TableRow>
                   <TableCell colSpan={22} className="text-center text-muted-foreground" data-testid="text-no-results">
                     No recommendations found
                   </TableCell>
                 </TableRow>
               ) : (
-                recommendations.map((rec) => (
+                paginatedRecommendations.map((rec) => (
                   <TableRow key={`${rec.sku}-${rec.stock_check_date}`} data-testid={`row-recommendation-${rec.sku}`}>
                     <TableCell className="font-medium" data-testid={`text-sku-${rec.sku}`}>{rec.sku}</TableCell>
                     <TableCell data-testid={`text-supplier-${rec.sku}`}>{rec.supplier}</TableCell>
@@ -364,6 +393,59 @@ export default function PORecommendations() {
           </Table>
         )}
       </div>
+
+      {!isLoading && totalRecords > 0 && (
+        <div className="flex items-center justify-between gap-4 p-4 border-t">
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground" data-testid="text-record-count">
+              Showing {startIndex + 1} - {endIndex} of {totalRecords} records
+            </div>
+            <Select 
+              value={pageSize.toString()} 
+              onValueChange={(value) => {
+                setPageSize(parseInt(value));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-32" data-testid="select-page-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 per page</SelectItem>
+                <SelectItem value="50">50 per page</SelectItem>
+                <SelectItem value="100">100 per page</SelectItem>
+                <SelectItem value="200">200 per page</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              data-testid="button-prev-page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground" data-testid="text-page-info">
+              Page {page} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              data-testid="button-next-page"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!selectedSku} onOpenChange={(open) => !open && setSelectedSku(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto" data-testid="dialog-steps">

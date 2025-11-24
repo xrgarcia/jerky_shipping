@@ -25,6 +25,7 @@ import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
 import { qcPassItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
+import type { PORecommendation } from "@shared/reporting-schema";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -3652,7 +3653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reporting API endpoints
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
     try {
-      const { supplier, stockCheckDate, search, sortBy, sortOrder } = req.query;
+      const { supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder } = req.query;
       
       // Validate sortBy parameter
       // IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
@@ -3691,6 +3692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplier: supplier as string | undefined,
         stockCheckDate: effectiveStockCheckDate,
         search: search as string | undefined,
+        isAssembledProduct: isAssembledProduct as string | undefined,
         sortBy: validatedSortBy as keyof PORecommendation,
         sortOrder: validatedSortOrder
       });
