@@ -79,18 +79,28 @@ export function PrintQueueBar() {
     }
   }, [activeJobs]);
 
-  const autoPrintLabel = (job: PrintJob) => {
+  const autoPrintLabel = async (job: PrintJob) => {
     try {
       printedJobsRef.current.add(job.id);
 
-      // Use Print.js to auto-print the PDF via our proxy endpoint
+      // Fetch PDF as blob first via our proxy endpoint
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
       
+      const response = await fetch(proxyUrl, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch label: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Use Print.js with the blob URL (avoids cross-origin issues)
       printJS({
-        printable: proxyUrl,
+        printable: blobUrl,
         type: 'pdf',
         onPrintDialogClose: () => {
-          // Print dialog closed - keep job in printed set to prevent re-triggering
+          // Clean up blob URL after print dialog closes
+          URL.revokeObjectURL(blobUrl);
           toast({
             title: "Print dialog closed",
             description: `Label for order #${job.orderId} ready. Click "Done" when finished.`,
@@ -99,6 +109,7 @@ export function PrintQueueBar() {
         },
         onError: (error: any) => {
           console.error('Print.js error:', error);
+          URL.revokeObjectURL(blobUrl);
           printedJobsRef.current.delete(job.id);
           
           toast({
