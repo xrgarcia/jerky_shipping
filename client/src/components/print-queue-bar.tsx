@@ -78,24 +78,27 @@ export function PrintQueueBar() {
     }
   }, [activeJobs]);
 
-  const autoPrintLabel = (job: PrintJob) => {
+  const autoPrintLabel = async (job: PrintJob) => {
     try {
       printedJobsRef.current.add(job.id);
 
-      // Proxy the label URL through our backend
+      // Fetch PDF as blob via our proxy endpoint
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
+      const response = await fetch(proxyUrl, { credentials: 'include' });
       
-      // Open PDF in new tab - browser's native PDF viewer has print button
-      const printWindow = window.open(proxyUrl, '_blank');
+      if (!response.ok) {
+        throw new Error('Failed to fetch label PDF');
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Open a helper window with HTML we control
+      const printWindow = window.open('', '_blank');
       
-      if (printWindow) {
-        toast({
-          title: "Label ready to print",
-          description: `Label for order #${job.orderId} opened in new tab - Use browser's print button (Ctrl+P)`,
-          duration: 5000,
-        });
-      } else {
+      if (!printWindow) {
         // Pop-up blocked
+        URL.revokeObjectURL(blobUrl);
         printedJobsRef.current.delete(job.id);
         toast({
           title: "Pop-up blocked",
@@ -103,13 +106,51 @@ export function PrintQueueBar() {
           variant: "destructive",
           duration: 6000,
         });
+        return;
       }
+
+      // Write HTML that embeds the PDF and auto-prints
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Print Label - Order #${job.orderId}</title>
+            <style>
+              body { margin: 0; }
+              embed { width: 100%; height: 100vh; }
+            </style>
+          </head>
+          <body>
+            <embed src="${blobUrl}" type="application/pdf" />
+            <script>
+              // Wait for PDF to load, then auto-print
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  // Clean up blob URL after print dialog opens
+                  setTimeout(function() {
+                    window.URL.revokeObjectURL('${blobUrl}');
+                  }, 1000);
+                }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      toast({
+        title: "Auto-print triggered",
+        description: `Label for order #${job.orderId} - Print dialog should open automatically`,
+        duration: 4000,
+      });
+      
     } catch (error) {
       console.error('Auto-print error:', error);
       printedJobsRef.current.delete(job.id);
       
       toast({
-        title: "Failed to open label",
+        title: "Auto-print failed",
         description: "Click 'Print Now' to try again",
         variant: "destructive",
       });
