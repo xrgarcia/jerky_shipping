@@ -48,7 +48,9 @@ export default function PORecommendations() {
     if (sortBy) params.set('sortBy', sortBy);
     if (sortOrder) params.set('sortOrder', sortOrder);
     const qs = params.toString();
-    return `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
+    const queryString = `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
+    console.log('[PO Recommendations] Building query string:', queryString, { supplier, stockCheckDate, search, sortBy, sortOrder });
+    return queryString;
   };
 
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({

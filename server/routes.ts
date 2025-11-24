@@ -3653,6 +3653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
     try {
       const { supplier, stockCheckDate, search, sortBy, sortOrder } = req.query;
+      console.log('[Reporting API] Received filters:', { supplier, stockCheckDate, search, sortBy, sortOrder });
       
       // Validate sortBy parameter
       // IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
