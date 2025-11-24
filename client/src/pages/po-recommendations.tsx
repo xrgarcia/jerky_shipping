@@ -40,21 +40,26 @@ export default function PORecommendations() {
   const sortBy = searchParams.get('sortBy') || 'sku';
   const sortOrder = (searchParams.get('sortOrder') || 'asc') as 'asc' | 'desc';
 
-  const buildQueryString = () => {
-    const params = new URLSearchParams();
-    if (supplier) params.set('supplier', supplier);
-    if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
-    if (search) params.set('search', search);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-    const qs = params.toString();
-    const queryString = `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
-    console.log('[PO Recommendations] Building query string:', queryString, { supplier, stockCheckDate, search, sortBy, sortOrder });
-    return queryString;
-  };
-
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: [buildQueryString()],
+    queryKey: ['/api/reporting/po-recommendations', { supplier, stockCheckDate, search, sortBy, sortOrder }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (supplier) params.set('supplier', supplier);
+      if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
+      if (search) params.set('search', search);
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortOrder) params.set('sortOrder', sortOrder);
+      const qs = params.toString();
+      const url = `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
+      
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch recommendations');
+      }
+      return response.json();
+    },
   });
 
   const { data: suppliers = [] } = useQuery<string[]>({
@@ -67,7 +72,6 @@ export default function PORecommendations() {
   });
 
   const updateSearchParam = (key: string, value: string | null) => {
-    console.log('[updateSearchParam] Called with:', { key, value });
     const params = new URLSearchParams(location.split('?')[1] || '');
     if (value) {
       params.set(key, value);
@@ -75,9 +79,7 @@ export default function PORecommendations() {
       params.delete(key);
     }
     const newSearch = params.toString();
-    const newLocation = `/po-recommendations${newSearch ? `?${newSearch}` : ''}`;
-    console.log('[updateSearchParam] Setting new location:', newLocation);
-    setLocation(newLocation);
+    setLocation(`/po-recommendations${newSearch ? `?${newSearch}` : ''}`);
   };
 
   const handleSort = (column: string) => {
@@ -152,29 +154,15 @@ export default function PORecommendations() {
         <div className="flex flex-wrap items-center gap-2">
           <Select 
             value={supplier || 'all'} 
-            onValueChange={(value) => {
-              console.log('[Select onValueChange] Triggered with value:', value);
-              updateSearchParam('supplier', value === 'all' ? null : value);
-            }}
+            onValueChange={(value) => updateSearchParam('supplier', value === 'all' ? null : value)}
           >
             <SelectTrigger className="w-48" data-testid="select-supplier">
               <SelectValue placeholder="All Suppliers" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem 
-                value="all"
-                onClick={() => console.log('[SelectItem] Clicked: all')}
-              >
-                All Suppliers
-              </SelectItem>
+              <SelectItem value="all">All Suppliers</SelectItem>
               {suppliers.map((s) => (
-                <SelectItem 
-                  key={s} 
-                  value={s}
-                  onClick={() => console.log('[SelectItem] Clicked:', s)}
-                >
-                  {s}
-                </SelectItem>
+                <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
