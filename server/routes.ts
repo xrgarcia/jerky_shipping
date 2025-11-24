@@ -3655,10 +3655,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { supplier, stockCheckDate, search, sortBy, sortOrder } = req.query;
       
       // Validate sortBy parameter
+      // IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
+      // Database contains additional columns that are not exposed in the UI and should NOT be added here
       const allowedSortColumns = [
-        'sku', 'supplier', 'title', 'current_total_stock', 
-        'recommended_quantity', 'base_velocity', 'ninety_day_forecast',
-        'current_days_cover', 'quantity_incoming'
+        'sku', 'supplier', 'title', 'lead_time', 'current_total_stock', 
+        'recommended_quantity', 'base_velocity', 'projected_velocity',
+        'growth_rate', 'ninety_day_forecast', 'current_days_cover', 
+        'quantity_incoming', 'next_holiday_count_down_in_days'
       ];
       
       const validatedSortBy = typeof sortBy === 'string' && allowedSortColumns.includes(sortBy) 
@@ -3724,6 +3727,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Reporting] Error fetching PO recommendation steps:", error);
       res.status(500).json({ error: "Failed to fetch PO recommendation steps" });
+    }
+  });
+
+  app.get("/api/reporting/unique-suppliers", requireAuth, async (req, res) => {
+    try {
+      const suppliers = await reportingStorage.getUniqueSuppliers();
+      res.json(suppliers);
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching unique suppliers:", error);
+      res.status(500).json({ error: "Failed to fetch unique suppliers" });
+    }
+  });
+
+  app.post("/api/reporting/invalidate-cache", requireAuth, async (req, res) => {
+    try {
+      await reportingStorage.invalidateCache();
+      res.json({ success: true, message: "Cache invalidated successfully" });
+    } catch (error: any) {
+      console.error("[Reporting] Error invalidating cache:", error);
+      res.status(500).json({ error: "Failed to invalidate cache" });
     }
   });
 

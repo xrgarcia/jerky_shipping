@@ -4,6 +4,13 @@ import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -17,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, X } from "lucide-react";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
 export default function PORecommendations() {
@@ -46,6 +53,10 @@ export default function PORecommendations() {
 
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
     queryKey: [buildQueryString()],
+  });
+
+  const { data: suppliers = [] } = useQuery<string[]>({
+    queryKey: ['/api/reporting/unique-suppliers'],
   });
 
   const { data: steps = [] } = useQuery<PORecommendationStep[]>({
@@ -90,12 +101,46 @@ export default function PORecommendations() {
     });
   };
 
+  const clearFilters = () => {
+    setSearchInput('');
+    setLocation('/po-recommendations');
+  };
+
+  const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
+    const isActive = sortBy === column;
+    const Icon = isActive ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => handleSort(column)}
+        className="hover-elevate"
+        data-testid={`button-sort-${column}`}
+      >
+        {children}
+        <Icon className={`ml-2 h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
+      </Button>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4 p-4 border-b">
+      <div className="flex flex-col gap-4 p-4 border-b">
         <h1 className="text-2xl font-semibold" data-testid="text-page-title">PO Recommendations</h1>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={supplier || 'all'} onValueChange={(value) => updateSearchParam('supplier', value === 'all' ? null : value)}>
+            <SelectTrigger className="w-48" data-testid="select-supplier">
+              <SelectValue placeholder="All Suppliers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Suppliers</SelectItem>
+              {suppliers.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Input
             placeholder="Search SKU, title, or supplier..."
             value={searchInput}
@@ -111,6 +156,17 @@ export default function PORecommendations() {
           >
             <Search className="h-4 w-4" />
           </Button>
+
+          {(supplier || search) && (
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              data-testid="button-clear-filters"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
+          )}
         </div>
       </div>
 
@@ -124,40 +180,51 @@ export default function PORecommendations() {
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort('sku')}
-                    className="hover-elevate"
-                    data-testid="button-sort-sku"
-                  >
-                    SKU <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
+                  <SortableHeader column="sku">SKU</SortableHeader>
                 </TableHead>
                 <TableHead>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort('supplier')}
-                    className="hover-elevate"
-                    data-testid="button-sort-supplier"
-                  >
-                    Supplier <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
+                  <SortableHeader column="supplier">Supplier</SortableHeader>
                 </TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-right">Recommended Qty</TableHead>
-                <TableHead className="text-right">Base Velocity</TableHead>
-                <TableHead className="text-right">90-Day Forecast</TableHead>
-                <TableHead className="text-right">Days Cover</TableHead>
-                <TableHead className="text-right">Qty Incoming</TableHead>
-                <TableHead>Next Holiday</TableHead>
+                <TableHead>
+                  <SortableHeader column="title">Title</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="lead_time">Lead Time</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="current_total_stock">Current Stock</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="recommended_quantity">Recommended Qty</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="base_velocity">Base Velocity</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="projected_velocity">Projected Velocity</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="growth_rate">Growth Rate</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="ninety_day_forecast">90-Day Forecast</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="current_days_cover">Days Cover</SortableHeader>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader column="quantity_incoming">Qty Incoming</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader column="next_holiday_count_down_in_days">Next Holiday</SortableHeader>
+                </TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {recommendations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground" data-testid="text-no-results">
+                  <TableCell colSpan={14} className="text-center text-muted-foreground" data-testid="text-no-results">
                     No recommendations found
                   </TableCell>
                 </TableRow>
@@ -167,9 +234,12 @@ export default function PORecommendations() {
                     <TableCell className="font-medium" data-testid={`text-sku-${rec.sku}`}>{rec.sku}</TableCell>
                     <TableCell data-testid={`text-supplier-${rec.sku}`}>{rec.supplier}</TableCell>
                     <TableCell className="max-w-xs truncate" data-testid={`text-title-${rec.sku}`}>{rec.title}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-lead-time-${rec.sku}`}>{rec.lead_time || '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-current-stock-${rec.sku}`}>{rec.current_total_stock?.toLocaleString() || '-'}</TableCell>
                     <TableCell className="text-right font-semibold" data-testid={`text-recommended-qty-${rec.sku}`}>{rec.recommended_quantity.toLocaleString()}</TableCell>
                     <TableCell className="text-right" data-testid={`text-base-velocity-${rec.sku}`}>{rec.base_velocity ? parseFloat(rec.base_velocity).toFixed(2) : '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-projected-velocity-${rec.sku}`}>{rec.projected_velocity ? parseFloat(rec.projected_velocity).toFixed(2) : '-'}</TableCell>
+                    <TableCell className="text-right" data-testid={`text-growth-rate-${rec.sku}`}>{rec.growth_rate ? `${(parseFloat(rec.growth_rate) * 100).toFixed(1)}%` : '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-forecast-${rec.sku}`}>{rec.ninety_day_forecast ? parseFloat(rec.ninety_day_forecast).toFixed(0) : '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-days-cover-${rec.sku}`}>{rec.current_days_cover ? parseFloat(rec.current_days_cover).toFixed(1) : '-'}</TableCell>
                     <TableCell className="text-right" data-testid={`text-qty-incoming-${rec.sku}`}>{rec.quantity_incoming?.toLocaleString() || '-'}</TableCell>
