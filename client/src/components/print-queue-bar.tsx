@@ -5,8 +5,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, Printer, X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { useEffect, useRef, useState } from "react";
-import printJS from "print-js";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface PrintJob {
   id: string;
@@ -20,6 +19,7 @@ interface PrintJob {
 export function PrintQueueBar() {
   const { toast } = useToast();
   const printedJobsRef = useRef<Set<string>>(new Set());
+  const isPrintingRef = useRef<boolean>(false);
 
   const { data: jobsData } = useQuery<{ jobs: PrintJob[] }>({
     queryKey: ["/api/print-queue"],
@@ -67,6 +67,11 @@ export function PrintQueueBar() {
 
   // Auto-print effect - triggers when a job gets a labelUrl
   useEffect(() => {
+    // Guard: prevent multiple concurrent print attempts
+    if (isPrintingRef.current) {
+      return;
+    }
+
     const jobsNeedingPrint = activeJobs.filter(
       job => job.labelUrl && 
              job.status === 'queued' && 
@@ -79,64 +84,53 @@ export function PrintQueueBar() {
     }
   }, [activeJobs]);
 
-  const autoPrintLabel = async (job: PrintJob) => {
+  const autoPrintLabel = useCallback((job: PrintJob) => {
+    // Double-check guards
+    if (isPrintingRef.current || printedJobsRef.current.has(job.id)) {
+      return;
+    }
+
+    // Mark as printing immediately to prevent re-entry
+    isPrintingRef.current = true;
+    printedJobsRef.current.add(job.id);
+
     try {
-      printedJobsRef.current.add(job.id);
-
-      // Fetch PDF as blob first via our proxy endpoint
+      // Open PDF in new tab - simple and reliable
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
+      const printWindow = window.open(proxyUrl, '_blank');
       
-      const response = await fetch(proxyUrl, { credentials: 'include' });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch label: ${response.statusText}`);
+      if (printWindow) {
+        toast({
+          title: "Label opened for printing",
+          description: `Order #${job.orderId} - Use Ctrl+P or browser print button. Click "Done" when finished.`,
+          duration: 8000,
+        });
+      } else {
+        // Pop-up blocked
+        printedJobsRef.current.delete(job.id);
+        toast({
+          title: "Pop-up blocked",
+          description: "Please allow pop-ups for this site, then click 'Print Now'",
+          variant: "destructive",
+          duration: 6000,
+        });
       }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      
-      // Use Print.js with the blob URL (avoids cross-origin issues)
-      printJS({
-        printable: blobUrl,
-        type: 'pdf',
-        onPrintDialogClose: () => {
-          // Clean up blob URL after print dialog closes
-          URL.revokeObjectURL(blobUrl);
-          toast({
-            title: "Print dialog closed",
-            description: `Label for order #${job.orderId} ready. Click "Done" when finished.`,
-            duration: 3000,
-          });
-        },
-        onError: (error: any) => {
-          console.error('Print.js error:', error);
-          URL.revokeObjectURL(blobUrl);
-          printedJobsRef.current.delete(job.id);
-          
-          toast({
-            title: "Auto-print failed",
-            description: "Click 'Print Now' to try again",
-            variant: "destructive",
-          });
-        },
-      });
-
-      toast({
-        title: "Auto-print triggered",
-        description: `Print dialog opening for order #${job.orderId}`,
-        duration: 3000,
-      });
-      
     } catch (error) {
       console.error('Auto-print error:', error);
       printedJobsRef.current.delete(job.id);
       
       toast({
-        title: "Auto-print failed",
+        title: "Failed to open label",
         description: "Click 'Print Now' to try again",
         variant: "destructive",
       });
+    } finally {
+      // Allow next print after a delay
+      setTimeout(() => {
+        isPrintingRef.current = false;
+      }, 2000);
     }
-  };
+  }, [toast]);
 
   if (activeJobs.length === 0) {
     return null;
