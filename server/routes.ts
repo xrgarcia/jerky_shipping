@@ -2691,6 +2691,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Worker not initialized yet
       }
 
+      // Get print queue worker status and stats
+      let printQueueWorkerStatus: 'sleeping' | 'running' = 'sleeping';
+      let printQueueWorkerStats = undefined;
+      try {
+        const { getPrintQueueWorkerStatus, getPrintQueueWorkerStats } = await import("./print-queue-worker");
+        printQueueWorkerStatus = getPrintQueueWorkerStatus();
+        printQueueWorkerStats = getPrintQueueWorkerStats();
+      } catch (error) {
+        // Worker not initialized yet
+      }
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -2714,6 +2725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataHealth: dataHealthMetrics,
         onHoldWorkerStatus,
         onHoldWorkerStats,
+        printQueueWorkerStatus,
+        printQueueWorkerStats,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);

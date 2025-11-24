@@ -212,6 +212,14 @@ export function broadcastQueueStatus(data: {
     workerStartedAt: string;
     lastCompletedAt: string | null;
   };
+  printQueueWorkerStatus?: 'sleeping' | 'running';
+  printQueueWorkerStats?: {
+    totalProcessedCount: number;
+    lastProcessedCount: number;
+    workerStartedAt: Date;
+    lastCompletedAt: Date | null;
+    status: 'sleeping' | 'running';
+  };
   dataHealth?: {
     ordersMissingShipments?: number;
     oldestOrderMissingShipmentAt?: string | null;

@@ -506,6 +506,8 @@ export const printQueue = pgTable("print_queue", {
   labelUrl: text("label_url"), // ShipStation label PDF/ZPL URL (nullable until label is fetched/created)
   status: text("status").notNull().default("queued"), // queued, printing, printed, failed
   error: text("error"), // Error message if status is failed
+  retryCount: integer("retry_count").notNull().default(0), // Number of retry attempts
+  lastRetryAt: timestamp("last_retry_at"), // Last retry timestamp for backoff calculation
   queuedAt: timestamp("queued_at").notNull().defaultNow(),
   printedAt: timestamp("printed_at"),
 }, (table) => ({

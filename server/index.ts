@@ -204,6 +204,10 @@ app.use((req, res, next) => {
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours
     
+    // Start print queue worker (processes label fetching for queued print jobs)
+    const { startPrintQueueWorker } = await import("./print-queue-worker");
+    startPrintQueueWorker(10000); // Process print queue every 10 seconds
+    
     // Resume any in-progress backfill jobs that were interrupted by server restart
     setImmediate(async () => {
       try {

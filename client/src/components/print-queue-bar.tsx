@@ -3,8 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Printer, X } from "lucide-react";
+import { Clock, Printer, X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { useEffect, useRef, useState } from "react";
 
 interface PrintJob {
   id: string;
@@ -17,6 +18,9 @@ interface PrintJob {
 
 export function PrintQueueBar() {
   const { toast } = useToast();
+  const [printingJobId, setPrintingJobId] = useState<string | null>(null);
+  const printedJobsRef = useRef<Set<string>>(new Set());
+  const printIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const { data: jobsData } = useQuery<{ jobs: PrintJob[] }>({
     queryKey: ["/api/print-queue"],
@@ -55,16 +59,132 @@ export function PrintQueueBar() {
 
   const handleMarkComplete = (jobId: string) => {
     markCompleteMutation.mutate(jobId);
+    // Remove from printed jobs set when manually marked complete
+    printedJobsRef.current.delete(jobId);
   };
 
   const jobs = jobsData?.jobs || [];
   const activeJobs = jobs.filter(j => j.status === "queued" || j.status === "printing");
 
+  // Auto-print effect - triggers when a job gets a labelUrl
+  useEffect(() => {
+    const jobsNeedingPrint = activeJobs.filter(
+      job => job.labelUrl && 
+             job.status === 'queued' && 
+             !printedJobsRef.current.has(job.id) &&
+             printingJobId !== job.id
+    );
+
+    if (jobsNeedingPrint.length > 0) {
+      const jobToPrint = jobsNeedingPrint[0]; // Print one at a time
+      autoPrintLabel(jobToPrint);
+    }
+  }, [activeJobs, printingJobId]);
+
+  const autoPrintLabel = async (job: PrintJob) => {
+    try {
+      setPrintingJobId(job.id);
+      printedJobsRef.current.add(job.id);
+
+      // Create hidden iframe to load PDF
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.style.position = 'absolute';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      document.body.appendChild(iframe);
+      printIframeRef.current = iframe;
+
+      // Proxy the label URL through our backend
+      const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
+      
+      return new Promise<void>((resolve, reject) => {
+        // Set timeout in case load fails
+        const timeout = setTimeout(() => {
+          cleanup(true); // true = failed
+          reject(new Error('Print timeout'));
+        }, 30000); // 30 second timeout
+
+        const cleanup = (failed: boolean = false) => {
+          clearTimeout(timeout);
+          if (printIframeRef.current) {
+            document.body.removeChild(printIframeRef.current);
+            printIframeRef.current = null;
+          }
+          setPrintingJobId(null);
+          
+          // Remove from printed jobs set on failure so retry is possible
+          if (failed) {
+            printedJobsRef.current.delete(job.id);
+          }
+        };
+
+        iframe.onload = () => {
+          try {
+            // Wait a moment for PDF to render
+            setTimeout(() => {
+              try {
+                // Trigger print dialog
+                iframe.contentWindow?.print();
+                
+                toast({
+                  title: "Auto-print triggered",
+                  description: `Label for order #${job.orderId} - Click OK in print dialog`,
+                });
+
+                // Clean up after a delay to allow print dialog to show
+                setTimeout(() => {
+                  cleanup(false); // false = success
+                  resolve();
+                }, 1000);
+              } catch (error) {
+                console.error('Print error:', error);
+                cleanup(true); // true = failed
+                reject(error);
+              }
+            }, 500);
+          } catch (error) {
+            console.error('Print setup error:', error);
+            cleanup(true); // true = failed
+            reject(error);
+          }
+        };
+
+        iframe.onerror = () => {
+          console.error('Failed to load label PDF');
+          cleanup(true); // true = failed
+          reject(new Error('Failed to load PDF'));
+        };
+
+        // Load the PDF
+        iframe.src = proxyUrl;
+      });
+    } catch (error) {
+      console.error('Auto-print error:', error);
+      setPrintingJobId(null);
+      // Remove from printed jobs set so retry is possible
+      printedJobsRef.current.delete(job.id);
+      
+      toast({
+        title: "Auto-print failed",
+        description: "Click 'Print Now' to print manually",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (activeJobs.length === 0) {
     return null;
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, jobId: string) => {
+    if (printingJobId === jobId) {
+      return <Badge variant="secondary" data-testid={`badge-status-auto-printing`} className="flex items-center gap-1">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Auto-Printing
+      </Badge>;
+    }
+    
     switch (status) {
       case "queued":
         return <Badge variant="default" data-testid={`badge-status-queued`}>Queued</Badge>;
@@ -95,7 +215,7 @@ export function PrintQueueBar() {
                 <span className="font-medium text-sm" data-testid={`text-order-${job.orderId}`}>
                   #{job.orderId}
                 </span>
-                {getStatusBadge(job.status)}
+                {getStatusBadge(job.status, job.id)}
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />
                   <span data-testid={`text-time-${job.id}`}>
