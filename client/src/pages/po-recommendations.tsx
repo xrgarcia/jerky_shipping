@@ -33,12 +33,23 @@ export default function PORecommendations() {
   const sortBy = searchParams.get('sortBy') || 'sku';
   const sortOrder = (searchParams.get('sortOrder') || 'asc') as 'asc' | 'desc';
 
+  const buildQueryString = () => {
+    const params = new URLSearchParams();
+    if (supplier) params.set('supplier', supplier);
+    if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
+    if (search) params.set('search', search);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    const qs = params.toString();
+    return `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
+  };
+
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: ['/api/reporting/po-recommendations', { supplier, stockCheckDate, search, sortBy, sortOrder }],
+    queryKey: [buildQueryString()],
   });
 
   const { data: steps = [] } = useQuery<PORecommendationStep[]>({
-    queryKey: ['/api/reporting/po-recommendation-steps', selectedSku?.sku, selectedSku?.stockCheckDate],
+    queryKey: [`/api/reporting/po-recommendation-steps/${selectedSku?.sku}/${selectedSku?.stockCheckDate}`],
     enabled: !!selectedSku,
   });
 

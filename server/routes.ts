@@ -3654,7 +3654,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { supplier, stockCheckDate, search, sortBy, sortOrder } = req.query;
       
+      // Validate sortBy parameter
+      const allowedSortColumns = [
+        'sku', 'supplier', 'title', 'current_total_stock', 
+        'recommended_quantity', 'base_velocity', 'ninety_day_forecast',
+        'current_days_cover', 'quantity_incoming'
+      ];
+      
+      const validatedSortBy = typeof sortBy === 'string' && allowedSortColumns.includes(sortBy) 
+        ? sortBy 
+        : 'sku';
+      
+      // Validate sortOrder parameter
+      const validatedSortOrder = sortOrder === 'desc' ? 'desc' : 'asc';
+      
+      // Validate stockCheckDate format (YYYY-MM-DD)
       let effectiveStockCheckDate = stockCheckDate as string | undefined;
+      if (effectiveStockCheckDate && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveStockCheckDate)) {
+        return res.status(400).json({ error: "Invalid stockCheckDate format. Expected YYYY-MM-DD" });
+      }
       
       // If no stockCheckDate specified, use latest
       if (!effectiveStockCheckDate) {
@@ -3668,8 +3686,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplier: supplier as string | undefined,
         stockCheckDate: effectiveStockCheckDate,
         search: search as string | undefined,
-        sortBy: sortBy as any,
-        sortOrder: sortOrder as 'asc' | 'desc' | undefined
+        sortBy: validatedSortBy,
+        sortOrder: validatedSortOrder
       });
       
       res.json(recommendations);
@@ -3692,6 +3710,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reporting/po-recommendation-steps/:sku/:stockCheckDate", requireAuth, async (req, res) => {
     try {
       const { sku, stockCheckDate } = req.params;
+      
+      // Validate stockCheckDate format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(stockCheckDate)) {
+        return res.status(400).json({ error: "Invalid stockCheckDate format. Expected YYYY-MM-DD" });
+      }
+      
       const steps = await reportingStorage.getPORecommendationSteps(
         sku, 
         new Date(stockCheckDate)

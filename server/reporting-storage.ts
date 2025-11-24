@@ -25,54 +25,43 @@ export class ReportingStorage implements IReportingStorage {
       sortOrder = 'asc'
     } = filters;
 
-    let query = reportingSql`
-      SELECT 
-        sku,
-        supplier,
-        title,
-        lead_time,
-        current_total_stock,
-        base_velocity,
-        projected_velocity,
-        growth_rate,
-        kit_driven_velocity,
-        individual_velocity,
-        ninety_day_forecast,
-        case_adjustment_applied,
-        current_days_cover,
-        moq_applied,
-        quantity_incoming,
-        recommended_quantity,
-        is_assembled_product,
-        stock_check_date,
-        next_holiday_count_down_in_days,
-        next_holiday_recommended_quantity,
-        next_holiday_season,
-        next_holiday_start_date
-      FROM vw_po_recommendations
-      WHERE 1=1
-    `;
+    // Whitelist allowed sort columns to prevent SQL injection
+    const allowedSortColumns = [
+      'sku', 'supplier', 'title', 'current_total_stock', 
+      'recommended_quantity', 'base_velocity', 'ninety_day_forecast',
+      'current_days_cover', 'quantity_incoming'
+    ];
+    
+    const safeSortColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'sku';
+    const safeSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC';
 
-    const conditions = [];
+    // Build WHERE conditions
+    const whereClauses = [];
     
     if (stockCheckDate) {
-      conditions.push(reportingSql`stock_check_date = ${stockCheckDate}`);
+      whereClauses.push(reportingSql`stock_check_date = ${stockCheckDate}`);
     }
     
     if (supplier) {
-      conditions.push(reportingSql`supplier = ${supplier}`);
+      whereClauses.push(reportingSql`supplier = ${supplier}`);
     }
     
     if (search) {
       const searchPattern = `%${search}%`;
-      conditions.push(reportingSql`(
+      whereClauses.push(reportingSql`(
         sku ILIKE ${searchPattern} OR 
         title ILIKE ${searchPattern} OR 
         supplier ILIKE ${searchPattern}
       )`);
     }
 
-    if (conditions.length > 0) {
+    // Build the complete query using postgres.js composition
+    let query;
+    if (whereClauses.length > 0) {
+      const whereCondition = whereClauses.reduce((acc, clause, i) => 
+        i === 0 ? clause : reportingSql`${acc} AND ${clause}`
+      );
+      
       query = reportingSql`
         SELECT 
           sku,
@@ -98,20 +87,40 @@ export class ReportingStorage implements IReportingStorage {
           next_holiday_season,
           next_holiday_start_date
         FROM vw_po_recommendations
-        WHERE ${reportingSql(conditions.reduce((acc, cond, i) => 
-          i === 0 ? cond : reportingSql`${acc} AND ${cond}`
-        ))}
+        WHERE ${whereCondition}
+        ORDER BY ${reportingSql(safeSortColumn)} ${reportingSql.unsafe(safeSortOrder)}
+      `;
+    } else {
+      query = reportingSql`
+        SELECT 
+          sku,
+          supplier,
+          title,
+          lead_time,
+          current_total_stock,
+          base_velocity,
+          projected_velocity,
+          growth_rate,
+          kit_driven_velocity,
+          individual_velocity,
+          ninety_day_forecast,
+          case_adjustment_applied,
+          current_days_cover,
+          moq_applied,
+          quantity_incoming,
+          recommended_quantity,
+          is_assembled_product,
+          stock_check_date,
+          next_holiday_count_down_in_days,
+          next_holiday_recommended_quantity,
+          next_holiday_season,
+          next_holiday_start_date
+        FROM vw_po_recommendations
+        ORDER BY ${reportingSql(safeSortColumn)} ${reportingSql.unsafe(safeSortOrder)}
       `;
     }
-
-    const orderColumn = reportingSql(sortBy);
-    const orderDir = sortOrder === 'desc' ? reportingSql`DESC` : reportingSql`ASC`;
     
-    const results = await reportingSql`
-      ${query}
-      ORDER BY ${orderColumn} ${orderDir}
-    `;
-
+    const results = await query;
     return results as PORecommendation[];
   }
 
