@@ -150,7 +150,13 @@ export default function PORecommendations() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={supplier || 'all'} onValueChange={(value) => updateSearchParam('supplier', value === 'all' ? null : value)}>
+          <Select 
+            value={supplier || 'all'} 
+            onValueChange={(value) => {
+              console.log('[Select onValueChange] Triggered with value:', value);
+              updateSearchParam('supplier', value === 'all' ? null : value);
+            }}
+          >
             <SelectTrigger className="w-48" data-testid="select-supplier">
               <SelectValue placeholder="All Suppliers" />
             </SelectTrigger>
