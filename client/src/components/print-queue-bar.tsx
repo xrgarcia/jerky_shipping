@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Clock, Printer, X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useEffect, useRef, useState } from "react";
+import printJS from "print-js";
 
 interface PrintJob {
   id: string;
@@ -78,71 +79,40 @@ export function PrintQueueBar() {
     }
   }, [activeJobs]);
 
-  const autoPrintLabel = async (job: PrintJob) => {
+  const autoPrintLabel = (job: PrintJob) => {
     try {
       printedJobsRef.current.add(job.id);
 
-      // Fetch PDF as blob via our proxy endpoint
+      // Use Print.js to auto-print the PDF via our proxy endpoint
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
-      const response = await fetch(proxyUrl, { credentials: 'include' });
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch label PDF');
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // Open a helper window with HTML we control
-      const printWindow = window.open('', '_blank');
-      
-      if (!printWindow) {
-        // Pop-up blocked
-        URL.revokeObjectURL(blobUrl);
-        printedJobsRef.current.delete(job.id);
-        toast({
-          title: "Pop-up blocked",
-          description: "Please allow pop-ups for this site, then click 'Print Now'",
-          variant: "destructive",
-          duration: 6000,
-        });
-        return;
-      }
-
-      // Write HTML that embeds the PDF and auto-prints
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Print Label - Order #${job.orderId}</title>
-            <style>
-              body { margin: 0; }
-              embed { width: 100%; height: 100vh; }
-            </style>
-          </head>
-          <body>
-            <embed src="${blobUrl}" type="application/pdf" />
-            <script>
-              // Wait for PDF to load, then auto-print
-              window.onload = function() {
-                setTimeout(function() {
-                  window.print();
-                  // Clean up blob URL after print dialog opens
-                  setTimeout(function() {
-                    window.URL.revokeObjectURL('${blobUrl}');
-                  }, 1000);
-                }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+      printJS({
+        printable: proxyUrl,
+        type: 'pdf',
+        onPrintDialogClose: () => {
+          // Print dialog closed - keep job in printed set to prevent re-triggering
+          toast({
+            title: "Print dialog closed",
+            description: `Label for order #${job.orderId} ready. Click "Done" when finished.`,
+            duration: 3000,
+          });
+        },
+        onError: (error: any) => {
+          console.error('Print.js error:', error);
+          printedJobsRef.current.delete(job.id);
+          
+          toast({
+            title: "Auto-print failed",
+            description: "Click 'Print Now' to try again",
+            variant: "destructive",
+          });
+        },
+      });
 
       toast({
         title: "Auto-print triggered",
-        description: `Label for order #${job.orderId} - Print dialog should open automatically`,
-        duration: 4000,
+        description: `Print dialog opening for order #${job.orderId}`,
+        duration: 3000,
       });
       
     } catch (error) {
