@@ -161,9 +161,20 @@ export default function PORecommendations() {
               <SelectValue placeholder="All Suppliers" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Suppliers</SelectItem>
+              <SelectItem 
+                value="all"
+                onClick={() => console.log('[SelectItem] Clicked: all')}
+              >
+                All Suppliers
+              </SelectItem>
               {suppliers.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
+                <SelectItem 
+                  key={s} 
+                  value={s}
+                  onClick={() => console.log('[SelectItem] Clicked:', s)}
+                >
+                  {s}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
