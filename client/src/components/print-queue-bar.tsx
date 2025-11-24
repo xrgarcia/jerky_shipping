@@ -57,8 +57,6 @@ export function PrintQueueBar() {
 
   const handleMarkComplete = (jobId: string) => {
     markCompleteMutation.mutate(jobId);
-    // Remove from printed jobs set when manually marked complete
-    printedJobsRef.current.delete(jobId);
   };
 
   const jobs = jobsData?.jobs || [];
@@ -110,15 +108,16 @@ export function PrintQueueBar() {
         return;
       }
 
-      // THEN: Open PDF in new tab
+      // Open PDF in new tab - browsers block automatic print() for security
       const proxyUrl = `/api/labels/proxy?url=${encodeURIComponent(job.labelUrl)}`;
       const printWindow = window.open(proxyUrl, '_blank');
       
       if (printWindow) {
+        printWindow.focus();
         toast({
-          title: "Label opened for printing",
-          description: `Order #${job.orderId} - Use Ctrl+P or browser print button. Click "Done" when finished.`,
-          duration: 8000,
+          title: "Label ready to print",
+          description: `Order #${job.orderId} - Press Ctrl+P (or Cmd+P on Mac) to print. Click "Done" when finished.`,
+          duration: 10000,
         });
       } else {
         toast({
