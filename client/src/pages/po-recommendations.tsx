@@ -187,7 +187,7 @@ export default function PORecommendations() {
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="w-full overflow-x-auto">
+        <div className="w-full overflow-x-scroll">
           {isLoading ? (
             <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
               <div className="text-muted-foreground">Loading recommendations...</div>
