@@ -39,8 +39,8 @@ export default function PORecommendations() {
   const [supplier, setSupplier] = useState<string>('');
   const [stockCheckDate, setStockCheckDate] = useState<string>('');
   const [search, setSearch] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('sku');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string>('recommended_qty');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Initialize state from URL params
   useEffect(() => {
@@ -55,8 +55,8 @@ export default function PORecommendations() {
     setSupplier(params.get('supplier') || '');
     setStockCheckDate(params.get('stockCheckDate') || '');
     setSearch(params.get('search') || '');
-    setSortBy(params.get('sortBy') || 'sku');
-    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'asc');
+    setSortBy(params.get('sortBy') || 'recommended_qty');
+    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'desc');
     
     lastSyncedSearchRef.current = currentSearch;
     setIsInitialized(true);
@@ -71,8 +71,8 @@ export default function PORecommendations() {
     if (supplier) params.set('supplier', supplier);
     if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
     if (search) params.set('search', search);
-    if (sortBy !== 'sku') params.set('sortBy', sortBy);
-    if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
+    if (sortBy !== 'recommended_qty') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
     
     const newSearch = params.toString();
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
@@ -131,8 +131,8 @@ export default function PORecommendations() {
     setSupplier('');
     setStockCheckDate('');
     setSearch('');
-    setSortBy('sku');
-    setSortOrder('asc');
+    setSortBy('recommended_qty');
+    setSortOrder('desc');
   };
 
   const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {

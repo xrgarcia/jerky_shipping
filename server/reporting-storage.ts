@@ -6,6 +6,9 @@ const CACHE_TTL = 300; // 5 minutes cache
 const CACHE_PREFIX = 'po_recommendations:';
 
 // Generate consistent cache key from filters
+// Note: sortBy and sortOrder are NOT included in the cache key because sorting
+// doesn't change the data - we cache the full dataset and sort it on every request.
+// This makes caching much more effective (one cache entry per supplier/date combo).
 function generateCacheKey(filters: PORecommendationFilters): string {
   const normalized: Record<string, string> = {};
   
@@ -18,8 +21,6 @@ function generateCacheKey(filters: PORecommendationFilters): string {
   
   // Add other non-default filter values in alphabetical order
   if (filters.supplier) normalized.supplier = filters.supplier;
-  if (filters.sortBy && filters.sortBy !== 'sku') normalized.sortBy = filters.sortBy;
-  if (filters.sortOrder && filters.sortOrder !== 'asc') normalized.sortOrder = filters.sortOrder;
   
   // Generate key from sorted keys for consistency
   const keyParts = Object.keys(normalized)
