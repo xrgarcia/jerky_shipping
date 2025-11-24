@@ -72,6 +72,9 @@ function generateCacheKey(filters: PORecommendationFilters): string {
   
   // Add other non-default filter values in alphabetical order
   if (filters.supplier) normalized.supplier = filters.supplier;
+  if (filters.isAssembledProduct && filters.isAssembledProduct !== 'all') {
+    normalized.isAssembledProduct = filters.isAssembledProduct;
+  }
   
   // Generate key from sorted keys for consistency
   const keyParts = Object.keys(normalized)
@@ -114,6 +117,7 @@ export class ReportingStorage implements IReportingStorage {
       supplier,
       stockCheckDate,
       search,
+      isAssembledProduct,
       sortBy = 'sku',
       sortOrder = 'asc'
     } = normalizedFilters;
@@ -150,6 +154,11 @@ export class ReportingStorage implements IReportingStorage {
     
     if (supplier) {
       whereClauses.push(reportingSql`supplier = ${supplier}`);
+    }
+    
+    if (isAssembledProduct && isAssembledProduct !== 'all') {
+      const isAssembled = isAssembledProduct === 'true';
+      whereClauses.push(reportingSql`is_assembled_product = ${isAssembled}`);
     }
     
     if (search) {

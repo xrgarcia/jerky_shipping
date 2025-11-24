@@ -38,6 +38,7 @@ export interface PORecommendationFilters {
   supplier?: string;
   stockCheckDate?: string;
   search?: string;
+  isAssembledProduct?: string;
   sortBy?: keyof PORecommendation;
   sortOrder?: 'asc' | 'desc';
 }

@@ -39,8 +39,9 @@ export default function PORecommendations() {
   const [supplier, setSupplier] = useState<string>('');
   const [stockCheckDate, setStockCheckDate] = useState<string>('');
   const [search, setSearch] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('recommended_qty');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isAssembledProduct, setIsAssembledProduct] = useState<string>('false');
+  const [sortBy, setSortBy] = useState<string>('ninety_day_forecast');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Initialize state from URL params
   useEffect(() => {
@@ -55,8 +56,9 @@ export default function PORecommendations() {
     setSupplier(params.get('supplier') || '');
     setStockCheckDate(params.get('stockCheckDate') || '');
     setSearch(params.get('search') || '');
-    setSortBy(params.get('sortBy') || 'recommended_qty');
-    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'desc');
+    setIsAssembledProduct(params.get('isAssembledProduct') || 'false');
+    setSortBy(params.get('sortBy') || 'ninety_day_forecast');
+    setSortOrder((params.get('sortOrder') as 'asc' | 'desc') || 'asc');
     
     lastSyncedSearchRef.current = currentSearch;
     setIsInitialized(true);
@@ -71,8 +73,9 @@ export default function PORecommendations() {
     if (supplier) params.set('supplier', supplier);
     if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
     if (search) params.set('search', search);
-    if (sortBy !== 'recommended_qty') params.set('sortBy', sortBy);
-    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    if (isAssembledProduct !== 'false') params.set('isAssembledProduct', isAssembledProduct);
+    if (sortBy !== 'ninety_day_forecast') params.set('sortBy', sortBy);
+    if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
     
     const newSearch = params.toString();
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
@@ -82,15 +85,16 @@ export default function PORecommendations() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
     }
-  }, [supplier, stockCheckDate, search, sortBy, sortOrder, isInitialized]);
+  }, [supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder, isInitialized]);
 
   const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: ['/api/reporting/po-recommendations', supplier, stockCheckDate, search, sortBy, sortOrder],
+    queryKey: ['/api/reporting/po-recommendations', supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (supplier) params.set('supplier', supplier);
       if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
       if (search) params.set('search', search);
+      if (isAssembledProduct !== 'all') params.set('isAssembledProduct', isAssembledProduct);
       if (sortBy) params.set('sortBy', sortBy);
       if (sortOrder) params.set('sortOrder', sortOrder);
       const qs = params.toString();
@@ -131,8 +135,9 @@ export default function PORecommendations() {
     setSupplier('');
     setStockCheckDate('');
     setSearch('');
-    setSortBy('recommended_qty');
-    setSortOrder('desc');
+    setIsAssembledProduct('false');
+    setSortBy('ninety_day_forecast');
+    setSortOrder('asc');
   };
 
   const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
@@ -189,6 +194,20 @@ export default function PORecommendations() {
             </SelectContent>
           </Select>
 
+          <Select 
+            value={isAssembledProduct} 
+            onValueChange={setIsAssembledProduct}
+          >
+            <SelectTrigger className="w-48" data-testid="select-is-assembled-product">
+              <SelectValue placeholder="Is Assembled Product" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="true">True</SelectItem>
+              <SelectItem value="false">False</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Input
             placeholder="Search SKU, title, or supplier..."
             value={search}
@@ -204,7 +223,7 @@ export default function PORecommendations() {
             <Search className="h-4 w-4" />
           </Button>
 
-          {(supplier || search) && (
+          {(supplier || search || isAssembledProduct !== 'false') && (
             <Button
               variant="outline"
               onClick={clearFilters}
