@@ -200,6 +200,10 @@ app.use((req, res, next) => {
     const { startOnHoldPollWorker } = await import("./onhold-poll-worker");
     startOnHoldPollWorker(60000); // Poll for on_hold shipments every 1 minute
     
+    // Start PO recommendations cache warmer (runs every 6 hours)
+    const { startPOCacheWarmer } = await import("./po-cache-warmer");
+    startPOCacheWarmer(21600000); // Warm cache every 6 hours
+    
     // Resume any in-progress backfill jobs that were interrupted by server restart
     setImmediate(async () => {
       try {

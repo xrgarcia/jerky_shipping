@@ -5,6 +5,57 @@ import { getRedisClient } from './utils/queue';
 const CACHE_TTL = 300; // 5 minutes cache
 const CACHE_PREFIX = 'po_recommendations:';
 
+// Whitelist of allowed sort columns (prevents SQL injection and prototype pollution)
+// IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
+const ALLOWED_SORT_COLUMNS = [
+  'sku', 'supplier', 'title', 'lead_time', 'current_total_stock', 
+  'recommended_quantity', 'base_velocity', 'projected_velocity',
+  'growth_rate', 'ninety_day_forecast', 'current_days_cover', 
+  'quantity_incoming', 'kit_driven_velocity', 'individual_velocity',
+  'case_adjustment_applied', 'moq_applied', 'is_assembled_product',
+  'next_holiday_count_down_in_days', 'next_holiday_recommended_quantity',
+  'next_holiday_season', 'next_holiday_start_date'
+];
+
+// Column mapping for frontend to backend names
+const COLUMN_MAP: Record<string, string> = {
+  'recommended_qty': 'recommended_quantity',
+};
+
+// In-memory sorting function for PO recommendations
+function sortRecommendations(
+  recommendations: PORecommendation[],
+  sortBy: string,
+  sortOrder: 'asc' | 'desc'
+): PORecommendation[] {
+  // Map frontend column names to backend column names
+  const mappedSortBy = COLUMN_MAP[sortBy] || sortBy;
+  
+  // Validate sortBy to prevent prototype pollution attacks
+  const safeSortColumn = ALLOWED_SORT_COLUMNS.includes(mappedSortBy) ? mappedSortBy : 'sku';
+  
+  // Create shallow copy to avoid mutating cached array
+  return [...recommendations].sort((a, b) => {
+    const aVal = a[safeSortColumn as keyof PORecommendation];
+    const bVal = b[safeSortColumn as keyof PORecommendation];
+    
+    // Handle null/undefined values (put them at the end)
+    if (aVal == null && bVal == null) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+    
+    // Compare values
+    let comparison = 0;
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      comparison = aVal - bVal;
+    } else {
+      comparison = String(aVal).localeCompare(String(bVal));
+    }
+    
+    return sortOrder === 'desc' ? -comparison : comparison;
+  });
+}
+
 // Generate consistent cache key from filters
 // Note: sortBy and sortOrder are NOT included in the cache key because sorting
 // doesn't change the data - we cache the full dataset and sort it on every request.
@@ -73,35 +124,24 @@ export class ReportingStorage implements IReportingStorage {
     // Try to get from cache (only if no search filter - searches are dynamic)
     // Skip cache entirely if search is provided (even empty string)
     const shouldCache = !search;
+    let recommendations: PORecommendation[];
+    
     if (shouldCache) {
       try {
         const redis = getRedisClient();
         const cached = await redis.get<PORecommendation[]>(cacheKey);
         if (cached) {
           console.log('[ReportingStorage] Cache hit for PO recommendations');
-          return cached;
+          recommendations = cached;
+          // Sort in-memory after cache retrieval
+          return sortRecommendations(recommendations, sortBy, sortOrder);
         }
       } catch (error) {
         console.error('[ReportingStorage] Redis error fetching recommendations:', error);
       }
     }
 
-    // Whitelist allowed sort columns to prevent SQL injection
-    // IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
-    const allowedSortColumns = [
-      'sku', 'supplier', 'title', 'lead_time', 'current_total_stock', 
-      'recommended_quantity', 'base_velocity', 'projected_velocity',
-      'growth_rate', 'ninety_day_forecast', 'current_days_cover', 
-      'quantity_incoming', 'kit_driven_velocity', 'individual_velocity',
-      'case_adjustment_applied', 'moq_applied', 'is_assembled_product',
-      'next_holiday_count_down_in_days', 'next_holiday_recommended_quantity',
-      'next_holiday_season', 'next_holiday_start_date'
-    ];
-    
-    const safeSortColumn = allowedSortColumns.includes(sortBy) ? sortBy : 'sku';
-    const safeSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC';
-
-    // Build WHERE conditions
+    // Build WHERE conditions (sorting happens in-memory after caching)
     const whereClauses = [];
     
     if (stockCheckDate) {
@@ -154,7 +194,6 @@ export class ReportingStorage implements IReportingStorage {
           next_holiday_start_date
         FROM vw_po_recommendations
         WHERE ${whereCondition}
-        ORDER BY ${reportingSql(safeSortColumn)} ${reportingSql.unsafe(safeSortOrder)}
       `;
     } else {
       query = reportingSql`
@@ -182,14 +221,13 @@ export class ReportingStorage implements IReportingStorage {
           next_holiday_season,
           next_holiday_start_date
         FROM vw_po_recommendations
-        ORDER BY ${reportingSql(safeSortColumn)} ${reportingSql.unsafe(safeSortOrder)}
       `;
     }
     
     const results = await query;
-    const recommendations = results as PORecommendation[];
+    recommendations = results as PORecommendation[];
 
-    // Cache the results (only if shouldCache is true)
+    // Cache the unsorted results (only if shouldCache is true)
     if (shouldCache) {
       try {
         const redis = getRedisClient();
@@ -200,7 +238,8 @@ export class ReportingStorage implements IReportingStorage {
       }
     }
 
-    return recommendations;
+    // Sort in-memory before returning
+    return sortRecommendations(recommendations, sortBy, sortOrder);
   }
 
   async getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]> {
