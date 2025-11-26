@@ -1,12 +1,11 @@
 /**
  * PO Recommendations Cache Warmer
  * Runs every 6 hours to pre-populate Redis cache with latest PO recommendations data
- * Ensures instant page loads for users by warming cache before they visit
+ * Ensures instant page loads by caching the full snapshot before users visit
  */
 
 import { getRedisClient } from './utils/queue';
 import { reportingStorage } from './reporting-storage';
-import { broadcastQueueStatus } from './websocket';
 
 const log = (message: string) => console.log(`[po-cache-warmer] ${message}`);
 
@@ -67,24 +66,13 @@ async function warmCache(): Promise<void> {
     
     log('Warming cache...');
     
-    // Warm main recommendations cache (no filters - gets full dataset)
-    const recommendations = await reportingStorage.getPORecommendations({
-      stockCheckDate: latestDateStr,
-    });
-    log(`Warmed ${recommendations.length} recommendations for ${latestDateStr}`);
-    
-    // Get unique suppliers and warm cache for each
-    const uniqueSuppliers = await reportingStorage.getUniqueSuppliers();
-    for (const supplier of uniqueSuppliers) {
-      await reportingStorage.getPORecommendations({
-        stockCheckDate: latestDateStr,
-        supplier,
-      });
-    }
-    log(`Warmed ${uniqueSuppliers.length} supplier-specific caches`);
+    // Warm the main snapshot (single Redis entry for all recommendations)
+    const { recordCount, stockCheckDate } = await reportingStorage.warmCache();
+    log(`Warmed snapshot: ${recordCount} recommendations for ${stockCheckDate}`);
     
     // Pre-warm steps for top SKUs by recommended quantity
-    const topSkus = recommendations
+    const snapshot = await reportingStorage.getFullSnapshot();
+    const topSkus = snapshot
       .filter(r => r.recommended_quantity > 0)
       .sort((a, b) => (b.recommended_quantity || 0) - (a.recommended_quantity || 0))
       .slice(0, TOP_SKUS_COUNT)

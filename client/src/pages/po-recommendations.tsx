@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,9 @@ import {
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
+// 24 hours in milliseconds - data only changes once per day
+const STALE_TIME = 24 * 60 * 60 * 1000;
+
 export default function PORecommendations() {
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
@@ -37,7 +40,6 @@ export default function PORecommendations() {
 
   // Filter states
   const [supplier, setSupplier] = useState<string>('');
-  const [stockCheckDate, setStockCheckDate] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [isAssembledProduct, setIsAssembledProduct] = useState<string>('false');
   const [sortBy, setSortBy] = useState<string>('ninety_day_forecast');
@@ -58,7 +60,6 @@ export default function PORecommendations() {
     const params = new URLSearchParams(currentSearch);
     
     setSupplier(params.get('supplier') || '');
-    setStockCheckDate(params.get('stockCheckDate') || '');
     setSearch(params.get('search') || '');
     setIsAssembledProduct(params.get('isAssembledProduct') || 'false');
     setSortBy(params.get('sortBy') || 'ninety_day_forecast');
@@ -77,7 +78,6 @@ export default function PORecommendations() {
     const params = new URLSearchParams();
     
     if (supplier) params.set('supplier', supplier);
-    if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
     if (search) params.set('search', search);
     if (isAssembledProduct !== 'false') params.set('isAssembledProduct', isAssembledProduct);
     if (sortBy !== 'ninety_day_forecast') params.set('sortBy', sortBy);
@@ -93,30 +93,69 @@ export default function PORecommendations() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
     }
-  }, [supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
+  }, [supplier, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
 
-  const { data: recommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: ['/api/reporting/po-recommendations', supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (supplier) params.set('supplier', supplier);
-      if (stockCheckDate) params.set('stockCheckDate', stockCheckDate);
-      if (search) params.set('search', search);
-      if (isAssembledProduct !== 'all') params.set('isAssembledProduct', isAssembledProduct);
-      if (sortBy) params.set('sortBy', sortBy);
-      if (sortOrder) params.set('sortOrder', sortOrder);
-      const qs = params.toString();
-      const url = `/api/reporting/po-recommendations${qs ? `?${qs}` : ''}`;
+  // Fetch full snapshot once - cached for 24 hours
+  const { data: rawRecommendations = [], isLoading } = useQuery<PORecommendation[]>({
+    queryKey: ['/api/reporting/po-recommendations'],
+    staleTime: STALE_TIME,
+    gcTime: STALE_TIME,
+  });
+
+  // Get unique suppliers from the data (computed locally)
+  const suppliers = useMemo(() => {
+    const supplierSet = new Set(rawRecommendations.map(r => r.supplier).filter((s): s is string => s != null));
+    return Array.from(supplierSet).sort();
+  }, [rawRecommendations]);
+
+  // Filter and sort locally - instant performance!
+  const recommendations = useMemo(() => {
+    let filtered = rawRecommendations;
+
+    // Filter by supplier
+    if (supplier) {
+      filtered = filtered.filter(r => r.supplier === supplier);
+    }
+
+    // Filter by isAssembledProduct
+    if (isAssembledProduct && isAssembledProduct !== 'all') {
+      const isAssembled = isAssembledProduct === 'true';
+      filtered = filtered.filter(r => r.is_assembled_product === isAssembled);
+    }
+
+    // Filter by search term
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.sku?.toLowerCase().includes(searchLower) ||
+        r.title?.toLowerCase().includes(searchLower) ||
+        r.supplier?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      const aVal = a[sortBy as keyof PORecommendation];
+      const bVal = b[sortBy as keyof PORecommendation];
       
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch recommendations');
-      return response.json();
-    },
-  });
+      // Handle null/undefined values (put them at the end)
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      
+      // Compare values
+      let comparison = 0;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        comparison = aVal - bVal;
+      } else {
+        comparison = String(aVal).localeCompare(String(bVal));
+      }
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
 
-  const { data: suppliers = [] } = useQuery<string[]>({
-    queryKey: ['/api/reporting/unique-suppliers'],
-  });
+    return sorted;
+  }, [rawRecommendations, supplier, isAssembledProduct, search, sortBy, sortOrder]);
 
   const { data: steps = [] } = useQuery<PORecommendationStep[]>({
     queryKey: [`/api/reporting/po-recommendation-steps/${selectedSku?.sku}/${selectedSku?.stockCheckDate}`],
@@ -155,7 +194,6 @@ export default function PORecommendations() {
 
   const clearFilters = () => {
     setSupplier('');
-    setStockCheckDate('');
     setSearch('');
     setIsAssembledProduct('false');
     setSortBy('ninety_day_forecast');
@@ -237,30 +275,29 @@ export default function PORecommendations() {
             </Select>
           </div>
 
-          <Input
-            placeholder="Search SKU, title, or supplier..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-80"
-            data-testid="input-search"
-          />
-          <Button 
-            size="icon"
-            data-testid="button-search"
-            className="opacity-0 pointer-events-none"
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground px-1">Search</label>
+            <Input
+              placeholder="Search SKU, title, or supplier..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-80"
+              data-testid="input-search"
+            />
+          </div>
 
           {(supplier || search || isAssembledProduct !== 'false') && (
-            <Button
-              variant="outline"
-              onClick={clearFilters}
-              data-testid="button-clear-filters"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Clear Filters
-            </Button>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground px-1 opacity-0">Clear</label>
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                data-testid="button-clear-filters"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
           )}
         </div>
       </div>

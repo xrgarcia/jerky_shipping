@@ -3664,52 +3664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reporting API endpoints
+  // Returns full snapshot - frontend handles all filtering/sorting locally for instant performance
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
     try {
-      const { supplier, stockCheckDate, search, isAssembledProduct, sortBy, sortOrder } = req.query;
-      
-      // Validate sortBy parameter
-      // IMPORTANT: Must match all SortableHeader columns in client/src/pages/po-recommendations.tsx
-      const allowedSortColumns = [
-        'sku', 'supplier', 'title', 'lead_time', 'current_total_stock', 
-        'recommended_quantity', 'base_velocity', 'projected_velocity',
-        'growth_rate', 'ninety_day_forecast', 'current_days_cover', 
-        'quantity_incoming', 'kit_driven_velocity', 'individual_velocity',
-        'case_adjustment_applied', 'moq_applied', 'is_assembled_product',
-        'next_holiday_count_down_in_days', 'next_holiday_recommended_quantity',
-        'next_holiday_season', 'next_holiday_start_date'
-      ];
-      
-      const validatedSortBy = typeof sortBy === 'string' && allowedSortColumns.includes(sortBy) 
-        ? sortBy 
-        : 'sku';
-      
-      // Validate sortOrder parameter
-      const validatedSortOrder = sortOrder === 'desc' ? 'desc' : 'asc';
-      
-      // Validate stockCheckDate format (YYYY-MM-DD)
-      let effectiveStockCheckDate = stockCheckDate as string | undefined;
-      if (effectiveStockCheckDate && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveStockCheckDate)) {
-        return res.status(400).json({ error: "Invalid stockCheckDate format. Expected YYYY-MM-DD" });
-      }
-      
-      // If no stockCheckDate specified, use latest
-      if (!effectiveStockCheckDate) {
-        const latestDate = await reportingStorage.getLatestStockCheckDate();
-        if (latestDate) {
-          effectiveStockCheckDate = latestDate.toISOString().split('T')[0];
-        }
-      }
-      
-      const recommendations = await reportingStorage.getPORecommendations({
-        supplier: supplier as string | undefined,
-        stockCheckDate: effectiveStockCheckDate,
-        search: search as string | undefined,
-        isAssembledProduct: isAssembledProduct as string | undefined,
-        sortBy: validatedSortBy as keyof PORecommendation,
-        sortOrder: validatedSortOrder
-      });
-      
+      const recommendations = await reportingStorage.getFullSnapshot();
       res.json(recommendations);
     } catch (error: any) {
       console.error("[Reporting] Error fetching PO recommendations:", error);
