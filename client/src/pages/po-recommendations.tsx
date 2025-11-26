@@ -24,7 +24,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 
 // 24 hours in milliseconds - data only changes once per day
@@ -39,7 +47,7 @@ export default function PORecommendations() {
   const [selectedSku, setSelectedSku] = useState<{ sku: string; stockCheckDate: string } | null>(null);
 
   // Filter states
-  const [supplier, setSupplier] = useState<string>('');
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [search, setSearch] = useState<string>('');
   const [isAssembledProduct, setIsAssembledProduct] = useState<string>('false');
   const [sortBy, setSortBy] = useState<string>('ninety_day_forecast');
@@ -59,7 +67,9 @@ export default function PORecommendations() {
     
     const params = new URLSearchParams(currentSearch);
     
-    setSupplier(params.get('supplier') || '');
+    // Parse suppliers - can be comma-separated list or multiple params
+    const suppliersParam = params.get('suppliers') || '';
+    setSelectedSuppliers(suppliersParam ? suppliersParam.split(',').filter(s => s) : []);
     setSearch(params.get('search') || '');
     setIsAssembledProduct(params.get('isAssembledProduct') || 'false');
     setSortBy(params.get('sortBy') || 'ninety_day_forecast');
@@ -77,7 +87,7 @@ export default function PORecommendations() {
     
     const params = new URLSearchParams();
     
-    if (supplier) params.set('supplier', supplier);
+    if (selectedSuppliers.length > 0) params.set('suppliers', selectedSuppliers.join(','));
     if (search) params.set('search', search);
     if (isAssembledProduct !== 'false') params.set('isAssembledProduct', isAssembledProduct);
     if (sortBy !== 'ninety_day_forecast') params.set('sortBy', sortBy);
@@ -93,7 +103,7 @@ export default function PORecommendations() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
     }
-  }, [supplier, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
+  }, [selectedSuppliers, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
 
   // Fetch full snapshot once - cached for 24 hours
   const { data: rawRecommendations = [], isLoading } = useQuery<PORecommendation[]>({
@@ -112,9 +122,9 @@ export default function PORecommendations() {
   const recommendations = useMemo(() => {
     let filtered = rawRecommendations;
 
-    // Filter by supplier
-    if (supplier) {
-      filtered = filtered.filter(r => r.supplier === supplier);
+    // Filter by suppliers (multi-select)
+    if (selectedSuppliers.length > 0) {
+      filtered = filtered.filter(r => r.supplier && selectedSuppliers.includes(r.supplier));
     }
 
     // Filter by isAssembledProduct
@@ -155,7 +165,7 @@ export default function PORecommendations() {
     });
 
     return sorted;
-  }, [rawRecommendations, supplier, isAssembledProduct, search, sortBy, sortOrder]);
+  }, [rawRecommendations, selectedSuppliers, isAssembledProduct, search, sortBy, sortOrder]);
 
   const { data: steps = [] } = useQuery<PORecommendationStep[]>({
     queryKey: [`/api/reporting/po-recommendation-steps/${selectedSku?.sku}/${selectedSku?.stockCheckDate}`],
@@ -176,7 +186,7 @@ export default function PORecommendations() {
     if (isInitialized) {
       setPage(1);
     }
-  }, [supplier, search, isAssembledProduct, isInitialized]);
+  }, [selectedSuppliers, search, isAssembledProduct, isInitialized]);
   
   // Calculate pagination
   const totalRecords = recommendations.length;
@@ -193,12 +203,21 @@ export default function PORecommendations() {
   };
 
   const clearFilters = () => {
-    setSupplier('');
+    setSelectedSuppliers([]);
     setSearch('');
     setIsAssembledProduct('false');
     setSortBy('ninety_day_forecast');
     setSortOrder('asc');
     setPage(1);
+  };
+
+  // Handler to toggle supplier selection
+  const toggleSupplier = (supplier: string) => {
+    setSelectedSuppliers(prev => 
+      prev.includes(supplier) 
+        ? prev.filter(s => s !== supplier)
+        : [...prev, supplier]
+    );
   };
 
   const SortableHeader = ({ column, children }: { column: string; children: React.ReactNode }) => {
@@ -241,21 +260,74 @@ export default function PORecommendations() {
         
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground px-1">Supplier</label>
-            <Select 
-              value={supplier || 'all'} 
-              onValueChange={(value) => setSupplier(value === 'all' ? '' : value)}
-            >
-              <SelectTrigger className="w-48" data-testid="select-supplier">
-                <SelectValue placeholder="All Suppliers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
-                {suppliers.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-xs text-muted-foreground px-1">Suppliers</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-64 justify-between"
+                  data-testid="button-supplier-filter"
+                >
+                  <span className="truncate">
+                    {selectedSuppliers.length === 0 
+                      ? "All Suppliers" 
+                      : selectedSuppliers.length === 1 
+                        ? selectedSuppliers[0]
+                        : `${selectedSuppliers.length} suppliers selected`}
+                  </span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <div className="p-2 border-b">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-sm"
+                    onClick={() => setSelectedSuppliers([])}
+                    data-testid="button-clear-suppliers"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Clear selection
+                  </Button>
+                </div>
+                <ScrollArea className="h-64">
+                  <div className="p-2 space-y-1">
+                    {suppliers.map((s) => (
+                      <div
+                        key={s}
+                        className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+                        onClick={() => toggleSupplier(s)}
+                        data-testid={`checkbox-supplier-${s}`}
+                      >
+                        <Checkbox
+                          checked={selectedSuppliers.includes(s)}
+                          onCheckedChange={() => toggleSupplier(s)}
+                        />
+                        <span className="text-sm truncate">{s}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                {selectedSuppliers.length > 0 && (
+                  <div className="p-2 border-t">
+                    <div className="flex flex-wrap gap-1">
+                      {selectedSuppliers.map((s) => (
+                        <Badge 
+                          key={s} 
+                          variant="secondary" 
+                          className="text-xs cursor-pointer"
+                          onClick={() => toggleSupplier(s)}
+                        >
+                          {s}
+                          <X className="ml-1 h-3 w-3" />
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -286,7 +358,7 @@ export default function PORecommendations() {
             />
           </div>
 
-          {(supplier || search || isAssembledProduct !== 'false') && (
+          {(selectedSuppliers.length > 0 || search || isAssembledProduct !== 'false') && (
             <div className="flex flex-col gap-1">
               <label className="text-xs text-muted-foreground px-1 opacity-0">Clear</label>
               <Button
