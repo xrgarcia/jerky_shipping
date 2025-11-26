@@ -69,6 +69,7 @@ export function ViewManager({
   const [newViewName, setNewViewName] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   const { data: savedViews = [] } = useQuery<SavedView[]>({
     queryKey: ['/api/saved-views', page],
@@ -164,13 +165,30 @@ export function ViewManager({
     setDeleteConfirmOpen(true);
   };
 
-  const handleDragStart = (columnKey: string) => {
+  const handleDragStart = (e: React.DragEvent, columnKey: string) => {
     setDraggedColumn(columnKey);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', columnKey);
   };
 
   const handleDragOver = (e: React.DragEvent, targetKey: string) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (!draggedColumn || draggedColumn === targetKey) return;
+    setDragOverColumn(targetKey);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetKey: string) => {
+    e.preventDefault();
+    if (!draggedColumn || draggedColumn === targetKey) {
+      setDraggedColumn(null);
+      setDragOverColumn(null);
+      return;
+    }
 
     const newOrder = [...visibleColumns];
     const draggedIndex = newOrder.indexOf(draggedColumn);
@@ -181,10 +199,14 @@ export function ViewManager({
       newOrder.splice(targetIndex, 0, draggedColumn);
       onColumnsChange(newOrder);
     }
+
+    setDraggedColumn(null);
+    setDragOverColumn(null);
   };
 
   const handleDragEnd = () => {
     setDraggedColumn(null);
+    setDragOverColumn(null);
   };
 
   const toggleColumn = (columnKey: string) => {
@@ -352,23 +374,29 @@ export function ViewManager({
                 {columns.map((column) => {
                   const isVisible = visibleColumns.includes(column.key);
                   const orderIndex = visibleColumns.indexOf(column.key);
+                  const isDragging = draggedColumn === column.key;
+                  const isDropTarget = dragOverColumn === column.key && draggedColumn !== column.key;
                   return (
                     <div
                       key={column.key}
                       draggable={isVisible}
-                      onDragStart={() => handleDragStart(column.key)}
+                      onDragStart={(e) => handleDragStart(e, column.key)}
                       onDragOver={(e) => handleDragOver(e, column.key)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, column.key)}
                       onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-2 p-2 rounded-md border ${
+                      className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
                         isVisible ? 'bg-background' : 'bg-muted/50'
-                      } ${draggedColumn === column.key ? 'opacity-50' : ''}`}
+                      } ${isDragging ? 'opacity-50 border-dashed' : ''} ${
+                        isDropTarget ? 'border-primary bg-primary/10' : ''
+                      }`}
                       data-testid={`column-item-${column.key}`}
                     >
                       {isVisible && (
-                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
                       )}
                       {!isVisible && <div className="w-4" />}
-                      <span className="flex-1 text-sm">
+                      <span className="flex-1 text-sm select-none">
                         {column.label}
                         {isVisible && orderIndex !== -1 && (
                           <span className="ml-2 text-xs text-muted-foreground">#{orderIndex + 1}</span>
