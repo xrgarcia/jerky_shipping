@@ -260,6 +260,25 @@ export default function PORecommendations() {
       );
     }
 
+    // Columns that should be sorted numerically (even if stored as strings)
+    const numericColumns = new Set([
+      'lead_time',
+      'current_total_stock',
+      'base_velocity',
+      'projected_velocity',
+      'growth_rate',
+      'kit_driven_velocity',
+      'individual_velocity',
+      'ninety_day_forecast',
+      'case_adjustment_applied',
+      'current_days_cover',
+      'moq_applied',
+      'quantity_incoming',
+      'recommended_quantity',
+      'next_holiday_count_down_in_days',
+      'next_holiday_recommended_quantity',
+    ]);
+
     // Sort
     const sorted = [...filtered].sort((a, b) => {
       const aVal = a[sortBy as keyof PORecommendation];
@@ -272,8 +291,17 @@ export default function PORecommendations() {
       
       // Compare values
       let comparison = 0;
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        comparison = aVal - bVal;
+      
+      // Check if this column should be sorted numerically
+      if (numericColumns.has(sortBy)) {
+        const aNum = typeof aVal === 'number' ? aVal : parseFloat(String(aVal));
+        const bNum = typeof bVal === 'number' ? bVal : parseFloat(String(bVal));
+        
+        // Handle NaN (non-numeric strings) - put them at the end
+        if (isNaN(aNum) && isNaN(bNum)) comparison = 0;
+        else if (isNaN(aNum)) comparison = 1;
+        else if (isNaN(bNum)) comparison = -1;
+        else comparison = aNum - bNum;
       } else {
         comparison = String(aVal).localeCompare(String(bVal));
       }
