@@ -294,10 +294,9 @@ export default function PORecommendations() {
                 <ScrollArea className="h-64">
                   <div className="p-2 space-y-1">
                     {suppliers.map((s) => (
-                      <div
+                      <label
                         key={s}
                         className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer"
-                        onClick={() => toggleSupplier(s)}
                         data-testid={`checkbox-supplier-${s}`}
                       >
                         <Checkbox
@@ -305,7 +304,7 @@ export default function PORecommendations() {
                           onCheckedChange={() => toggleSupplier(s)}
                         />
                         <span className="text-sm truncate">{s}</span>
-                      </div>
+                      </label>
                     ))}
                   </div>
                 </ScrollArea>
