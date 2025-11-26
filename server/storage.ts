@@ -48,6 +48,9 @@ import {
   type ShipmentEvent,
   type InsertShipmentEvent,
   shipmentEvents,
+  type SavedView,
+  type InsertSavedView,
+  savedViews,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -222,6 +225,14 @@ export interface IStorage {
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   }>;
+
+  // Saved Views
+  getSavedView(id: string): Promise<SavedView | undefined>;
+  getSavedViewsByUser(userId: string, page?: string): Promise<SavedView[]>;
+  getPublicView(id: string): Promise<SavedView | undefined>;
+  createSavedView(view: InsertSavedView): Promise<SavedView>;
+  updateSavedView(id: string, userId: string, updates: Partial<InsertSavedView>): Promise<SavedView | undefined>;
+  deleteSavedView(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1786,6 +1797,57 @@ export class DatabaseStorage implements IStorage {
 
   async clearShopifyOrderSyncFailures(): Promise<void> {
     await db.delete(shopifyOrderSyncFailures);
+  }
+
+  // Saved Views
+  async getSavedView(id: string): Promise<SavedView | undefined> {
+    const result = await db
+      .select()
+      .from(savedViews)
+      .where(eq(savedViews.id, id));
+    return result[0];
+  }
+
+  async getSavedViewsByUser(userId: string, page?: string): Promise<SavedView[]> {
+    let conditions = [eq(savedViews.userId, userId)];
+    if (page) {
+      conditions.push(eq(savedViews.page, page));
+    }
+    return await db
+      .select()
+      .from(savedViews)
+      .where(and(...conditions))
+      .orderBy(desc(savedViews.createdAt));
+  }
+
+  async getPublicView(id: string): Promise<SavedView | undefined> {
+    const result = await db
+      .select()
+      .from(savedViews)
+      .where(and(eq(savedViews.id, id), eq(savedViews.isPublic, true)));
+    return result[0];
+  }
+
+  async createSavedView(view: InsertSavedView): Promise<SavedView> {
+    const result = await db.insert(savedViews).values(view).returning();
+    return result[0];
+  }
+
+  async updateSavedView(id: string, userId: string, updates: Partial<InsertSavedView>): Promise<SavedView | undefined> {
+    const result = await db
+      .update(savedViews)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(savedViews.id, id), eq(savedViews.userId, userId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSavedView(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(savedViews)
+      .where(and(eq(savedViews.id, id), eq(savedViews.userId, userId)))
+      .returning();
+    return result.length > 0;
   }
 }
 

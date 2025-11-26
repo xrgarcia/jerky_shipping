@@ -3663,6 +3663,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Saved Views API endpoints
+  // Get current user's saved views for a specific page
+  app.get("/api/saved-views", requireAuth, async (req, res) => {
+    try {
+      const { page } = req.query;
+      const views = await storage.getSavedViewsByUser(req.user!.id, page as string | undefined);
+      res.json(views);
+    } catch (error: any) {
+      console.error("[Views] Error fetching saved views:", error);
+      res.status(500).json({ error: "Failed to fetch saved views" });
+    }
+  });
+
+  // Get a specific view (public access if view is public)
+  app.get("/api/saved-views/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // First try to get as authenticated user's own view
+      if (req.user) {
+        const ownView = await storage.getSavedView(id);
+        if (ownView && ownView.userId === req.user.id) {
+          return res.json(ownView);
+        }
+      }
+      
+      // Otherwise, try to get as public view
+      const publicView = await storage.getPublicView(id);
+      if (publicView) {
+        return res.json(publicView);
+      }
+      
+      res.status(404).json({ error: "View not found" });
+    } catch (error: any) {
+      console.error("[Views] Error fetching view:", error);
+      res.status(500).json({ error: "Failed to fetch view" });
+    }
+  });
+
+  // Zod schema for view config validation
+  const savedViewConfigSchema = z.object({
+    columns: z.array(z.string()).optional(),
+    filters: z.object({
+      suppliers: z.array(z.string()).optional(),
+      search: z.string().optional(),
+      isAssembledProduct: z.string().optional(),
+    }).optional(),
+    sort: z.object({
+      column: z.string(),
+      order: z.enum(['asc', 'desc']),
+    }).optional(),
+  });
+
+  const createViewSchema = z.object({
+    name: z.string().min(1, "Name is required").max(100, "Name too long"),
+    page: z.string().min(1, "Page is required"),
+    config: savedViewConfigSchema,
+    isPublic: z.boolean().optional().default(false),
+  });
+
+  const updateViewSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    config: savedViewConfigSchema.optional(),
+    isPublic: z.boolean().optional(),
+  });
+
+  // Create a new saved view
+  app.post("/api/saved-views", requireAuth, async (req, res) => {
+    try {
+      const parseResult = createViewSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body",
+          details: parseResult.error.issues 
+        });
+      }
+      
+      const { name, page, config, isPublic } = parseResult.data;
+      
+      const view = await storage.createSavedView({
+        userId: req.user!.id,
+        name,
+        page,
+        config,
+        isPublic,
+      });
+      
+      res.status(201).json(view);
+    } catch (error: any) {
+      console.error("[Views] Error creating view:", error);
+      res.status(500).json({ error: "Failed to create view" });
+    }
+  });
+
+  // Update a saved view
+  app.patch("/api/saved-views/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const parseResult = updateViewSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body",
+          details: parseResult.error.issues 
+        });
+      }
+      
+      const { name, config, isPublic } = parseResult.data;
+      
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (config !== undefined) updates.config = config;
+      if (isPublic !== undefined) updates.isPublic = isPublic;
+      
+      // If no updates provided, return error
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid update fields provided" });
+      }
+      
+      const view = await storage.updateSavedView(id, req.user!.id, updates);
+      
+      if (!view) {
+        return res.status(404).json({ error: "View not found or access denied" });
+      }
+      
+      res.json(view);
+    } catch (error: any) {
+      console.error("[Views] Error updating view:", error);
+      res.status(500).json({ error: "Failed to update view" });
+    }
+  });
+
+  // Delete a saved view
+  app.delete("/api/saved-views/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSavedView(id, req.user!.id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "View not found or access denied" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Views] Error deleting view:", error);
+      res.status(500).json({ error: "Failed to delete view" });
+    }
+  });
+
   // Reporting API endpoints
   // Returns full snapshot - frontend handles all filtering/sorting locally for instant performance
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {

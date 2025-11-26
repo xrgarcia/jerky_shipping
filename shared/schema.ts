@@ -609,3 +609,37 @@ export const insertPackingLogSchema = createInsertSchema(packingLogs).omit({
 
 export type InsertPackingLog = z.infer<typeof insertPackingLogSchema>;
 export type PackingLog = typeof packingLogs.$inferSelect;
+
+// Saved views for customizable table columns and filters
+export const savedViews = pgTable("saved_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  page: text("page").notNull(), // e.g., 'po-recommendations', 'orders', 'shipments'
+  config: jsonb("config").notNull(), // { columns: string[], filters: {...}, sort: {...} }
+  isPublic: boolean("is_public").notNull().default(false), // Whether view is shareable
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdPageIdx: index("saved_views_user_id_page_idx").on(table.userId, table.page),
+  isPublicIdx: index("saved_views_is_public_idx").on(table.isPublic),
+}));
+
+export const insertSavedViewSchema = createInsertSchema(savedViews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  config: z.object({
+    columns: z.array(z.string()),
+    filters: z.record(z.any()).optional(),
+    sort: z.object({
+      column: z.string(),
+      order: z.enum(['asc', 'desc']),
+    }).optional(),
+  }),
+});
+
+export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
+export type SavedView = typeof savedViews.$inferSelect;
+export type SavedViewConfig = z.infer<typeof insertSavedViewSchema>['config'];

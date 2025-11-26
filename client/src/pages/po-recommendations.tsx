@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,36 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { ViewManager, type ColumnDefinition } from "@/components/view-manager";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
+import type { SavedView, SavedViewConfig } from "@shared/schema";
+
+// Column definitions for the PO Recommendations table
+const ALL_COLUMNS: ColumnDefinition[] = [
+  { key: 'sku', label: 'SKU', align: 'left', defaultVisible: true },
+  { key: 'supplier', label: 'Supplier', align: 'left', defaultVisible: true },
+  { key: 'title', label: 'Title', align: 'left', defaultVisible: true },
+  { key: 'lead_time', label: 'Lead Time', align: 'right', defaultVisible: true },
+  { key: 'current_total_stock', label: 'Current Stock', align: 'right', defaultVisible: true },
+  { key: 'recommended_quantity', label: 'Recommended Qty', align: 'right', defaultVisible: true },
+  { key: 'base_velocity', label: 'Base Velocity', align: 'right', defaultVisible: true },
+  { key: 'projected_velocity', label: 'Projected Velocity', align: 'right', defaultVisible: true },
+  { key: 'growth_rate', label: 'Growth Rate', align: 'right', defaultVisible: true },
+  { key: 'ninety_day_forecast', label: '90-Day Forecast', align: 'right', defaultVisible: true },
+  { key: 'current_days_cover', label: 'Days Cover', align: 'right', defaultVisible: true },
+  { key: 'quantity_incoming', label: 'Qty Incoming', align: 'right', defaultVisible: true },
+  { key: 'kit_driven_velocity', label: 'Kit Velocity', align: 'right', defaultVisible: false },
+  { key: 'individual_velocity', label: 'Individual Velocity', align: 'right', defaultVisible: false },
+  { key: 'case_adjustment_applied', label: 'Case Adjustment', align: 'right', defaultVisible: false },
+  { key: 'moq_applied', label: 'MOQ Applied', align: 'right', defaultVisible: false },
+  { key: 'is_assembled_product', label: 'Assembled', align: 'left', defaultVisible: false },
+  { key: 'next_holiday_count_down_in_days', label: 'Next Holiday Days', align: 'left', defaultVisible: false },
+  { key: 'next_holiday_recommended_quantity', label: 'Holiday Rec Qty', align: 'right', defaultVisible: false },
+  { key: 'next_holiday_season', label: 'Holiday Season', align: 'left', defaultVisible: false },
+  { key: 'next_holiday_start_date', label: 'Holiday Start', align: 'left', defaultVisible: false },
+];
+
+const DEFAULT_VISIBLE_COLUMNS = ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key);
 
 // 24 hours in milliseconds - data only changes once per day
 const STALE_TIME = 24 * 60 * 60 * 1000;
@@ -57,7 +86,42 @@ export default function PORecommendations() {
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(100);
 
-  // Initialize state from URL params
+  // View and column states
+  const [currentViewId, setCurrentViewId] = useState<string | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+
+  // Fetch a specific saved view if referenced in URL
+  const viewIdFromUrl = useMemo(() => {
+    const params = new URLSearchParams(searchParams.startsWith('?') ? searchParams.slice(1) : searchParams);
+    return params.get('view');
+  }, [searchParams]);
+
+  const { data: loadedView } = useQuery<SavedView>({
+    queryKey: ['/api/saved-views', viewIdFromUrl],
+    enabled: !!viewIdFromUrl,
+  });
+
+  // Apply loaded view config when view changes
+  useEffect(() => {
+    if (loadedView && loadedView.config) {
+      const config = loadedView.config as SavedViewConfig;
+      if (config.columns && config.columns.length > 0) {
+        setVisibleColumns(config.columns);
+      }
+      if (config.filters) {
+        if (config.filters.suppliers) setSelectedSuppliers(config.filters.suppliers);
+        if (config.filters.search) setSearch(config.filters.search);
+        if (config.filters.isAssembledProduct) setIsAssembledProduct(config.filters.isAssembledProduct);
+      }
+      if (config.sort) {
+        setSortBy(config.sort.column);
+        setSortOrder(config.sort.order);
+      }
+      setCurrentViewId(loadedView.id);
+    }
+  }, [loadedView]);
+
+  // Initialize state from URL params (excluding view param which is handled separately)
   useEffect(() => {
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
     
@@ -66,6 +130,13 @@ export default function PORecommendations() {
     }
     
     const params = new URLSearchParams(currentSearch);
+    
+    // Skip if loading a view (view params take precedence)
+    if (params.has('view')) {
+      lastSyncedSearchRef.current = currentSearch;
+      setIsInitialized(true);
+      return;
+    }
     
     // Parse suppliers - can be comma-separated list or multiple params
     const suppliersParam = params.get('suppliers') || '';
@@ -77,6 +148,15 @@ export default function PORecommendations() {
     setPage(parseInt(params.get('page') || '1'));
     setPageSize(parseInt(params.get('pageSize') || '100'));
     
+    // Parse columns from URL
+    const columnsParam = params.get('columns');
+    if (columnsParam) {
+      const columns = columnsParam.split(',').filter(c => ALL_COLUMNS.some(col => col.key === c));
+      if (columns.length > 0) {
+        setVisibleColumns(columns);
+      }
+    }
+    
     lastSyncedSearchRef.current = currentSearch;
     setIsInitialized(true);
   }, [searchParams]);
@@ -87,6 +167,11 @@ export default function PORecommendations() {
     
     const params = new URLSearchParams();
     
+    // If we have a view selected, preserve it in URL
+    if (currentViewId) {
+      params.set('view', currentViewId);
+    }
+    
     if (selectedSuppliers.length > 0) params.set('suppliers', selectedSuppliers.join(','));
     if (search) params.set('search', search);
     if (isAssembledProduct !== 'false') params.set('isAssembledProduct', isAssembledProduct);
@@ -94,6 +179,13 @@ export default function PORecommendations() {
     if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
     if (page !== 1) params.set('page', page.toString());
     if (pageSize !== 100) params.set('pageSize', pageSize.toString());
+    
+    // Only include columns in URL if different from default
+    const columnsChanged = visibleColumns.length !== DEFAULT_VISIBLE_COLUMNS.length ||
+      visibleColumns.some((c, i) => c !== DEFAULT_VISIBLE_COLUMNS[i]);
+    if (columnsChanged) {
+      params.set('columns', visibleColumns.join(','));
+    }
     
     const newSearch = params.toString();
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
@@ -103,7 +195,32 @@ export default function PORecommendations() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/po-recommendations${newUrl}`);
     }
-  }, [selectedSuppliers, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized]);
+  }, [selectedSuppliers, search, isAssembledProduct, sortBy, sortOrder, page, pageSize, isInitialized, currentViewId, visibleColumns]);
+
+  // Get current config for saving views
+  const getCurrentConfig = useCallback((): SavedViewConfig => {
+    return {
+      columns: visibleColumns,
+      filters: {
+        suppliers: selectedSuppliers,
+        search,
+        isAssembledProduct,
+      },
+      sort: {
+        column: sortBy,
+        order: sortOrder,
+      },
+    };
+  }, [visibleColumns, selectedSuppliers, search, isAssembledProduct, sortBy, sortOrder]);
+
+  // Handle view change
+  const handleViewChange = useCallback((viewId: string | null) => {
+    setCurrentViewId(viewId);
+    if (!viewId) {
+      // Reset to defaults when clearing view
+      setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    }
+  }, []);
 
   // Fetch full snapshot once - cached for 24 hours
   const { data: rawRecommendations = [], isLoading } = useQuery<PORecommendation[]>({
@@ -245,17 +362,80 @@ export default function PORecommendations() {
       })
     : null;
 
+  // Helper function to render cell values based on column type
+  const renderCellValue = (rec: PORecommendation, columnKey: string): React.ReactNode => {
+    switch (columnKey) {
+      case 'sku':
+        return rec.sku;
+      case 'supplier':
+        return rec.supplier;
+      case 'title':
+        return rec.title;
+      case 'lead_time':
+        return rec.lead_time || '-';
+      case 'current_total_stock':
+        return rec.current_total_stock?.toLocaleString() || '-';
+      case 'recommended_quantity':
+        return rec.recommended_quantity.toLocaleString();
+      case 'base_velocity':
+        return rec.base_velocity ? parseFloat(rec.base_velocity).toFixed(2) : '-';
+      case 'projected_velocity':
+        return rec.projected_velocity ? parseFloat(rec.projected_velocity).toFixed(2) : '-';
+      case 'growth_rate':
+        return rec.growth_rate ? `${(parseFloat(rec.growth_rate) * 100).toFixed(1)}%` : '-';
+      case 'ninety_day_forecast':
+        return rec.ninety_day_forecast ? parseFloat(rec.ninety_day_forecast).toFixed(0) : '-';
+      case 'current_days_cover':
+        return rec.current_days_cover ? parseFloat(rec.current_days_cover).toFixed(1) : '-';
+      case 'quantity_incoming':
+        return rec.quantity_incoming?.toLocaleString() || '-';
+      case 'kit_driven_velocity':
+        return rec.kit_driven_velocity ? parseFloat(rec.kit_driven_velocity).toFixed(2) : '-';
+      case 'individual_velocity':
+        return rec.individual_velocity ? parseFloat(rec.individual_velocity).toFixed(2) : '-';
+      case 'case_adjustment_applied':
+        return rec.case_adjustment_applied?.toLocaleString() || '-';
+      case 'moq_applied':
+        return rec.moq_applied?.toLocaleString() || '-';
+      case 'is_assembled_product':
+        return rec.is_assembled_product ? 'Yes' : 'No';
+      case 'next_holiday_count_down_in_days':
+        return rec.next_holiday_count_down_in_days || '-';
+      case 'next_holiday_recommended_quantity':
+        return rec.next_holiday_recommended_quantity?.toLocaleString() || '-';
+      case 'next_holiday_season':
+        return rec.next_holiday_season || '-';
+      case 'next_holiday_start_date':
+        return rec.next_holiday_start_date 
+          ? new Date(rec.next_holiday_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : '-';
+      default:
+        return '-';
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col gap-4 p-4 border-b">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <h1 className="text-2xl font-semibold" data-testid="text-page-title">PO Recommendations</h1>
-          {dataTimestamp && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-data-timestamp">
-              <Calendar className="h-4 w-4" />
-              <span>Data as of: <span className="font-medium text-foreground">{dataTimestamp}</span></span>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            <ViewManager
+              page="po-recommendations"
+              columns={ALL_COLUMNS}
+              visibleColumns={visibleColumns}
+              onColumnsChange={setVisibleColumns}
+              currentViewId={currentViewId}
+              onViewChange={handleViewChange}
+              getCurrentConfig={getCurrentConfig}
+            />
+            {dataTimestamp && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-data-timestamp">
+                <Calendar className="h-4 w-4" />
+                <span>Data as of: <span className="font-medium text-foreground">{dataTimestamp}</span></span>
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
@@ -379,111 +559,47 @@ export default function PORecommendations() {
             <div className="text-muted-foreground">Loading recommendations...</div>
           </div>
         ) : (
-          <Table containerClassName="h-full overflow-scroll" className="min-w-[2000px]">
+          <Table containerClassName="h-full overflow-scroll" className={`min-w-[${Math.max(800, visibleColumns.length * 120)}px]`}>
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="sku">SKU</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="supplier">Supplier</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="title">Title</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="lead_time">Lead Time</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="current_total_stock">Current Stock</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="recommended_quantity">Recommended Qty</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="base_velocity">Base Velocity</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="projected_velocity">Projected Velocity</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="growth_rate">Growth Rate</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="ninety_day_forecast">90-Day Forecast</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="current_days_cover">Days Cover</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="quantity_incoming">Qty Incoming</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="kit_driven_velocity">Kit Velocity</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="individual_velocity">Individual Velocity</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="case_adjustment_applied">Case Adjustment</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="moq_applied">MOQ Applied</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="is_assembled_product">Assembled</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="next_holiday_count_down_in_days">Next Holiday Days</SortableHeader>
-                </TableHead>
-                <TableHead className="text-right sticky top-0 bg-background z-20">
-                  <SortableHeader column="next_holiday_recommended_quantity">Holiday Rec Qty</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="next_holiday_season">Holiday Season</SortableHeader>
-                </TableHead>
-                <TableHead className="sticky top-0 bg-background z-20">
-                  <SortableHeader column="next_holiday_start_date">Holiday Start</SortableHeader>
-                </TableHead>
+                {visibleColumns.map((columnKey) => {
+                  const columnDef = ALL_COLUMNS.find(c => c.key === columnKey);
+                  if (!columnDef) return null;
+                  return (
+                    <TableHead 
+                      key={columnKey}
+                      className={`sticky top-0 bg-background z-20 ${columnDef.align === 'right' ? 'text-right' : ''}`}
+                    >
+                      <SortableHeader column={columnKey}>{columnDef.label}</SortableHeader>
+                    </TableHead>
+                  );
+                })}
                 <TableHead className="sticky top-0 bg-background z-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {totalRecords === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={22} className="text-center text-muted-foreground" data-testid="text-no-results">
+                  <TableCell colSpan={visibleColumns.length + 1} className="text-center text-muted-foreground" data-testid="text-no-results">
                     No recommendations found
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedRecommendations.map((rec) => (
                   <TableRow key={`${rec.sku}-${rec.stock_check_date}`} data-testid={`row-recommendation-${rec.sku}`}>
-                    <TableCell className="font-medium" data-testid={`text-sku-${rec.sku}`}>{rec.sku}</TableCell>
-                    <TableCell data-testid={`text-supplier-${rec.sku}`}>{rec.supplier}</TableCell>
-                    <TableCell className="max-w-xs truncate" data-testid={`text-title-${rec.sku}`}>{rec.title}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-lead-time-${rec.sku}`}>{rec.lead_time || '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-current-stock-${rec.sku}`}>{rec.current_total_stock?.toLocaleString() || '-'}</TableCell>
-                    <TableCell className="text-right font-semibold" data-testid={`text-recommended-qty-${rec.sku}`}>{rec.recommended_quantity.toLocaleString()}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-base-velocity-${rec.sku}`}>{rec.base_velocity ? parseFloat(rec.base_velocity).toFixed(2) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-projected-velocity-${rec.sku}`}>{rec.projected_velocity ? parseFloat(rec.projected_velocity).toFixed(2) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-growth-rate-${rec.sku}`}>{rec.growth_rate ? `${(parseFloat(rec.growth_rate) * 100).toFixed(1)}%` : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-forecast-${rec.sku}`}>{rec.ninety_day_forecast ? parseFloat(rec.ninety_day_forecast).toFixed(0) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-days-cover-${rec.sku}`}>{rec.current_days_cover ? parseFloat(rec.current_days_cover).toFixed(1) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-qty-incoming-${rec.sku}`}>{rec.quantity_incoming?.toLocaleString() || '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-kit-velocity-${rec.sku}`}>{rec.kit_driven_velocity ? parseFloat(rec.kit_driven_velocity).toFixed(2) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-individual-velocity-${rec.sku}`}>{rec.individual_velocity ? parseFloat(rec.individual_velocity).toFixed(2) : '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-case-adjustment-${rec.sku}`}>{rec.case_adjustment_applied?.toLocaleString() || '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-moq-applied-${rec.sku}`}>{rec.moq_applied?.toLocaleString() || '-'}</TableCell>
-                    <TableCell data-testid={`text-assembled-${rec.sku}`}>{rec.is_assembled_product ? 'Yes' : 'No'}</TableCell>
-                    <TableCell data-testid={`text-next-holiday-days-${rec.sku}`}>{rec.next_holiday_count_down_in_days || '-'}</TableCell>
-                    <TableCell className="text-right" data-testid={`text-holiday-rec-qty-${rec.sku}`}>{rec.next_holiday_recommended_quantity?.toLocaleString() || '-'}</TableCell>
-                    <TableCell data-testid={`text-holiday-season-${rec.sku}`}>{rec.next_holiday_season || '-'}</TableCell>
-                    <TableCell data-testid={`text-holiday-start-${rec.sku}`}>
-                      {rec.next_holiday_start_date 
-                        ? new Date(rec.next_holiday_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                        : '-'
-                      }
-                    </TableCell>
+                    {visibleColumns.map((columnKey) => {
+                      const columnDef = ALL_COLUMNS.find(c => c.key === columnKey);
+                      if (!columnDef) return null;
+                      return (
+                        <TableCell 
+                          key={columnKey}
+                          className={`${columnDef.align === 'right' ? 'text-right' : ''} ${columnKey === 'sku' ? 'font-medium' : ''} ${columnKey === 'title' ? 'max-w-xs truncate' : ''} ${columnKey === 'recommended_quantity' ? 'font-semibold' : ''}`}
+                          data-testid={`text-${columnKey}-${rec.sku}`}
+                        >
+                          {renderCellValue(rec, columnKey)}
+                        </TableCell>
+                      );
+                    })}
                     <TableCell>
                       <Button
                         variant="outline"
