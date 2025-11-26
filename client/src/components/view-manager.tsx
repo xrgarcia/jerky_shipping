@@ -371,36 +371,30 @@ export function ViewManager({
             </div>
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-1">
-                {columns.map((column) => {
-                  const isVisible = visibleColumns.includes(column.key);
-                  const orderIndex = visibleColumns.indexOf(column.key);
+                {/* Visible columns first, sorted by their position */}
+                {visibleColumns.map((columnKey, index) => {
+                  const column = columns.find(c => c.key === columnKey);
+                  if (!column) return null;
                   const isDragging = draggedColumn === column.key;
                   const isDropTarget = dragOverColumn === column.key && draggedColumn !== column.key;
                   return (
                     <div
                       key={column.key}
-                      draggable={isVisible}
+                      draggable
                       onDragStart={(e) => handleDragStart(e, column.key)}
                       onDragOver={(e) => handleDragOver(e, column.key)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, column.key)}
                       onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
-                        isVisible ? 'bg-background' : 'bg-muted/50'
-                      } ${isDragging ? 'opacity-50 border-dashed' : ''} ${
-                        isDropTarget ? 'border-primary bg-primary/10' : ''
-                      }`}
+                      className={`flex items-center gap-2 p-2 rounded-md border transition-colors bg-background ${
+                        isDragging ? 'opacity-50 border-dashed' : ''
+                      } ${isDropTarget ? 'border-primary bg-primary/10' : ''}`}
                       data-testid={`column-item-${column.key}`}
                     >
-                      {isVisible && (
-                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
-                      )}
-                      {!isVisible && <div className="w-4" />}
+                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
                       <span className="flex-1 text-sm select-none">
                         {column.label}
-                        {isVisible && orderIndex !== -1 && (
-                          <span className="ml-2 text-xs text-muted-foreground">#{orderIndex + 1}</span>
-                        )}
+                        <span className="ml-2 text-xs text-muted-foreground">#{index + 1}</span>
                       </span>
                       <Button
                         variant="ghost"
@@ -409,15 +403,40 @@ export function ViewManager({
                         onClick={() => toggleColumn(column.key)}
                         data-testid={`button-toggle-column-${column.key}`}
                       >
-                        {isVisible ? (
-                          <Eye className="h-4 w-4" />
-                        ) : (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        <Eye className="h-4 w-4" />
                       </Button>
                     </div>
                   );
                 })}
+                {/* Hidden columns section */}
+                {columns.filter(c => !visibleColumns.includes(c.key)).length > 0 && (
+                  <div className="pt-2 mt-2 border-t">
+                    <p className="text-xs text-muted-foreground mb-2 px-2">Hidden Columns</p>
+                    {columns
+                      .filter(c => !visibleColumns.includes(c.key))
+                      .map((column) => (
+                        <div
+                          key={column.key}
+                          className="flex items-center gap-2 p-2 rounded-md border bg-muted/50"
+                          data-testid={`column-item-${column.key}`}
+                        >
+                          <div className="w-4" />
+                          <span className="flex-1 text-sm select-none text-muted-foreground">
+                            {column.label}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => toggleColumn(column.key)}
+                            data-testid={`button-toggle-column-${column.key}`}
+                          >
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </div>
