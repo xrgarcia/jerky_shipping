@@ -2,7 +2,7 @@ import { reportingSql } from './reporting-db';
 import type { PORecommendation, PORecommendationStep, PORecommendationFilters } from '@shared/reporting-schema';
 import { getRedisClient } from './utils/queue';
 
-const CACHE_TTL = 300; // 5 minutes cache
+// No TTL - cache only invalidates when stock_check_date changes (handled by cache warmer)
 const CACHE_PREFIX = 'po_recommendations:';
 
 // Whitelist of allowed sort columns (prevents SQL injection and prototype pollution)
@@ -237,11 +237,12 @@ export class ReportingStorage implements IReportingStorage {
     recommendations = results as PORecommendation[];
 
     // Cache the unsorted results (only if shouldCache is true)
+    // No TTL - cache persists until explicitly invalidated by cache warmer when stock_check_date changes
     if (shouldCache) {
       try {
         const redis = getRedisClient();
-        await redis.set(cacheKey, recommendations, { ex: CACHE_TTL });
-        console.log('[ReportingStorage] Cached PO recommendations');
+        await redis.set(cacheKey, recommendations);
+        console.log('[ReportingStorage] Cached PO recommendations (no TTL)');
       } catch (error) {
         console.error('[ReportingStorage] Redis error caching recommendations:', error);
       }
@@ -293,7 +294,7 @@ export class ReportingStorage implements IReportingStorage {
 
     try {
       const redis = getRedisClient();
-      await redis.set(cacheKey, suppliers, { ex: CACHE_TTL });
+      await redis.set(cacheKey, suppliers); // No TTL - persists until cache warmer invalidates
     } catch (error) {
       console.error('[ReportingStorage] Redis error caching suppliers:', error);
     }

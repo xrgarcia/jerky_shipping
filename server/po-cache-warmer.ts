@@ -60,6 +60,11 @@ async function warmCache(): Promise<void> {
     }
     
     log(`New stock check date detected: ${latestDateStr} (previous: ${lastWarmedDate || 'none'})`);
+    
+    // Invalidate old cache entries before warming new ones
+    log('Invalidating old cache entries...');
+    await reportingStorage.invalidateCache();
+    
     log('Warming cache...');
     
     // Warm main recommendations cache (no filters - gets full dataset)
@@ -101,8 +106,8 @@ async function warmCache(): Promise<void> {
       log(`Warmed ${warmedCount}/${topSkus.length} SKU step caches`);
     }
     
-    // Update last warmed date in Redis (30 day TTL)
-    await redis.set(LAST_WARMED_DATE_KEY, latestDateStr, { ex: 2592000 });
+    // Update last warmed date in Redis (no TTL - persists until explicitly changed)
+    await redis.set(LAST_WARMED_DATE_KEY, latestDateStr);
     
     // Update stats
     workerStats.totalRunsCount++;
