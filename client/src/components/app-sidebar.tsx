@@ -119,7 +119,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <div 
-        className="flex items-center justify-center py-6 px-4 border-b border-sidebar-border"
+        className="flex items-center justify-center px-4 border-b border-sidebar-border h-[72px]"
         style={{ background: '#1a1a1a' }}
       >
         <img 

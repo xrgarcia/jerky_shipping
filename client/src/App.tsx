@@ -93,7 +93,7 @@ function AppContent() {
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden relative">
           <header 
-            className="flex items-center justify-between py-6 px-4 border-b border-sidebar-border"
+            className="flex items-center justify-between px-4 border-b border-sidebar-border h-[72px]"
             style={{ background: '#1a1a1a' }}
           >
             <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
