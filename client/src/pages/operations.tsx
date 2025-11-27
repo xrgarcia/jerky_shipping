@@ -120,6 +120,7 @@ type QueueStats = {
     totalSynced: number;
     lastSyncCount: number;
     lastSyncAt: string | null;
+    lastSyncTimestamp: string | null;
     workerStartedAt: string;
     errorsCount: number;
     lastError: string | null;
@@ -1510,6 +1511,9 @@ Please analyze this failure and help me understand:
                   <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
                     <div>Last synced: {queueStats.firestoreSessionSyncWorkerStats.lastSyncCount.toLocaleString()} sessions</div>
                     <div>Total synced: {queueStats.firestoreSessionSyncWorkerStats.totalSynced.toLocaleString()} sessions</div>
+                    {queueStats.firestoreSessionSyncWorkerStats.lastSyncTimestamp && (
+                      <div>Sync since: {new Date(queueStats.firestoreSessionSyncWorkerStats.lastSyncTimestamp).toLocaleString()}</div>
+                    )}
                     <div>Started: {formatDistanceToNow(new Date(queueStats.firestoreSessionSyncWorkerStats.workerStartedAt), { addSuffix: true })}</div>
                     {queueStats.firestoreSessionSyncWorkerStats.lastSyncAt && (
                       <div>Last sync: {formatDistanceToNow(new Date(queueStats.firestoreSessionSyncWorkerStats.lastSyncAt), { addSuffix: true })}</div>

@@ -224,52 +224,76 @@ export async function syncFirestoreSessions(): Promise<number> {
 }
 
 /**
- * Initial sync - sync all sessions from today
- * Called on worker startup to catch up
+ * Initial sync - sync all sessions from the past year
+ * Called on worker startup to catch up on all historical data
  */
 export async function initialSync(): Promise<number> {
   try {
-    log('Starting initial sync of today\'s sessions...');
+    // Start from 1 year ago to capture all historical sessions
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    
+    log(`Starting initial sync from ${oneYearAgo.toISOString()}...`);
     workerStatus = 'running';
 
-    const sessions = await firestoreStorage.getTodaysSessions();
-    
-    if (sessions.length === 0) {
-      log('No sessions today');
-      workerStatus = 'sleeping';
-      return 0;
-    }
+    // Use pagination to handle large result sets
+    let totalSynced = 0;
+    let latestUpdateDate = oneYearAgo;
+    let hasMore = true;
+    let pageCount = 0;
+    const BATCH_LIMIT = 500;
 
-    log(`Found ${sessions.length} session(s) from today`);
+    while (hasMore) {
+      pageCount++;
+      log(`Fetching page ${pageCount} of sessions updated since ${latestUpdateDate.toISOString()}`);
+      
+      const sessions = await firestoreStorage.getSessionsUpdatedSince(latestUpdateDate, BATCH_LIMIT);
+      
+      if (sessions.length === 0) {
+        hasMore = false;
+        break;
+      }
 
-    let syncedCount = 0;
-    let latestUpdateDate = new Date(0);
+      log(`Page ${pageCount}: Found ${sessions.length} session(s)`);
 
-    for (const session of sessions) {
-      const synced = await syncSessionToShipment(session);
-      if (synced) {
-        syncedCount++;
+      // Track the cursor before processing
+      const previousCursor = latestUpdateDate.getTime();
+
+      for (const session of sessions) {
+        const synced = await syncSessionToShipment(session);
+        if (synced) {
+          totalSynced++;
+        }
+        
+        if (session.updated_date > latestUpdateDate) {
+          latestUpdateDate = session.updated_date;
+        }
+      }
+
+      // If we got fewer than the limit, we've reached the end
+      if (sessions.length < BATCH_LIMIT) {
+        hasMore = false;
+      } else if (latestUpdateDate.getTime() === previousCursor) {
+        // Safety: if cursor didn't advance (all 500 sessions have same timestamp),
+        // add 1ms to prevent infinite loop
+        latestUpdateDate = new Date(latestUpdateDate.getTime() + 1);
+        log(`Warning: Cursor didn't advance, adding 1ms buffer to prevent stuck pagination`);
       }
       
-      if (session.updated_date > latestUpdateDate) {
-        latestUpdateDate = session.updated_date;
-      }
+      // Log progress every page
+      log(`Page ${pageCount} complete: ${totalSynced} total sessions synced so far`);
     }
 
     // Set the last sync timestamp to the latest update
-    if (latestUpdateDate.getTime() > 0) {
-      lastSyncTimestamp = latestUpdateDate;
-    } else {
-      lastSyncTimestamp = new Date();
-    }
+    lastSyncTimestamp = latestUpdateDate;
 
-    workerStats.totalSynced += syncedCount;
-    workerStats.lastSyncCount = syncedCount;
+    workerStats.totalSynced += totalSynced;
+    workerStats.lastSyncCount = totalSynced;
     workerStats.lastSyncAt = new Date();
 
-    log(`Initial sync complete: ${syncedCount} sessions synced`);
+    log(`Initial sync complete: ${totalSynced} sessions synced across ${pageCount} page(s)`);
     workerStatus = 'sleeping';
-    return syncedCount;
+    return totalSynced;
   } catch (error: any) {
     log(`Initial sync error: ${error.message}`);
     workerStats.errorsCount++;
@@ -292,12 +316,11 @@ export async function startFirestoreSessionSyncWorker(): Promise<void> {
     return;
   }
 
-  try {
-    // Run initial sync to catch up on today's sessions
-    await initialSync();
-  } catch (error: any) {
-    log(`Initial sync failed (will retry): ${error.message}`);
-  }
+  // Run initial sync in background (fire-and-forget) to not block server startup
+  // This can take several minutes for large historical syncs
+  initialSync().catch((error: any) => {
+    log(`Initial sync failed (will retry on next poll): ${error.message}`);
+  });
 
   // Start polling every minute
   const POLL_INTERVAL = 60 * 1000; // 1 minute
