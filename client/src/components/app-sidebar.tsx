@@ -126,7 +126,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div 
-            className="flex items-center justify-center py-4 px-3 mx-2 my-2 rounded-lg"
+            className="flex items-center justify-center py-6 px-4 border-b border-sidebar-border"
             style={{ background: '#1a1a1a' }}
           >
             <img 
