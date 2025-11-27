@@ -175,29 +175,38 @@ export class FirestoreStorage implements IFirestoreStorage {
   async getSkuVaultOrderSessionByPicklistId(picklistId: string): Promise<SkuVaultOrderSession[]> {
     const db = getFirestoreDb();
     
-    // Query by session_picklist_id (which stores the picklist ID as a string)
-    const snapshot = await db.collection(this.collectionName)
-      .where('session_picklist_id', '==', picklistId)
-      .orderBy('create_date', 'desc')
-      .get();
-
-    if (snapshot.empty) {
-      // Also try querying by session_id as a number (some documents might use this)
-      const numericId = parseInt(picklistId, 10);
-      if (!isNaN(numericId)) {
-        const numericSnapshot = await db.collection(this.collectionName)
-          .where('session_id', '==', numericId)
-          .orderBy('create_date', 'desc')
-          .get();
-        
-        if (!numericSnapshot.empty) {
-          return numericSnapshot.docs.map(doc => this.mapDocToSession(doc));
-        }
+    // The picklistId from customField2 is the numeric session_id
+    const numericId = parseInt(picklistId, 10);
+    
+    if (!isNaN(numericId)) {
+      // Query by session_id (numeric) - this is the primary identifier
+      // Note: Avoid combining where + orderBy on different fields to prevent composite index requirements
+      const snapshot = await db.collection(this.collectionName)
+        .where('session_id', '==', numericId)
+        .get();
+      
+      if (!snapshot.empty) {
+        const sessions = snapshot.docs.map(doc => this.mapDocToSession(doc));
+        // Sort in memory by create_date descending
+        return sessions.sort((a, b) => 
+          new Date(b.create_date).getTime() - new Date(a.create_date).getTime()
+        );
       }
-      return [];
+    }
+    
+    // Fallback: try querying by session_picklist_id as a string
+    const stringSnapshot = await db.collection(this.collectionName)
+      .where('session_picklist_id', '==', picklistId)
+      .get();
+    
+    if (!stringSnapshot.empty) {
+      const sessions = stringSnapshot.docs.map(doc => this.mapDocToSession(doc));
+      return sessions.sort((a, b) => 
+        new Date(b.create_date).getTime() - new Date(a.create_date).getTime()
+      );
     }
 
-    return snapshot.docs.map(doc => this.mapDocToSession(doc));
+    return [];
   }
 
   async getUniquePickerNames(): Promise<string[]> {
