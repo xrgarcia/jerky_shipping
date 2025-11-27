@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash } from "lucide-react";
+import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
 interface ShipmentWithItemCount extends Shipment {
   itemCount?: number;
@@ -29,8 +30,10 @@ interface ShipmentsResponse {
 function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   
   const shipmentIdOrUuid = shipment.shipmentId ?? shipment.id;
+  const sessionInfo = parseCustomField2(shipment.customField2);
 
   const { data: items, isLoading: isLoadingItems } = useQuery<ShipmentItem[]>({
     queryKey: ['/api/shipments', shipmentIdOrUuid, 'items'],
@@ -203,6 +206,31 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
               </div>
             )}
 
+            {/* Session/Spot Info */}
+            {sessionInfo && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Boxes className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="flex items-center gap-1.5">
+                  <span>Session</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSessionId(sessionInfo.sessionId);
+                    }}
+                    className="font-semibold text-primary hover:underline cursor-pointer"
+                    data-testid={`link-session-${sessionInfo.sessionId}`}
+                  >
+                    {sessionInfo.sessionId}
+                  </button>
+                  <span>•</span>
+                  <Badge variant="secondary" className="text-xs">
+                    Spot #{sessionInfo.spot}
+                  </Badge>
+                </div>
+              </div>
+            )}
+
             {/* ShipStation Tags only */}
             {tags && tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -371,6 +399,12 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Session Detail Modal */}
+      <SessionDetailDialog 
+        picklistId={selectedSessionId}
+        onClose={() => setSelectedSessionId(null)}
+      />
     </Card>
   );
 }

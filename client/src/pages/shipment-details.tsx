@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
 interface ShipmentWithOrder extends Shipment {
   order: Order | null;
@@ -17,6 +19,7 @@ export default function ShipmentDetails() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const shipmentId = params?.id;
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const { data: shipment, isLoading, isError } = useQuery<ShipmentWithOrder>({
     queryKey: ['/api/shipments', shipmentId],
@@ -294,6 +297,33 @@ export default function ShipmentDetails() {
               </div>
             )}
 
+            {/* Session/Spot Info */}
+            {(() => {
+              const sessionInfo = parseCustomField2(shipment.customField2);
+              if (!sessionInfo) return null;
+              return (
+                <div className="flex items-start gap-2">
+                  <Boxes className="h-4 w-4 text-muted-foreground mt-1" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pick Session</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSessionId(sessionInfo.sessionId)}
+                        className="text-lg font-semibold text-primary hover:underline cursor-pointer"
+                        data-testid={`link-session-${sessionInfo.sessionId}`}
+                      >
+                        Session {sessionInfo.sessionId}
+                      </button>
+                      <Badge variant="secondary">
+                        Spot #{sessionInfo.spot}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {shipment.labelUrl && (
               <div className="pt-2">
                 <Button
@@ -407,6 +437,12 @@ export default function ShipmentDetails() {
           </CardContent>
         </Card>
       )}
+
+      {/* Session Detail Modal */}
+      <SessionDetailDialog 
+        picklistId={selectedSessionId}
+        onClose={() => setSelectedSessionId(null)}
+      />
     </div>
   );
 }

@@ -28,7 +28,9 @@ import {
   Phone,
   ChevronDown,
   Zap,
+  Boxes,
 } from "lucide-react";
+import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
 type ShipmentItem = {
   id: string;
@@ -91,6 +93,8 @@ type ShipmentWithItems = {
   isGift: boolean | null;
   notesForGift: string | null;
   notesFromBuyer: string | null;
+  // Session/spot from SkuVault
+  customField2: string | null;
   items: ShipmentItem[];
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
   qcSale?: QCSale | null; // SkuVault QC Sale data (includes PassedItems, expected Items)
@@ -169,6 +173,7 @@ export default function Packing() {
   const [skuProgress, setSkuProgress] = useState<Map<string, SkuProgress>>(new Map());
   const [packingComplete, setPackingComplete] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
@@ -1134,6 +1139,35 @@ export default function Packing() {
                     {formatOrderAge(currentShipment.orderDate)}
                   </div>
                 </div>
+                {/* Session/Spot Info */}
+                {(() => {
+                  const sessionInfo = parseCustomField2(currentShipment.customField2);
+                  if (!sessionInfo) return null;
+                  return (
+                    <>
+                      <div className="h-12 w-[2px] bg-border" />
+                      <div>
+                        <div className="text-xs text-muted-foreground font-semibold mb-1 flex items-center gap-1">
+                          <Boxes className="h-3 w-3" />
+                          Session
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSessionId(sessionInfo.sessionId)}
+                            className="text-lg font-semibold text-primary hover:underline cursor-pointer"
+                            data-testid={`link-session-${sessionInfo.sessionId}`}
+                          >
+                            {sessionInfo.sessionId}
+                          </button>
+                          <Badge variant="secondary" className="text-xs">
+                            #{sessionInfo.spot}
+                          </Badge>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1891,6 +1925,12 @@ export default function Packing() {
           );
         })()}
       </div>
+
+      {/* Session Detail Modal */}
+      <SessionDetailDialog 
+        picklistId={selectedSessionId}
+        onClose={() => setSelectedSessionId(null)}
+      />
     </div>
   );
 }
