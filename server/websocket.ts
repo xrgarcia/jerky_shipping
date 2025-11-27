@@ -233,6 +233,19 @@ export function broadcastQueueStatus(data: {
     recentOrdersWithoutShipments?: number;
     paidOrdersWithoutShipments?: number;
   };
+  skuvaultQCQueue?: {
+    length: number;
+    status: 'sleeping' | 'running' | 'error';
+    stats: {
+      totalProcessed: number;
+      successCount: number;
+      failCount: number;
+      lastProcessedAt: Date | null;
+      workerStartedAt: Date;
+      errorsCount: number;
+      lastError: string | null;
+    };
+  };
 }): void {
   // Guard against wss being null and clear entire cache to prevent stale data after restart
   if (!wss) {

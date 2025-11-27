@@ -464,3 +464,189 @@ export async function requeueShopifyOrderSyncMessages(messages: ShopifyOrderSync
   const serialized = messages.reverse().map(msg => JSON.stringify(msg));
   await redis.rpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
 }
+
+// SkuVault QC Sync Queue operations - async QC scanning for optimistic packing
+const SKUVAULT_QC_QUEUE_KEY = 'skuvault:qc-sync';
+const SKUVAULT_QC_INFLIGHT_KEY = 'skuvault:qc-sync:inflight';
+
+export interface SkuVaultQCSyncMessage {
+  saleId: string; // SkuVault Sale ID
+  sku: string; // Product SKU to mark as scanned
+  quantity: number; // Number of units scanned
+  orderNumber: string; // Order number for reference
+  scannedBy: string; // User who scanned
+  scannedAt: string; // ISO timestamp when scanned
+  enqueuedAt: number;
+  retryCount?: number; // Track retry attempts
+  shipmentItemId?: string; // Optional: our shipment item ID for event linking
+}
+
+/**
+ * Generate a deduplication key for a QC sync message
+ * Uses saleId + sku + timestamp window (30 sec) to prevent duplicate scans
+ * We want to allow re-scans of same item if they're separated by time
+ */
+function getSkuVaultQCDedupeKey(message: SkuVaultQCSyncMessage): string {
+  // Round timestamp to 30-second window for reasonable deduplication
+  const timeWindow = Math.floor(new Date(message.scannedAt).getTime() / 30000);
+  return `qc:${message.saleId}:${message.sku}:${timeWindow}`;
+}
+
+/**
+ * Enqueue a SkuVault QC sync message with deduplication
+ * Returns true if enqueued, false if already in queue (duplicate scan)
+ */
+export async function enqueueSkuVaultQCSync(message: SkuVaultQCSyncMessage): Promise<boolean> {
+  const redis = getRedisClient();
+  const dedupeKey = getSkuVaultQCDedupeKey(message);
+  
+  // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+  const added = await redis.sadd(SKUVAULT_QC_INFLIGHT_KEY, dedupeKey);
+  
+  // If already existed, don't enqueue (duplicate scan within time window)
+  if (added === 0) {
+    return false;
+  }
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SKUVAULT_QC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue the message
+  await redis.lpush(SKUVAULT_QC_QUEUE_KEY, JSON.stringify(message));
+  return true;
+}
+
+/**
+ * Enqueue multiple SkuVault QC sync messages with deduplication
+ * Returns count of messages successfully enqueued
+ */
+export async function enqueueSkuVaultQCSyncBatch(messages: SkuVaultQCSyncMessage[]): Promise<number> {
+  if (messages.length === 0) return 0;
+  
+  const redis = getRedisClient();
+  const toEnqueue: SkuVaultQCSyncMessage[] = [];
+  const seenKeys = new Set<string>();
+  
+  for (const message of messages) {
+    const dedupeKey = getSkuVaultQCDedupeKey(message);
+    
+    // Skip if already seen in this batch
+    if (seenKeys.has(dedupeKey)) {
+      continue;
+    }
+    
+    // Atomically add to in-flight set
+    const added = await redis.sadd(SKUVAULT_QC_INFLIGHT_KEY, dedupeKey);
+    
+    if (added === 1) {
+      toEnqueue.push(message);
+      seenKeys.add(dedupeKey);
+    }
+  }
+  
+  if (toEnqueue.length === 0) return 0;
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(SKUVAULT_QC_INFLIGHT_KEY, 3600);
+  
+  // Enqueue all messages
+  const serialized = toEnqueue.map(msg => JSON.stringify(msg));
+  await redis.lpush(SKUVAULT_QC_QUEUE_KEY, ...serialized);
+  
+  return toEnqueue.length;
+}
+
+/**
+ * Remove a QC sync message from the in-flight set
+ * Call this after processing completes (success or failure)
+ */
+export async function removeSkuVaultQCFromInflight(message: SkuVaultQCSyncMessage): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = getSkuVaultQCDedupeKey(message);
+  await redis.srem(SKUVAULT_QC_INFLIGHT_KEY, dedupeKey);
+}
+
+export async function dequeueSkuVaultQCSync(): Promise<SkuVaultQCSyncMessage | null> {
+  const redis = getRedisClient();
+  const data = await redis.rpop(SKUVAULT_QC_QUEUE_KEY);
+  
+  if (!data) {
+    return null;
+  }
+
+  // Handle case where Redis returns an object instead of a string
+  if (typeof data === 'object') {
+    return data as SkuVaultQCSyncMessage;
+  }
+
+  return JSON.parse(data as string);
+}
+
+export async function dequeueSkuVaultQCSyncBatch(count: number): Promise<SkuVaultQCSyncMessage[]> {
+  const redis = getRedisClient();
+  const messages: SkuVaultQCSyncMessage[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    const data = await redis.rpop(SKUVAULT_QC_QUEUE_KEY);
+    if (!data) break;
+    
+    // Handle case where Redis returns an object instead of a string
+    if (typeof data === 'object') {
+      messages.push(data as SkuVaultQCSyncMessage);
+    } else {
+      messages.push(JSON.parse(data as string));
+    }
+  }
+  
+  return messages;
+}
+
+export async function getSkuVaultQCSyncQueueLength(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.llen(SKUVAULT_QC_QUEUE_KEY) || 0;
+}
+
+export async function clearSkuVaultQCSyncQueue(): Promise<number> {
+  const redis = getRedisClient();
+  const length = await getSkuVaultQCSyncQueueLength();
+  if (length > 0) {
+    await redis.del(SKUVAULT_QC_QUEUE_KEY);
+  }
+  return length;
+}
+
+export async function getOldestSkuVaultQCSyncQueueMessage(): Promise<{ enqueuedAt: number | null }> {
+  const redis = getRedisClient();
+  const data = await redis.lindex(SKUVAULT_QC_QUEUE_KEY, -1);
+  
+  if (!data) {
+    return { enqueuedAt: null };
+  }
+  
+  try {
+    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+    return { enqueuedAt: parsed.enqueuedAt || null };
+  } catch {
+    return { enqueuedAt: null };
+  }
+}
+
+/**
+ * Requeue QC sync messages back to the front of the queue (FIFO order preserved)
+ * Used when worker needs to retry due to rate limits or other failures
+ */
+export async function requeueSkuVaultQCSyncMessages(messages: SkuVaultQCSyncMessage[]): Promise<void> {
+  if (messages.length === 0) return;
+  
+  const redis = getRedisClient();
+  // Increment retry count for each message
+  const updatedMessages = messages.map(msg => ({
+    ...msg,
+    retryCount: (msg.retryCount || 0) + 1
+  }));
+  
+  // RPUSH adds to the end of the queue (which is the front for RPOP consumers)
+  // Reverse the array to maintain FIFO order
+  const serialized = updatedMessages.reverse().map(msg => JSON.stringify(msg));
+  await redis.rpush(SKUVAULT_QC_QUEUE_KEY, ...serialized);
+}

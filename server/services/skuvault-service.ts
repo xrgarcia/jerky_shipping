@@ -1283,6 +1283,105 @@ export class SkuVaultService {
   }
 
   /**
+   * Scan/pass an item in SkuVault QC (Quality Control)
+   * Endpoint: POST /sales/QualityControl/passItem
+   * 
+   * This marks an item as scanned/passed in SkuVault's QC system.
+   * Called asynchronously after local barcode validation succeeds.
+   * 
+   * @param saleId - SkuVault Sale ID (e.g., "1-352444-5-13038-138162-JK3825346033")
+   * @param sku - Product SKU to mark as scanned
+   * @param quantity - Number of units to pass (default 1)
+   * @returns true if successful, false if failed
+   */
+  async scanQCItem(saleId: string, sku: string, quantity: number = 1): Promise<boolean> {
+    await this.ensureAuthenticated();
+
+    try {
+      // QC passItem endpoint on app.skuvault.com
+      const url = `https://app.skuvault.com/sales/QualityControl/passItem`;
+      console.log(`[SkuVault QC] Passing item:`, { saleId, sku, quantity });
+      
+      // Apply rate limiting
+      await this.applyRateLimit();
+      
+      // Make request with form data
+      const headers = await this.getApiHeaders();
+      const response = await this.client.request({
+        method: 'POST',
+        url,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        data: new URLSearchParams({
+          saleId,
+          codeOrSku: sku,
+          quantity: quantity.toString(),
+        }).toString(),
+        transformResponse: [], // Handle response manually
+      });
+      
+      let rawData = response.data as string;
+      
+      // Check for HTML response (session expired)
+      if (typeof rawData === 'string' && (rawData.trim().startsWith('<!doctype') || rawData.trim().startsWith('<html'))) {
+        console.log('[SkuVault QC] Received HTML response (session expired), re-authenticating...');
+        await this.tokenCache.clear();
+        this.isAuthenticated = false;
+        await this.ensureAuthenticated();
+        
+        // Retry the request with new token
+        const retryHeaders = await this.getApiHeaders();
+        const retryResponse = await this.client.request({
+          method: 'POST',
+          url,
+          headers: {
+            ...retryHeaders,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          data: new URLSearchParams({
+            saleId,
+            codeOrSku: sku,
+            quantity: quantity.toString(),
+          }).toString(),
+          transformResponse: [],
+        });
+        rawData = retryResponse.data as string;
+      }
+      
+      // Strip anti-XSSI prefix if present
+      if (typeof rawData === 'string' && rawData.startsWith(")]}',")) {
+        rawData = rawData.substring(6);
+      }
+      
+      // Parse response
+      const parsedData = typeof rawData === 'string' && rawData.trim() ? JSON.parse(rawData) : {};
+      
+      // Check for errors in response
+      if (parsedData.Errors && parsedData.Errors.length > 0) {
+        console.error(`[SkuVault QC] Errors in response:`, parsedData.Errors);
+        return false;
+      }
+      
+      console.log(`[SkuVault QC] Successfully passed item:`, { saleId, sku, quantity });
+      return true;
+
+    } catch (error) {
+      const axiosError = error as any;
+      
+      // Some successful operations may return 200 with empty body
+      if (axiosError?.response?.status === 200) {
+        console.log(`[SkuVault QC] Item passed (empty response):`, { saleId, sku, quantity });
+        return true;
+      }
+      
+      console.error(`[SkuVault QC] Error passing item:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Get token metadata for operations dashboard
    * Returns authentication status and last refresh timestamp
    */
