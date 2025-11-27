@@ -922,10 +922,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get detailed directions for a specific SkuVault session
+  // First tries Firestore (for completed sessions), then falls back to SkuVault API (for active sessions)
   app.get("/api/skuvault/sessions/:picklistId", requireAuth, async (req, res) => {
     try {
       const { picklistId } = req.params;
-      console.log(`Fetching SkuVault session details for picklist ${picklistId}...`);
+      console.log(`Fetching session details for picklist ${picklistId}...`);
+      
+      // First try to get session data from Firestore (contains completed sessions)
+      const firestoreSessions = await firestoreStorage.getSkuVaultOrderSessionByPicklistId(picklistId);
+      
+      if (firestoreSessions.length > 0) {
+        console.log(`Found ${firestoreSessions.length} session(s) in Firestore for picklist ${picklistId}`);
+        
+        // Extract all unique SKUs from the Firestore sessions
+        const skus = new Set<string>();
+        for (const session of firestoreSessions) {
+          if (session.order_items) {
+            for (const item of session.order_items) {
+              if (item.sku) {
+                skus.add(item.sku);
+              }
+            }
+          }
+        }
+        
+        // Fetch product images for all SKUs
+        const skuImageMap = new Map<string, string>();
+        if (skus.size > 0) {
+          const variants = await storage.getProductVariantsBySKUs(Array.from(skus));
+          for (const variant of variants) {
+            if (variant.sku && variant.imageUrl) {
+              skuImageMap.set(variant.sku, variant.imageUrl);
+            }
+          }
+        }
+        
+        // Transform Firestore data to match the expected response format
+        // Group all orders from the sessions
+        const orders = firestoreSessions.map(session => ({
+          orderNumber: session.order_number,
+          saleId: session.sale_id,
+          shipmentId: session.shipment_id,
+          spot: session.spot_number,
+          status: session.session_status,
+          pickerName: session.picked_by_user_name,
+          pickStartTime: session.pick_start_datetime,
+          pickEndTime: session.pick_end_datetime,
+          items: session.order_items.map(item => ({
+            sku: item.sku,
+            description: item.description,
+            quantity: item.quantity,
+            location: item.location,
+            locations: item.locations,
+            picked: item.picked,
+            completed: item.completed,
+            imageUrl: skuImageMap.get(item.sku) || (item.product_pictures?.[0] || null),
+          })),
+        }));
+        
+        // Use the first session for picklist-level info
+        const firstSession = firestoreSessions[0];
+        return res.json({
+          source: 'firestore',
+          picklist: {
+            picklistId: firstSession.session_picklist_id || picklistId,
+            sessionId: firstSession.session_id,
+            status: firstSession.session_status,
+            pickerName: firstSession.picked_by_user_name,
+            pickerId: firstSession.picked_by_user_id,
+            pickStartTime: firstSession.pick_start_datetime,
+            pickEndTime: firstSession.pick_end_datetime,
+            orders,
+          },
+        });
+      }
+      
+      // Fall back to SkuVault API for active sessions
+      console.log(`No Firestore data found, trying SkuVault API for picklist ${picklistId}...`);
       const directions = await skuVaultService.getSessionDirections(picklistId);
       
       // Extract all unique SKUs from the session
@@ -966,9 +1039,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      res.json(directions);
+      res.json({ source: 'skuvault', ...directions });
     } catch (error: any) {
-      console.error(`Error fetching SkuVault session details for picklist ${req.params.picklistId}:`, error);
+      console.error(`Error fetching session details for picklist ${req.params.picklistId}:`, error);
       res.status(500).json({ 
         error: "Failed to fetch session details",
         message: error.message 

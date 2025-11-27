@@ -51,6 +51,7 @@ export interface IFirestoreStorage {
     sessions: SkuVaultOrderSession[];
     total: number;
   }>;
+  getSkuVaultOrderSessionByPicklistId(picklistId: string): Promise<SkuVaultOrderSession[]>;
   getUniquePickerNames(): Promise<string[]>;
   getUniqueSessionStatuses(): Promise<string[]>;
 }
@@ -169,6 +170,34 @@ export class FirestoreStorage implements IFirestoreStorage {
     sessions = sessions.slice(offset, offset + limit);
 
     return { sessions, total };
+  }
+
+  async getSkuVaultOrderSessionByPicklistId(picklistId: string): Promise<SkuVaultOrderSession[]> {
+    const db = getFirestoreDb();
+    
+    // Query by session_picklist_id (which stores the picklist ID as a string)
+    const snapshot = await db.collection(this.collectionName)
+      .where('session_picklist_id', '==', picklistId)
+      .orderBy('create_date', 'desc')
+      .get();
+
+    if (snapshot.empty) {
+      // Also try querying by session_id as a number (some documents might use this)
+      const numericId = parseInt(picklistId, 10);
+      if (!isNaN(numericId)) {
+        const numericSnapshot = await db.collection(this.collectionName)
+          .where('session_id', '==', numericId)
+          .orderBy('create_date', 'desc')
+          .get();
+        
+        if (!numericSnapshot.empty) {
+          return numericSnapshot.docs.map(doc => this.mapDocToSession(doc));
+        }
+      }
+      return [];
+    }
+
+    return snapshot.docs.map(doc => this.mapDocToSession(doc));
   }
 
   async getUniquePickerNames(): Promise<string[]> {
