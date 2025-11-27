@@ -1891,14 +1891,20 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(sql`${shipments.sessionedAt} >= ${todayStart}`);
     
-    // Query 2: Orders in packing queue (has session data but not shipped)
-    // These are orders that have been sessioned in SkuVault but don't have tracking yet
+    // Query 2: Orders in packing queue (closed/picked session, no tracking number yet)
+    // These are orders ready to be packed - their session is complete but they haven't shipped
     const inPackingQueueResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
-        sql`${shipments.sessionId} IS NOT NULL 
-            AND (${shipments.trackingNumber} IS NULL OR ${shipments.status} != 'shipped')`
+        and(
+          isNotNull(shipments.sessionId),
+          or(
+            eq(shipments.sessionStatus, 'closed'),
+            eq(shipments.sessionStatus, 'picked')
+          ),
+          isNull(shipments.trackingNumber)
+        )
       );
     
     // Query 3: Orders shipped today (shipDate is today)
@@ -1912,8 +1918,14 @@ export class DatabaseStorage implements IStorage {
       .select({ sessionedAt: shipments.sessionedAt })
       .from(shipments)
       .where(
-        sql`${shipments.sessionId} IS NOT NULL 
-            AND (${shipments.trackingNumber} IS NULL OR ${shipments.status} != 'shipped')`
+        and(
+          isNotNull(shipments.sessionId),
+          or(
+            eq(shipments.sessionStatus, 'closed'),
+            eq(shipments.sessionStatus, 'picked')
+          ),
+          isNull(shipments.trackingNumber)
+        )
       )
       .orderBy(shipments.sessionedAt)
       .limit(1);
