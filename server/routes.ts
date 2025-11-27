@@ -15,7 +15,7 @@ import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -3732,6 +3732,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         valid: false, 
         error: "Failed to validate barcode" 
+      });
+    }
+  });
+
+  // Queue SkuVault QC scan for async processing
+  // Optimistic: Returns immediately, QC sync happens in background via worker
+  app.post("/api/packing/queue-qc-scan", requireAuth, async (req, res) => {
+    try {
+      const { saleId, sku, quantity = 1, orderNumber } = req.body;
+      
+      // Validate required fields
+      if (!saleId || !sku || !orderNumber) {
+        return res.status(400).json({ 
+          queued: false, 
+          error: "Missing required fields: saleId, sku, orderNumber" 
+        });
+      }
+      
+      // Get user email from session for audit
+      const scannedBy = req.user?.email || "unknown";
+      const scannedAt = new Date().toISOString();
+      
+      // Enqueue the QC sync message
+      const queued = await enqueueSkuVaultQCSync({
+        saleId,
+        sku,
+        quantity: Number(quantity),
+        orderNumber,
+        scannedBy,
+        scannedAt,
+        enqueuedAt: Date.now(),
+        retryCount: 0,
+      });
+      
+      if (!queued) {
+        // Deduplication prevented queue - this is OK, means already queued recently
+        console.log(`[Packing] QC scan deduplicated: ${sku} for ${orderNumber}`);
+        return res.json({ 
+          queued: false, 
+          deduplicated: true,
+          message: "Scan already queued within deduplication window" 
+        });
+      }
+      
+      console.log(`[Packing] QC scan queued: ${sku} for ${orderNumber} by ${scannedBy}`);
+      res.json({ 
+        queued: true, 
+        message: "QC sync queued for background processing" 
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error queuing QC scan:", error);
+      res.status(500).json({ 
+        queued: false, 
+        error: "Failed to queue QC scan" 
       });
     }
   });

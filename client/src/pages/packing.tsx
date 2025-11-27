@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { QCPassItemResponse } from "@shared/skuvault-types";
 import {
   Accordion,
   AccordionContent,
@@ -127,22 +126,6 @@ type ShipmentTag = {
   name: string;
   color: string | null;
   tagId: number | null;
-};
-
-type SkuVaultProduct = {
-  IdItem?: string | null;
-  Sku?: string | null;
-  Description?: string | null;
-  Code?: string | null;
-  PartNumber?: string | null;
-  IsKit?: boolean | null;
-  WeightPound?: number | null;
-  ProductPictures?: string[] | null;
-};
-
-type SkuVaultProductResponse = {
-  product: SkuVaultProduct;
-  rawResponse: any; // Raw SkuVault API response for audit logging
 };
 
 type SkuProgress = {
@@ -587,27 +570,6 @@ export default function Packing() {
     },
   });
 
-  // Pass QC item in SkuVault
-  const passQcItemMutation = useMutation({
-    mutationFn: async (params: {
-      skuVaultProductId: string;
-      scannedCode: string;
-      saleId: string | null;
-      orderNumber: string;
-    }) => {
-      const response = await apiRequest("POST", "/api/skuvault/qc/pass-item", {
-        IdItem: params.skuVaultProductId,
-        Quantity: 1,
-        IdSale: params.saleId, // Cached SaleId (or null if not found in SkuVault)
-        OrderNumber: params.orderNumber, // Fallback for backend lookup if needed
-        ScannedCode: params.scannedCode,
-        Note: null,
-        SerialNumber: "",
-      });
-      return (await response.json()) as QCPassItemResponse;
-    },
-  });
-
   // Clear packing history (for testing/re-scanning)
   const clearHistoryMutation = useMutation({
     mutationFn: async (shipmentId: string) => {
@@ -639,30 +601,76 @@ export default function Packing() {
     },
   });
 
-  // Get picked quantity from SkuVault (for sync validation)
-  const getPickedQuantityMutation = useMutation({
-    mutationFn: async (params: {
-      codeOrSku: string;
-      saleId: string;
-    }) => {
-      const response = await apiRequest(
-        "GET", 
-        `/api/skuvault/qc/picked-quantity?codeOrSku=${encodeURIComponent(params.codeOrSku)}&saleId=${encodeURIComponent(params.saleId)}`
-      );
-      return (await response.json()) as { pickedQuantity: number | null };
+  // Local barcode validation (instant lookup from local database)
+  type LocalBarcodeResponse = {
+    valid: boolean;
+    sku?: string;
+    barcode?: string;
+    title?: string;
+    variantId?: string;
+    productId?: string;
+    error?: string;
+    scannedValue?: string;
+  };
+
+  // Queue SkuVault QC scan for async processing
+  const queueQCScanMutation = useMutation({
+    mutationFn: async (params: { saleId: string; sku: string; quantity: number; orderNumber: string }) => {
+      const response = await apiRequest("POST", "/api/packing/queue-qc-scan", params);
+      return (await response.json()) as { queued: boolean; deduplicated?: boolean; message: string };
+    },
+    onSuccess: (result, params) => {
+      if (result.queued) {
+        console.log(`[Packing] QC sync queued for ${params.sku}`);
+      } else if (result.deduplicated) {
+        console.log(`[Packing] QC scan deduplicated for ${params.sku} (already queued)`);
+      }
+    },
+    onError: (error: Error, params) => {
+      console.warn(`[Packing] Failed to queue QC sync for ${params.sku}:`, error);
+      // Non-blocking: QC queue failure shouldn't interrupt packing flow
     },
   });
 
-  // Validate product with SkuVault QC
+  // Validate product with local barcode lookup (replaces SkuVault API call)
   const validateProductMutation = useMutation({
     mutationFn: async (scannedCode: string) => {
-      const response = await apiRequest("GET", `/api/skuvault/qc/product/${encodeURIComponent(scannedCode)}`);
-      return (await response.json()) as SkuVaultProductResponse;
+      const response = await apiRequest("GET", `/api/packing/validate-barcode/${encodeURIComponent(scannedCode)}`);
+      return (await response.json()) as LocalBarcodeResponse;
     },
     onSuccess: async (data, scannedCode) => {
-      const { product, rawResponse } = data;
-      // Normalize scanned SKU for comparison (handle undefined Sku)
-      const normalizedSku = normalizeSku(product.Sku || "");
+      // Handle invalid barcode (not found in local DB)
+      if (!data.valid || !data.sku) {
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: null,
+          scannedCode,
+          skuVaultProductId: null,
+          success: false,
+          errorMessage: data.error || "Product not found in local database",
+        });
+
+        logShipmentEvent("product_scan_failed", {
+          scannedCode,
+          errorMessage: data.error || "Product not found",
+        });
+
+        showScanFeedback(
+          "error",
+          "PRODUCT NOT FOUND",
+          "Check barcode → Scan any remaining item below",
+          {
+            sku: scannedCode,
+          }
+        );
+
+        setProductScan("");
+        setTimeout(() => productInputRef.current?.focus(), 0);
+        return;
+      }
+
+      // Normalize scanned SKU for comparison
+      const normalizedSku = normalizeSku(data.sku);
       
       // STEP 1: Find ANY matching SKU (regardless of remaining quantity)
       let matchingItemKey: string | null = null;
@@ -686,12 +694,11 @@ export default function Packing() {
         // SKU not in this order at all
         await createPackingLog({
           action: "product_scanned",
-          productSku: product.Sku || "",
+          productSku: data.sku,
           scannedCode,
-          skuVaultProductId: product.IdItem || null,
+          skuVaultProductId: data.variantId || null,
           success: false,
-          errorMessage: `SKU ${product.Sku} not in this shipment`,
-          skuVaultRawResponse: rawResponse,
+          errorMessage: `SKU ${data.sku} not in this shipment`,
         });
 
         showScanFeedback(
@@ -699,9 +706,8 @@ export default function Packing() {
           "WRONG ITEM - Not in this order",
           `Set aside → Scan any remaining item below`,
           {
-            sku: product.Sku || "",
-            productName: product.Description || undefined,
-            imageUrl: product.ProductPictures?.[0] || null,
+            sku: data.sku,
+            productName: data.title || undefined,
           }
         );
 
@@ -714,12 +720,11 @@ export default function Packing() {
       if (matchingProgress.remaining === 0) {
         await createPackingLog({
           action: "product_scanned",
-          productSku: product.Sku || "",
+          productSku: data.sku,
           scannedCode,
-          skuVaultProductId: product.IdItem || null,
+          skuVaultProductId: data.variantId || null,
           success: false,
-          errorMessage: `Already scanned ${matchingProgress.scanned}/${matchingProgress.expected} units of ${product.Sku}`,
-          skuVaultRawResponse: rawResponse,
+          errorMessage: `Already scanned ${matchingProgress.scanned}/${matchingProgress.expected} units of ${data.sku}`,
         });
 
         showScanFeedback(
@@ -740,147 +745,26 @@ export default function Packing() {
         return;
       }
 
-      const progress = matchingProgress;
+      const currentProgress = matchingProgress;
 
-      // Sync with SkuVault picked quantity (call FIRST before proceeding with scan)
-      let syncedFromSkuVault = false;
-      let currentProgress = progress; // Track latest progress (including potential SkuVault sync)
-      
-      if (currentShipment?.saleId && product.Sku) {
-        try {
-          const { pickedQuantity } = await getPickedQuantityMutation.mutateAsync({
-            codeOrSku: product.Sku,
-            saleId: currentShipment.saleId,
-          });
-          
-          if (pickedQuantity !== null && pickedQuantity > progress.scanned) {
-            // SkuVault has more picks than us - sync our progress
-            const previousCount = progress.scanned;
-            
-            // Update currentProgress to reflect SkuVault's state
-            currentProgress = {
-              ...progress,
-              scanned: pickedQuantity,
-              remaining: progress.expected - pickedQuantity,
-            };
-            
-            // Update React state
-            const newProgress = new Map(skuProgress);
-            newProgress.set(matchingItemKey!, currentProgress);
-            setSkuProgress(newProgress);
-            
-            // Log sync event
-            await logShipmentEvent("skuvault_picked_quantity_sync", {
-              sku: product.Sku,
-              barcode: scannedCode,
-              itemId: matchingItemKey,
-              previousCount,
-              skuVaultPickedCount: pickedQuantity,
-              syncedCount: pickedQuantity - previousCount,
-            });
-            
-            syncedFromSkuVault = true;
-            
-            showScanFeedback(
-              "info",
-              "SYNCED WITH SKUVAULT",
-              `Updated from ${previousCount} to ${pickedQuantity} scanned (SkuVault already picked ${pickedQuantity - previousCount} units)`,
-              {
-                sku: product.Sku,
-                productName: product.Description || undefined,
-                imageUrl: progress.imageUrl,
-                scannedCount: pickedQuantity,
-                expectedCount: progress.expected,
-              }
-            );
-          }
-        } catch (error) {
-          console.warn("[Packing] SkuVault sync check failed (non-blocking):", error);
-          // Graceful degradation - continue with normal scan flow
-        }
-      }
-      
-      // Check if already scanned expected quantity (after potential SkuVault sync)
-      if (currentProgress.scanned >= currentProgress.expected) {
-        await createPackingLog({
-          action: "product_scanned",
-          productSku: product.Sku || "",
-          scannedCode,
-          skuVaultProductId: product.IdItem || null,
-          success: false,
-          errorMessage: `Already scanned ${currentProgress.scanned}/${currentProgress.expected} units of ${product.Sku}`,
-          skuVaultRawResponse: rawResponse,
-        });
-
-        showScanFeedback(
-          "info",
-          "ALREADY COMPLETE",
-          "This item is fully scanned. Scan next item.",
-          {
-            sku: currentProgress.sku,
-            productName: currentProgress.name,
-            imageUrl: currentProgress.imageUrl,
-            scannedCount: currentProgress.scanned,
-            expectedCount: currentProgress.expected,
-          }
-        );
-
-        setProductScan("");
-        setTimeout(() => productInputRef.current?.focus(), 0);
-        return;
-      }
-
-      // Mark as QC passed in SkuVault (optional - if order doesn't exist in SkuVault, we still proceed)
-      let qcPassSuccess = false;
-      let qcPassError: string | null = null;
-      try {
-        const qcResponse = await passQcItemMutation.mutateAsync({
-          skuVaultProductId: product.IdItem || "0",
-          scannedCode, // Send original scanned code, not normalized
-          saleId: currentShipment!.saleId, // Cached SaleId (null if not found)
-          orderNumber: currentShipment!.orderNumber, // Fallback for backend
-        });
-        
-        // Validate QC response - SkuVault returns: {"Data": null, "Errors": [], "Success": true}
-        const isSuccess = qcResponse.Success === true;
-        const hasErrors = qcResponse.Errors && qcResponse.Errors.length > 0;
-        
-        if (!isSuccess || hasErrors) {
-          // Extract error message from Errors array
-          qcPassError = qcResponse.Errors?.join(", ") || "QC pass rejected by SkuVault";
-          throw new Error(qcPassError);
-        }
-        
-        qcPassSuccess = true;
-      } catch (error: any) {
-        console.warn("SkuVault QC pass failed (non-fatal):", error);
-        qcPassError = error.message || "QC pass failed";
-        
-        // QC pass failure is non-fatal - we already validated the product exists in SkuVault
-        // This typically happens when the order doesn't exist in SkuVault (e.g., Shopify/ShipStation orders)
-        // Log the attempt but allow the scan to proceed
-        console.log(`[Packing] QC pass skipped for ${product.Sku}: ${qcPassError} (order may not be in SkuVault)`);
-      }
-
-      // Log successful scan (product validated via lookup, QC pass is optional enhancement)
+      // Log successful scan (validated via local database lookup - instant)
       await createPackingLog({
         action: "product_scanned",
-        productSku: product.Sku || "",
+        productSku: data.sku,
         scannedCode,
-        skuVaultProductId: product.IdItem || null,
+        skuVaultProductId: data.variantId || null,
         success: true,
         errorMessage: null,
-        skuVaultRawResponse: rawResponse,
       });
 
       // Log shipment event for successful scan
       logShipmentEvent("product_scan_success", {
-        sku: product.Sku || "",
+        sku: data.sku,
         barcode: scannedCode,
         itemId: matchingItemKey,
         scannedCount: currentProgress.scanned + 1,
         expectedCount: currentProgress.expected,
-        syncedFromSkuVault,
+        localValidation: true,
       });
 
       // Update progress (using item ID as key, tracking remaining units)
@@ -888,19 +772,28 @@ export default function Packing() {
       newProgress.set(matchingItemKey!, {
         ...currentProgress,
         scanned: currentProgress.scanned + 1,
-        remaining: currentProgress.remaining - 1, // Decrement remaining for this specific item
+        remaining: currentProgress.remaining - 1,
       });
       setSkuProgress(newProgress);
 
+      // Queue SkuVault QC sync in background (non-blocking, fire-and-forget)
+      // Only queue if shipment has a valid saleId from pre-synced Firestore session
+      if (currentShipment?.saleId) {
+        queueQCScanMutation.mutate({
+          saleId: currentShipment.saleId,
+          sku: data.sku,
+          quantity: 1,
+          orderNumber: currentShipment.orderNumber,
+        });
+      }
+
       showScanFeedback(
         "success",
-        qcPassSuccess ? "SCAN ACCEPTED" : "SCAN ACCEPTED",
-        qcPassSuccess 
-          ? "Product validated & QC passed in SkuVault"
-          : "Product validated (QC pass skipped - order not in SkuVault)",
+        "SCAN ACCEPTED",
+        "Product validated instantly",
         {
-          sku: product.Sku || "",
-          productName: product.Description || currentProgress.name,
+          sku: data.sku,
+          productName: data.title || currentProgress.name,
           imageUrl: currentProgress.imageUrl,
           scannedCount: currentProgress.scanned + 1,
           expectedCount: currentProgress.expected,
@@ -929,7 +822,7 @@ export default function Packing() {
 
       showScanFeedback(
         "error",
-        "PRODUCT NOT FOUND",
+        "VALIDATION ERROR",
         "Check barcode → Scan any remaining item below",
         {
           sku: scannedCode,
