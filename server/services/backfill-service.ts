@@ -5,7 +5,7 @@
  */
 
 import type { IStorage } from '../storage';
-import { getShipmentsByDateRange } from '../utils/shipstation-api';
+import { getShipmentsByDateRange, type ShipmentPageResult } from '../utils/shipstation-api';
 import { extractActualOrderNumber, extractShopifyOrderPrices } from '../utils/shopify-utils';
 import type { InsertOrder, BackfillJob } from '@shared/schema';
 import { broadcastQueueStatus } from '../websocket';
@@ -265,70 +265,79 @@ export class BackfillService {
 
   /**
    * Import ShipStation shipments for date range
+   * Uses page-by-page processing for memory efficiency and real-time progress
    */
   private async importShipStationShipments(jobId: string, startDate: Date, endDate: Date): Promise<void> {
     console.log(`[Backfill] Importing ShipStation shipments from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
+    let imported = 0;
+    let failed = 0;
+    let cancelled = false;
+
     try {
-      // Fetch all shipments for date range (pagination handled internally)
-      const { data: shipments } = await getShipmentsByDateRange(startDate, endDate);
+      // Process shipments page-by-page as they're fetched
+      // This saves each page immediately instead of waiting for all 16K+ shipments
+      await getShipmentsByDateRange(
+        startDate,
+        endDate,
+        500, // page size
+        async (pageResult: ShipmentPageResult) => {
+          // Check if job was cancelled before processing this page
+          const currentJob = await this.storage.getBackfillJob(jobId);
+          if (currentJob?.status === 'cancelled') {
+            console.log(`[Backfill] Job ${jobId} was cancelled, stopping ShipStation import`);
+            cancelled = true;
+            return; // Stop processing pages
+          }
 
-      // Update total after fetching all pages
-      await this.storage.updateBackfillJob(jobId, {
-        shipstationShipmentsTotal: shipments.length,
-      });
-      this.broadcastJobProgress(jobId);
+          // Update total on first page (we now know the total)
+          if (pageResult.page === 1) {
+            await this.storage.updateBackfillJob(jobId, {
+              shipstationShipmentsTotal: pageResult.totalShipments,
+            });
+            console.log(`[Backfill] Total ShipStation shipments to import: ${pageResult.totalShipments}`);
+          }
 
-      console.log(`[Backfill] Total ShipStation shipments to import: ${shipments.length}`);
+          // Process each shipment in this page
+          for (const shipmentData of pageResult.shipments) {
+            try {
+              await this.saveShipStationShipment(shipmentData);
+              imported++;
+            } catch (error: any) {
+              failed++;
+              console.error(`[Backfill] Error saving ShipStation shipment:`, error);
+            }
+          }
 
-      if (shipments.length === 0) {
-        return;
-      }
-
-      // Save each shipment directly
-      let imported = 0;
-      let failed = 0;
-      for (const shipmentData of shipments) {
-        // Check if job was cancelled
-        const currentJob = await this.storage.getBackfillJob(jobId);
-        if (currentJob?.status === 'cancelled') {
-          console.log(`[Backfill] Job ${jobId} was cancelled, stopping ShipStation import`);
-          // Persist final counts before returning
+          // Update progress after each page
           await this.storage.updateBackfillJob(jobId, {
             shipstationShipmentsImported: imported,
             shipstationShipmentsFailed: failed,
           });
           this.broadcastJobProgress(jobId);
-          return;
-        }
 
-        try {
-          await this.saveShipStationShipment(shipmentData);
-          imported++;
-
-          // Update progress every 10 shipments
-          if (imported % 10 === 0) {
-            await this.storage.updateBackfillJob(jobId, {
-              shipstationShipmentsImported: imported,
-              shipstationShipmentsFailed: failed,
-            });
-            this.broadcastJobProgress(jobId);
-          }
-        } catch (error: any) {
-          failed++;
-          console.error(`[Backfill] Error saving ShipStation shipment:`, error);
-          // Continue with other shipments
+          console.log(`[Backfill] ShipStation page ${pageResult.page}/${pageResult.totalPages} complete: ${imported} imported, ${failed} failed`);
         }
+      );
+
+      if (cancelled) {
+        // Job was cancelled mid-import
+        await this.storage.updateBackfillJob(jobId, {
+          shipstationShipmentsImported: imported,
+          shipstationShipmentsFailed: failed,
+        });
+        this.broadcastJobProgress(jobId);
+        return;
       }
 
-      // Final progress update to capture any remainder
+      // Final progress update
       await this.storage.updateBackfillJob(jobId, {
         shipstationShipmentsImported: imported,
         shipstationShipmentsFailed: failed,
       });
       this.broadcastJobProgress(jobId);
 
-      console.log(`[Backfill] ShipStation import complete: ${imported} shipments`);
+      console.log(`[Backfill] ShipStation import complete: ${imported} shipments, ${failed} failed`);
     } catch (error: any) {
       console.error(`[Backfill] ShipStation import error:`, error);
       throw error;
