@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, ClipboardList, Headset } from "lucide-react";
+import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
@@ -124,8 +125,13 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-serif">
-            ship.jerky.com
+          <SidebarGroupLabel className="py-4">
+            <img 
+              src={jerkyLogo} 
+              alt="Jerky.com" 
+              className="h-8 w-auto"
+              data-testid="img-jerky-logo"
+            />
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
