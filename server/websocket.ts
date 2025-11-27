@@ -272,34 +272,50 @@ export function broadcastQueueStatus(data: {
     // Worker not initialized yet
   }
 
-  // Normalize to canonical format
-  const canonicalData: QueueStatusData = {
-    shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? 0,
-    shipmentSyncQueue: data.shipmentSyncQueue ?? data.shipmentSyncQueueLength ?? 0,
-    shopifyOrderSyncQueue: data.shopifyOrderSyncQueue ?? data.shopifyOrderSyncQueueLength ?? 0,
-    shipmentFailureCount: data.shipmentFailureCount ?? data.failureCount ?? 0,
-    shopifyQueueOldestAt: data.shopifyQueueOldestAt ?? data.oldestShopify?.enqueuedAt ?? null,
-    shipmentSyncQueueOldestAt: data.shipmentSyncQueueOldestAt ?? data.oldestShipmentSync?.enqueuedAt ?? null,
-    shopifyOrderSyncQueueOldestAt: data.shopifyOrderSyncQueueOldestAt ?? data.oldestShopifyOrderSync?.enqueuedAt ?? null,
-    backfillActiveJob: data.backfillActiveJob ?? data.activeBackfillJob ?? null,
-    onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
-    onHoldWorkerStats: data.onHoldWorkerStats ?? workerStats,
-    dataHealth: {
-      ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? 0,
-      oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? null,
-      shipmentsWithoutOrders: data.dataHealth?.shipmentsWithoutOrders ?? 0,
-      orphanedShipments: data.dataHealth?.orphanedShipments ?? 0,
-      shipmentsWithoutStatus: data.dataHealth?.shipmentsWithoutStatus ?? 0,
-      shipmentSyncFailures: data.dataHealth?.shipmentSyncFailures ?? 0,
-      ordersWithoutOrderItems: data.dataHealth?.ordersWithoutOrderItems ?? 0,
-    },
-  };
-
-  // Cache last broadcast data to detect changes and prevent flashing
+  // Get cached state to merge with (prevents flashing when partial updates are sent)
+  let cachedState: Partial<QueueStatusData> = {};
   if (!globalThis.__lastQueueStatus) {
     globalThis.__lastQueueStatus = {};
   }
-  
+  if (globalThis.__lastQueueStatus['queue']) {
+    try {
+      cachedState = JSON.parse(globalThis.__lastQueueStatus['queue']);
+    } catch (error) {
+      // Invalid cache, start fresh
+    }
+  }
+
+  // Merge incoming data with cached state, then apply defaults
+  // This prevents flashing when one worker sends partial updates
+  const canonicalData: QueueStatusData = {
+    shopifyQueue: data.shopifyQueue ?? data.shopifyQueueLength ?? cachedState.shopifyQueue ?? 0,
+    shipmentSyncQueue: data.shipmentSyncQueue ?? data.shipmentSyncQueueLength ?? cachedState.shipmentSyncQueue ?? 0,
+    shopifyOrderSyncQueue: data.shopifyOrderSyncQueue ?? data.shopifyOrderSyncQueueLength ?? cachedState.shopifyOrderSyncQueue ?? 0,
+    shipmentFailureCount: data.shipmentFailureCount ?? data.failureCount ?? cachedState.shipmentFailureCount ?? 0,
+    shopifyQueueOldestAt: data.shopifyQueueOldestAt ?? data.oldestShopify?.enqueuedAt ?? cachedState.shopifyQueueOldestAt ?? null,
+    shipmentSyncQueueOldestAt: data.shipmentSyncQueueOldestAt ?? data.oldestShipmentSync?.enqueuedAt ?? cachedState.shipmentSyncQueueOldestAt ?? null,
+    shopifyOrderSyncQueueOldestAt: data.shopifyOrderSyncQueueOldestAt ?? data.oldestShopifyOrderSync?.enqueuedAt ?? cachedState.shopifyOrderSyncQueueOldestAt ?? null,
+    // For backfillActiveJob: only update if explicitly provided (not undefined)
+    // This prevents other workers from accidentally clearing the backfill job
+    backfillActiveJob: data.backfillActiveJob !== undefined 
+      ? data.backfillActiveJob 
+      : (data.activeBackfillJob !== undefined 
+        ? data.activeBackfillJob 
+        : cachedState.backfillActiveJob ?? null),
+    onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
+    onHoldWorkerStats: data.onHoldWorkerStats ?? workerStats,
+    dataHealth: {
+      ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? cachedState.dataHealth?.ordersMissingShipments ?? 0,
+      oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? cachedState.dataHealth?.oldestOrderMissingShipmentAt ?? null,
+      shipmentsWithoutOrders: data.dataHealth?.shipmentsWithoutOrders ?? cachedState.dataHealth?.shipmentsWithoutOrders ?? 0,
+      orphanedShipments: data.dataHealth?.orphanedShipments ?? cachedState.dataHealth?.orphanedShipments ?? 0,
+      shipmentsWithoutStatus: data.dataHealth?.shipmentsWithoutStatus ?? cachedState.dataHealth?.shipmentsWithoutStatus ?? 0,
+      shipmentSyncFailures: data.dataHealth?.shipmentSyncFailures ?? cachedState.dataHealth?.shipmentSyncFailures ?? 0,
+      ordersWithoutOrderItems: data.dataHealth?.ordersWithoutOrderItems ?? cachedState.dataHealth?.ordersWithoutOrderItems ?? 0,
+    },
+  };
+
+  // Cache last broadcast data to detect changes and prevent duplicate broadcasts
   const cacheKey = JSON.stringify(canonicalData);
   const lastCacheKey = globalThis.__lastQueueStatus['queue'];
   
