@@ -14,19 +14,27 @@ function getFirestoreDb(): admin.firestore.Firestore {
   }
 
   try {
+    console.log('[FirestoreStorage] Parsing service account JSON...');
     const serviceAccount = JSON.parse(serviceAccountJson);
     
-    if (!admin.apps.length) {
+    console.log('[FirestoreStorage] Service account project_id:', serviceAccount.project_id);
+    
+    // Check if Firebase app is already initialized
+    const existingApp = admin.apps && admin.apps.length > 0 ? admin.apps[0] : null;
+    
+    if (!existingApp) {
+      console.log('[FirestoreStorage] Initializing Firebase app...');
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
     }
     
     firestoreDb = admin.firestore();
-    console.log('[FirestoreStorage] Firestore connection initialized');
+    console.log('[FirestoreStorage] Firestore connection initialized successfully');
     return firestoreDb;
-  } catch (error) {
-    console.error('[FirestoreStorage] Failed to initialize Firestore:', error);
+  } catch (error: any) {
+    console.error('[FirestoreStorage] Failed to initialize Firestore:', error.message);
+    console.error('[FirestoreStorage] Error stack:', error.stack);
     throw error;
   }
 }
