@@ -1,0 +1,461 @@
+Reading the MarketplaceIdParser to extract the parsing logic for Replit:
+
+
+[2 tools called]
+
+
+Sale ID parsing logic specification for Replit:
+
+---
+
+# **Sale ID Parsing Logic Specification**
+
+## **Overview**
+
+Parse jerky.com SkuVault sale IDs to extract:
+- Account ID (e.g., `1-352444-5-13038`)
+- Channel ID (e.g., `480797`, `138162`, `111`)
+- Order Number (marketplace-specific order identifier)
+- Shipment ID (optional, for multi-shipment orders)
+
+## **Base Sale ID Structure**
+
+All sale IDs follow this pattern:
+```
+1-352444-{ACCOUNT_TYPE}-{ACCOUNT_ID}-{CHANNEL_ID}-{ORDER_NUMBER}[-{SHIPMENT_ID}]
+```
+
+**Base Regex Pattern:**
+```regex
+^(1-352444-\d+-\d+)-([^-\s]+)(?:-(.+))?$
+```
+
+This extracts:
+- Group 1: Account ID (e.g., `1-352444-5-13038`)
+- Group 2: Channel ID (e.g., `480797`)
+- Group 3: Order number (and optionally shipment ID) (e.g., `JK3825-RW` or `JK3825-82525-DH`)
+
+## **Pattern Matching System**
+
+The parser uses a priority-based pattern matching system. Patterns are checked in order of priority (highest first). The first match wins.
+
+### **Pattern Definition Structure**
+
+Each pattern has:
+- `name`: Pattern identifier
+- `regex`: Regular expression pattern
+- `marketplace`: Marketplace type enum
+- `priority`: Higher priority = checked first (110 = highest, 10 = fallback)
+- `confidence`: Match confidence (0.0-1.0)
+- `extract_group`: Regex capture group number to extract order number
+- `description`: Human-readable description
+
+### **All Parsing Patterns (Priority Order)**
+
+```python
+PATTERNS = [
+    # Priority 110: Jerky Wholesale JW pattern with # character
+    {
+        "name": "Jerky_Wholesale_JW_Pattern",
+        "regex": r"^1-352444-\d+-\d+-#([Jj][Ww]\d+)$",
+        "marketplace": "JERKY_WHOLESALE",
+        "priority": 110,
+        "confidence": 0.99,
+        "extract_group": 1,
+        "description": "Jerky Wholesale JW orders with # character in channel ID"
+    },
+    
+    # Priority 105: Walmart pattern
+    {
+        "name": "Walmart_Pattern",
+        "regex": r"^1-352444-26-18614-(\d{15})$",
+        "marketplace": "WALMART",
+        "priority": 105,
+        "confidence": 0.95,
+        "extract_group": 1,
+        "description": "Walmart orders with 15-digit channel ID"
+    },
+    
+    # Priority 102: Jerky.com Shopify JK pattern with complex numeric segments
+    {
+        "name": "Jerky_Shopify_JK_Complex_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:138162|480797)-([Jj][Kk]\d+-\d+-[A-Z]+)$",
+        "marketplace": "SHOPIFY",
+        "priority": 102,
+        "confidence": 0.99,
+        "extract_group": 1,
+        "description": "Jerky.com Shopify JK orders with complex numeric segments and letter suffixes"
+    },
+    
+    # Priority 101: Jerky.com Shopify JK pattern with shipment ID
+    {
+        "name": "Jerky_Shopify_JK_With_Shipment_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:138162|480797)-([Jj][Kk]\d+)-\d{8,}$",
+        "marketplace": "SHOPIFY",
+        "priority": 101,
+        "confidence": 0.99,
+        "extract_group": 1,
+        "description": "Jerky.com Shopify JK orders with shipment IDs (8+ digits at end)"
+    },
+    
+    # Priority 100: Jerky.com Shopify JK pattern with suffixes
+    {
+        "name": "Jerky_Shopify_JK_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:138162|480797)-([Jj][Kk]\d+(?:-[A-Z]+\d*)?)$",
+        "marketplace": "SHOPIFY",
+        "priority": 100,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Shopify JK orders with suffixes like -RW, -NK1, -DH"
+    },
+    
+    # Priority 98: Jerky.com Shopify JW pattern with shipment ID
+    {
+        "name": "Jerky_Shopify_JW_With_Shipment_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:138162|480797)-([Jj][Ww]\d+)-\d{8,}$",
+        "marketplace": "SHOPIFY",
+        "priority": 98,
+        "confidence": 0.99,
+        "extract_group": 1,
+        "description": "Jerky.com Shopify JW orders with shipment IDs"
+    },
+    
+    # Priority 97: Jerky.com Shopify JW pattern with suffixes
+    {
+        "name": "Jerky_Shopify_JW_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:138162|480797)-([Jj][Ww]\d+(?:-[A-Z]+\d*)?)$",
+        "marketplace": "SHOPIFY",
+        "priority": 97,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Shopify JW orders with suffixes"
+    },
+    
+    # Priority 96: Jerky.com Special Amazon pattern with suffix
+    {
+        "name": "Jerky_Special_Amazon_Pattern",
+        "regex": r"^1-352444-\d+-\d+-480797-(113-\d+-\d+-[A-Z]+)$",
+        "marketplace": "AMAZON",
+        "priority": 96,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Special Amazon orders with suffix"
+    },
+    
+    # Priority 96: Jerky.com Amazon Mexico pattern
+    {
+        "name": "Jerky_Amazon_Mexico_Pattern",
+        "regex": r"^1-352444-5-13038-520661-(7\d{2}-\d{7}-\d{7})$",
+        "marketplace": "AMAZON",
+        "priority": 96,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Amazon Mexico orders with channel 520661"
+    },
+    
+    # Priority 95: Jerky.com Amazon pattern with channel ID 113
+    {
+        "name": "Jerky_Amazon_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(113-\d+-\d+)(?:-\d+)?$",
+        "marketplace": "AMAZON",
+        "priority": 95,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Amazon orders with channel 113"
+    },
+    
+    # Priority 91: Jerky.com Manual orders with suffixes
+    {
+        "name": "Jerky_Manual_With_Suffix_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:480797|138162)-(111-\d+-\d+-[A-Z]+)$",
+        "marketplace": "MANUAL",
+        "priority": 91,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Manual orders with letter suffixes"
+    },
+    
+    # Priority 90: Jerky.com Manual/Direct orders
+    {
+        "name": "Jerky_Manual_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(111-\d+-\d+)(?:-\d+)?$",
+        "marketplace": "MANUAL",
+        "priority": 90,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com Manual/Direct orders with channel 111"
+    },
+    
+    # Priority 86: Jerky.com other marketplace channels with suffixes
+    {
+        "name": "Jerky_Other_Channels_With_Suffix_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:480797|138162)-((?:112|114|115|116|117|118|119)-\d+-\d+-[A-Z]+)$",
+        "marketplace": "UNKNOWN",
+        "priority": 86,
+        "confidence": 0.98,
+        "extract_group": 1,
+        "description": "Jerky.com other marketplace channels with letter suffixes"
+    },
+    
+    # Priority 85: Jerky.com other marketplace channels
+    {
+        "name": "Jerky_Other_Channels_Pattern",
+        "regex": r"^1-352444-\d+-\d+-((?:112|114|115|116|117|118|119)-\d+-\d+)(?:-\d+)?$",
+        "marketplace": "UNKNOWN",
+        "priority": 85,
+        "confidence": 0.95,
+        "extract_group": 1,
+        "description": "Jerky.com other marketplace channels"
+    },
+    
+    # Priority 81: Jerky.com Custom TEST pattern
+    {
+        "name": "Jerky_Custom_Test_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:306053|480797)-(TEST[A-Z]+-\d+)$",
+        "marketplace": "MANUAL",
+        "priority": 81,
+        "confidence": 0.90,
+        "extract_group": 1,
+        "description": "Jerky.com custom TEST orders with extended test names"
+    },
+    
+    # Priority 80: Jerky.com TEST pattern
+    {
+        "name": "Jerky_Test_Pattern",
+        "regex": r"^1-352444-\d+-\d+-(?:306053|480797)-(TEST-\d+-\d+)(?:-\d+)?$",
+        "marketplace": "MANUAL",
+        "priority": 80,
+        "confidence": 0.90,
+        "extract_group": 1,
+        "description": "Jerky.com TEST orders"
+    },
+    
+    # Priority 70: Legacy Shopify JK pattern
+    {
+        "name": "Legacy_Shopify_JK_Pattern",
+        "regex": r"^.*?-([Jj][Kk]\d+)$",
+        "marketplace": "SHOPIFY",
+        "priority": 70,
+        "confidence": 0.85,
+        "extract_group": 1,
+        "description": "Legacy Shopify orders with JK prefix"
+    },
+    
+    # Priority 65: Legacy Shopify JW pattern
+    {
+        "name": "Legacy_Shopify_JW_Pattern",
+        "regex": r"^.*?-([Jj][Ww]\d+)$",
+        "marketplace": "SHOPIFY",
+        "priority": 65,
+        "confidence": 0.85,
+        "extract_group": 1,
+        "description": "Legacy Shopify orders with JW prefix"
+    },
+    
+    # Priority 60: Legacy Amazon pattern
+    {
+        "name": "Legacy_Amazon_Pattern",
+        "regex": r"^.*?-(113-\d{7}-\d{7})$",
+        "marketplace": "AMAZON",
+        "priority": 60,
+        "confidence": 0.80,
+        "extract_group": 1,
+        "description": "Legacy Amazon orders with 113 prefix"
+    },
+    
+    # Priority 55: Legacy Manual pattern
+    {
+        "name": "Legacy_Manual_Pattern",
+        "regex": r"^.*?-((?:111|112|114)-\d{7}-\d{7})$",
+        "marketplace": "MANUAL",
+        "priority": 55,
+        "confidence": 0.75,
+        "extract_group": 1,
+        "description": "Legacy Manual/Direct orders"
+    },
+    
+    # Priority 10: Fallback pattern (lowest priority)
+    {
+        "name": "Last_Segment_Fallback",
+        "regex": r"^.*-([^-]+)$",
+        "marketplace": "UNKNOWN",
+        "priority": 10,
+        "confidence": 0.50,
+        "extract_group": 1,
+        "description": "Fallback pattern using last segment"
+    }
+]
+```
+
+## **Parsing Algorithm**
+
+### **Step 1: Base Pattern Matching**
+
+1. Preprocess: strip whitespace
+2. Match base pattern: `^(1-352444-\d+-\d+)-([^-\s]+)(?:-(.+))?$`
+3. Extract:
+   - `account_id` = Group 1
+   - `channel_id` = Group 2
+   - `order_part` = Group 3 (if exists)
+
+If base pattern doesn't match, return failure.
+
+### **Step 2: Pattern Priority Matching**
+
+1. Sort patterns by priority (descending)
+2. For each pattern (highest priority first):
+   - Compile regex pattern
+   - Match against processed sale ID
+   - If match:
+     - Extract `order_number` from the specified `extract_group`
+     - Set `marketplace`, `confidence`, and `pattern_matched`
+     - Break (first match wins)
+
+### **Step 3: Shipment ID Detection**
+
+1. Search for `-(\d{8,})$` at the end of the sale ID
+2. If found and not part of `order_number`:
+   - Extract as `raw_shipment_id`
+   - Format as `se-{raw_shipment_id}` (ShipStation format)
+   - Remove shipment ID from sale ID and re-extract order number
+
+Example:
+- Sale ID: `1-352444-5-13038-480797-JK3825-893078172`
+- Shipment ID detected: `893078172` → formatted as `se-893078172`
+- Order number extracted: `JK3825`
+
+### **Step 4: Result Construction**
+
+Return a result object with:
+- `account_id`: String (e.g., `"1-352444-5-13038"`)
+- `channel_id`: String (e.g., `"480797"`)
+- `order_number`: String (e.g., `"JK3825-RW"`)
+- `shipment_id`: String or None (e.g., `"se-893078172"` or `None`)
+- `marketplace`: Enum value (e.g., `"SHOPIFY"`, `"AMAZON"`, `"MANUAL"`)
+- `confidence`: Float (0.0-1.0)
+- `pattern_matched`: String (e.g., `"Jerky_Shopify_JK_Pattern"`)
+- `success`: Boolean
+- `error_message`: String or None
+- `original_sale_id`: String (original input)
+
+## **Marketplace Types Enum**
+
+```python
+class MarketplaceType:
+    AMAZON = "Amazon"
+    SHOPIFY = "Shopify"
+    JERKY_WHOLESALE = "Jerky Wholesale"
+    WALMART = "Walmart"
+    EBAY = "eBay"
+    MANUAL = "Manual"
+    UNKNOWN = "Unknown"
+```
+
+## **Example Parsing Scenarios**
+
+### **Example 1: Simple Shopify JK Order**
+```
+Input: "1-352444-5-13038-480797-JK3825332589-RW"
+Result:
+  account_id: "1-352444-5-13038"
+  channel_id: "480797"
+  order_number: "JK3825332589-RW"
+  shipment_id: None
+  marketplace: "SHOPIFY"
+  confidence: 0.98
+  pattern_matched: "Jerky_Shopify_JK_Pattern"
+  success: True
+```
+
+### **Example 2: Complex Shopify JK Order**
+```
+Input: "1-352444-5-13038-480797-JK3825-82525-DH"
+Result:
+  account_id: "1-352444-5-13038"
+  channel_id: "480797"
+  order_number: "JK3825-82525-DH"
+  shipment_id: None
+  marketplace: "SHOPIFY"
+  confidence: 0.99
+  pattern_matched: "Jerky_Shopify_JK_Complex_Pattern"
+  success: True
+```
+
+### **Example 3: Order with Shipment ID**
+```
+Input: "1-352444-5-13038-480797-JK3825332795-893078172"
+Result:
+  account_id: "1-352444-5-13038"
+  channel_id: "480797"
+  order_number: "JK3825332795"
+  shipment_id: "se-893078172"
+  marketplace: "SHOPIFY"
+  confidence: 0.99
+  pattern_matched: "Jerky_Shopify_JK_With_Shipment_Pattern"
+  success: True
+```
+
+### **Example 4: Amazon Order**
+```
+Input: "1-352444-8-12075-113-8552113-2383428"
+Result:
+  account_id: "1-352444-8-12075"
+  channel_id: "113"
+  order_number: "113-8552113-2383428"
+  shipment_id: None
+  marketplace: "AMAZON"
+  confidence: 0.98
+  pattern_matched: "Jerky_Amazon_Pattern"
+  success: True
+```
+
+### **Example 5: Manual Order**
+```
+Input: "1-352444-5-13038-480797-111-3320472-9341817-SP"
+Result:
+  account_id: "1-352444-5-13038"
+  channel_id: "480797"
+  order_number: "111-3320472-9341817-SP"
+  shipment_id: None
+  marketplace: "MANUAL"
+  confidence: 0.98
+  pattern_matched: "Jerky_Manual_With_Suffix_Pattern"
+  success: True
+```
+
+## **Special Cases**
+
+### **Walmart Orders**
+
+Walmart requires special handling. The order number is not in the sale ID; it's in a separate `MarketplaceId` field.
+
+For Walmart:
+1. Parse sale ID to extract account and channel
+2. Use the `MarketplaceId` field as the order number (not extracted from sale ID)
+
+Walmart sale ID pattern: `1-352444-26-18614-{15-digit-channel-id}`
+
+### **Error Handling**
+
+If no pattern matches:
+- `success` = `False`
+- `error_message` = `"No matching pattern found for sale_id: {sale_id}"`
+- `marketplace` = `"UNKNOWN"`
+- `confidence` = `0.0`
+
+If sale ID is empty or None:
+- `success` = `False`
+- `error_message` = `"Empty or None sale_id provided"`
+- All other fields empty/default
+
+## **Implementation Notes**
+
+1. Pattern priority: higher priority patterns are checked first
+2. Case-insensitive matching: patterns allow `[Jj][Kk]` for case variations
+3. Shipment ID format: automatically adds `se-` prefix to match ShipStation format
+4. Order number re-extraction: when a shipment ID is detected, re-extract the order number from the sale ID with the shipment ID removed
+5. Normalization: strip whitespace from input sale IDs
+
+---
+
+This specification provides the logic needed to rebuild the sale ID parser. Patterns are defined with priorities, regex patterns, and extraction rules.
