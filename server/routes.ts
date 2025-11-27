@@ -26,6 +26,8 @@ import { qcPassItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
 import type { PORecommendation } from "@shared/reporting-schema";
+import { firestoreStorage } from "./firestore-storage";
+import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -3873,6 +3875,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Reporting] Error invalidating cache:", error);
       res.status(500).json({ error: "Failed to invalidate cache" });
+    }
+  });
+
+  // ==================== Firestore Routes (Session Orders) ====================
+
+  app.get("/api/firestore/session-orders", requireAuth, async (req, res) => {
+    try {
+      const filters: SkuVaultOrderSessionFilters = {
+        search: req.query.search as string | undefined,
+        pickerName: req.query.pickerName as string | undefined,
+        sessionStatus: req.query.sessionStatus as string | undefined,
+        startDate: req.query.startDate as string | undefined,
+        endDate: req.query.endDate as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset as string, 10) : 0,
+      };
+
+      const result = await firestoreStorage.getSkuVaultOrderSessions(filters);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Firestore] Error fetching session orders:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch session orders" });
+    }
+  });
+
+  app.get("/api/firestore/session-orders/picker-names", requireAuth, async (req, res) => {
+    try {
+      const pickerNames = await firestoreStorage.getUniquePickerNames();
+      res.json(pickerNames);
+    } catch (error: any) {
+      console.error("[Firestore] Error fetching picker names:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch picker names" });
+    }
+  });
+
+  app.get("/api/firestore/session-orders/statuses", requireAuth, async (req, res) => {
+    try {
+      const statuses = await firestoreStorage.getUniqueSessionStatuses();
+      res.json(statuses);
+    } catch (error: any) {
+      console.error("[Firestore] Error fetching session statuses:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch session statuses" });
     }
   });
 
