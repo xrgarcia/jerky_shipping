@@ -92,8 +92,11 @@ function AppContent() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden relative">
-          <header className="flex items-center justify-between p-4 border-b bg-card">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+          <header 
+            className="flex items-center justify-between py-6 px-4 border-b border-sidebar-border"
+            style={{ background: '#1a1a1a' }}
+          >
+            <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
           </header>
           <main className="flex-1 overflow-y-auto pb-20">
             {router}
