@@ -193,6 +193,9 @@ export default function Packing() {
   // Check if shipment has Gift tag
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
   
+  // Check if shipment has MOVE OVER tag (means it's shippable)
+  const hasMoveOverTag = shipmentTags.some(tag => tag.name === 'MOVE OVER');
+  
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
   
@@ -1192,13 +1195,23 @@ export default function Packing() {
                 <div>
                   <div className="text-xs text-muted-foreground font-semibold mb-1">Status</div>
                   <div className="flex items-center gap-2">
-                    <Badge 
-                      className="bg-green-600 hover:bg-green-600 text-white text-sm px-3 py-1"
-                      data-testid="badge-shippable"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Shippable
-                    </Badge>
+                    {hasMoveOverTag ? (
+                      <Badge 
+                        className="bg-green-600 hover:bg-green-600 text-white text-sm px-3 py-1"
+                        data-testid="badge-shippable"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Shippable
+                      </Badge>
+                    ) : (
+                      <Badge 
+                        className="bg-red-600 hover:bg-red-600 text-white text-sm px-3 py-1"
+                        data-testid="badge-not-shippable"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Not Shippable
+                      </Badge>
+                    )}
                     {hasGiftTag && (
                       <Badge 
                         className="bg-pink-600 hover:bg-pink-600 text-white text-sm px-3 py-1"
