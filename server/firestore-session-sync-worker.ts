@@ -1,9 +1,9 @@
 import { firestoreStorage } from './firestore-storage';
 import { db } from './db';
-import { shipments } from '@shared/schema';
-import { eq, isNull, and } from 'drizzle-orm';
+import { shipments, shipmentItems } from '@shared/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
-import type { SkuVaultOrderSession } from '@shared/firestore-schema';
+import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
 
@@ -35,8 +35,64 @@ export function getFirestoreSessionSyncWorkerStats() {
 }
 
 /**
+ * Sync SkuVault session items to shipment_items table
+ * Matches by SKU and updates the sv_* fields
+ */
+async function syncSessionItemsToShipmentItems(
+  shipmentId: string, 
+  orderItems: SkuVaultOrderSessionItem[]
+): Promise<number> {
+  let updatedCount = 0;
+
+  for (const item of orderItems) {
+    if (!item.sku) continue;
+
+    // Find existing shipment_item by shipmentId and SKU
+    const existingItems = await db
+      .select()
+      .from(shipmentItems)
+      .where(and(
+        eq(shipmentItems.shipmentId, shipmentId),
+        eq(shipmentItems.sku, item.sku)
+      ))
+      .limit(1);
+
+    if (existingItems.length > 0) {
+      // Update existing shipment_item with SkuVault data
+      await db
+        .update(shipmentItems)
+        .set({
+          svProductId: item.product_id,
+          expectedQuantity: item.quantity,
+          svPicked: item.picked,
+          svCompleted: item.completed,
+          svAuditStatus: item.audit_status,
+          svWarehouseLocation: item.location,
+          svWarehouseLocations: item.locations,
+          svStockStatus: item.stock_status,
+          svAvailableQuantity: item.available,
+          svNotFoundProduct: item.not_found_product,
+          svIsSerialized: item.is_serialized,
+          svPartNumber: item.part_number,
+          svWeightPounds: item.weight_pound?.toString() || null,
+          svCode: item.code,
+          svProductPictures: item.product_pictures,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipmentItems.id, existingItems[0].id));
+      
+      updatedCount++;
+    }
+    // Note: We don't create new shipment_items for SkuVault items that don't match
+    // The shipment_items should already exist from ShipStation sync
+  }
+
+  return updatedCount;
+}
+
+/**
  * Sync a single session to the shipments table
- * Matches on order_number and updates session-related fields
+ * Matches on order_number and updates session-related fields (normalized columns)
  */
 async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boolean> {
   try {
@@ -55,16 +111,19 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
 
     const shipment = existingShipments[0];
 
-    // Check if already synced with same session data
-    if (shipment.sessionId === session.session_id.toString()) {
-      // Already synced - check if updated_date changed
-      const existingData = shipment.skuvaultSessionData as any;
-      if (existingData?.updated_date === session.updated_date.toISOString()) {
+    // Check if already synced with same session data (use firestoreDocumentId for change detection)
+    if (shipment.sessionId === session.session_id.toString() && 
+        shipment.firestoreDocumentId === session.document_id) {
+      // Check if the updated timestamp matches - skip if no changes
+      // Use pickEndedAt as a proxy for last update
+      const existingPickEnd = shipment.pickEndedAt?.toISOString();
+      const newPickEnd = session.pick_end_datetime?.toISOString();
+      if (existingPickEnd === newPickEnd) {
         return false; // No changes
       }
     }
 
-    // Update shipment with session data
+    // Update shipment with normalized session data (no more jsonb)
     await db
       .update(shipments)
       .set({
@@ -72,23 +131,30 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
         sessionedAt: session.create_date,
         waveId: session.session_picklist_id || null,
         saleId: session.sale_id || null,
-        skuvaultSessionData: {
-          document_id: session.document_id,
-          session_status: session.session_status,
-          spot_number: session.spot_number,
-          picked_by_user_id: session.picked_by_user_id,
-          picked_by_user_name: session.picked_by_user_name,
-          pick_start_datetime: session.pick_start_datetime?.toISOString() || null,
-          pick_end_datetime: session.pick_end_datetime?.toISOString() || null,
-          create_date: session.create_date.toISOString(),
-          updated_date: session.updated_date.toISOString(),
-          order_items: session.order_items,
-        },
+        firestoreDocumentId: session.document_id,
+        sessionStatus: session.session_status,
+        spotNumber: session.spot_number,
+        pickedByUserId: session.picked_by_user_id,
+        pickedByUserName: session.picked_by_user_name,
+        pickStartedAt: session.pick_start_datetime,
+        pickEndedAt: session.pick_end_datetime,
+        savedCustomField2: session.saved_custom_field_2,
         updatedAt: new Date(),
       })
       .where(eq(shipments.id, shipment.id));
 
-    log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
+    // Sync session items to shipment_items table
+    if (session.order_items && session.order_items.length > 0) {
+      const itemsUpdated = await syncSessionItemsToShipmentItems(shipment.id, session.order_items);
+      if (itemsUpdated > 0) {
+        log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber} (${itemsUpdated} items updated)`);
+      } else {
+        log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
+      }
+    } else {
+      log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
+    }
+
     return true;
   } catch (error: any) {
     log(`Error syncing session ${session.session_id}: ${error.message}`);

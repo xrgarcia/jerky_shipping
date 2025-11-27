@@ -16,6 +16,10 @@ Preferred communication style: Simple, everyday language.
 - **Backend**: Express.js with Node.js and TypeScript, RESTful API, Drizzle ORM for database interactions.
 - **Authentication**: Passwordless via magic link tokens (email), secure HTTP-only session cookies.
 - **Data Storage**: PostgreSQL via Neon serverless connection, Drizzle Kit for migrations. Schema includes tables for users, authentication, orders, products, product variants, and order items. Comprehensive indexing strategy across all major tables for optimized query performance.
+- **Normalized SkuVault Data Model**: SkuVault session data is normalized into relational columns instead of jsonb for single source of truth:
+    - `shipments` table: firestoreDocumentId, sessionStatus, spotNumber, pickedByUserId/Name, pickStartedAt/EndedAt, savedCustomField2
+    - `shipment_items` table: sv_* prefixed columns (svProductId, expectedQuantity, scannedQuantity, svPicked, svCompleted, svAuditStatus, svWarehouseLocation/Locations, svStockStatus, svAvailableQuantity, svNotFoundProduct, svIsSerialized, svPartNumber, svWeightPounds, svCode, svProductPictures)
+    - Packing page uses `expectedQuantity` from SkuVault when available, falls back to ShipStation quantity
 - **Core Features**:
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and SkuVault QC Integration for packing.
     - **Packing Page**: Single-warehouse MVP for order fulfillment with SkuVault QC validation, scan-first workflow, individual unit scanning, and comprehensive audit trails. Integrates with the print queue.

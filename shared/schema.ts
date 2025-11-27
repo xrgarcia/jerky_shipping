@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -256,10 +256,17 @@ export const shipments = pgTable("shipments", {
   orderDate: timestamp("order_date"), // ShipStation createDate - when the shipment/label was created
   // SkuVault session data (synced from Firestore skuvaultOrderSessions)
   sessionId: text("session_id"), // SkuVault session ID (numeric in Firestore)
-  sessionedAt: timestamp("sessioned_at"), // When order entered a wave/session
+  sessionedAt: timestamp("sessioned_at"), // When order entered a wave/session (create_date)
   waveId: text("wave_id"), // Session picklist ID (wave identifier)
   saleId: text("sale_id"), // SkuVault sale ID for QC operations
-  skuvaultSessionData: jsonb("skuvault_session_data"), // Full SkuVault session data including items
+  firestoreDocumentId: text("firestore_document_id"), // Firestore document ID for the session
+  sessionStatus: text("session_status"), // Session status (e.g., "Picked", "Pending")
+  spotNumber: integer("spot_number"), // Physical bin/spot number in warehouse
+  pickedByUserId: integer("picked_by_user_id"), // SkuVault user ID who picked the order
+  pickedByUserName: text("picked_by_user_name"), // Name of picker
+  pickStartedAt: timestamp("pick_started_at"), // When picking began
+  pickEndedAt: timestamp("pick_ended_at"), // When picking finished
+  savedCustomField2: boolean("saved_custom_field_2"), // SkuVault custom field flag
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -343,7 +350,14 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   sessionedAt: z.coerce.date().optional().or(z.null()),
   waveId: z.string().nullish(),
   saleId: z.string().nullish(),
-  skuvaultSessionData: z.any().nullish(),
+  firestoreDocumentId: z.string().nullish(),
+  sessionStatus: z.string().nullish(),
+  spotNumber: z.number().int().nullish(),
+  pickedByUserId: z.number().int().nullish(),
+  pickedByUserName: z.string().nullish(),
+  pickStartedAt: z.coerce.date().optional().or(z.null()),
+  pickEndedAt: z.coerce.date().optional().or(z.null()),
+  savedCustomField2: z.boolean().nullish(),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
@@ -356,10 +370,27 @@ export const shipmentItems = pgTable("shipment_items", {
   orderItemId: varchar("order_item_id").references(() => orderItems.id), // Nullable - not all shipments linked to orders
   sku: text("sku"), // Product SKU
   name: text("name").notNull(), // Product name/title
-  quantity: integer("quantity").notNull(), // Quantity in this shipment
+  quantity: integer("quantity").notNull(), // Quantity in this shipment (from ShipStation)
   unitPrice: text("unit_price"), // Price per unit (text for consistency)
   externalOrderItemId: text("external_order_item_id"), // ShipStation's reference to Shopify line item
   imageUrl: text("image_url"), // Product image URL
+  // SkuVault session item data (sv_ prefix indicates SkuVault source)
+  svProductId: integer("sv_product_id"), // SkuVault product ID
+  expectedQuantity: integer("expected_quantity"), // Expected quantity from SkuVault session
+  scannedQuantity: integer("scanned_quantity").default(0), // QC scan progress during packing
+  svPicked: boolean("sv_picked"), // Whether item was picked in SkuVault
+  svCompleted: boolean("sv_completed"), // Whether item is complete in SkuVault
+  svAuditStatus: text("sv_audit_status"), // SkuVault audit status
+  svWarehouseLocation: text("sv_warehouse_location"), // Primary warehouse location
+  svWarehouseLocations: text("sv_warehouse_locations").array(), // All warehouse locations
+  svStockStatus: text("sv_stock_status"), // Stock status from SkuVault
+  svAvailableQuantity: integer("sv_available_quantity"), // Available quantity in SkuVault
+  svNotFoundProduct: boolean("sv_not_found_product"), // Whether product wasn't found
+  svIsSerialized: boolean("sv_is_serialized"), // Whether item is serialized
+  svPartNumber: text("sv_part_number"), // SkuVault part number
+  svWeightPounds: numeric("sv_weight_pounds"), // Weight in pounds
+  svCode: text("sv_code"), // SkuVault code
+  svProductPictures: text("sv_product_pictures").array(), // Product picture URLs
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -368,6 +399,8 @@ export const shipmentItems = pgTable("shipment_items", {
   skuIdx: index("shipment_items_sku_idx").on(table.sku).where(sql`${table.sku} IS NOT NULL`),
   // Index for webhook reconciliation via ShipStation's external order item ID reference
   externalOrderItemIdIdx: index("shipment_items_external_order_item_id_idx").on(table.externalOrderItemId).where(sql`${table.externalOrderItemId} IS NOT NULL`),
+  // Index for SkuVault product lookups
+  svProductIdIdx: index("shipment_items_sv_product_id_idx").on(table.svProductId).where(sql`${table.svProductId} IS NOT NULL`),
 }));
 
 export const insertShipmentItemSchema = createInsertSchema(shipmentItems).omit({

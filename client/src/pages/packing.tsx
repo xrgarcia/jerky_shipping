@@ -39,6 +39,7 @@ type ShipmentItem = {
   sku: string | null;
   name: string;
   quantity: number;
+  expectedQuantity: number | null; // From SkuVault session (preferred), falls back to ShipStation quantity
   unitPrice: string | null;
   imageUrl: string | null;
 };
@@ -366,6 +367,9 @@ export default function Packing() {
       physicalItems.forEach((item) => {
         // Use item ID as key to handle duplicate SKUs properly
         const key = item.id;
+        // Use expectedQuantity from SkuVault session if available, otherwise fall back to ShipStation quantity
+        const expectedQty = item.expectedQuantity ?? item.quantity;
+        
         if (item.sku) {
           const normalized = normalizeSku(item.sku);
           
@@ -375,27 +379,27 @@ export default function Packing() {
           const availableFromSkuvault = Math.max(0, totalPassedInSkuvault - alreadyAllocated);
           
           // Determine how many of this item's units were scanned in SkuVault
-          const scannedInSkuvault = Math.min(item.quantity, availableFromSkuvault);
+          const scannedInSkuvault = Math.min(expectedQty, availableFromSkuvault);
           skuvaultAllocated.set(normalized, alreadyAllocated + scannedInSkuvault);
           
           // Mark as synced ONLY if ALL units for this item were passed in SkuVault
-          const skuvaultSynced = scannedInSkuvault === item.quantity;
+          const skuvaultSynced = scannedInSkuvault === expectedQty;
           
           progress.set(key, {
             itemId: item.id,
             sku: item.sku, // Keep original for display
             normalizedSku: normalized, // For matching scans
             name: item.name,
-            expected: item.quantity,
+            expected: expectedQty,
             scanned: scannedInSkuvault, // Start with what was scanned in SkuVault
-            remaining: item.quantity - scannedInSkuvault, // Only remaining units need scanning
+            remaining: expectedQty - scannedInSkuvault, // Only remaining units need scanning
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
             skuvaultSynced, // Flag if already scanned in SkuVault
           });
           
           if (scannedInSkuvault > 0) {
-            console.log(`[Packing] Item ${item.sku} has ${scannedInSkuvault}/${item.quantity} units already scanned in SkuVault`);
+            console.log(`[Packing] Item ${item.sku} has ${scannedInSkuvault}/${expectedQty} units already scanned in SkuVault`);
           }
         } else {
           progress.set(key, {
@@ -403,9 +407,9 @@ export default function Packing() {
             sku: "NO SKU",
             normalizedSku: "",
             name: item.name,
-            expected: item.quantity,
+            expected: expectedQty,
             scanned: 0,
-            remaining: item.quantity,
+            remaining: expectedQty,
             requiresManualVerification: true,
             imageUrl: item.imageUrl,
             skuvaultSynced: false,
