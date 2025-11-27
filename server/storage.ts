@@ -1,4 +1,4 @@
-import { eq, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count } from "drizzle-orm";
+import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -956,7 +956,7 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'packing_queue':
-          // Packing Queue: Orders ready to pack (picked/closed session status, no tracking number yet)
+          // Packing Queue: Orders ready to pack (picked/closed session status, no tracking number yet, not cancelled)
           conditions.push(
             and(
               isNotNull(shipments.sessionId),
@@ -964,7 +964,8 @@ export class DatabaseStorage implements IStorage {
                 eq(shipments.sessionStatus, 'closed'),
                 eq(shipments.sessionStatus, 'picked')
               ),
-              isNull(shipments.trackingNumber)
+              isNull(shipments.trackingNumber),
+              ne(shipments.status, 'cancelled')
             )
           );
           break;
@@ -1103,7 +1104,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Packing Queue: Orders ready to pack (picked/closed session, no tracking number)
+    // Packing Queue: Orders ready to pack (picked/closed session, no tracking number, not cancelled)
     const packingQueueResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1114,7 +1115,8 @@ export class DatabaseStorage implements IStorage {
             eq(shipments.sessionStatus, 'closed'),
             eq(shipments.sessionStatus, 'picked')
           ),
-          isNull(shipments.trackingNumber)
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
         )
       );
 
@@ -1891,7 +1893,7 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(sql`${shipments.sessionedAt} >= ${todayStart}`);
     
-    // Query 2: Orders in packing queue (closed/picked session, no tracking number yet)
+    // Query 2: Orders in packing queue (closed/picked session, no tracking number yet, not cancelled)
     // These are orders ready to be packed - their session is complete but they haven't shipped
     const inPackingQueueResult = await db
       .select({ count: count() })
@@ -1903,7 +1905,8 @@ export class DatabaseStorage implements IStorage {
             eq(shipments.sessionStatus, 'closed'),
             eq(shipments.sessionStatus, 'picked')
           ),
-          isNull(shipments.trackingNumber)
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
         )
       );
     
@@ -1913,7 +1916,7 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(sql`${shipments.shipDate} >= ${todayStart}`);
     
-    // Query 4: Get oldest session in packing queue
+    // Query 4: Get oldest session in packing queue (excluding cancelled)
     const oldestQueuedResult = await db
       .select({ sessionedAt: shipments.sessionedAt })
       .from(shipments)
@@ -1924,7 +1927,8 @@ export class DatabaseStorage implements IStorage {
             eq(shipments.sessionStatus, 'closed'),
             eq(shipments.sessionStatus, 'picked')
           ),
-          isNull(shipments.trackingNumber)
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
         )
       )
       .orderBy(shipments.sessionedAt)
