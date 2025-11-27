@@ -254,6 +254,12 @@ export const shipments = pgTable("shipments", {
   overrideHoliday: boolean("override_holiday"),
   shipmentData: jsonb("shipment_data"), // Store full ShipStation shipment payload
   orderDate: timestamp("order_date"), // ShipStation createDate - when the shipment/label was created
+  // SkuVault session data (synced from Firestore skuvaultOrderSessions)
+  sessionId: text("session_id"), // SkuVault session ID (numeric in Firestore)
+  sessionedAt: timestamp("sessioned_at"), // When order entered a wave/session
+  waveId: text("wave_id"), // Session picklist ID (wave identifier)
+  saleId: text("sale_id"), // SkuVault sale ID for QC operations
+  skuvaultSessionData: jsonb("skuvault_session_data"), // Full SkuVault session data including items
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -272,6 +278,10 @@ export const shipments = pgTable("shipments", {
   statusIdx: index("shipments_status_idx").on(table.status).where(sql`${table.status} IN ('delivered', 'in_transit', 'exception', 'pending')`),
   // Partial index for orphaned shipments (missing both order linkage and tracking)
   orphanedIdx: index("shipments_orphaned_idx").on(table.createdAt).where(sql`${table.orderId} IS NULL AND ${table.trackingNumber} IS NULL`),
+  // Index for SkuVault session lookups (fast packing queue queries)
+  sessionIdIdx: index("shipments_session_id_idx").on(table.sessionId).where(sql`${table.sessionId} IS NOT NULL`),
+  // Index for sessioned orders (orders in picking/packing queue)
+  sessionedAtIdx: index("shipments_sessioned_at_idx").on(table.sessionedAt.desc().nullsLast()).where(sql`${table.sessionedAt} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -328,6 +338,12 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   eventNotification: z.boolean().nullish(),
   importServices: z.boolean().nullish(),
   overrideHoliday: z.boolean().nullish(),
+  // SkuVault session fields
+  sessionId: z.string().nullish(),
+  sessionedAt: z.coerce.date().optional().or(z.null()),
+  waveId: z.string().nullish(),
+  saleId: z.string().nullish(),
+  skuvaultSessionData: z.any().nullish(),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
