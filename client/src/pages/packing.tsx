@@ -520,6 +520,8 @@ export default function Packing() {
           variant: "destructive",
         });
         setOrderScan("");
+        // Re-focus order input for next scan attempt
+        setTimeout(() => orderInputRef.current?.focus(), 100);
         return;
       }
 
@@ -580,6 +582,8 @@ export default function Packing() {
         variant: "destructive",
       });
       setOrderScan("");
+      // Re-focus order input for next scan attempt
+      setTimeout(() => orderInputRef.current?.focus(), 100);
     },
   });
 
