@@ -32,6 +32,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { ViewManager, type ColumnDefinition } from "@/components/view-manager";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
@@ -581,13 +582,14 @@ export default function PORecommendations() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
-            <div className="text-muted-foreground">Loading recommendations...</div>
-          </div>
-        ) : (
-          <Table containerClassName="h-full overflow-scroll" className={`min-w-[${Math.max(800, visibleColumns.length * 120)}px]`}>
+      <div className="flex-1 min-h-0 p-4">
+        <Card className="h-full overflow-hidden">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64" data-testid="loading-spinner">
+              <div className="text-muted-foreground">Loading recommendations...</div>
+            </div>
+          ) : (
+            <Table containerClassName="h-full overflow-scroll" className={`min-w-[${Math.max(800, visibleColumns.length * 120)}px]`}>
             <TableHeader>
               <TableRow>
                 {visibleColumns.map((columnKey) => {
@@ -643,7 +645,8 @@ export default function PORecommendations() {
               )}
             </TableBody>
           </Table>
-        )}
+          )}
+        </Card>
       </div>
 
       {!isLoading && totalRecords > 0 && (
