@@ -2780,6 +2780,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Worker not initialized yet
       }
 
+      // Get Firestore session sync worker status and stats
+      let firestoreSessionSyncWorkerStatus: 'sleeping' | 'running' | 'error' = 'sleeping';
+      let firestoreSessionSyncWorkerStats = undefined;
+      try {
+        const { getFirestoreSessionSyncWorkerStatus, getFirestoreSessionSyncWorkerStats } = await import("./firestore-session-sync-worker");
+        firestoreSessionSyncWorkerStatus = getFirestoreSessionSyncWorkerStatus();
+        const stats = getFirestoreSessionSyncWorkerStats();
+        firestoreSessionSyncWorkerStats = {
+          totalSynced: stats.totalSynced,
+          lastSyncCount: stats.lastSyncCount,
+          lastSyncAt: stats.lastSyncAt?.toISOString() || null,
+          workerStartedAt: stats.workerStartedAt.toISOString(),
+          errorsCount: stats.errorsCount,
+          lastError: stats.lastError,
+        };
+      } catch (error) {
+        // Worker not initialized yet
+      }
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -2806,6 +2825,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onHoldWorkerStats,
         printQueueWorkerStatus,
         printQueueWorkerStats,
+        firestoreSessionSyncWorkerStatus,
+        firestoreSessionSyncWorkerStats,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);

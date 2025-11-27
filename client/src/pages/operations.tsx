@@ -115,6 +115,15 @@ type QueueStats = {
     workerStartedAt: string;
     lastCompletedAt: string | null;
   };
+  firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
+  firestoreSessionSyncWorkerStats?: {
+    totalSynced: number;
+    lastSyncCount: number;
+    lastSyncAt: string | null;
+    workerStartedAt: string;
+    errorsCount: number;
+    lastError: string | null;
+  };
 };
 
 type EnvironmentInfo = {
@@ -1465,6 +1474,50 @@ Please analyze this failure and help me understand:
                   ? 'Sleeping' 
                   : queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job'
                   ? 'Awaiting Backfill'
+                  : 'Unknown'}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium">Firestore Session Sync Worker</p>
+                <p className="text-sm text-muted-foreground">
+                  {queueStats?.firestoreSessionSyncWorkerStatus === 'error' 
+                    ? 'Error syncing sessions' 
+                    : 'Syncs SkuVault sessions from Firestore, 1 minute intervals'}
+                </p>
+                {queueStats?.firestoreSessionSyncWorkerStats && (
+                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
+                    <div>Last synced: {queueStats.firestoreSessionSyncWorkerStats.lastSyncCount.toLocaleString()} sessions</div>
+                    <div>Total synced: {queueStats.firestoreSessionSyncWorkerStats.totalSynced.toLocaleString()} sessions</div>
+                    <div>Started: {formatDistanceToNow(new Date(queueStats.firestoreSessionSyncWorkerStats.workerStartedAt), { addSuffix: true })}</div>
+                    {queueStats.firestoreSessionSyncWorkerStats.lastSyncAt && (
+                      <div>Last sync: {formatDistanceToNow(new Date(queueStats.firestoreSessionSyncWorkerStats.lastSyncAt), { addSuffix: true })}</div>
+                    )}
+                    {queueStats.firestoreSessionSyncWorkerStats.errorsCount > 0 && (
+                      <div className="text-destructive">Errors: {queueStats.firestoreSessionSyncWorkerStats.errorsCount}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Badge 
+                variant={
+                  queueStats?.firestoreSessionSyncWorkerStatus === 'running' 
+                    ? 'default' 
+                    : queueStats?.firestoreSessionSyncWorkerStatus === 'error'
+                    ? 'destructive'
+                    : 'secondary'
+                } 
+                data-testid={`badge-firestore-session-sync-worker-${queueStats?.firestoreSessionSyncWorkerStatus || 'unknown'}`}
+              >
+                {queueStats?.firestoreSessionSyncWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
+                {queueStats?.firestoreSessionSyncWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
+                {queueStats?.firestoreSessionSyncWorkerStatus === 'error' && <AlertCircle className="h-3 w-3 mr-1" />}
+                {queueStats?.firestoreSessionSyncWorkerStatus === 'running' 
+                  ? 'Running' 
+                  : queueStats?.firestoreSessionSyncWorkerStatus === 'sleeping' 
+                  ? 'Sleeping' 
+                  : queueStats?.firestoreSessionSyncWorkerStatus === 'error'
+                  ? 'Error'
                   : 'Unknown'}
               </Badge>
             </div>
