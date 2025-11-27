@@ -1,115 +1,145 @@
 /**
- * Manual Order Number Generator
+ * Manual Order Number Generator for Customer Service
  * 
- * Generates order numbers for manual/direct orders in the format:
- * 111-XXXXXXX-XXXXXXX with optional suffix (e.g., -SP, -RW)
+ * Generates order numbers for manual/phone orders in Shopify format:
+ * JK{4digits}-{6digits}-{initials}
+ * 
+ * Example: JK3825-112525-JB
  * 
  * This ensures all manually created orders follow the expected pattern
- * and will be correctly parsed by the SkuVault automation.
+ * and will be correctly parsed by the SkuVault/ShipStation automation.
+ * 
+ * IMPORTANT: Initials must be letters only (no trailing digits)
+ * to avoid confusion with shipment ID detection.
  */
 
 export interface GeneratedOrderNumber {
   orderNumber: string;
-  fullSaleId: string;
   isValid: boolean;
   validationError?: string;
 }
 
 export interface GenerateOrderOptions {
-  suffix?: string;
+  initials?: string;
 }
 
-const MANUAL_CHANNEL_ID = '111';
-const ACCOUNT_PREFIX = '1-352444-5-13038';
-const CHANNEL_ID = '480797';
-
 /**
- * Generate a random 7-digit number as a string
+ * Generate a random 4-digit number as a string (first segment)
  */
-function generateRandomSegment(): string {
-  const min = 1000000;
-  const max = 9999999;
+function generateFirstSegment(): string {
+  const min = 1000;
+  const max = 9999;
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
 /**
- * Validate a suffix format (uppercase letters only, optionally followed by digits)
+ * Generate a random 6-digit number as a string (second segment)
  */
-export function validateSuffix(suffix: string): { valid: boolean; error?: string } {
-  if (!suffix) {
-    return { valid: true };
+function generateSecondSegment(): string {
+  const min = 100000;
+  const max = 999999;
+  return Math.floor(Math.random() * (max - min + 1) + min).toString();
+}
+
+/**
+ * Validate initials format (2-3 uppercase letters only, NO trailing digits)
+ * 
+ * CRITICAL: Trailing digits like "JB1" cause parsing issues because
+ * the automation may confuse them with shipment IDs (8+ digits at end get stripped)
+ */
+export function validateInitials(initials: string): { valid: boolean; error?: string } {
+  if (!initials) {
+    return { valid: false, error: 'Initials are required (e.g., JB, SP, RW)' };
   }
   
-  // Suffix must start with a dash if provided
-  const cleanSuffix = suffix.startsWith('-') ? suffix.slice(1) : suffix;
+  const cleanInitials = initials.trim().toUpperCase();
   
-  // Must be uppercase letters, optionally followed by digits
-  const suffixPattern = /^[A-Z]+\d*$/;
+  // Must be 2-3 uppercase letters ONLY - no digits allowed
+  const initialsPattern = /^[A-Z]{2,3}$/;
   
-  if (!suffixPattern.test(cleanSuffix)) {
+  if (!initialsPattern.test(cleanInitials)) {
+    if (/\d/.test(cleanInitials)) {
+      return { 
+        valid: false, 
+        error: 'Initials must be letters only - no numbers (e.g., use JB not JB1)' 
+      };
+    }
     return { 
       valid: false, 
-      error: 'Suffix must be uppercase letters only (e.g., SP, RW, DH), optionally followed by numbers' 
+      error: 'Initials must be 2-3 uppercase letters (e.g., JB, SP, RW)' 
     };
-  }
-  
-  if (cleanSuffix.length > 10) {
-    return { valid: false, error: 'Suffix must be 10 characters or less' };
   }
   
   return { valid: true };
 }
 
 /**
- * Generate a manual order number in the format: 111-XXXXXXX-XXXXXXX[-SUFFIX]
+ * Generate a manual order number in the format: JK{4digits}-{6digits}-{initials}
+ * Example: JK3825-112525-JB
  */
 export function generateManualOrderNumber(options?: GenerateOrderOptions): GeneratedOrderNumber {
-  const segment1 = generateRandomSegment();
-  const segment2 = generateRandomSegment();
-  
-  let orderNumber = `${MANUAL_CHANNEL_ID}-${segment1}-${segment2}`;
-  
-  // Add suffix if provided
-  if (options?.suffix) {
-    const suffixValidation = validateSuffix(options.suffix);
-    if (!suffixValidation.valid) {
+  // Validate initials if provided
+  if (options?.initials) {
+    const initialsValidation = validateInitials(options.initials);
+    if (!initialsValidation.valid) {
       return {
         orderNumber: '',
-        fullSaleId: '',
         isValid: false,
-        validationError: suffixValidation.error
+        validationError: initialsValidation.error
       };
     }
-    
-    const cleanSuffix = options.suffix.startsWith('-') ? options.suffix : `-${options.suffix}`;
-    orderNumber += cleanSuffix.toUpperCase();
   }
   
-  // Construct the full sale ID
-  const fullSaleId = `${ACCOUNT_PREFIX}-${CHANNEL_ID}-${orderNumber}`;
+  const segment1 = generateFirstSegment();
+  const segment2 = generateSecondSegment();
+  const initials = options?.initials?.trim().toUpperCase() || generateDefaultInitials();
   
-  // Validate the generated order number matches expected patterns
+  const orderNumber = `JK${segment1}-${segment2}-${initials}`;
+  
+  // Validate the generated order number matches expected pattern
   const validation = validateManualOrderNumber(orderNumber);
   
   return {
     orderNumber,
-    fullSaleId,
     isValid: validation.valid,
     validationError: validation.error
   };
 }
 
 /**
+ * Generate default initials (random 2 uppercase letters)
+ */
+function generateDefaultInitials(): string {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return letters.charAt(Math.floor(Math.random() * 26)) + 
+         letters.charAt(Math.floor(Math.random() * 26));
+}
+
+/**
  * Validate that an order number matches the manual order pattern
+ * Pattern: JK{4digits}-{6digits}-{2-3 letters}
  */
 export function validateManualOrderNumber(orderNumber: string): { valid: boolean; error?: string } {
-  // Pattern: 111-XXXXXXX-XXXXXXX with optional suffix
-  const manualPattern = /^111-\d{7}-\d{7}(?:-[A-Z]+\d*)?$/;
+  // Pattern: JK followed by 4 digits, dash, 6 digits, dash, 2-3 letters (no digits!)
+  const manualPattern = /^JK\d{4}-\d{6}-[A-Z]{2,3}$/;
   
   if (!manualPattern.test(orderNumber)) {
+    // Provide specific error messages
+    if (!orderNumber.startsWith('JK')) {
+      return { valid: false, error: 'Order number must start with JK' };
+    }
+    if (!/^JK\d{4}/.test(orderNumber)) {
+      return { valid: false, error: 'Order number must have 4 digits after JK (e.g., JK3825)' };
+    }
+    if (!/^JK\d{4}-\d{6}/.test(orderNumber)) {
+      return { valid: false, error: 'Order number must have 6 digits in the middle segment (e.g., JK3825-112525)' };
+    }
+    if (/^JK\d{4}-\d{6}-[A-Z]+\d+$/.test(orderNumber)) {
+      return { valid: false, error: 'Initials cannot end with numbers - use letters only (e.g., JB not JB1)' };
+    }
     return {
       valid: false,
-      error: 'Order number must be in format 111-XXXXXXX-XXXXXXX (with optional -SUFFIX)'
+      error: 'Order number must be in format JK####-######-XX (e.g., JK3825-112525-JB)'
     };
   }
   
@@ -117,65 +147,32 @@ export function validateManualOrderNumber(orderNumber: string): { valid: boolean
 }
 
 /**
- * Validate the full sale ID matches expected structure
+ * Validate a user-entered order number for the manual channel
+ * This is for CS to check if their custom order number will parse correctly
  */
-export function validateFullSaleId(saleId: string): { valid: boolean; error?: string; orderNumber?: string } {
-  // Pattern for manual orders with our account
-  const fullPattern = /^1-352444-\d+-\d+-(?:480797|138162)-(111-\d{7}-\d{7}(?:-[A-Z]+\d*)?)$/;
-  
-  const match = saleId.match(fullPattern);
-  
-  if (!match) {
-    return {
-      valid: false,
-      error: 'Sale ID does not match expected manual order format'
-    };
-  }
-  
-  return { 
-    valid: true,
-    orderNumber: match[1]
-  };
-}
-
-/**
- * Parse a sale ID to extract components (simplified for manual orders)
- */
-export interface ParsedSaleId {
-  accountId: string;
-  channelId: string;
-  orderNumber: string;
-  marketplace: 'MANUAL';
-  success: boolean;
+export function validateUserOrderNumber(orderNumber: string): { 
+  valid: boolean; 
   error?: string;
-}
-
-export function parseManualSaleId(saleId: string): ParsedSaleId {
-  const basePattern = /^(1-352444-\d+-\d+)-(\d+)-(.+)$/;
-  const match = saleId.match(basePattern);
-  
-  if (!match) {
-    return {
-      accountId: '',
-      channelId: '',
-      orderNumber: '',
-      marketplace: 'MANUAL',
-      success: false,
-      error: 'Could not parse sale ID structure'
-    };
+  suggestion?: string;
+} {
+  if (!orderNumber || !orderNumber.trim()) {
+    return { valid: false, error: 'Order number is required' };
   }
   
-  const [, accountId, channelId, orderPart] = match;
+  const cleaned = orderNumber.trim().toUpperCase();
+  const validation = validateManualOrderNumber(cleaned);
   
-  // For manual orders, validate the order part
-  const validation = validateManualOrderNumber(orderPart);
+  if (!validation.valid) {
+    // Check if it's close and provide a suggestion
+    const trailingDigitMatch = cleaned.match(/^(JK\d{4}-\d{6}-[A-Z]+)\d+$/);
+    if (trailingDigitMatch) {
+      return {
+        valid: false,
+        error: 'Initials cannot end with numbers - they may be confused with shipment IDs',
+        suggestion: trailingDigitMatch[1]
+      };
+    }
+  }
   
-  return {
-    accountId,
-    channelId,
-    orderNumber: orderPart,
-    marketplace: 'MANUAL',
-    success: validation.valid,
-    error: validation.error
-  };
+  return validation;
 }
