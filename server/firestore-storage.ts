@@ -1,7 +1,8 @@
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionFilters, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 
 let firestoreDb: admin.firestore.Firestore | null = null;
+let firebaseApp: admin.app.App | null = null;
 
 function getFirestoreDb(): admin.firestore.Firestore {
   if (firestoreDb) {
@@ -20,12 +21,10 @@ function getFirestoreDb(): admin.firestore.Firestore {
     console.log('[FirestoreStorage] Service account project_id:', serviceAccount.project_id);
     
     // Check if Firebase app is already initialized
-    const existingApp = admin.apps && admin.apps.length > 0 ? admin.apps[0] : null;
-    
-    if (!existingApp) {
+    if (!firebaseApp) {
       console.log('[FirestoreStorage] Initializing Firebase app...');
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      firebaseApp = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
       });
     }
     

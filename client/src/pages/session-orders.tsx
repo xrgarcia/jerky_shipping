@@ -317,7 +317,7 @@ export default function SessionOrders() {
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Search */}
             <div className="lg:col-span-2 space-y-2">
               <Label htmlFor="search" className="text-sm font-medium">Search</Label>
@@ -381,10 +381,10 @@ export default function SessionOrders() {
               </Select>
             </div>
 
-            {/* Date Range */}
-            <div className="space-y-2">
+            {/* Date Range - spans 2 columns for space */}
+            <div className="lg:col-span-2 space-y-2">
               <Label className="text-sm font-medium">Date Range</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Input
                   type="date"
                   value={startDate}
@@ -392,9 +392,10 @@ export default function SessionOrders() {
                     setStartDate(e.target.value);
                     setPage(1);
                   }}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                   data-testid="input-start-date"
                 />
+                <span className="text-muted-foreground text-sm flex-shrink-0">to</span>
                 <Input
                   type="date"
                   value={endDate}
@@ -402,7 +403,7 @@ export default function SessionOrders() {
                     setEndDate(e.target.value);
                     setPage(1);
                   }}
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                   data-testid="input-end-date"
                 />
               </div>
