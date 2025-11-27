@@ -125,14 +125,17 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="py-4">
+          <div 
+            className="flex items-center justify-center py-4 px-3 mx-2 my-2 rounded-lg"
+            style={{ background: 'var(--rank-neutral-800)' }}
+          >
             <img 
               src={jerkyLogo} 
               alt="Jerky.com" 
-              className="h-8 w-auto"
+              className="h-12 w-auto"
               data-testid="img-jerky-logo"
             />
-          </SidebarGroupLabel>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
