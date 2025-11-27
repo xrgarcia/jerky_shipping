@@ -12,18 +12,14 @@ import { Copy, RefreshCw, CheckCircle2, AlertCircle, Sparkles } from "lucide-rea
 interface GenerateResponse {
   success: boolean;
   orderNumber?: string;
-  fullSaleId?: string;
   attempts?: number;
   error?: string;
 }
 
 export default function CustomerService() {
   const { toast } = useToast();
-  const [suffix, setSuffix] = useState("");
-  const [generatedOrder, setGeneratedOrder] = useState<{
-    orderNumber: string;
-    fullSaleId: string;
-  } | null>(null);
+  const [initials, setInitials] = useState("");
+  const [generatedOrder, setGeneratedOrder] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const generateMutation = useMutation({
@@ -31,16 +27,13 @@ export default function CustomerService() {
       const response = await apiRequest(
         "POST", 
         "/api/manual-orders/generate", 
-        { suffix: suffix.trim() || undefined }
+        { initials: initials.trim() || undefined }
       );
       return response.json() as Promise<GenerateResponse>;
     },
     onSuccess: (data) => {
       if (data.success && data.orderNumber) {
-        setGeneratedOrder({
-          orderNumber: data.orderNumber,
-          fullSaleId: data.fullSaleId || "",
-        });
+        setGeneratedOrder(data.orderNumber);
         setCopied(false);
         toast({
           title: "Order Number Generated",
@@ -67,7 +60,7 @@ export default function CustomerService() {
     if (!generatedOrder) return;
     
     try {
-      await navigator.clipboard.writeText(generatedOrder.orderNumber);
+      await navigator.clipboard.writeText(generatedOrder);
       setCopied(true);
       toast({
         title: "Copied!",
@@ -83,9 +76,11 @@ export default function CustomerService() {
     }
   };
 
-  const handleSuffixChange = (value: string) => {
-    const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    setSuffix(cleaned);
+  const handleInitialsChange = (value: string) => {
+    const cleaned = value.toUpperCase().replace(/[^A-Z]/g, "");
+    if (cleaned.length <= 3) {
+      setInitials(cleaned);
+    }
   };
 
   return (
@@ -95,7 +90,7 @@ export default function CustomerService() {
           Customer Service
         </h1>
         <p className="text-muted-foreground mt-2">
-          Tools for customer service representatives
+          Generate valid order numbers for manual/phone orders
         </p>
       </div>
 
@@ -106,29 +101,29 @@ export default function CustomerService() {
             Manual Order Number Generator
           </CardTitle>
           <CardDescription>
-            Generate a unique order number for manual orders. The order number will be verified 
-            against our system to ensure it doesn't already exist.
+            Generate a unique order number for manual orders in Shopify. The order number will be 
+            verified against our system to ensure it doesn't already exist and follows the correct format.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="suffix">Suffix (Optional)</Label>
+            <Label htmlFor="initials">Your Initials (2-3 letters)</Label>
             <div className="flex items-center gap-2">
               <Input
-                id="suffix"
-                placeholder="e.g., SP, RW, DH"
-                value={suffix}
-                onChange={(e) => handleSuffixChange(e.target.value)}
-                className="max-w-[200px] font-mono uppercase"
-                maxLength={10}
-                data-testid="input-suffix"
+                id="initials"
+                placeholder="e.g., JB, SP, RW"
+                value={initials}
+                onChange={(e) => handleInitialsChange(e.target.value)}
+                className="max-w-[120px] font-mono uppercase text-center text-lg"
+                maxLength={3}
+                data-testid="input-initials"
               />
               <span className="text-sm text-muted-foreground">
-                Uppercase letters only
+                Letters only, no numbers
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Add a suffix to identify the order source (e.g., SP for phone orders)
+              Your initials help identify who created the order
             </p>
           </div>
 
@@ -169,7 +164,7 @@ export default function CustomerService() {
                   className="text-3xl font-mono font-bold tracking-wider select-all bg-background px-4 py-3 rounded-md border flex-1 text-center sm:text-left"
                   data-testid="text-generated-order"
                 >
-                  {generatedOrder.orderNumber}
+                  {generatedOrder}
                 </div>
                 
                 <Button
@@ -192,15 +187,6 @@ export default function CustomerService() {
                   )}
                 </Button>
               </div>
-
-              <details className="mt-4">
-                <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                  View full Sale ID (for developers)
-                </summary>
-                <code className="block mt-2 p-3 bg-muted rounded text-xs font-mono break-all">
-                  {generatedOrder.fullSaleId}
-                </code>
-              </details>
             </div>
           )}
 
@@ -224,17 +210,27 @@ export default function CustomerService() {
         </CardHeader>
         <CardContent>
           <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+            <li>Enter your initials (2-3 letters, like JB or RW)</li>
             <li>Click "Generate Order Number" to create a new unique order number</li>
-            <li>Optionally add a suffix to identify the order source</li>
             <li>The system verifies the order number doesn't already exist</li>
-            <li>Copy the order number and use it when creating the manual order</li>
+            <li>Copy the order number and use it when creating the manual order in Shopify</li>
           </ol>
           
           <div className="mt-4 p-3 bg-muted rounded-lg">
             <p className="text-sm font-medium mb-1">Order Number Format:</p>
-            <code className="text-sm font-mono">111-XXXXXXX-XXXXXXX[-SUFFIX]</code>
+            <code className="text-sm font-mono">JK####-######-XX</code>
             <p className="text-xs text-muted-foreground mt-1">
-              Example: 111-1234567-8901234 or 111-1234567-8901234-SP
+              Example: JK3825-112525-JB
+            </p>
+          </div>
+
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+              Important: No numbers in initials
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Initials must be letters only (like JB, not JB1). Numbers at the end can cause 
+              parsing issues with the automation system.
             </p>
           </div>
         </CardContent>
