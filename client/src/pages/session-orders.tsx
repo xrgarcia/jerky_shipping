@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SessionDetailDialog } from "@/components/session-detail-dialog";
 import { 
   Search, 
   ChevronDown, 
@@ -30,7 +31,7 @@ interface SessionOrdersResponse {
   total: number;
 }
 
-function SessionCard({ session }: { session: SkuVaultOrderSession }) {
+function SessionCard({ session, onSessionClick }: { session: SkuVaultOrderSession; onSessionClick: (sessionId: string) => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getStatusColor = (status: string) => {
@@ -79,9 +80,14 @@ function SessionCard({ session }: { session: SkuVaultOrderSession }) {
           {/* LEFT COLUMN: Session & Order Info */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <CardTitle className="text-2xl font-bold" data-testid={`title-session-${session.session_id}`}>
+              <button
+                type="button"
+                onClick={() => onSessionClick(session.session_id.toString())}
+                className="text-2xl font-bold text-primary hover:underline cursor-pointer"
+                data-testid={`link-session-${session.session_id}`}
+              >
                 Session #{session.session_id}
-              </CardTitle>
+              </button>
               <Badge className={getStatusColor(session.session_status)} data-testid={`badge-status-${session.session_id}`}>
                 {session.session_status}
               </Badge>
@@ -245,6 +251,7 @@ export default function SessionOrders() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const pageSize = 25;
 
   const buildQueryParams = () => {
@@ -483,7 +490,11 @@ export default function SessionOrders() {
       {!isLoading && !error && sessions.length > 0 && (
         <div className="space-y-4">
           {sessions.map((session) => (
-            <SessionCard key={session.document_id} session={session} />
+            <SessionCard 
+              key={session.document_id} 
+              session={session} 
+              onSessionClick={setSelectedSessionId}
+            />
           ))}
         </div>
       )}
@@ -522,6 +533,12 @@ export default function SessionOrders() {
           </CardContent>
         </Card>
       )}
+
+      {/* Session Detail Modal */}
+      <SessionDetailDialog 
+        picklistId={selectedSessionId}
+        onClose={() => setSelectedSessionId(null)}
+      />
     </div>
   );
 }
