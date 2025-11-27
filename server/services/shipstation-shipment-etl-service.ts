@@ -232,9 +232,25 @@ export class ShipStationShipmentETLService {
 
   /**
    * Extract tracking number from ShipStation data
+   * Checks root object first, then nested labels array (attached by API functions)
    */
   private extractTrackingNumber(shipmentData: any): string | null {
-    return shipmentData?.tracking_number || shipmentData?.trackingNumber || null;
+    // Check root object first (may have been attached by API functions)
+    if (shipmentData?.tracking_number) return shipmentData.tracking_number;
+    if (shipmentData?.trackingNumber) return shipmentData.trackingNumber;
+    
+    // Check nested labels array (attached by getShipmentsByOrderNumber/getShipmentsByDateRange)
+    if (Array.isArray(shipmentData?.labels) && shipmentData.labels.length > 0) {
+      const label = shipmentData.labels[0];
+      if (label?.tracking_number) return label.tracking_number;
+      if (label?.trackingNumber) return label.trackingNumber;
+    }
+    
+    // Check webhook formats that might have nested shipment data
+    if (shipmentData?.data?.tracking_number) return shipmentData.data.tracking_number;
+    if (shipmentData?.latestTracking?.tracking_number) return shipmentData.latestTracking.tracking_number;
+    
+    return null;
   }
 
   /**

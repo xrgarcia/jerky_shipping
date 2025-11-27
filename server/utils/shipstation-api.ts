@@ -168,6 +168,7 @@ export async function createLabel(shipmentData: any): Promise<any> {
  * Get shipments by order number with tracking numbers from labels
  * In ShipStation, shipment_number equals order_number
  * Returns shipments array and rate limit info
+ * Fetches labels for each shipment to get tracking numbers
  */
 export async function getShipmentsByOrderNumber(orderNumber: string): Promise<ApiResponseWithRateLimit<ShipStationShipment[]>> {
   if (!SHIPSTATION_API_KEY) {
@@ -192,9 +193,55 @@ export async function getShipmentsByOrderNumber(orderNumber: string): Promise<Ap
   const shipments = data.shipments || [];
   const rateLimit = extractRateLimitInfo(response.headers);
 
-  // Note: We skip label fetching here to improve performance
-  // Most shipments during bootstrap are on_hold and don't have labels yet
-  // Tracking numbers will be filled in later when tracking webhooks arrive
+  // Fetch labels for each shipment to get tracking numbers
+  // Labels contain tracking_number which is not on the shipment object itself
+  for (const shipment of shipments) {
+    const shipmentId = shipment.shipment_id;
+    if (shipmentId) {
+      // Retry loop for rate limit handling
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          const labelUrl = `${SHIPSTATION_API_BASE}/v2/labels?shipment_id=${encodeURIComponent(shipmentId)}`;
+          const labelResponse = await fetch(labelUrl, {
+            headers: {
+              'api-key': SHIPSTATION_API_KEY,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          // Handle 429 rate limit responses with retry
+          if (labelResponse.status === 429) {
+            const retryAfter = parseInt(labelResponse.headers.get('Retry-After') || '60');
+            console.log(`[ShipStation] Rate limited (429) for shipment ${shipmentId}, waiting ${retryAfter}s before retry ${retryCount + 1}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+            retryCount++;
+            continue; // Retry
+          }
+          
+          if (labelResponse.ok) {
+            const labelData = await labelResponse.json();
+            const labels = labelData.labels || [];
+            if (labels.length > 0) {
+              // Attach the first label's tracking number to the shipment
+              // Also attach the full labels array for additional data
+              shipment.tracking_number = labels[0].tracking_number || null;
+              shipment.labels = labels;
+            }
+          }
+          
+          break; // Success, exit retry loop
+        } catch (labelError: any) {
+          // Log but don't fail - some shipments may not have labels yet (on_hold status)
+          console.log(`[ShipStation] Could not fetch labels for shipment ${shipmentId}: ${labelError.message}`);
+          break; // Don't retry on exceptions
+        }
+      }
+    }
+  }
+
   return {
     data: shipments,
     rateLimit,
@@ -336,6 +383,83 @@ export async function getShipmentsByDateRange(
   }
 
   console.log(`Total shipments fetched: ${allShipments.length}`);
+
+  // Now fetch labels for each shipment to get tracking numbers
+  // Labels contain tracking_number which is not on the shipment object itself
+  console.log(`Fetching labels for ${allShipments.length} shipments to get tracking numbers...`);
+  let labelsProcessed = 0;
+  let labelsWithTracking = 0;
+  
+  for (const shipment of allShipments) {
+    const shipmentId = shipment.shipment_id;
+    if (shipmentId) {
+      // Check rate limit before each label fetch
+      if (lastRateLimit.remaining < 2) {
+        const resetEpochMs = lastRateLimit.reset * 1000;
+        const now = Date.now();
+        
+        if (resetEpochMs > now) {
+          const waitTimeMs = resetEpochMs - now + 1000;
+          const waitTimeSec = Math.ceil(waitTimeMs / 1000);
+          console.log(`Rate limit exhausted during label fetch, waiting ${waitTimeSec}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitTimeMs));
+        }
+      }
+      
+      // Retry loop for rate limit handling
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          // Get labels with rate limit tracking
+          const labelUrl = `${SHIPSTATION_API_BASE}/v2/labels?shipment_id=${encodeURIComponent(shipmentId)}`;
+          const labelResponse = await fetch(labelUrl, {
+            headers: {
+              'api-key': SHIPSTATION_API_KEY,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          lastRateLimit = extractRateLimitInfo(labelResponse.headers);
+          
+          // Handle 429 rate limit responses with retry
+          if (labelResponse.status === 429) {
+            const retryAfter = parseInt(labelResponse.headers.get('Retry-After') || '60');
+            console.log(`Rate limited by API (429) for shipment ${shipmentId}, waiting ${retryAfter}s before retry ${retryCount + 1}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+            retryCount++;
+            continue; // Retry this shipment
+          }
+          
+          if (labelResponse.ok) {
+            const labelData = await labelResponse.json();
+            const labels = labelData.labels || [];
+            if (labels.length > 0) {
+              shipment.tracking_number = labels[0].tracking_number || null;
+              shipment.labels = labels;
+              if (shipment.tracking_number) {
+                labelsWithTracking++;
+              }
+            }
+          }
+          
+          break; // Success, exit retry loop
+        } catch (labelError: any) {
+          // Log but don't fail - some shipments may not have labels yet (on_hold status)
+          console.log(`Could not fetch labels for shipment ${shipmentId}: ${labelError.message}`);
+          break; // Don't retry on exceptions
+        }
+      }
+      
+      labelsProcessed++;
+      if (labelsProcessed % 100 === 0) {
+        console.log(`Labels processed: ${labelsProcessed}/${allShipments.length} (${labelsWithTracking} with tracking, rate limit: ${lastRateLimit.remaining}/${lastRateLimit.limit})`);
+      }
+    }
+  }
+  
+  console.log(`Label fetch complete: ${labelsWithTracking} of ${allShipments.length} shipments have tracking numbers`);
 
   return {
     data: allShipments,
