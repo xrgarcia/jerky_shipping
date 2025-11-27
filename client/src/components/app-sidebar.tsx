@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, ClipboardList } from "lucide-react";
+import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, ClipboardList, Headset } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
@@ -107,6 +107,11 @@ export function AppSidebar() {
       title: "Session Orders",
       url: "/session-orders",
       icon: ClipboardList,
+    },
+    {
+      title: "Customer Service",
+      url: "/customer-service",
+      icon: Headset,
     },
     {
       title: "Profile",
