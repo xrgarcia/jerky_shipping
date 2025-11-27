@@ -54,6 +54,8 @@ export interface IFirestoreStorage {
   getSkuVaultOrderSessionByPicklistId(picklistId: string): Promise<SkuVaultOrderSession[]>;
   getUniquePickerNames(): Promise<string[]>;
   getUniqueSessionStatuses(): Promise<string[]>;
+  getSessionsUpdatedSince(sinceDate: Date, limit?: number): Promise<SkuVaultOrderSession[]>;
+  getTodaysSessions(): Promise<SkuVaultOrderSession[]>;
 }
 
 export class FirestoreStorage implements IFirestoreStorage {
@@ -243,6 +245,41 @@ export class FirestoreStorage implements IFirestoreStorage {
     });
 
     return Array.from(statuses).sort();
+  }
+
+  /**
+   * Get sessions updated since a given timestamp for incremental sync
+   * Used by the session sync worker to fetch recently updated sessions
+   */
+  async getSessionsUpdatedSince(sinceDate: Date, limit: number = 500): Promise<SkuVaultOrderSession[]> {
+    const db = getFirestoreDb();
+    
+    // Query for sessions updated after the given date
+    const snapshot = await db.collection(this.collectionName)
+      .where('updated_date', '>', Timestamp.fromDate(sinceDate))
+      .orderBy('updated_date', 'asc')
+      .limit(limit)
+      .get();
+
+    return snapshot.docs.map(doc => this.mapDocToSession(doc));
+  }
+
+  /**
+   * Get all sessions created today (for initial sync and daily metrics)
+   */
+  async getTodaysSessions(): Promise<SkuVaultOrderSession[]> {
+    const db = getFirestoreDb();
+    
+    // Start of today in UTC
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    
+    const snapshot = await db.collection(this.collectionName)
+      .where('create_date', '>=', Timestamp.fromDate(today))
+      .orderBy('create_date', 'desc')
+      .get();
+
+    return snapshot.docs.map(doc => this.mapDocToSession(doc));
   }
 }
 

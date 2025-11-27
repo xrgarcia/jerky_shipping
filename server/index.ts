@@ -232,6 +232,19 @@ app.use((req, res, next) => {
     // Continue server startup even if SkuVault auth fails
   }
 
+  // Start Firestore session sync worker (syncs SkuVault sessions to shipments table)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      const { startFirestoreSessionSyncWorker } = await import("./firestore-session-sync-worker");
+      await startFirestoreSessionSyncWorker();
+      log("Firestore session sync worker started");
+    } catch (error) {
+      console.error("Failed to start Firestore session sync worker:", error);
+    }
+  } else {
+    log("Skipping Firestore session sync worker - Firebase not configured");
+  }
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
