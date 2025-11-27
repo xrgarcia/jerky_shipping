@@ -1166,49 +1166,51 @@ Please analyze this failure and help me understand:
             </CardContent>
           </Card>
 
-          <Card data-testid="card-packing-queue" className="hover-elevate min-h-[180px]">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg">Packing Queue</CardTitle>
-                <CardDescription>Sessioned but not shipped</CardDescription>
-              </div>
-              {(() => {
-                const queueHealth = (() => {
-                  const count = queueStats?.pipeline?.inPackingQueue ?? 0;
-                  if (count === 0) return "healthy";
-                  if (count > 50) return "warning";
-                  return "healthy";
-                })();
-                
-                return (
-                  <Badge
-                    data-testid={`badge-packing-queue-${queueHealth}`}
-                    variant={queueHealth === "healthy" ? "default" : "secondary"}
-                  >
-                    {queueHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                    {queueHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
-                    {queueHealth}
-                  </Badge>
-                );
-              })()}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold" data-testid="text-packing-queue">
-                    {!hasQueueData ? "-" : (queueStats?.pipeline?.inPackingQueue ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground">orders</span>
+          <Link href="/shipments?tab=packing_queue">
+            <Card data-testid="card-packing-queue" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Packing Queue</CardTitle>
+                  <CardDescription>Sessioned but not shipped</CardDescription>
                 </div>
-                {queueStats?.pipeline?.oldestQueuedSessionAt && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    Oldest: {formatDistanceToNow(new Date(queueStats.pipeline.oldestQueuedSessionAt), { addSuffix: true })}
+                {(() => {
+                  const queueHealth = (() => {
+                    const count = queueStats?.pipeline?.inPackingQueue ?? 0;
+                    if (count === 0) return "healthy";
+                    if (count > 50) return "warning";
+                    return "healthy";
+                  })();
+                  
+                  return (
+                    <Badge
+                      data-testid={`badge-packing-queue-${queueHealth}`}
+                      variant={queueHealth === "healthy" ? "default" : "secondary"}
+                    >
+                      {queueHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {queueHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {queueHealth}
+                    </Badge>
+                  );
+                })()}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold" data-testid="text-packing-queue">
+                      {!hasQueueData ? "-" : (queueStats?.pipeline?.inPackingQueue ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-muted-foreground">orders</span>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {queueStats?.pipeline?.oldestQueuedSessionAt && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      Oldest: {formatDistanceToNow(new Date(queueStats.pipeline.oldestQueuedSessionAt), { addSuffix: true })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card data-testid="card-shipped-today" className="hover-elevate min-h-[180px]">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
