@@ -3690,6 +3690,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fast barcode validation for packing - uses local indexed lookup (instant)
+  app.get("/api/packing/validate-barcode/:barcode", requireAuth, async (req, res) => {
+    try {
+      const { barcode } = req.params;
+      
+      if (!barcode || barcode.trim() === '') {
+        return res.status(400).json({ 
+          valid: false, 
+          error: "Barcode is required" 
+        });
+      }
+      
+      // First try exact barcode match (most common case)
+      let variant = await storage.getVariantByBarcode(barcode);
+      
+      // If not found by barcode, try SKU lookup (some items may be scanned by SKU)
+      if (!variant) {
+        variant = await storage.getVariantBySku(barcode);
+      }
+      
+      if (!variant) {
+        return res.status(404).json({ 
+          valid: false, 
+          error: "Product not found",
+          scannedValue: barcode
+        });
+      }
+      
+      // Return minimal data needed for packing validation
+      res.json({
+        valid: true,
+        sku: variant.sku,
+        barcode: variant.barCode,
+        title: variant.title,
+        variantId: variant.id,
+        productId: variant.productId
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error validating barcode:", error);
+      res.status(500).json({ 
+        valid: false, 
+        error: "Failed to validate barcode" 
+      });
+    }
+  });
+
   // Complete order packing
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
     try {
