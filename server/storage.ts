@@ -73,9 +73,10 @@ export interface OrderFilters {
 
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
+  workflowTab?: 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
-  shipmentStatus?: string; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
+  shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
   carrierCode?: string[];
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
@@ -142,6 +143,7 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
+  getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -919,6 +921,7 @@ export class DatabaseStorage implements IStorage {
   async getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }> {
     const {
       search,
+      workflowTab,
       status: statusFilter,
       statusDescription,
       shipmentStatus,
@@ -935,6 +938,45 @@ export class DatabaseStorage implements IStorage {
 
     // Build WHERE conditions
     const conditions = [];
+
+    // Workflow tab filter - applies different filters based on selected tab
+    if (workflowTab) {
+      switch (workflowTab) {
+        case 'in_progress':
+          // In Progress: Orders currently being picked (New or Active sessions, not yet shipped)
+          conditions.push(
+            and(
+              isNotNull(shipments.sessionId),
+              or(
+                eq(shipments.sessionStatus, 'New'),
+                eq(shipments.sessionStatus, 'Active')
+              ),
+              isNull(shipments.shipDate)
+            )
+          );
+          break;
+        case 'packing_queue':
+          // Packing Queue: Orders ready to pack (picked/closed session status, no ship date yet)
+          conditions.push(
+            and(
+              isNotNull(shipments.sessionId),
+              or(
+                eq(shipments.sessionStatus, 'Closed'),
+                eq(shipments.sessionStatus, 'Picked')
+              ),
+              isNull(shipments.shipDate)
+            )
+          );
+          break;
+        case 'shipped':
+          // Shipped: Orders that have been shipped (has ship date)
+          conditions.push(isNotNull(shipments.shipDate));
+          break;
+        case 'all':
+          // All: No additional filter, shows everything
+          break;
+      }
+    }
 
     // Text search across tracking number, carrier, order fields
     if (search) {
@@ -1043,6 +1085,56 @@ export class DatabaseStorage implements IStorage {
       .offset(offset);
 
     return { shipments: result, total };
+  }
+
+  async getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }> {
+    // In Progress: Orders currently being picked (New or Active sessions, not yet shipped)
+    const inProgressResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          isNotNull(shipments.sessionId),
+          or(
+            eq(shipments.sessionStatus, 'New'),
+            eq(shipments.sessionStatus, 'Active')
+          ),
+          isNull(shipments.shipDate)
+        )
+      );
+
+    // Packing Queue: Orders ready to pack (picked/closed session, no ship date)
+    const packingQueueResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          isNotNull(shipments.sessionId),
+          or(
+            eq(shipments.sessionStatus, 'Closed'),
+            eq(shipments.sessionStatus, 'Picked')
+          ),
+          isNull(shipments.shipDate)
+        )
+      );
+
+    // Shipped: Orders that have been shipped (has ship date)
+    const shippedResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(isNotNull(shipments.shipDate));
+
+    // All: Total count
+    const allResult = await db
+      .select({ count: count() })
+      .from(shipments);
+
+    return {
+      inProgress: inProgressResult[0]?.count || 0,
+      packingQueue: packingQueueResult[0]?.count || 0,
+      shipped: shippedResult[0]?.count || 0,
+      all: allResult[0]?.count || 0,
+    };
   }
 
   async getDistinctStatuses(): Promise<string[]> {

@@ -643,6 +643,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tab counts for workflow tabs
+  app.get("/api/shipments/tab-counts", requireAuth, async (req, res) => {
+    try {
+      const counts = await storage.getShipmentTabCounts();
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching tab counts:", error);
+      res.status(500).json({ error: "Failed to fetch tab counts" });
+    }
+  });
+
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
       // Parse filter parameters from query string
@@ -653,6 +664,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortBy: req.query.sortBy as any || 'createdAt',
         sortOrder: req.query.sortOrder as any || 'desc',
       };
+
+      // Parse workflow tab filter
+      if (req.query.workflowTab) {
+        filters.workflowTab = req.query.workflowTab as string;
+      }
 
       // Parse status as single value (for cascading filter)
       if (req.query.status) {

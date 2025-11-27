@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -26,6 +27,15 @@ interface ShipmentsResponse {
   pageSize: number;
   totalPages: number;
 }
+
+interface TabCounts {
+  inProgress: number;
+  packingQueue: number;
+  shipped: number;
+  all: number;
+}
+
+type WorkflowTab = 'in_progress' | 'packing_queue' | 'shipped' | 'all';
 
 function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -81,6 +91,40 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
     }
   };
 
+  const calculatePickDuration = (start: Date | string | null, end: Date | string | null) => {
+    if (!start || !end) return null;
+    try {
+      const startDate = typeof start === 'string' ? new Date(start) : start;
+      const endDate = typeof end === 'string' ? new Date(end) : end;
+      const diffMs = endDate.getTime() - startDate.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffSecs = Math.floor((diffMs % 60000) / 1000);
+      
+      if (diffMins > 0) {
+        return `${diffMins}m ${diffSecs}s`;
+      }
+      return `${diffSecs}s`;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const getSessionStatusBadge = (status: string | null | undefined) => {
+    if (!status) return null;
+    
+    const statusLower = status.toLowerCase();
+    if (statusLower === 'closed' || statusLower === 'picked') {
+      return <Badge className="bg-green-600 hover:bg-green-700 text-xs">Picked</Badge>;
+    }
+    if (statusLower === 'active') {
+      return <Badge className="bg-blue-600 hover:bg-blue-700 text-xs">Active</Badge>;
+    }
+    if (statusLower === 'new') {
+      return <Badge variant="outline" className="border-yellow-500 text-yellow-700 dark:text-yellow-400 text-xs">New</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs">{status}</Badge>;
+  };
+
   return (
     <Card className="overflow-hidden" data-testid={`card-shipment-${shipment.id}`}>
       <CardHeader className="pb-4">
@@ -128,55 +172,82 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
               </div>
             )}
 
-            {/* Contact Info */}
-            <div className="space-y-1.5 text-sm text-muted-foreground">
-              {shipment.shipToEmail && (
-                <div className="flex items-start gap-1.5">
-                  <Mail className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span className="truncate">{shipment.shipToEmail}</span>
-                </div>
-              )}
-              {shipment.shipToPhone && (
-                <div className="flex items-start gap-1.5">
-                  <Phone className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>{shipment.shipToPhone}</span>
-                </div>
-              )}
-            </div>
+            {/* Shipping Address */}
+            {shipment.shipToCity && (
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+                <span className="text-sm text-muted-foreground">
+                  {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* MIDDLE COLUMN: Shipping Information */}
+          {/* MIDDLE COLUMN: Session & Shipping Info */}
           <div className="space-y-3">
-            {/* Address */}
-            {(shipment.shipToAddressLine1 || shipment.shipToCity || shipment.shipToState) && (
-              <div className="flex items-start gap-2">
-                <MapPin className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div className="flex flex-col text-sm leading-snug">
-                  {shipment.shipToAddressLine1 && <span className="font-medium">{shipment.shipToAddressLine1}</span>}
-                  {shipment.shipToAddressLine2 && <span>{shipment.shipToAddressLine2}</span>}
-                  <span className="text-muted-foreground">
-                    {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </span>
+            {/* Session Info - Only show if has session data */}
+            {(shipment.sessionId || shipment.pickedByUserName) && (
+              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Boxes className="h-4 w-4 text-primary" />
+                  <span>Session Info</span>
+                  {getSessionStatusBadge(shipment.sessionStatus)}
                 </div>
+                
+                {/* Picker Name */}
+                {shipment.pickedByUserName && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="font-medium">{shipment.pickedByUserName}</span>
+                  </div>
+                )}
+
+                {/* Pick Duration */}
+                {shipment.pickStartedAt && shipment.pickEndedAt && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Timer className="h-3.5 w-3.5" />
+                    <span>Pick time: {calculatePickDuration(shipment.pickStartedAt, shipment.pickEndedAt)}</span>
+                  </div>
+                )}
+
+                {/* Spot Number */}
+                {shipment.spotNumber && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      Spot #{shipment.spotNumber}
+                    </Badge>
+                  </div>
+                )}
+
+                {/* Session ID link */}
+                {shipment.sessionId && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSessionId(shipment.sessionId);
+                    }}
+                    className="text-xs text-primary hover:underline cursor-pointer"
+                    data-testid={`link-session-${shipment.sessionId}`}
+                  >
+                    View Session #{shipment.sessionId}
+                  </button>
+                )}
               </div>
             )}
 
-            {/* Service & Carrier with Status Description */}
-            {(shipment.carrierCode || shipment.serviceCode || shipment.statusDescription) && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Truck className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            {/* Carrier Info */}
+            {(shipment.carrierCode || shipment.serviceCode) && (
+              <div className="flex items-start gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <div className="flex items-center gap-2 flex-wrap">
-                  {shipment.statusDescription && <span>{shipment.statusDescription}</span>}
-                  {(shipment.carrierCode || shipment.serviceCode) && <span>via</span>}
                   {shipment.carrierCode && (
-                    <Badge variant="outline" className="text-xs uppercase font-semibold">
+                    <Badge variant="secondary" className="font-mono text-xs">
                       {shipment.carrierCode}
                     </Badge>
                   )}
                   {shipment.serviceCode && (
-                    <span>{shipment.serviceCode}</span>
+                    <span className="text-sm">{shipment.serviceCode}</span>
                   )}
                 </div>
               </div>
@@ -203,31 +274,6 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Hash className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="font-mono">{shipment.trackingNumber}</span>
-              </div>
-            )}
-
-            {/* Session/Spot Info */}
-            {sessionInfo && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Boxes className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <div className="flex items-center gap-1.5">
-                  <span>Session</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSessionId(sessionInfo.sessionId);
-                    }}
-                    className="font-semibold text-primary hover:underline cursor-pointer"
-                    data-testid={`link-session-${sessionInfo.sessionId}`}
-                  >
-                    {sessionInfo.sessionId}
-                  </button>
-                  <span>•</span>
-                  <Badge variant="secondary" className="text-xs">
-                    Spot #{sessionInfo.spot}
-                  </Badge>
-                </div>
               </div>
             )}
 
@@ -419,11 +465,14 @@ export default function Shipments() {
   const [isInitialized, setIsInitialized] = useState(false);
   const lastSyncedSearchRef = useRef<string>('');
 
+  // Workflow tab state
+  const [activeTab, setActiveTab] = useState<WorkflowTab>('in_progress');
+
   // Filter states
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>(""); // Single status for cascading filter
   const [statusDescription, setStatusDescription] = useState<string>("");
-  const [shipmentStatus, setShipmentStatus] = useState<string[]>(["on_hold", "pending"]); // Warehouse status filter (multi-select with defaults)
+  const [shipmentStatus, setShipmentStatus] = useState<string[]>([]); // Warehouse status filter (multi-select)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -448,11 +497,12 @@ export default function Shipments() {
     const params = new URLSearchParams(currentSearch);
     
     // Always reset to defaults, then apply URL params
+    setActiveTab((params.get('tab') as WorkflowTab) || 'in_progress');
     setSearch(params.get('search') || '');
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
     const shipmentStatusValues = params.getAll('shipmentStatus');
-    setShipmentStatus(shipmentStatusValues.length > 0 ? shipmentStatusValues : ["on_hold", "pending"]);
+    setShipmentStatus(shipmentStatusValues);
     setCarrierCode(params.getAll('carrierCode'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -488,6 +538,7 @@ export default function Shipments() {
     
     const params = new URLSearchParams();
     
+    if (activeTab !== 'in_progress') params.set('tab', activeTab);
     if (search) params.set('search', search);
     if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
@@ -513,7 +564,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -632,6 +683,9 @@ export default function Shipments() {
   const buildQueryString = () => {
     const params = new URLSearchParams();
     
+    // Add workflow tab filter
+    params.append('workflowTab', activeTab);
+    
     if (search) params.append('search', search);
     if (status) params.append('status', status); // Single status value
     if (statusDescription) params.append('statusDescription', statusDescription);
@@ -650,6 +704,13 @@ export default function Shipments() {
     
     return params.toString();
   };
+
+  // Fetch tab counts
+  const { data: tabCountsData } = useQuery<TabCounts>({
+    queryKey: ["/api/shipments/tab-counts"],
+  });
+
+  const tabCounts = tabCountsData || { inProgress: 0, packingQueue: 0, shipped: 0, all: 0 };
 
   // Fetch distinct statuses for the status filter dropdown
   const { data: statusesData } = useQuery<{ statuses: string[] }>({
@@ -683,7 +744,7 @@ export default function Shipments() {
   const shipmentStatuses = shipmentStatusesData?.shipmentStatuses || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -756,6 +817,7 @@ export default function Shipments() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shipments/tab-counts"] });
       toast({
         title: "Sync jobs enqueued",
         description: `Enqueued ${data.enqueuedCount} jobs (${data.nonDeliveredShipments} non-delivered shipments + ${data.ordersWithoutShipments} unshipped orders). Processing in background...`,
@@ -763,26 +825,22 @@ export default function Shipments() {
     },
   });
 
-
-  const isOrphanedShipment = (shipment: ShipmentWithItemCount) => {
-    // A shipment is orphaned if it's missing all key identifiers
-    return !shipment.trackingNumber && !shipment.shipDate && !shipment.shipmentId;
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as WorkflowTab);
+    setPage(1);
   };
 
-  const getStatusBadge = (status: string | null) => {
-    if (!status) {
-      return <Badge variant="outline">Unknown</Badge>;
+  const getTabDescription = () => {
+    switch (activeTab) {
+      case 'in_progress':
+        return 'Orders currently being picked (New or Active sessions)';
+      case 'packing_queue':
+        return 'Orders ready to pack (all items picked, awaiting shipment)';
+      case 'shipped':
+        return 'Orders that have been shipped';
+      case 'all':
+        return 'All shipments regardless of status';
     }
-    if (status === "delivered") {
-      return <Badge className="bg-green-600 text-white">Delivered</Badge>;
-    }
-    if (status === "shipped") {
-      return <Badge className="bg-blue-600 text-white">Shipped</Badge>;
-    }
-    if (status === "cancelled") {
-      return <Badge className="bg-red-600 text-white">Cancelled</Badge>;
-    }
-    return <Badge variant="secondary">{status}</Badge>;
   };
 
   return (
@@ -791,9 +849,62 @@ export default function Shipments() {
         <div>
           <h1 className="text-4xl font-serif font-bold text-foreground mb-2">Shipments</h1>
           <p className="text-muted-foreground text-lg">
-            Track all shipments • Real-time carrier updates
+            Manage orders through the fulfillment workflow
           </p>
         </div>
+
+        {/* Workflow Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+            <TabsTrigger 
+              value="in_progress" 
+              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              data-testid="tab-in-progress"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                <span className="font-semibold">In Progress</span>
+              </div>
+              <span className="text-xs opacity-80">{tabCounts.inProgress} orders</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="packing_queue" 
+              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              data-testid="tab-packing-queue"
+            >
+              <div className="flex items-center gap-2">
+                <PackageOpen className="h-4 w-4" />
+                <span className="font-semibold">Packing Queue</span>
+              </div>
+              <span className="text-xs opacity-80">{tabCounts.packingQueue} orders</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="shipped" 
+              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              data-testid="tab-shipped"
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                <span className="font-semibold">Shipped</span>
+              </div>
+              <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="all" 
+              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              data-testid="tab-all"
+            >
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                <span className="font-semibold">All</span>
+              </div>
+              <span className="text-xs opacity-80">{tabCounts.all} total</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Tab Description */}
+        <p className="text-sm text-muted-foreground italic">{getTabDescription()}</p>
 
         {/* Search and Filters */}
         <Card>
@@ -803,7 +914,7 @@ export default function Shipments() {
               <Input
                 data-testid="input-search-shipments"
                 type="search"
-                placeholder="Search by tracking number, carrier, shipment ID..."
+                placeholder="Search by order #, tracking #, customer name, shipment ID..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -1097,6 +1208,12 @@ export default function Shipments() {
               <p className="text-muted-foreground">
                 {activeFiltersCount > 0
                   ? "Try adjusting your filters or clearing them to see more results"
+                  : activeTab === 'in_progress'
+                  ? "No orders are currently being picked"
+                  : activeTab === 'packing_queue'
+                  ? "No orders are ready for packing"
+                  : activeTab === 'shipped'
+                  ? "No shipped orders match your criteria"
                   : "Shipments will appear here when orders are fulfilled through ShipStation"}
               </p>
             </CardContent>
