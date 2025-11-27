@@ -2755,6 +2755,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get comprehensive data health metrics
       const dataHealthMetrics = await storage.getDataHealthMetrics();
 
+      // Get pipeline metrics (SkuVault session workflow)
+      const pipelineMetrics = await storage.getPipelineMetrics();
+
       // Get on-hold worker status and stats
       let onHoldWorkerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
       let onHoldWorkerStats = undefined;
@@ -2798,6 +2801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recentJobs: recentBackfillJobs,
         },
         dataHealth: dataHealthMetrics,
+        pipeline: pipelineMetrics,
         onHoldWorkerStatus,
         onHoldWorkerStats,
         printQueueWorkerStatus,

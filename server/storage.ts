@@ -226,6 +226,14 @@ export interface IStorage {
     shopifyOrderSyncFailures: number;
   }>;
 
+  // Pipeline Metrics (SkuVault session workflow)
+  getPipelineMetrics(): Promise<{
+    sessionedToday: number;
+    inPackingQueue: number;
+    shippedToday: number;
+    oldestQueuedSessionAt: string | null;
+  }>;
+
   // Saved Views
   getSavedView(id: string): Promise<SavedView | undefined>;
   getSavedViewsByUser(userId: string, page?: string): Promise<SavedView[]>;
@@ -1771,6 +1779,58 @@ export class DatabaseStorage implements IStorage {
       shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,
       shipmentSyncFailures: syncFailuresResult[0]?.count || 0,
       shopifyOrderSyncFailures: shopifyOrderSyncFailuresResult[0]?.count || 0,
+    };
+  }
+
+  // Pipeline Metrics - Track SkuVault session workflow progress
+  async getPipelineMetrics(): Promise<{
+    sessionedToday: number;
+    inPackingQueue: number;
+    shippedToday: number;
+    oldestQueuedSessionAt: string | null;
+  }> {
+    // Get start of today (UTC)
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    
+    // Query 1: Orders sessioned today (sessionedAt is today)
+    const sessionedTodayResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(sql`${shipments.sessionedAt} >= ${todayStart}`);
+    
+    // Query 2: Orders in packing queue (has session data but not shipped)
+    // These are orders that have been sessioned in SkuVault but don't have tracking yet
+    const inPackingQueueResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        sql`${shipments.sessionId} IS NOT NULL 
+            AND (${shipments.trackingNumber} IS NULL OR ${shipments.status} != 'shipped')`
+      );
+    
+    // Query 3: Orders shipped today (shipDate is today)
+    const shippedTodayResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(sql`${shipments.shipDate} >= ${todayStart}`);
+    
+    // Query 4: Get oldest session in packing queue
+    const oldestQueuedResult = await db
+      .select({ sessionedAt: shipments.sessionedAt })
+      .from(shipments)
+      .where(
+        sql`${shipments.sessionId} IS NOT NULL 
+            AND (${shipments.trackingNumber} IS NULL OR ${shipments.status} != 'shipped')`
+      )
+      .orderBy(shipments.sessionedAt)
+      .limit(1);
+    
+    return {
+      sessionedToday: sessionedTodayResult[0]?.count || 0,
+      inPackingQueue: inPackingQueueResult[0]?.count || 0,
+      shippedToday: shippedTodayResult[0]?.count || 0,
+      oldestQueuedSessionAt: oldestQueuedResult[0]?.sessionedAt ? new Date(oldestQueuedResult[0].sessionedAt).toISOString() : null,
     };
   }
 

@@ -21,7 +21,8 @@ import {
   XCircle,
   Copy,
   AlertTriangle,
-  Pause
+  Pause,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +101,12 @@ type QueueStats = {
     shipmentsWithoutStatus: number;
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
+  };
+  pipeline?: {
+    sessionedToday: number;
+    inPackingQueue: number;
+    shippedToday: number;
+    oldestQueuedSessionAt: string | null;
   };
   onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
   onHoldWorkerStats?: {
@@ -1101,6 +1108,100 @@ Please analyze this failure and help me understand:
         </Card>
       </div>
 
+      {/* Pipeline Metrics - SkuVault Session Workflow */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Package className="h-5 w-5" />
+          Pipeline Metrics
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card data-testid="card-sessioned-today" className="hover-elevate min-h-[180px]">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Sessioned Today</CardTitle>
+                <CardDescription>Orders entered wave picking</CardDescription>
+              </div>
+              <Zap className="h-5 w-5 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold" data-testid="text-sessioned-today">
+                    {!hasQueueData ? "-" : (queueStats?.pipeline?.sessionedToday ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">orders</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-packing-queue" className="hover-elevate min-h-[180px]">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Packing Queue</CardTitle>
+                <CardDescription>Sessioned but not shipped</CardDescription>
+              </div>
+              {(() => {
+                const queueHealth = (() => {
+                  const count = queueStats?.pipeline?.inPackingQueue ?? 0;
+                  if (count === 0) return "healthy";
+                  if (count > 50) return "warning";
+                  return "healthy";
+                })();
+                
+                return (
+                  <Badge
+                    data-testid={`badge-packing-queue-${queueHealth}`}
+                    variant={queueHealth === "healthy" ? "default" : "secondary"}
+                  >
+                    {queueHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {queueHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                    {queueHealth}
+                  </Badge>
+                );
+              })()}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold" data-testid="text-packing-queue">
+                    {!hasQueueData ? "-" : (queueStats?.pipeline?.inPackingQueue ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">orders</span>
+                </div>
+                {queueStats?.pipeline?.oldestQueuedSessionAt && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Oldest: {formatDistanceToNow(new Date(queueStats.pipeline.oldestQueuedSessionAt), { addSuffix: true })}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-shipped-today" className="hover-elevate min-h-[180px]">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Shipped Today</CardTitle>
+                <CardDescription>Orders with shipments today</CardDescription>
+              </div>
+              <Truck className="h-5 w-5 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold" data-testid="text-shipped-today">
+                    {!hasQueueData ? "-" : (queueStats?.pipeline?.shippedToday ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">orders</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Data Health */}
       <div className="grid gap-4 md:grid-cols-3">
         <Link href="/orders?hasShipment=false">
           <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
