@@ -525,6 +525,8 @@ export const backfillJobs = pgTable("backfill_jobs", {
   shipstationShipmentsTotal: integer("shipstation_shipments_total").notNull().default(0),
   shipstationShipmentsImported: integer("shipstation_shipments_imported").notNull().default(0),
   shipstationShipmentsFailed: integer("shipstation_shipments_failed").notNull().default(0),
+  // Resume cursor for ShipStation pagination (oldest created_at seen in last complete page)
+  shipstationResumeCreatedAt: timestamp("shipstation_resume_created_at"),
   // Error tracking
   errorMessage: text("error_message"),
   // Timestamps

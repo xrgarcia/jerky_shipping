@@ -266,20 +266,38 @@ export class BackfillService {
   /**
    * Import ShipStation shipments for date range
    * Uses page-by-page processing for memory efficiency and real-time progress
+   * RESUMABLE: If the server restarts mid-import, it will continue from where it left off
    */
   private async importShipStationShipments(jobId: string, startDate: Date, endDate: Date): Promise<void> {
-    console.log(`[Backfill] Importing ShipStation shipments from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    // Check for resume cursor - if we have one, we're resuming a previous import
+    const existingJob = await this.storage.getBackfillJob(jobId);
+    const resumeCursor = existingJob?.shipstationResumeCreatedAt;
+    
+    // If resuming, use the cursor as the effective end date (results are sorted by created_at DESC)
+    // We subtract 1 second to avoid re-processing the same shipment at the cursor boundary
+    let effectiveEndDate = endDate;
+    if (resumeCursor) {
+      effectiveEndDate = new Date(resumeCursor.getTime() - 1000);
+      console.log(`[Backfill] Resuming ShipStation import from cursor ${resumeCursor.toISOString()}`);
+      console.log(`[Backfill] Effective date range: ${startDate.toISOString()} to ${effectiveEndDate.toISOString()}`);
+    } else {
+      console.log(`[Backfill] Starting ShipStation import from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    }
 
-    let imported = 0;
-    let failed = 0;
+    // Initialize from existing job progress (for resume)
+    let imported = existingJob?.shipstationShipmentsImported || 0;
+    let failed = existingJob?.shipstationShipmentsFailed || 0;
     let cancelled = false;
+
+    // Track the oldest created_at in each page for resume cursor
+    let oldestCreatedAt: Date | null = null;
 
     try {
       // Process shipments page-by-page as they're fetched
       // This saves each page immediately instead of waiting for all 16K+ shipments
       await getShipmentsByDateRange(
         startDate,
-        endDate,
+        effectiveEndDate,
         500, // page size
         async (pageResult: ShipmentPageResult) => {
           // Check if job was cancelled before processing this page
@@ -290,12 +308,21 @@ export class BackfillService {
             return; // Stop processing pages
           }
 
-          // Update total on first page (we now know the total)
-          if (pageResult.page === 1) {
+          // Update total on first page (if not resuming)
+          if (pageResult.page === 1 && !resumeCursor) {
             await this.storage.updateBackfillJob(jobId, {
               shipstationShipmentsTotal: pageResult.totalShipments,
             });
             console.log(`[Backfill] Total ShipStation shipments to import: ${pageResult.totalShipments}`);
+          }
+
+          // Find the oldest created_at in this page (for resume cursor)
+          // Since results are sorted by created_at DESC, the last item has the oldest date
+          if (pageResult.shipments.length > 0) {
+            const lastShipment = pageResult.shipments[pageResult.shipments.length - 1];
+            if (lastShipment.created_at) {
+              oldestCreatedAt = new Date(lastShipment.created_at);
+            }
           }
 
           // Process each shipment in this page
@@ -309,11 +336,16 @@ export class BackfillService {
             }
           }
 
-          // Update progress after each page
-          await this.storage.updateBackfillJob(jobId, {
+          // Update progress AND resume cursor after each page
+          // This makes the import resumable if the server restarts
+          const updateData: any = {
             shipstationShipmentsImported: imported,
             shipstationShipmentsFailed: failed,
-          });
+          };
+          if (oldestCreatedAt) {
+            updateData.shipstationResumeCreatedAt = oldestCreatedAt;
+          }
+          await this.storage.updateBackfillJob(jobId, updateData);
           this.broadcastJobProgress(jobId);
 
           console.log(`[Backfill] ShipStation page ${pageResult.page}/${pageResult.totalPages} complete: ${imported} imported, ${failed} failed`);
@@ -330,10 +362,11 @@ export class BackfillService {
         return;
       }
 
-      // Final progress update
+      // Final progress update - clear the resume cursor since we're done
       await this.storage.updateBackfillJob(jobId, {
         shipstationShipmentsImported: imported,
         shipstationShipmentsFailed: failed,
+        shipstationResumeCreatedAt: null,
       });
       this.broadcastJobProgress(jobId);
 
