@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, ClipboardList, Headset } from "lucide-react";
+import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -103,11 +103,6 @@ export function AppSidebar() {
       title: "PO Recommend",
       url: "/po-recommendations",
       icon: ShoppingCart,
-    },
-    {
-      title: "Session Orders",
-      url: "/session-orders",
-      icon: ClipboardList,
     },
     {
       title: "Customer Service",
