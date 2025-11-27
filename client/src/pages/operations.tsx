@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -455,6 +455,9 @@ export default function OperationsPage() {
   const [expandedFailure, setExpandedFailure] = useState<string | null>(null);
   const [liveQueueStats, setLiveQueueStats] = useState<QueueStats | null>(null);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
+  
+  // Ref to access initialQueueStats in WebSocket handler without adding to dependencies
+  const initialQueueStatsRef = useRef<QueueStats | undefined>(undefined);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
@@ -555,6 +558,13 @@ Please analyze this failure and help me understand:
   // Show loading state only if we have no data at all (neither from WebSocket nor initial API)
   const hasQueueData = !!queueStats;
 
+  // Keep the ref updated so WebSocket handler can access it
+  useEffect(() => {
+    if (initialQueueStats) {
+      initialQueueStatsRef.current = initialQueueStats;
+    }
+  }, [initialQueueStats]);
+
   // Initialize liveQueueStats with initialQueueStats when it first loads
   useEffect(() => {
     if (initialQueueStats && !liveQueueStats) {
@@ -593,6 +603,8 @@ Please analyze this failure and help me understand:
           
           if (message.type === 'queue_status' && message.data) {
             // Update live queue stats from WebSocket with backfill data directly from broadcast
+            // Use initialQueueStatsRef as fallback when prev is undefined (first WebSocket message)
+            const initial = initialQueueStatsRef.current;
             setLiveQueueStats((prev) => ({
               shopifyQueue: {
                 size: message.data.shopifyQueue,
@@ -612,21 +624,23 @@ Please analyze this failure and help me understand:
               backfill: {
                 activeJob: message.data.backfillActiveJob || null,
                 // Preserve recentJobs from initial API load since WebSocket doesn't send them
-                recentJobs: prev?.backfill?.recentJobs || [],
+                recentJobs: prev?.backfill?.recentJobs || initial?.backfill?.recentJobs || [],
               },
               dataHealth: message.data.dataHealth,
               // Preserve pipeline metrics from initial API load since WebSocket doesn't send them
-              pipeline: prev?.pipeline,
+              pipeline: prev?.pipeline || initial?.pipeline,
               onHoldWorkerStatus: message.data.onHoldWorkerStatus || 'sleeping',
-              // Only update onHoldWorkerStats if defined, otherwise preserve previous value
+              // Only update onHoldWorkerStats if defined, otherwise preserve previous value or use initial
               onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
                 ? message.data.onHoldWorkerStats 
-                : prev?.onHoldWorkerStats,
-              // Preserve firestore worker status from initial API load since WebSocket doesn't send them
-              firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus || prev?.firestoreSessionSyncWorkerStatus,
+                : (prev?.onHoldWorkerStats || initial?.onHoldWorkerStats),
+              // Preserve firestore worker status - use WebSocket data, then prev, then initial API data
+              firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus 
+                || prev?.firestoreSessionSyncWorkerStatus 
+                || initial?.firestoreSessionSyncWorkerStatus,
               firestoreSessionSyncWorkerStats: message.data.firestoreSessionSyncWorkerStats !== undefined
                 ? message.data.firestoreSessionSyncWorkerStats
-                : prev?.firestoreSessionSyncWorkerStats,
+                : (prev?.firestoreSessionSyncWorkerStats || initial?.firestoreSessionSyncWorkerStats),
             }));
           }
         } catch (error) {

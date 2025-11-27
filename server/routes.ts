@@ -2795,8 +2795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errorsCount: stats.errorsCount,
           lastError: stats.lastError,
         };
-      } catch (error) {
-        // Worker not initialized yet
+        console.log('[queue-stats] Firestore worker status:', firestoreSessionSyncWorkerStatus, 'stats:', firestoreSessionSyncWorkerStats);
+      } catch (error: any) {
+        console.error('[queue-stats] Error getting firestore worker status:', error.message);
       }
 
       res.json({
