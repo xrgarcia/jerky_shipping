@@ -127,7 +127,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <div 
             className="flex items-center justify-center py-4 px-3 mx-2 my-2 rounded-lg"
-            style={{ background: 'var(--rank-neutral-800)' }}
+            style={{ background: '#1a1a1a' }}
           >
             <img 
               src={jerkyLogo} 
