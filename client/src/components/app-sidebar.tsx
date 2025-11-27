@@ -123,19 +123,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
+      <div 
+        className="flex items-center justify-center py-6 px-4 border-b border-sidebar-border"
+        style={{ background: '#1a1a1a' }}
+      >
+        <img 
+          src={jerkyLogo} 
+          alt="Jerky.com" 
+          className="h-12 w-auto"
+          data-testid="img-jerky-logo"
+        />
+      </div>
       <SidebarContent>
         <SidebarGroup>
-          <div 
-            className="flex items-center justify-center py-6 px-4 border-b border-sidebar-border"
-            style={{ background: '#1a1a1a' }}
-          >
-            <img 
-              src={jerkyLogo} 
-              alt="Jerky.com" 
-              className="h-12 w-auto"
-              data-testid="img-jerky-logo"
-            />
-          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
