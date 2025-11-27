@@ -2752,27 +2752,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Operations Dashboard - Queue Management
   app.get("/api/operations/queue-stats", requireAuth, async (req, res) => {
     try {
-      const shopifyQueueLength = await getQueueLength();
-      const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
-      const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
-      const oldestShopify = await getOldestShopifyQueueMessage();
-      const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
-      const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
+      // Run all independent queries in parallel for faster response
+      const [
+        shopifyQueueLength,
+        shipmentSyncQueueLength,
+        shopifyOrderSyncQueueLength,
+        oldestShopify,
+        oldestShipmentSync,
+        oldestShopifyOrderSync,
+        failureCountRows,
+        allBackfillJobs,
+        dataHealthMetrics,
+        pipelineMetrics
+      ] = await Promise.all([
+        getQueueLength(),
+        getShipmentSyncQueueLength(),
+        getShopifyOrderSyncQueueLength(),
+        getOldestShopifyQueueMessage(),
+        getOldestShipmentSyncQueueMessage(),
+        getOldestShopifyOrderSyncQueueMessage(),
+        db.select({ count: count() }).from(shipmentSyncFailures),
+        storage.getAllBackfillJobs(),
+        storage.getDataHealthMetrics(),
+        storage.getPipelineMetrics()
+      ]);
       
-      const failureCount = await db.select({ count: count() })
-        .from(shipmentSyncFailures)
-        .then(rows => rows[0]?.count || 0);
-
-      // Get active/recent backfill jobs
-      const allBackfillJobs = await storage.getAllBackfillJobs();
+      const failureCount = failureCountRows[0]?.count || 0;
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending');
       const recentBackfillJobs = allBackfillJobs.slice(0, 5); // Last 5 jobs
-
-      // Get comprehensive data health metrics
-      const dataHealthMetrics = await storage.getDataHealthMetrics();
-
-      // Get pipeline metrics (SkuVault session workflow)
-      const pipelineMetrics = await storage.getPipelineMetrics();
 
       // Get on-hold worker status and stats
       let onHoldWorkerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
