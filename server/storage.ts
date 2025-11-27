@@ -969,8 +969,8 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'shipped':
-          // Shipped: Orders that have been shipped (has ship date)
-          conditions.push(isNotNull(shipments.shipDate));
+          // Shipped: Orders that have been shipped (has tracking number)
+          conditions.push(isNotNull(shipments.trackingNumber));
           break;
         case 'all':
           // All: No additional filter, shows everything
