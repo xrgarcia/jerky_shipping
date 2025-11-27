@@ -1,10 +1,13 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
+import { getFirestore, Firestore, Timestamp, Query, DocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionFilters, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 
-let firestoreDb: admin.firestore.Firestore | null = null;
-let firebaseApp: admin.app.App | null = null;
+let firestoreDb: Firestore | null = null;
+let firebaseApp: App | null = null;
 
-function getFirestoreDb(): admin.firestore.Firestore {
+const FIRESTORE_DATABASE_ID = 'jerky-data-hub';
+
+function getFirestoreDb(): Firestore {
   if (firestoreDb) {
     return firestoreDb;
   }
@@ -19,17 +22,22 @@ function getFirestoreDb(): admin.firestore.Firestore {
     const serviceAccount = JSON.parse(serviceAccountJson);
     
     console.log('[FirestoreStorage] Service account project_id:', serviceAccount.project_id);
+    console.log('[FirestoreStorage] Using named database:', FIRESTORE_DATABASE_ID);
     
     // Check if Firebase app is already initialized
-    if (!firebaseApp) {
+    const existingApps = getApps();
+    if (existingApps.length === 0) {
       console.log('[FirestoreStorage] Initializing Firebase app...');
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+      firebaseApp = initializeApp({
+        credential: cert(serviceAccount),
       });
+    } else {
+      firebaseApp = existingApps[0];
     }
     
-    firestoreDb = admin.firestore();
-    console.log('[FirestoreStorage] Firestore connection initialized successfully');
+    // Connect to the named database using the databaseId parameter
+    firestoreDb = getFirestore(firebaseApp, FIRESTORE_DATABASE_ID);
+    console.log('[FirestoreStorage] Firestore connection initialized successfully to database:', FIRESTORE_DATABASE_ID);
     return firestoreDb;
   } catch (error: any) {
     console.error('[FirestoreStorage] Failed to initialize Firestore:', error.message);
@@ -50,15 +58,15 @@ export interface IFirestoreStorage {
 export class FirestoreStorage implements IFirestoreStorage {
   private readonly collectionName = 'skuvaultOrderSessions';
 
-  private convertTimestamp(timestamp: admin.firestore.Timestamp | Date | null): Date | null {
+  private convertTimestamp(timestamp: Timestamp | Date | null): Date | null {
     if (!timestamp) return null;
-    if (timestamp instanceof admin.firestore.Timestamp) {
+    if (timestamp instanceof Timestamp) {
       return timestamp.toDate();
     }
     return timestamp as Date;
   }
 
-  private mapDocToSession(doc: admin.firestore.DocumentSnapshot): SkuVaultOrderSession {
+  private mapDocToSession(doc: DocumentSnapshot<DocumentData>): SkuVaultOrderSession {
     const data = doc.data();
     if (!data) {
       throw new Error(`Document ${doc.id} has no data`);
@@ -107,19 +115,19 @@ export class FirestoreStorage implements IFirestoreStorage {
     total: number;
   }> {
     const db = getFirestoreDb();
-    let query: admin.firestore.Query = db.collection(this.collectionName);
+    let query: Query<DocumentData> = db.collection(this.collectionName);
 
     // Apply date filters if provided
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       startDate.setHours(0, 0, 0, 0);
-      query = query.where('create_date', '>=', admin.firestore.Timestamp.fromDate(startDate));
+      query = query.where('create_date', '>=', Timestamp.fromDate(startDate));
     }
 
     if (filters.endDate) {
       const endDate = new Date(filters.endDate);
       endDate.setHours(23, 59, 59, 999);
-      query = query.where('create_date', '<=', admin.firestore.Timestamp.fromDate(endDate));
+      query = query.where('create_date', '<=', Timestamp.fromDate(endDate));
     }
 
     // Apply picker name filter
