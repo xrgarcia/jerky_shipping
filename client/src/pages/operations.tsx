@@ -615,11 +615,18 @@ Please analyze this failure and help me understand:
                 recentJobs: prev?.backfill?.recentJobs || [],
               },
               dataHealth: message.data.dataHealth,
+              // Preserve pipeline metrics from initial API load since WebSocket doesn't send them
+              pipeline: prev?.pipeline,
               onHoldWorkerStatus: message.data.onHoldWorkerStatus || 'sleeping',
               // Only update onHoldWorkerStats if defined, otherwise preserve previous value
               onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
                 ? message.data.onHoldWorkerStats 
                 : prev?.onHoldWorkerStats,
+              // Preserve firestore worker status from initial API load since WebSocket doesn't send them
+              firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus || prev?.firestoreSessionSyncWorkerStatus,
+              firestoreSessionSyncWorkerStats: message.data.firestoreSessionSyncWorkerStats !== undefined
+                ? message.data.firestoreSessionSyncWorkerStats
+                : prev?.firestoreSessionSyncWorkerStats,
             }));
           }
         } catch (error) {
