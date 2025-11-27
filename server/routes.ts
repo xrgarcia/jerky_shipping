@@ -3954,19 +3954,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== Customer Service Routes ====================
 
   app.post("/api/manual-orders/generate", requireAuth, async (req, res) => {
-    const { generateManualOrderNumber, validateSuffix } = await import("@shared/manual-order-generator");
+    const { generateManualOrderNumber, validateInitials } = await import("@shared/manual-order-generator");
     const { reportingSql } = await import("./reporting-db");
     
     try {
-      const { suffix } = req.body as { suffix?: string };
+      const { initials } = req.body as { initials?: string };
       
-      // Validate suffix if provided
-      if (suffix) {
-        const suffixValidation = validateSuffix(suffix);
-        if (!suffixValidation.valid) {
+      // Validate initials if provided (2-3 uppercase letters only, no trailing digits)
+      if (initials) {
+        const initialsValidation = validateInitials(initials);
+        if (!initialsValidation.valid) {
           return res.status(400).json({ 
             success: false, 
-            error: suffixValidation.error 
+            error: initialsValidation.error 
           });
         }
       }
@@ -3978,7 +3978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       while (attempts < maxAttempts) {
         attempts++;
         
-        const generated = generateManualOrderNumber({ suffix });
+        const generated = generateManualOrderNumber({ initials });
         
         if (!generated.isValid) {
           return res.status(400).json({ 
@@ -3999,7 +3999,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             success: true,
             orderNumber: generated.orderNumber,
-            fullSaleId: generated.fullSaleId,
             attempts
           });
         }
@@ -4023,7 +4022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/manual-orders/validate", requireAuth, async (req, res) => {
-    const { validateManualOrderNumber, validateFullSaleId } = await import("@shared/manual-order-generator");
+    const { validateUserOrderNumber } = await import("@shared/manual-order-generator");
     const { reportingSql } = await import("./reporting-db");
     
     try {
@@ -4037,18 +4036,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate format
-      const validation = validateManualOrderNumber(orderNumber);
+      const validation = validateUserOrderNumber(orderNumber);
       if (!validation.valid) {
         return res.status(400).json({
           success: false,
           isValid: false,
-          error: validation.error
+          error: validation.error,
+          suggestion: validation.suggestion
         });
       }
       
       // Check if it exists
       const existingOrders = await reportingSql`
-        SELECT count(1) as count FROM orders WHERE order_number = ${orderNumber}
+        SELECT count(1) as count FROM orders WHERE order_number = ${orderNumber.trim().toUpperCase()}
       `;
       
       const exists = parseInt(existingOrders[0].count as string, 10) > 0;
@@ -4057,7 +4057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         isValid: true,
         exists,
-        orderNumber
+        orderNumber: orderNumber.trim().toUpperCase()
       });
       
     } catch (error: any) {
