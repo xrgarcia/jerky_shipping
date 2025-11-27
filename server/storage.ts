@@ -951,12 +951,12 @@ export class DatabaseStorage implements IStorage {
                 eq(shipments.sessionStatus, 'New'),
                 eq(shipments.sessionStatus, 'Active')
               ),
-              isNull(shipments.shipDate)
+              isNull(shipments.trackingNumber)
             )
           );
           break;
         case 'packing_queue':
-          // Packing Queue: Orders ready to pack (picked/closed session status, no ship date yet)
+          // Packing Queue: Orders ready to pack (picked/closed session status, no tracking number yet)
           conditions.push(
             and(
               isNotNull(shipments.sessionId),
@@ -964,7 +964,7 @@ export class DatabaseStorage implements IStorage {
                 eq(shipments.sessionStatus, 'Closed'),
                 eq(shipments.sessionStatus, 'Picked')
               ),
-              isNull(shipments.shipDate)
+              isNull(shipments.trackingNumber)
             )
           );
           break;
@@ -1099,11 +1099,11 @@ export class DatabaseStorage implements IStorage {
             eq(shipments.sessionStatus, 'New'),
             eq(shipments.sessionStatus, 'Active')
           ),
-          isNull(shipments.shipDate)
+          isNull(shipments.trackingNumber)
         )
       );
 
-    // Packing Queue: Orders ready to pack (picked/closed session, no ship date)
+    // Packing Queue: Orders ready to pack (picked/closed session, no tracking number)
     const packingQueueResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1114,15 +1114,15 @@ export class DatabaseStorage implements IStorage {
             eq(shipments.sessionStatus, 'Closed'),
             eq(shipments.sessionStatus, 'Picked')
           ),
-          isNull(shipments.shipDate)
+          isNull(shipments.trackingNumber)
         )
       );
 
-    // Shipped: Orders that have been shipped (has ship date)
+    // Shipped: Orders that have been shipped (has tracking number)
     const shippedResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(isNotNull(shipments.shipDate));
+      .where(isNotNull(shipments.trackingNumber));
 
     // All: Total count
     const allResult = await db
