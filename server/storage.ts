@@ -943,13 +943,13 @@ export class DatabaseStorage implements IStorage {
     if (workflowTab) {
       switch (workflowTab) {
         case 'in_progress':
-          // In Progress: Orders currently being picked (New or Active sessions, not yet shipped)
+          // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
           conditions.push(
             and(
               isNotNull(shipments.sessionId),
               or(
-                eq(shipments.sessionStatus, 'New'),
-                eq(shipments.sessionStatus, 'Active')
+                eq(shipments.sessionStatus, 'new'),
+                eq(shipments.sessionStatus, 'active')
               ),
               isNull(shipments.trackingNumber)
             )
@@ -961,8 +961,8 @@ export class DatabaseStorage implements IStorage {
             and(
               isNotNull(shipments.sessionId),
               or(
-                eq(shipments.sessionStatus, 'Closed'),
-                eq(shipments.sessionStatus, 'Picked')
+                eq(shipments.sessionStatus, 'closed'),
+                eq(shipments.sessionStatus, 'picked')
               ),
               isNull(shipments.trackingNumber)
             )
@@ -1088,7 +1088,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }> {
-    // In Progress: Orders currently being picked (New or Active sessions, not yet shipped)
+    // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
     const inProgressResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1096,8 +1096,8 @@ export class DatabaseStorage implements IStorage {
         and(
           isNotNull(shipments.sessionId),
           or(
-            eq(shipments.sessionStatus, 'New'),
-            eq(shipments.sessionStatus, 'Active')
+            eq(shipments.sessionStatus, 'new'),
+            eq(shipments.sessionStatus, 'active')
           ),
           isNull(shipments.trackingNumber)
         )
@@ -1111,8 +1111,8 @@ export class DatabaseStorage implements IStorage {
         and(
           isNotNull(shipments.sessionId),
           or(
-            eq(shipments.sessionStatus, 'Closed'),
-            eq(shipments.sessionStatus, 'Picked')
+            eq(shipments.sessionStatus, 'closed'),
+            eq(shipments.sessionStatus, 'picked')
           ),
           isNull(shipments.trackingNumber)
         )
