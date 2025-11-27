@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Zap,
   Boxes,
+  Gift,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -120,6 +121,14 @@ type ShipmentEvent = {
   skuvaultImport?: boolean; // True if imported from SkuVault PassedItems
 };
 
+type ShipmentTag = {
+  id: string;
+  shipmentId: string;
+  name: string;
+  color: string | null;
+  tagId: number | null;
+};
+
 type SkuVaultProduct = {
   IdItem?: string | null;
   Sku?: string | null;
@@ -174,6 +183,15 @@ export default function Packing() {
   const [packingComplete, setPackingComplete] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+  // Fetch shipment tags to check for Gift tag
+  const { data: shipmentTags = [] } = useQuery<ShipmentTag[]>({
+    queryKey: ['/api/shipments', currentShipment?.id, 'tags'],
+    enabled: !!currentShipment?.id,
+  });
+
+  // Check if shipment has Gift tag
+  const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
@@ -1168,6 +1186,30 @@ export default function Packing() {
                     </>
                   );
                 })()}
+
+                {/* Status Indicators */}
+                <div className="h-12 w-[2px] bg-border" />
+                <div>
+                  <div className="text-xs text-muted-foreground font-semibold mb-1">Status</div>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      className="bg-green-600 hover:bg-green-600 text-white text-sm px-3 py-1"
+                      data-testid="badge-shippable"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Shippable
+                    </Badge>
+                    {hasGiftTag && (
+                      <Badge 
+                        className="bg-pink-600 hover:bg-pink-600 text-white text-sm px-3 py-1"
+                        data-testid="badge-gift"
+                      >
+                        <Gift className="h-4 w-4 mr-1" />
+                        Add $5 Gift Card
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button
