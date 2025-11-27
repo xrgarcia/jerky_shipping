@@ -198,6 +198,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
                 {shipment.pickedByUserName && (
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Picked by:</span>
                     <span className="font-medium">{shipment.pickedByUserName}</span>
                   </div>
                 )}
