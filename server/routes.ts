@@ -3951,6 +3951,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Customer Service Routes ====================
+
+  app.post("/api/manual-orders/generate", requireAuth, async (req, res) => {
+    const { generateManualOrderNumber, validateSuffix } = await import("@shared/manual-order-generator");
+    const { reportingSql } = await import("./reporting-db");
+    
+    try {
+      const { suffix } = req.body as { suffix?: string };
+      
+      // Validate suffix if provided
+      if (suffix) {
+        const suffixValidation = validateSuffix(suffix);
+        if (!suffixValidation.valid) {
+          return res.status(400).json({ 
+            success: false, 
+            error: suffixValidation.error 
+          });
+        }
+      }
+      
+      // Generate order numbers until we find one that doesn't exist
+      const maxAttempts = 10;
+      let attempts = 0;
+      
+      while (attempts < maxAttempts) {
+        attempts++;
+        
+        const generated = generateManualOrderNumber({ suffix });
+        
+        if (!generated.isValid) {
+          return res.status(400).json({ 
+            success: false, 
+            error: generated.validationError || "Failed to generate valid order number" 
+          });
+        }
+        
+        // Check if order number exists in reporting database
+        const existingOrders = await reportingSql`
+          SELECT count(1) as count FROM orders WHERE order_number = ${generated.orderNumber}
+        `;
+        
+        const exists = parseInt(existingOrders[0].count as string, 10) > 0;
+        
+        if (!exists) {
+          console.log(`[Manual Order] Generated unique order number: ${generated.orderNumber} (attempt ${attempts})`);
+          return res.json({
+            success: true,
+            orderNumber: generated.orderNumber,
+            fullSaleId: generated.fullSaleId,
+            attempts
+          });
+        }
+        
+        console.log(`[Manual Order] Order number ${generated.orderNumber} already exists, retrying...`);
+      }
+      
+      // Exhausted all attempts
+      return res.status(500).json({ 
+        success: false, 
+        error: `Failed to generate unique order number after ${maxAttempts} attempts. Please try again.` 
+      });
+      
+    } catch (error: any) {
+      console.error("[Manual Order] Error generating order number:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || "Failed to generate order number" 
+      });
+    }
+  });
+
+  app.post("/api/manual-orders/validate", requireAuth, async (req, res) => {
+    const { validateManualOrderNumber, validateFullSaleId } = await import("@shared/manual-order-generator");
+    const { reportingSql } = await import("./reporting-db");
+    
+    try {
+      const { orderNumber } = req.body as { orderNumber: string };
+      
+      if (!orderNumber) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Order number is required" 
+        });
+      }
+      
+      // Validate format
+      const validation = validateManualOrderNumber(orderNumber);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          isValid: false,
+          error: validation.error
+        });
+      }
+      
+      // Check if it exists
+      const existingOrders = await reportingSql`
+        SELECT count(1) as count FROM orders WHERE order_number = ${orderNumber}
+      `;
+      
+      const exists = parseInt(existingOrders[0].count as string, 10) > 0;
+      
+      res.json({
+        success: true,
+        isValid: true,
+        exists,
+        orderNumber
+      });
+      
+    } catch (error: any) {
+      console.error("[Manual Order] Error validating order number:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || "Failed to validate order number" 
+      });
+    }
+  });
+
   // ==================== Firestore Routes (Session Orders) ====================
 
   app.get("/api/firestore/session-orders", requireAuth, async (req, res) => {
