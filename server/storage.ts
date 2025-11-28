@@ -1143,10 +1143,10 @@ export class DatabaseStorage implements IStorage {
       .from(shipments);
 
     return {
-      inProgress: inProgressResult[0]?.count || 0,
-      packingQueue: packingQueueResult[0]?.count || 0,
-      shipped: shippedResult[0]?.count || 0,
-      all: allResult[0]?.count || 0,
+      inProgress: Number(inProgressResult[0]?.count) || 0,
+      packingQueue: Number(packingQueueResult[0]?.count) || 0,
+      shipped: Number(shippedResult[0]?.count) || 0,
+      all: Number(allResult[0]?.count) || 0,
     };
   }
 

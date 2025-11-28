@@ -647,6 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shipments/tab-counts", requireAuth, async (req, res) => {
     try {
       const counts = await storage.getShipmentTabCounts();
+      console.log("[tab-counts] Returning counts:", JSON.stringify(counts));
       res.json(counts);
     } catch (error) {
       console.error("Error fetching tab counts:", error);
