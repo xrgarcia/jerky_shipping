@@ -16,53 +16,131 @@ interface SystemPrinter {
 
 export class PrinterService {
   private tempDir: string;
+  private platform: NodeJS.Platform;
   
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'jerky-ship-connect');
+    this.platform = process.platform;
   }
   
   async discoverPrinters(): Promise<SystemPrinter[]> {
     try {
-      const { stdout } = await execAsync('lpstat -p -d 2>/dev/null || true');
-      const printers: SystemPrinter[] = [];
-      let defaultPrinter = '';
-      
-      const lines = stdout.split('\n');
-      
-      for (const line of lines) {
-        if (line.startsWith('system default destination:')) {
-          defaultPrinter = line.split(':')[1]?.trim() || '';
-        } else if (line.startsWith('printer')) {
-          const match = line.match(/^printer\s+(\S+)\s+(.*)$/);
-          if (match) {
-            const systemName = match[1];
-            const statusPart = match[2];
-            
-            const isEnabled = statusPart.includes('enabled');
-            const isIdle = statusPart.includes('idle');
-            
-            let status = 'offline';
-            if (isEnabled && isIdle) {
-              status = 'online';
-            } else if (isEnabled) {
-              status = 'busy';
-            }
-            
-            printers.push({
-              name: systemName.replace(/_/g, ' '),
-              systemName,
-              isDefault: systemName === defaultPrinter,
-              status,
-            });
-          }
-        }
+      if (this.platform === 'win32') {
+        return await this.discoverWindowsPrinters();
+      } else {
+        return await this.discoverMacPrinters();
       }
-      
-      return printers;
     } catch (error) {
       console.error('Failed to discover printers:', error);
       return [];
     }
+  }
+  
+  private async discoverMacPrinters(): Promise<SystemPrinter[]> {
+    const { stdout } = await execAsync('lpstat -p -d 2>/dev/null || true');
+    const printers: SystemPrinter[] = [];
+    let defaultPrinter = '';
+    
+    const lines = stdout.split('\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('system default destination:')) {
+        defaultPrinter = line.split(':')[1]?.trim() || '';
+      } else if (line.startsWith('printer')) {
+        const match = line.match(/^printer\s+(\S+)\s+(.*)$/);
+        if (match) {
+          const systemName = match[1];
+          const statusPart = match[2];
+          
+          const isEnabled = statusPart.includes('enabled');
+          const isIdle = statusPart.includes('idle');
+          
+          let status = 'offline';
+          if (isEnabled && isIdle) {
+            status = 'online';
+          } else if (isEnabled) {
+            status = 'busy';
+          }
+          
+          printers.push({
+            name: systemName.replace(/_/g, ' '),
+            systemName,
+            isDefault: systemName === defaultPrinter,
+            status,
+          });
+        }
+      }
+    }
+    
+    return printers;
+  }
+  
+  private async discoverWindowsPrinters(): Promise<SystemPrinter[]> {
+    const printers: SystemPrinter[] = [];
+    
+    try {
+      const { stdout } = await execAsync(
+        'powershell -Command "Get-Printer | Select-Object Name, PrinterStatus, Default | ConvertTo-Json"',
+        { encoding: 'utf8' }
+      );
+      
+      if (!stdout.trim()) {
+        return [];
+      }
+      
+      let printerList = JSON.parse(stdout);
+      
+      if (!Array.isArray(printerList)) {
+        printerList = [printerList];
+      }
+      
+      for (const printer of printerList) {
+        let status = 'offline';
+        if (printer.PrinterStatus === 0 || printer.PrinterStatus === 'Normal') {
+          status = 'online';
+        } else if (printer.PrinterStatus === 1 || printer.PrinterStatus === 'Paused') {
+          status = 'offline';
+        } else if (printer.PrinterStatus === 3 || printer.PrinterStatus === 'Printing') {
+          status = 'busy';
+        }
+        
+        printers.push({
+          name: printer.Name,
+          systemName: printer.Name,
+          isDefault: printer.Default === true,
+          status,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to discover Windows printers:', error);
+      
+      try {
+        const { stdout } = await execAsync('wmic printer get name,default,status', { encoding: 'utf8' });
+        const lines = stdout.split('\n').filter(line => line.trim());
+        
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].trim().split(/\s{2,}/);
+          if (parts.length >= 2) {
+            const isDefault = parts[0]?.toLowerCase() === 'true';
+            const name = parts[1] || '';
+            const status = parts[2]?.toLowerCase() === 'ok' ? 'online' : 'offline';
+            
+            if (name) {
+              printers.push({
+                name,
+                systemName: name,
+                isDefault,
+                status,
+              });
+            }
+          }
+        }
+      } catch (wmicError) {
+        console.error('WMIC fallback also failed:', wmicError);
+      }
+    }
+    
+    return printers;
   }
   
   async print(job: PrintJob, printerName: string): Promise<void> {
@@ -105,6 +183,14 @@ export class PrinterService {
   }
   
   private async printFile(filePath: string, printerName: string): Promise<void> {
+    if (this.platform === 'win32') {
+      return this.printFileWindows(filePath, printerName);
+    } else {
+      return this.printFileMac(filePath, printerName);
+    }
+  }
+  
+  private async printFileMac(filePath: string, printerName: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const args = [
         '-d', printerName,
@@ -133,6 +219,36 @@ export class PrinterService {
       
       process.on('error', (error) => {
         reject(error);
+      });
+    });
+  }
+  
+  private async printFileWindows(filePath: string, printerName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const escapedPath = filePath.replace(/\\/g, '\\\\');
+      const escapedPrinter = printerName.replace(/"/g, '\\"');
+      
+      const command = `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}' -Wait"`;
+      
+      console.log(`[Printer] Executing Windows print command for ${printerName}`);
+      
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error('[Printer] Windows print error:', stderr);
+          
+          const fallbackCommand = `print /d:"${printerName}" "${filePath}"`;
+          console.log(`[Printer] Trying fallback: ${fallbackCommand}`);
+          
+          exec(fallbackCommand, (fallbackError, _, fallbackStderr) => {
+            if (fallbackError) {
+              reject(new Error(`Print failed: ${fallbackStderr || fallbackError.message}`));
+            } else {
+              resolve();
+            }
+          });
+        } else {
+          resolve();
+        }
       });
     });
   }

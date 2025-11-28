@@ -1,13 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Monitor, CheckCircle, AlertCircle, Apple } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download, Monitor, CheckCircle, AlertCircle } from "lucide-react";
+import { SiApple } from "react-icons/si";
+import { FaWindows } from "react-icons/fa";
 
 const APP_VERSION = "1.0.0";
 const RELEASE_DATE = "November 2024";
 
 export default function Downloads() {
-  const systemRequirements = [
+  const macRequirements = [
     "macOS 12 (Monterey) or later",
     "Apple Silicon (M1/M2/M3) or Intel processor",
     "4GB RAM minimum",
@@ -15,12 +18,21 @@ export default function Downloads() {
     "Active internet connection",
   ];
 
+  const windowsRequirements = [
+    "Windows 10 (64-bit) or later",
+    "64-bit processor",
+    "4GB RAM minimum",
+    "100MB free disk space",
+    "Active internet connection",
+  ];
+
   const features = [
-    "Native macOS printer discovery",
+    "Native printer discovery",
     "Real-time print job delivery via WebSocket",
     "Secure Google Workspace authentication",
     "Station-based session management",
     "Automatic reconnection and heartbeat",
+    "Environment switching (Production/Development)",
   ];
 
   return (
@@ -37,18 +49,13 @@ export default function Downloads() {
       <Card className="mb-6">
         <CardHeader>
           <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-primary/10">
-                <Apple className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-xl" data-testid="text-app-name">
-                  Jerky Ship Connect
-                </CardTitle>
-                <CardDescription>
-                  Desktop printing client for macOS
-                </CardDescription>
-              </div>
+            <div>
+              <CardTitle className="text-xl" data-testid="text-app-name">
+                Jerky Ship Connect
+              </CardTitle>
+              <CardDescription>
+                Desktop printing client for warehouse stations
+              </CardDescription>
             </div>
             <Badge variant="secondary" data-testid="badge-version">
               v{APP_VERSION}
@@ -56,27 +63,90 @@ export default function Downloads() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button 
-              size="lg" 
-              className="flex-1"
-              data-testid="button-download-dmg"
-              disabled
-            >
-              <Download className="mr-2 h-5 w-5" />
-              Download for macOS (.dmg)
-            </Button>
-            <Button 
-              variant="outline" 
-              size="lg"
-              className="flex-1"
-              data-testid="button-download-zip"
-              disabled
-            >
-              <Download className="mr-2 h-5 w-5" />
-              Download ZIP Archive
-            </Button>
-          </div>
+          <Tabs defaultValue="windows" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="windows" className="flex items-center gap-2" data-testid="tab-windows">
+                <FaWindows className="h-4 w-4" />
+                Windows
+              </TabsTrigger>
+              <TabsTrigger value="macos" className="flex items-center gap-2" data-testid="tab-macos">
+                <SiApple className="h-4 w-4" />
+                macOS
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="windows" className="space-y-4 mt-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  size="lg" 
+                  className="flex-1"
+                  data-testid="button-download-exe"
+                  disabled
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Download Installer (.exe)
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="flex-1"
+                  data-testid="button-download-portable"
+                  disabled
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Portable Version
+                </Button>
+              </div>
+              
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-2">System Requirements</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {windowsRequirements.map((req, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="macos" className="space-y-4 mt-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  size="lg" 
+                  className="flex-1"
+                  data-testid="button-download-dmg"
+                  disabled
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Download for macOS (.dmg)
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="flex-1"
+                  data-testid="button-download-zip"
+                  disabled
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  Download ZIP Archive
+                </Button>
+              </div>
+              
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-2">System Requirements</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {macRequirements.map((req, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </TabsContent>
+          </Tabs>
           
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <AlertCircle className="h-4 w-4" />
@@ -93,90 +163,86 @@ export default function Downloads() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Monitor className="h-5 w-5" />
-              System Requirements
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {systemRequirements.map((req, index) => (
-                <li 
-                  key={index} 
-                  className="flex items-start gap-2 text-sm"
-                  data-testid={`text-requirement-${index}`}
-                >
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                  <span>{req}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            Features
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid md:grid-cols-2 gap-2">
+            {features.map((feature, index) => (
+              <li 
+                key={index} 
+                className="flex items-start gap-2 text-sm"
+                data-testid={`text-feature-${index}`}
+              >
+                <CheckCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5" />
-              Features
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {features.map((feature, index) => (
-                <li 
-                  key={index} 
-                  className="flex items-start gap-2 text-sm"
-                  data-testid={`text-feature-${index}`}
-                >
-                  <CheckCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle>Installation Instructions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ol className="list-decimal list-inside space-y-3 text-sm">
-            <li data-testid="text-install-step-1">
-              <strong>Download</strong> the DMG file using the button above
-            </li>
-            <li data-testid="text-install-step-2">
-              <strong>Open</strong> the downloaded .dmg file
-            </li>
-            <li data-testid="text-install-step-3">
-              <strong>Drag</strong> Jerky Ship Connect to your Applications folder
-            </li>
-            <li data-testid="text-install-step-4">
-              <strong>Launch</strong> the app from Applications or Spotlight
-            </li>
-            <li data-testid="text-install-step-5">
-              <strong>Select your environment</strong> (Development or Production) from the dropdown
-            </li>
-            <li data-testid="text-install-step-6">
-              <strong>Sign in</strong> with your @jerky.com Google account
-            </li>
-            <li data-testid="text-install-step-7">
-              <strong>Select your station</strong> to start receiving print jobs
-            </li>
-          </ol>
+          <Tabs defaultValue="windows-install">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="windows-install" className="flex items-center gap-2">
+                <SiWindows className="h-4 w-4" />
+                Windows
+              </TabsTrigger>
+              <TabsTrigger value="macos-install" className="flex items-center gap-2">
+                <SiApple className="h-4 w-4" />
+                macOS
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="windows-install" className="mt-4">
+              <ol className="list-decimal list-inside space-y-3 text-sm">
+                <li><strong>Download</strong> the installer (.exe) using the button above</li>
+                <li><strong>Run</strong> the downloaded installer</li>
+                <li><strong>Follow</strong> the installation wizard prompts</li>
+                <li><strong>Launch</strong> Jerky Ship Connect from the Start Menu or Desktop</li>
+                <li><strong>Select your environment</strong> (Development or Production) from the dropdown</li>
+                <li><strong>Sign in</strong> with your @jerky.com Google account</li>
+                <li><strong>Select your station</strong> to start receiving print jobs</li>
+              </ol>
 
-          <div className="p-4 bg-muted rounded-lg mt-4">
-            <p className="text-sm font-medium mb-2">First Launch Security Notice</p>
-            <p className="text-sm text-muted-foreground">
-              On first launch, macOS may show a security warning. Right-click the app and 
-              select "Open" to bypass Gatekeeper. You only need to do this once.
-            </p>
-          </div>
+              <div className="p-4 bg-muted rounded-lg mt-4">
+                <p className="text-sm font-medium mb-2">Windows SmartScreen Notice</p>
+                <p className="text-sm text-muted-foreground">
+                  On first launch, Windows SmartScreen may show a warning. Click "More info" then 
+                  "Run anyway" to proceed. This is normal for new applications not yet widely distributed.
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="macos-install" className="mt-4">
+              <ol className="list-decimal list-inside space-y-3 text-sm">
+                <li><strong>Download</strong> the DMG file using the button above</li>
+                <li><strong>Open</strong> the downloaded .dmg file</li>
+                <li><strong>Drag</strong> Jerky Ship Connect to your Applications folder</li>
+                <li><strong>Launch</strong> the app from Applications or Spotlight</li>
+                <li><strong>Select your environment</strong> (Development or Production) from the dropdown</li>
+                <li><strong>Sign in</strong> with your @jerky.com Google account</li>
+                <li><strong>Select your station</strong> to start receiving print jobs</li>
+              </ol>
+
+              <div className="p-4 bg-muted rounded-lg mt-4">
+                <p className="text-sm font-medium mb-2">First Launch Security Notice</p>
+                <p className="text-sm text-muted-foreground">
+                  On first launch, macOS may show a security warning. Right-click the app and 
+                  select "Open" to bypass Gatekeeper. You only need to do this once.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

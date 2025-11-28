@@ -32,13 +32,14 @@ let appState: AppState = {
 };
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
+  const isMac = process.platform === 'darwin';
+  const isWin = process.platform === 'win32';
+  
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: 480,
     height: 720,
     minWidth: 400,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -46,7 +47,17 @@ function createWindow(): void {
     },
     show: false,
     backgroundColor: '#1a1a1a',
-  });
+  };
+  
+  if (isMac) {
+    windowOptions.titleBarStyle = 'hiddenInset';
+    windowOptions.trafficLightPosition = { x: 16, y: 16 };
+  } else if (isWin) {
+    windowOptions.frame = true;
+    windowOptions.autoHideMenuBar = true;
+  }
+  
+  mainWindow = new BrowserWindow(windowOptions);
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
