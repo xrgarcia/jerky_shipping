@@ -225,30 +225,59 @@ export class PrinterService {
   
   private async printFileWindows(filePath: string, printerName: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const escapedPath = filePath.replace(/\\/g, '\\\\');
-      const escapedPrinter = printerName.replace(/"/g, '\\"');
-      
-      const command = `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}' -Wait"`;
-      
       console.log(`[Printer] Executing Windows print command for ${printerName}`);
       
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
+      // Use spawn with argument array to avoid shell escaping issues
+      // PowerShell's Start-Process with PrintTo verb sends file to specified printer
+      const psCommand = `Start-Process -FilePath '${filePath.replace(/'/g, "''")}' -Verb PrintTo -ArgumentList '${printerName.replace(/'/g, "''")}' -Wait`;
+      
+      const printProcess = spawn('powershell', ['-NoProfile', '-Command', psCommand], {
+        shell: false,
+        windowsHide: true,
+      });
+      
+      let stderr = '';
+      
+      printProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      printProcess.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
           console.error('[Printer] Windows print error:', stderr);
           
-          const fallbackCommand = `print /d:"${printerName}" "${filePath}"`;
-          console.log(`[Printer] Trying fallback: ${fallbackCommand}`);
+          // Fallback: Use spawn to avoid shell injection issues
+          console.log(`[Printer] Trying fallback print command`);
           
-          exec(fallbackCommand, (fallbackError, _, fallbackStderr) => {
-            if (fallbackError) {
-              reject(new Error(`Print failed: ${fallbackStderr || fallbackError.message}`));
-            } else {
+          const fallbackProcess = spawn('cmd', ['/c', 'print', `/d:${printerName}`, filePath], {
+            shell: false,
+            windowsHide: true,
+          });
+          
+          let fallbackStderr = '';
+          
+          fallbackProcess.stderr.on('data', (data) => {
+            fallbackStderr += data.toString();
+          });
+          
+          fallbackProcess.on('close', (fallbackCode) => {
+            if (fallbackCode === 0) {
               resolve();
+            } else {
+              reject(new Error(`Print failed: ${fallbackStderr || stderr || 'Unknown error'}`));
             }
           });
-        } else {
-          resolve();
+          
+          fallbackProcess.on('error', (error) => {
+            reject(error);
+          });
         }
+      });
+      
+      printProcess.on('error', (error) => {
+        reject(error);
       });
     });
   }

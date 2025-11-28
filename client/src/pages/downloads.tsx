@@ -194,7 +194,7 @@ export default function Downloads() {
           <Tabs defaultValue="windows-install">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="windows-install" className="flex items-center gap-2">
-                <SiWindows className="h-4 w-4" />
+                <FaWindows className="h-4 w-4" />
                 Windows
               </TabsTrigger>
               <TabsTrigger value="macos-install" className="flex items-center gap-2">
