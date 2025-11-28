@@ -334,7 +334,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
                   Return
                 </Badge>
               )}
-              {shipment.isGift && (
+              {(shipment.isGift || tags?.some(tag => tag.name === 'Gift')) && (
                 <Badge variant="outline" className="border-pink-500 text-pink-700 dark:text-pink-400 text-xs">
                   Gift
                 </Badge>

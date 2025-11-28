@@ -174,8 +174,9 @@ export default function Packing() {
     enabled: !!currentShipment?.id,
   });
 
-  // Check if shipment has Gift tag
+  // Check if shipment is a gift (either has Gift tag OR isGift boolean)
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
+  const isGift = hasGiftTag || Boolean(currentShipment?.isGift);
   
   // Check if shipment has MOVE OVER tag (means it's shippable)
   const hasMoveOverTag = shipmentTags.some(tag => tag.name === 'MOVE OVER');
@@ -1113,7 +1114,7 @@ export default function Packing() {
                         Not Shippable
                       </Badge>
                     )}
-                    {hasGiftTag && (
+                    {isGift && (
                       <Badge 
                         className="bg-pink-600 hover:bg-pink-600 text-white text-sm px-3 py-1"
                         data-testid="badge-gift"
@@ -1279,7 +1280,7 @@ export default function Packing() {
                       <div>
                         <div className="text-xs text-muted-foreground font-semibold mb-2">Gift Message</div>
                         <div className="text-sm" data-testid="text-gift-message">
-                          {currentShipment.isGift && currentShipment.notesForGift ? (
+                          {isGift && currentShipment.notesForGift ? (
                             <span className="italic text-pink-600">"{currentShipment.notesForGift}"</span>
                           ) : (
                             <span className="text-muted-foreground">None</span>
