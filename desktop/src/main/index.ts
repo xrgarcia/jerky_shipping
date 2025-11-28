@@ -142,7 +142,7 @@ async function connectWebSocket(): Promise<void> {
   wsClient.on('connected', () => {
     updateState({ connectionStatus: 'connected' });
     
-    if (appState.session?.stationId) {
+    if (appState.session?.stationId && wsClient) {
       wsClient.subscribeToStation(appState.session.stationId);
     }
   });
@@ -156,7 +156,7 @@ async function connectWebSocket(): Promise<void> {
       printJobs: [job, ...appState.printJobs],
     });
     
-    if (appState.selectedPrinter) {
+    if (appState.selectedPrinter && wsClient) {
       try {
         await printerService.print(job, appState.selectedPrinter.systemName);
         wsClient.sendJobUpdate(job.id, 'completed');
@@ -243,6 +243,7 @@ function setupIpcHandlers(): void {
   
   ipcMain.handle('station:list', async () => {
     try {
+      if (!apiClient) throw new Error('Not authenticated');
       const stations = await apiClient.getStations();
       return { success: true, data: stations };
     } catch (error) {
@@ -251,8 +252,9 @@ function setupIpcHandlers(): void {
     }
   });
   
-  ipcMain.handle('station:claim', async (_, stationId: string) => {
+  ipcMain.handle('station:claim', async (_event, stationId: string) => {
     try {
+      if (!apiClient) throw new Error('Not authenticated');
       const session = await apiClient.claimStation(stationId);
       const station = await apiClient.getStation(stationId);
       
@@ -271,7 +273,7 @@ function setupIpcHandlers(): void {
   
   ipcMain.handle('station:release', async () => {
     try {
-      if (appState.session) {
+      if (appState.session && apiClient) {
         await apiClient.releaseStation(appState.session.id);
       }
       
@@ -299,7 +301,7 @@ function setupIpcHandlers(): void {
   
   ipcMain.handle('printer:list', async () => {
     try {
-      if (!appState.station) {
+      if (!appState.station || !apiClient) {
         return { success: true, data: [] };
       }
       const printers = await apiClient.getPrinters(appState.station.id);
@@ -311,9 +313,9 @@ function setupIpcHandlers(): void {
     }
   });
   
-  ipcMain.handle('printer:register', async (_, printerData: { name: string; systemName: string }) => {
+  ipcMain.handle('printer:register', async (_event, printerData: { name: string; systemName: string }) => {
     try {
-      if (!appState.station) {
+      if (!appState.station || !apiClient) {
         throw new Error('No station selected');
       }
       const printer = await apiClient.registerPrinter({
@@ -328,7 +330,7 @@ function setupIpcHandlers(): void {
     }
   });
   
-  ipcMain.handle('printer:set-default', async (_, printerId: string) => {
+  ipcMain.handle('printer:set-default', async (_event, printerId: string) => {
     try {
       const printer = appState.printers.find(p => p.id === printerId);
       if (printer) {
@@ -367,7 +369,7 @@ function setupIpcHandlers(): void {
     return { success: true, data: selectedEnvironment };
   });
   
-  ipcMain.handle('env:set', async (_, envName: string) => {
+  ipcMain.handle('env:set', async (_event, envName: string) => {
     const env = getEnvironment(envName);
     if (!env) {
       return { success: false, error: 'Invalid environment' };
