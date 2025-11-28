@@ -14,7 +14,7 @@ Preferred communication style: Simple, everyday language.
 ### Technical Implementations
 - **Frontend**: React with TypeScript (Vite), Wouter for routing, TanStack Query for server state management.
 - **Backend**: Express.js with Node.js and TypeScript, RESTful API, Drizzle ORM for database interactions.
-- **Authentication**: Passwordless via magic link tokens (email), secure HTTP-only session cookies.
+- **Authentication**: Google OAuth with domain restriction (@jerky.com only), secure HTTP-only session cookies. Users sign in with their Google Workspace account.
 - **Data Storage**: PostgreSQL via Neon serverless connection, Drizzle Kit for migrations. Schema includes tables for users, authentication, orders, products, product variants, and order items. Comprehensive indexing strategy across all major tables for optimized query performance.
 - **Normalized SkuVault Data Model**: SkuVault session data is normalized into relational columns instead of jsonb for single source of truth:
     - `shipments` table: firestoreDocumentId, sessionStatus, spotNumber, pickedByUserId/Name, pickStartedAt/EndedAt, savedCustomField2
@@ -49,6 +49,6 @@ Preferred communication style: Simple, everyday language.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning. Features automatic authentication with Redis-backed token caching.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
--   **Nodemailer**: For sending magic link authentication emails.
+-   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database (primary).
 -   **GCP PostgreSQL**: Separate reporting database for purchase order recommendations and inventory forecasting analytics.

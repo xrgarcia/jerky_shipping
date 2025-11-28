@@ -1,46 +1,58 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
+import { Loader2 } from "lucide-react";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
   const [, setLocation] = useLocation();
+  const searchParams = new URLSearchParams(useSearch());
+  const error = searchParams.get("error");
   const { toast } = useToast();
 
-  const requestLinkMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/auth/request-magic-link", { email });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Check your email",
-        description: "We've sent you a magic link to sign in.",
-      });
-      setEmail("");
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to send magic link. Please try again.",
-        variant: "destructive",
-      });
-    },
+  const { data: authData, isLoading } = useQuery<{ user: any }>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      requestLinkMutation.mutate(email);
+  useEffect(() => {
+    if (authData?.user) {
+      setLocation("/orders");
     }
+  }, [authData, setLocation]);
+
+  useEffect(() => {
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        oauth_denied: "Sign in was cancelled. Please try again.",
+        no_code: "Authentication failed. Please try again.",
+        invalid_state: "Authentication failed. Please try again.",
+        unauthorized_domain: "Only @jerky.com accounts are allowed to sign in.",
+        auth_failed: "Authentication failed. Please try again.",
+      };
+      toast({
+        title: "Sign In Error",
+        description: errorMessages[error] || "An error occurred during sign in.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", "/login");
+    }
+  }, [error, toast]);
+
+  const handleGoogleSignIn = () => {
+    window.location.href = "/api/auth/google";
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -48,42 +60,25 @@ export default function Login() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="bg-primary text-primary-foreground p-3 rounded-full">
-              <Mail className="h-8 w-8" />
+              <SiGoogle className="h-8 w-8" />
             </div>
           </div>
           <CardTitle className="text-3xl font-serif">ship.jerky.com</CardTitle>
           <CardDescription className="text-base">
-            Enter your email to receive a magic link
+            Sign in with your Jerky.com Google account
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-base">
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                data-testid="input-email"
-                type="email"
-                placeholder="warehouse@jerky.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-12 text-base"
-              />
-            </div>
-            <Button
-              type="submit"
-              data-testid="button-request-magic-link"
-              className="w-full h-12 text-base font-semibold"
-              disabled={requestLinkMutation.isPending}
-            >
-              {requestLinkMutation.isPending ? "Sending..." : "Send Magic Link"}
-            </Button>
-          </form>
-          <p className="text-sm text-muted-foreground text-center mt-6">
-            You'll receive a link that expires in 15 minutes
+        <CardContent className="space-y-4">
+          <Button
+            onClick={handleGoogleSignIn}
+            data-testid="button-google-signin"
+            className="w-full h-12 text-base font-semibold gap-2"
+          >
+            <SiGoogle className="h-5 w-5" />
+            Sign in with Google
+          </Button>
+          <p className="text-sm text-muted-foreground text-center">
+            Only @jerky.com accounts can access this application
           </p>
         </CardContent>
       </Card>

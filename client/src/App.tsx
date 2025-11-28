@@ -8,7 +8,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { PrintQueueBar } from "@/components/print-queue-bar";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
-import VerifyMagicLink from "@/pages/verify-magic-link";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Shipments from "@/pages/shipments";
@@ -33,7 +32,7 @@ function AppContent() {
   });
 
   const [location] = useLocation();
-  const isPublicRoute = location === "/login" || location.startsWith("/auth/verify");
+  const isPublicRoute = location === "/login";
   const isAuthenticated = !!userData?.user;
 
   const sidebarStyle = {
@@ -60,7 +59,6 @@ function AppContent() {
   const router = (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/auth/verify" component={VerifyMagicLink} />
       <Route path="/">
         <Redirect to="/orders" />
       </Route>

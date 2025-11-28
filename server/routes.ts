@@ -6,9 +6,8 @@ import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags } from "@shared/schema";
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import nodemailer from "nodemailer";
 import { z } from "zod";
-import { insertUserSchema, insertMagicLinkTokenSchema, insertPackingLogSchema, insertShipmentEventSchema } from "@shared/schema";
+import { insertUserSchema, insertPackingLogSchema, insertShipmentEventSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -53,6 +52,11 @@ const upload = multer({
 
 const SESSION_COOKIE_NAME = "session_token";
 const SESSION_DURATION_DAYS = 30;
+const ALLOWED_EMAIL_DOMAIN = "jerky.com";
+
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 // Shopify API helpers
 // To set up Shopify integration:
@@ -128,37 +132,56 @@ async function fetchShopifyOrder(orderId: string) {
   return data.order;
 }
 
-// Email helper
-async function sendMagicLinkEmail(email: string, token: string, req: Request) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_PORT === "465",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+// Google OAuth helper - generate authorization URL
+function getGoogleAuthUrl(redirectUri: string, state: string): string {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID!,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    state: state,
+    prompt: "select_account",
+    hd: ALLOWED_EMAIL_DOMAIN, // Restrict to jerky.com domain in Google's picker
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+// Exchange Google auth code for tokens and user info
+async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{ email: string; name: string; picture?: string }> {
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: GOOGLE_CLIENT_ID!,
+      client_secret: GOOGLE_CLIENT_SECRET!,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
   });
 
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const magicLink = `${baseUrl}/auth/verify?token=${token}`;
+  if (!tokenResponse.ok) {
+    const error = await tokenResponse.text();
+    throw new Error(`Failed to exchange code: ${error}`);
+  }
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM_EMAIL,
-    to: email,
-    subject: "Your ship.jerky.com Login Link",
-    html: `
-      <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #6B8E23; font-size: 28px;">ship.jerky.com</h1>
-        <p style="font-size: 16px; color: #2c2c2c;">Click the link below to sign in to your warehouse dashboard:</p>
-        <p style="margin: 30px 0;">
-          <a href="${magicLink}" style="background-color: #6B8E23; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">Sign In</a>
-        </p>
-        <p style="font-size: 14px; color: #666666;">This link will expire in 15 minutes.</p>
-        <p style="font-size: 14px; color: #666666;">If you didn't request this link, you can safely ignore this email.</p>
-      </div>
-    `,
+  const tokens = await tokenResponse.json();
+  
+  const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
+
+  if (!userInfoResponse.ok) {
+    throw new Error("Failed to get user info from Google");
+  }
+
+  const userInfo = await userInfoResponse.json();
+  return {
+    email: userInfo.email,
+    name: userInfo.name,
+    picture: userInfo.picture,
+  };
 }
 
 // Auth middleware
@@ -186,47 +209,72 @@ async function requireAuth(req: Request, res: Response, next: Function) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth routes
-  app.post("/api/auth/request-magic-link", async (req, res) => {
-    try {
-      const { email } = z.object({ email: z.string().email() }).parse(req.body);
-
-      const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-      await storage.createMagicLinkToken({
-        email,
-        token,
-        expiresAt,
-      });
-
-      await sendMagicLinkEmail(email, token, req);
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error requesting magic link:", error);
-      res.status(500).json({ error: "Failed to send magic link" });
+  // Google OAuth routes
+  app.get("/api/auth/google", (req, res) => {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({ error: "Google OAuth not configured" });
     }
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const redirectUri = `${baseUrl}/api/auth/google/callback`;
+    const state = randomBytes(16).toString("hex");
+    
+    res.cookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 10 * 60 * 1000, // 10 minutes
+      sameSite: "lax",
+    });
+
+    const authUrl = getGoogleAuthUrl(redirectUri, state);
+    res.redirect(authUrl);
   });
 
-  app.post("/api/auth/verify-magic-link", async (req, res) => {
+  app.get("/api/auth/google/callback", async (req, res) => {
     try {
-      const { token } = z.object({ token: z.string().min(1) }).parse(req.body);
+      const { code, state, error: oauthError } = req.query;
+      const savedState = req.cookies.oauth_state;
 
-      const magicLink = await storage.getMagicLinkToken(token);
+      res.clearCookie("oauth_state");
 
-      if (!magicLink || magicLink.expiresAt < new Date()) {
-        return res.status(401).json({ error: "Invalid or expired token" });
+      if (oauthError) {
+        console.error("Google OAuth error:", oauthError);
+        return res.redirect("/login?error=oauth_denied");
       }
 
-      let user = await storage.getUserByEmail(magicLink.email);
+      if (!code || typeof code !== "string") {
+        return res.redirect("/login?error=no_code");
+      }
+
+      if (!state || state !== savedState) {
+        return res.redirect("/login?error=invalid_state");
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const redirectUri = `${baseUrl}/api/auth/google/callback`;
+
+      const googleUser = await exchangeGoogleCode(code, redirectUri);
+
+      // Verify the email domain
+      const emailDomain = googleUser.email.split("@")[1];
+      if (emailDomain !== ALLOWED_EMAIL_DOMAIN) {
+        console.error(`Unauthorized domain attempt: ${googleUser.email}`);
+        return res.redirect("/login?error=unauthorized_domain");
+      }
+
+      // Find or create user
+      let user = await storage.getUserByEmail(googleUser.email);
 
       if (!user) {
-        user = await storage.createUser({ email: magicLink.email });
+        user = await storage.createUser({ 
+          email: googleUser.email,
+          avatarUrl: googleUser.picture,
+        });
+      } else if (googleUser.picture && !user.avatarUrl) {
+        await storage.updateUser(user.id, { avatarUrl: googleUser.picture });
       }
 
-      await storage.deleteMagicLinkToken(token);
-
+      // Create session
       const sessionToken = randomBytes(32).toString("hex");
       const sessionExpiresAt = new Date(Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -243,13 +291,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sameSite: "lax",
       });
 
-      res.json({ success: true, user });
+      res.redirect("/orders");
     } catch (error) {
-      console.error("Error verifying magic link:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Token is required" });
-      }
-      res.status(500).json({ error: "Failed to verify token" });
+      console.error("Error in Google OAuth callback:", error);
+      res.redirect("/login?error=auth_failed");
     }
   });
 
