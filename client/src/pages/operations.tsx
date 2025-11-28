@@ -1337,7 +1337,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Link href="/shipments?shippedWithoutTracking=true" data-testid="link-shipped-without-tracking">
+        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking">
           <Card data-testid="card-shipments-without-status" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
