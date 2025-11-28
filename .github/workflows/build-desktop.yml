@@ -32,6 +32,10 @@ on:
   # Allow manual trigger from Actions tab (for testing builds)
   workflow_dispatch:
 
+# Required permissions for uploading release assets
+permissions:
+  contents: write
+
 jobs:
   # Build Windows installer (.exe)
   build-windows:
