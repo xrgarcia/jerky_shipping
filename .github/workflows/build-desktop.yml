@@ -1,0 +1,148 @@
+# Jerky Ship Connect - Desktop App Build Workflow
+#
+# This workflow builds Windows (.exe) and macOS (.dmg) installers for the
+# Jerky Ship Connect desktop application.
+#
+# HOW TO USE:
+# 1. Push this repository to GitHub
+# 2. Go to the GitHub repository's Releases page
+# 3. Click "Create a new release"
+# 4. Choose a tag (e.g., v1.0.0) and fill in release notes
+# 5. Click "Publish release"
+# 6. The workflow will automatically build both Windows and macOS installers
+# 7. Once complete, the installers will appear as assets on the release page
+#
+# MANUAL TRIGGER:
+# You can also run this workflow manually from the Actions tab by clicking
+# "Run workflow" on the build-desktop workflow. Manual runs save artifacts
+# for download but don't upload to releases.
+#
+# CODE SIGNING (Optional):
+# For signed builds, add these repository secrets:
+# - macOS: CSC_LINK (base64 cert), CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD
+# - Windows: CSC_LINK (pfx file), CSC_KEY_PASSWORD
+
+name: Build Desktop App
+
+on:
+  # Trigger on new releases - electron-builder auto-publishes to this release
+  release:
+    types: [created]
+  
+  # Allow manual trigger from Actions tab (for testing builds)
+  workflow_dispatch:
+
+jobs:
+  # Build Windows installer (.exe)
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+      
+      - name: Build application
+        working-directory: desktop
+        run: npm run build
+      
+      - name: Build Windows installer (Release)
+        if: github.event_name == 'release'
+        working-directory: desktop
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build Windows installer (Manual - no publish)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: desktop
+        run: npx electron-builder --win --publish=never
+      
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            desktop/release/*.exe
+          retention-days: 30
+
+  # Build macOS installer (.dmg)
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+      
+      - name: Build application
+        working-directory: desktop
+        run: npm run build
+      
+      - name: Build macOS installer (Release)
+        if: github.event_name == 'release'
+        working-directory: desktop
+        run: npm run dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skip code signing if no certificate is configured
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+      
+      - name: Build macOS installer (Manual - no publish, unsigned)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: desktop
+        run: npx electron-builder --mac --publish=never
+        env:
+          # Disable code signing for manual/test builds
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+          retention-days: 30
+
+  # Summary job that runs after both builds complete
+  build-summary:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Desktop App Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.build-windows.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | ${{ needs.build-macos.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "📦 Installers have been uploaded to the release page." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "📥 Download installers from the Artifacts section above." >> $GITHUB_STEP_SUMMARY
+          fi
