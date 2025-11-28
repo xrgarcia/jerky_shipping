@@ -38,6 +38,12 @@ Preferred communication style: Simple, everyday language.
         - **API Endpoints**: REST API at `/api/desktop/*` for station/printer management, client registration, session claiming, and print job lifecycle
         - **Authentication**: Desktop apps authenticate via Google OAuth, receive API tokens (20-hour expiry), stored securely in macOS Keychain
         - **Station Sessions**: Users temporarily claim a physical station for their shift (20-hour expiry), not permanently assigned
+        - **WebSocket Isolation**: Desktop clients use completely separate WebSocket channel from browser clients:
+            - **Path**: `/ws/desktop` (vs `/ws` for browsers)
+            - **Auth**: Bearer token in Authorization header (vs session cookie)
+            - **Rooms**: `desktop:station:{stationId}` (isolated from browser rooms)
+            - **Messages**: Namespaced types (`desktop:job:new`, `desktop:job:update`, `desktop:heartbeat`)
+            - **Connection Tracking**: Separate maps from browser clients - bugs in one system won't affect the other
         - **Electron App** (Phase 2): Will connect via WebSocket, discover local macOS printers, receive print jobs in real-time
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.
     - **Saved Views System**: Customizable column views for PO Recommendations page stored in `saved_views` table.

@@ -2,33 +2,291 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { parse as parseCookie } from 'cookie';
 import { URL } from 'url';
+import { createHash } from 'crypto';
 import { storage } from './storage';
 
 let wss: WebSocketServer | null = null;
 const SESSION_COOKIE_NAME = 'session_token';
 
-// WebSocket rooms for separating broadcasts by page/context
+// WebSocket rooms for separating broadcasts by page/context (BROWSER CLIENTS)
 type Room = 'home' | 'operations' | 'orders' | 'backfill' | 'default';
 const rooms = new Map<Room, Set<WebSocket>>();
 const clientRooms = new WeakMap<WebSocket, Room>();
 
-// Initialize rooms
+// Initialize browser rooms
 (['home', 'operations', 'orders', 'backfill', 'default'] as Room[]).forEach(room => {
   rooms.set(room, new Set());
 });
+
+// ============================================================================
+// DESKTOP PRINTING WEBSOCKET (COMPLETELY ISOLATED)
+// ============================================================================
+
+// Desktop client connections - separate from browser clients
+interface DesktopConnection {
+  ws: WebSocket;
+  clientId: string;
+  userId: string;
+  stationId: string | null;
+  lastHeartbeat: Date;
+}
+
+// Map of stationId -> Set of connections (one station can have one active client)
+const desktopStationConnections = new Map<string, DesktopConnection>();
+// Map of clientId -> connection for quick lookup
+const desktopClientConnections = new Map<string, DesktopConnection>();
+
+// Hash token for lookup
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+// Authenticate desktop client from Bearer token
+async function authenticateDesktopClient(authHeader: string | undefined): Promise<{ clientId: string; userId: string } | null> {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.substring(7);
+  const tokenHash = hashToken(token);
+
+  try {
+    const client = await storage.getDesktopClientByAccessToken(tokenHash);
+    if (!client) {
+      return null;
+    }
+
+    // Check token expiry
+    if (new Date() > new Date(client.accessTokenExpiresAt)) {
+      return null;
+    }
+
+    return { clientId: client.id, userId: client.userId };
+  } catch (error) {
+    console.error('[Desktop WS] Auth error:', error);
+    return null;
+  }
+}
+
+// Handle desktop client WebSocket connection
+function handleDesktopConnection(ws: WebSocket, clientId: string, userId: string): void {
+  const connection: DesktopConnection = {
+    ws,
+    clientId,
+    userId,
+    stationId: null,
+    lastHeartbeat: new Date(),
+  };
+
+  desktopClientConnections.set(clientId, connection);
+  console.log(`[Desktop WS] Client ${clientId} connected`);
+
+  // Send welcome message
+  ws.send(JSON.stringify({
+    type: 'desktop:connected',
+    clientId,
+  }));
+
+  // Handle incoming messages
+  ws.on('message', async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      await handleDesktopMessage(connection, message);
+    } catch (error) {
+      console.error('[Desktop WS] Message parse error:', error);
+    }
+  });
+
+  // Handle disconnect
+  ws.on('close', () => {
+    console.log(`[Desktop WS] Client ${clientId} disconnected`);
+    cleanupDesktopConnection(connection);
+  });
+
+  ws.on('error', (error) => {
+    console.error(`[Desktop WS] Client ${clientId} error:`, error);
+    cleanupDesktopConnection(connection);
+  });
+}
+
+// Helper to safely cleanup a desktop connection without affecting other clients
+function cleanupDesktopConnection(connection: DesktopConnection): void {
+  // Only remove from station map if THIS exact connection (same socket) is still the active one
+  // This prevents a reconnecting client or new client from being kicked when old socket closes
+  if (connection.stationId) {
+    const activeConnection = desktopStationConnections.get(connection.stationId);
+    if (activeConnection && activeConnection.ws === connection.ws) {
+      desktopStationConnections.delete(connection.stationId);
+    }
+  }
+  
+  // Only remove from client map if THIS exact connection (same socket) is still the active one
+  const activeClientConnection = desktopClientConnections.get(connection.clientId);
+  if (activeClientConnection && activeClientConnection.ws === connection.ws) {
+    desktopClientConnections.delete(connection.clientId);
+  }
+}
+
+// Handle messages from desktop clients
+async function handleDesktopMessage(connection: DesktopConnection, message: any): Promise<void> {
+  switch (message.type) {
+    case 'desktop:heartbeat':
+      connection.lastHeartbeat = new Date();
+      connection.ws.send(JSON.stringify({ type: 'desktop:heartbeat_ack' }));
+      break;
+
+    case 'desktop:subscribe_station':
+      // Client wants to receive jobs for a station
+      const stationId = message.stationId;
+      if (!stationId) {
+        connection.ws.send(JSON.stringify({ 
+          type: 'desktop:error', 
+          error: 'Missing stationId' 
+        }));
+        return;
+      }
+
+      // Verify the client has an active session for this station
+      const session = await storage.getActiveSessionByDesktopClient(connection.clientId);
+      if (!session || session.stationId !== stationId) {
+        connection.ws.send(JSON.stringify({ 
+          type: 'desktop:error', 
+          error: 'No active session for this station' 
+        }));
+        return;
+      }
+
+      // Remove from old station if any (safely, only if we're the exact active socket)
+      if (connection.stationId && connection.stationId !== stationId) {
+        const activeConnection = desktopStationConnections.get(connection.stationId);
+        if (activeConnection && activeConnection.ws === connection.ws) {
+          desktopStationConnections.delete(connection.stationId);
+        }
+      }
+
+      // Subscribe to new station
+      connection.stationId = stationId;
+      desktopStationConnections.set(stationId, connection);
+      
+      connection.ws.send(JSON.stringify({ 
+        type: 'desktop:subscribed', 
+        stationId 
+      }));
+      console.log(`[Desktop WS] Client ${connection.clientId} subscribed to station ${stationId}`);
+      break;
+
+    case 'desktop:unsubscribe_station':
+      if (connection.stationId) {
+        const oldStationId = connection.stationId;
+        // Only remove from map if we're the exact active socket for this station
+        const activeConnection = desktopStationConnections.get(oldStationId);
+        if (activeConnection && activeConnection.ws === connection.ws) {
+          desktopStationConnections.delete(oldStationId);
+        }
+        connection.stationId = null;
+        connection.ws.send(JSON.stringify({ 
+          type: 'desktop:unsubscribed', 
+          stationId: oldStationId 
+        }));
+      }
+      break;
+
+    default:
+      console.log(`[Desktop WS] Unknown message type: ${message.type}`);
+  }
+}
+
+// Broadcast a print job to the desktop client subscribed to a station
+export function broadcastDesktopPrintJob(stationId: string, job: any): void {
+  const connection = desktopStationConnections.get(stationId);
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Desktop WS] No active connection for station ${stationId}`);
+    return;
+  }
+
+  try {
+    connection.ws.send(JSON.stringify({
+      type: 'desktop:job:new',
+      job,
+    }));
+    console.log(`[Desktop WS] Sent job ${job.id} to station ${stationId}`);
+  } catch (error) {
+    console.error(`[Desktop WS] Error sending job to station ${stationId}:`, error);
+  }
+}
+
+// Broadcast job status update to desktop client
+export function broadcastDesktopJobUpdate(stationId: string, jobId: string, status: string, data?: any): void {
+  const connection = desktopStationConnections.get(stationId);
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  try {
+    connection.ws.send(JSON.stringify({
+      type: 'desktop:job:update',
+      jobId,
+      status,
+      ...data,
+    }));
+  } catch (error) {
+    console.error(`[Desktop WS] Error sending job update to station ${stationId}:`, error);
+  }
+}
+
+// Get desktop connection stats
+export function getDesktopConnectionStats(): { totalClients: number; stationsWithClients: number } {
+  return {
+    totalClients: desktopClientConnections.size,
+    stationsWithClients: desktopStationConnections.size,
+  };
+}
 
 export function setupWebSocket(server: Server): void {
   wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', async (request: IncomingMessage, socket, head) => {
-    // Extract room from query parameter (e.g., /ws?room=operations)
     const url = new URL(request.url || '', `http://${request.headers.host}`);
-    const requestedRoom = url.searchParams.get('room') as Room | null;
-    const room: Room = requestedRoom && rooms.has(requestedRoom) ? requestedRoom : 'default';
     
+    // ========================================
+    // DESKTOP CLIENT WEBSOCKET (ISOLATED)
+    // Path: /ws/desktop
+    // Auth: Bearer token in Authorization header
+    // ========================================
+    if (url.pathname === '/ws/desktop') {
+      try {
+        const authHeader = request.headers.authorization;
+        const authResult = await authenticateDesktopClient(authHeader);
+        
+        if (!authResult) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        wss?.handleUpgrade(request, socket, head, (ws) => {
+          // Handle desktop connection separately - NOT emitting to main 'connection' event
+          handleDesktopConnection(ws, authResult.clientId, authResult.userId);
+        });
+      } catch (error) {
+        console.error('[Desktop WS] Upgrade error:', error);
+        socket.destroy();
+      }
+      return;
+    }
+    
+    // ========================================
+    // BROWSER CLIENT WEBSOCKET
+    // Path: /ws
+    // Auth: Session cookie
+    // ========================================
     if (url.pathname !== '/ws') {
       return;
     }
+
+    // Extract room from query parameter (e.g., /ws?room=operations)
+    const requestedRoom = url.searchParams.get('room') as Room | null;
+    const room: Room = requestedRoom && rooms.has(requestedRoom) ? requestedRoom : 'default';
 
     try {
       const cookies = request.headers.cookie ? parseCookie(request.headers.cookie) : {};
@@ -65,6 +323,7 @@ export function setupWebSocket(server: Server): void {
     }
   });
 
+  // Browser client connection handler (room-based)
   wss.on('connection', (ws: WebSocket, context: { request: IncomingMessage; room: Room }) => {
     const room = context.room || 'default';
     
