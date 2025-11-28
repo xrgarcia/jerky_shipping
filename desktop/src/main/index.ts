@@ -4,13 +4,16 @@ import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
 import { PrinterService } from './printer';
 import { ApiClient } from './api';
-import { AppState, Station, StationSession, PrintJob } from '../shared/types';
+import { AppState, PrintJob } from '../shared/types';
+import { environments, config, getEnvironment } from '../shared/config';
 
 let mainWindow: BrowserWindow | null = null;
 let authService: AuthService;
-let wsClient: WebSocketClient;
+let wsClient: WebSocketClient | null = null;
 let printerService: PrinterService;
-let apiClient: ApiClient;
+let apiClient: ApiClient | null = null;
+
+let selectedEnvironment = config.defaultEnvironment;
 
 let appState: AppState = {
   auth: {
@@ -25,6 +28,7 @@ let appState: AppState = {
   selectedPrinter: null,
   printJobs: [],
   connectionStatus: 'disconnected',
+  environment: selectedEnvironment,
 };
 
 function createWindow(): void {
@@ -78,25 +82,40 @@ async function initializeApp(): Promise<void> {
   authService = new AuthService();
   printerService = new PrinterService();
   
+  selectedEnvironment = await loadEnvironmentSetting();
+  updateState({ environment: selectedEnvironment });
+  
   const savedAuth = await authService.loadSavedAuth();
   if (savedAuth) {
-    apiClient = new ApiClient(savedAuth.token, savedAuth.serverUrl);
+    const expectedServerUrl = getEnvironment(selectedEnvironment).serverUrl;
     
-    try {
-      const user = await apiClient.getCurrentUser();
-      updateState({
-        auth: {
-          isAuthenticated: true,
-          user,
-          token: savedAuth.token,
-          clientId: savedAuth.clientId,
-        },
-      });
-      
-      await connectWebSocket();
-    } catch (error) {
-      console.error('Failed to restore session:', error);
+    if (savedAuth.serverUrl !== expectedServerUrl) {
+      console.log('[Init] Saved auth serverUrl differs from selected environment, clearing auth');
       await authService.clearAuth();
+    } else {
+      if (savedAuth.environment) {
+        selectedEnvironment = savedAuth.environment;
+        updateState({ environment: selectedEnvironment });
+      }
+      
+      apiClient = new ApiClient(savedAuth.token, savedAuth.serverUrl);
+      
+      try {
+        const user = await apiClient.getCurrentUser();
+        updateState({
+          auth: {
+            isAuthenticated: true,
+            user,
+            token: savedAuth.token,
+            clientId: savedAuth.clientId,
+          },
+        });
+        
+        await connectWebSocket();
+      } catch (error) {
+        console.error('Failed to restore session:', error);
+        await authService.clearAuth();
+      }
     }
   }
 }
@@ -106,7 +125,8 @@ async function connectWebSocket(): Promise<void> {
   
   updateState({ connectionStatus: 'connecting' });
   
-  wsClient = new WebSocketClient(appState.auth.token, appState.auth.clientId);
+  const env = getEnvironment(selectedEnvironment);
+  wsClient = new WebSocketClient(appState.auth.token, appState.auth.clientId, env.wsUrl);
   
   wsClient.on('connected', () => {
     updateState({ connectionStatus: 'connected' });
@@ -162,7 +182,7 @@ function setupIpcHandlers(): void {
   
   ipcMain.handle('auth:login', async () => {
     try {
-      const result = await authService.login();
+      const result = await authService.login(selectedEnvironment);
       apiClient = new ApiClient(result.token, result.serverUrl);
       
       updateState({
@@ -172,6 +192,7 @@ function setupIpcHandlers(): void {
           token: result.token,
           clientId: result.clientId,
         },
+        environment: result.environment,
       });
       
       await connectWebSocket();
@@ -319,6 +340,83 @@ function setupIpcHandlers(): void {
     updateState({ connectionStatus: 'disconnected' });
     return { success: true };
   });
+  
+  ipcMain.handle('env:list', () => {
+    return {
+      success: true,
+      data: environments.map(e => ({
+        name: e.name,
+        label: e.label,
+        serverUrl: e.serverUrl,
+      })),
+    };
+  });
+  
+  ipcMain.handle('env:get', () => {
+    return { success: true, data: selectedEnvironment };
+  });
+  
+  ipcMain.handle('env:set', async (_, envName: string) => {
+    const env = getEnvironment(envName);
+    if (!env) {
+      return { success: false, error: 'Invalid environment' };
+    }
+    
+    const previousEnv = selectedEnvironment;
+    selectedEnvironment = envName;
+    
+    if (previousEnv !== envName && appState.auth.isAuthenticated) {
+      wsClient?.disconnect();
+      wsClient = null;
+      apiClient = null;
+      await authService.clearAuth();
+      
+      updateState({
+        environment: envName,
+        auth: {
+          isAuthenticated: false,
+          user: null,
+          token: null,
+          clientId: null,
+        },
+        station: null,
+        session: null,
+        printers: [],
+        selectedPrinter: null,
+        printJobs: [],
+        connectionStatus: 'disconnected',
+      });
+    } else {
+      updateState({ environment: envName });
+    }
+    
+    await saveEnvironmentSetting(envName);
+    
+    return { success: true };
+  });
+}
+
+async function loadEnvironmentSetting(): Promise<string> {
+  try {
+    const keytar = await import('keytar');
+    const envName = await keytar.getPassword(config.keychainService, config.settingsAccount);
+    if (envName && environments.some(e => e.name === envName)) {
+      return envName;
+    }
+  } catch (error) {
+    console.error('Failed to load environment setting:', error);
+  }
+  return config.defaultEnvironment;
+}
+
+async function saveEnvironmentSetting(envName: string): Promise<void> {
+  try {
+    const keytar = await import('keytar');
+    await keytar.setPassword(config.keychainService, config.settingsAccount, envName);
+    console.log('[Settings] Saved environment preference:', envName);
+  } catch (error) {
+    console.error('Failed to save environment setting:', error);
+  }
 }
 
 app.whenReady().then(async () => {

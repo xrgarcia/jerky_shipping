@@ -23,6 +23,7 @@ import Operations from "@/pages/operations";
 import PORecommendations from "@/pages/po-recommendations";
 import SessionOrders from "@/pages/session-orders";
 import CustomerService from "@/pages/customer-service";
+import Downloads from "@/pages/downloads";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -76,6 +77,7 @@ function AppContent() {
       <Route path="/po-recommendations" component={PORecommendations} />
       <Route path="/session-orders" component={SessionOrders} />
       <Route path="/customer-service" component={CustomerService} />
+      <Route path="/downloads" component={Downloads} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>

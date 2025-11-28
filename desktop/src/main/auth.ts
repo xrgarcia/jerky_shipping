@@ -4,13 +4,14 @@ import https from 'https';
 import crypto from 'crypto';
 import { URL } from 'url';
 import os from 'os';
-import { config } from '../shared/config';
+import { config, getEnvironment } from '../shared/config';
 import type { User } from '../shared/types';
 
 interface SavedAuth {
   token: string;
   clientId: string;
   serverUrl: string;
+  environment?: string;
 }
 
 interface AuthResult {
@@ -18,6 +19,7 @@ interface AuthResult {
   clientId: string;
   user: User;
   serverUrl: string;
+  environment: string;
 }
 
 function generateCodeVerifier(): string {
@@ -77,10 +79,11 @@ async function httpRequest(
 
 export class AuthService {
   private store: Map<string, string> = new Map();
-  private serverUrl: string;
   
-  constructor() {
-    this.serverUrl = config.serverUrl;
+  constructor() {}
+  
+  getServerUrl(envName: string): string {
+    return getEnvironment(envName).serverUrl;
   }
   
   async loadSavedAuth(): Promise<SavedAuth | null> {
@@ -127,10 +130,11 @@ export class AuthService {
     this.store.delete('auth');
   }
   
-  async login(): Promise<AuthResult> {
+  async login(envName: string): Promise<AuthResult> {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
     const state = generateState();
+    const serverUrl = this.getServerUrl(envName);
     
     return new Promise((resolve, reject) => {
       const server = http.createServer(async (req, res) => {
@@ -193,7 +197,7 @@ export class AuthService {
             console.log('[Auth] Token received, registering desktop client...');
             
             const registrationResponse = await httpRequest(
-              `${this.serverUrl}/api/desktop/clients/register`,
+              `${serverUrl}/api/desktop/clients/register`,
               {
                 method: 'POST',
                 headers: {
@@ -222,13 +226,15 @@ export class AuthService {
               token: registration.apiToken,
               clientId: registration.id,
               user: registration.user,
-              serverUrl: this.serverUrl,
+              serverUrl: serverUrl,
+              environment: envName,
             };
             
             await this.saveAuth({
               token: authResult.token,
               clientId: authResult.clientId,
-              serverUrl: this.serverUrl,
+              serverUrl: serverUrl,
+              environment: envName,
             });
             
             console.log('[Auth] Desktop client registered successfully');

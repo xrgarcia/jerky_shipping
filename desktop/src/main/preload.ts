@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, IpcChannel, IpcResponse } from '../shared/types';
+import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo } from '../shared/types';
 
 const api = {
   invoke: <T = unknown>(channel: IpcChannel, data?: unknown): Promise<IpcResponse<T>> => {
@@ -38,6 +38,12 @@ const api = {
   ws: {
     connect: () => ipcRenderer.invoke('ws:connect'),
     disconnect: () => ipcRenderer.invoke('ws:disconnect'),
+  },
+  
+  environment: {
+    list: (): Promise<IpcResponse<EnvironmentInfo[]>> => ipcRenderer.invoke('env:list'),
+    get: (): Promise<IpcResponse<string>> => ipcRenderer.invoke('env:get'),
+    set: (envName: string): Promise<IpcResponse<void>> => ipcRenderer.invoke('env:set', envName),
   },
 };
 

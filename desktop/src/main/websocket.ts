@@ -12,6 +12,7 @@ export class WebSocketClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private token: string;
   private clientId: string;
+  private wsUrl: string;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private subscribedStationId: string | null = null;
@@ -19,10 +20,11 @@ export class WebSocketClient extends EventEmitter {
   private isIntentionalClose = false;
   private isAuthenticated = false;
   
-  constructor(token: string, clientId: string) {
+  constructor(token: string, clientId: string, wsUrl: string) {
     super();
     this.token = token;
     this.clientId = clientId;
+    this.wsUrl = wsUrl;
   }
   
   connect(): void {
@@ -34,7 +36,7 @@ export class WebSocketClient extends EventEmitter {
     this.isAuthenticated = false;
     
     try {
-      this.ws = new WebSocket(config.wsUrl, {
+      this.ws = new WebSocket(this.wsUrl, {
         headers: {
           'Authorization': `Bearer ${this.token}`,
           'X-Desktop-Client-Id': this.clientId,

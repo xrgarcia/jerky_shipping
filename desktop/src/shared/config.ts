@@ -1,6 +1,31 @@
+export interface Environment {
+  name: string;
+  label: string;
+  serverUrl: string;
+  wsUrl: string;
+}
+
+export const environments: Environment[] = [
+  {
+    name: 'production',
+    label: 'Production',
+    serverUrl: 'https://ship.jerky.com',
+    wsUrl: 'wss://ship.jerky.com/ws/desktop',
+  },
+  {
+    name: 'development',
+    label: 'Development',
+    serverUrl: process.env.DEV_SERVER_URL || 'https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev',
+    wsUrl: process.env.DEV_WS_URL || 'wss://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/ws/desktop',
+  },
+];
+
+export const getEnvironment = (name: string): Environment => {
+  return environments.find(e => e.name === name) || environments[0];
+};
+
 export const config = {
-  serverUrl: process.env.SERVER_URL || 'https://ship.jerky.com',
-  wsUrl: process.env.WS_URL || 'wss://ship.jerky.com/ws/desktop',
+  defaultEnvironment: 'production',
   
   oauth: {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
@@ -16,4 +41,13 @@ export const config = {
   
   keychainService: 'com.jerkyship.connect',
   keychainAccount: 'api-token',
+  settingsAccount: 'app-settings',
+};
+
+export const getCurrentServerUrl = (envName: string): string => {
+  return getEnvironment(envName).serverUrl;
+};
+
+export const getCurrentWsUrl = (envName: string): string => {
+  return getEnvironment(envName).wsUrl;
 };

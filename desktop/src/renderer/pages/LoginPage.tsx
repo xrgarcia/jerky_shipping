@@ -1,9 +1,44 @@
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, ChevronDown, Server } from 'lucide-react';
+
+interface EnvironmentInfo {
+  name: string;
+  label: string;
+  serverUrl: string;
+}
 
 function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [environments, setEnvironments] = useState<EnvironmentInfo[]>([]);
+  const [selectedEnv, setSelectedEnv] = useState<string>('production');
+  const [showEnvDropdown, setShowEnvDropdown] = useState(false);
+
+  useEffect(() => {
+    loadEnvironments();
+  }, []);
+
+  const loadEnvironments = async () => {
+    try {
+      const result = await window.electronAPI.environment.list();
+      if (result.success && result.data) {
+        setEnvironments(result.data);
+      }
+      
+      const currentEnv = await window.electronAPI.environment.get();
+      if (currentEnv.success && currentEnv.data) {
+        setSelectedEnv(currentEnv.data);
+      }
+    } catch (err) {
+      console.error('Failed to load environments:', err);
+    }
+  };
+
+  const handleEnvChange = async (envName: string) => {
+    setSelectedEnv(envName);
+    setShowEnvDropdown(false);
+    await window.electronAPI.environment.set(envName);
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -21,6 +56,9 @@ function LoginPage() {
     }
   };
 
+  const currentEnv = environments.find(e => e.name === selectedEnv);
+  const isDev = selectedEnv === 'development';
+
   return (
     <div className="h-full flex flex-col">
       <div className="h-12 drag-region bg-[#1a1a1a] border-b border-[#333]" />
@@ -34,9 +72,53 @@ function LoginPage() {
           Jerky Ship Connect
         </h1>
         
-        <p className="text-[#999] text-center mb-8 max-w-[280px]">
+        <p className="text-[#999] text-center mb-6 max-w-[280px]">
           Sign in with your Jerky.com Google Workspace account to get started
         </p>
+
+        <div className="relative mb-6 w-full max-w-[280px]">
+          <button
+            onClick={() => setShowEnvDropdown(!showEnvDropdown)}
+            className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-lg border transition-colors ${
+              isDev 
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                : 'bg-[#2a2a2a] border-[#444] text-white'
+            }`}
+            data-testid="button-env-selector"
+          >
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4" />
+              <span className="font-medium">{currentEnv?.label || 'Select Environment'}</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showEnvDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showEnvDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-[#2a2a2a] border border-[#444] rounded-lg overflow-hidden z-10 shadow-xl">
+              {environments.map((env) => (
+                <button
+                  key={env.name}
+                  onClick={() => handleEnvChange(env.name)}
+                  className={`w-full px-4 py-3 text-left transition-colors flex flex-col ${
+                    env.name === selectedEnv 
+                      ? 'bg-primary-500/20 text-white' 
+                      : 'text-[#ccc] hover:bg-[#333]'
+                  }`}
+                  data-testid={`button-env-${env.name}`}
+                >
+                  <span className="font-medium">{env.label}</span>
+                  <span className="text-xs text-[#888] truncate">{env.serverUrl}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {isDev && (
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm text-center max-w-[280px]">
+            Development mode - connecting to test server
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center max-w-[280px]">

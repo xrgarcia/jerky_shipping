@@ -77,6 +77,13 @@ export interface AppState {
   selectedPrinter: Printer | null;
   printJobs: PrintJob[];
   connectionStatus: 'disconnected' | 'connecting' | 'connected';
+  environment: string;
+}
+
+export interface EnvironmentInfo {
+  name: string;
+  label: string;
+  serverUrl: string;
 }
 
 export type IpcChannel = 
@@ -96,7 +103,10 @@ export type IpcChannel =
   | 'ws:disconnect'
   | 'ws:status'
   | 'app:get-state'
-  | 'app:state-changed';
+  | 'app:state-changed'
+  | 'env:list'
+  | 'env:get'
+  | 'env:set';
 
 export interface IpcRequest<T = unknown> {
   channel: IpcChannel;
