@@ -6,6 +6,10 @@
   "author": "Jerky Ship",
   "license": "UNLICENSED",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xrgarcia/jerky_shipping.git"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json --watch",
@@ -87,6 +91,11 @@
       "dist/**/*",
       "package.json"
     ],
-    "extraResources": []
+    "extraResources": [],
+    "publish": {
+      "provider": "github",
+      "owner": "xrgarcia",
+      "repo": "jerky_shipping"
+    }
   }
 }
