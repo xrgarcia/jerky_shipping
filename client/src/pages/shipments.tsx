@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Truck, Package, RefreshCw, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer } from "lucide-react";
+import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -814,25 +814,6 @@ export default function Shipments() {
     setPage(1);
   };
 
-  const syncShipmentsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/shipments/sync");
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to sync shipments");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shipments/tab-counts"] });
-      toast({
-        title: "Sync jobs enqueued",
-        description: `Enqueued ${data.enqueuedCount} jobs (${data.nonDeliveredShipments} non-delivered shipments + ${data.ordersWithoutShipments} unshipped orders). Processing in background...`,
-      });
-    },
-  });
-
   const handleTabChange = (value: string) => {
     setActiveTab(value as WorkflowTab);
     setPage(1);
@@ -945,23 +926,12 @@ export default function Shipments() {
                   </Button>
                 </CollapsibleTrigger>
                 
-                <div className="flex items-center gap-2">
-                  {activeFiltersCount > 0 && (
-                    <Button variant="ghost" onClick={clearFilters} className="gap-2" data-testid="button-clear-filters">
-                      <X className="h-4 w-4" />
-                      Clear Filters
-                    </Button>
-                  )}
-                  <Button
-                    data-testid="button-sync-shipments"
-                    onClick={() => syncShipmentsMutation.mutate()}
-                    disabled={syncShipmentsMutation.isPending}
-                    className="gap-2"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${syncShipmentsMutation.isPending ? 'animate-spin' : ''}`} />
-                    {syncShipmentsMutation.isPending ? "Syncing..." : "Sync from ShipStation"}
+                {activeFiltersCount > 0 && (
+                  <Button variant="ghost" onClick={clearFilters} className="gap-2" data-testid="button-clear-filters">
+                    <X className="h-4 w-4" />
+                    Clear Filters
                   </Button>
-                </div>
+                )}
               </div>
 
               <CollapsibleContent className="pt-4 space-y-4">
