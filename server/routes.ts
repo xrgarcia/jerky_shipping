@@ -54,6 +54,15 @@ const SESSION_COOKIE_NAME = "session_token";
 const SESSION_DURATION_DAYS = 30;
 const ALLOWED_EMAIL_DOMAIN = "jerky.com";
 
+// Helper to get the correct base URL (handles proxy/forwarded headers)
+function getBaseUrl(req: Request): string {
+  // Check for forwarded protocol (from proxy like Replit)
+  const forwardedProto = req.get("x-forwarded-proto");
+  const protocol = forwardedProto || req.protocol;
+  const host = req.get("host");
+  return `${protocol}://${host}`;
+}
+
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -215,8 +224,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Google OAuth not configured" });
     }
 
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/api/auth/google/callback`;
+    console.log("[Google OAuth] Redirect URI:", redirectUri);
     const state = randomBytes(16).toString("hex");
     
     res.cookie("oauth_state", state, {
@@ -250,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/login?error=invalid_state");
       }
 
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const baseUrl = getBaseUrl(req);
       const redirectUri = `${baseUrl}/api/auth/google/callback`;
 
       const googleUser = await exchangeGoogleCode(code, redirectUri);
