@@ -479,6 +479,7 @@ export default function Shipments() {
   const [dateTo, setDateTo] = useState("");
   const [showOrphanedOnly, setShowOrphanedOnly] = useState(false);
   const [showWithoutOrders, setShowWithoutOrders] = useState(false);
+  const [showShippedWithoutTracking, setShowShippedWithoutTracking] = useState(false);
 
   // Pagination and sorting
   const [page, setPage] = useState(1);
@@ -509,6 +510,7 @@ export default function Shipments() {
     setDateTo(params.get('dateTo') || '');
     setShowOrphanedOnly(params.get('orphaned') === 'true');
     setShowWithoutOrders(params.get('withoutOrders') === 'true');
+    setShowShippedWithoutTracking(params.get('shippedWithoutTracking') === 'true');
     setPage(parseInt(params.get('page') || '1'));
     setPageSize(parseInt(params.get('pageSize') || '50'));
     setSortBy(params.get('sortBy') || 'orderDate');
@@ -523,7 +525,8 @@ export default function Shipments() {
       params.get('dateFrom') ||
       params.get('dateTo') ||
       params.get('orphaned') === 'true' ||
-      params.get('withoutOrders') === 'true';
+      params.get('withoutOrders') === 'true' ||
+      params.get('shippedWithoutTracking') === 'true';
     
     if (hasActiveFilters) {
       setFiltersOpen(true);
@@ -550,6 +553,7 @@ export default function Shipments() {
     if (dateTo) params.set('dateTo', dateTo);
     if (showOrphanedOnly) params.set('orphaned', 'true');
     if (showWithoutOrders) params.set('withoutOrders', 'true');
+    if (showShippedWithoutTracking) params.set('shippedWithoutTracking', 'true');
     
     if (page !== 1) params.set('page', page.toString());
     if (pageSize !== 50) params.set('pageSize', pageSize.toString());
@@ -565,7 +569,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -697,6 +701,7 @@ export default function Shipments() {
     if (dateTo) params.append('dateTo', dateTo);
     if (showOrphanedOnly) params.append('orphaned', 'true');
     if (showWithoutOrders) params.append('withoutOrders', 'true');
+    if (showShippedWithoutTracking) params.append('shippedWithoutTracking', 'true');
     
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
@@ -745,7 +750,7 @@ export default function Shipments() {
   const shipmentStatuses = shipmentStatusesData?.shipmentStatuses || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -783,6 +788,7 @@ export default function Shipments() {
     setDateTo("");
     setShowOrphanedOnly(false);
     setShowWithoutOrders(false);
+    setShowShippedWithoutTracking(false);
     setPage(1);
   };
 
@@ -796,6 +802,7 @@ export default function Shipments() {
     dateTo,
     showOrphanedOnly,
     showWithoutOrders,
+    showShippedWithoutTracking,
   ].filter(Boolean).length;
 
   const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
@@ -1079,6 +1086,23 @@ export default function Shipments() {
                           className="text-sm cursor-pointer"
                         >
                           Show shipments without orders only
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="shipped-without-tracking-filter"
+                          checked={showShippedWithoutTracking}
+                          onCheckedChange={(checked) => {
+                            setShowShippedWithoutTracking(checked as boolean);
+                            setPage(1);
+                          }}
+                          data-testid="checkbox-shipped-without-tracking-filter"
+                        />
+                        <label
+                          htmlFor="shipped-without-tracking-filter"
+                          className="text-sm cursor-pointer"
+                        >
+                          Show shipped without tracking only
                         </label>
                       </div>
                     </div>

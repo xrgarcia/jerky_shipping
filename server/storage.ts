@@ -82,6 +82,7 @@ export interface ShipmentFilters {
   dateTo?: Date;
   orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
   withoutOrders?: boolean; // Filter for shipments with no linked order
+  shippedWithoutTracking?: boolean; // Filter for shipments with status='shipped' but no tracking number
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode' | 'orderDate';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -1046,6 +1047,16 @@ export class DatabaseStorage implements IStorage {
       conditions.push(isNull(shipments.orderId));
     }
 
+    // Shipped without tracking filter (status='shipped' but no tracking number)
+    if (filters.shippedWithoutTracking) {
+      conditions.push(
+        and(
+          eq(shipments.status, 'shipped'),
+          isNull(shipments.trackingNumber)
+        )
+      );
+    }
+
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Get total count
@@ -1245,6 +1256,16 @@ export class DatabaseStorage implements IStorage {
     // Without orders filter - shipments with no linked order
     if (withoutOrders) {
       conditions.push(isNull(shipments.orderId));
+    }
+
+    // Shipped without tracking filter (status='shipped' but no tracking number)
+    if (filters.shippedWithoutTracking) {
+      conditions.push(
+        and(
+          eq(shipments.status, 'shipped'),
+          isNull(shipments.trackingNumber)
+        )
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

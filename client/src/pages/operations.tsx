@@ -1337,20 +1337,22 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shipments-without-status" className="min-h-[280px]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Shipped Without Tracking
-            </CardTitle>
-            <CardDescription>Shipped shipments missing tracking numbers</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="text-shipments-without-status">
-              {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/shipments?shippedWithoutTracking=true" data-testid="link-shipped-without-tracking">
+          <Card data-testid="card-shipments-without-status" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Shipped Without Tracking
+              </CardTitle>
+              <CardDescription>Shipped shipments missing tracking numbers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold" data-testid="text-shipments-without-status">
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card data-testid="card-shipment-sync-failures" className="min-h-[280px]">
           <CardHeader>

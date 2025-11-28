@@ -717,6 +717,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.withoutOrders = true;
       }
 
+      // Parse shippedWithoutTracking filter (shipped but missing tracking number)
+      if (req.query.shippedWithoutTracking === 'true') {
+        filters.shippedWithoutTracking = true;
+      }
+
       // Get filtered shipments (no orders table join - all data comes from shipments table)
       const { shipments, total } = await storage.getFilteredShipments(filters);
 
