@@ -44,7 +44,13 @@ Preferred communication style: Simple, everyday language.
             - **Rooms**: `desktop:station:{stationId}` (isolated from browser rooms)
             - **Messages**: Namespaced types (`desktop:job:new`, `desktop:job:update`, `desktop:heartbeat`)
             - **Connection Tracking**: Separate maps from browser clients - bugs in one system won't affect the other
-        - **Electron App** (Phase 2): Will connect via WebSocket, discover local macOS printers, receive print jobs in real-time
+        - **Electron App**: Complete React-based desktop app in `desktop/` folder with:
+            - **OAuth PKCE Flow**: Google OAuth with PKCE for secure desktop authentication
+            - **Token Persistence**: Tokens stored securely in macOS Keychain via `keytar`
+            - **WebSocket Client**: Connects to `/ws/desktop` with Bearer auth, automatic reconnect, heartbeat
+            - **Station Selection**: Users claim physical stations for 20-hour shifts
+            - **Printer Discovery**: Native macOS printer discovery and registration
+            - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.
     - **Saved Views System**: Customizable column views for PO Recommendations page stored in `saved_views` table.
 - **Monorepo Structure**: Client, server, and shared code co-located.
