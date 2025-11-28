@@ -113,11 +113,14 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
     if (!status) return null;
     
     const statusLower = status.toLowerCase();
-    if (statusLower === 'closed' || statusLower === 'picked') {
-      return <Badge className="bg-green-600 hover:bg-green-700 text-xs">Picked</Badge>;
+    if (statusLower === 'closed') {
+      return <Badge className="bg-green-600 hover:bg-green-700 text-xs">Closed</Badge>;
     }
     if (statusLower === 'active') {
       return <Badge className="bg-blue-600 hover:bg-blue-700 text-xs">Active</Badge>;
+    }
+    if (statusLower === 'inactive') {
+      return <Badge variant="outline" className="border-gray-500 text-gray-700 dark:text-gray-400 text-xs">Inactive</Badge>;
     }
     if (statusLower === 'new') {
       return <Badge variant="outline" className="border-yellow-500 text-yellow-700 dark:text-yellow-400 text-xs">New</Badge>;
