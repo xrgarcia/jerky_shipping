@@ -924,6 +924,8 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
       
       // Get comprehensive data health metrics
       const dataHealth = await storage.getDataHealthMetrics();
+      // Pipeline metrics for operations dashboard
+      const pipeline = await storage.getPipelineMetrics();
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
@@ -935,6 +937,7 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
         shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync.enqueuedAt,
         backfillActiveJob: activeBackfillJob,
         dataHealth,
+        pipeline,
       });
     } catch (error) {
       console.error("Shipment sync worker error:", error);

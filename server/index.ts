@@ -113,6 +113,8 @@ app.use((req, res, next) => {
     const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
     // Data health metrics are already in the correct format (dates as ISO strings)
     const dataHealth = await storage.getDataHealthMetrics();
+    // Pipeline metrics for operations dashboard
+    const pipeline = await storage.getPipelineMetrics();
     
     broadcastQueueStatus({
       shopifyQueue: shopifyQueueLength,
@@ -126,6 +128,7 @@ app.use((req, res, next) => {
       onHoldWorkerStatus: 'sleeping', // Worker hasn't started yet, default to sleeping
       onHoldWorkerStats: undefined, // Worker hasn't started yet, will be populated after first run
       dataHealth,
+      pipeline,
     });
     log("Initial queue status broadcast sent");
   } catch (error) {

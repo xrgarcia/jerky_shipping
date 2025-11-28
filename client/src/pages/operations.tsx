@@ -603,45 +603,50 @@ Please analyze this failure and help me understand:
           const message = JSON.parse(event.data);
           
           if (message.type === 'queue_status' && message.data) {
-            // Update live queue stats from WebSocket with backfill data directly from broadcast
-            // Use initialQueueStatsRef as fallback when prev is undefined (first WebSocket message)
+            // Update live queue stats from WebSocket
+            // Strategy: Use WebSocket data if defined, otherwise preserve previous/initial values
+            // This prevents flashing to zero when partial updates are sent
             const initial = initialQueueStatsRef.current;
             setLiveQueueStats((prev) => ({
               shopifyQueue: {
-                size: message.data.shopifyQueue,
-                oldestMessageAt: message.data.shopifyQueueOldestAt,
+                size: message.data.shopifyQueue ?? prev?.shopifyQueue?.size ?? initial?.shopifyQueue?.size ?? 0,
+                oldestMessageAt: message.data.shopifyQueueOldestAt ?? prev?.shopifyQueue?.oldestMessageAt ?? null,
               },
               shipmentSyncQueue: {
-                size: message.data.shipmentSyncQueue,
-                oldestMessageAt: message.data.shipmentSyncQueueOldestAt,
+                size: message.data.shipmentSyncQueue ?? prev?.shipmentSyncQueue?.size ?? initial?.shipmentSyncQueue?.size ?? 0,
+                oldestMessageAt: message.data.shipmentSyncQueueOldestAt ?? prev?.shipmentSyncQueue?.oldestMessageAt ?? null,
               },
               shopifyOrderSyncQueue: {
-                size: message.data.shopifyOrderSyncQueue || 0,
-                oldestMessageAt: message.data.shopifyOrderSyncQueueOldestAt || null,
+                size: message.data.shopifyOrderSyncQueue ?? prev?.shopifyOrderSyncQueue?.size ?? initial?.shopifyOrderSyncQueue?.size ?? 0,
+                oldestMessageAt: message.data.shopifyOrderSyncQueueOldestAt ?? prev?.shopifyOrderSyncQueue?.oldestMessageAt ?? null,
               },
               failures: {
-                total: message.data.shipmentFailureCount,
+                total: message.data.shipmentFailureCount ?? prev?.failures?.total ?? initial?.failures?.total ?? 0,
               },
               backfill: {
-                activeJob: message.data.backfillActiveJob || null,
+                // Only update activeJob if explicitly provided (null clears it, undefined preserves)
+                activeJob: message.data.backfillActiveJob !== undefined 
+                  ? message.data.backfillActiveJob 
+                  : (prev?.backfill?.activeJob ?? initial?.backfill?.activeJob ?? null),
                 // Preserve recentJobs from initial API load since WebSocket doesn't send them
                 recentJobs: prev?.backfill?.recentJobs || initial?.backfill?.recentJobs || [],
               },
-              dataHealth: message.data.dataHealth,
-              // Preserve pipeline metrics from initial API load since WebSocket doesn't send them
-              pipeline: prev?.pipeline || initial?.pipeline,
-              onHoldWorkerStatus: message.data.onHoldWorkerStatus || 'sleeping',
-              // Only update onHoldWorkerStats if defined, otherwise preserve previous value or use initial
+              // Use WebSocket dataHealth if defined, otherwise preserve previous
+              dataHealth: message.data.dataHealth ?? prev?.dataHealth ?? initial?.dataHealth,
+              // Pipeline metrics - now included in WebSocket broadcasts
+              pipeline: message.data.pipeline ?? prev?.pipeline ?? initial?.pipeline,
+              onHoldWorkerStatus: message.data.onHoldWorkerStatus ?? prev?.onHoldWorkerStatus ?? 'sleeping',
+              // Only update onHoldWorkerStats if defined, otherwise preserve previous value
               onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
                 ? message.data.onHoldWorkerStats 
-                : (prev?.onHoldWorkerStats || initial?.onHoldWorkerStats),
-              // Preserve firestore worker status - use WebSocket data, then prev, then initial API data
+                : (prev?.onHoldWorkerStats ?? initial?.onHoldWorkerStats),
+              // Firestore worker status - use WebSocket data if defined
               firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus 
-                || prev?.firestoreSessionSyncWorkerStatus 
-                || initial?.firestoreSessionSyncWorkerStatus,
+                ?? prev?.firestoreSessionSyncWorkerStatus 
+                ?? initial?.firestoreSessionSyncWorkerStatus,
               firestoreSessionSyncWorkerStats: message.data.firestoreSessionSyncWorkerStats !== undefined
                 ? message.data.firestoreSessionSyncWorkerStats
-                : (prev?.firestoreSessionSyncWorkerStats || initial?.firestoreSessionSyncWorkerStats),
+                : (prev?.firestoreSessionSyncWorkerStats ?? initial?.firestoreSessionSyncWorkerStats),
             }));
           }
         } catch (error) {

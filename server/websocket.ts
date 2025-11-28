@@ -177,6 +177,22 @@ export type QueueStatusData = {
     workerStartedAt: string;
     lastCompletedAt: string | null;
   };
+  firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
+  firestoreSessionSyncWorkerStats?: {
+    totalSynced: number;
+    lastSyncCount: number;
+    lastSyncAt: string | null;
+    lastSyncTimestamp: string | null;
+    workerStartedAt: string;
+    errorsCount: number;
+    lastError: string | null;
+  };
+  pipeline?: {
+    sessionedToday: number;
+    inPackingQueue: number;
+    shippedToday: number;
+    oldestQueuedSessionAt: string | null;
+  };
   dataHealth: {
     ordersMissingShipments: number;
     oldestOrderMissingShipmentAt: string | null;
@@ -246,6 +262,22 @@ export function broadcastQueueStatus(data: {
       lastError: string | null;
     };
   };
+  firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
+  firestoreSessionSyncWorkerStats?: {
+    totalSynced: number;
+    lastSyncCount: number;
+    lastSyncAt: string | null;
+    lastSyncTimestamp: string | null;
+    workerStartedAt: string;
+    errorsCount: number;
+    lastError: string | null;
+  };
+  pipeline?: {
+    sessionedToday: number;
+    inPackingQueue: number;
+    shippedToday: number;
+    oldestQueuedSessionAt: string | null;
+  };
 }): void {
   // Guard against wss being null and clear entire cache to prevent stale data after restart
   if (!wss) {
@@ -304,6 +336,11 @@ export function broadcastQueueStatus(data: {
         : cachedState.backfillActiveJob ?? null),
     onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
     onHoldWorkerStats: data.onHoldWorkerStats ?? workerStats,
+    // Firestore session sync worker - preserve from cache if not provided
+    firestoreSessionSyncWorkerStatus: data.firestoreSessionSyncWorkerStatus ?? cachedState.firestoreSessionSyncWorkerStatus,
+    firestoreSessionSyncWorkerStats: data.firestoreSessionSyncWorkerStats ?? cachedState.firestoreSessionSyncWorkerStats,
+    // Pipeline metrics - preserve from cache if not provided (prevents flashing)
+    pipeline: data.pipeline ?? cachedState.pipeline,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? cachedState.dataHealth?.ordersMissingShipments ?? 0,
       oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? cachedState.dataHealth?.oldestOrderMissingShipmentAt ?? null,

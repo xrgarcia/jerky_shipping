@@ -289,6 +289,9 @@ export const shipments = pgTable("shipments", {
   sessionIdIdx: index("shipments_session_id_idx").on(table.sessionId).where(sql`${table.sessionId} IS NOT NULL`),
   // Index for sessioned orders (orders in picking/packing queue)
   sessionedAtIdx: index("shipments_sessioned_at_idx").on(table.sessionedAt.desc().nullsLast()).where(sql`${table.sessionedAt} IS NOT NULL`),
+  // Composite index for packing queue queries (sessionStatus + trackingNumber filtering)
+  // Covers: WHERE sessionId IS NOT NULL AND sessionStatus IN ('closed', 'picked') AND trackingNumber IS NULL
+  packingQueueIdx: index("shipments_packing_queue_idx").on(table.sessionStatus, table.trackingNumber).where(sql`${table.sessionId} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({

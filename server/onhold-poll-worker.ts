@@ -60,6 +60,8 @@ async function broadcastWorkerStatus() {
     const allBackfillJobs = await storage.getAllBackfillJobs();
     const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
     const dataHealth = await storage.getDataHealthMetrics();
+    // Pipeline metrics for operations dashboard - included in every broadcast
+    const pipeline = await storage.getPipelineMetrics();
 
     broadcastQueueStatus({
       shopifyQueue: shopifyQueueLength,
@@ -78,6 +80,7 @@ async function broadcastWorkerStatus() {
         lastCompletedAt: workerStats.lastCompletedAt?.toISOString() || null,
       },
       dataHealth,
+      pipeline,
     });
   } catch (error) {
     // Don't crash the worker if broadcast fails
