@@ -51,6 +51,22 @@ import {
   type SavedView,
   type InsertSavedView,
   savedViews,
+  // Desktop Printing System
+  type Station,
+  type InsertStation,
+  stations,
+  type Printer,
+  type InsertPrinter,
+  printers,
+  type DesktopClient,
+  type InsertDesktopClient,
+  desktopClients,
+  type StationSession,
+  type InsertStationSession,
+  stationSessions,
+  type PrintJob,
+  type InsertPrintJob,
+  printJobs,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -244,6 +260,63 @@ export interface IStorage {
   createSavedView(view: InsertSavedView): Promise<SavedView>;
   updateSavedView(id: string, userId: string, updates: Partial<InsertSavedView>): Promise<SavedView | undefined>;
   deleteSavedView(id: string, userId: string): Promise<boolean>;
+
+  // ============================================================================
+  // DESKTOP PRINTING SYSTEM
+  // ============================================================================
+
+  // Stations
+  createStation(station: InsertStation): Promise<Station>;
+  updateStation(id: string, updates: Partial<InsertStation>): Promise<Station | undefined>;
+  getStation(id: string): Promise<Station | undefined>;
+  getStationByName(name: string): Promise<Station | undefined>;
+  getAllStations(activeOnly?: boolean): Promise<Station[]>;
+  deleteStation(id: string): Promise<boolean>;
+
+  // Printers
+  createPrinter(printer: InsertPrinter): Promise<Printer>;
+  updatePrinter(id: string, updates: Partial<InsertPrinter>): Promise<Printer | undefined>;
+  getPrinter(id: string): Promise<Printer | undefined>;
+  getPrinterBySystemName(systemName: string): Promise<Printer | undefined>;
+  getPrintersByStation(stationId: string): Promise<Printer[]>;
+  getAllPrinters(): Promise<Printer[]>;
+  deletePrinter(id: string): Promise<boolean>;
+  updatePrinterLastSeen(id: string): Promise<void>;
+
+  // Desktop Clients
+  createDesktopClient(client: InsertDesktopClient): Promise<DesktopClient>;
+  updateDesktopClient(id: string, updates: Partial<InsertDesktopClient>): Promise<DesktopClient | undefined>;
+  getDesktopClient(id: string): Promise<DesktopClient | undefined>;
+  getDesktopClientByAccessToken(accessTokenHash: string): Promise<DesktopClient | undefined>;
+  getDesktopClientByRefreshToken(refreshTokenHash: string): Promise<DesktopClient | undefined>;
+  getDesktopClientsByUser(userId: string): Promise<DesktopClient[]>;
+  deleteDesktopClient(id: string): Promise<boolean>;
+  updateDesktopClientActivity(id: string, lastIp?: string): Promise<void>;
+
+  // Station Sessions
+  createStationSession(session: InsertStationSession): Promise<StationSession>;
+  updateStationSession(id: string, updates: Partial<{ status: string; endedAt: Date }>): Promise<StationSession | undefined>;
+  getStationSession(id: string): Promise<StationSession | undefined>;
+  getActiveSessionByStation(stationId: string): Promise<StationSession | undefined>;
+  getActiveSessionByUser(userId: string): Promise<StationSession | undefined>;
+  getActiveSessionByDesktopClient(desktopClientId: string): Promise<StationSession | undefined>;
+  endStationSession(id: string): Promise<StationSession | undefined>;
+  expireOldSessions(): Promise<number>;
+  claimStationAtomically(session: InsertStationSession, clientId: string): Promise<{ session?: StationSession; error?: string; claimedBy?: string; expiresAt?: Date }>;
+
+  // Print Jobs
+  createPrintJob(job: InsertPrintJob): Promise<PrintJob>;
+  updatePrintJob(id: string, updates: Partial<InsertPrintJob & { attempts?: number; sentAt?: Date; completedAt?: Date }>): Promise<PrintJob | undefined>;
+  getPrintJob(id: string): Promise<PrintJob | undefined>;
+  getPendingJobsByStation(stationId: string, limit?: number): Promise<PrintJob[]>;
+  getJobsByStation(stationId: string, limit?: number): Promise<PrintJob[]>;
+  getJobsByOrder(orderId: string): Promise<PrintJob[]>;
+  getJobsByShipment(shipmentId: string): Promise<PrintJob[]>;
+  markJobSent(id: string): Promise<PrintJob | undefined>;
+  markJobCompleted(id: string): Promise<PrintJob | undefined>;
+  markJobFailed(id: string, errorMessage: string): Promise<PrintJob | undefined>;
+  retryJob(id: string): Promise<PrintJob | undefined>;
+  cancelJob(id: string): Promise<PrintJob | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2037,6 +2110,359 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(savedViews.id, id), eq(savedViews.userId, userId)))
       .returning();
     return result.length > 0;
+  }
+
+  // ============================================================================
+  // DESKTOP PRINTING SYSTEM
+  // ============================================================================
+
+  // Stations
+  async createStation(station: InsertStation): Promise<Station> {
+    const result = await db.insert(stations).values(station).returning();
+    return result[0];
+  }
+
+  async updateStation(id: string, updates: Partial<InsertStation>): Promise<Station | undefined> {
+    const result = await db
+      .update(stations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(stations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getStation(id: string): Promise<Station | undefined> {
+    const result = await db.select().from(stations).where(eq(stations.id, id));
+    return result[0];
+  }
+
+  async getStationByName(name: string): Promise<Station | undefined> {
+    const result = await db.select().from(stations).where(eq(stations.name, name));
+    return result[0];
+  }
+
+  async getAllStations(activeOnly: boolean = false): Promise<Station[]> {
+    if (activeOnly) {
+      return await db.select().from(stations).where(eq(stations.isActive, true)).orderBy(stations.name);
+    }
+    return await db.select().from(stations).orderBy(stations.name);
+  }
+
+  async deleteStation(id: string): Promise<boolean> {
+    const result = await db.delete(stations).where(eq(stations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Printers
+  async createPrinter(printer: InsertPrinter): Promise<Printer> {
+    const result = await db.insert(printers).values(printer).returning();
+    return result[0];
+  }
+
+  async updatePrinter(id: string, updates: Partial<InsertPrinter>): Promise<Printer | undefined> {
+    const result = await db
+      .update(printers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(printers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getPrinter(id: string): Promise<Printer | undefined> {
+    const result = await db.select().from(printers).where(eq(printers.id, id));
+    return result[0];
+  }
+
+  async getPrinterBySystemName(systemName: string): Promise<Printer | undefined> {
+    const result = await db.select().from(printers).where(eq(printers.systemName, systemName));
+    return result[0];
+  }
+
+  async getPrintersByStation(stationId: string): Promise<Printer[]> {
+    return await db.select().from(printers).where(eq(printers.stationId, stationId)).orderBy(printers.name);
+  }
+
+  async getAllPrinters(): Promise<Printer[]> {
+    return await db.select().from(printers).orderBy(printers.name);
+  }
+
+  async deletePrinter(id: string): Promise<boolean> {
+    const result = await db.delete(printers).where(eq(printers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async updatePrinterLastSeen(id: string): Promise<void> {
+    await db.update(printers).set({ lastSeenAt: new Date() }).where(eq(printers.id, id));
+  }
+
+  // Desktop Clients
+  async createDesktopClient(client: InsertDesktopClient): Promise<DesktopClient> {
+    const result = await db.insert(desktopClients).values(client).returning();
+    return result[0];
+  }
+
+  async updateDesktopClient(id: string, updates: Partial<InsertDesktopClient>): Promise<DesktopClient | undefined> {
+    const result = await db
+      .update(desktopClients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(desktopClients.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getDesktopClient(id: string): Promise<DesktopClient | undefined> {
+    const result = await db.select().from(desktopClients).where(eq(desktopClients.id, id));
+    return result[0];
+  }
+
+  async getDesktopClientByAccessToken(accessTokenHash: string): Promise<DesktopClient | undefined> {
+    const result = await db.select().from(desktopClients).where(eq(desktopClients.accessTokenHash, accessTokenHash));
+    return result[0];
+  }
+
+  async getDesktopClientByRefreshToken(refreshTokenHash: string): Promise<DesktopClient | undefined> {
+    const result = await db.select().from(desktopClients).where(eq(desktopClients.refreshTokenHash, refreshTokenHash));
+    return result[0];
+  }
+
+  async getDesktopClientsByUser(userId: string): Promise<DesktopClient[]> {
+    return await db.select().from(desktopClients).where(eq(desktopClients.userId, userId)).orderBy(desc(desktopClients.lastActiveAt));
+  }
+
+  async deleteDesktopClient(id: string): Promise<boolean> {
+    const result = await db.delete(desktopClients).where(eq(desktopClients.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async updateDesktopClientActivity(id: string, lastIp?: string): Promise<void> {
+    const updates: any = { lastActiveAt: new Date() };
+    if (lastIp) {
+      updates.lastIp = lastIp;
+    }
+    await db.update(desktopClients).set(updates).where(eq(desktopClients.id, id));
+  }
+
+  // Station Sessions
+  async createStationSession(session: InsertStationSession): Promise<StationSession> {
+    const result = await db.insert(stationSessions).values(session).returning();
+    return result[0];
+  }
+
+  async updateStationSession(id: string, updates: Partial<{ status: string; endedAt: Date }>): Promise<StationSession | undefined> {
+    const result = await db
+      .update(stationSessions)
+      .set(updates)
+      .where(eq(stationSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getStationSession(id: string): Promise<StationSession | undefined> {
+    const result = await db.select().from(stationSessions).where(eq(stationSessions.id, id));
+    return result[0];
+  }
+
+  async getActiveSessionByStation(stationId: string): Promise<StationSession | undefined> {
+    const result = await db
+      .select()
+      .from(stationSessions)
+      .where(and(eq(stationSessions.stationId, stationId), eq(stationSessions.status, 'active')));
+    return result[0];
+  }
+
+  async getActiveSessionByUser(userId: string): Promise<StationSession | undefined> {
+    const result = await db
+      .select()
+      .from(stationSessions)
+      .where(and(eq(stationSessions.userId, userId), eq(stationSessions.status, 'active')));
+    return result[0];
+  }
+
+  async getActiveSessionByDesktopClient(desktopClientId: string): Promise<StationSession | undefined> {
+    const result = await db
+      .select()
+      .from(stationSessions)
+      .where(and(eq(stationSessions.desktopClientId, desktopClientId), eq(stationSessions.status, 'active')));
+    return result[0];
+  }
+
+  async endStationSession(id: string): Promise<StationSession | undefined> {
+    const result = await db
+      .update(stationSessions)
+      .set({ status: 'ended', endedAt: new Date() })
+      .where(eq(stationSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async expireOldSessions(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .update(stationSessions)
+      .set({ status: 'expired', endedAt: now })
+      .where(and(eq(stationSessions.status, 'active'), lte(stationSessions.expiresAt, now)))
+      .returning();
+    return result.length;
+  }
+
+  async claimStationAtomically(session: InsertStationSession, clientId: string): Promise<{ session?: StationSession; error?: string; claimedBy?: string; expiresAt?: Date }> {
+    try {
+      return await db.transaction(async (tx) => {
+        // Check if station is already claimed by someone else (SELECT FOR UPDATE for row-level lock)
+        const existingSession = await tx
+          .select()
+          .from(stationSessions)
+          .where(and(
+            eq(stationSessions.stationId, session.stationId),
+            eq(stationSessions.status, 'active')
+          ))
+          .for('update');
+        
+        if (existingSession.length > 0 && existingSession[0].desktopClientId !== clientId) {
+          // Get the user who claimed it
+          const claimingUser = await tx
+            .select()
+            .from(users)
+            .where(eq(users.id, existingSession[0].userId));
+          
+          return {
+            error: 'Station is already claimed',
+            claimedBy: claimingUser[0]?.name || 'Another user',
+            expiresAt: existingSession[0].expiresAt,
+          };
+        }
+
+        // If there's an existing session for this same client, end it
+        if (existingSession.length > 0 && existingSession[0].desktopClientId === clientId) {
+          await tx
+            .update(stationSessions)
+            .set({ status: 'ended', endedAt: new Date() })
+            .where(eq(stationSessions.id, existingSession[0].id));
+        }
+
+        // End any other active session for this client (they might be claiming a different station)
+        await tx
+          .update(stationSessions)
+          .set({ status: 'ended', endedAt: new Date() })
+          .where(and(
+            eq(stationSessions.desktopClientId, clientId),
+            eq(stationSessions.status, 'active')
+          ));
+
+        // Create the new session
+        const newSession = await tx
+          .insert(stationSessions)
+          .values(session)
+          .returning();
+
+        return { session: newSession[0] };
+      });
+    } catch (error: any) {
+      console.error('[Station Claim] Transaction failed:', error);
+      return { error: error.message || 'Failed to claim station' };
+    }
+  }
+
+  // Print Jobs
+  async createPrintJob(job: InsertPrintJob): Promise<PrintJob> {
+    const result = await db.insert(printJobs).values(job).returning();
+    return result[0];
+  }
+
+  async updatePrintJob(id: string, updates: Partial<InsertPrintJob & { attempts?: number; sentAt?: Date; completedAt?: Date }>): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getPrintJob(id: string): Promise<PrintJob | undefined> {
+    const result = await db.select().from(printJobs).where(eq(printJobs.id, id));
+    return result[0];
+  }
+
+  async getPendingJobsByStation(stationId: string, limit: number = 50): Promise<PrintJob[]> {
+    return await db
+      .select()
+      .from(printJobs)
+      .where(and(eq(printJobs.stationId, stationId), eq(printJobs.status, 'pending')))
+      .orderBy(desc(printJobs.priority), printJobs.createdAt)
+      .limit(limit);
+  }
+
+  async getJobsByStation(stationId: string, limit: number = 100): Promise<PrintJob[]> {
+    return await db
+      .select()
+      .from(printJobs)
+      .where(eq(printJobs.stationId, stationId))
+      .orderBy(desc(printJobs.createdAt))
+      .limit(limit);
+  }
+
+  async getJobsByOrder(orderId: string): Promise<PrintJob[]> {
+    return await db.select().from(printJobs).where(eq(printJobs.orderId, orderId)).orderBy(desc(printJobs.createdAt));
+  }
+
+  async getJobsByShipment(shipmentId: string): Promise<PrintJob[]> {
+    return await db.select().from(printJobs).where(eq(printJobs.shipmentId, shipmentId)).orderBy(desc(printJobs.createdAt));
+  }
+
+  async markJobSent(id: string): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markJobCompleted(id: string): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ status: 'completed', completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markJobFailed(id: string, errorMessage: string): Promise<PrintJob | undefined> {
+    const job = await this.getPrintJob(id);
+    if (!job) return undefined;
+    
+    const newAttempts = job.attempts + 1;
+    const newStatus = newAttempts >= job.maxAttempts ? 'failed' : 'pending';
+    
+    const result = await db
+      .update(printJobs)
+      .set({ 
+        status: newStatus, 
+        attempts: newAttempts,
+        errorMessage,
+        updatedAt: new Date() 
+      })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async retryJob(id: string): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ status: 'pending', errorMessage: null, sentAt: null, updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async cancelJob(id: string): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
   }
 }
 

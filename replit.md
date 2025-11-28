@@ -33,6 +33,12 @@ Preferred communication style: Simple, everyday language.
     - **Reporting & Analytics**: Reports page with business analytics dashboard (Gross Sales, Net Sales). PO Recommendations page with inventory recommendations querying a separate GCP PostgreSQL database.
     - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets.
     - **Print Queue System**: Automated shipping label printing workflow with background worker, retry logic, and browser auto-print.
+    - **Desktop Printing System**: Three-tier architecture for native macOS printing:
+        - **Database Schema**: `stations` (packing station locations), `printers` (discovered macOS printers), `desktop_clients` (authenticated Electron apps), `station_sessions` (20-hour user-station claims), `print_jobs` (job queue per station)
+        - **API Endpoints**: REST API at `/api/desktop/*` for station/printer management, client registration, session claiming, and print job lifecycle
+        - **Authentication**: Desktop apps authenticate via Google OAuth, receive API tokens (20-hour expiry), stored securely in macOS Keychain
+        - **Station Sessions**: Users temporarily claim a physical station for their shift (20-hour expiry), not permanently assigned
+        - **Electron App** (Phase 2): Will connect via WebSocket, discover local macOS printers, receive print jobs in real-time
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.
     - **Saved Views System**: Customizable column views for PO Recommendations page stored in `saved_views` table.
 - **Monorepo Structure**: Client, server, and shared code co-located.

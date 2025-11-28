@@ -697,3 +697,159 @@ export const insertSavedViewSchema = createInsertSchema(savedViews).omit({
 export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
 export type SavedView = typeof savedViews.$inferSelect;
 export type SavedViewConfig = z.infer<typeof insertSavedViewSchema>['config'];
+
+// ============================================================================
+// DESKTOP PRINTING SYSTEM TABLES
+// ============================================================================
+
+// Stations - Physical packing stations in the warehouse
+export const stations = pgTable("stations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // e.g., "Station 1", "Packing Area A"
+  locationHint: text("location_hint"), // e.g., "Near shipping dock", "Second floor"
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("stations_name_idx").on(table.name),
+  isActiveIdx: index("stations_is_active_idx").on(table.isActive),
+}));
+
+export const insertStationSchema = createInsertSchema(stations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStation = z.infer<typeof insertStationSchema>;
+export type Station = typeof stations.$inferSelect;
+
+// Printers - Local printers discovered by desktop apps
+export const printers = pgTable("printers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stationId: varchar("station_id").references(() => stations.id), // Nullable - printer may not be assigned to a station yet
+  name: text("name").notNull(), // Display name, e.g., "Zebra ZP450"
+  systemName: text("system_name").notNull(), // macOS system printer name for lpstat/lp
+  printerType: text("printer_type").notNull().default("label"), // "label" or "document"
+  capabilities: jsonb("capabilities"), // Supported paper sizes, dpi, etc.
+  isDefault: boolean("is_default").notNull().default(false), // Default printer for this station
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stationIdIdx: index("printers_station_id_idx").on(table.stationId),
+  systemNameIdx: uniqueIndex("printers_system_name_idx").on(table.systemName),
+}));
+
+export const insertPrinterSchema = createInsertSchema(printers).omit({
+  id: true,
+  lastSeenAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrinter = z.infer<typeof insertPrinterSchema>;
+export type Printer = typeof printers.$inferSelect;
+
+// Desktop Clients - Registered Electron app instances with auth tokens
+export const desktopClients = pgTable("desktop_clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  deviceName: text("device_name").notNull(), // Computer name, e.g., "Rays-MacBook-Pro"
+  accessTokenHash: text("access_token_hash").notNull(), // Hashed access token
+  refreshTokenHash: text("refresh_token_hash").notNull(), // Hashed refresh token
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(),
+  lastIp: text("last_ip"),
+  lastActiveAt: timestamp("last_active_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("desktop_clients_user_id_idx").on(table.userId),
+  accessTokenHashIdx: uniqueIndex("desktop_clients_access_token_hash_idx").on(table.accessTokenHash),
+  refreshTokenHashIdx: uniqueIndex("desktop_clients_refresh_token_hash_idx").on(table.refreshTokenHash),
+}));
+
+export const insertDesktopClientSchema = createInsertSchema(desktopClients).omit({
+  id: true,
+  lastActiveAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDesktopClient = z.infer<typeof insertDesktopClientSchema>;
+export type DesktopClient = typeof desktopClients.$inferSelect;
+
+// Station Sessions - Who's working at which station (20-hour sessions)
+export const stationSessions = pgTable("station_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stationId: varchar("station_id").notNull().references(() => stations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  desktopClientId: varchar("desktop_client_id").notNull().references(() => desktopClients.id),
+  status: text("status").notNull().default("active"), // "active", "ended", "expired"
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // startedAt + 20 hours
+  endedAt: timestamp("ended_at"), // When user manually ended or was kicked
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  stationIdIdx: index("station_sessions_station_id_idx").on(table.stationId),
+  userIdIdx: index("station_sessions_user_id_idx").on(table.userId),
+  desktopClientIdIdx: index("station_sessions_desktop_client_id_idx").on(table.desktopClientId),
+  statusIdx: index("station_sessions_status_idx").on(table.status),
+  // Ensure only one active session per station at a time
+  activeStationIdx: uniqueIndex("station_sessions_active_station_idx")
+    .on(table.stationId)
+    .where(sql`${table.status} = 'active'`),
+}));
+
+export const insertStationSessionSchema = createInsertSchema(stationSessions).omit({
+  id: true,
+  startedAt: true,
+  endedAt: true,
+  createdAt: true,
+});
+
+export type InsertStationSession = z.infer<typeof insertStationSessionSchema>;
+export type StationSession = typeof stationSessions.$inferSelect;
+
+// Print Jobs - Queue of labels to print with status tracking
+export const printJobs = pgTable("print_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stationId: varchar("station_id").notNull().references(() => stations.id),
+  printerId: varchar("printer_id").references(() => printers.id), // Nullable until printer is assigned
+  orderId: varchar("order_id").references(() => orders.id), // Optional link to order
+  shipmentId: varchar("shipment_id").references(() => shipments.id), // Optional link to shipment
+  jobType: text("job_type").notNull().default("label"), // "label", "packing_slip", "invoice"
+  payload: jsonb("payload").notNull(), // Label data, PDF URL, or raw print content
+  status: text("status").notNull().default("pending"), // "pending", "sent", "printing", "completed", "failed", "cancelled"
+  priority: integer("priority").notNull().default(0), // Higher = more urgent
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"), // When job was sent to desktop client
+  completedAt: timestamp("completed_at"), // When printing finished
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stationIdIdx: index("print_jobs_station_id_idx").on(table.stationId),
+  printerIdIdx: index("print_jobs_printer_id_idx").on(table.printerId),
+  orderIdIdx: index("print_jobs_order_id_idx").on(table.orderId),
+  shipmentIdIdx: index("print_jobs_shipment_id_idx").on(table.shipmentId),
+  statusIdx: index("print_jobs_status_idx").on(table.status),
+  // Composite index for fetching pending jobs by station, ordered by priority
+  pendingJobsIdx: index("print_jobs_pending_idx")
+    .on(table.stationId, table.priority.desc(), table.createdAt)
+    .where(sql`${table.status} = 'pending'`),
+}));
+
+export const insertPrintJobSchema = createInsertSchema(printJobs).omit({
+  id: true,
+  attempts: true,
+  sentAt: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPrintJob = z.infer<typeof insertPrintJobSchema>;
+export type PrintJob = typeof printJobs.$inferSelect;

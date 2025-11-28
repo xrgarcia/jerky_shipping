@@ -7,7 +7,8 @@ import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderIte
 import { eq, count, desc, or, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
-import { insertUserSchema, insertPackingLogSchema, insertShipmentEventSchema } from "@shared/schema";
+import { createHash } from "crypto";
+import { insertUserSchema, insertPackingLogSchema, insertShipmentEventSchema, insertStationSchema, insertPrinterSchema, insertDesktopClientSchema, insertStationSessionSchema, insertPrintJobSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -4318,6 +4319,651 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Firestore] Error fetching session statuses:", error);
       res.status(500).json({ error: error.message || "Failed to fetch session statuses" });
+    }
+  });
+
+  // ============================================================================
+  // DESKTOP PRINTING SYSTEM API
+  // ============================================================================
+
+  // Helper function to hash tokens
+  function hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  // Desktop client authentication middleware
+  async function requireDesktopAuth(req: Request, res: Response, next: Function) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+
+    const token = authHeader.substring(7);
+    const tokenHash = hashToken(token);
+    
+    try {
+      const client = await storage.getDesktopClientByAccessToken(tokenHash);
+      if (!client) {
+        return res.status(401).json({ error: 'Invalid access token' });
+      }
+
+      // Check token expiry
+      if (new Date() > new Date(client.accessTokenExpiresAt)) {
+        return res.status(401).json({ error: 'Access token expired', code: 'TOKEN_EXPIRED' });
+      }
+
+      // Update activity
+      const clientIp = req.ip || req.socket.remoteAddress;
+      await storage.updateDesktopClientActivity(client.id, clientIp);
+
+      // Attach client and user to request
+      const user = await storage.getUser(client.userId);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      (req as any).desktopClient = client;
+      (req as any).user = user;
+      next();
+    } catch (error) {
+      console.error('[Desktop Auth] Error:', error);
+      res.status(500).json({ error: 'Authentication error' });
+    }
+  }
+
+  // ==================== Stations ====================
+
+  // Get all stations
+  app.get("/api/desktop/stations", requireAuth, async (req, res) => {
+    try {
+      const activeOnly = req.query.active === 'true';
+      const stations = await storage.getAllStations(activeOnly);
+      res.json(stations);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching stations:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch stations" });
+    }
+  });
+
+  // Get a specific station
+  app.get("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+    try {
+      const station = await storage.getStation(req.params.id);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      res.json(station);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching station:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch station" });
+    }
+  });
+
+  // Create a new station
+  app.post("/api/desktop/stations", requireAuth, async (req, res) => {
+    try {
+      const data = insertStationSchema.parse(req.body);
+      
+      // Check for duplicate name
+      const existing = await storage.getStationByName(data.name);
+      if (existing) {
+        return res.status(400).json({ error: "A station with this name already exists" });
+      }
+
+      const station = await storage.createStation(data);
+      res.status(201).json(station);
+    } catch (error: any) {
+      console.error("[Desktop] Error creating station:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid station data", details: error.errors });
+      }
+      res.status(500).json({ error: error.message || "Failed to create station" });
+    }
+  });
+
+  // Update a station
+  app.patch("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+    try {
+      const station = await storage.updateStation(req.params.id, req.body);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      res.json(station);
+    } catch (error: any) {
+      console.error("[Desktop] Error updating station:", error);
+      res.status(500).json({ error: error.message || "Failed to update station" });
+    }
+  });
+
+  // Delete a station
+  app.delete("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deleteStation(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Desktop] Error deleting station:", error);
+      res.status(500).json({ error: error.message || "Failed to delete station" });
+    }
+  });
+
+  // ==================== Printers ====================
+
+  // Get all printers (optionally filter by station)
+  app.get("/api/desktop/printers", requireAuth, async (req, res) => {
+    try {
+      const stationId = req.query.stationId as string | undefined;
+      const printers = stationId 
+        ? await storage.getPrintersByStation(stationId)
+        : await storage.getAllPrinters();
+      res.json(printers);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching printers:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch printers" });
+    }
+  });
+
+  // Get a specific printer
+  app.get("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+    try {
+      const printer = await storage.getPrinter(req.params.id);
+      if (!printer) {
+        return res.status(404).json({ error: "Printer not found" });
+      }
+      res.json(printer);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching printer:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch printer" });
+    }
+  });
+
+  // Register/update a printer (used by desktop app during discovery)
+  app.post("/api/desktop/printers", requireDesktopAuth, async (req, res) => {
+    try {
+      const data = insertPrinterSchema.parse(req.body);
+      
+      // Check if printer already exists by system name
+      const existing = await storage.getPrinterBySystemName(data.systemName);
+      if (existing) {
+        // Update existing printer
+        const updated = await storage.updatePrinter(existing.id, data);
+        return res.json(updated);
+      }
+
+      const printer = await storage.createPrinter(data);
+      res.status(201).json(printer);
+    } catch (error: any) {
+      console.error("[Desktop] Error registering printer:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid printer data", details: error.errors });
+      }
+      res.status(500).json({ error: error.message || "Failed to register printer" });
+    }
+  });
+
+  // Update a printer
+  app.patch("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+    try {
+      const printer = await storage.updatePrinter(req.params.id, req.body);
+      if (!printer) {
+        return res.status(404).json({ error: "Printer not found" });
+      }
+      res.json(printer);
+    } catch (error: any) {
+      console.error("[Desktop] Error updating printer:", error);
+      res.status(500).json({ error: error.message || "Failed to update printer" });
+    }
+  });
+
+  // Delete a printer
+  app.delete("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deletePrinter(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Printer not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Desktop] Error deleting printer:", error);
+      res.status(500).json({ error: error.message || "Failed to delete printer" });
+    }
+  });
+
+  // ==================== Desktop Client Authentication ====================
+
+  // Register a new desktop client (called after OAuth flow from desktop app)
+  app.post("/api/desktop/clients/register", async (req, res) => {
+    try {
+      const { googleIdToken, deviceName } = req.body;
+
+      if (!googleIdToken || !deviceName) {
+        return res.status(400).json({ error: "Missing googleIdToken or deviceName" });
+      }
+
+      // Verify the Google ID token
+      const googleResponse = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${googleIdToken}`
+      );
+      
+      if (!googleResponse.ok) {
+        return res.status(401).json({ error: "Invalid Google ID token" });
+      }
+
+      const googleData = await googleResponse.json();
+      const email = googleData.email;
+
+      // Verify domain
+      if (!email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`)) {
+        return res.status(403).json({ 
+          error: `Only @${ALLOWED_EMAIL_DOMAIN} accounts are allowed` 
+        });
+      }
+
+      // Find or create user
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
+        user = await storage.createUser({
+          id: randomBytes(16).toString('hex'),
+          email,
+          name: googleData.name || email.split('@')[0],
+          role: 'user',
+        });
+      }
+
+      // Generate tokens
+      const accessToken = randomBytes(32).toString('hex');
+      const refreshToken = randomBytes(32).toString('hex');
+      const now = new Date();
+      const accessTokenExpiry = new Date(now.getTime() + 20 * 60 * 60 * 1000); // 20 hours
+      const refreshTokenExpiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      // Create desktop client
+      const clientId = randomBytes(16).toString('hex');
+      const client = await storage.createDesktopClient({
+        id: clientId,
+        userId: user.id,
+        deviceName,
+        accessTokenHash: hashToken(accessToken),
+        refreshTokenHash: hashToken(refreshToken),
+        accessTokenExpiresAt: accessTokenExpiry,
+        refreshTokenExpiresAt: refreshTokenExpiry,
+        lastIp: req.ip || req.socket.remoteAddress,
+        lastActiveAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      res.status(201).json({
+        clientId: client.id,
+        accessToken,
+        refreshToken,
+        accessTokenExpiresAt: accessTokenExpiry.toISOString(),
+        refreshTokenExpiresAt: refreshTokenExpiry.toISOString(),
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Desktop] Error registering client:", error);
+      res.status(500).json({ error: error.message || "Failed to register desktop client" });
+    }
+  });
+
+  // Refresh access token
+  app.post("/api/desktop/clients/refresh", async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: "Missing refreshToken" });
+      }
+
+      const tokenHash = hashToken(refreshToken);
+      const client = await storage.getDesktopClientByRefreshToken(tokenHash);
+
+      if (!client) {
+        return res.status(401).json({ error: "Invalid refresh token" });
+      }
+
+      // Check refresh token expiry
+      if (new Date() > new Date(client.refreshTokenExpiresAt)) {
+        return res.status(401).json({ error: "Refresh token expired", code: 'REFRESH_TOKEN_EXPIRED' });
+      }
+
+      // Generate new access token
+      const newAccessToken = randomBytes(32).toString('hex');
+      const now = new Date();
+      const accessTokenExpiry = new Date(now.getTime() + 20 * 60 * 60 * 1000); // 20 hours
+
+      await storage.updateDesktopClient(client.id, {
+        accessTokenHash: hashToken(newAccessToken),
+        accessTokenExpiresAt: accessTokenExpiry,
+        lastActiveAt: now,
+      } as any);
+
+      res.json({
+        accessToken: newAccessToken,
+        accessTokenExpiresAt: accessTokenExpiry.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("[Desktop] Error refreshing token:", error);
+      res.status(500).json({ error: error.message || "Failed to refresh token" });
+    }
+  });
+
+  // Revoke desktop client (logout)
+  app.post("/api/desktop/clients/revoke", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      await storage.deleteDesktopClient(client.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Desktop] Error revoking client:", error);
+      res.status(500).json({ error: error.message || "Failed to revoke client" });
+    }
+  });
+
+  // Get current user info
+  app.get("/api/desktop/me", requireDesktopAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const client = (req as any).desktopClient;
+      
+      // Get active session if any
+      const session = await storage.getActiveSessionByDesktopClient(client.id);
+      let station = null;
+      if (session) {
+        station = await storage.getStation(session.stationId);
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        client: {
+          id: client.id,
+          deviceName: client.deviceName,
+          lastActiveAt: client.lastActiveAt,
+        },
+        session: session ? {
+          id: session.id,
+          stationId: session.stationId,
+          stationName: station?.name,
+          status: session.status,
+          startedAt: session.startedAt,
+          expiresAt: session.expiresAt,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("[Desktop] Error getting user info:", error);
+      res.status(500).json({ error: error.message || "Failed to get user info" });
+    }
+  });
+
+  // ==================== Station Sessions ====================
+
+  // Claim a station (start a session) - uses atomic transaction to prevent race conditions
+  app.post("/api/desktop/sessions/claim", requireDesktopAuth, async (req, res) => {
+    try {
+      const { stationId } = req.body;
+      const user = (req as any).user;
+      const client = (req as any).desktopClient;
+
+      if (!stationId) {
+        return res.status(400).json({ error: "Missing stationId" });
+      }
+
+      // Check if station exists and is active
+      const station = await storage.getStation(stationId);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+
+      if (!station.isActive) {
+        return res.status(400).json({ error: "Station is not active" });
+      }
+
+      // Use atomic transaction to claim the station
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 20 * 60 * 60 * 1000); // 20 hours
+
+      const result = await storage.claimStationAtomically({
+        id: randomBytes(16).toString('hex'),
+        stationId,
+        userId: user.id,
+        desktopClientId: client.id,
+        status: 'active',
+        startedAt: now,
+        expiresAt,
+        createdAt: now,
+      }, client.id);
+
+      if (result.error) {
+        if (result.claimedBy) {
+          return res.status(409).json({ 
+            error: result.error, 
+            claimedBy: result.claimedBy,
+            expiresAt: result.expiresAt,
+          });
+        }
+        return res.status(500).json({ error: result.error });
+      }
+
+      const session = result.session!;
+      res.status(201).json({
+        session: {
+          id: session.id,
+          stationId: session.stationId,
+          stationName: station.name,
+          status: session.status,
+          startedAt: session.startedAt,
+          expiresAt: session.expiresAt,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Desktop] Error claiming station:", error);
+      res.status(500).json({ error: error.message || "Failed to claim station" });
+    }
+  });
+
+  // Release a station (end session)
+  app.post("/api/desktop/sessions/release", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+
+      const session = await storage.getActiveSessionByDesktopClient(client.id);
+      if (!session) {
+        return res.status(404).json({ error: "No active session found" });
+      }
+
+      const ended = await storage.endStationSession(session.id);
+      res.json({ success: true, session: ended });
+    } catch (error: any) {
+      console.error("[Desktop] Error releasing station:", error);
+      res.status(500).json({ error: error.message || "Failed to release station" });
+    }
+  });
+
+  // Get current session
+  app.get("/api/desktop/sessions/current", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      const session = await storage.getActiveSessionByDesktopClient(client.id);
+      
+      if (!session) {
+        return res.json({ session: null });
+      }
+
+      const station = await storage.getStation(session.stationId);
+      res.json({
+        session: {
+          id: session.id,
+          stationId: session.stationId,
+          stationName: station?.name,
+          status: session.status,
+          startedAt: session.startedAt,
+          expiresAt: session.expiresAt,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Desktop] Error getting current session:", error);
+      res.status(500).json({ error: error.message || "Failed to get current session" });
+    }
+  });
+
+  // ==================== Print Jobs ====================
+
+  // Get pending print jobs for the current station
+  app.get("/api/desktop/print-jobs", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      const session = await storage.getActiveSessionByDesktopClient(client.id);
+
+      if (!session) {
+        return res.status(400).json({ error: "No active station session" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const pendingOnly = req.query.pending !== 'false';
+
+      const jobs = pendingOnly
+        ? await storage.getPendingJobsByStation(session.stationId, limit)
+        : await storage.getJobsByStation(session.stationId, limit);
+
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching print jobs:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch print jobs" });
+    }
+  });
+
+  // Create a print job (used by web app or other services)
+  app.post("/api/desktop/print-jobs", requireAuth, async (req, res) => {
+    try {
+      const data = insertPrintJobSchema.parse(req.body);
+      const job = await storage.createPrintJob(data);
+      
+      // TODO: Notify desktop clients via WebSocket
+      
+      res.status(201).json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error creating print job:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid print job data", details: error.errors });
+      }
+      res.status(500).json({ error: error.message || "Failed to create print job" });
+    }
+  });
+
+  // Helper to verify print job ownership by desktop client's station session
+  async function verifyPrintJobOwnership(jobId: string, clientId: string): Promise<{ error?: string; job?: any; session?: any }> {
+    const session = await storage.getActiveSessionByDesktopClient(clientId);
+    if (!session) {
+      return { error: "No active station session" };
+    }
+    
+    const job = await storage.getPrintJob(jobId);
+    if (!job) {
+      return { error: "Print job not found" };
+    }
+    
+    if (job.stationId !== session.stationId) {
+      return { error: "Print job does not belong to your station" };
+    }
+    
+    return { job, session };
+  }
+
+  // Acknowledge a print job (mark as sent to printer)
+  app.post("/api/desktop/print-jobs/:id/ack", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      const result = await verifyPrintJobOwnership(req.params.id, client.id);
+      
+      if (result.error) {
+        const status = result.error === "Print job not found" ? 404 : 403;
+        return res.status(status).json({ error: result.error });
+      }
+
+      const job = await storage.markJobSent(req.params.id);
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error acknowledging print job:", error);
+      res.status(500).json({ error: error.message || "Failed to acknowledge print job" });
+    }
+  });
+
+  // Complete a print job
+  app.post("/api/desktop/print-jobs/:id/complete", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      const result = await verifyPrintJobOwnership(req.params.id, client.id);
+      
+      if (result.error) {
+        const status = result.error === "Print job not found" ? 404 : 403;
+        return res.status(status).json({ error: result.error });
+      }
+
+      const job = await storage.markJobCompleted(req.params.id);
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error completing print job:", error);
+      res.status(500).json({ error: error.message || "Failed to complete print job" });
+    }
+  });
+
+  // Report a print job failure
+  app.post("/api/desktop/print-jobs/:id/fail", requireDesktopAuth, async (req, res) => {
+    try {
+      const client = (req as any).desktopClient;
+      const result = await verifyPrintJobOwnership(req.params.id, client.id);
+      
+      if (result.error) {
+        const status = result.error === "Print job not found" ? 404 : 403;
+        return res.status(status).json({ error: result.error });
+      }
+
+      const { errorMessage } = req.body;
+      const job = await storage.markJobFailed(req.params.id, errorMessage || "Unknown error");
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error reporting print job failure:", error);
+      res.status(500).json({ error: error.message || "Failed to report print job failure" });
+    }
+  });
+
+  // Retry a failed print job
+  app.post("/api/desktop/print-jobs/:id/retry", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.retryJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Print job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error retrying print job:", error);
+      res.status(500).json({ error: error.message || "Failed to retry print job" });
+    }
+  });
+
+  // Cancel a print job
+  app.post("/api/desktop/print-jobs/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const job = await storage.cancelJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Print job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Desktop] Error cancelling print job:", error);
+      res.status(500).json({ error: error.message || "Failed to cancel print job" });
     }
   });
 
