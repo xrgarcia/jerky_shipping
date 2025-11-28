@@ -8,6 +8,7 @@ import { FaWindows } from "react-icons/fa";
 
 const APP_VERSION = "1.0.0";
 const RELEASE_DATE = "November 2024";
+const GITHUB_RELEASE_URL = "https://github.com/xrgarcia/jerky_shipping/releases/download/v1.0.0";
 
 export default function Downloads() {
   const macRequirements = [
@@ -81,20 +82,24 @@ export default function Downloads() {
                   size="lg" 
                   className="flex-1"
                   data-testid="button-download-exe"
-                  disabled
+                  asChild
                 >
-                  <Download className="mr-2 h-5 w-5" />
-                  Download Installer (.exe)
+                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-Setup-${APP_VERSION}.exe`} download>
+                    <Download className="mr-2 h-5 w-5" />
+                    Download Installer (.exe)
+                  </a>
                 </Button>
                 <Button 
                   variant="outline" 
                   size="lg"
                   className="flex-1"
                   data-testid="button-download-portable"
-                  disabled
+                  asChild
                 >
-                  <Download className="mr-2 h-5 w-5" />
-                  Portable Version
+                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}.exe`} download>
+                    <Download className="mr-2 h-5 w-5" />
+                    Portable Version
+                  </a>
                 </Button>
               </div>
               
@@ -117,20 +122,24 @@ export default function Downloads() {
                   size="lg" 
                   className="flex-1"
                   data-testid="button-download-dmg"
-                  disabled
+                  asChild
                 >
-                  <Download className="mr-2 h-5 w-5" />
-                  Download for macOS (.dmg)
+                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}-arm64.dmg`} download>
+                    <Download className="mr-2 h-5 w-5" />
+                    Download for macOS (.dmg)
+                  </a>
                 </Button>
                 <Button 
                   variant="outline" 
                   size="lg"
                   className="flex-1"
                   data-testid="button-download-zip"
-                  disabled
+                  asChild
                 >
-                  <Download className="mr-2 h-5 w-5" />
-                  Download ZIP Archive
+                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}-arm64-mac.zip`} download>
+                    <Download className="mr-2 h-5 w-5" />
+                    Download ZIP Archive
+                  </a>
                 </Button>
               </div>
               
@@ -149,9 +158,9 @@ export default function Downloads() {
           </Tabs>
           
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4" />
+            <CheckCircle className="h-4 w-4 text-green-500" />
             <span data-testid="text-build-status">
-              Build coming soon. Contact IT for early access.
+              v{APP_VERSION} is now available for download.
             </span>
           </div>
 
