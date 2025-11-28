@@ -6,9 +6,9 @@ import { Download, Monitor, CheckCircle, AlertCircle } from "lucide-react";
 import { SiApple } from "react-icons/si";
 import { FaWindows } from "react-icons/fa";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 const RELEASE_DATE = "November 2024";
-const GITHUB_RELEASE_URL = "https://github.com/xrgarcia/jerky_shipping/releases/download/v1.0.0";
+const GITHUB_RELEASE_URL = "https://github.com/xrgarcia/jerky_shipping/releases/download/v1.0.1";
 
 export default function Downloads() {
   const macRequirements = [
