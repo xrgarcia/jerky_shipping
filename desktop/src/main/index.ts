@@ -1,5 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import path from 'path';
+
+// Build marker - change this to verify new code is being used
+const BUILD_VERSION = 'v1.0.1-fix1';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
 import { PrinterService } from './printer';
@@ -67,9 +70,17 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    const rendererPath = path.join(app.getAppPath(), 'dist', 'renderer', 'index.html');
-    console.log('[Main] app.getAppPath():', app.getAppPath());
-    console.log('[Main] Loading renderer from:', rendererPath);
+    const appPath = app.getAppPath();
+    const rendererPath = path.join(appPath, 'dist', 'renderer', 'index.html');
+    
+    // Show build info dialog to verify correct code is being used
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Build Info',
+      message: `Jerky Ship Connect ${BUILD_VERSION}`,
+      detail: `App Path: ${appPath}\nRenderer: ${rendererPath}\nPreload: ${preloadPath}`,
+      buttons: ['OK']
+    });
     
     mainWindow.loadFile(rendererPath);
   }
