@@ -249,7 +249,7 @@ async function connectWebSocket(): Promise<void> {
     mainWindow?.webContents.send('station-deleted', data);
   });
   
-  wsClient.on('station-updated', (data: { stationId: string; station: { id: string; name: string; location: string | null; isActive: boolean } }) => {
+  wsClient.on('station-updated', (data: { stationId: string; station: { id: string; name: string; locationHint: string | null; isActive: boolean } }) => {
     console.log(`[Main] Station ${data.stationId} was updated`);
     
     // Update the station in app state if it's our current station
@@ -258,7 +258,7 @@ async function connectWebSocket(): Promise<void> {
         station: {
           ...appState.station,
           name: data.station.name,
-          location: data.station.location,
+          locationHint: data.station.locationHint,
           isActive: data.station.isActive,
         },
       });

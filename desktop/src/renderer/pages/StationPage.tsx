@@ -249,10 +249,10 @@ function StationPage({ state }: StationPageProps) {
                         </span>
                       )}
                     </div>
-                    {station.location && (
+                    {station.locationHint && (
                       <p className="text-sm text-[#999] mt-1 flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        {station.location}
+                        {station.locationHint}
                       </p>
                     )}
                   </div>

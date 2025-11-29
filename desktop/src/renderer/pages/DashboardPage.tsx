@@ -260,7 +260,7 @@ function DashboardPage({ state }: DashboardPageProps) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-[#999]" />
-              <span className="text-sm text-[#999]">{state.station?.location || 'No location'}</span>
+              <span className="text-sm text-[#999]">{state.station?.locationHint || 'No location'}</span>
             </div>
             <button
               onClick={handleReleaseStation}
