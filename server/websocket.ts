@@ -249,6 +249,23 @@ export function getDesktopConnectionStats(): { totalClients: number; stationsWit
   };
 }
 
+// Get list of station IDs that have active WebSocket connections
+export function getConnectedStationIds(): string[] {
+  const connectedIds: string[] = [];
+  for (const [stationId, connection] of desktopStationConnections) {
+    if (connection.ws.readyState === WebSocket.OPEN) {
+      connectedIds.push(stationId);
+    }
+  }
+  return connectedIds;
+}
+
+// Check if a specific station has an active WebSocket connection
+export function isStationConnected(stationId: string): boolean {
+  const connection = desktopStationConnections.get(stationId);
+  return connection?.ws.readyState === WebSocket.OPEN;
+}
+
 // Broadcast station deletion to the desktop client - forces logout
 export function broadcastDesktopStationDeleted(stationId: string): void {
   const connection = desktopStationConnections.get(stationId);

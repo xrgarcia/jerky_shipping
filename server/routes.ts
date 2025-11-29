@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, getConnectedStationIds } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -4487,6 +4487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stations", requireAuth, async (req, res) => {
     try {
       const stations = await storage.getAllStations(false); // Get all stations
+      const connectedStationIds = getConnectedStationIds();
       
       // Fetch active sessions for each station
       const stationsWithSessions = await Promise.all(
@@ -4509,11 +4510,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               startedAt: activeSession.startedAt,
               expiresAt: activeSession.expiresAt,
             } : null,
+            isConnected: connectedStationIds.includes(station.id),
           };
         })
       );
       
-      res.json({ stations: stationsWithSessions });
+      // Calculate connection stats for the response
+      const totalStations = stationsWithSessions.length;
+      const connectedCount = stationsWithSessions.filter(s => s.isConnected).length;
+      const offlineCount = totalStations - connectedCount;
+      
+      res.json({ 
+        stations: stationsWithSessions,
+        connectionStats: {
+          total: totalStations,
+          connected: connectedCount,
+          offline: offlineCount,
+        }
+      });
     } catch (error: any) {
       console.error("[Stations] Error fetching stations:", error);
       res.status(500).json({ error: error.message || "Failed to fetch stations" });
