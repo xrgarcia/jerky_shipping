@@ -12,7 +12,7 @@ import {
   AlertCircle,
   ChevronRight
 } from 'lucide-react';
-import type { AppState, Printer as PrinterType, PrintJob } from '@shared/types';
+import type { AppState, PrintJob } from '@shared/types';
 
 interface SystemPrinter {
   name: string;
@@ -108,20 +108,63 @@ function DashboardPage({ state }: DashboardPageProps) {
     });
   };
 
+  const getConnectionStatusText = () => {
+    const info = state.connectionInfo;
+    switch (state.connectionStatus) {
+      case 'connected':
+        return 'Connected';
+      case 'connecting':
+        return 'Connecting...';
+      case 'reconnecting':
+        return `Retrying (${info?.reconnectAttempt || 0})...`;
+      case 'disconnected':
+        return 'Disconnected';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const getConnectionTooltip = () => {
+    const info = state.connectionInfo;
+    if (state.connectionStatus === 'connected' && info?.lastConnectedAt) {
+      const connectedAt = new Date(info.lastConnectedAt);
+      return `Connected since ${connectedAt.toLocaleTimeString()}`;
+    }
+    if (state.connectionStatus === 'reconnecting' && info?.lastError) {
+      return `Last error: ${info.lastError}\nRetry attempt ${info.reconnectAttempt}`;
+    }
+    if (state.connectionStatus === 'disconnected' && info?.lastError) {
+      return `Error: ${info.lastError}`;
+    }
+    return state.connectionStatus;
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="h-12 drag-region bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4">
-        <div className="flex items-center gap-2 no-drag">
+        <div className="flex items-center gap-2 no-drag" title={getConnectionTooltip()}>
           {state.connectionStatus === 'connected' ? (
-            <Wifi className="w-4 h-4 text-green-500" />
+            <div className="relative">
+              <Wifi className="w-4 h-4 text-green-500" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
+            </div>
           ) : state.connectionStatus === 'connecting' ? (
             <Wifi className="w-4 h-4 text-yellow-500 animate-pulse" />
+          ) : state.connectionStatus === 'reconnecting' ? (
+            <div className="relative">
+              <Wifi className="w-4 h-4 text-orange-500 animate-pulse" />
+              <RefreshCw className="absolute -bottom-1 -right-1 w-2.5 h-2.5 text-orange-500 animate-spin" />
+            </div>
           ) : (
             <WifiOff className="w-4 h-4 text-red-500" />
           )}
-          <span className="text-xs text-[#999]">
-            {state.connectionStatus === 'connected' ? 'Connected' : 
-             state.connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+          <span className={`text-xs ${
+            state.connectionStatus === 'connected' ? 'text-green-500' :
+            state.connectionStatus === 'reconnecting' ? 'text-orange-400' :
+            state.connectionStatus === 'connecting' ? 'text-yellow-500' :
+            'text-red-400'
+          }`}>
+            {getConnectionStatusText()}
           </span>
         </div>
         <span className="text-sm font-medium text-white">{state.station?.name}</span>

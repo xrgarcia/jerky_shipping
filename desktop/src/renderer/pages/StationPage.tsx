@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Loader2, LogOut, RefreshCw, Plus, X } from 'lucide-react';
+import { MapPin, Loader2, LogOut, RefreshCw, Plus, X, Wifi, WifiOff } from 'lucide-react';
 import type { AppState, Station } from '@shared/types';
 
 interface StationPageProps {
@@ -89,7 +89,20 @@ function StationPage({ state }: StationPageProps) {
   return (
     <div className="h-full flex flex-col">
       <div className="h-12 drag-region bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4">
-        <div className="w-20" />
+        <div className="flex items-center gap-2 no-drag w-20">
+          {state.connectionStatus === 'connected' ? (
+            <div className="relative">
+              <Wifi className="w-4 h-4 text-green-500" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
+            </div>
+          ) : state.connectionStatus === 'connecting' || state.connectionStatus === 'reconnecting' ? (
+            <div className="relative">
+              <Wifi className="w-4 h-4 text-orange-500 animate-pulse" />
+            </div>
+          ) : (
+            <WifiOff className="w-4 h-4 text-red-500" />
+          )}
+        </div>
         <span className="text-sm font-medium text-white">Select Station</span>
         <button
           onClick={handleLogout}

@@ -65,6 +65,13 @@ export interface AuthState {
   clientId: string | null;
 }
 
+export interface ConnectionInfo {
+  status: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+  reconnectAttempt: number;
+  lastError: string | null;
+  lastConnectedAt: string | null;
+}
+
 export interface AppState {
   auth: AuthState;
   station: Station | null;
@@ -72,7 +79,8 @@ export interface AppState {
   printers: Printer[];
   selectedPrinter: Printer | null;
   printJobs: PrintJob[];
-  connectionStatus: 'disconnected' | 'connecting' | 'connected';
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+  connectionInfo: ConnectionInfo;
   environment: string;
 }
 

@@ -4,7 +4,7 @@ import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
 import { PrinterService } from './printer';
 import { ApiClient } from './api';
-import { AppState, PrintJob } from '../shared/types';
+import { AppState, PrintJob, ConnectionInfo } from '../shared/types';
 import { environments, config, getEnvironment } from '../shared/config';
 
 let mainWindow: BrowserWindow | null = null;
@@ -14,6 +14,13 @@ let printerService: PrinterService;
 let apiClient: ApiClient | null = null;
 
 let selectedEnvironment = config.defaultEnvironment;
+
+const initialConnectionInfo: ConnectionInfo = {
+  status: 'disconnected',
+  reconnectAttempt: 0,
+  lastError: null,
+  lastConnectedAt: null,
+};
 
 let appState: AppState = {
   auth: {
@@ -28,6 +35,7 @@ let appState: AppState = {
   selectedPrinter: null,
   printJobs: [],
   connectionStatus: 'disconnected',
+  connectionInfo: { ...initialConnectionInfo },
   environment: selectedEnvironment,
 };
 
@@ -140,21 +148,32 @@ async function initializeApp(): Promise<void> {
 async function connectWebSocket(): Promise<void> {
   if (!appState.auth.token || !appState.auth.clientId) return;
   
-  updateState({ connectionStatus: 'connecting' });
+  // Disconnect existing client if any
+  if (wsClient) {
+    wsClient.disconnect();
+    wsClient = null;
+  }
+  
+  updateState({ 
+    connectionStatus: 'connecting',
+    connectionInfo: { ...initialConnectionInfo, status: 'connecting' },
+  });
   
   const env = getEnvironment(selectedEnvironment);
   wsClient = new WebSocketClient(appState.auth.token, appState.auth.clientId, env.wsUrl);
   
+  // Listen for detailed status changes
+  wsClient.on('status-change', (info: ConnectionInfo) => {
+    updateState({ 
+      connectionStatus: info.status,
+      connectionInfo: info,
+    });
+  });
+  
   wsClient.on('connected', () => {
-    updateState({ connectionStatus: 'connected' });
-    
     if (appState.session?.stationId && wsClient) {
       wsClient.subscribeToStation(appState.session.stationId);
     }
-  });
-  
-  wsClient.on('disconnected', () => {
-    updateState({ connectionStatus: 'disconnected' });
   });
   
   wsClient.on('job:new', async (job: PrintJob) => {
@@ -223,6 +242,7 @@ function setupIpcHandlers(): void {
   ipcMain.handle('auth:logout', async () => {
     try {
       wsClient?.disconnect();
+      wsClient = null;
       await authService.clearAuth();
       
       updateState({
@@ -238,6 +258,7 @@ function setupIpcHandlers(): void {
         selectedPrinter: null,
         printJobs: [],
         connectionStatus: 'disconnected',
+        connectionInfo: { ...initialConnectionInfo },
       });
       
       return { success: true };

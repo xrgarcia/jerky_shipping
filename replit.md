@@ -47,8 +47,13 @@ Preferred communication style: Simple, everyday language.
         - **Electron App**: Complete React-based desktop app in `desktop/` folder with:
             - **OAuth PKCE Flow**: Google OAuth with PKCE for secure desktop authentication
             - **Token Persistence**: Tokens stored securely in macOS Keychain via `keytar`
-            - **WebSocket Client**: Connects to `/ws/desktop` with Bearer auth, automatic reconnect, heartbeat
-            - **Station Selection**: Users claim physical stations for 20-hour shifts
+            - **WebSocket Client**: Connects to `/ws/desktop` with Bearer auth, automatic reconnect with exponential backoff (2s-30s), heartbeat every 30s
+            - **Connection Status Indicator**: Visual indicator showing connection state:
+                - Green dot + "Connected" when connected to server
+                - Orange pulsing + "Retrying (N)..." during reconnection attempts
+                - Yellow pulsing + "Connecting..." during initial connection
+                - Red + "Disconnected" when connection lost after max retries (50)
+            - **Station Management**: Users can create new stations or claim existing ones for 20-hour shifts
             - **Printer Discovery**: Native macOS printer discovery and registration
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.

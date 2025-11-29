@@ -1,12 +1,16 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import { config } from '../shared/config';
-import type { PrintJob } from '../shared/types';
+import type { PrintJob, ConnectionInfo } from '../shared/types';
 
 interface WebSocketMessage {
   type: string;
   [key: string]: unknown;
 }
+
+const MAX_RECONNECT_ATTEMPTS = 50;
+const BASE_RECONNECT_DELAY = 2000;
+const MAX_RECONNECT_DELAY = 30000;
 
 export class WebSocketClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -19,12 +23,35 @@ export class WebSocketClient extends EventEmitter {
   private pendingStationSubscription: string | null = null;
   private isIntentionalClose = false;
   private isAuthenticated = false;
+  private reconnectAttempt = 0;
+  private lastError: string | null = null;
+  private lastConnectedAt: string | null = null;
   
   constructor(token: string, clientId: string, wsUrl: string) {
     super();
     this.token = token;
     this.clientId = clientId;
     this.wsUrl = wsUrl;
+  }
+  
+  getConnectionInfo(): ConnectionInfo {
+    let status: ConnectionInfo['status'] = 'disconnected';
+    
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      status = 'connected';
+    } else if (this.ws?.readyState === WebSocket.CONNECTING) {
+      status = 'connecting';
+    } else if (this.reconnectTimer || (this.reconnectAttempt > 0 && !this.isIntentionalClose)) {
+      // We're either actively waiting to reconnect (timer set) or we've started reconnection attempts
+      status = 'reconnecting';
+    }
+    
+    return {
+      status,
+      reconnectAttempt: this.reconnectAttempt,
+      lastError: this.lastError,
+      lastConnectedAt: this.lastConnectedAt,
+    };
   }
   
   connect(): void {
@@ -36,6 +63,7 @@ export class WebSocketClient extends EventEmitter {
     this.isAuthenticated = false;
     
     try {
+      console.log(`[WebSocket] Connecting to ${this.wsUrl}...`);
       this.ws = new WebSocket(this.wsUrl, {
         headers: {
           'Authorization': `Bearer ${this.token}`,
@@ -43,9 +71,16 @@ export class WebSocketClient extends EventEmitter {
         },
       });
       
+      // Emit connecting status now that ws is created
+      this.emit('status-change', this.getConnectionInfo());
+      
       this.ws.on('open', () => {
         console.log('[WebSocket] Connected, waiting for authentication...');
+        this.reconnectAttempt = 0;
+        this.lastError = null;
+        this.lastConnectedAt = new Date().toISOString();
         this.emit('connected');
+        this.emit('status-change', this.getConnectionInfo());
         this.startHeartbeat();
       });
       
@@ -59,21 +94,30 @@ export class WebSocketClient extends EventEmitter {
       });
       
       this.ws.on('close', (code, reason) => {
-        console.log(`[WebSocket] Disconnected: ${code} ${reason}`);
+        const reasonStr = reason?.toString() || 'Unknown';
+        console.log(`[WebSocket] Disconnected: ${code} ${reasonStr}`);
         this.stopHeartbeat();
-        this.emit('disconnected');
+        this.isAuthenticated = false;
         
         if (!this.isIntentionalClose) {
+          this.lastError = `Connection closed: ${code} ${reasonStr}`;
           this.scheduleReconnect();
+        } else {
+          this.emit('disconnected');
+          this.emit('status-change', this.getConnectionInfo());
         }
       });
       
       this.ws.on('error', (error) => {
-        console.error('[WebSocket] Error:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[WebSocket] Error:', errorMsg);
+        this.lastError = errorMsg;
         this.emit('error', error);
       });
     } catch (error) {
-      console.error('[WebSocket] Connection error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Connection failed';
+      console.error('[WebSocket] Connection error:', errorMsg);
+      this.lastError = errorMsg;
       this.scheduleReconnect();
     }
   }
@@ -206,10 +250,39 @@ export class WebSocketClient extends EventEmitter {
   
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
-    console.log(`[WebSocket] Reconnecting in ${config.wsReconnectInterval}ms...`);
+    
+    this.reconnectAttempt++;
+    
+    if (this.reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
+      console.error(`[WebSocket] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`);
+      this.lastError = 'Max reconnect attempts reached';
+      // Reset attempts so getConnectionInfo returns 'disconnected' properly
+      this.reconnectAttempt = 0;
+      this.emit('disconnected');
+      this.emit('status-change', this.getConnectionInfo());
+      return;
+    }
+    
+    // Exponential backoff with jitter
+    const delay = Math.min(
+      BASE_RECONNECT_DELAY * Math.pow(1.5, this.reconnectAttempt - 1) + Math.random() * 1000,
+      MAX_RECONNECT_DELAY
+    );
+    
+    console.log(`[WebSocket] Reconnecting in ${Math.round(delay)}ms... (attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
+    
+    // Set timer BEFORE emitting status-change so getConnectionInfo() returns 'reconnecting'
     this.reconnectTimer = setTimeout(() => {
       this.connect();
-    }, config.wsReconnectInterval);
+    }, delay);
+    
+    // Emit reconnecting status after timer is set
+    this.emit('status-change', this.getConnectionInfo());
+  }
+  
+  resetReconnectAttempts(): void {
+    this.reconnectAttempt = 0;
+    this.lastError = null;
   }
   
   private clearReconnectTimer(): void {
