@@ -86,6 +86,13 @@ function handleDesktopConnection(ws: WebSocket, clientId: string, userId: string
     type: 'desktop:connected',
     clientId,
   }));
+  
+  // Send authenticated message - the client waits for this before resubscribing to stations
+  ws.send(JSON.stringify({
+    type: 'desktop:authenticated',
+    clientId,
+  }));
+  console.log(`[Desktop WS] Client ${clientId} authenticated`);
 
   // Handle incoming messages
   ws.on('message', async (data) => {

@@ -8,7 +8,8 @@ interface WebSocketMessage {
   [key: string]: unknown;
 }
 
-const MAX_RECONNECT_ATTEMPTS = 50;
+// PRODUCTION: Unlimited reconnection attempts - warehouse apps MUST survive server restarts/deployments
+const MAX_RECONNECT_ATTEMPTS = Infinity;
 const BASE_RECONNECT_DELAY = 2000;
 const MAX_RECONNECT_DELAY = 30000;
 
@@ -262,23 +263,14 @@ export class WebSocketClient extends EventEmitter {
     
     this.reconnectAttempt++;
     
-    if (this.reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[WebSocket] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`);
-      this.lastError = 'Max reconnect attempts reached';
-      // Reset attempts so getConnectionInfo returns 'disconnected' properly
-      this.reconnectAttempt = 0;
-      this.emit('disconnected');
-      this.emit('status-change', this.getConnectionInfo());
-      return;
-    }
-    
-    // Exponential backoff with jitter
+    // PRODUCTION: Never give up reconnecting - warehouse apps MUST survive server restarts/deployments
+    // Exponential backoff with jitter, capped at MAX_RECONNECT_DELAY
     const delay = Math.min(
-      BASE_RECONNECT_DELAY * Math.pow(1.5, this.reconnectAttempt - 1) + Math.random() * 1000,
+      BASE_RECONNECT_DELAY * Math.pow(1.5, Math.min(this.reconnectAttempt - 1, 10)) + Math.random() * 1000,
       MAX_RECONNECT_DELAY
     );
     
-    console.log(`[WebSocket] Reconnecting in ${Math.round(delay)}ms... (attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
+    console.log(`[WebSocket] Reconnecting in ${Math.round(delay)}ms... (attempt ${this.reconnectAttempt})`);
     
     // Set timer BEFORE emitting status-change so getConnectionInfo() returns 'reconnecting'
     this.reconnectTimer = setTimeout(() => {
