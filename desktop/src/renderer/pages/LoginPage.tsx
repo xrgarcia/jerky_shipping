@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2, ChevronDown, Server } from 'lucide-react';
+import logoImage from '../assets/logo.png';
 
 interface EnvironmentInfo {
   name: string;
@@ -64,8 +65,8 @@ function LoginPage() {
       <div className="h-12 drag-region bg-[#1a1a1a] border-b border-[#333]" />
       
       <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-          <span className="text-4xl font-bold text-white">J</span>
+        <div className="w-20 h-20 mb-6 rounded-2xl overflow-hidden">
+          <img src={logoImage} alt="Jerky Ship Connect" className="w-full h-full object-cover" />
         </div>
         
         <h1 className="text-2xl font-semibold text-white mb-2">

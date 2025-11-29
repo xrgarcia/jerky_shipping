@@ -175,6 +175,7 @@ export class AuthService {
             
             const tokenBody = new URLSearchParams({
               client_id: config.oauth.clientId,
+              client_secret: config.oauth.clientSecret,
               code,
               code_verifier: codeVerifier,
               grant_type: 'authorization_code',

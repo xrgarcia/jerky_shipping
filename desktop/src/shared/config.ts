@@ -30,6 +30,9 @@ export const config = {
   oauth: {
     // Desktop app OAuth client ID (public, not a secret)
     clientId: '420892918128-g27ccqjer6ei9evog8tgk9bi3o5dtosa.apps.googleusercontent.com',
+    // Desktop app client secret (injected at build time via DESKTOP_OAUTH_CLIENT_SECRET env var)
+    // Note: For desktop apps, this is considered "public" since it's bundled in the binary
+    clientSecret: process.env.DESKTOP_OAUTH_CLIENT_SECRET || '',
     // Use 127.0.0.1 (loopback) for desktop OAuth - simpler and more reliable
     redirectUri: 'http://127.0.0.1:8234',
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
