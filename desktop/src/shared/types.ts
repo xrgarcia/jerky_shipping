@@ -78,6 +78,7 @@ export interface AppState {
   session: StationSession | null;
   printers: Printer[];
   selectedPrinter: Printer | null;
+  printersLoaded: boolean; // True after printers have been fetched from server
   printJobs: PrintJob[];
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
   connectionInfo: ConnectionInfo;

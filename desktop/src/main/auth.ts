@@ -12,6 +12,7 @@ interface SavedAuth {
   clientId: string;
   serverUrl: string;
   environment?: string;
+  stationId?: string; // Persisted station ID for session restoration
 }
 
 interface AuthResult {
@@ -128,6 +129,23 @@ export class AuthService {
       console.error('Failed to clear auth:', error);
     }
     this.store.delete('auth');
+  }
+  
+  async updateStationId(stationId: string | null): Promise<void> {
+    const savedAuth = await this.loadSavedAuth();
+    if (!savedAuth) {
+      console.warn('[Auth] Cannot update stationId - no saved auth');
+      return;
+    }
+    
+    if (stationId) {
+      savedAuth.stationId = stationId;
+    } else {
+      delete savedAuth.stationId;
+    }
+    
+    await this.saveAuth(savedAuth);
+    console.log('[Auth] Updated stationId in keychain:', stationId);
   }
   
   async login(envName: string): Promise<AuthResult> {

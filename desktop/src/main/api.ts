@@ -103,6 +103,21 @@ export class ApiClient {
     return this.request<StationSession>('POST', `/api/desktop/sessions/claim`, { stationId });
   }
   
+  async getCurrentSession(): Promise<{ session: StationSession; station: Station } | null> {
+    try {
+      return await this.request<{ session: StationSession; station: Station }>('GET', `/api/desktop/sessions/current`);
+    } catch (error: unknown) {
+      // HTTP 404 means no active session - return null instead of throwing
+      // Match the exact error format from httpRequest: "HTTP 404" or "No active session"
+      if (error instanceof Error && 
+          (error.message === 'HTTP 404' || 
+           error.message.toLowerCase().includes('no active session'))) {
+        return null;
+      }
+      throw error;
+    }
+  }
+  
   async releaseStation(): Promise<void> {
     await this.request<void>('POST', `/api/desktop/sessions/release`);
   }

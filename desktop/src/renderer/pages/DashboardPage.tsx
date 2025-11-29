@@ -38,7 +38,7 @@ interface DashboardPageProps {
 function DashboardPage({ state }: DashboardPageProps) {
   const [systemPrinters, setSystemPrinters] = useState<SystemPrinter[]>([]);
   const [discovering, setDiscovering] = useState(false);
-  const [showPrinterSetup, setShowPrinterSetup] = useState(!state.selectedPrinter);
+  const [showPrinterSetup, setShowPrinterSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const connectionPopupRef = useRef<HTMLDivElement>(null);
@@ -47,6 +47,21 @@ function DashboardPage({ state }: DashboardPageProps) {
   const [showEnvDropdown, setShowEnvDropdown] = useState(false);
   const [switchingEnv, setSwitchingEnv] = useState(false);
   const envDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Use printersLoaded flag from main process to determine loading state
+  const loadingPrinters = !state.printersLoaded;
+  
+  // React to printer state changes from main process
+  useEffect(() => {
+    // If we have a selected printer, hide setup
+    if (state.selectedPrinter) {
+      setShowPrinterSetup(false);
+    }
+    // If printers are loaded but none registered and none selected, show setup
+    else if (state.printersLoaded && state.printers.length === 0) {
+      setShowPrinterSetup(true);
+    }
+  }, [state.selectedPrinter, state.printers, state.printersLoaded]);
 
   const discoverPrinters = async () => {
     setDiscovering(true);
@@ -399,7 +414,12 @@ function DashboardPage({ state }: DashboardPageProps) {
             )}
           </div>
 
-          {showPrinterSetup ? (
+          {loadingPrinters ? (
+            <div className="w-full p-4 rounded-xl bg-[#242424] border border-[#333] flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 text-[#999] animate-spin" />
+              <span className="text-sm text-[#999]">Loading printer...</span>
+            </div>
+          ) : showPrinterSetup ? (
             <div className="bg-[#242424] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium text-white">Select Printer</h3>

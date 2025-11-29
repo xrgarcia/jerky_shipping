@@ -56,6 +56,7 @@ let appState: AppState = {
   session: null,
   printers: [],
   selectedPrinter: null,
+  printersLoaded: false,
   printJobs: [],
   connectionStatus: 'disconnected',
   connectionInfo: { ...initialConnectionInfo },
@@ -157,6 +158,8 @@ async function initializeApp(): Promise<void> {
     if (savedAuth.serverUrl !== expectedServerUrl) {
       console.log('[Init] Saved auth serverUrl differs from selected environment, clearing auth');
       await authService.clearAuth();
+      // No station session, mark printers as loaded (empty state)
+      updateState({ printersLoaded: true });
     } else {
       if (savedAuth.environment) {
         selectedEnvironment = savedAuth.environment;
@@ -177,11 +180,108 @@ async function initializeApp(): Promise<void> {
         });
         
         await connectWebSocket();
+        
+        // Try to restore an existing active session from the server
+        if (apiClient) {
+          try {
+            console.log('[Init] Checking for existing session...');
+            const currentSession = await apiClient.getCurrentSession();
+            
+            if (currentSession) {
+              const { session, station } = currentSession;
+              console.log('[Init] Found existing session for station:', station.name);
+              
+              updateState({ station, session });
+              
+              // Update saved stationId if different
+              if (savedAuth.stationId !== station.id) {
+                await authService.updateStationId(station.id);
+              }
+              
+              if (wsClient) {
+                wsClient.subscribeToStation(station.id);
+              }
+              
+              // Fetch printers for restored station
+              try {
+                const printers = await apiClient.getPrinters(station.id);
+                const selectedPrinter = printers.length > 0 
+                  ? (printers.find(p => p.isDefault) || printers[0])
+                  : null;
+                updateState({ printers, selectedPrinter, printersLoaded: true });
+                console.log('[Init] Restored printers:', printers.length, 'selected:', selectedPrinter?.name);
+              } catch (printerError) {
+                console.warn('[Init] Failed to restore printers:', printerError);
+                updateState({ printers: [], selectedPrinter: null, printersLoaded: true });
+              }
+            } else if (savedAuth.stationId) {
+              // No active session but we have a saved stationId - try to reclaim
+              console.log('[Init] No active session, attempting to reclaim station:', savedAuth.stationId);
+              try {
+                const session = await apiClient.claimStation(savedAuth.stationId);
+                const station = await apiClient.getStation(savedAuth.stationId);
+                
+                updateState({ station, session });
+                
+                if (wsClient) {
+                  wsClient.subscribeToStation(savedAuth.stationId);
+                }
+                
+                // Fetch printers for reclaimed station
+                try {
+                  const printers = await apiClient.getPrinters(savedAuth.stationId);
+                  const selectedPrinter = printers.length > 0 
+                    ? (printers.find(p => p.isDefault) || printers[0])
+                    : null;
+                  updateState({ printers, selectedPrinter, printersLoaded: true });
+                  console.log('[Init] Reclaimed station, printers:', printers.length);
+                } catch (printerError) {
+                  console.warn('[Init] Failed to fetch printers after reclaim:', printerError);
+                  updateState({ printers: [], selectedPrinter: null, printersLoaded: true });
+                }
+              } catch (reclaimError) {
+                console.warn('[Init] Failed to reclaim station:', reclaimError);
+                // Clear stale stationId from persistence and reset all station-related state
+                await authService.updateStationId(null);
+                updateState({ 
+                  station: null, 
+                  session: null, 
+                  printers: [], 
+                  selectedPrinter: null, 
+                  printersLoaded: true 
+                });
+              }
+            } else {
+              // No session and no saved stationId
+              console.log('[Init] No station session to restore');
+              updateState({ printersLoaded: true });
+            }
+          } catch (sessionError) {
+            console.warn('[Init] Error checking session:', sessionError);
+            // Clear stale stationId if any and reset all station-related state
+            if (savedAuth.stationId) {
+              await authService.updateStationId(null);
+            }
+            updateState({ 
+              station: null, 
+              session: null, 
+              printers: [], 
+              selectedPrinter: null, 
+              printersLoaded: true 
+            });
+          }
+        } else {
+          updateState({ printersLoaded: true });
+        }
       } catch (error) {
         console.error('Failed to restore session:', error);
         await authService.clearAuth();
+        updateState({ printersLoaded: true });
       }
     }
+  } else {
+    // No saved auth, mark printers as loaded (empty state)
+    updateState({ printersLoaded: true });
   }
 }
 
@@ -340,7 +440,7 @@ function setupIpcHandlers(): void {
     try {
       wsClient?.disconnect();
       wsClient = null;
-      await authService.clearAuth();
+      await authService.clearAuth(); // This also clears stationId
       
       updateState({
         auth: {
@@ -353,6 +453,7 @@ function setupIpcHandlers(): void {
         session: null,
         printers: [],
         selectedPrinter: null,
+        printersLoaded: true, // Mark as loaded (empty state)
         printJobs: [],
         connectionStatus: 'disconnected',
         connectionInfo: { ...initialConnectionInfo },
@@ -382,7 +483,17 @@ function setupIpcHandlers(): void {
       const session = await apiClient.claimStation(stationId);
       const station = await apiClient.getStation(stationId);
       
-      updateState({ station, session });
+      // Clear previous printer state before loading new station's printers
+      updateState({ 
+        station, 
+        session, 
+        printers: [], 
+        selectedPrinter: null, 
+        printersLoaded: false 
+      });
+      
+      // Persist stationId for session restoration on restart
+      await authService?.updateStationId(stationId);
       
       if (wsClient) {
         wsClient.subscribeToStation(stationId);
@@ -394,9 +505,11 @@ function setupIpcHandlers(): void {
         const selectedPrinter = printers.length > 0 
           ? (printers.find(p => p.isDefault) || printers[0])
           : null;
-        updateState({ printers, selectedPrinter });
+        updateState({ printers, selectedPrinter, printersLoaded: true });
       } catch (printerError) {
         console.warn('[Main] Failed to fetch printers after claiming station:', printerError);
+        // On fetch error, leave printers empty and mark as loaded
+        updateState({ printers: [], selectedPrinter: null, printersLoaded: true });
       }
       
       return { success: true, data: { station, session } };
@@ -416,7 +529,10 @@ function setupIpcHandlers(): void {
         wsClient.unsubscribeFromStation();
       }
       
-      updateState({ station: null, session: null });
+      // Clear persisted stationId
+      await authService?.updateStationId(null);
+      
+      updateState({ station: null, session: null, printers: [], selectedPrinter: null, printersLoaded: true });
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to release station';
@@ -448,12 +564,13 @@ function setupIpcHandlers(): void {
   ipcMain.handle('printer:list', async () => {
     try {
       if (!appState.station || !apiClient) {
+        // Clear printer state when no station/auth
+        updateState({ printers: [], selectedPrinter: null, printersLoaded: true });
         return { success: true, data: [] };
       }
       const printers = await apiClient.getPrinters(appState.station.id);
       
-      // Auto-select the first printer if there's no selected printer
-      // or if the selected printer is no longer in the list
+      // Determine selected printer based on fetched printers
       let selectedPrinter = appState.selectedPrinter;
       if (printers.length > 0) {
         // If no printer selected, or selected printer not in list, select the first one
@@ -463,13 +580,15 @@ function setupIpcHandlers(): void {
           selectedPrinter = printers.find(p => p.isDefault) || printers[0];
         }
       } else {
+        // No printers registered - clear selection
         selectedPrinter = null;
       }
       
-      updateState({ printers, selectedPrinter });
+      updateState({ printers, selectedPrinter, printersLoaded: true });
       return { success: true, data: printers };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load printers';
+      updateState({ printersLoaded: true }); // Mark as loaded even on error
       return { success: false, error: message };
     }
   });

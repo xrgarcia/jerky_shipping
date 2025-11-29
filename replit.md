@@ -56,6 +56,12 @@ Preferred communication style: Simple, everyday language.
             - **Station Management**: Users can create new stations or claim existing ones for 20-hour shifts
             - **Printer Discovery**: Native macOS printer discovery and registration
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
+            - **Session Persistence**: Station sessions and printer selection persist across app restarts:
+                - Station ID saved to macOS Keychain alongside auth tokens
+                - On startup, checks for existing active session via `/api/desktop/sessions/current`
+                - Auto-restores station and printers without requiring reclaim
+                - Falls back to reclaim if no active session exists
+                - Clears stale data on any failure to prevent ghost states
             - **Environment Switching**: Dashboard UI allows switching between development/production environments while logged in; auto-triggers re-authentication with new server and reconnects WebSocket
             - **Graceful Shutdown**: Sends `desktop:going_offline` message with ACK confirmation before closing, ensuring server properly tracks station status
             - **Remote Configuration ("Mars Rover" Control)**: Desktop clients fetch timing settings from server on startup and receive real-time updates via WebSocket, eliminating need for desktop app redeployment:
