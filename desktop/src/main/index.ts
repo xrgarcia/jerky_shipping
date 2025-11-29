@@ -448,15 +448,27 @@ function setupIpcHandlers(): void {
     }
   });
   
-  ipcMain.handle('printer:register', async (_event, printerData: { name: string; systemName: string }) => {
+  ipcMain.handle('printer:register', async (_event, printerData: { name: string; systemName: string; status?: string }) => {
     try {
       if (!appState.station || !apiClient) {
         throw new Error('No station selected');
       }
       const printer = await apiClient.registerPrinter({
-        ...printerData,
+        name: printerData.name,
+        systemName: printerData.systemName,
         stationId: appState.station.id,
       });
+      
+      // Update printer status if provided
+      if (printerData.status && printer.id) {
+        try {
+          await apiClient.updatePrinterStatus(printer.id, printerData.status);
+          printer.status = printerData.status as 'online' | 'offline' | 'error';
+        } catch (statusError) {
+          console.warn('Failed to update printer status:', statusError);
+        }
+      }
+      
       updateState({ printers: [...(appState.printers || []), printer] });
       return { success: true, data: printer };
     } catch (error) {

@@ -132,6 +132,7 @@ function DashboardPage({ state }: DashboardPageProps) {
       const registerResult = await window.electronAPI.printer.register({
         name: printer.name,
         systemName: printer.systemName,
+        status: printer.status, // Pass the discovered status
       });
       
       if (registerResult.success) {

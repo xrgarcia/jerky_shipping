@@ -4519,6 +4519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: selectedPrinter.id,
               name: selectedPrinter.name,
               systemName: selectedPrinter.systemName,
+              status: selectedPrinter.status || 'offline',
             } : null,
           };
         })
@@ -4691,6 +4692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: updated.id,
             name: updated.name,
             systemName: updated.systemName,
+            status: updated.status || 'offline',
           });
         }
         
@@ -4705,6 +4707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: printer.id,
           name: printer.name,
           systemName: printer.systemName,
+          status: printer.status || 'offline',
         });
       }
       
@@ -4732,6 +4735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: printer.id,
           name: printer.name,
           systemName: printer.systemName,
+          status: printer.status || 'offline',
         });
       }
       

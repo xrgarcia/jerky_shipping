@@ -42,7 +42,7 @@ const api = {
   printer: {
     discover: () => ipcRenderer.invoke('printer:discover'),
     list: () => ipcRenderer.invoke('printer:list'),
-    register: (data: { name: string; systemName: string }) => 
+    register: (data: { name: string; systemName: string; status?: string }) => 
       ipcRenderer.invoke('printer:register', data),
     setDefault: (printerId: string) => ipcRenderer.invoke('printer:set-default', printerId),
   },

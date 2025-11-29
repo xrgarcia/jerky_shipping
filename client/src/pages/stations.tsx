@@ -54,6 +54,7 @@ interface StationWithSession extends Station {
     id: string;
     name: string;
     systemName: string;
+    status?: string;
   } | null;
 }
 
@@ -477,13 +478,34 @@ export default function Stations() {
                   <div className="flex-1 min-w-0">
                     <span className="text-xs text-muted-foreground">Printer</span>
                     {station.printer ? (
-                      <p 
-                        className="text-sm font-medium text-foreground truncate"
-                        data-testid={`text-printer-name-${station.id}`}
-                        title={station.printer.name}
-                      >
-                        {station.printer.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p 
+                          className="text-sm font-medium text-foreground truncate"
+                          data-testid={`text-printer-name-${station.id}`}
+                          title={station.printer.name}
+                        >
+                          {station.printer.name}
+                        </p>
+                        <span 
+                          className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${
+                            station.printer.status === 'online' 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : station.printer.status === 'busy'
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                          }`}
+                          data-testid={`text-printer-status-${station.id}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            station.printer.status === 'online' 
+                              ? 'bg-green-500'
+                              : station.printer.status === 'busy'
+                                ? 'bg-yellow-500'
+                                : 'bg-amber-500'
+                          }`} />
+                          {station.printer.status === 'online' ? 'Online' : station.printer.status === 'busy' ? 'Busy' : 'Offline'}
+                        </span>
+                      </div>
                     ) : (
                       <p 
                         className="text-sm font-medium text-red-500"
