@@ -224,60 +224,246 @@ export class PrinterService {
   }
   
   private async printFileWindows(filePath: string, printerName: string): Promise<void> {
+    console.log(`[Printer] Windows print starting for "${printerName}" with file: ${filePath}`);
+    
+    // Try multiple approaches in order of reliability
+    const errors: string[] = [];
+    
+    // Approach 1: Use SumatraPDF if available (most reliable for label printers)
+    try {
+      console.log('[Printer] Trying SumatraPDF...');
+      await this.printWithSumatra(filePath, printerName);
+      console.log('[Printer] SumatraPDF print succeeded');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] SumatraPDF not available: ${msg}`);
+      errors.push(`SumatraPDF: ${msg}`);
+    }
+    
+    // Approach 2: Use Adobe Reader if available
+    try {
+      console.log('[Printer] Trying Adobe Reader...');
+      await this.printWithAdobeReader(filePath, printerName);
+      console.log('[Printer] Adobe Reader print succeeded');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] Adobe Reader not available: ${msg}`);
+      errors.push(`Adobe Reader: ${msg}`);
+    }
+    
+    // Approach 3: Use Windows PrintTo shell verb (requires default PDF handler)
+    try {
+      console.log('[Printer] Trying Windows shell PrintTo verb...');
+      await this.printWithShellVerb(filePath, printerName);
+      console.log('[Printer] Shell PrintTo succeeded');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] Shell PrintTo failed: ${msg}`);
+      errors.push(`Shell PrintTo: ${msg}`);
+    }
+    
+    // Approach 4: Use PowerShell's Out-Printer (text only, last resort)
+    try {
+      console.log('[Printer] Trying PowerShell Out-Printer...');
+      await this.printWithPowerShell(filePath, printerName);
+      console.log('[Printer] PowerShell Out-Printer succeeded');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] PowerShell Out-Printer failed: ${msg}`);
+      errors.push(`PowerShell: ${msg}`);
+    }
+    
+    throw new Error(`All print methods failed:\n${errors.join('\n')}`);
+  }
+  
+  private printWithSumatra(filePath: string, printerName: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[Printer] Executing Windows print command for ${printerName}`);
+      // SumatraPDF is commonly installed and has excellent command-line printing
+      const sumatraPath = 'SumatraPDF.exe';
+      const args = ['-print-to', printerName, '-silent', filePath];
       
-      // Use spawn with argument array to avoid shell escaping issues
-      // PowerShell's Start-Process with PrintTo verb sends file to specified printer
-      const psCommand = `Start-Process -FilePath '${filePath.replace(/'/g, "''")}' -Verb PrintTo -ArgumentList '${printerName.replace(/'/g, "''")}' -Wait`;
+      console.log(`[Printer] Executing: ${sumatraPath} ${args.join(' ')}`);
       
-      const printProcess = spawn('powershell', ['-NoProfile', '-Command', psCommand], {
+      const proc = spawn(sumatraPath, args, { shell: false, windowsHide: true });
+      let stderr = '';
+      
+      proc.stderr.on('data', (data) => { stderr += data.toString(); });
+      proc.on('error', (error) => reject(error));
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`SumatraPDF exited with code ${code}: ${stderr}`));
+        }
+      });
+    });
+  }
+  
+  private printWithAdobeReader(filePath: string, printerName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Try common Adobe Reader paths
+      const adobePaths = [
+        'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe',
+        'C:\\Program Files (x86)\\Adobe\\Acrobat Reader DC\\Reader\\AcroRd32.exe',
+        'C:\\Program Files\\Adobe\\Reader 11.0\\Reader\\AcroRd32.exe',
+        'AcroRd32.exe', // If in PATH
+      ];
+      
+      // Use spawn to find and execute Adobe Reader
+      // Adobe Reader syntax: AcroRd32.exe /t "file.pdf" "printer" "driver" "port"
+      const psCommand = `
+        $adobePaths = @(${adobePaths.map(p => `'${p.replace(/'/g, "''")}'`).join(',')})
+        $found = $false
+        foreach ($path in $adobePaths) {
+          if (Test-Path $path) {
+            $found = $true
+            $proc = Start-Process -FilePath $path -ArgumentList '/t', '"${filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"', '"${printerName.replace(/"/g, '\\"')}"' -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 10
+            if (!$proc.HasExited) { Stop-Process $proc -Force -ErrorAction SilentlyContinue }
+            break
+          }
+        }
+        if (!$found) { exit 1 }
+      `;
+      
+      console.log('[Printer] Searching for Adobe Reader...');
+      
+      const proc = spawn('powershell', ['-NoProfile', '-Command', psCommand], {
         shell: false,
         windowsHide: true,
       });
       
       let stderr = '';
-      
-      printProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      printProcess.on('close', (code) => {
+      proc.stderr.on('data', (data) => { stderr += data.toString(); });
+      proc.on('error', (error) => reject(error));
+      proc.on('close', (code) => {
         if (code === 0) {
           resolve();
         } else {
-          console.error('[Printer] Windows print error:', stderr);
-          
-          // Fallback: Use spawn to avoid shell injection issues
-          console.log(`[Printer] Trying fallback print command`);
-          
-          const fallbackProcess = spawn('cmd', ['/c', 'print', `/d:${printerName}`, filePath], {
-            shell: false,
-            windowsHide: true,
-          });
-          
-          let fallbackStderr = '';
-          
-          fallbackProcess.stderr.on('data', (data) => {
-            fallbackStderr += data.toString();
-          });
-          
-          fallbackProcess.on('close', (fallbackCode) => {
-            if (fallbackCode === 0) {
-              resolve();
-            } else {
-              reject(new Error(`Print failed: ${fallbackStderr || stderr || 'Unknown error'}`));
-            }
-          });
-          
-          fallbackProcess.on('error', (error) => {
-            reject(error);
-          });
+          reject(new Error(`Adobe Reader not found or failed: ${stderr}`));
         }
       });
+    });
+  }
+  
+  private printWithShellVerb(filePath: string, printerName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Use Windows Shell to print via the default PDF handler
+      // This requires a PDF viewer to be installed and associated with .pdf files
+      const psCommand = `
+        $file = '${filePath.replace(/'/g, "''")}'
+        $printer = '${printerName.replace(/'/g, "''")}'
+        
+        Write-Host "[PowerShell] Printing $file to $printer"
+        
+        # Set the default printer temporarily
+        $printerObj = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$printer'"
+        if ($printerObj) {
+          $printerObj.SetDefaultPrinter() | Out-Null
+          Write-Host "[PowerShell] Set default printer to: $printer"
+        } else {
+          Write-Host "[PowerShell] Warning: Could not find printer $printer in WMI"
+        }
+        
+        # Print using shell verb
+        $shell = New-Object -ComObject Shell.Application
+        $folder = $shell.NameSpace((Split-Path $file))
+        $item = $folder.ParseName((Split-Path $file -Leaf))
+        
+        if ($item) {
+          $item.InvokeVerb('Print')
+          Write-Host "[PowerShell] Print verb invoked"
+          Start-Sleep -Seconds 5
+        } else {
+          Write-Error "Could not find file: $file"
+          exit 1
+        }
+      `;
       
-      printProcess.on('error', (error) => {
-        reject(error);
+      console.log('[Printer] Executing shell print verb...');
+      
+      const proc = spawn('powershell', ['-NoProfile', '-Command', psCommand], {
+        shell: false,
+        windowsHide: true,
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+        console.log('[Printer/PS]', data.toString().trim());
+      });
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+        console.error('[Printer/PS Error]', data.toString().trim());
+      });
+      
+      proc.on('error', (error) => reject(error));
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Shell print failed (code ${code}): ${stderr || stdout}`));
+        }
+      });
+    });
+  }
+  
+  private printWithPowerShell(filePath: string, printerName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Last resort: read file content and send to printer
+      // Note: This won't work well for PDFs but might work for some raw print scenarios
+      const psCommand = `
+        $file = '${filePath.replace(/'/g, "''")}'
+        $printer = '${printerName.replace(/'/g, "''")}'
+        
+        Write-Host "[PowerShell] Attempting raw print to $printer"
+        
+        # For label printers, try sending raw data
+        $content = [System.IO.File]::ReadAllBytes($file)
+        
+        # Use .NET printing
+        Add-Type -AssemblyName System.Drawing
+        $printDoc = New-Object System.Drawing.Printing.PrintDocument
+        $printDoc.PrinterSettings.PrinterName = $printer
+        
+        if ($printDoc.PrinterSettings.IsValid) {
+          Write-Host "[PowerShell] Printer is valid, attempting print..."
+          # Note: This approach doesn't work for PDFs, but signals that we tried
+          throw "PDF printing requires a PDF viewer application"
+        } else {
+          throw "Printer '$printer' is not valid or not accessible"
+        }
+      `;
+      
+      const proc = spawn('powershell', ['-NoProfile', '-Command', psCommand], {
+        shell: false,
+        windowsHide: true,
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+        console.log('[Printer/PS]', data.toString().trim());
+      });
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      proc.on('error', (error) => reject(error));
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`PowerShell print failed: ${stderr || 'Unknown error'}`));
+        }
       });
     });
   }
