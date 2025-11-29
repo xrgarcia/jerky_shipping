@@ -245,6 +245,27 @@ export default function Packing() {
     enabled: !!currentShipment?.id,
   });
 
+  // Check for pending print jobs for this shipment
+  type PendingPrintJob = {
+    id: string;
+    stationId: string;
+    stationName: string;
+    status: 'pending' | 'sent' | 'printing';
+    errorMessage: string | null;
+    attempts: number;
+    maxAttempts: number;
+    createdAt: string;
+  };
+  
+  const { data: pendingPrintJobsData } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
+    queryKey: ['/api/print-jobs/shipment', currentShipment?.id],
+    enabled: !!currentShipment?.id,
+    refetchInterval: 5000, // Refresh every 5 seconds to catch status changes
+  });
+  
+  const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || [];
+  const hasPendingPrintJob = pendingPrintJobs.length > 0;
+
   // Check if shipment is a gift (either has Gift tag OR isGift boolean)
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
   const isGift = hasGiftTag || Boolean(currentShipment?.isGift);
@@ -1837,10 +1858,44 @@ export default function Packing() {
                 })()}
               </div>
 
+              {/* Pending Print Job Warning */}
+              {hasPendingPrintJob && (
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3" data-testid="alert-pending-print-job">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-amber-800 dark:text-amber-200">Print Job In Progress</h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        A label is already queued for printing. Please wait for it to complete or resolve the issue before packing again.
+                      </p>
+                      <div className="mt-2 text-sm">
+                        {pendingPrintJobs.map(job => (
+                          <div key={job.id} className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                            <Badge variant="outline" className="text-xs">
+                              {job.status === 'pending' ? 'Queued' : job.status === 'sent' ? 'Sent to Printer' : 'Printing'}
+                            </Badge>
+                            <span>at {job.stationName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => window.open('/print-queue', '_blank')}
+                    data-testid="button-view-print-queue"
+                  >
+                    View Print Queue
+                  </Button>
+                </div>
+              )}
+
               {/* Complete Packing Button */}
               <Button
                 onClick={handleCompletePacking}
-                disabled={!allItemsScanned || completePackingMutation.isPending}
+                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob}
                 className="w-full"
                 size="lg"
                 data-testid="button-complete-packing"
@@ -1849,6 +1904,11 @@ export default function Packing() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Completing...
+                  </>
+                ) : hasPendingPrintJob ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Print Job Pending
                   </>
                 ) : allItemsScanned ? (
                   <>

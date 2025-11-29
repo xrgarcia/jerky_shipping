@@ -3498,6 +3498,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending print jobs for a specific shipment (used by packing page)
+  app.get("/api/print-jobs/shipment/:shipmentId", requireAuth, async (req, res) => {
+    try {
+      const jobs = await storage.getJobsByShipment(req.params.shipmentId);
+      
+      // Filter to only non-terminal statuses (pending, sent, printing)
+      const pendingJobs = jobs.filter(job => 
+        ['pending', 'sent', 'printing'].includes(job.status)
+      );
+      
+      // Get station info for display
+      const stations = await storage.getAllStations();
+      const stationMap = new Map(stations.map(s => [s.id, s.name]));
+      
+      const formattedJobs = pendingJobs.map(job => ({
+        id: job.id,
+        stationId: job.stationId,
+        stationName: stationMap.get(job.stationId) || 'Unknown Station',
+        status: job.status,
+        errorMessage: job.errorMessage,
+        attempts: job.attempts,
+        maxAttempts: job.maxAttempts,
+        createdAt: job.createdAt,
+      }));
+      
+      res.json({ pendingJobs: formattedJobs });
+    } catch (error) {
+      console.error("Error fetching print jobs for shipment:", error);
+      res.status(500).json({ error: "Failed to fetch print jobs" });
+    }
+  });
+
   app.post("/api/print-queue/:id/printing", requireAuth, async (req, res) => {
     try {
       const job = await storage.getPrintJob(req.params.id);
