@@ -187,16 +187,19 @@ export default function Stations() {
   const stations = data?.stations || [];
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Packing Stations</h1>
-          <p className="text-muted-foreground">Manage packing stations for the desktop print app</p>
+          <h1 className="text-3xl font-bold font-serif text-foreground" data-testid="text-page-title">
+            Packing Stations
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage packing stations for the desktop print app
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            size="sm"
             onClick={() => refetch()}
             disabled={isRefetching}
             data-testid="button-refresh-stations"
@@ -209,6 +212,7 @@ export default function Stations() {
               setFormData({ name: "", locationHint: "", isActive: true });
               setShowCreateDialog(true);
             }}
+            className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
             data-testid="button-create-station"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -218,110 +222,122 @@ export default function Stations() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
+            <Card key={i} className="shadow-md">
+              <CardHeader className="pb-3">
+                <Skeleton className="h-7 w-48" />
+                <Skeleton className="h-5 w-24 mt-2" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-4 w-32 mb-2" />
-                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-20 w-full rounded-lg" />
               </CardContent>
             </Card>
           ))}
         </div>
       ) : stations.length === 0 ? (
-        <Card className="text-center py-12">
+        <Card className="text-center py-16 shadow-lg border-dashed border-2">
           <CardContent>
-            <Monitor className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Stations</h3>
-            <p className="text-muted-foreground mb-4">Create your first packing station to get started</p>
+            <div className="w-16 h-16 mx-auto mb-4 bg-[#6B8E23]/10 rounded-full flex items-center justify-center">
+              <Monitor className="h-8 w-8 text-[#6B8E23]" />
+            </div>
+            <h3 className="text-xl font-semibold font-serif mb-2">No Stations Yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Create your first packing station to start managing print jobs from the desktop app
+            </p>
             <Button
               onClick={() => {
                 setFormData({ name: "", locationHint: "", isActive: true });
                 setShowCreateDialog(true);
               }}
+              className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
               data-testid="button-create-first-station"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create Station
+              Create Your First Station
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {stations.map((station) => (
             <Card 
               key={station.id} 
-              className={!station.isActive ? "opacity-60" : undefined}
+              className={`shadow-md hover:shadow-lg transition-shadow ${!station.isActive ? "opacity-60" : ""}`}
               data-testid={`card-station-${station.id}`}
             >
-              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <CardTitle className="text-lg truncate" data-testid={`text-station-name-${station.id}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle 
+                      className="text-xl font-semibold font-serif truncate" 
+                      data-testid={`text-station-name-${station.id}`}
+                    >
                       {station.name}
                     </CardTitle>
-                    <Badge 
-                      variant={station.isActive ? "default" : "secondary"}
-                      data-testid={`badge-station-status-${station.id}`}
-                    >
-                      {station.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    {station.locationHint && (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1.5">
+                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                        <span data-testid={`text-station-location-${station.id}`}>{station.locationHint}</span>
+                      </div>
+                    )}
                   </div>
-                  {station.locationHint && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <MapPin className="h-3 w-3" />
-                      <span data-testid={`text-station-location-${station.id}`}>{station.locationHint}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDialog(station)}
-                    data-testid={`button-edit-station-${station.id}`}
+                  <Badge 
+                    variant={station.isActive ? "default" : "secondary"}
+                    className={station.isActive ? "bg-[#6B8E23] hover:bg-[#5a7a1e]" : ""}
+                    data-testid={`badge-station-status-${station.id}`}
                   >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openDeleteDialog(station)}
-                    data-testid={`button-delete-station-${station.id}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                    {station.isActive ? "Active" : "Inactive"}
+                  </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 {station.activeSession ? (
-                  <div className="bg-accent/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-sm font-medium mb-1">
-                      <User className="h-4 w-4 text-green-600" />
-                      <span className="text-green-700 dark:text-green-400">Active Session</span>
+                  <div className="bg-[#6B8E23]/10 border border-[#6B8E23]/20 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-[#6B8E23] rounded-full animate-pulse" />
+                      <span className="text-sm font-medium text-[#6B8E23]">Active Session</span>
                     </div>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-session-user-${station.id}`}>
+                    <p className="font-medium text-foreground" data-testid={`text-session-user-${station.id}`}>
                       {station.activeSession.userName || "Unknown User"}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Started: {formatDate(station.activeSession.startedAt)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Expires: {formatDate(station.activeSession.expiresAt)}
-                    </p>
+                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                      <p>Started: {formatDate(station.activeSession.startedAt)}</p>
+                      <p>Expires: {formatDate(station.activeSession.expiresAt)}</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
-                    <span>No active session</span>
+                  <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
+                    <Monitor className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">No active session</span>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground mt-3">
-                  Created: {formatDate(station.createdAt)}
-                </p>
+                
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    Created {formatDate(station.createdAt)}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditDialog(station)}
+                      className="h-8 w-8 p-0"
+                      data-testid={`button-edit-station-${station.id}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openDeleteDialog(station)}
+                      className="h-8 w-8 p-0 hover:bg-destructive/10"
+                      data-testid={`button-delete-station-${station.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -329,9 +345,9 @@ export default function Stations() {
       )}
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Station</DialogTitle>
+            <DialogTitle className="text-xl font-serif">Create New Station</DialogTitle>
             <DialogDescription>
               Add a new packing station for the warehouse
             </DialogDescription>
@@ -339,27 +355,36 @@ export default function Stations() {
           <form onSubmit={handleCreate}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="create-name">Station Name *</Label>
+                <Label htmlFor="create-name" className="text-sm font-medium">
+                  Station Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="create-name"
                   placeholder="e.g., Packing Station 1"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="h-11"
                   data-testid="input-station-name"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="create-location">Location (optional)</Label>
+                <Label htmlFor="create-location" className="text-sm font-medium">
+                  Location Hint
+                </Label>
                 <Input
                   id="create-location"
                   placeholder="e.g., Near shipping dock"
                   value={formData.locationHint}
                   onChange={(e) => setFormData(prev => ({ ...prev, locationHint: e.target.value }))}
+                  className="h-11"
                   data-testid="input-station-location"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Optional description to help identify the physical location
+                </p>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button 
                 type="button" 
                 variant="outline" 
@@ -371,6 +396,7 @@ export default function Stations() {
               <Button 
                 type="submit" 
                 disabled={!formData.name.trim() || createMutation.isPending}
+                className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
                 data-testid="button-submit-create"
               >
                 {createMutation.isPending ? "Creating..." : "Create Station"}
@@ -381,9 +407,9 @@ export default function Stations() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Station</DialogTitle>
+            <DialogTitle className="text-xl font-serif">Edit Station</DialogTitle>
             <DialogDescription>
               Update station details
             </DialogDescription>
@@ -391,30 +417,36 @@ export default function Stations() {
           <form onSubmit={handleEdit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Station Name *</Label>
+                <Label htmlFor="edit-name" className="text-sm font-medium">
+                  Station Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="edit-name"
                   placeholder="e.g., Packing Station 1"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="h-11"
                   data-testid="input-edit-station-name"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-location">Location (optional)</Label>
+                <Label htmlFor="edit-location" className="text-sm font-medium">
+                  Location Hint
+                </Label>
                 <Input
                   id="edit-location"
                   placeholder="e.g., Near shipping dock"
                   value={formData.locationHint}
                   onChange={(e) => setFormData(prev => ({ ...prev, locationHint: e.target.value }))}
+                  className="h-11"
                   data-testid="input-edit-station-location"
                 />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-0.5">
-                  <Label htmlFor="edit-active">Active</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Inactive stations cannot be claimed
+                  <Label htmlFor="edit-active" className="text-sm font-medium">Station Active</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Inactive stations cannot be claimed by users
                   </p>
                 </div>
                 <Switch
@@ -425,7 +457,7 @@ export default function Stations() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button 
                 type="button" 
                 variant="outline" 
@@ -437,6 +469,7 @@ export default function Stations() {
               <Button 
                 type="submit" 
                 disabled={!formData.name.trim() || updateMutation.isPending}
+                className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
                 data-testid="button-submit-edit"
               >
                 {updateMutation.isPending ? "Saving..." : "Save Changes"}
