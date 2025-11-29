@@ -353,7 +353,8 @@ export default function Packing() {
   // Use pre-calculated data from shipment (instant) OR query data (for updates after load)
   const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || currentShipment?.pendingPrintJobs || [];
   // Immediate display: use pre-calculated flag (instant) or optimistic state or confirmed data
-  const hasPendingPrintJob = justCreatedPrintJob || currentShipment?.hasPendingPrintJobs || pendingPrintJobs.length > 0;
+  // Only show warning when there's an active shipment (prevent flash after completing)
+  const hasPendingPrintJob = currentShipment && (justCreatedPrintJob || currentShipment?.hasPendingPrintJobs || pendingPrintJobs.length > 0);
   
   // WebSocket subscription for real-time print job status updates
   useEffect(() => {
@@ -1128,6 +1129,7 @@ export default function Packing() {
 
       // Reset for next order
       setTimeout(() => {
+        setJustCreatedPrintJob(false); // Clear optimistic state before clearing shipment
         setCurrentShipment(null);
         setPackingComplete(false);
         setOrderScan("");
