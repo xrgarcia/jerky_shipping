@@ -3463,7 +3463,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/print-queue", requireAuth, async (req, res) => {
     try {
-      const jobs = await storage.getActivePrintJobs();
+      // Get all desktop print jobs (includes history)
+      const desktopJobs = await storage.getAllDesktopPrintJobs(100);
+      
+      // Get stations for display names
+      const stations = await storage.getStations();
+      const stationMap = new Map(stations.map(s => [s.id, s.name]));
+      
+      // Transform jobs to include station name and order number from payload
+      const jobs = desktopJobs.map(job => ({
+        id: job.id,
+        orderId: job.orderId,
+        orderNumber: (job.payload as any)?.orderNumber || job.orderId,
+        stationId: job.stationId,
+        stationName: stationMap.get(job.stationId) || 'Unknown Station',
+        shipmentId: job.shipmentId,
+        jobType: job.jobType,
+        status: job.status,
+        labelUrl: (job.payload as any)?.labelUrl,
+        trackingNumber: (job.payload as any)?.trackingNumber,
+        errorMessage: job.errorMessage,
+        attempts: job.attempts,
+        maxAttempts: job.maxAttempts,
+        queuedAt: job.createdAt,
+        sentAt: job.sentAt,
+        printedAt: job.completedAt,
+        createdAt: job.createdAt,
+      }));
+      
       res.json({ jobs });
     } catch (error) {
       console.error("Error fetching print queue:", error);
@@ -3496,21 +3523,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/print-queue/:id/complete", requireAuth, async (req, res) => {
     try {
-      const job = await storage.getPrintJob(req.params.id);
+      // Try desktop print jobs table first, then fall back to old print queue table
+      let job = await storage.getDesktopPrintJob(req.params.id);
+      let isDesktopJob = !!job;
+      
+      if (!job) {
+        // Fall back to old print queue table
+        job = await storage.getPrintJob(req.params.id) as any;
+      }
       
       if (!job) {
         return res.status(404).json({ error: "Print job not found" });
       }
 
-      if (job.status === "printed") {
+      if (job.status === "completed" || job.status === "printed") {
         return res.json({ success: true, job });
       }
 
-      if (job.status !== "queued" && job.status !== "printing") {
-        return res.status(400).json({ error: "Job must be in queued or printing status to complete" });
+      let updatedJob;
+      if (isDesktopJob) {
+        // Use desktop print jobs method
+        updatedJob = await storage.markJobCompleted(req.params.id);
+      } else {
+        // Use old print queue method
+        updatedJob = await storage.updatePrintJobStatus(req.params.id, "printed", new Date());
       }
-
-      const updatedJob = await storage.updatePrintJobStatus(req.params.id, "printed", new Date());
       
       broadcastPrintQueueUpdate({ type: "job_completed", job: updatedJob });
 

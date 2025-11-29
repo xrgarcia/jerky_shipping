@@ -313,14 +313,16 @@ export interface IStorage {
   expireOldSessions(): Promise<number>;
   claimStationAtomically(session: InsertStationSession, clientId: string): Promise<{ session?: StationSession; error?: string; claimedBy?: string; expiresAt?: Date }>;
 
-  // Print Jobs
+  // Print Jobs (Desktop)
   createPrintJob(job: InsertPrintJob): Promise<PrintJob>;
   updatePrintJob(id: string, updates: Partial<InsertPrintJob & { attempts?: number; sentAt?: Date; completedAt?: Date }>): Promise<PrintJob | undefined>;
   getPrintJob(id: string): Promise<PrintJob | undefined>;
+  getDesktopPrintJob(id: string): Promise<PrintJob | undefined>;
   getPendingJobsByStation(stationId: string, limit?: number): Promise<PrintJob[]>;
   getJobsByStation(stationId: string, limit?: number): Promise<PrintJob[]>;
   getJobsByOrder(orderId: string): Promise<PrintJob[]>;
   getJobsByShipment(shipmentId: string): Promise<PrintJob[]>;
+  getAllDesktopPrintJobs(limit?: number): Promise<PrintJob[]>;
   markJobSent(id: string): Promise<PrintJob | undefined>;
   markJobCompleted(id: string): Promise<PrintJob | undefined>;
   markJobFailed(id: string, errorMessage: string): Promise<PrintJob | undefined>;
@@ -2471,6 +2473,19 @@ export class DatabaseStorage implements IStorage {
 
   async getJobsByShipment(shipmentId: string): Promise<PrintJob[]> {
     return await db.select().from(printJobs).where(eq(printJobs.shipmentId, shipmentId)).orderBy(desc(printJobs.createdAt));
+  }
+
+  async getDesktopPrintJob(id: string): Promise<PrintJob | undefined> {
+    const result = await db.select().from(printJobs).where(eq(printJobs.id, id));
+    return result[0];
+  }
+
+  async getAllDesktopPrintJobs(limit: number = 100): Promise<PrintJob[]> {
+    return await db
+      .select()
+      .from(printJobs)
+      .orderBy(desc(printJobs.createdAt))
+      .limit(limit);
   }
 
   async markJobSent(id: string): Promise<PrintJob | undefined> {

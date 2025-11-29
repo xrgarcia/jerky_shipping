@@ -2,20 +2,32 @@ import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Printer, Check, Clock } from "lucide-react";
+import { Printer, Check, Clock, AlertCircle, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type PrintJob = {
   id: string;
-  orderId: string;
-  labelUrl: string;
-  status: "queued" | "printing" | "printed";
+  orderId: string | null;
+  orderNumber: string;
+  stationId: string;
+  stationName: string;
+  shipmentId: string | null;
+  jobType: string;
+  status: "pending" | "sent" | "printing" | "completed" | "failed" | "cancelled";
+  labelUrl: string | null;
+  trackingNumber: string | null;
+  errorMessage: string | null;
+  attempts: number;
+  maxAttempts: number;
   queuedAt: string;
+  sentAt: string | null;
   printedAt: string | null;
+  createdAt: string;
 };
 
 export default function PrintQueuePage() {
@@ -54,10 +66,16 @@ export default function PrintQueuePage() {
                 title: "New print job",
                 description: "A new label has been added to the print queue.",
               });
-            } else if (data.data.type === 'job_completed') {
+            } else if (data.data.type === 'job_completed' || data.data.status === 'completed') {
               toast({
                 title: "Print completed",
                 description: "Label has been successfully printed.",
+              });
+            } else if (data.data.type === 'job_updated' && data.data.status === 'failed') {
+              toast({
+                title: "Print failed",
+                description: data.data.errorMessage || "Label printing failed.",
+                variant: "destructive",
               });
             }
           }
@@ -100,6 +118,31 @@ export default function PrintQueuePage() {
     refetchInterval: 2000,
   });
 
+  const retryMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await apiRequest("POST", `/api/desktop/print-jobs/${jobId}/retry`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to retry job");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/print-queue"] });
+      toast({
+        title: "Job retrying",
+        description: "Print job has been queued for retry.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to retry job",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const markCompleteMutation = useMutation({
     mutationFn: async (jobId: string) => {
       const response = await apiRequest("POST", `/api/print-queue/${jobId}/complete`);
@@ -127,21 +170,36 @@ export default function PrintQueuePage() {
     },
   });
 
-  // Note: Auto-print is handled by PrintQueueBar component on the packing page
-  // This page is for viewing/managing the queue, not auto-printing
-
   const jobs = jobsData?.jobs || [];
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "queued":
-        return <Badge data-testid={`badge-status-queued`} variant="outline">Queued</Badge>;
+  const getStatusBadge = (job: PrintJob) => {
+    switch (job.status) {
+      case "pending":
+        return <Badge data-testid={`badge-status-pending`} variant="outline">Pending</Badge>;
+      case "sent":
+        return <Badge data-testid={`badge-status-sent`} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Sent</Badge>;
       case "printing":
         return <Badge data-testid={`badge-status-printing`} variant="default">Printing</Badge>;
-      case "printed":
-        return <Badge data-testid={`badge-status-printed`} variant="secondary">Printed</Badge>;
+      case "completed":
+        return <Badge data-testid={`badge-status-completed`} variant="secondary" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
+      case "failed":
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge data-testid={`badge-status-failed`} variant="destructive" className="cursor-help">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Failed ({job.attempts}/{job.maxAttempts})
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{job.errorMessage || "Unknown error"}</p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      case "cancelled":
+        return <Badge data-testid={`badge-status-cancelled`} variant="outline" className="text-muted-foreground">Cancelled</Badge>;
       default:
-        return <Badge data-testid={`badge-status-unknown`} variant="outline">{status}</Badge>;
+        return <Badge data-testid={`badge-status-unknown`} variant="outline">{job.status}</Badge>;
     }
   };
 
@@ -151,16 +209,16 @@ export default function PrintQueuePage() {
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-page-title">Print Queue</h1>
           <p className="text-muted-foreground" data-testid="text-page-description">
-            Auto-print labels from active warehouse print jobs
+            Desktop print jobs for shipping labels
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle data-testid="text-active-jobs-title">Active Print Jobs</CardTitle>
+          <CardTitle data-testid="text-active-jobs-title">Print Jobs</CardTitle>
           <CardDescription data-testid="text-active-jobs-description">
-            Labels will automatically print when added to the queue
+            All print jobs including history (last 100)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -171,16 +229,18 @@ export default function PrintQueuePage() {
           ) : jobs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="empty-print-queue">
               <Printer className="h-12 w-12 text-muted-foreground mb-3" />
-              <p className="text-lg font-medium" data-testid="text-no-jobs">No print jobs in queue</p>
+              <p className="text-lg font-medium" data-testid="text-no-jobs">No print jobs</p>
               <p className="text-sm text-muted-foreground" data-testid="text-no-jobs-description">
-                Labels will appear here when created from order details
+                Print jobs will appear here when packing is completed
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead data-testid="table-header-order">Order ID</TableHead>
+                  <TableHead data-testid="table-header-order">Order</TableHead>
+                  <TableHead data-testid="table-header-station">Station</TableHead>
+                  <TableHead data-testid="table-header-tracking">Tracking</TableHead>
                   <TableHead data-testid="table-header-status">Status</TableHead>
                   <TableHead data-testid="table-header-queued">Queued At</TableHead>
                   <TableHead data-testid="table-header-printed">Printed At</TableHead>
@@ -190,27 +250,49 @@ export default function PrintQueuePage() {
               <TableBody>
                 {jobs.map((job) => (
                   <TableRow key={job.id} data-testid={`row-print-job-${job.id}`}>
-                    <TableCell data-testid={`text-order-id-${job.id}`}>{job.orderId}</TableCell>
-                    <TableCell data-testid={`status-${job.id}`}>{getStatusBadge(job.status)}</TableCell>
+                    <TableCell data-testid={`text-order-${job.id}`}>
+                      <span className="font-medium">{job.orderNumber || job.orderId || '-'}</span>
+                    </TableCell>
+                    <TableCell data-testid={`text-station-${job.id}`}>
+                      {job.stationName}
+                    </TableCell>
+                    <TableCell data-testid={`text-tracking-${job.id}`}>
+                      <span className="font-mono text-sm">{job.trackingNumber || '-'}</span>
+                    </TableCell>
+                    <TableCell data-testid={`status-${job.id}`}>{getStatusBadge(job)}</TableCell>
                     <TableCell data-testid={`text-queued-at-${job.id}`}>
-                      {format(new Date(job.queuedAt), "PPp")}
+                      {job.queuedAt ? format(new Date(job.queuedAt), "MMM d, h:mm a") : "-"}
                     </TableCell>
                     <TableCell data-testid={`text-printed-at-${job.id}`}>
-                      {job.printedAt ? format(new Date(job.printedAt), "PPp") : "-"}
+                      {job.printedAt ? format(new Date(job.printedAt), "MMM d, h:mm a") : "-"}
                     </TableCell>
                     <TableCell>
-                      {job.status !== "printed" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => markCompleteMutation.mutate(job.id)}
-                          disabled={markCompleteMutation.isPending}
-                          data-testid={`button-mark-complete-${job.id}`}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Mark Complete
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                        {job.status === "failed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => retryMutation.mutate(job.id)}
+                            disabled={retryMutation.isPending}
+                            data-testid={`button-retry-${job.id}`}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Retry
+                          </Button>
+                        )}
+                        {(job.status === "pending" || job.status === "sent") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markCompleteMutation.mutate(job.id)}
+                            disabled={markCompleteMutation.isPending}
+                            data-testid={`button-mark-complete-${job.id}`}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Mark Complete
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
