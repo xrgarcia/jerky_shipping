@@ -4063,7 +4063,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const printJob = await storage.createPrintJob({
         stationId: webSession.stationId,
         orderId: shipment.orderId, // Non-null, safe to insert
-        labelUrl: shipment.labelUrl || null, // Use shipment's label URL if available
+        shipmentId: shipment.id,
+        jobType: "label",
+        payload: { 
+          labelUrl: shipment.labelUrl || null,
+          orderNumber: shipment.orderNumber,
+          trackingNumber: shipment.trackingNumber
+        },
         status: "queued"
       });
       
