@@ -229,7 +229,11 @@ export class WebSocketClient extends EventEmitter {
       case 'desktop:authenticated':
         console.log('[WebSocket] Authenticated');
         this.isAuthenticated = true;
+        this.reconnectAttempt = 0;
+        this.lastError = null;
         this.emit('authenticated');
+        // Emit status-change again now that we're fully authenticated
+        this.emit('status-change', this.getConnectionInfo());
         
         if (this.pendingStationSubscription) {
           console.log('[WebSocket] Processing pending station subscription');

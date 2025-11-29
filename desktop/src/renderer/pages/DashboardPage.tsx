@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Printer, 
   Wifi, 
@@ -10,7 +10,8 @@ import {
   X,
   Clock,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import type { AppState, PrintJob } from '@shared/types';
 
@@ -30,6 +31,8 @@ function DashboardPage({ state }: DashboardPageProps) {
   const [discovering, setDiscovering] = useState(false);
   const [showPrinterSetup, setShowPrinterSetup] = useState(!state.selectedPrinter);
   const [error, setError] = useState<string | null>(null);
+  const [showConnectionDetails, setShowConnectionDetails] = useState(false);
+  const connectionPopupRef = useRef<HTMLDivElement>(null);
 
   const discoverPrinters = async () => {
     setDiscovering(true);
@@ -54,6 +57,22 @@ function DashboardPage({ state }: DashboardPageProps) {
       discoverPrinters();
     }
   }, [showPrinterSetup]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (connectionPopupRef.current && !connectionPopupRef.current.contains(event.target as Node)) {
+        setShowConnectionDetails(false);
+      }
+    };
+    
+    if (showConnectionDetails) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showConnectionDetails]);
 
   const handleSelectPrinter = async (printer: SystemPrinter) => {
     try {
@@ -124,48 +143,106 @@ function DashboardPage({ state }: DashboardPageProps) {
     }
   };
 
-  const getConnectionTooltip = () => {
-    const info = state.connectionInfo;
-    if (state.connectionStatus === 'connected' && info?.lastConnectedAt) {
-      const connectedAt = new Date(info.lastConnectedAt);
-      return `Connected since ${connectedAt.toLocaleTimeString()}`;
-    }
-    if (state.connectionStatus === 'reconnecting' && info?.lastError) {
-      return `Last error: ${info.lastError}\nRetry attempt ${info.reconnectAttempt}`;
-    }
-    if (state.connectionStatus === 'disconnected' && info?.lastError) {
-      return `Error: ${info.lastError}`;
-    }
-    return state.connectionStatus;
-  };
-
   return (
     <div className="h-full flex flex-col">
       <div className="h-12 drag-region bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4">
-        <div className="flex items-center gap-2 no-drag" title={getConnectionTooltip()}>
-          {state.connectionStatus === 'connected' ? (
-            <div className="relative">
-              <Wifi className="w-4 h-4 text-green-500" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
+        <div className="relative" ref={connectionPopupRef}>
+          <button
+            onClick={() => setShowConnectionDetails(!showConnectionDetails)}
+            className="flex items-center gap-2 no-drag px-2 py-1 rounded-lg hover:bg-[#333] transition-colors"
+            data-testid="button-connection-status"
+          >
+            {state.connectionStatus === 'connected' ? (
+              <div className="relative">
+                <Wifi className="w-4 h-4 text-green-500" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
+              </div>
+            ) : state.connectionStatus === 'connecting' ? (
+              <Wifi className="w-4 h-4 text-yellow-500 animate-pulse" />
+            ) : state.connectionStatus === 'reconnecting' ? (
+              <div className="relative">
+                <Wifi className="w-4 h-4 text-orange-500 animate-pulse" />
+                <RefreshCw className="absolute -bottom-1 -right-1 w-2.5 h-2.5 text-orange-500 animate-spin" />
+              </div>
+            ) : (
+              <WifiOff className="w-4 h-4 text-red-500" />
+            )}
+            <span className={`text-xs ${
+              state.connectionStatus === 'connected' ? 'text-green-500' :
+              state.connectionStatus === 'reconnecting' ? 'text-orange-400' :
+              state.connectionStatus === 'connecting' ? 'text-yellow-500' :
+              'text-red-400'
+            }`}>
+              {getConnectionStatusText()}
+            </span>
+            <Info className="w-3 h-3 text-[#666]" />
+          </button>
+          
+          {showConnectionDetails && (
+            <div className="absolute top-full left-0 mt-2 w-72 bg-[#242424] border border-[#444] rounded-lg shadow-xl z-50 no-drag">
+              <div className="p-3 border-b border-[#333]">
+                <div className="flex items-center gap-2 mb-1">
+                  {state.connectionStatus === 'connected' ? (
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  ) : state.connectionStatus === 'connecting' || state.connectionStatus === 'reconnecting' ? (
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                  ) : (
+                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                  <span className="text-sm font-medium text-white">
+                    {state.connectionStatus === 'connected' ? 'Connected to Server' :
+                     state.connectionStatus === 'connecting' ? 'Connecting to Server...' :
+                     state.connectionStatus === 'reconnecting' ? 'Reconnecting to Server...' :
+                     'Disconnected from Server'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#999]">
+                  {state.connectionStatus === 'connected' 
+                    ? 'Real-time updates are active' 
+                    : state.connectionStatus === 'reconnecting'
+                    ? 'Attempting to restore connection...'
+                    : 'Waiting for server connection...'}
+                </p>
+              </div>
+              
+              <div className="p-3 space-y-2 text-xs">
+                {state.connectionInfo?.lastConnectedAt && (
+                  <div className="flex justify-between">
+                    <span className="text-[#999]">Last Connected</span>
+                    <span className="text-white">
+                      {new Date(state.connectionInfo.lastConnectedAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+                
+                {state.connectionStatus === 'reconnecting' && state.connectionInfo?.reconnectAttempt && (
+                  <div className="flex justify-between">
+                    <span className="text-[#999]">Retry Attempt</span>
+                    <span className="text-orange-400">
+                      #{state.connectionInfo.reconnectAttempt}
+                    </span>
+                  </div>
+                )}
+                
+                {state.connectionInfo?.lastError && state.connectionStatus !== 'connected' && (
+                  <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-red-400 break-words">
+                        {state.connectionInfo.lastError}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                {state.connectionStatus === 'reconnecting' && (
+                  <p className="text-[#666] mt-2 pt-2 border-t border-[#333]">
+                    The app will automatically reconnect when the server becomes available. No action needed.
+                  </p>
+                )}
+              </div>
             </div>
-          ) : state.connectionStatus === 'connecting' ? (
-            <Wifi className="w-4 h-4 text-yellow-500 animate-pulse" />
-          ) : state.connectionStatus === 'reconnecting' ? (
-            <div className="relative">
-              <Wifi className="w-4 h-4 text-orange-500 animate-pulse" />
-              <RefreshCw className="absolute -bottom-1 -right-1 w-2.5 h-2.5 text-orange-500 animate-spin" />
-            </div>
-          ) : (
-            <WifiOff className="w-4 h-4 text-red-500" />
           )}
-          <span className={`text-xs ${
-            state.connectionStatus === 'connected' ? 'text-green-500' :
-            state.connectionStatus === 'reconnecting' ? 'text-orange-400' :
-            state.connectionStatus === 'connecting' ? 'text-yellow-500' :
-            'text-red-400'
-          }`}>
-            {getConnectionStatusText()}
-          </span>
         </div>
         <span className="text-sm font-medium text-white">{state.station?.name}</span>
         <button
