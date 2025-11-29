@@ -134,6 +134,10 @@ export default function Stations() {
             // Desktop client connected/disconnected - refetch stations data immediately
             console.log(`[WS] Station ${message.stationId} connection change: ${message.isConnected ? 'online' : 'offline'}`);
             queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+          } else if (message.type === 'station_printer_update') {
+            // Desktop app updated printer selection - refetch stations data
+            console.log(`[WS] Station ${message.stationId} printer update: ${message.printer ? message.printer.name : 'none'}`);
+            queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
