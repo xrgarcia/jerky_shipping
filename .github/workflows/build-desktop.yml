@@ -18,8 +18,9 @@
 # for download but don't upload to releases.
 #
 # REQUIRED SECRETS:
+# - DESKTOP_OAUTH_CLIENT_ID: Google OAuth client ID for the Desktop app
 # - DESKTOP_OAUTH_CLIENT_SECRET: Google OAuth client secret for the Desktop app
-#   (Get from Google Cloud Console > APIs & Services > Credentials > Desktop OAuth client)
+#   (Get both from Google Cloud Console > APIs & Services > Credentials > Desktop OAuth client)
 #
 # CODE SIGNING (Optional):
 # For signed builds, add these repository secrets:
@@ -62,6 +63,7 @@ jobs:
         working-directory: desktop
         run: npm run build
         env:
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
       
       - name: Build Windows installer (Release)
@@ -70,6 +72,7 @@ jobs:
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
       
       - name: Build Windows installer (Manual - no publish)
@@ -77,6 +80,7 @@ jobs:
         working-directory: desktop
         run: npx electron-builder --win --publish=never
         env:
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
       
       - name: Upload Windows artifacts
@@ -108,6 +112,7 @@ jobs:
         working-directory: desktop
         run: npm run build
         env:
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
       
       - name: Build macOS installer (Release)
@@ -116,6 +121,7 @@ jobs:
         run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
           # Skip code signing if no certificate is configured
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
@@ -125,6 +131,7 @@ jobs:
         working-directory: desktop
         run: npx electron-builder --mac --publish=never
         env:
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
           DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.DESKTOP_OAUTH_CLIENT_SECRET }}
           # Disable code signing for manual/test builds
           CSC_IDENTITY_AUTO_DISCOVERY: false
