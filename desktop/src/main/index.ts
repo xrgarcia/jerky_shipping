@@ -457,7 +457,7 @@ function setupIpcHandlers(): void {
         ...printerData,
         stationId: appState.station.id,
       });
-      updateState({ printers: [...appState.printers, printer] });
+      updateState({ printers: [...(appState.printers || []), printer] });
       return { success: true, data: printer };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to register printer';
@@ -467,7 +467,7 @@ function setupIpcHandlers(): void {
   
   ipcMain.handle('printer:set-default', async (_event, printerId: string) => {
     try {
-      const printer = appState.printers.find(p => p.id === printerId);
+      const printer = (appState.printers || []).find(p => p.id === printerId);
       if (printer) {
         updateState({ selectedPrinter: printer });
       }
