@@ -180,6 +180,13 @@ export class AuthService {
               redirect_uri: config.oauth.redirectUri,
             }).toString();
             
+            console.log('[Auth] Token exchange request:', {
+              client_id: config.oauth.clientId,
+              redirect_uri: config.oauth.redirectUri,
+              code_length: code.length,
+              code_verifier_length: codeVerifier.length,
+            });
+            
             const tokenResponse = await httpRequest(config.oauth.tokenUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -187,8 +194,9 @@ export class AuthService {
             });
             
             if (!tokenResponse.ok) {
-              const errorData = await tokenResponse.json() as { error?: string };
-              throw new Error(`Token exchange failed: ${errorData.error || tokenResponse.status}`);
+              const errorData = await tokenResponse.json() as { error?: string; error_description?: string };
+              console.error('[Auth] Token exchange error:', errorData);
+              throw new Error(`Token exchange failed: ${errorData.error || tokenResponse.status}${errorData.error_description ? ' - ' + errorData.error_description : ''}`);
             }
             
             const tokenData = await tokenResponse.json() as { id_token: string };
