@@ -138,9 +138,10 @@ export class AuthService {
     
     return new Promise((resolve, reject) => {
       const server = http.createServer(async (req, res) => {
-        const url = new URL(req.url!, `http://localhost:8234`);
+        const url = new URL(req.url!, `http://127.0.0.1:8234`);
         
-        if (url.pathname === '/oauth/callback') {
+        // Handle OAuth callback on root path (Google redirects to redirect_uri exactly)
+        if (url.pathname === '/' || url.pathname === '/oauth/callback') {
           const code = url.searchParams.get('code');
           const returnedState = url.searchParams.get('state');
           const error = url.searchParams.get('error');
@@ -285,7 +286,7 @@ export class AuthService {
         }
       });
       
-      server.listen(8234, 'localhost', () => {
+      server.listen(8234, '127.0.0.1', () => {
         const authUrl = new URL(config.oauth.authUrl);
         authUrl.searchParams.set('client_id', config.oauth.clientId);
         authUrl.searchParams.set('redirect_uri', config.oauth.redirectUri);
