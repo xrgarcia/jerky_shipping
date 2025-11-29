@@ -546,6 +546,23 @@ export function broadcastStationConnectionChange(stationId: string, isConnected:
   console.log(`[WS] Broadcast station ${stationId} connection change: ${isConnected ? 'online' : 'offline'}`);
 }
 
+// Broadcast printer updates to web clients (when desktop app registers/changes printer)
+export function broadcastStationPrinterUpdate(stationId: string, printer: { id: string; name: string; systemName: string } | null): void {
+  if (!wss) {
+    return;
+  }
+
+  const message = JSON.stringify({
+    type: 'station_printer_update',
+    stationId,
+    printer,
+  });
+
+  // Broadcast to operations and default rooms (stations page uses default)
+  broadcastToRooms(['operations', 'default'], message);
+  console.log(`[WS] Broadcast station ${stationId} printer update: ${printer ? printer.name : 'none'}`);
+}
+
 export function broadcastOrderUpdate(order: any): void {
   if (!wss) {
     return;
