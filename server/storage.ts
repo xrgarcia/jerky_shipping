@@ -290,6 +290,7 @@ export interface IStorage {
   getDesktopClientByAccessToken(accessTokenHash: string): Promise<DesktopClient | undefined>;
   getDesktopClientByRefreshToken(refreshTokenHash: string): Promise<DesktopClient | undefined>;
   getDesktopClientsByUser(userId: string): Promise<DesktopClient[]>;
+  getDesktopClientByUserAndDevice(userId: string, deviceName: string): Promise<DesktopClient | undefined>;
   deleteDesktopClient(id: string): Promise<boolean>;
   updateDesktopClientActivity(id: string, lastIp?: string): Promise<void>;
 
@@ -2227,6 +2228,14 @@ export class DatabaseStorage implements IStorage {
 
   async getDesktopClientsByUser(userId: string): Promise<DesktopClient[]> {
     return await db.select().from(desktopClients).where(eq(desktopClients.userId, userId)).orderBy(desc(desktopClients.lastActiveAt));
+  }
+
+  async getDesktopClientByUserAndDevice(userId: string, deviceName: string): Promise<DesktopClient | undefined> {
+    const result = await db
+      .select()
+      .from(desktopClients)
+      .where(and(eq(desktopClients.userId, userId), eq(desktopClients.deviceName, deviceName)));
+    return result[0];
   }
 
   async deleteDesktopClient(id: string): Promise<boolean> {

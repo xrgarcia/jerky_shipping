@@ -4737,6 +4737,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: googleData.name || email.split('@')[0],
           role: 'user',
         });
+      } else if (googleData.name && user.name !== googleData.name) {
+        // Update user name if it changed in Google
+        await storage.updateUser(user.id, { name: googleData.name });
+        user.name = googleData.name;
       }
 
       // Generate tokens
@@ -4746,21 +4750,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const accessTokenExpiry = new Date(now.getTime() + 20 * 60 * 60 * 1000); // 20 hours
       const refreshTokenExpiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-      // Create desktop client
-      const clientId = randomBytes(16).toString('hex');
-      const client = await storage.createDesktopClient({
-        id: clientId,
-        userId: user.id,
-        deviceName,
-        accessTokenHash: hashToken(accessToken),
-        refreshTokenHash: hashToken(refreshToken),
-        accessTokenExpiresAt: accessTokenExpiry,
-        refreshTokenExpiresAt: refreshTokenExpiry,
-        lastIp: req.ip || req.socket.remoteAddress,
-        lastActiveAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
+      // Check if desktop client already exists for this user+device (preserve session ownership)
+      let client = await storage.getDesktopClientByUserAndDevice(user.id, deviceName);
+      
+      if (client) {
+        // Reuse existing client - just update tokens (keeps session ownership intact!)
+        console.log(`[Desktop] Reusing existing client ${client.id} for ${email} on ${deviceName}`);
+        client = await storage.updateDesktopClient(client.id, {
+          accessTokenHash: hashToken(accessToken),
+          refreshTokenHash: hashToken(refreshToken),
+          accessTokenExpiresAt: accessTokenExpiry,
+          refreshTokenExpiresAt: refreshTokenExpiry,
+          lastIp: req.ip || req.socket.remoteAddress,
+          lastActiveAt: now,
+        }) as typeof client;
+      } else {
+        // Create new desktop client
+        const clientId = randomBytes(16).toString('hex');
+        console.log(`[Desktop] Creating new client ${clientId} for ${email} on ${deviceName}`);
+        client = await storage.createDesktopClient({
+          id: clientId,
+          userId: user.id,
+          deviceName,
+          accessTokenHash: hashToken(accessToken),
+          refreshTokenHash: hashToken(refreshToken),
+          accessTokenExpiresAt: accessTokenExpiry,
+          refreshTokenExpiresAt: refreshTokenExpiry,
+          lastIp: req.ip || req.socket.remoteAddress,
+          lastActiveAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
 
       res.status(201).json({
         clientId: client.id,
