@@ -1328,87 +1328,93 @@ export default function Packing() {
           </Card>
         ) : !currentShipment ? (
           /* No Order Loaded - Show Scan Order Input */
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              {/* Print Queue Status Indicator */}
-              {!isLoadingStaleMetrics && printQueueJobCount > 0 && (
-                <div 
-                  className={`rounded-lg p-4 ${
-                    hasCriticalPrintQueue 
-                      ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' 
-                      : 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800'
-                  }`}
-                  data-testid="alert-print-queue-status"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                      hasCriticalPrintQueue 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : 'text-amber-600 dark:text-amber-400'
-                    }`} />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className={`font-medium ${
-                          hasCriticalPrintQueue 
-                            ? 'text-red-800 dark:text-red-200' 
-                            : 'text-amber-800 dark:text-amber-200'
-                        }`}>
-                          Print Queue {hasCriticalPrintQueue ? 'Blocked' : 'Warning'}
-                        </h4>
-                        <Badge 
-                          variant={hasCriticalPrintQueue ? 'destructive' : 'outline'}
-                          className="text-xs"
-                        >
-                          {printQueueJobCount} job{printQueueJobCount !== 1 ? 's' : ''} stale
-                        </Badge>
-                      </div>
-                      <p className={`text-sm ${
-                        hasCriticalPrintQueue 
-                          ? 'text-red-700 dark:text-red-300' 
-                          : 'text-amber-700 dark:text-amber-300'
-                      }`}>
-                        {hasCriticalPrintQueue 
-                          ? 'Critical print jobs are stuck. Please resolve the print queue before scanning orders.' 
-                          : 'Some print jobs are taking longer than expected. Check the print queue if needed.'}
-                      </p>
+          <>
+            {/* Order Scan Card - Entire card is clickable to focus input */}
+            <Card 
+              className={`cursor-text hover-elevate transition-shadow ${hasCriticalPrintQueue ? 'opacity-50' : ''}`}
+              onClick={() => !hasCriticalPrintQueue && orderInputRef.current?.focus()}
+            >
+              <CardContent className="pt-6">
+                <form onSubmit={handleOrderScan} className="space-y-3">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Scan className="h-4 w-4" />
+                    Scan Order Barcode
+                  </label>
+                  <Input
+                    ref={orderInputRef}
+                    type="text"
+                    placeholder={hasCriticalPrintQueue ? "Resolve print queue first..." : "Scan order number..."}
+                    value={orderScan}
+                    onChange={(e) => setOrderScan(e.target.value)}
+                    disabled={loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue}
+                    className="text-2xl h-16 text-center font-mono"
+                    data-testid="input-order-scan"
+                  />
+                  {loadShipmentMutation.isPending && (
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span className="text-sm">Loading order...</span>
                     </div>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+            
+            {/* Print Queue Status Indicator - Separate container below scan card */}
+            {!isLoadingStaleMetrics && printQueueJobCount > 0 && (
+              <div 
+                className={`rounded-lg p-4 ${
+                  hasCriticalPrintQueue 
+                    ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' 
+                    : 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800'
+                }`}
+                data-testid="alert-print-queue-status"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                    hasCriticalPrintQueue 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`} />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className={`font-medium ${
+                        hasCriticalPrintQueue 
+                          ? 'text-red-800 dark:text-red-200' 
+                          : 'text-amber-800 dark:text-amber-200'
+                      }`}>
+                        Print Queue {hasCriticalPrintQueue ? 'Blocked' : 'Warning'}
+                      </h4>
+                      <Badge 
+                        variant={hasCriticalPrintQueue ? 'destructive' : 'outline'}
+                        className="text-xs"
+                      >
+                        {printQueueJobCount} job{printQueueJobCount !== 1 ? 's' : ''} stale
+                      </Badge>
+                    </div>
+                    <p className={`text-sm ${
+                      hasCriticalPrintQueue 
+                        ? 'text-red-700 dark:text-red-300' 
+                        : 'text-amber-700 dark:text-amber-300'
+                    }`}>
+                      {hasCriticalPrintQueue 
+                        ? 'Critical print jobs are stuck. Please resolve the print queue before scanning orders.' 
+                        : 'Some print jobs are taking longer than expected. Check the print queue if needed.'}
+                    </p>
                   </div>
-                  <Button 
-                    variant={hasCriticalPrintQueue ? 'destructive' : 'outline'} 
-                    size="sm" 
-                    className="w-full mt-3"
-                    onClick={() => setLocation('/print-queue')}
-                    data-testid="button-resolve-print-queue"
-                  >
-                    {hasCriticalPrintQueue ? 'Resolve Print Queue' : 'View Print Queue'}
-                  </Button>
                 </div>
-              )}
-              
-              <form onSubmit={handleOrderScan} className="space-y-3">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Scan className="h-4 w-4" />
-                  Scan Order Barcode
-                </label>
-                <Input
-                  ref={orderInputRef}
-                  type="text"
-                  placeholder={hasCriticalPrintQueue ? "Resolve print queue first..." : "Scan order number..."}
-                  value={orderScan}
-                  onChange={(e) => setOrderScan(e.target.value)}
-                  disabled={loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue}
-                  className={`text-2xl h-16 text-center font-mono ${hasCriticalPrintQueue ? 'opacity-50' : ''}`}
-                  data-testid="input-order-scan"
-                />
-                {loadShipmentMutation.isPending && (
-                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="text-sm">Loading order...</span>
-                  </div>
-                )}
-              </form>
-            </CardContent>
-          </Card>
+                <Button 
+                  variant={hasCriticalPrintQueue ? 'destructive' : 'outline'} 
+                  size="sm" 
+                  className="w-full mt-3"
+                  onClick={() => setLocation('/print-queue')}
+                  data-testid="button-resolve-print-queue"
+                >
+                  {hasCriticalPrintQueue ? 'Resolve Print Queue' : 'View Print Queue'}
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           /* Order Loaded - Show Header and QC or Completion */
           <>
