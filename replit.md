@@ -56,6 +56,8 @@ Preferred communication style: Simple, everyday language.
             - **Station Management**: Users can create new stations or claim existing ones for 20-hour shifts
             - **Printer Discovery**: Native macOS printer discovery and registration
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
+            - **Environment Switching**: Dashboard UI allows switching between development/production environments while logged in; auto-triggers re-authentication with new server and reconnects WebSocket
+            - **Graceful Shutdown**: Sends `desktop:going_offline` message with ACK confirmation before closing, ensuring server properly tracks station status
     - **Web-based Stations Management**: Full CRUD page at `/stations` for managing packing stations. When a station is deleted, active desktop sessions are automatically terminated and clients are notified via WebSocket (`desktop:station:deleted` message). Includes real-time connection status tracking:
         - Each station displays online/offline status with Wifi/WifiOff icons based on active WebSocket connections
         - Filter tabs (All/Online/Offline) with URL-based filtering via `?connection=online|offline`

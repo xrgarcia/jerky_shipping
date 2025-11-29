@@ -11,10 +11,18 @@ import {
   Clock,
   AlertCircle,
   ChevronRight,
-  Info
+  Info,
+  Server,
+  ChevronDown
 } from 'lucide-react';
 import type { AppState, PrintJob } from '@shared/types';
 import logoImage from '../assets/logo.png';
+
+interface EnvironmentInfo {
+  name: string;
+  label: string;
+  serverUrl: string;
+}
 
 interface SystemPrinter {
   name: string;
@@ -34,6 +42,11 @@ function DashboardPage({ state }: DashboardPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const connectionPopupRef = useRef<HTMLDivElement>(null);
+  
+  const [environments, setEnvironments] = useState<EnvironmentInfo[]>([]);
+  const [showEnvDropdown, setShowEnvDropdown] = useState(false);
+  const [switchingEnv, setSwitchingEnv] = useState(false);
+  const envDropdownRef = useRef<HTMLDivElement>(null);
 
   const discoverPrinters = async () => {
     setDiscovering(true);
@@ -64,16 +77,53 @@ function DashboardPage({ state }: DashboardPageProps) {
       if (connectionPopupRef.current && !connectionPopupRef.current.contains(event.target as Node)) {
         setShowConnectionDetails(false);
       }
+      if (envDropdownRef.current && !envDropdownRef.current.contains(event.target as Node)) {
+        setShowEnvDropdown(false);
+      }
     };
     
-    if (showConnectionDetails) {
+    if (showConnectionDetails || showEnvDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showConnectionDetails]);
+  }, [showConnectionDetails, showEnvDropdown]);
+
+  useEffect(() => {
+    const loadEnvironments = async () => {
+      try {
+        const result = await window.electronAPI.environment.list();
+        if (result.success && result.data) {
+          setEnvironments(result.data);
+        }
+      } catch (err) {
+        console.error('Failed to load environments:', err);
+      }
+    };
+    loadEnvironments();
+  }, []);
+
+  const handleEnvChange = async (envName: string) => {
+    if (envName === state.environment || switchingEnv) return;
+    
+    setSwitchingEnv(true);
+    setShowEnvDropdown(false);
+    setError(null);
+    
+    try {
+      const result = await window.electronAPI.environment.set(envName);
+      if (!result.success) {
+        setError(result.error || 'Failed to switch environment');
+      }
+    } catch (err) {
+      console.error('Failed to change environment:', err);
+      setError(err instanceof Error ? err.message : 'Failed to switch environment');
+    } finally {
+      setSwitchingEnv(false);
+    }
+  };
 
   const handleSelectPrinter = async (printer: SystemPrinter) => {
     try {
@@ -278,6 +328,60 @@ function DashboardPage({ state }: DashboardPageProps) {
             >
               Change Station
             </button>
+          </div>
+          
+          <div className="relative mb-3" ref={envDropdownRef}>
+            <button
+              onClick={() => setShowEnvDropdown(!showEnvDropdown)}
+              disabled={switchingEnv}
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                state.environment === 'development'
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                  : 'bg-[#2a2a2a] border-[#444] text-white'
+              } ${switchingEnv ? 'opacity-50' : ''}`}
+              data-testid="button-env-selector"
+            >
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {switchingEnv ? 'Switching...' : environments.find(e => e.name === state.environment)?.label || state.environment}
+                </span>
+              </div>
+              {switchingEnv ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <ChevronDown className={`w-4 h-4 transition-transform ${showEnvDropdown ? 'rotate-180' : ''}`} />
+              )}
+            </button>
+            
+            {showEnvDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#2a2a2a] border border-[#444] rounded-lg overflow-hidden z-10 shadow-xl">
+                {environments.map((env) => (
+                  <button
+                    key={env.name}
+                    onClick={() => handleEnvChange(env.name)}
+                    className={`w-full px-3 py-2 text-left transition-colors flex flex-col ${
+                      env.name === state.environment
+                        ? 'bg-primary-500/20 text-white'
+                        : 'text-[#ccc] hover:bg-[#333]'
+                    }`}
+                    data-testid={`button-env-${env.name}`}
+                  >
+                    <span className="text-sm font-medium">{env.label}</span>
+                    <span className="text-xs text-[#888] truncate">{env.serverUrl}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {error && !showPrinterSetup && (
+              <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {showPrinterSetup ? (

@@ -490,19 +490,16 @@ function setupIpcHandlers(): void {
     selectedEnvironment = envName;
     
     if (previousEnv !== envName && appState.auth.isAuthenticated) {
+      console.log(`[Env] Switching from ${previousEnv} to ${envName} while authenticated`);
+      
+      // Disconnect from current environment
       wsClient?.disconnect();
       wsClient = null;
       apiClient = null;
-      await authService.clearAuth();
       
+      // Clear station/session (environment-specific) but keep minimal UI state
       updateState({
         environment: envName,
-        auth: {
-          isAuthenticated: false,
-          user: null,
-          token: null,
-          clientId: null,
-        },
         station: null,
         session: null,
         printers: [],
@@ -510,11 +507,51 @@ function setupIpcHandlers(): void {
         printJobs: [],
         connectionStatus: 'disconnected',
       });
+      
+      // Save the new environment preference
+      await saveEnvironmentSetting(envName);
+      
+      // Auto re-authenticate with the new environment
+      try {
+        console.log(`[Env] Re-authenticating with ${envName} environment...`);
+        const result = await authService.login(envName);
+        
+        // Create new API client for new environment
+        apiClient = new ApiClient(result.token, result.serverUrl);
+        
+        // Update state with new auth
+        updateState({
+          auth: {
+            isAuthenticated: true,
+            user: result.user,
+            token: result.token,
+            clientId: result.clientId,
+          },
+        });
+        
+        // Connect WebSocket to new environment
+        await connectWebSocket();
+        
+        console.log(`[Env] Successfully switched to ${envName} environment`);
+        return { success: true };
+      } catch (error) {
+        console.error(`[Env] Failed to authenticate with ${envName}:`, error);
+        // Clear auth on failure
+        await authService.clearAuth();
+        updateState({
+          auth: {
+            isAuthenticated: false,
+            user: null,
+            token: null,
+            clientId: null,
+          },
+        });
+        return { success: false, error: 'Failed to authenticate with new environment' };
+      }
     } else {
       updateState({ environment: envName });
+      await saveEnvironmentSetting(envName);
     }
-    
-    await saveEnvironmentSetting(envName);
     
     return { success: true };
   });
