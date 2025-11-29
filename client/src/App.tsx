@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { PrintQueueBar } from "@/components/print-queue-bar";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Orders from "@/pages/orders";
@@ -102,10 +101,9 @@ function AppContent() {
           >
             <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
           </header>
-          <main className="flex-1 overflow-y-auto pb-20">
+          <main className="flex-1 overflow-y-auto">
             {router}
           </main>
-          <PrintQueueBar />
         </div>
       </div>
     </SidebarProvider>
