@@ -22,7 +22,12 @@ Preferred communication style: Simple, everyday language.
     - Packing page uses `expectedQuantity` from SkuVault when available, falls back to ShipStation quantity
 - **Core Features**:
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and SkuVault QC Integration for packing.
-    - **Packing Page**: Single-warehouse MVP for order fulfillment with SkuVault QC validation, scan-first workflow, individual unit scanning, and comprehensive audit trails. Integrates with the print queue.
+    - **Packing Page**: Single-warehouse MVP for order fulfillment with SkuVault QC validation, scan-first workflow, individual unit scanning, and comprehensive audit trails. Integrates with the print queue. Features daily station selection requirement:
+        - **Web Packing Sessions**: Separate from desktop station sessions, stored in `web_packing_sessions` table
+        - **Daily Expiration**: Sessions expire at midnight Pacific time (calculated using date-fns-tz)
+        - **Station Selection Modal**: Prompts user to select station before packing operations
+        - **Action Gating**: All packing actions (order scan, product scan, manual verify, complete) require valid session
+        - **Session Validation**: Both client and server validate session expiration
     - **Shipment Management**: Unified shipments page with workflow tabs (In Progress, Packing Queue, Shipped, All). Session info displayed inline on shipment cards. Tab-based filtering uses session status and ship date. Shipment details page with comprehensive metadata. Dual-ID Routing for all shipment-related API endpoints.
     - **Workflow Tabs**: 
         - **In Progress**: Orders currently being picked (sessionStatus = 'New' or 'Active')
