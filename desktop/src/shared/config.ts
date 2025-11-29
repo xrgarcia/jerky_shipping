@@ -28,7 +28,8 @@ export const config = {
   defaultEnvironment: 'production',
   
   oauth: {
-    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    // Desktop app OAuth client ID (public, not a secret)
+    clientId: '420892918128-g27ccqjer6ei9evog8tgk9bi3o5dtosa.apps.googleusercontent.com',
     redirectUri: 'http://localhost:8234/oauth/callback',
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
