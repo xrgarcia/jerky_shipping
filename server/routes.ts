@@ -4308,6 +4308,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if shipment has a label URL - can't print without one
+      if (!shipment.labelUrl) {
+        console.warn(`[Packing] Shipment ${shipment.orderNumber} has no label URL yet - skipping print queue`);
+        return res.json({ 
+          success: true, 
+          printQueued: false,
+          noLabel: true,
+          message: "Order complete! No shipping label available yet. Label will print when ShipStation generates it.",
+          orderNumber: shipment.orderNumber
+        });
+      }
+      
       // Create print job with shipment label URL and station from web session
       const printJob = await storage.createPrintJob({
         stationId: webSession.stationId,

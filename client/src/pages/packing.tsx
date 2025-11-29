@@ -1179,7 +1179,7 @@ export default function Packing() {
       const response = await apiRequest("POST", "/api/packing/complete", {
         shipmentId: currentShipment!.id,
       });
-      return (await response.json()) as { success: boolean; printQueued: boolean; message?: string };
+      return (await response.json()) as { success: boolean; printQueued: boolean; noLabel?: boolean; message?: string };
     },
     onSuccess: (result) => {
       setPackingComplete(true);
@@ -1192,10 +1192,18 @@ export default function Packing() {
         printQueued: result.printQueued,
       });
       
-      toast({
-        title: "Packing Complete",
-        description: result.printQueued ? "Label queued for printing" : result.message || "Order complete",
-      });
+      if (result.noLabel) {
+        toast({
+          title: "Packing Complete - No Label",
+          description: result.message || "No shipping label available yet",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Packing Complete",
+          description: result.printQueued ? "Label queued for printing" : result.message || "Order complete",
+        });
+      }
 
       // Reset for next order
       setTimeout(() => {
