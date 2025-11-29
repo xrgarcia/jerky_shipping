@@ -41,6 +41,7 @@ export interface PrintJob {
   attempts: number;
   createdAt: string;
   printedAt: string | null;
+  requestedBy: string | null; // Name of user who requested the print
 }
 
 export interface DesktopClient {

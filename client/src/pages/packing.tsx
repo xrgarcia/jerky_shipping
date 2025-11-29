@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,6 +182,7 @@ type ScanFeedback = {
 
 export default function Packing() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
@@ -193,6 +195,9 @@ export default function Packing() {
   const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showStationModal, setShowStationModal] = useState(false);
+  
+  // Optimistic state for print job creation (immediately shows warning after completing packing)
+  const [justCreatedPrintJob, setJustCreatedPrintJob] = useState(false);
 
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
@@ -264,7 +269,49 @@ export default function Packing() {
   });
   
   const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || [];
-  const hasPendingPrintJob = pendingPrintJobs.length > 0;
+  // Combine server state with optimistic state for immediate UI feedback
+  const hasPendingPrintJob = pendingPrintJobs.length > 0 || justCreatedPrintJob;
+  
+  // WebSocket subscription for real-time print job status updates
+  useEffect(() => {
+    if (!currentShipment?.id) return;
+    
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        // Handle print job status updates
+        if (message.type === 'job_completed' || message.type === 'job_failed' || 
+            message.type === 'job_cancelled' || message.type === 'job_added' ||
+            message.type === 'job_printing' || message.type === 'stale_jobs_update') {
+          // Invalidate the pending print jobs query to refresh immediately
+          queryClient.invalidateQueries({ 
+            queryKey: ['/api/print-jobs/shipment', currentShipment.id] 
+          });
+          // Also clear optimistic state when we get server confirmation
+          if (message.type === 'job_completed' || message.type === 'job_failed' || message.type === 'job_cancelled') {
+            setJustCreatedPrintJob(false);
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    };
+    
+    return () => {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    };
+  }, [currentShipment?.id]);
+  
+  // Reset optimistic state when loading a new shipment
+  useEffect(() => {
+    setJustCreatedPrintJob(false);
+  }, [currentShipment?.id]);
 
   // Check if shipment is a gift (either has Gift tag OR isGift boolean)
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
@@ -973,6 +1020,8 @@ export default function Packing() {
   // Complete packing and queue print job
   const completePackingMutation = useMutation({
     mutationFn: async () => {
+      // Set optimistic state immediately so button shows pending state right away
+      setJustCreatedPrintJob(true);
       const response = await apiRequest("POST", "/api/packing/complete", {
         shipmentId: currentShipment!.id,
       });
@@ -980,6 +1029,7 @@ export default function Packing() {
     },
     onSuccess: (result) => {
       setPackingComplete(true);
+      // Keep optimistic state true - it will be cleared when order resets or print job completes
       
       // Log packing completed event
       const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
@@ -1884,7 +1934,7 @@ export default function Packing() {
                     variant="outline" 
                     size="sm" 
                     className="w-full"
-                    onClick={() => window.open('/print-queue', '_blank')}
+                    onClick={() => setLocation('/print-queue')}
                     data-testid="button-view-print-queue"
                   >
                     View Print Queue

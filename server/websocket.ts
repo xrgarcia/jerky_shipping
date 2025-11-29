@@ -4,6 +4,7 @@ import { parse as parseCookie } from 'cookie';
 import { URL } from 'url';
 import { createHash } from 'crypto';
 import { storage } from './storage';
+import { transformPrintJobForDesktop } from './print-job-transform';
 
 let wss: WebSocketServer | null = null;
 const SESSION_COOKIE_NAME = 'session_token';
@@ -280,11 +281,14 @@ export function broadcastDesktopPrintJob(stationId: string, job: any): void {
   }
 
   try {
+    // Use shared transformer for desktop client compatibility
+    const transformedJob = transformPrintJobForDesktop(job);
+    
     connection.ws.send(JSON.stringify({
       type: 'desktop:job:new',
-      job,
+      job: transformedJob,
     }));
-    console.log(`[Desktop WS] Sent job ${job.id} to station ${stationId}`);
+    console.log(`[Desktop WS] Sent job ${job.id} (order ${transformedJob.orderNumber}) to station ${stationId}`);
   } catch (error) {
     console.error(`[Desktop WS] Error sending job to station ${stationId}:`, error);
   }

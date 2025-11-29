@@ -621,8 +621,16 @@ function DashboardPage({ state }: DashboardPageProps) {
                     <div className="flex items-center gap-3">
                       {getStatusIcon(job.status)}
                       <div>
-                        <p className="text-sm text-white">{job.orderNumber}</p>
-                        <p className="text-xs text-[#666]">{formatTime(job.createdAt)}</p>
+                        <p className="text-sm text-white font-medium">{job.orderNumber || 'Unknown Order'}</p>
+                        <div className="flex items-center gap-2 text-xs text-[#666]">
+                          <span>{formatTime(job.createdAt)}</span>
+                          {job.requestedBy && (
+                            <>
+                              <span>•</span>
+                              <span>{job.requestedBy}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${

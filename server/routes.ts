@@ -28,6 +28,7 @@ import { checkRateLimit } from "./utils/rate-limiter";
 import type { PORecommendation } from "@shared/reporting-schema";
 import { firestoreStorage } from "./firestore-storage";
 import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
+import { transformPrintJobForDesktop } from "./print-job-transform";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -4147,7 +4148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payload: { 
           labelUrl: shipment.labelUrl || null,
           orderNumber: shipment.orderNumber,
-          trackingNumber: shipment.trackingNumber
+          trackingNumber: shipment.trackingNumber,
+          requestedBy: user.displayName || user.email || 'Unknown'
         },
         status: "pending" // Start as pending, desktop client will pick it up
       });
@@ -5321,9 +5323,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 50;
       const pendingOnly = req.query.pending !== 'false';
 
-      const jobs = pendingOnly
+      const rawJobs = pendingOnly
         ? await storage.getPendingJobsByStation(session.stationId, limit)
         : await storage.getJobsByStation(session.stationId, limit);
+
+      // Transform jobs for desktop client compatibility
+      const jobs = rawJobs.map(transformPrintJobForDesktop);
 
       res.json(jobs);
     } catch (error: any) {
@@ -5381,7 +5386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const job = await storage.markJobSent(req.params.id);
-      res.json(job);
+      res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error acknowledging print job:", error);
       res.status(500).json({ error: error.message || "Failed to acknowledge print job" });
@@ -5400,7 +5405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const job = await storage.markJobCompleted(req.params.id);
-      res.json(job);
+      res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error completing print job:", error);
       res.status(500).json({ error: error.message || "Failed to complete print job" });
@@ -5420,7 +5425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { errorMessage } = req.body;
       const job = await storage.markJobFailed(req.params.id, errorMessage || "Unknown error");
-      res.json(job);
+      res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error reporting print job failure:", error);
       res.status(500).json({ error: error.message || "Failed to report print job failure" });
@@ -5434,7 +5439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!job) {
         return res.status(404).json({ error: "Print job not found" });
       }
-      res.json(job);
+      res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error retrying print job:", error);
       res.status(500).json({ error: error.message || "Failed to retry print job" });
@@ -5448,7 +5453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!job) {
         return res.status(404).json({ error: "Print job not found" });
       }
-      res.json(job);
+      res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error cancelling print job:", error);
       res.status(500).json({ error: error.message || "Failed to cancel print job" });
