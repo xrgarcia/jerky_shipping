@@ -113,7 +113,55 @@ export class WebSocketClient extends EventEmitter {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         console.error('[WebSocket] Error:', errorMsg);
         this.lastError = errorMsg;
-        this.emit('error', error);
+        
+        // Don't emit error for expected reconnection scenarios (502, connection refused, etc.)
+        // These are normal during server restarts and will be handled by reconnection logic
+        const isExpectedError = errorMsg.includes('502') || 
+                                errorMsg.includes('503') || 
+                                errorMsg.includes('ECONNREFUSED') ||
+                                errorMsg.includes('ETIMEDOUT') ||
+                                errorMsg.includes('Unexpected server response');
+        
+        if (!isExpectedError) {
+          this.emit('error', error);
+        }
+        
+        // Clean up the WebSocket to ensure we can reconnect
+        if (this.ws) {
+          try {
+            this.ws.terminate();
+          } catch (e) {
+            // Ignore terminate errors
+          }
+          this.ws = null;
+        }
+        
+        // Schedule reconnect (close event may not fire on error)
+        if (!this.isIntentionalClose && !this.reconnectTimer) {
+          this.scheduleReconnect();
+        }
+      });
+      
+      // Handle unexpected upgrade errors (like 502 during server restart)
+      this.ws.on('unexpected-response', (req, res) => {
+        const statusCode = res.statusCode || 'unknown';
+        console.log(`[WebSocket] Unexpected response: ${statusCode} (server may be restarting)`);
+        this.lastError = `Server unavailable (${statusCode})`;
+        
+        // Clean up
+        if (this.ws) {
+          try {
+            this.ws.terminate();
+          } catch (e) {
+            // Ignore
+          }
+          this.ws = null;
+        }
+        
+        // Schedule reconnect
+        if (!this.isIntentionalClose && !this.reconnectTimer) {
+          this.scheduleReconnect();
+        }
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Connection failed';

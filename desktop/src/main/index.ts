@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import path from 'path';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
@@ -6,6 +6,29 @@ import { PrinterService } from './printer';
 import { ApiClient } from './api';
 import { AppState, PrintJob, ConnectionInfo } from '../shared/types';
 import { environments, config, getEnvironment } from '../shared/config';
+
+// Global error handlers to prevent crashes during server restarts
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Uncaught exception:', error.message);
+  
+  // Don't crash for expected network errors (server restart, connection refused, etc.)
+  const isNetworkError = error.message.includes('502') ||
+                         error.message.includes('503') ||
+                         error.message.includes('ECONNREFUSED') ||
+                         error.message.includes('ETIMEDOUT') ||
+                         error.message.includes('Unexpected server response') ||
+                         error.message.includes('WebSocket');
+  
+  if (!isNetworkError) {
+    // For unexpected errors, log but don't show dialog (it's annoying)
+    console.error('[Main] Unexpected error (non-network):', error);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Main] Unhandled rejection:', reason);
+  // Don't crash - just log it
+});
 
 let mainWindow: BrowserWindow | null = null;
 let authService: AuthService;
