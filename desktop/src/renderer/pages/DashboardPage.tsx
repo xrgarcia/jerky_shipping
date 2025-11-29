@@ -150,36 +150,63 @@ function DashboardPage({ state }: DashboardPageProps) {
   const handleSelectPrinter = async (printer: SystemPrinter) => {
     try {
       setError(null);
+      console.log('[Renderer] handleSelectPrinter starting for:', printer.name, printer.systemName);
       
       const registerResult = await window.electronAPI.printer.register({
         name: printer.name,
         systemName: printer.systemName,
         status: printer.status, // Pass the discovered status
       });
+      console.log('[Renderer] Register result:', registerResult);
       
       if (registerResult.success) {
         // Refresh the printer list to get the newly registered printer
         const listResult = await window.electronAPI.printer.list();
+        console.log('[Renderer] List result:', listResult);
         
         // Find the newly registered printer in the fresh list and set it as default
         if (listResult.success && listResult.data && Array.isArray(listResult.data)) {
+          console.log('[Renderer] Printers from list:', listResult.data.map((p: any) => ({ id: p.id, name: p.name, systemName: p.systemName })));
+          
           // Find the printer we just registered by matching the system name
           const registeredPrinter = listResult.data.find(
             (p: { systemName: string }) => p.systemName === printer.systemName
           );
+          console.log('[Renderer] Found registeredPrinter:', registeredPrinter);
           
           if (registeredPrinter) {
-            await window.electronAPI.printer.setDefault(registeredPrinter.id);
+            console.log('[Renderer] Calling setDefault with id:', registeredPrinter.id);
+            const setDefaultResult = await window.electronAPI.printer.setDefault(registeredPrinter.id);
+            console.log('[Renderer] setDefault result:', setDefaultResult);
+            
+            if (!setDefaultResult.success) {
+              setError(setDefaultResult.error || 'Failed to set default printer');
+              return;
+            }
           } else if (listResult.data.length > 0) {
             // Fallback: set the first printer as default if we can't find the exact match
-            await window.electronAPI.printer.setDefault(listResult.data[0].id);
+            console.log('[Renderer] Using fallback, setting first printer as default:', listResult.data[0].id);
+            const setDefaultResult = await window.electronAPI.printer.setDefault(listResult.data[0].id);
+            console.log('[Renderer] Fallback setDefault result:', setDefaultResult);
+            
+            if (!setDefaultResult.success) {
+              setError(setDefaultResult.error || 'Failed to set default printer');
+              return;
+            }
+          } else {
+            console.log('[Renderer] No printers in list to set as default');
           }
+        } else {
+          console.log('[Renderer] List failed or no data:', listResult);
         }
         setShowPrinterSetup(false);
+        console.log('[Renderer] handleSelectPrinter completed successfully');
       } else {
         setError(registerResult.error || 'Failed to register printer');
+        console.log('[Renderer] Register failed:', registerResult.error);
       }
     } catch (err) {
+      console.error('[Renderer] handleSelectPrinter error:', err);
       setError(err instanceof Error ? err.message : 'Failed to select printer');
     }
   };

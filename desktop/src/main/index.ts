@@ -910,30 +910,44 @@ function setupIpcHandlers(): void {
   });
   
   ipcMain.handle('printer:set-default', async (_event, printerId: string) => {
+    console.log('[Main] printer:set-default called with printerId:', printerId);
+    console.log('[Main] Current state - station:', appState.station?.id, 'printers count:', appState.printers?.length, 'selectedPrinter:', appState.selectedPrinter?.name);
+    
     // Save current state for rollback on error
     const previousPrinter = appState.selectedPrinter;
     const previousPrinters = appState.printers;
     
     try {
       if (!appState.station || !apiClient) {
+        console.log('[Main] No station or apiClient - station:', !!appState.station, 'apiClient:', !!apiClient);
         throw new Error('No station selected');
       }
       
       // Optimistically update local state first for responsiveness
       const printer = (appState.printers || []).find(p => p.id === printerId);
+      console.log('[Main] Found printer in appState.printers:', printer?.name, 'printers:', appState.printers?.map(p => ({ id: p.id, name: p.name })));
       if (printer) {
         updateState({ selectedPrinter: printer });
+        console.log('[Main] Optimistically set selectedPrinter to:', printer.name);
+      } else {
+        console.log('[Main] Printer not found in local state, proceeding with API call anyway');
       }
       
       // Call API to persist the default and broadcast to other clients
+      console.log('[Main] Calling setDefaultPrinter API for station:', appState.station.id);
       const updatedPrinter = await apiClient.setDefaultPrinter(appState.station.id, printerId);
+      console.log('[Main] API setDefaultPrinter returned:', updatedPrinter?.name);
       
       // Refresh the printers list to get updated isDefault flags and consistent ordering
+      console.log('[Main] Refreshing printers list...');
       const printers = await apiClient.getPrinters(appState.station.id);
-      const selectedPrinter = printers.find(p => p.id === printerId) || updatedPrinter;
-      updateState({ printers, selectedPrinter });
+      console.log('[Main] Got printers from API:', printers?.map(p => ({ id: p.id, name: p.name, isDefault: p.isDefault })));
       
-      console.log('[Main] Set default printer:', selectedPrinter.name);
+      const selectedPrinter = printers.find(p => p.id === printerId) || updatedPrinter;
+      console.log('[Main] Final selectedPrinter:', selectedPrinter?.name, 'id:', selectedPrinter?.id);
+      
+      updateState({ printers, selectedPrinter });
+      console.log('[Main] State updated, appState.selectedPrinter is now:', appState.selectedPrinter?.name);
       
       return { success: true, data: selectedPrinter };
     } catch (error) {

@@ -15,18 +15,27 @@ declare global {
       };
       station: {
         list: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
-        claim: (stationId: string) => Promise<{ success: boolean; error?: string }>;
+        claim: (stationId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
         release: () => Promise<{ success: boolean; error?: string }>;
+        create: (data: { name: string; locationHint?: string }) => Promise<{ success: boolean; data?: unknown; error?: string }>;
       };
       printer: {
         discover: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
-        list: () => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
-        register: (data: { name: string; systemName: string }) => Promise<{ success: boolean; error?: string }>;
-        setDefault: (printerId: string) => Promise<{ success: boolean; error?: string }>;
+        list: () => Promise<{ success: boolean; data?: { id: string; name: string; systemName: string; isDefault: boolean; status: string }[]; error?: string }>;
+        register: (data: { name: string; systemName: string; status?: string }) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+        setDefault: (printerId: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
       };
       ws: {
         connect: () => Promise<{ success: boolean; error?: string }>;
         disconnect: () => Promise<{ success: boolean; error?: string }>;
+      };
+      job: {
+        retry: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      environment: {
+        list: () => Promise<{ success: boolean; data?: { name: string; displayName: string; serverUrl: string }[]; error?: string }>;
+        get: () => Promise<{ success: boolean; data?: string; error?: string }>;
+        set: (envName: string) => Promise<{ success: boolean; error?: string }>;
       };
     };
   }
