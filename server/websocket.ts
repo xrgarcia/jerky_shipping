@@ -346,6 +346,40 @@ export function broadcastDesktopStationUpdated(stationId: string, station: { id:
   }
 }
 
+// Desktop Configuration type for WebSocket broadcast
+interface DesktopConfigUpdate {
+  connectionTimeout: number;
+  baseReconnectDelay: number;
+  maxReconnectDelay: number;
+  heartbeatInterval: number;
+  reconnectInterval: number;
+  tokenRefreshInterval: number;
+  offlineTimeout: number;
+}
+
+// Broadcast config update to ALL connected desktop clients - "Mars rover" control
+export function broadcastDesktopConfigUpdate(config: DesktopConfigUpdate): void {
+  let notifiedCount = 0;
+  
+  for (const [stationId, connection] of desktopStationConnections.entries()) {
+    if (connection.ws.readyState !== WebSocket.OPEN) {
+      continue;
+    }
+    
+    try {
+      connection.ws.send(JSON.stringify({
+        type: 'desktop:config_update',
+        config,
+      }));
+      notifiedCount++;
+    } catch (error) {
+      console.error(`[Desktop WS] Error notifying station ${stationId} of config update:`, error);
+    }
+  }
+  
+  console.log(`[Desktop WS] Broadcast config update to ${notifiedCount} connected desktop clients`);
+}
+
 export function setupWebSocket(server: Server): void {
   wss = new WebSocketServer({ noServer: true });
 

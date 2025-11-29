@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, getConnectedStationIds } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, getConnectedStationIds } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -5170,6 +5170,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Desktop] Error cancelling print job:", error);
       res.status(500).json({ error: error.message || "Failed to cancel print job" });
+    }
+  });
+
+  // ============================================================================
+  // DESKTOP CONFIGURATION ENDPOINTS - "Mars rover" remote control
+  // ============================================================================
+
+  // Get current desktop configuration (accessible by web and desktop clients)
+  app.get("/api/desktop/config", hybridAuth, async (req, res) => {
+    try {
+      const config = await storage.getDesktopConfig();
+      res.json(config);
+    } catch (error: any) {
+      console.error("[Desktop] Error fetching config:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch desktop configuration" });
+    }
+  });
+
+  // Update desktop configuration (web admin only) - broadcasts update to all connected desktop clients
+  app.patch("/api/desktop/config", requireAuth, async (req, res) => {
+    try {
+      const { 
+        connectionTimeout, 
+        baseReconnectDelay, 
+        maxReconnectDelay, 
+        heartbeatInterval, 
+        reconnectInterval, 
+        tokenRefreshInterval, 
+        offlineTimeout 
+      } = req.body;
+
+      // Build update object with only provided fields
+      const updates: Record<string, number> = {};
+      if (typeof connectionTimeout === 'number') updates.connectionTimeout = connectionTimeout;
+      if (typeof baseReconnectDelay === 'number') updates.baseReconnectDelay = baseReconnectDelay;
+      if (typeof maxReconnectDelay === 'number') updates.maxReconnectDelay = maxReconnectDelay;
+      if (typeof heartbeatInterval === 'number') updates.heartbeatInterval = heartbeatInterval;
+      if (typeof reconnectInterval === 'number') updates.reconnectInterval = reconnectInterval;
+      if (typeof tokenRefreshInterval === 'number') updates.tokenRefreshInterval = tokenRefreshInterval;
+      if (typeof offlineTimeout === 'number') updates.offlineTimeout = offlineTimeout;
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid configuration fields provided" });
+      }
+
+      // Get user ID from session (web auth)
+      const userId = (req as any).user?.id;
+      const config = await storage.updateDesktopConfig(updates, userId);
+
+      // Broadcast the update to all connected desktop clients
+      broadcastDesktopConfigUpdate({
+        connectionTimeout: config.connectionTimeout,
+        baseReconnectDelay: config.baseReconnectDelay,
+        maxReconnectDelay: config.maxReconnectDelay,
+        heartbeatInterval: config.heartbeatInterval,
+        reconnectInterval: config.reconnectInterval,
+        tokenRefreshInterval: config.tokenRefreshInterval,
+        offlineTimeout: config.offlineTimeout,
+      });
+
+      console.log(`[Desktop] Config updated by user ${userId}:`, updates);
+      res.json(config);
+    } catch (error: any) {
+      console.error("[Desktop] Error updating config:", error);
+      res.status(500).json({ error: error.message || "Failed to update desktop configuration" });
     }
   });
 

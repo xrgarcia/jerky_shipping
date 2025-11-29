@@ -67,6 +67,10 @@ import {
   type PrintJob,
   type InsertPrintJob,
   printJobs,
+  // Desktop Configuration
+  type DesktopConfig,
+  type InsertDesktopConfig,
+  desktopConfig,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -318,6 +322,10 @@ export interface IStorage {
   markJobFailed(id: string, errorMessage: string): Promise<PrintJob | undefined>;
   retryJob(id: string): Promise<PrintJob | undefined>;
   cancelJob(id: string): Promise<PrintJob | undefined>;
+
+  // Desktop Configuration
+  getDesktopConfig(): Promise<DesktopConfig>;
+  updateDesktopConfig(updates: Partial<InsertDesktopConfig>, updatedBy?: string): Promise<DesktopConfig>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2472,6 +2480,44 @@ export class DatabaseStorage implements IStorage {
       .where(eq(printJobs.id, id))
       .returning();
     return result[0];
+  }
+
+  // ============================================================================
+  // DESKTOP CONFIGURATION
+  // ============================================================================
+
+  async getDesktopConfig(): Promise<DesktopConfig> {
+    const result = await db.select().from(desktopConfig).where(eq(desktopConfig.id, 'global'));
+    if (result[0]) {
+      return result[0];
+    }
+    // Create default config if it doesn't exist
+    const [newConfig] = await db.insert(desktopConfig).values({ id: 'global' }).returning();
+    return newConfig;
+  }
+
+  async updateDesktopConfig(updates: Partial<InsertDesktopConfig>, updatedBy?: string): Promise<DesktopConfig> {
+    const result = await db
+      .update(desktopConfig)
+      .set({ 
+        ...updates,
+        updatedAt: new Date(),
+        updatedBy: updatedBy ?? null,
+      })
+      .where(eq(desktopConfig.id, 'global'))
+      .returning();
+    
+    if (result[0]) {
+      return result[0];
+    }
+    
+    // If no row existed, create it with the updates
+    const [newConfig] = await db.insert(desktopConfig).values({ 
+      id: 'global',
+      ...updates,
+      updatedBy: updatedBy ?? null,
+    }).returning();
+    return newConfig;
   }
 }
 
