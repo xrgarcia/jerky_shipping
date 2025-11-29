@@ -15,7 +15,8 @@ import {
   Server,
   ChevronDown,
   RotateCcw,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import type { AppState, PrintJob } from '@shared/types';
 import logoImage from '../assets/logo.png';
@@ -682,6 +683,29 @@ function DashboardPage({ state }: DashboardPageProps) {
                   })}
                 </div>
               )}
+              
+              {/* PDF Viewer requirement notice for Windows */}
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-300">
+                    <p className="font-medium mb-1">PDF Viewer Required</p>
+                    <p className="text-blue-300/80 mb-2">
+                      To print shipping labels, you need a PDF viewer installed. We recommend SumatraPDF for best compatibility with label printers.
+                    </p>
+                    <a 
+                      href="https://www.sumatrapdfreader.org/download-free-pdf-viewer"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 underline"
+                      data-testid="link-download-sumatra"
+                    >
+                      Download SumatraPDF (free)
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : state.selectedPrinter ? (
             (() => {
