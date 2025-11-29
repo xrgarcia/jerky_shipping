@@ -144,29 +144,56 @@ export class PrinterService {
   }
   
   async print(job: PrintJob, printerName: string): Promise<void> {
-    console.log(`[Printer] Printing job ${job.id} to ${printerName}`);
+    console.log('[Printer] ========================================');
+    console.log('[Printer] PRINT JOB STARTING');
+    console.log('[Printer] ========================================');
+    console.log(`[Printer] Job ID: ${job.id}`);
+    console.log(`[Printer] Printer: ${printerName}`);
+    console.log(`[Printer] Has labelData: ${!!job.labelData}`);
+    console.log(`[Printer] Has labelUrl: ${!!job.labelUrl}`);
+    console.log(`[Printer] Platform: ${this.platform}`);
+    console.log(`[Printer] Temp dir: ${this.tempDir}`);
     
     await fs.mkdir(this.tempDir, { recursive: true });
     
     const labelPath = path.join(this.tempDir, `label-${job.id}.pdf`);
+    console.log(`[Printer] Label file path: ${labelPath}`);
     
     try {
       if (job.labelData) {
         const buffer = Buffer.from(job.labelData, 'base64');
         await fs.writeFile(labelPath, buffer);
+        console.log(`[Printer] Wrote ${buffer.length} bytes from base64 data`);
       } else if (job.labelUrl) {
+        console.log(`[Printer] Downloading from: ${job.labelUrl}`);
         await this.downloadLabel(job.labelUrl, labelPath);
+        const stats = await fs.stat(labelPath);
+        console.log(`[Printer] Downloaded ${stats.size} bytes`);
       } else {
         throw new Error('No label data or URL provided');
       }
       
+      // Verify file exists before printing
+      const fileExists = await fs.stat(labelPath).then(() => true).catch(() => false);
+      console.log(`[Printer] File exists before print: ${fileExists}`);
+      
       await this.printFile(labelPath, printerName);
       
+      console.log('[Printer] ========================================');
       console.log(`[Printer] Job ${job.id} printed successfully`);
+      console.log('[Printer] ========================================');
+    } catch (error) {
+      console.log('[Printer] ========================================');
+      console.log('[Printer] PRINT JOB FAILED');
+      console.log(`[Printer] Error: ${error instanceof Error ? error.message : String(error)}`);
+      console.log('[Printer] ========================================');
+      throw error;
     } finally {
       try {
         await fs.unlink(labelPath);
+        console.log('[Printer] Cleaned up temp file');
       } catch {
+        // Ignore cleanup errors
       }
     }
   }
@@ -224,40 +251,45 @@ export class PrinterService {
   }
   
   private async printFileWindows(filePath: string, printerName: string): Promise<void> {
-    console.log(`[Printer] Windows print starting for "${printerName}" with file: ${filePath}`);
+    console.log('[Printer] ====== WINDOWS PRINT DISPATCH ======');
+    console.log(`[Printer] Printer name: "${printerName}"`);
+    console.log(`[Printer] File path: "${filePath}"`);
+    console.log(`[Printer] LOCALAPPDATA: ${process.env.LOCALAPPDATA}`);
+    console.log(`[Printer] APPDATA: ${process.env.APPDATA}`);
+    console.log(`[Printer] USERPROFILE: ${process.env.USERPROFILE}`);
     
     // Try multiple approaches in order of reliability
     const errors: string[] = [];
     
     // Approach 1: Use SumatraPDF if available (most reliable for label printers)
     try {
-      console.log('[Printer] Trying SumatraPDF...');
+      console.log('[Printer] ====== ATTEMPT 1: SumatraPDF ======');
       await this.printWithSumatra(filePath, printerName);
-      console.log('[Printer] SumatraPDF print succeeded');
+      console.log('[Printer] SumatraPDF print succeeded!');
       return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] SumatraPDF not available: ${msg}`);
+      console.log(`[Printer] SumatraPDF failed: ${msg}`);
       errors.push(`SumatraPDF: ${msg}`);
     }
     
     // Approach 2: Use Adobe Reader if available
     try {
-      console.log('[Printer] Trying Adobe Reader...');
+      console.log('[Printer] ====== ATTEMPT 2: Adobe Reader ======');
       await this.printWithAdobeReader(filePath, printerName);
-      console.log('[Printer] Adobe Reader print succeeded');
+      console.log('[Printer] Adobe Reader print succeeded!');
       return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] Adobe Reader not available: ${msg}`);
+      console.log(`[Printer] Adobe Reader failed: ${msg}`);
       errors.push(`Adobe Reader: ${msg}`);
     }
     
     // Approach 3: Use Windows PrintTo shell verb (requires default PDF handler)
     try {
-      console.log('[Printer] Trying Windows shell PrintTo verb...');
+      console.log('[Printer] ====== ATTEMPT 3: Shell PrintTo ======');
       await this.printWithShellVerb(filePath, printerName);
-      console.log('[Printer] Shell PrintTo succeeded');
+      console.log('[Printer] Shell PrintTo succeeded!');
       return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -267,37 +299,94 @@ export class PrinterService {
     
     // Approach 4: Use PowerShell's Out-Printer (text only, last resort)
     try {
-      console.log('[Printer] Trying PowerShell Out-Printer...');
+      console.log('[Printer] ====== ATTEMPT 4: PowerShell ======');
       await this.printWithPowerShell(filePath, printerName);
-      console.log('[Printer] PowerShell Out-Printer succeeded');
+      console.log('[Printer] PowerShell succeeded!');
       return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] PowerShell Out-Printer failed: ${msg}`);
+      console.log(`[Printer] PowerShell failed: ${msg}`);
       errors.push(`PowerShell: ${msg}`);
     }
     
+    console.log('[Printer] ====== ALL METHODS FAILED ======');
+    console.log('[Printer] Errors:', errors);
     throw new Error(`All print methods failed:\n${errors.join('\n')}`);
   }
   
-  private printWithSumatra(filePath: string, printerName: string): Promise<void> {
+  private async printWithSumatra(filePath: string, printerName: string): Promise<void> {
+    // Search for SumatraPDF in common installation paths
+    const sumatraPaths = [
+      // Common installation locations
+      'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
+      'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
+      // Local user installations
+      `${process.env.LOCALAPPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+      `${process.env.APPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+      // Portable version in user's home folder
+      `${process.env.USERPROFILE}\\SumatraPDF\\SumatraPDF.exe`,
+      `${process.env.USERPROFILE}\\Downloads\\SumatraPDF.exe`,
+      // If in PATH
+      'SumatraPDF.exe',
+    ];
+    
+    console.log('[Printer] ====== SUMATRA PDF SEARCH ======');
+    console.log('[Printer] Looking for SumatraPDF in the following locations:');
+    
+    let foundPath: string | null = null;
+    
+    for (const sumatraPath of sumatraPaths) {
+      if (!sumatraPath) continue;
+      console.log(`[Printer]   Checking: ${sumatraPath}`);
+      try {
+        await fs.access(sumatraPath);
+        foundPath = sumatraPath;
+        console.log(`[Printer]   ✓ FOUND: ${sumatraPath}`);
+        break;
+      } catch {
+        console.log(`[Printer]   ✗ Not found`);
+      }
+    }
+    
+    if (!foundPath) {
+      const errorMsg = 'SumatraPDF not found. Please install from https://www.sumatrapdfreader.org/download-free-pdf-viewer and install to Program Files.';
+      console.log(`[Printer] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
     return new Promise((resolve, reject) => {
-      // SumatraPDF is commonly installed and has excellent command-line printing
-      const sumatraPath = 'SumatraPDF.exe';
       const args = ['-print-to', printerName, '-silent', filePath];
       
-      console.log(`[Printer] Executing: ${sumatraPath} ${args.join(' ')}`);
+      console.log('[Printer] ====== EXECUTING SUMATRA ======');
+      console.log(`[Printer] Command: "${foundPath}" ${args.join(' ')}`);
+      console.log(`[Printer] Printer: ${printerName}`);
+      console.log(`[Printer] File: ${filePath}`);
       
-      const proc = spawn(sumatraPath, args, { shell: false, windowsHide: true });
+      const proc = spawn(foundPath!, args, { shell: false, windowsHide: true });
+      let stdout = '';
       let stderr = '';
       
-      proc.stderr.on('data', (data) => { stderr += data.toString(); });
-      proc.on('error', (error) => reject(error));
+      proc.stdout?.on('data', (data) => { 
+        stdout += data.toString(); 
+        console.log('[Printer/Sumatra OUT]', data.toString().trim());
+      });
+      proc.stderr.on('data', (data) => { 
+        stderr += data.toString(); 
+        console.log('[Printer/Sumatra ERR]', data.toString().trim());
+      });
+      proc.on('error', (error) => {
+        console.log('[Printer] Sumatra spawn error:', error.message);
+        reject(error);
+      });
       proc.on('close', (code) => {
+        console.log(`[Printer] Sumatra exited with code ${code}`);
         if (code === 0) {
+          console.log('[Printer] ====== PRINT SUCCESS ======');
           resolve();
         } else {
-          reject(new Error(`SumatraPDF exited with code ${code}: ${stderr}`));
+          const errorMsg = `SumatraPDF exited with code ${code}: ${stderr || stdout || 'No output'}`;
+          console.log(`[Printer] ====== PRINT FAILED: ${errorMsg} ======`);
+          reject(new Error(errorMsg));
         }
       });
     });
