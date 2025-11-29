@@ -366,35 +366,49 @@ async function connectWebSocket(): Promise<void> {
   wsClient.on('job:batch', async (data: { stationId: string; jobs: PrintJob[] }) => {
     console.log(`[Main] Received batch of ${data.jobs.length} pending job(s)`);
     
-    // Merge by: keep all current jobs, add any incoming that don't exist yet
-    // Access appState.printJobs directly inline to ensure freshest possible state
-    const existingJobIds = new Set(appState.printJobs.map(j => j.id));
-    const trulyNewJobs = data.jobs.filter(j => !existingJobIds.has(j.id));
+    // Read fresh state at the start of processing
+    const currentJobIds = new Set(appState.printJobs.map(j => j.id));
+    const trulyNewJobs = data.jobs.filter(j => !currentJobIds.has(j.id));
     
     if (trulyNewJobs.length > 0) {
-      // Re-read state right before update for maximum freshness
-      const finalJobs = [...trulyNewJobs, ...appState.printJobs];
-      updateState({ printJobs: finalJobs });
+      // Add jobs to state first
+      updateState({ printJobs: [...trulyNewJobs, ...appState.printJobs] });
       console.log(`[Main] Added ${trulyNewJobs.length} new job(s) from batch`);
       
       // Process pending jobs that need printing (only those with 'pending' status)
       const jobsToPrint = trulyNewJobs.filter(j => j.status === 'pending');
-      if (jobsToPrint.length > 0 && appState.selectedPrinter && wsClient) {
-        console.log(`[Main] Printing ${jobsToPrint.length} pending job(s) from batch`);
+      if (jobsToPrint.length > 0) {
+        console.log(`[Main] Attempting to print ${jobsToPrint.length} pending job(s) from batch`);
         
         for (const job of jobsToPrint) {
+          // Re-read fresh state before each print attempt to get current printer
+          const currentPrinter = appState.selectedPrinter;
+          const currentWsClient = wsClient;
+          
+          if (!currentPrinter) {
+            console.warn(`[Main] Cannot print batch job ${job.id}: no printer selected`);
+            continue;
+          }
+          
+          if (!currentWsClient) {
+            console.warn(`[Main] Cannot print batch job ${job.id}: WebSocket disconnected`);
+            continue;
+          }
+          
           try {
-            await printerService.print(job, appState.selectedPrinter.systemName);
-            wsClient.sendJobUpdate(job.id, 'completed');
+            await printerService.print(job, currentPrinter.systemName);
+            currentWsClient.sendJobUpdate(job.id, 'completed');
+            // Read fresh printJobs state before updating
             updateState({
               printJobs: appState.printJobs.map(j => 
                 j.id === job.id ? { ...j, status: 'completed' as const } : j
               ),
             });
-            console.log(`[Main] Batch job ${job.id} printed successfully`);
+            console.log(`[Main] Batch job ${job.id} printed successfully to ${currentPrinter.name}`);
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            wsClient.sendJobUpdate(job.id, 'failed', errorMessage);
+            currentWsClient.sendJobUpdate(job.id, 'failed', errorMessage);
+            // Read fresh printJobs state before updating
             updateState({
               printJobs: appState.printJobs.map(j => 
                 j.id === job.id ? { ...j, status: 'failed' as const, errorMessage } : j
@@ -403,8 +417,6 @@ async function connectWebSocket(): Promise<void> {
             console.error(`[Main] Batch job ${job.id} failed:`, errorMessage);
           }
         }
-      } else if (jobsToPrint.length > 0 && !appState.selectedPrinter) {
-        console.warn(`[Main] Cannot print ${jobsToPrint.length} batch job(s): no printer selected`);
       }
     } else {
       console.log(`[Main] All ${data.jobs.length} job(s) from batch already present`);
