@@ -4,3 +4,10 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Desktop app build artifacts
+desktop/release
+desktop/dist
+
+# Desktop OAuth credentials (generated at build time, contains secrets)
+desktop/src/shared/oauth-credentials.json
