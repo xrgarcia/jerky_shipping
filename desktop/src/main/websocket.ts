@@ -291,6 +291,14 @@ export class WebSocketClient extends EventEmitter {
         });
         break;
         
+      case 'desktop:station:updated':
+        console.log(`[WebSocket] Station ${message.stationId} was updated`);
+        this.emit('station-updated', {
+          stationId: message.stationId,
+          station: message.station as { id: string; name: string; location: string | null; isActive: boolean },
+        });
+        break;
+        
       default:
         console.log('[WebSocket] Unknown message type:', message.type);
     }

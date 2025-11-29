@@ -273,6 +273,31 @@ export function broadcastDesktopStationDeleted(stationId: string): void {
   }
 }
 
+// Broadcast station update to the desktop client - updates station details in real-time
+export function broadcastDesktopStationUpdated(stationId: string, station: { id: string; name: string; locationHint: string | null; isActive: boolean }): void {
+  const connection = desktopStationConnections.get(stationId);
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Desktop WS] No active connection for station ${stationId} to notify of update`);
+    return;
+  }
+
+  try {
+    connection.ws.send(JSON.stringify({
+      type: 'desktop:station:updated',
+      stationId,
+      station: {
+        id: station.id,
+        name: station.name,
+        location: station.locationHint,
+        isActive: station.isActive,
+      },
+    }));
+    console.log(`[Desktop WS] Notified client of station ${stationId} update`);
+  } catch (error) {
+    console.error(`[Desktop WS] Error notifying station ${stationId} update:`, error);
+  }
+}
+
 export function setupWebSocket(server: Server): void {
   wss = new WebSocketServer({ noServer: true });
 
