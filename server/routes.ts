@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -4070,14 +4070,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderNumber: shipment.orderNumber,
           trackingNumber: shipment.trackingNumber
         },
-        status: "queued"
+        status: "pending" // Start as pending, desktop client will pick it up
       });
       
-      // Broadcast WebSocket update
+      // Send job to desktop client via WebSocket
+      broadcastDesktopPrintJob(webSession.stationId, printJob);
+      
+      // Also broadcast to browser print queue for visibility
       broadcastPrintQueueUpdate({ 
         type: "job_added", 
         job: printJob 
       });
+      
+      console.log(`[Packing] Created print job ${printJob.id} for station ${webSession.stationId}`);
       
       res.json({ 
         success: true, 

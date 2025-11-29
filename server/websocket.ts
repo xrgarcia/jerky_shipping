@@ -229,6 +229,43 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
       }
       break;
 
+    case 'desktop:job_status':
+      // Desktop client reporting print job status (completed/failed)
+      const { jobId, status: jobStatus, errorMessage: jobError } = message;
+      if (!jobId || !jobStatus) {
+        console.log('[Desktop WS] Invalid job_status message - missing jobId or status');
+        return;
+      }
+      
+      console.log(`[Desktop WS] Job ${jobId} status update: ${jobStatus}${jobError ? ` - ${jobError}` : ''}`);
+      
+      try {
+        // Update the print job in the database using existing methods
+        let updatedJob;
+        if (jobStatus === 'completed') {
+          updatedJob = await storage.markJobCompleted(jobId);
+          console.log(`[Desktop WS] Job ${jobId} marked as completed`);
+        } else if (jobStatus === 'failed') {
+          updatedJob = await storage.markJobFailed(jobId, jobError || 'Unknown error');
+          console.log(`[Desktop WS] Job ${jobId} marked as failed: ${jobError}`);
+        } else if (jobStatus === 'printing') {
+          updatedJob = await storage.markJobSent(jobId);
+          console.log(`[Desktop WS] Job ${jobId} marked as printing/sent`);
+        }
+        
+        // Broadcast update to web clients for visibility
+        broadcastPrintQueueUpdate({ 
+          type: 'job_updated', 
+          jobId,
+          status: jobStatus,
+          errorMessage: jobError,
+          job: updatedJob
+        });
+      } catch (error) {
+        console.error(`[Desktop WS] Failed to update job ${jobId} status:`, error);
+      }
+      break;
+
     default:
       console.log(`[Desktop WS] Unknown message type: ${message.type}`);
   }
