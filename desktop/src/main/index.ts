@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
@@ -35,6 +35,10 @@ function createWindow(): void {
   const isMac = process.platform === 'darwin';
   const isWin = process.platform === 'win32';
   
+  const preloadPath = process.env.NODE_ENV === 'development'
+    ? path.join(__dirname, 'preload.js')
+    : path.join(app.getAppPath(), 'dist', 'main', 'main', 'preload.js');
+  
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: 480,
     height: 720,
@@ -43,7 +47,7 @@ function createWindow(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPath,
     },
     show: false,
     backgroundColor: '#1a1a1a',
@@ -63,36 +67,15 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    const rendererPath = path.join(__dirname, '../../renderer/index.html');
-    console.log('[Main] __dirname:', __dirname);
+    const rendererPath = path.join(app.getAppPath(), 'dist', 'renderer', 'index.html');
+    console.log('[Main] app.getAppPath():', app.getAppPath());
     console.log('[Main] Loading renderer from:', rendererPath);
     
-    const fs = require('fs');
-    if (!fs.existsSync(rendererPath)) {
-      dialog.showErrorBox('Renderer Not Found', 
-        `Could not find renderer at:\n${rendererPath}\n\n__dirname: ${__dirname}\n\nPlease reinstall the application.`);
-    }
-    
-    mainWindow.loadFile(rendererPath).catch((err: Error) => {
-      console.error('[Main] Failed to load renderer:', err);
-      dialog.showErrorBox('Load Error', `Failed to load: ${err.message}\n\nPath: ${rendererPath}`);
-    });
+    mainWindow.loadFile(rendererPath);
   }
-
-  mainWindow.webContents.on('did-fail-load', (_event: unknown, errorCode: number, errorDescription: string) => {
-    console.error('[Main] Page failed to load:', errorCode, errorDescription);
-    dialog.showErrorBox('Page Load Failed', `Error ${errorCode}: ${errorDescription}`);
-  });
-
-  mainWindow.webContents.on('console-message', (_event: unknown, _level: number, message: string) => {
-    console.log('[Renderer Console]', message);
-  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
-    if (process.env.NODE_ENV !== 'development') {
-      mainWindow?.webContents.openDevTools({ mode: 'detach' });
-    }
   });
 
   mainWindow.on('closed', () => {
