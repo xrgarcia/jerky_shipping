@@ -47,6 +47,36 @@ const DEFAULT_REMOTE_CONFIG: RemoteConfig = {
   offlineTimeout: 1000,
 };
 
+const MIN_VALUES: RemoteConfig = {
+  connectionTimeout: 5000,
+  baseReconnectDelay: 1000,
+  maxReconnectDelay: 5000,
+  heartbeatInterval: 10000,
+  reconnectInterval: 1000,
+  tokenRefreshInterval: 300000,
+  offlineTimeout: 500,
+};
+
+function clampConfig(config: Partial<RemoteConfig>): Partial<RemoteConfig> {
+  const clamped: Partial<RemoteConfig> = {};
+  
+  for (const [key, value] of Object.entries(config)) {
+    if (typeof value === 'number' && key in MIN_VALUES) {
+      const minValue = MIN_VALUES[key as keyof RemoteConfig];
+      if (typeof minValue === 'number') {
+        clamped[key as keyof RemoteConfig] = Math.max(value, minValue) as any;
+        if (value < minValue) {
+          console.warn(`[RuntimeConfig] Clamping ${key} from ${value} to minimum ${minValue}`);
+        }
+      }
+    } else {
+      (clamped as any)[key] = value;
+    }
+  }
+  
+  return clamped;
+}
+
 class RuntimeConfig {
   private _remoteConfig: RemoteConfig = { ...DEFAULT_REMOTE_CONFIG };
   private _listeners: Array<(config: RemoteConfig) => void> = [];
@@ -84,10 +114,11 @@ class RuntimeConfig {
   }
   
   updateFromRemote(config: Partial<RemoteConfig>): void {
+    const clampedConfig = clampConfig(config);
     const oldConfig = { ...this._remoteConfig };
-    this._remoteConfig = { ...this._remoteConfig, ...config };
+    this._remoteConfig = { ...this._remoteConfig, ...clampedConfig };
     
-    console.log('[RuntimeConfig] Updated from remote:', config);
+    console.log('[RuntimeConfig] Updated from remote (clamped):', clampedConfig);
     console.log('[RuntimeConfig] New config:', this._remoteConfig);
     
     this._listeners.forEach(listener => {

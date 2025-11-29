@@ -5201,15 +5201,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         offlineTimeout 
       } = req.body;
 
-      // Build update object with only provided fields
+      // Minimum values to prevent infinite loops and broken connectivity
+      const MIN_VALUES = {
+        connectionTimeout: 5000,      // 5 seconds minimum
+        baseReconnectDelay: 1000,     // 1 second minimum
+        maxReconnectDelay: 5000,      // 5 seconds minimum
+        heartbeatInterval: 10000,     // 10 seconds minimum
+        reconnectInterval: 1000,      // 1 second minimum
+        tokenRefreshInterval: 300000, // 5 minutes minimum
+        offlineTimeout: 500,          // 0.5 seconds minimum
+      };
+
+      // Validate and build update object with only provided fields
       const updates: Record<string, number> = {};
-      if (typeof connectionTimeout === 'number') updates.connectionTimeout = connectionTimeout;
-      if (typeof baseReconnectDelay === 'number') updates.baseReconnectDelay = baseReconnectDelay;
-      if (typeof maxReconnectDelay === 'number') updates.maxReconnectDelay = maxReconnectDelay;
-      if (typeof heartbeatInterval === 'number') updates.heartbeatInterval = heartbeatInterval;
-      if (typeof reconnectInterval === 'number') updates.reconnectInterval = reconnectInterval;
-      if (typeof tokenRefreshInterval === 'number') updates.tokenRefreshInterval = tokenRefreshInterval;
-      if (typeof offlineTimeout === 'number') updates.offlineTimeout = offlineTimeout;
+      const errors: string[] = [];
+
+      if (typeof connectionTimeout === 'number') {
+        if (connectionTimeout < MIN_VALUES.connectionTimeout) {
+          errors.push(`connectionTimeout must be at least ${MIN_VALUES.connectionTimeout}ms`);
+        } else {
+          updates.connectionTimeout = connectionTimeout;
+        }
+      }
+      if (typeof baseReconnectDelay === 'number') {
+        if (baseReconnectDelay < MIN_VALUES.baseReconnectDelay) {
+          errors.push(`baseReconnectDelay must be at least ${MIN_VALUES.baseReconnectDelay}ms`);
+        } else {
+          updates.baseReconnectDelay = baseReconnectDelay;
+        }
+      }
+      if (typeof maxReconnectDelay === 'number') {
+        if (maxReconnectDelay < MIN_VALUES.maxReconnectDelay) {
+          errors.push(`maxReconnectDelay must be at least ${MIN_VALUES.maxReconnectDelay}ms`);
+        } else {
+          updates.maxReconnectDelay = maxReconnectDelay;
+        }
+      }
+      if (typeof heartbeatInterval === 'number') {
+        if (heartbeatInterval < MIN_VALUES.heartbeatInterval) {
+          errors.push(`heartbeatInterval must be at least ${MIN_VALUES.heartbeatInterval}ms`);
+        } else {
+          updates.heartbeatInterval = heartbeatInterval;
+        }
+      }
+      if (typeof reconnectInterval === 'number') {
+        if (reconnectInterval < MIN_VALUES.reconnectInterval) {
+          errors.push(`reconnectInterval must be at least ${MIN_VALUES.reconnectInterval}ms`);
+        } else {
+          updates.reconnectInterval = reconnectInterval;
+        }
+      }
+      if (typeof tokenRefreshInterval === 'number') {
+        if (tokenRefreshInterval < MIN_VALUES.tokenRefreshInterval) {
+          errors.push(`tokenRefreshInterval must be at least ${MIN_VALUES.tokenRefreshInterval}ms`);
+        } else {
+          updates.tokenRefreshInterval = tokenRefreshInterval;
+        }
+      }
+      if (typeof offlineTimeout === 'number') {
+        if (offlineTimeout < MIN_VALUES.offlineTimeout) {
+          errors.push(`offlineTimeout must be at least ${MIN_VALUES.offlineTimeout}ms`);
+        } else {
+          updates.offlineTimeout = offlineTimeout;
+        }
+      }
+
+      // Return validation errors if any
+      if (errors.length > 0) {
+        return res.status(400).json({ error: errors.join('; ') });
+      }
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No valid configuration fields provided" });

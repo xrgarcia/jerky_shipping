@@ -32,6 +32,16 @@ interface ConfigFormData {
   offlineTimeout: number;
 }
 
+const MIN_VALUES = {
+  connectionTimeout: 5000,
+  baseReconnectDelay: 1000,
+  maxReconnectDelay: 5000,
+  heartbeatInterval: 10000,
+  reconnectInterval: 1000,
+  tokenRefreshInterval: 300000,
+  offlineTimeout: 500,
+};
+
 function formatMs(ms: number): string {
   if (ms >= 3600000) {
     const hours = ms / 3600000;
@@ -55,7 +65,8 @@ function ConfigField({
   onChange, 
   icon: Icon,
   unit = "ms",
-  testId
+  testId,
+  minValue
 }: { 
   label: string; 
   description: string; 
@@ -64,7 +75,10 @@ function ConfigField({
   icon: React.ComponentType<{ className?: string }>;
   unit?: string;
   testId: string;
+  minValue: number;
 }) {
+  const isValid = value >= minValue;
+  
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -80,12 +94,17 @@ function ConfigField({
           id={testId}
           type="number"
           value={value}
-          onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-          className="max-w-[200px]"
+          min={minValue}
+          onChange={(e) => {
+            const parsed = parseInt(e.target.value);
+            onChange(isNaN(parsed) ? minValue : Math.max(parsed, minValue));
+          }}
+          className={`max-w-[200px] ${!isValid ? 'border-destructive' : ''}`}
           data-testid={testId}
         />
         <span className="text-sm text-muted-foreground">{unit}</span>
       </div>
+      <p className="text-xs text-muted-foreground">Minimum: {formatMs(minValue)}</p>
     </div>
   );
 }
@@ -231,6 +250,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("connectionTimeout")}
                   icon={Clock}
                   testId="input-connection-timeout"
+                  minValue={MIN_VALUES.connectionTimeout}
                 />
                 <ConfigField
                   label="Base Reconnect Delay"
@@ -239,6 +259,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("baseReconnectDelay")}
                   icon={Timer}
                   testId="input-base-reconnect-delay"
+                  minValue={MIN_VALUES.baseReconnectDelay}
                 />
               </div>
 
@@ -250,6 +271,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("maxReconnectDelay")}
                   icon={RotateCcw}
                   testId="input-max-reconnect-delay"
+                  minValue={MIN_VALUES.maxReconnectDelay}
                 />
                 <ConfigField
                   label="Reconnect Interval"
@@ -258,6 +280,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("reconnectInterval")}
                   icon={RefreshCw}
                   testId="input-reconnect-interval"
+                  minValue={MIN_VALUES.reconnectInterval}
                 />
               </div>
 
@@ -269,6 +292,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("heartbeatInterval")}
                   icon={Heart}
                   testId="input-heartbeat-interval"
+                  minValue={MIN_VALUES.heartbeatInterval}
                 />
                 <ConfigField
                   label="Token Refresh Interval"
@@ -277,6 +301,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("tokenRefreshInterval")}
                   icon={Key}
                   testId="input-token-refresh-interval"
+                  minValue={MIN_VALUES.tokenRefreshInterval}
                 />
               </div>
 
@@ -288,6 +313,7 @@ export default function DesktopConfigPage() {
                   onChange={handleFieldChange("offlineTimeout")}
                   icon={WifiOff}
                   testId="input-offline-timeout"
+                  minValue={MIN_VALUES.offlineTimeout}
                 />
               </div>
             </>
