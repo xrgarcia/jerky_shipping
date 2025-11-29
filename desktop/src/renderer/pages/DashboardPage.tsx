@@ -198,14 +198,25 @@ function DashboardPage({ state }: DashboardPageProps) {
             <div className="bg-[#242424] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium text-white">Select Printer</h3>
-                <button
-                  onClick={discoverPrinters}
-                  disabled={discovering}
-                  data-testid="button-refresh-printers"
-                  className="p-1.5 rounded hover:bg-[#333] transition-colors"
-                >
-                  <RefreshCw className={`w-4 h-4 text-[#999] ${discovering ? 'animate-spin' : ''}`} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {state.selectedPrinter && (
+                    <button
+                      onClick={() => setShowPrinterSetup(false)}
+                      data-testid="button-cancel-printer-selection"
+                      className="text-xs text-[#999] hover:text-white px-2 py-1 rounded hover:bg-[#333] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={discoverPrinters}
+                    disabled={discovering}
+                    data-testid="button-refresh-printers"
+                    className="p-1.5 rounded hover:bg-[#333] transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-[#999] ${discovering ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
               </div>
 
               {error && (

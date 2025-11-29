@@ -4475,7 +4475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (activeSession) {
             // Get user info for the session
             const user = await storage.getUser(activeSession.userId);
-            userName = user?.name || undefined;
+            userName = user?.handle || user?.email?.split('@')[0] || undefined;
           }
           
           return {
@@ -4829,8 +4829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
-          role: user.role,
+          name: user.handle || user.email?.split('@')[0] || user.email,
         },
         client: {
           id: client.id,
