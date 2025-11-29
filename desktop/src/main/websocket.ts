@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
-import { config } from '../shared/config';
+import { config, runtimeConfig, RemoteConfig } from '../shared/config';
 import type { PrintJob, ConnectionInfo } from '../shared/types';
 
 interface WebSocketMessage {
@@ -8,11 +8,7 @@ interface WebSocketMessage {
   [key: string]: unknown;
 }
 
-// PRODUCTION: Unlimited reconnection attempts - warehouse apps MUST survive server restarts/deployments
 const MAX_RECONNECT_ATTEMPTS = Infinity;
-const BASE_RECONNECT_DELAY = 2000;
-const MAX_RECONNECT_DELAY = 30000;
-const CONNECTION_TIMEOUT = 15000; // 15 seconds to establish connection
 
 export class WebSocketClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -79,6 +75,7 @@ export class WebSocketClient extends EventEmitter {
       });
       
       // Set connection timeout - if we don't connect within this time, retry
+      const timeout = runtimeConfig.connectionTimeout;
       this.connectionTimeout = setTimeout(() => {
         console.log('[WebSocket] Connection timeout, retrying...');
         this.lastError = 'Connection timeout';
@@ -100,7 +97,7 @@ export class WebSocketClient extends EventEmitter {
         // Reset flag and schedule a retry (connect() will set isIntentionalClose = false)
         this.isIntentionalClose = false;
         this.scheduleReconnect();
-      }, CONNECTION_TIMEOUT);
+      }, timeout);
       
       // Emit connecting status now that ws is created
       this.emit('status-change', this.getConnectionInfo());
@@ -264,7 +261,7 @@ export class WebSocketClient extends EventEmitter {
     
     console.log('[WebSocket] Sending going offline notification...');
     
-    const OFFLINE_TIMEOUT = 1000; // Max wait time for ACK
+    const offlineTimeout = runtimeConfig.offlineTimeout;
     
     return new Promise<void>((resolve) => {
       let resolved = false;
@@ -288,7 +285,7 @@ export class WebSocketClient extends EventEmitter {
       const timeoutId = setTimeout(() => {
         console.log('[WebSocket] Offline notification timeout, proceeding with shutdown');
         resolveOnce();
-      }, OFFLINE_TIMEOUT);
+      }, offlineTimeout);
       
       // When we resolve, clear the timeout
       const originalResolveOnce = resolveOnce;
@@ -400,8 +397,24 @@ export class WebSocketClient extends EventEmitter {
         });
         break;
         
+      case 'desktop:config_update':
+        console.log('[WebSocket] Received config update from server');
+        const configData = message.config as Partial<RemoteConfig>;
+        runtimeConfig.updateFromRemote(configData);
+        this.emit('config-update', configData);
+        this.restartHeartbeat();
+        break;
+        
       default:
         console.log('[WebSocket] Unknown message type:', message.type);
+    }
+  }
+  
+  private restartHeartbeat(): void {
+    if (this.ws?.readyState === WebSocket.OPEN && this.isAuthenticated) {
+      console.log('[WebSocket] Restarting heartbeat with new interval');
+      this.stopHeartbeat();
+      this.startHeartbeat();
     }
   }
   
@@ -425,10 +438,12 @@ export class WebSocketClient extends EventEmitter {
     this.reconnectAttempt++;
     
     // PRODUCTION: Never give up reconnecting - warehouse apps MUST survive server restarts/deployments
-    // Exponential backoff with jitter, capped at MAX_RECONNECT_DELAY
+    // Exponential backoff with jitter, capped at max reconnect delay (from remote config)
+    const baseDelay = runtimeConfig.baseReconnectDelay;
+    const maxDelay = runtimeConfig.maxReconnectDelay;
     const delay = Math.min(
-      BASE_RECONNECT_DELAY * Math.pow(1.5, Math.min(this.reconnectAttempt - 1, 10)) + Math.random() * 1000,
-      MAX_RECONNECT_DELAY
+      baseDelay * Math.pow(1.5, Math.min(this.reconnectAttempt - 1, 10)) + Math.random() * 1000,
+      maxDelay
     );
     
     console.log(`[WebSocket] Reconnecting in ${Math.round(delay)}ms... (attempt ${this.reconnectAttempt})`);

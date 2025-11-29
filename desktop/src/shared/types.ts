@@ -90,6 +90,17 @@ export interface EnvironmentInfo {
   serverUrl: string;
 }
 
+export interface RemoteConfig {
+  connectionTimeout: number;
+  baseReconnectDelay: number;
+  maxReconnectDelay: number;
+  heartbeatInterval: number;
+  reconnectInterval: number;
+  tokenRefreshInterval: number;
+  offlineTimeout: number;
+  updatedAt?: string;
+}
+
 export type IpcChannel = 
   | 'auth:login'
   | 'auth:logout'
@@ -108,6 +119,7 @@ export type IpcChannel =
   | 'ws:disconnect'
   | 'ws:status'
   | 'app:get-state'
+  | 'app:get-config'
   | 'app:state-changed'
   | 'env:list'
   | 'env:get'

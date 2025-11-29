@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo } from '../shared/types';
+import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo, RemoteConfig } from '../shared/types';
 
 const api = {
   invoke: <T = unknown>(channel: IpcChannel, data?: unknown): Promise<IpcResponse<T>> => {
@@ -12,8 +12,18 @@ const api = {
     return () => ipcRenderer.removeListener('app:state-changed', handler);
   },
   
+  onConfigUpdate: (callback: (config: Partial<RemoteConfig>) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, config: Partial<RemoteConfig>) => callback(config);
+    ipcRenderer.on('config-updated', handler);
+    return () => ipcRenderer.removeListener('config-updated', handler);
+  },
+  
   getState: (): Promise<AppState> => {
     return ipcRenderer.invoke('app:get-state');
+  },
+  
+  getConfig: (): Promise<IpcResponse<RemoteConfig>> => {
+    return ipcRenderer.invoke('app:get-config');
   },
   
   auth: {

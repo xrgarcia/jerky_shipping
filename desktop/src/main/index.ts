@@ -5,7 +5,7 @@ import { WebSocketClient } from './websocket';
 import { PrinterService } from './printer';
 import { ApiClient } from './api';
 import { AppState, PrintJob, ConnectionInfo } from '../shared/types';
-import { environments, config, getEnvironment } from '../shared/config';
+import { environments, config, getEnvironment, fetchRemoteConfig, runtimeConfig } from '../shared/config';
 
 // Global error handlers to prevent crashes during server restarts
 process.on('uncaughtException', (error) => {
@@ -200,6 +200,18 @@ async function connectWebSocket(): Promise<void> {
   });
   
   const env = getEnvironment(selectedEnvironment);
+  
+  // Fetch remote config before connecting (uses default values if fetch fails)
+  try {
+    const remoteConfig = await fetchRemoteConfig(env.serverUrl, appState.auth.token);
+    if (remoteConfig) {
+      runtimeConfig.updateFromRemote(remoteConfig);
+      console.log('[Main] Applied remote config before WebSocket connection');
+    }
+  } catch (error) {
+    console.warn('[Main] Failed to fetch remote config, using defaults:', error);
+  }
+  
   wsClient = new WebSocketClient(appState.auth.token, appState.auth.clientId, env.wsUrl);
   
   // Listen for detailed status changes
@@ -283,11 +295,23 @@ async function connectWebSocket(): Promise<void> {
     }
   });
   
+  wsClient.on('config-update', (configData: Record<string, unknown>) => {
+    console.log('[Main] Received config update from server:', configData);
+    mainWindow?.webContents.send('config-updated', configData);
+  });
+  
   wsClient.connect();
 }
 
 function setupIpcHandlers(): void {
   ipcMain.handle('app:get-state', () => appState);
+  
+  ipcMain.handle('app:get-config', () => {
+    return {
+      success: true,
+      data: runtimeConfig.remoteConfig,
+    };
+  });
   
   ipcMain.handle('auth:login', async () => {
     try {
