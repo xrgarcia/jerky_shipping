@@ -4033,6 +4033,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
     try {
       const { shipmentId } = req.body;
+      const user = req.user!;
+      
+      // Get user's current web packing session to get station ID
+      const webSession = await storage.getActiveWebPackingSession(user.id);
+      if (!webSession) {
+        return res.status(400).json({ error: "No active station session. Please select a station first." });
+      }
       
       // Get shipment
       const shipment = await storage.getShipment(shipmentId);
@@ -4052,8 +4059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Create print job with shipment label URL
+      // Create print job with shipment label URL and station from web session
       const printJob = await storage.createPrintJob({
+        stationId: webSession.stationId,
         orderId: shipment.orderId, // Non-null, safe to insert
         labelUrl: shipment.labelUrl || null, // Use shipment's label URL if available
         status: "queued"
