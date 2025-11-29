@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog, nativeImage, Menu } from 'electron';
 import path from 'path';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
@@ -604,7 +604,145 @@ async function saveEnvironmentSetting(envName: string): Promise<void> {
   }
 }
 
+function formatConfigValue(ms: number): string {
+  if (ms >= 3600000) {
+    return `${ms / 3600000} hour${ms / 3600000 !== 1 ? 's' : ''}`;
+  }
+  if (ms >= 60000) {
+    return `${ms / 60000} minute${ms / 60000 !== 1 ? 's' : ''}`;
+  }
+  if (ms >= 1000) {
+    return `${ms / 1000} second${ms / 1000 !== 1 ? 's' : ''}`;
+  }
+  return `${ms}ms`;
+}
+
+function showConfigurationDialog(): void {
+  const cfg = runtimeConfig.remoteConfig;
+  
+  const configText = [
+    'Current Desktop Configuration',
+    '',
+    `Connection Timeout: ${formatConfigValue(cfg.connectionTimeout)}`,
+    `Base Reconnect Delay: ${formatConfigValue(cfg.baseReconnectDelay)}`,
+    `Max Reconnect Delay: ${formatConfigValue(cfg.maxReconnectDelay)}`,
+    `Heartbeat Interval: ${formatConfigValue(cfg.heartbeatInterval)}`,
+    `Reconnect Interval: ${formatConfigValue(cfg.reconnectInterval)}`,
+    `Token Refresh Interval: ${formatConfigValue(cfg.tokenRefreshInterval)}`,
+    `Offline Timeout: ${formatConfigValue(cfg.offlineTimeout)}`,
+    '',
+    cfg.updatedAt ? `Last Updated: ${new Date(cfg.updatedAt).toLocaleString()}` : 'Using default values',
+    '',
+    'These settings are managed remotely from the web admin console.',
+  ].join('\n');
+  
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Configuration',
+    message: 'Desktop Configuration',
+    detail: configText,
+    buttons: ['OK'],
+  });
+}
+
+function createApplicationMenu(): void {
+  const isMac = process.platform === 'darwin';
+  
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const },
+      ],
+    }] : []),
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'View Configuration',
+          accelerator: isMac ? 'Cmd+,' : 'Ctrl+,',
+          click: () => showConfigurationDialog(),
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' as const } : { role: 'quit' as const },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        ...(isMac ? [
+          { role: 'pasteAndMatchStyle' as const },
+          { role: 'delete' as const },
+          { role: 'selectAll' as const },
+        ] : [
+          { role: 'delete' as const },
+          { type: 'separator' as const },
+          { role: 'selectAll' as const },
+        ]),
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const },
+          { type: 'separator' as const },
+          { role: 'window' as const },
+        ] : [
+          { role: 'close' as const },
+        ]),
+      ],
+    },
+    {
+      role: 'help' as const,
+      submenu: [
+        {
+          label: 'Learn More',
+          click: async () => {
+            await shell.openExternal('https://ship.jerky.com');
+          },
+        },
+      ],
+    },
+  ];
+  
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(async () => {
+  createApplicationMenu();
   setupIpcHandlers();
   createWindow();
   await initializeApp();
