@@ -243,6 +243,25 @@ export default function Packing() {
       setShowStationModal(true);
     }
   }, [isLoadingSession, hasValidSession]);
+  
+  // Auto-focus order input when page loads and ready to scan
+  // This handles returning to the page after printing a label
+  useEffect(() => {
+    // Wait for session and stale metrics to load before focusing
+    if (isLoadingSession || isLoadingStaleMetrics) return;
+    
+    // Only focus when:
+    // 1. Has valid session
+    // 2. No current shipment loaded
+    // 3. Print queue is not critical (not blocked)
+    if (hasValidSession && !currentShipment && !hasCriticalPrintQueue) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        orderInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoadingSession, isLoadingStaleMetrics, hasValidSession, currentShipment, hasCriticalPrintQueue]);
 
   // Fetch shipment tags to check for Gift tag
   const { data: shipmentTags = [] } = useQuery<ShipmentTag[]>({
