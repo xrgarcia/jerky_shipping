@@ -135,16 +135,22 @@ function DashboardPage({ state }: DashboardPageProps) {
       });
       
       if (registerResult.success) {
-        // Refresh the printer list
+        // Refresh the printer list to get the newly registered printer
         const listResult = await window.electronAPI.printer.list();
         
-        // Set this printer as default if we have printers in the list
-        const printers = state.printers || [];
-        if (printers.length > 0) {
-          await window.electronAPI.printer.setDefault(printers[0].id);
-        } else if (listResult.success && listResult.data && Array.isArray(listResult.data) && listResult.data.length > 0) {
-          // Fallback: use the result from the list call if state hasn't updated yet
-          await window.electronAPI.printer.setDefault(listResult.data[0].id);
+        // Find the newly registered printer in the fresh list and set it as default
+        if (listResult.success && listResult.data && Array.isArray(listResult.data)) {
+          // Find the printer we just registered by matching the system name
+          const registeredPrinter = listResult.data.find(
+            (p: { systemName: string }) => p.systemName === printer.systemName
+          );
+          
+          if (registeredPrinter) {
+            await window.electronAPI.printer.setDefault(registeredPrinter.id);
+          } else if (listResult.data.length > 0) {
+            // Fallback: set the first printer as default if we can't find the exact match
+            await window.electronAPI.printer.setDefault(listResult.data[0].id);
+          }
         }
         setShowPrinterSetup(false);
       } else {
@@ -429,49 +435,135 @@ function DashboardPage({ state }: DashboardPageProps) {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {systemPrinters.map((printer) => (
-                    <button
-                      key={printer.systemName}
-                      onClick={() => handleSelectPrinter(printer)}
-                      data-testid={`button-select-printer-${printer.systemName}`}
-                      className="w-full p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-[#333] hover:border-primary-500/50 transition-all flex items-center justify-between text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Printer className="w-5 h-5 text-[#999]" />
-                        <div>
-                          <p className="text-sm text-white">{printer.name}</p>
-                          <p className="text-xs text-[#666]">{printer.status}</p>
+                  {systemPrinters.map((printer) => {
+                    const isOnline = printer.status === 'online';
+                    const isBusy = printer.status === 'busy';
+                    const isOffline = printer.status === 'offline' || (!isOnline && !isBusy);
+                    
+                    return (
+                      <button
+                        key={printer.systemName}
+                        onClick={() => handleSelectPrinter(printer)}
+                        data-testid={`button-select-printer-${printer.systemName}`}
+                        className={`w-full p-3 rounded-lg bg-[#1a1a1a] hover:bg-[#2a2a2a] border transition-all flex items-center justify-between text-left ${
+                          isOffline 
+                            ? 'border-amber-500/30 hover:border-amber-500/50' 
+                            : 'border-[#333] hover:border-primary-500/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            isOnline 
+                              ? 'bg-green-500/20' 
+                              : isBusy 
+                                ? 'bg-yellow-500/20'
+                                : 'bg-amber-500/20'
+                          }`}>
+                            <Printer className={`w-5 h-5 ${
+                              isOnline 
+                                ? 'text-green-500' 
+                                : isBusy 
+                                  ? 'text-yellow-500'
+                                  : 'text-amber-500'
+                            }`} />
+                          </div>
+                          <div>
+                            <p className="text-sm text-white">{printer.name}</p>
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 text-xs ${
+                                isOnline 
+                                  ? 'text-green-400' 
+                                  : isBusy 
+                                    ? 'text-yellow-400'
+                                    : 'text-amber-400'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  isOnline 
+                                    ? 'bg-green-500' 
+                                    : isBusy 
+                                      ? 'bg-yellow-500'
+                                      : 'bg-amber-500'
+                                }`} />
+                                {isOnline ? 'Ready' : isBusy ? 'Busy' : 'Offline'}
+                              </span>
+                              {isOffline && (
+                                <span className="text-xs text-[#666]">(jobs will queue)</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      {printer.isDefault && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400">
-                          Default
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                        <div className="flex items-center gap-2">
+                          {printer.isDefault && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           ) : state.selectedPrinter ? (
-            <button
-              onClick={() => setShowPrinterSetup(true)}
-              data-testid="button-change-printer"
-              className="w-full p-3 rounded-xl bg-[#242424] hover:bg-[#2a2a2a] border border-[#333] transition-all flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center">
-                  <Printer className="w-5 h-5 text-primary-500" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-white">{state.selectedPrinter.name}</p>
-                  <p className="text-xs text-[#999]">
-                    {state.selectedPrinter.status === 'online' ? 'Ready to print' : state.selectedPrinter.status}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-[#666]" />
-            </button>
+            (() => {
+              const isOnline = state.selectedPrinter.status === 'online';
+              const isBusy = state.selectedPrinter.status === 'busy';
+              const isOffline = !isOnline && !isBusy;
+              
+              return (
+                <button
+                  onClick={() => setShowPrinterSetup(true)}
+                  data-testid="button-change-printer"
+                  className={`w-full p-3 rounded-xl bg-[#242424] hover:bg-[#2a2a2a] border transition-all flex items-center justify-between ${
+                    isOffline ? 'border-amber-500/30' : 'border-[#333]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      isOnline 
+                        ? 'bg-green-500/20' 
+                        : isBusy 
+                          ? 'bg-yellow-500/20'
+                          : 'bg-amber-500/20'
+                    }`}>
+                      <Printer className={`w-5 h-5 ${
+                        isOnline 
+                          ? 'text-green-500' 
+                          : isBusy 
+                            ? 'text-yellow-500'
+                            : 'text-amber-500'
+                      }`} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-white">{state.selectedPrinter.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 text-xs ${
+                          isOnline 
+                            ? 'text-green-400' 
+                            : isBusy 
+                              ? 'text-yellow-400'
+                              : 'text-amber-400'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            isOnline 
+                              ? 'bg-green-500' 
+                              : isBusy 
+                                ? 'bg-yellow-500'
+                                : 'bg-amber-500'
+                          }`} />
+                          {isOnline ? 'Ready to print' : isBusy ? 'Busy' : 'Offline'}
+                        </span>
+                        {isOffline && (
+                          <span className="text-xs text-[#666]">(jobs will queue)</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#666]" />
+                </button>
+              );
+            })()
           ) : (
             <button
               onClick={() => setShowPrinterSetup(true)}
