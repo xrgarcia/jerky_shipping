@@ -127,16 +127,24 @@ function DashboardPage({ state }: DashboardPageProps) {
 
   const handleSelectPrinter = async (printer: SystemPrinter) => {
     try {
+      setError(null);
+      
       const registerResult = await window.electronAPI.printer.register({
         name: printer.name,
         systemName: printer.systemName,
       });
       
       if (registerResult.success) {
-        await window.electronAPI.printer.list();
+        // Refresh the printer list
+        const listResult = await window.electronAPI.printer.list();
         
-        if (state.printers.length > 0) {
-          await window.electronAPI.printer.setDefault(state.printers[0].id);
+        // Set this printer as default if we have printers in the list
+        const printers = state.printers || [];
+        if (printers.length > 0) {
+          await window.electronAPI.printer.setDefault(printers[0].id);
+        } else if (listResult.success && listResult.data && Array.isArray(listResult.data) && listResult.data.length > 0) {
+          // Fallback: use the result from the list call if state hasn't updated yet
+          await window.electronAPI.printer.setDefault(listResult.data[0].id);
         }
         setShowPrinterSetup(false);
       } else {
