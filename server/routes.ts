@@ -4373,12 +4373,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Hybrid auth middleware - accepts both web session cookies AND desktop Bearer tokens
-  // Tries desktop token first, falls back to web session. Only returns 401 if BOTH fail.
+  // Tries BOTH methods independently and succeeds if EITHER works.
   async function hybridAuth(req: Request, res: Response, next: Function) {
-    let desktopAuthError: string | null = null;
-    let webAuthError: string | null = null;
+    const errors: string[] = [];
     
-    // First, try desktop Bearer token auth
+    // Try desktop Bearer token auth
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
@@ -4387,36 +4386,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const client = await storage.getDesktopClientByAccessToken(tokenHash);
         if (client) {
-          // Check token expiry
           if (new Date() > new Date(client.accessTokenExpiresAt)) {
-            desktopAuthError = 'Access token expired';
-            // Don't return here - try cookie auth as fallback
+            errors.push('Desktop token expired');
           } else {
-            // Update activity
-            const clientIp = req.ip || req.socket.remoteAddress;
-            await storage.updateDesktopClientActivity(client.id, clientIp);
-
-            // Attach client and user to request
             const user = await storage.getUser(client.userId);
-            if (!user) {
-              desktopAuthError = 'User not found';
-            } else {
+            if (user) {
+              // Desktop auth succeeded
+              const clientIp = req.ip || req.socket.remoteAddress;
+              await storage.updateDesktopClientActivity(client.id, clientIp);
               (req as any).desktopClient = client;
               (req as any).user = user;
               (req as any).authType = 'desktop';
               return next();
+            } else {
+              errors.push('Desktop token user not found');
             }
           }
         } else {
-          desktopAuthError = 'Invalid access token';
+          errors.push('Invalid desktop token');
         }
       } catch (error) {
         console.error('[Hybrid Auth] Desktop token error:', error);
-        desktopAuthError = 'Token validation error';
+        errors.push('Desktop token validation error');
       }
     }
 
-    // Try web session cookie auth (either as primary or fallback)
+    // Try web session cookie auth (always attempted, even if Bearer was present)
     const sessionToken = req.cookies[SESSION_COOKIE_NAME];
     if (sessionToken) {
       try {
@@ -4424,26 +4419,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (session && session.expiresAt >= new Date()) {
           const user = await storage.getUser(session.userId);
           if (user) {
+            // Cookie auth succeeded
             (req as any).user = user;
             (req as any).authType = 'web';
             return next();
           } else {
-            webAuthError = 'User not found';
+            errors.push('Session user not found');
           }
         } else {
-          webAuthError = 'Session expired or invalid';
+          errors.push('Session expired or invalid');
         }
       } catch (error) {
         console.error('[Hybrid Auth] Session error:', error);
-        webAuthError = 'Session validation error';
+        errors.push('Session validation error');
       }
     } else if (!authHeader) {
-      webAuthError = 'No authentication provided';
+      // Only report no auth if neither method was attempted
+      errors.push('No authentication provided');
     }
 
-    // Both auth methods failed - return appropriate error
-    const error = desktopAuthError || webAuthError || 'Not authenticated';
-    return res.status(401).json({ error });
+    // Both auth methods failed
+    return res.status(401).json({ 
+      error: 'Not authenticated',
+      details: errors.length > 0 ? errors.join('; ') : undefined
+    });
   }
   
   // Role-based access control middleware (use after hybridAuth)
