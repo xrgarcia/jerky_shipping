@@ -3467,7 +3467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const desktopJobs = await storage.getAllDesktopPrintJobs(100);
       
       // Get stations for display names
-      const stations = await storage.getStations();
+      const stations = await storage.getAllStations();
       const stationMap = new Map(stations.map(s => [s.id, s.name]));
       
       // Transform jobs to include station name and order number from payload
