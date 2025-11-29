@@ -156,7 +156,7 @@ function safeUpdateJob(jobId: string, status: PrintJob['status'], errorMessage?:
       updated.errorMessage = errorMessage;
     } else if (status !== 'failed') {
       // Clear any prior error when transitioning to a non-failed status
-      updated.errorMessage = undefined;
+      updated.errorMessage = null;
     }
     return updated;
   });
@@ -509,7 +509,7 @@ async function connectWebSocket(): Promise<void> {
       const existingJob = result.existingJob;
       if (existingJob.status !== job.status) {
         console.log(`[Main] Job ${job.id} duplicate detected, replaying local status: ${existingJob.status}`);
-        trySendStatusUpdate(getCurrentWsClient(), job.id, existingJob.status, existingJob.errorMessage);
+        trySendStatusUpdate(getCurrentWsClient(), job.id, existingJob.status, existingJob.errorMessage ?? undefined);
       }
       // Don't process again - local state is already correct
       return;
@@ -571,7 +571,7 @@ async function connectWebSocket(): Promise<void> {
         const incomingJob = data.jobs.find(j => j.id === localJob.id);
         if (incomingJob && localJob.status !== incomingJob.status) {
           console.log(`[Main] Batch duplicate ${localJob.id} detected, replaying local status: ${localJob.status}`);
-          trySendStatusUpdate(getCurrentWsClient(), localJob.id, localJob.status, localJob.errorMessage);
+          trySendStatusUpdate(getCurrentWsClient(), localJob.id, localJob.status, localJob.errorMessage ?? undefined);
         }
       }
     }
