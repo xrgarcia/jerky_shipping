@@ -1,0 +1,49 @@
+[Renderer] handleSelectPrinter starting for: iDPRT SP410 iDPRT SP410
+2index-opysy5XL.js:40 [Renderer] handleSelectPrinter starting for: HP OfficeJet Pro 8720 [011C8E] (Fax) HP OfficeJet Pro 8720 [011C8E] (Fax)
+2index-opysy5XL.js:40 [Renderer] handleSelectPrinter starting for: HP011C8E (HP OfficeJet Pro 8720) HP011C8E (HP OfficeJet Pro 8720)
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter starting for: iDPRT SP410 iDPRT SP410
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter starting for: iDPRT SP410 iDPRT SP410
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] Register result: Object
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully
+index-opysy5XL.js:40 [Renderer] List result: Object
+index-opysy5XL.js:40 [Renderer] List failed or no data: Object
+index-opysy5XL.js:40 [Renderer] handleSelectPrinter completed successfully

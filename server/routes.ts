@@ -4897,7 +4897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== Printers ====================
 
   // Get all printers (optionally filter by station)
-  app.get("/api/desktop/printers", requireAuth, async (req, res) => {
+  app.get("/api/desktop/printers", requireDesktopAuth, async (req, res) => {
     try {
       const stationId = req.query.stationId as string | undefined;
       const printers = stationId 
@@ -4911,7 +4911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get a specific printer
-  app.get("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+  app.get("/api/desktop/printers/:id", requireDesktopAuth, async (req, res) => {
     try {
       const printer = await storage.getPrinter(req.params.id);
       if (!printer) {
@@ -4971,7 +4971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a printer
-  app.patch("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+  app.patch("/api/desktop/printers/:id", requireDesktopAuth, async (req, res) => {
     try {
       const printer = await storage.updatePrinter(req.params.id, req.body);
       if (!printer) {
@@ -4996,7 +4996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a printer
-  app.delete("/api/desktop/printers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/desktop/printers/:id", requireDesktopAuth, async (req, res) => {
     try {
       const deleted = await storage.deletePrinter(req.params.id);
       if (!deleted) {
