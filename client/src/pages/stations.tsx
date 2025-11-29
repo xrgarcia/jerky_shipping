@@ -34,7 +34,8 @@ import {
   RefreshCw,
   Monitor,
   Wifi,
-  WifiOff
+  WifiOff,
+  Printer
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Station } from "@shared/schema";
@@ -49,6 +50,11 @@ interface StationWithSession extends Station {
     expiresAt: string;
   } | null;
   isConnected?: boolean;
+  printer?: {
+    id: string;
+    name: string;
+    systemName: string;
+  } | null;
 }
 
 interface ConnectionStats {
@@ -461,6 +467,29 @@ export default function Stations() {
                     <span className="text-sm text-muted-foreground">No active session</span>
                   </div>
                 )}
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-background/50">
+                  <Printer className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs text-muted-foreground">Printer</span>
+                    {station.printer ? (
+                      <p 
+                        className="text-sm font-medium text-foreground truncate"
+                        data-testid={`text-printer-name-${station.id}`}
+                        title={station.printer.name}
+                      >
+                        {station.printer.name}
+                      </p>
+                    ) : (
+                      <p 
+                        className="text-sm font-medium text-red-500"
+                        data-testid={`text-printer-none-${station.id}`}
+                      >
+                        None
+                      </p>
+                    )}
+                  </div>
+                </div>
                 
                 <div className="flex items-center justify-between pt-2 border-t">
                   <p className="text-xs text-muted-foreground">

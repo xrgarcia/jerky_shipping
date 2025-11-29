@@ -4489,7 +4489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stations = await storage.getAllStations(false); // Get all stations
       const connectedStationIds = getConnectedStationIds();
       
-      // Fetch active sessions for each station
+      // Fetch active sessions and printer info for each station
       const stationsWithSessions = await Promise.all(
         stations.map(async (station) => {
           const activeSession = await storage.getActiveSessionByStation(station.id);
@@ -4501,6 +4501,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userName = user?.name || user?.handle || user?.email?.split('@')[0] || undefined;
           }
           
+          // Get printer assigned to this station
+          const printers = await storage.getPrintersByStation(station.id);
+          const selectedPrinter = printers.length > 0 ? printers[0] : null;
+          
           return {
             ...station,
             activeSession: activeSession ? {
@@ -4511,6 +4515,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               expiresAt: activeSession.expiresAt,
             } : null,
             isConnected: connectedStationIds.includes(station.id),
+            printer: selectedPrinter ? {
+              id: selectedPrinter.id,
+              name: selectedPrinter.name,
+              systemName: selectedPrinter.systemName,
+            } : null,
           };
         })
       );
