@@ -89,6 +89,7 @@ export type IpcChannel =
   | 'station:list'
   | 'station:claim'
   | 'station:release'
+  | 'station:create'
   | 'printer:discover'
   | 'printer:list'
   | 'printer:register'

@@ -25,6 +25,8 @@ const api = {
     list: () => ipcRenderer.invoke('station:list'),
     claim: (stationId: string) => ipcRenderer.invoke('station:claim', stationId),
     release: () => ipcRenderer.invoke('station:release'),
+    create: (data: { name: string; locationHint?: string }) => 
+      ipcRenderer.invoke('station:create', data),
   },
   
   printer: {

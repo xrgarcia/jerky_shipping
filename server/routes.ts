@@ -4331,7 +4331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  // Desktop client authentication middleware
+  // Desktop client authentication middleware (Bearer token only)
   async function requireDesktopAuth(req: Request, res: Response, next: Function) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -4364,6 +4364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       (req as any).desktopClient = client;
       (req as any).user = user;
+      (req as any).authType = 'desktop';
       next();
     } catch (error) {
       console.error('[Desktop Auth] Error:', error);
@@ -4371,10 +4372,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  // Hybrid auth middleware - accepts both web session cookies AND desktop Bearer tokens
+  // Tries desktop token first, falls back to web session. Only returns 401 if BOTH fail.
+  async function hybridAuth(req: Request, res: Response, next: Function) {
+    let desktopAuthError: string | null = null;
+    let webAuthError: string | null = null;
+    
+    // First, try desktop Bearer token auth
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const tokenHash = hashToken(token);
+      
+      try {
+        const client = await storage.getDesktopClientByAccessToken(tokenHash);
+        if (client) {
+          // Check token expiry
+          if (new Date() > new Date(client.accessTokenExpiresAt)) {
+            desktopAuthError = 'Access token expired';
+            // Don't return here - try cookie auth as fallback
+          } else {
+            // Update activity
+            const clientIp = req.ip || req.socket.remoteAddress;
+            await storage.updateDesktopClientActivity(client.id, clientIp);
+
+            // Attach client and user to request
+            const user = await storage.getUser(client.userId);
+            if (!user) {
+              desktopAuthError = 'User not found';
+            } else {
+              (req as any).desktopClient = client;
+              (req as any).user = user;
+              (req as any).authType = 'desktop';
+              return next();
+            }
+          }
+        } else {
+          desktopAuthError = 'Invalid access token';
+        }
+      } catch (error) {
+        console.error('[Hybrid Auth] Desktop token error:', error);
+        desktopAuthError = 'Token validation error';
+      }
+    }
+
+    // Try web session cookie auth (either as primary or fallback)
+    const sessionToken = req.cookies[SESSION_COOKIE_NAME];
+    if (sessionToken) {
+      try {
+        const session = await storage.getSession(sessionToken);
+        if (session && session.expiresAt >= new Date()) {
+          const user = await storage.getUser(session.userId);
+          if (user) {
+            (req as any).user = user;
+            (req as any).authType = 'web';
+            return next();
+          } else {
+            webAuthError = 'User not found';
+          }
+        } else {
+          webAuthError = 'Session expired or invalid';
+        }
+      } catch (error) {
+        console.error('[Hybrid Auth] Session error:', error);
+        webAuthError = 'Session validation error';
+      }
+    } else if (!authHeader) {
+      webAuthError = 'No authentication provided';
+    }
+
+    // Both auth methods failed - return appropriate error
+    const error = desktopAuthError || webAuthError || 'Not authenticated';
+    return res.status(401).json({ error });
+  }
+  
+  // Role-based access control middleware (use after hybridAuth)
+  function requireRole(...allowedRoles: string[]) {
+    return (req: Request, res: Response, next: Function) => {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+      next();
+    };
+  }
+
   // ==================== Stations ====================
 
-  // Get all stations
-  app.get("/api/desktop/stations", requireAuth, async (req, res) => {
+  // Get all stations (accessible by both web and desktop)
+  app.get("/api/desktop/stations", hybridAuth, async (req, res) => {
     try {
       const activeOnly = req.query.active === 'true';
       const stations = await storage.getAllStations(activeOnly);
@@ -4385,8 +4474,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get a specific station
-  app.get("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+  // Get a specific station (accessible by both web and desktop)
+  app.get("/api/desktop/stations/:id", hybridAuth, async (req, res) => {
     try {
       const station = await storage.getStation(req.params.id);
       if (!station) {
@@ -4399,8 +4488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new station
-  app.post("/api/desktop/stations", requireAuth, async (req, res) => {
+  // Create a new station (accessible by both web and desktop)
+  app.post("/api/desktop/stations", hybridAuth, async (req, res) => {
     try {
       const data = insertStationSchema.parse(req.body);
       
@@ -4421,8 +4510,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update a station
-  app.patch("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+  // Update a station (accessible by both web and desktop)
+  app.patch("/api/desktop/stations/:id", hybridAuth, async (req, res) => {
     try {
       const station = await storage.updateStation(req.params.id, req.body);
       if (!station) {
@@ -4435,8 +4524,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete a station
-  app.delete("/api/desktop/stations/:id", requireAuth, async (req, res) => {
+  // Delete a station (accessible by both web and desktop)
+  app.delete("/api/desktop/stations/:id", hybridAuth, async (req, res) => {
     try {
       const deleted = await storage.deleteStation(req.params.id);
       if (!deleted) {

@@ -280,7 +280,7 @@ function setupIpcHandlers(): void {
   ipcMain.handle('station:release', async () => {
     try {
       if (appState.session && apiClient) {
-        await apiClient.releaseStation(appState.session.id);
+        await apiClient.releaseStation();
       }
       
       if (wsClient && appState.station) {
@@ -291,6 +291,17 @@ function setupIpcHandlers(): void {
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to release station';
+      return { success: false, error: message };
+    }
+  });
+  
+  ipcMain.handle('station:create', async (_event, data: { name: string; locationHint?: string }) => {
+    try {
+      if (!apiClient) throw new Error('Not authenticated');
+      const station = await apiClient.createStation(data);
+      return { success: true, data: station };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create station';
       return { success: false, error: message };
     }
   });

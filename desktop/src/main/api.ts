@@ -94,11 +94,15 @@ export class ApiClient {
   }
   
   async claimStation(stationId: string): Promise<StationSession> {
-    return this.request<StationSession>('POST', `/api/desktop/stations/${stationId}/claim`);
+    return this.request<StationSession>('POST', `/api/desktop/sessions/claim`, { stationId });
   }
   
-  async releaseStation(sessionId: string): Promise<void> {
-    await this.request<void>('POST', `/api/desktop/sessions/${sessionId}/release`);
+  async releaseStation(): Promise<void> {
+    await this.request<void>('POST', `/api/desktop/sessions/release`);
+  }
+  
+  async createStation(data: { name: string; locationHint?: string }): Promise<Station> {
+    return this.request<Station>('POST', '/api/desktop/stations', data);
   }
   
   async getPrinters(stationId: string): Promise<Printer[]> {
