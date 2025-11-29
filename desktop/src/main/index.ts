@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import path from 'path';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
@@ -64,17 +64,27 @@ function createWindow(): void {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     const rendererPath = path.join(__dirname, '../../renderer/index.html');
+    console.log('[Main] __dirname:', __dirname);
     console.log('[Main] Loading renderer from:', rendererPath);
-    mainWindow.loadFile(rendererPath).catch((err) => {
+    
+    const fs = require('fs');
+    if (!fs.existsSync(rendererPath)) {
+      dialog.showErrorBox('Renderer Not Found', 
+        `Could not find renderer at:\n${rendererPath}\n\n__dirname: ${__dirname}\n\nPlease reinstall the application.`);
+    }
+    
+    mainWindow.loadFile(rendererPath).catch((err: Error) => {
       console.error('[Main] Failed to load renderer:', err);
+      dialog.showErrorBox('Load Error', `Failed to load: ${err.message}\n\nPath: ${rendererPath}`);
     });
   }
 
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+  mainWindow.webContents.on('did-fail-load', (_event: unknown, errorCode: number, errorDescription: string) => {
     console.error('[Main] Page failed to load:', errorCode, errorDescription);
+    dialog.showErrorBox('Page Load Failed', `Error ${errorCode}: ${errorDescription}`);
   });
 
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('console-message', (_event: unknown, _level: number, message: string) => {
     console.log('[Renderer Console]', message);
   });
 
