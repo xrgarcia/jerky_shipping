@@ -208,6 +208,30 @@ function DashboardPage({ state }: DashboardPageProps) {
     });
   };
 
+  // Calculate relative time (freshness indicator)
+  const getRelativeTime = (date: string): string => {
+    const now = Date.now();
+    const created = new Date(date).getTime();
+    const diffMs = now - created;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMins > 0) return `${diffMins}m ago`;
+    if (diffSecs > 10) return `${diffSecs}s ago`;
+    return 'just now';
+  };
+
+  // Refresh relative times every 30 seconds
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const getConnectionStatusText = () => {
     const info = state.connectionInfo;
     switch (state.connectionStatus) {
@@ -621,7 +645,16 @@ function DashboardPage({ state }: DashboardPageProps) {
                     <div className="flex items-center gap-3">
                       {getStatusIcon(job.status)}
                       <div>
-                        <p className="text-sm text-white font-medium">{job.orderNumber || 'Unknown Order'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-white font-medium">{job.orderNumber || 'Unknown Order'}</p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            job.status === 'pending' || job.status === 'queued' 
+                              ? 'bg-blue-500/20 text-blue-400' 
+                              : 'bg-[#333] text-[#888]'
+                          }`}>
+                            {getRelativeTime(job.createdAt)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-[#666]">
                           <span>{formatTime(job.createdAt)}</span>
                           {job.requestedBy && (

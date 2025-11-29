@@ -365,6 +365,14 @@ export class WebSocketClient extends EventEmitter {
         });
         break;
         
+      case 'desktop:job:batch':
+        console.log(`[WebSocket] Batch of ${(message.jobs as PrintJob[])?.length || 0} pending job(s) received`);
+        this.emit('job:batch', {
+          stationId: message.stationId,
+          jobs: message.jobs as PrintJob[],
+        });
+        break;
+        
       case 'desktop:heartbeat':
         break;
       

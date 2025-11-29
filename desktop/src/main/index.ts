@@ -362,6 +362,25 @@ async function connectWebSocket(): Promise<void> {
     });
   });
   
+  // Handle batch of pending jobs (sent when desktop reconnects to catch up on missed jobs)
+  wsClient.on('job:batch', (data: { stationId: string; jobs: PrintJob[] }) => {
+    console.log(`[Main] Received batch of ${data.jobs.length} pending job(s)`);
+    
+    // Merge by: keep all current jobs, add any incoming that don't exist yet
+    // Access appState.printJobs directly inline to ensure freshest possible state
+    const existingJobIds = new Set(appState.printJobs.map(j => j.id));
+    const trulyNewJobs = data.jobs.filter(j => !existingJobIds.has(j.id));
+    
+    if (trulyNewJobs.length > 0) {
+      // Re-read state right before update for maximum freshness
+      const finalJobs = [...trulyNewJobs, ...appState.printJobs];
+      updateState({ printJobs: finalJobs });
+      console.log(`[Main] Added ${trulyNewJobs.length} new job(s) from batch`);
+    } else {
+      console.log(`[Main] All ${data.jobs.length} job(s) from batch already present`);
+    }
+  });
+  
   wsClient.on('station-deleted', (data: { stationId: string; message: string }) => {
     console.log(`[Main] Station ${data.stationId} was deleted, releasing station session`);
     

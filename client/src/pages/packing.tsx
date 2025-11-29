@@ -262,15 +262,16 @@ export default function Packing() {
     createdAt: string;
   };
   
-  const { data: pendingPrintJobsData } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
+  const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading, isFetching: isPendingJobsFetching } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
     queryKey: ['/api/print-jobs/shipment', currentShipment?.id],
     enabled: !!currentShipment?.id,
     refetchInterval: 5000, // Refresh every 5 seconds to catch status changes
   });
   
   const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || [];
-  // Combine server state with optimistic state for immediate UI feedback
-  const hasPendingPrintJob = pendingPrintJobs.length > 0 || justCreatedPrintJob;
+  // Only show pending job warning when query is settled (not loading for first time)
+  // Use optimistic state OR confirmed server data (when not initially loading)
+  const hasPendingPrintJob = justCreatedPrintJob || (!isPendingJobsLoading && pendingPrintJobs.length > 0);
   
   // WebSocket subscription for real-time print job status updates
   useEffect(() => {
@@ -283,10 +284,10 @@ export default function Packing() {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        // Handle print job status updates
+        // Handle print job status updates (not stale_jobs_update - that's for operations dashboard)
         if (message.type === 'job_completed' || message.type === 'job_failed' || 
             message.type === 'job_cancelled' || message.type === 'job_added' ||
-            message.type === 'job_printing' || message.type === 'stale_jobs_update') {
+            message.type === 'job_printing' || message.type === 'job_updated') {
           // Invalidate the pending print jobs query to refresh immediately
           queryClient.invalidateQueries({ 
             queryKey: ['/api/print-jobs/shipment', currentShipment.id] 

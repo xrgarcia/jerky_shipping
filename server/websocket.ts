@@ -187,6 +187,23 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
       
       // Broadcast to web clients that this station is now online
       broadcastStationConnectionChange(stationId, true);
+      
+      // Send pending jobs for this station (so desktop gets jobs created while disconnected)
+      try {
+        const pendingJobs = await storage.getPendingJobsByStation(stationId);
+        if (pendingJobs.length > 0) {
+          const transformedJobs = pendingJobs.map((job: any) => transformPrintJobForDesktop(job));
+          connection.ws.send(JSON.stringify({ 
+            type: 'desktop:job:batch',
+            stationId,
+            jobs: transformedJobs
+          }));
+          console.log(`[Desktop WS] Sent ${pendingJobs.length} pending job(s) to station ${stationId}`);
+        }
+      } catch (error) {
+        console.error(`[Desktop WS] Error fetching pending jobs for station ${stationId}:`, error);
+        // Don't fail the subscription, just log the error
+      }
       break;
 
     case 'desktop:unsubscribe_station':
