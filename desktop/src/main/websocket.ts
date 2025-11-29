@@ -228,6 +228,15 @@ export class WebSocketClient extends EventEmitter {
         console.error('[WebSocket] Server error:', message.error);
         this.emit('server-error', message.error);
         break;
+      
+      case 'desktop:station:deleted':
+        console.log(`[WebSocket] Station ${message.stationId} was deleted, forcing logout`);
+        this.subscribedStationId = null;
+        this.emit('station-deleted', {
+          stationId: message.stationId,
+          message: message.message || 'This station has been deleted.',
+        });
+        break;
         
       default:
         console.log('[WebSocket] Unknown message type:', message.type);

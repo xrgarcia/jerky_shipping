@@ -56,6 +56,7 @@ Preferred communication style: Simple, everyday language.
             - **Station Management**: Users can create new stations or claim existing ones for 20-hour shifts
             - **Printer Discovery**: Native macOS printer discovery and registration
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
+    - **Web-based Stations Management**: Full CRUD page at `/stations` for managing packing stations. When a station is deleted, active desktop sessions are automatically terminated and clients are notified via WebSocket (`desktop:station:deleted` message).
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.
     - **Saved Views System**: Customizable column views for PO Recommendations page stored in `saved_views` table.
 - **Monorepo Structure**: Client, server, and shared code co-located.

@@ -210,6 +210,22 @@ async function connectWebSocket(): Promise<void> {
     });
   });
   
+  wsClient.on('station-deleted', (data: { stationId: string; message: string }) => {
+    console.log(`[Main] Station ${data.stationId} was deleted, releasing station session`);
+    
+    // Clear the station and session from app state
+    updateState({
+      station: null,
+      session: null,
+      printers: [],
+      selectedPrinter: null,
+      printJobs: [],
+    });
+    
+    // Notify the renderer about the station deletion
+    mainWindow?.webContents.send('station-deleted', data);
+  });
+  
   wsClient.connect();
 }
 

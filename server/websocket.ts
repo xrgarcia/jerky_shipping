@@ -242,6 +242,30 @@ export function getDesktopConnectionStats(): { totalClients: number; stationsWit
   };
 }
 
+// Broadcast station deletion to the desktop client - forces logout
+export function broadcastDesktopStationDeleted(stationId: string): void {
+  const connection = desktopStationConnections.get(stationId);
+  if (!connection || connection.ws.readyState !== WebSocket.OPEN) {
+    console.log(`[Desktop WS] No active connection for station ${stationId} to notify of deletion`);
+    return;
+  }
+
+  try {
+    connection.ws.send(JSON.stringify({
+      type: 'desktop:station:deleted',
+      stationId,
+      message: 'This station has been deleted. You will be logged out.',
+    }));
+    console.log(`[Desktop WS] Notified client of station ${stationId} deletion`);
+    
+    // Clean up the connection after notification
+    desktopStationConnections.delete(stationId);
+    connection.stationId = null;
+  } catch (error) {
+    console.error(`[Desktop WS] Error notifying station ${stationId} deletion:`, error);
+  }
+}
+
 export function setupWebSocket(server: Server): void {
   wss = new WebSocketServer({ noServer: true });
 

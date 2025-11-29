@@ -82,7 +82,13 @@ export class ApiClient {
   }
   
   async getCurrentUser(): Promise<User> {
-    return this.request<User>('GET', '/api/desktop/me');
+    const response = await this.request<{ user: { id: string; email: string; name: string; role?: string } }>('GET', '/api/desktop/me');
+    return {
+      id: response.user.id,
+      email: response.user.email,
+      displayName: response.user.name,
+      role: response.user.role,
+    };
   }
   
   async getStations(): Promise<Station[]> {

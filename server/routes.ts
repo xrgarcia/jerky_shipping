@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -4461,6 +4461,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Stations ====================
 
+  // Get all stations with their active sessions (web-friendly endpoint)
+  app.get("/api/stations", requireAuth, async (req, res) => {
+    try {
+      const stations = await storage.getAllStations(false); // Get all stations
+      
+      // Fetch active sessions for each station
+      const stationsWithSessions = await Promise.all(
+        stations.map(async (station) => {
+          const activeSession = await storage.getActiveSessionByStation(station.id);
+          let userName: string | undefined;
+          
+          if (activeSession) {
+            // Get user info for the session
+            const user = await storage.getUser(activeSession.userId);
+            userName = user?.name || undefined;
+          }
+          
+          return {
+            ...station,
+            activeSession: activeSession ? {
+              id: activeSession.id,
+              userId: activeSession.userId,
+              userName,
+              startedAt: activeSession.startedAt,
+              expiresAt: activeSession.expiresAt,
+            } : null,
+          };
+        })
+      );
+      
+      res.json({ stations: stationsWithSessions });
+    } catch (error: any) {
+      console.error("[Stations] Error fetching stations:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch stations" });
+    }
+  });
+
   // Get all stations (accessible by both web and desktop)
   app.get("/api/desktop/stations", hybridAuth, async (req, res) => {
     try {
@@ -4526,10 +4563,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a station (accessible by both web and desktop)
   app.delete("/api/desktop/stations/:id", hybridAuth, async (req, res) => {
     try {
-      const deleted = await storage.deleteStation(req.params.id);
+      const stationId = req.params.id;
+      
+      // Check if station exists
+      const station = await storage.getStation(stationId);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      
+      // End any active session on this station
+      const activeSession = await storage.getActiveSessionByStation(stationId);
+      if (activeSession) {
+        await storage.endStationSession(activeSession.id);
+        console.log(`[Desktop] Ended active session ${activeSession.id} for deleted station ${stationId}`);
+      }
+      
+      // Broadcast station deletion to desktop client (forces logout)
+      broadcastDesktopStationDeleted(stationId);
+      
+      // Delete the station
+      const deleted = await storage.deleteStation(stationId);
       if (!deleted) {
         return res.status(404).json({ error: "Station not found" });
       }
+      
       res.json({ success: true });
     } catch (error: any) {
       console.error("[Desktop] Error deleting station:", error);
