@@ -299,10 +299,17 @@ export class AuthService {
         reject(err);
       });
       
-      setTimeout(() => {
+      // 5 minute timeout for OAuth flow (user may need time for 2FA/security codes)
+      const timeoutId = setTimeout(() => {
+        console.log('[Auth] OAuth timeout - closing server');
         server.close();
-        reject(new Error('Authentication timeout'));
-      }, 120000);
+        reject(new Error('Authentication timeout - please try again'));
+      }, 300000);
+      
+      // Clear timeout when server closes (success or failure)
+      server.on('close', () => {
+        clearTimeout(timeoutId);
+      });
     });
   }
   
