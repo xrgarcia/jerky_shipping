@@ -323,6 +323,7 @@ export interface IStorage {
   getJobsByOrder(orderId: string): Promise<PrintJob[]>;
   getJobsByShipment(shipmentId: string): Promise<PrintJob[]>;
   getAllDesktopPrintJobs(limit?: number): Promise<PrintJob[]>;
+  markJobPickedUp(id: string): Promise<PrintJob | undefined>;
   markJobSent(id: string): Promise<PrintJob | undefined>;
   markJobCompleted(id: string): Promise<PrintJob | undefined>;
   markJobFailed(id: string, errorMessage: string): Promise<PrintJob | undefined>;
@@ -2486,6 +2487,15 @@ export class DatabaseStorage implements IStorage {
       .from(printJobs)
       .orderBy(desc(printJobs.createdAt))
       .limit(limit);
+  }
+
+  async markJobPickedUp(id: string): Promise<PrintJob | undefined> {
+    const result = await db
+      .update(printJobs)
+      .set({ status: 'picked_up', updatedAt: new Date() })
+      .where(eq(printJobs.id, id))
+      .returning();
+    return result[0];
   }
 
   async markJobSent(id: string): Promise<PrintJob | undefined> {

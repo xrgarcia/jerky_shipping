@@ -258,7 +258,7 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
       console.log(`[Desktop WS] Job ${jobId} status update: ${jobStatus}${jobError ? ` - ${jobError}` : ''}`);
       
       try {
-        // Update the print job in the database using existing methods
+        // Update the print job in the database based on status
         let updatedJob;
         if (jobStatus === 'completed') {
           updatedJob = await storage.markJobCompleted(jobId);
@@ -266,19 +266,34 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
         } else if (jobStatus === 'failed') {
           updatedJob = await storage.markJobFailed(jobId, jobError || 'Unknown error');
           console.log(`[Desktop WS] Job ${jobId} marked as failed: ${jobError}`);
+        } else if (jobStatus === 'picked_up') {
+          // Desktop has received the job
+          updatedJob = await storage.markJobPickedUp(jobId);
+          console.log(`[Desktop WS] Job ${jobId} marked as picked_up`);
+        } else if (jobStatus === 'sent') {
+          // Job sent to printer spooler
+          updatedJob = await storage.markJobSent(jobId);
+          console.log(`[Desktop WS] Job ${jobId} marked as sent to printer`);
         } else if (jobStatus === 'printing') {
+          // Legacy status - treat as sent
           updatedJob = await storage.markJobSent(jobId);
           console.log(`[Desktop WS] Job ${jobId} marked as printing/sent`);
+        } else {
+          console.log(`[Desktop WS] Unknown job status: ${jobStatus}`);
         }
         
-        // Broadcast update to web clients for visibility
-        broadcastPrintQueueUpdate({ 
-          type: 'job_updated', 
-          jobId,
-          status: jobStatus,
-          errorMessage: jobError,
-          job: updatedJob
-        });
+        // Only broadcast if we actually updated the job
+        if (updatedJob) {
+          broadcastPrintQueueUpdate({ 
+            type: 'job_updated', 
+            jobId,
+            status: jobStatus,
+            errorMessage: jobError,
+            job: updatedJob
+          });
+        } else {
+          console.warn(`[Desktop WS] Job ${jobId} not found or status update failed`);
+        }
       } catch (error) {
         console.error(`[Desktop WS] Failed to update job ${jobId} status:`, error);
       }

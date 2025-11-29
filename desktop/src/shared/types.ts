@@ -36,7 +36,13 @@ export interface PrintJob {
   orderNumber: string;
   labelUrl: string;
   labelData: string | null;
-  status: 'pending' | 'queued' | 'printing' | 'completed' | 'failed';
+  // Status lifecycle: pending -> picked_up -> sent -> completed/failed
+  // pending: Job created, waiting for desktop to pick up
+  // picked_up: Desktop received the job
+  // sent: Job sent to printer spooler
+  // completed: Print job finished successfully
+  // failed: Print job failed (includes error message)
+  status: 'pending' | 'picked_up' | 'sent' | 'completed' | 'failed';
   errorMessage: string | null;
   attempts: number;
   createdAt: string;

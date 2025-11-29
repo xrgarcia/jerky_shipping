@@ -144,6 +144,166 @@ function updateState(updates: Partial<AppState>): void {
   broadcastState();
 }
 
+// Safe job state update - directly mutates state synchronously
+// JavaScript is single-threaded, so this is atomic between await boundaries
+// Clears errorMessage when transitioning to non-failed statuses to prevent stale diagnostics
+function safeUpdateJob(jobId: string, status: PrintJob['status'], errorMessage?: string): void {
+  const updatedJobs = appState.printJobs.map(j => {
+    if (j.id !== jobId) return j;
+    const updated: PrintJob = { ...j, status };
+    // Set errorMessage explicitly: use provided value, or clear it if transitioning to non-failed status
+    if (errorMessage !== undefined) {
+      updated.errorMessage = errorMessage;
+    } else if (status !== 'failed') {
+      // Clear any prior error when transitioning to a non-failed status
+      updated.errorMessage = undefined;
+    }
+    return updated;
+  });
+  appState = { ...appState, printJobs: updatedJobs };
+  broadcastState();
+}
+
+// Safe job add - directly mutates state synchronously
+// Deduplicates by returning 'exists' if job ID already exists
+// Returns { added: true } if job was added, or { added: false, existingJob } if duplicate
+function safeAddJob(job: PrintJob): { added: true } | { added: false; existingJob: PrintJob } {
+  const existingJob = appState.printJobs.find(j => j.id === job.id);
+  if (existingJob) {
+    console.log(`[Main] Job ${job.id} already exists with status: ${existingJob.status}`);
+    return { added: false, existingJob };
+  }
+  appState = { ...appState, printJobs: [job, ...appState.printJobs] };
+  broadcastState();
+  return { added: true };
+}
+
+// Safe bulk job add - atomically checks and adds only new jobs
+// Returns { newJobs: jobs that were added, duplicates: existing jobs that match incoming IDs }
+function safeAddBatchJobs(jobs: PrintJob[]): { newJobs: PrintJob[]; duplicates: PrintJob[] } {
+  const currentJobsById = new Map(appState.printJobs.map(j => [j.id, j]));
+  const newJobs: PrintJob[] = [];
+  const duplicates: PrintJob[] = [];
+  
+  for (const job of jobs) {
+    const existing = currentJobsById.get(job.id);
+    if (existing) {
+      duplicates.push(existing);
+    } else {
+      newJobs.push(job);
+    }
+  }
+  
+  if (newJobs.length > 0) {
+    appState = { ...appState, printJobs: [...newJobs, ...appState.printJobs] };
+    broadcastState();
+  }
+  
+  return { newJobs, duplicates };
+}
+
+// Get current WebSocket client - must be called to get fresh reference after awaits
+function getCurrentWsClient(): typeof wsClient {
+  return wsClient;
+}
+
+// Get current state for read operations - must be called synchronously before any await
+function getState(): AppState {
+  return appState;
+}
+
+// Pending status updates queue - for updates that couldn't be sent due to ws unavailability
+// IMPORTANT: We keep ALL transitions per job (in order) so server receives the full lifecycle
+// The server needs to see: pending → picked_up → sent → completed/failed
+interface PendingStatusUpdate {
+  jobId: string;
+  status: PrintJob['status'];
+  errorMessage?: string;
+  timestamp: number;
+  sequence: number; // Order within job's lifecycle
+}
+const pendingStatusUpdates: PendingStatusUpdate[] = [];
+const jobSequenceCounters = new Map<string, number>(); // Track sequence per job
+
+// Queue a status update for retry if ws is unavailable
+// KEEPS ALL TRANSITIONS - does not collapse to latest
+function queueStatusUpdate(jobId: string, status: PrintJob['status'], errorMessage?: string): void {
+  // Get next sequence number for this job
+  const currentSeq = jobSequenceCounters.get(jobId) ?? 0;
+  const nextSeq = currentSeq + 1;
+  jobSequenceCounters.set(jobId, nextSeq);
+  
+  pendingStatusUpdates.push({ 
+    jobId, 
+    status, 
+    errorMessage, 
+    timestamp: Date.now(),
+    sequence: nextSeq
+  });
+  console.log(`[Main] Queued status update for job ${jobId}: ${status} (seq ${nextSeq}, ${pendingStatusUpdates.length} total pending)`);
+}
+
+// Try to send a status update, queue if fails
+// Does NOT remove from queue - only flushPendingStatusUpdates removes after successful send
+function trySendStatusUpdate(ws: typeof wsClient, jobId: string, status: PrintJob['status'], errorMessage?: string): boolean {
+  if (ws) {
+    try {
+      ws.sendJobUpdate(jobId, status, errorMessage);
+      return true;
+    } catch (e) {
+      console.error(`[Main] Failed to send status update for job ${jobId}:`, e);
+      queueStatusUpdate(jobId, status, errorMessage);
+      return false;
+    }
+  } else {
+    queueStatusUpdate(jobId, status, errorMessage);
+    return false;
+  }
+}
+
+// Flush pending updates on reconnect - sends ALL transitions in order
+function flushPendingStatusUpdates(): void {
+  const ws = getCurrentWsClient();
+  if (!ws || pendingStatusUpdates.length === 0) return;
+  
+  console.log(`[Main] Flushing ${pendingStatusUpdates.length} pending status update(s)`);
+  
+  // Sort by timestamp then sequence to ensure correct order
+  const sortedUpdates = [...pendingStatusUpdates].sort((a, b) => {
+    if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+    return a.sequence - b.sequence;
+  });
+  
+  // Clear the queue - we'll re-add failed ones
+  pendingStatusUpdates.length = 0;
+  
+  const failed: PendingStatusUpdate[] = [];
+  
+  for (const update of sortedUpdates) {
+    try {
+      ws.sendJobUpdate(update.jobId, update.status, update.errorMessage);
+      console.log(`[Main] Flushed status update for job ${update.jobId}: ${update.status} (seq ${update.sequence})`);
+    } catch (e) {
+      // Re-queue if send fails
+      failed.push(update);
+      console.error(`[Main] Failed to flush status update for job ${update.jobId}:`, e);
+    }
+  }
+  
+  // Re-add any failed updates
+  if (failed.length > 0) {
+    pendingStatusUpdates.push(...failed);
+    console.log(`[Main] ${failed.length} update(s) re-queued after flush failure`);
+  }
+  
+  // Clear sequence counters for jobs that were fully flushed
+  for (const [jobId] of jobSequenceCounters) {
+    if (!pendingStatusUpdates.some(u => u.jobId === jobId)) {
+      jobSequenceCounters.delete(jobId);
+    }
+  }
+}
+
 async function initializeApp(): Promise<void> {
   authService = new AuthService();
   printerService = new PrinterService();
@@ -326,95 +486,144 @@ async function connectWebSocket(): Promise<void> {
     if (appState.session?.stationId && wsClient) {
       wsClient.subscribeToStation(appState.session.stationId);
     }
+    // Flush any pending status updates that couldn't be sent during disconnect
+    flushPendingStatusUpdates();
   });
   
   wsClient.on('job:new', async (job: PrintJob) => {
-    updateState({
-      printJobs: [job, ...appState.printJobs],
-    });
+    console.log(`[Main] Received new job ${job.id}`);
     
-    if (appState.selectedPrinter && wsClient) {
-      try {
-        await printerService.print(job, appState.selectedPrinter.systemName);
-        wsClient.sendJobUpdate(job.id, 'completed');
-        updateState({
-          printJobs: appState.printJobs.map(j => 
-            j.id === job.id ? { ...j, status: 'completed' as const } : j
-          ),
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        wsClient.sendJobUpdate(job.id, 'failed', errorMessage);
-        updateState({
-          printJobs: appState.printJobs.map(j => 
-            j.id === job.id ? { ...j, status: 'failed' as const, errorMessage } : j
-          ),
-        });
+    // Capture printer reference SYNCHRONOUSLY before any awaits or state mutations
+    // This ensures we use a consistent printer throughout the operation
+    // Note: We intentionally use the printer that was selected at job start time
+    const printer = getState().selectedPrinter;
+    const printerName = printer?.name ?? null;
+    const printerSystemName = printer?.systemName ?? null;
+    
+    // Add job to state (synchronous, atomic, deduplicates)
+    const result = safeAddJob(job);
+    
+    if (!result.added) {
+      // Job already exists - this is a duplicate from reconnect/retry
+      // Replay the local status to server to reconcile (uses retry queue)
+      const existingJob = result.existingJob;
+      if (existingJob.status !== job.status) {
+        console.log(`[Main] Job ${job.id} duplicate detected, replaying local status: ${existingJob.status}`);
+        trySendStatusUpdate(getCurrentWsClient(), job.id, existingJob.status, existingJob.errorMessage);
       }
+      // Don't process again - local state is already correct
+      return;
+    }
+    
+    // Immediately mark as picked_up - we have the job
+    // Always update local state, attempt to send to server (queues if fails)
+    safeUpdateJob(job.id, 'picked_up');
+    const sentPickedUp = trySendStatusUpdate(getCurrentWsClient(), job.id, 'picked_up');
+    console.log(`[Main] Job ${job.id} marked as picked_up (${sentPickedUp ? 'sent to server' : 'queued for retry'})`);
+    
+    // Check if we can print (using captured printer reference)
+    if (!printerSystemName) {
+      const errorMessage = 'No printer selected';
+      console.error(`[Main] Job ${job.id} failed: ${errorMessage}`);
+      safeUpdateJob(job.id, 'failed', errorMessage);
+      trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);
+      return;
+    }
+    
+    // Mark as sent - we're about to print (uses captured printer name for logging)
+    safeUpdateJob(job.id, 'sent');
+    const sentSent = trySendStatusUpdate(getCurrentWsClient(), job.id, 'sent');
+    console.log(`[Main] Job ${job.id} marked as sent (${sentSent ? 'sent to server' : 'queued'}), printing to ${printerName}`);
+    
+    try {
+      // ASYNC: Use the captured printer reference we got at the start
+      await printerService.print(job, printerSystemName);
+      
+      // AFTER AWAIT: Update local state first, then try to notify server (queues if fails)
+      safeUpdateJob(job.id, 'completed');
+      const sentCompleted = trySendStatusUpdate(getCurrentWsClient(), job.id, 'completed');
+      console.log(`[Main] Job ${job.id} completed on ${printerName} (${sentCompleted ? 'sent to server' : 'queued for retry'})`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // AFTER AWAIT: Update local state first, then try to notify server (queues if fails)
+      safeUpdateJob(job.id, 'failed', errorMessage);
+      trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);
+      console.error(`[Main] Job ${job.id} failed on ${printerName}:`, errorMessage);
     }
   });
   
   wsClient.on('job:update', (update: { jobId: string; status: PrintJob['status'] }) => {
-    updateState({
-      printJobs: appState.printJobs.map(j => 
-        j.id === update.jobId ? { ...j, status: update.status } : j
-      ),
-    });
+    safeUpdateJob(update.jobId, update.status);
   });
   
   // Handle batch of pending jobs (sent when desktop reconnects to catch up on missed jobs)
   wsClient.on('job:batch', async (data: { stationId: string; jobs: PrintJob[] }) => {
     console.log(`[Main] Received batch of ${data.jobs.length} pending job(s)`);
     
-    // Read fresh state at the start of processing
-    const currentJobIds = new Set(appState.printJobs.map(j => j.id));
-    const trulyNewJobs = data.jobs.filter(j => !currentJobIds.has(j.id));
+    // Atomically add new jobs and get duplicates (synchronous, race-safe, deduplicates)
+    const { newJobs: trulyNewJobs, duplicates } = safeAddBatchJobs(data.jobs);
+    
+    // Replay local status for any duplicates to reconcile with server (uses retry queue)
+    if (duplicates.length > 0) {
+      for (const localJob of duplicates) {
+        // Find the incoming job to check if status differs
+        const incomingJob = data.jobs.find(j => j.id === localJob.id);
+        if (incomingJob && localJob.status !== incomingJob.status) {
+          console.log(`[Main] Batch duplicate ${localJob.id} detected, replaying local status: ${localJob.status}`);
+          trySendStatusUpdate(getCurrentWsClient(), localJob.id, localJob.status, localJob.errorMessage);
+        }
+      }
+    }
     
     if (trulyNewJobs.length > 0) {
-      // Add jobs to state first
-      updateState({ printJobs: [...trulyNewJobs, ...appState.printJobs] });
       console.log(`[Main] Added ${trulyNewJobs.length} new job(s) from batch`);
       
       // Process pending jobs that need printing (only those with 'pending' status)
       const jobsToPrint = trulyNewJobs.filter(j => j.status === 'pending');
       if (jobsToPrint.length > 0) {
-        console.log(`[Main] Attempting to print ${jobsToPrint.length} pending job(s) from batch`);
+        console.log(`[Main] Processing ${jobsToPrint.length} pending job(s) from batch`);
         
         for (const job of jobsToPrint) {
-          // Re-read fresh state before each print attempt to get current printer
-          const currentPrinter = appState.selectedPrinter;
-          const currentWsClient = wsClient;
+          // Capture printer reference SYNCHRONOUSLY before processing this job
+          // Note: We intentionally use the printer that was selected at job start time
+          const printer = getState().selectedPrinter;
+          const printerName = printer?.name ?? null;
+          const printerSystemName = printer?.systemName ?? null;
           
-          if (!currentPrinter) {
-            console.warn(`[Main] Cannot print batch job ${job.id}: no printer selected`);
+          // Immediately mark as picked_up - always update local state, use retry queue for server
+          safeUpdateJob(job.id, 'picked_up');
+          const sentPickedUp = trySendStatusUpdate(getCurrentWsClient(), job.id, 'picked_up');
+          console.log(`[Main] Batch job ${job.id} marked as picked_up (${sentPickedUp ? 'sent' : 'queued'})`);
+          
+          if (!printerSystemName) {
+            const errorMessage = 'No printer selected';
+            console.error(`[Main] Batch job ${job.id} failed: ${errorMessage}`);
+            safeUpdateJob(job.id, 'failed', errorMessage);
+            trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);
             continue;
           }
           
-          if (!currentWsClient) {
-            console.warn(`[Main] Cannot print batch job ${job.id}: WebSocket disconnected`);
-            continue;
-          }
+          // Mark as sent - we're about to print
+          safeUpdateJob(job.id, 'sent');
+          const sentSent = trySendStatusUpdate(getCurrentWsClient(), job.id, 'sent');
+          console.log(`[Main] Batch job ${job.id} marked as sent (${sentSent ? 'sent' : 'queued'}), printing to ${printerName}`);
           
           try {
-            await printerService.print(job, currentPrinter.systemName);
-            currentWsClient.sendJobUpdate(job.id, 'completed');
-            // Read fresh printJobs state before updating
-            updateState({
-              printJobs: appState.printJobs.map(j => 
-                j.id === job.id ? { ...j, status: 'completed' as const } : j
-              ),
-            });
-            console.log(`[Main] Batch job ${job.id} printed successfully to ${currentPrinter.name}`);
+            // ASYNC: Use captured printer reference
+            await printerService.print(job, printerSystemName);
+            
+            // AFTER AWAIT: Update local state first, use retry queue for server
+            safeUpdateJob(job.id, 'completed');
+            const sentCompleted = trySendStatusUpdate(getCurrentWsClient(), job.id, 'completed');
+            console.log(`[Main] Batch job ${job.id} completed on ${printerName} (${sentCompleted ? 'sent' : 'queued'})`);
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            currentWsClient.sendJobUpdate(job.id, 'failed', errorMessage);
-            // Read fresh printJobs state before updating
-            updateState({
-              printJobs: appState.printJobs.map(j => 
-                j.id === job.id ? { ...j, status: 'failed' as const, errorMessage } : j
-              ),
-            });
-            console.error(`[Main] Batch job ${job.id} failed:`, errorMessage);
+            
+            // AFTER AWAIT: Update local state first, use retry queue for server
+            safeUpdateJob(job.id, 'failed', errorMessage);
+            trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);
+            console.error(`[Main] Batch job ${job.id} failed on ${printerName}:`, errorMessage);
           }
         }
       }

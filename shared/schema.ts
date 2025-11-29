@@ -823,7 +823,13 @@ export const printJobs = pgTable("print_jobs", {
   shipmentId: varchar("shipment_id").references(() => shipments.id), // Optional link to shipment
   jobType: text("job_type").notNull().default("label"), // "label", "packing_slip", "invoice"
   payload: jsonb("payload").notNull(), // Label data, PDF URL, or raw print content
-  status: text("status").notNull().default("pending"), // "pending", "sent", "printing", "completed", "failed", "cancelled"
+  // Status lifecycle: pending -> picked_up -> sent -> completed/failed
+  // pending: Job created, waiting for desktop to pick up
+  // picked_up: Desktop received the job
+  // sent: Job sent to printer spooler
+  // completed: Print job finished successfully
+  // failed: Print job failed (includes error message)
+  status: text("status").notNull().default("pending"), // "pending", "picked_up", "sent", "completed", "failed"
   priority: integer("priority").notNull().default(0), // Higher = more urgent
   attempts: integer("attempts").notNull().default(0),
   maxAttempts: integer("max_attempts").notNull().default(3),
