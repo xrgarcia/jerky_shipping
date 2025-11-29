@@ -279,10 +279,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         user = await storage.createUser({ 
           email: googleUser.email,
+          name: googleUser.name,
           avatarUrl: googleUser.picture,
         });
-      } else if (googleUser.picture && !user.avatarUrl) {
-        await storage.updateUser(user.id, { avatarUrl: googleUser.picture });
+      } else {
+        // Update user info from Google if changed or missing
+        const updates: { name?: string; avatarUrl?: string } = {};
+        if (googleUser.name && !user.name) {
+          updates.name = googleUser.name;
+        }
+        if (googleUser.picture && !user.avatarUrl) {
+          updates.avatarUrl = googleUser.picture;
+        }
+        if (Object.keys(updates).length > 0) {
+          await storage.updateUser(user.id, updates);
+          user = { ...user, ...updates };
+        }
       }
 
       // Create session
@@ -4475,7 +4487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (activeSession) {
             // Get user info for the session
             const user = await storage.getUser(activeSession.userId);
-            userName = user?.handle || user?.email?.split('@')[0] || undefined;
+            userName = user?.name || user?.handle || user?.email?.split('@')[0] || undefined;
           }
           
           return {
@@ -4829,7 +4841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: {
           id: user.id,
           email: user.email,
-          name: user.handle || user.email?.split('@')[0] || user.email,
+          name: user.name || user.handle || user.email?.split('@')[0] || user.email,
         },
         client: {
           id: client.id,
