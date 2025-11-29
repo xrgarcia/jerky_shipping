@@ -28,6 +28,7 @@ import { checkRateLimit } from "./utils/rate-limiter";
 import type { PORecommendation } from "@shared/reporting-schema";
 import { firestoreStorage } from "./firestore-storage";
 import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
+import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
 
 // Initialize the shipment service
@@ -3624,6 +3625,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       broadcastPrintQueueUpdate({ type: "job_completed", job: updatedJob });
+      
+      // Immediately recalculate and broadcast stale job metrics (instant UI update)
+      refreshStaleJobsMetrics().catch(err => console.error("[Print Queue] Error refreshing stale metrics:", err));
 
       res.json({ success: true, job: updatedJob });
     } catch (error) {
@@ -5444,6 +5448,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const job = await storage.markJobCompleted(req.params.id);
+      
+      // Immediately recalculate and broadcast stale job metrics (instant UI update)
+      refreshStaleJobsMetrics().catch(err => console.error("[Print Queue] Error refreshing stale metrics:", err));
+      
       res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error completing print job:", error);
@@ -5464,6 +5472,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { errorMessage } = req.body;
       const job = await storage.markJobFailed(req.params.id, errorMessage || "Unknown error");
+      
+      // Immediately recalculate and broadcast stale job metrics (instant UI update)
+      refreshStaleJobsMetrics().catch(err => console.error("[Print Queue] Error refreshing stale metrics:", err));
+      
       res.json(transformPrintJobForDesktop(job));
     } catch (error: any) {
       console.error("[Desktop] Error reporting print job failure:", error);

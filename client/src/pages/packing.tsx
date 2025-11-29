@@ -89,6 +89,17 @@ type QCSale = {
   }> | null;
 };
 
+type PendingPrintJob = {
+  id: string;
+  stationId: string;
+  stationName: string;
+  status: 'pending' | 'sent' | 'printing';
+  errorMessage: string | null;
+  attempts: number;
+  maxAttempts: number;
+  createdAt: string;
+};
+
 type ShipmentWithItems = {
   id: string;
   shipmentId: string | null;
@@ -326,18 +337,6 @@ export default function Packing() {
     }
   }, [isLoadingSession, isLoadingStaleMetrics, hasValidSession, currentShipment, hasCriticalPrintQueue]);
   
-  // Check for pending print jobs for this shipment
-  type PendingPrintJob = {
-    id: string;
-    stationId: string;
-    stationName: string;
-    status: 'pending' | 'sent' | 'printing';
-    errorMessage: string | null;
-    attempts: number;
-    maxAttempts: number;
-    createdAt: string;
-  };
-  
   // Pending print jobs - use pre-calculated data from validate-order response for immediate display
   // The query is kept as a fallback for WebSocket updates after initial load
   const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
@@ -354,7 +353,7 @@ export default function Packing() {
   const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || currentShipment?.pendingPrintJobs || [];
   // Immediate display: use pre-calculated flag (instant) or optimistic state or confirmed data
   // Only show warning when there's an active shipment (prevent flash after completing)
-  const hasPendingPrintJob = currentShipment && (justCreatedPrintJob || currentShipment?.hasPendingPrintJobs || pendingPrintJobs.length > 0);
+  const hasPendingPrintJob = !!(currentShipment && (justCreatedPrintJob || currentShipment?.hasPendingPrintJobs || pendingPrintJobs.length > 0));
   
   // WebSocket subscription for real-time print job status updates
   useEffect(() => {
