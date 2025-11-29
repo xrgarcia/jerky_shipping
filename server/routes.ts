@@ -3509,6 +3509,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get stale job metrics (used by packing page to block on critical jobs)
+  app.get("/api/print-queue/stale-metrics", requireAuth, async (req, res) => {
+    try {
+      const { getStaleJobsMetrics } = await import("./print-queue-worker");
+      const metrics = getStaleJobsMetrics();
+      
+      res.json({
+        totalStale: metrics.totalStale,
+        warningCount: metrics.warningCount,
+        criticalCount: metrics.criticalCount,
+        healthStatus: metrics.healthStatus,
+        lastCheckedAt: metrics.lastCheckedAt.toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching stale job metrics:", error);
+      // Return healthy status if worker not initialized
+      res.json({
+        totalStale: 0,
+        warningCount: 0,
+        criticalCount: 0,
+        healthStatus: 'healthy',
+        lastCheckedAt: new Date().toISOString(),
+      });
+    }
+  });
+
   // Get pending print jobs for a specific shipment (used by packing page)
   app.get("/api/print-jobs/shipment/:shipmentId", requireAuth, async (req, res) => {
     try {
