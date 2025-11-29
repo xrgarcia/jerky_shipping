@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +96,69 @@ export default function Stations() {
   const { data, isLoading, refetch, isRefetching } = useQuery<StationsResponse>({
     queryKey: ["/api/stations"],
   });
+
+  // WebSocket connection for real-time station connection updates
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws?room=default`;
+    
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    let isMounted = true;
+    const maxReconnectDelay = 30000;
+
+    const connect = () => {
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        console.error('WebSocket creation error:', error);
+        return;
+      }
+
+      ws.onopen = () => {
+        console.log('WebSocket connected (Stations)');
+        reconnectAttempts = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'station_connection_change') {
+            // Desktop client connected/disconnected - refetch stations data immediately
+            console.log(`[WS] Station ${message.stationId} connection change: ${message.isConnected ? 'online' : 'offline'}`);
+            queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+          }
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        if (isMounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(connect, delay);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, []);
 
   const setConnectionFilter = (filter: "online" | "offline" | null) => {
     if (filter) {

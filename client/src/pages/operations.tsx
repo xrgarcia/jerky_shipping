@@ -672,6 +672,10 @@ Please analyze this failure and help me understand:
                 ? message.data.firestoreSessionSyncWorkerStats
                 : (prev?.firestoreSessionSyncWorkerStats ?? initial?.firestoreSessionSyncWorkerStats),
             }));
+          } else if (message.type === 'station_connection_change') {
+            // Desktop client connected/disconnected - refetch stations data immediately
+            console.log(`[WS] Station ${message.stationId} connection change: ${message.isConnected ? 'online' : 'offline'}`);
+            queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
           }
         } catch (error) {
           console.error('WebSocket message error:', error);

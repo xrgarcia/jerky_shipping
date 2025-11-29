@@ -121,9 +121,12 @@ function cleanupDesktopConnection(connection: DesktopConnection): void {
   // Only remove from station map if THIS exact connection (same socket) is still the active one
   // This prevents a reconnecting client or new client from being kicked when old socket closes
   if (connection.stationId) {
+    const stationIdToNotify = connection.stationId;
     const activeConnection = desktopStationConnections.get(connection.stationId);
     if (activeConnection && activeConnection.ws === connection.ws) {
       desktopStationConnections.delete(connection.stationId);
+      // Broadcast to web clients that this station is now offline
+      broadcastStationConnectionChange(stationIdToNotify, false);
     }
   }
   
@@ -180,6 +183,9 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
         stationId 
       }));
       console.log(`[Desktop WS] Client ${connection.clientId} subscribed to station ${stationId}`);
+      
+      // Broadcast to web clients that this station is now online
+      broadcastStationConnectionChange(stationId, true);
       break;
 
     case 'desktop:unsubscribe_station':
@@ -189,6 +195,8 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
         const activeConnection = desktopStationConnections.get(oldStationId);
         if (activeConnection && activeConnection.ws === connection.ws) {
           desktopStationConnections.delete(oldStationId);
+          // Broadcast to web clients that this station is now offline
+          broadcastStationConnectionChange(oldStationId, false);
         }
         connection.stationId = null;
         connection.ws.send(JSON.stringify({ 
@@ -202,10 +210,13 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
       // Client is gracefully shutting down - clean up immediately
       console.log(`[Desktop WS] Client ${connection.clientId} going offline gracefully`);
       if (connection.stationId) {
+        const stationIdToNotify = connection.stationId;
         const activeConnection = desktopStationConnections.get(connection.stationId);
         if (activeConnection && activeConnection.ws === connection.ws) {
           desktopStationConnections.delete(connection.stationId);
           console.log(`[Desktop WS] Removed station ${connection.stationId} from active connections`);
+          // Broadcast to web clients that this station is now offline
+          broadcastStationConnectionChange(stationIdToNotify, false);
         }
       }
       desktopClientConnections.delete(connection.clientId);
@@ -482,6 +493,23 @@ function broadcastToRooms(targetRooms: Room[], message: string): void {
       });
     });
   });
+}
+
+// Broadcast station connection status changes to web clients
+export function broadcastStationConnectionChange(stationId: string, isConnected: boolean): void {
+  if (!wss) {
+    return;
+  }
+
+  const message = JSON.stringify({
+    type: 'station_connection_change',
+    stationId,
+    isConnected,
+  });
+
+  // Broadcast to operations and stations pages
+  broadcastToRooms(['operations', 'default'], message);
+  console.log(`[WS] Broadcast station ${stationId} connection change: ${isConnected ? 'online' : 'offline'}`);
 }
 
 export function broadcastOrderUpdate(order: any): void {
