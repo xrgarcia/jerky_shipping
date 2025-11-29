@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, getConnectedStationIds } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -4675,10 +4675,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing) {
         // Update existing printer
         const updated = await storage.updatePrinter(existing.id, data);
+        
+        // Broadcast printer update if associated with a station
+        if (updated && updated.stationId) {
+          broadcastStationPrinterUpdate(updated.stationId, {
+            id: updated.id,
+            name: updated.name,
+            systemName: updated.systemName,
+          });
+        }
+        
         return res.json(updated);
       }
 
       const printer = await storage.createPrinter(data);
+      
+      // Broadcast printer update if associated with a station
+      if (printer.stationId) {
+        broadcastStationPrinterUpdate(printer.stationId, {
+          id: printer.id,
+          name: printer.name,
+          systemName: printer.systemName,
+        });
+      }
+      
       res.status(201).json(printer);
     } catch (error: any) {
       console.error("[Desktop] Error registering printer:", error);
@@ -4696,6 +4716,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!printer) {
         return res.status(404).json({ error: "Printer not found" });
       }
+      
+      // Broadcast printer update if associated with a station
+      if (printer.stationId) {
+        broadcastStationPrinterUpdate(printer.stationId, {
+          id: printer.id,
+          name: printer.name,
+          systemName: printer.systemName,
+        });
+      }
+      
       res.json(printer);
     } catch (error: any) {
       console.error("[Desktop] Error updating printer:", error);
