@@ -63,11 +63,26 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+    const rendererPath = path.join(__dirname, '../../renderer/index.html');
+    console.log('[Main] Loading renderer from:', rendererPath);
+    mainWindow.loadFile(rendererPath).catch((err) => {
+      console.error('[Main] Failed to load renderer:', err);
+    });
   }
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[Main] Page failed to load:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log('[Renderer Console]', message);
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    if (process.env.NODE_ENV !== 'development') {
+      mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
   mainWindow.on('closed', () => {
