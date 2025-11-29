@@ -496,9 +496,18 @@ async function connectWebSocket(): Promise<void> {
     // Capture printer reference SYNCHRONOUSLY before any awaits or state mutations
     // This ensures we use a consistent printer throughout the operation
     // Note: We intentionally use the printer that was selected at job start time
-    const printer = getState().selectedPrinter;
+    const currentState = getState();
+    const printer = currentState.selectedPrinter;
     const printerName = printer?.name ?? null;
     const printerSystemName = printer?.systemName ?? null;
+    
+    // Debug: Log printer state at job arrival
+    console.log(`[Main] Job ${job.id} printer state:`, {
+      selectedPrinter: printerName,
+      systemName: printerSystemName,
+      printersLoaded: currentState.printersLoaded,
+      printerCount: currentState.printers?.length ?? 0,
+    });
     
     // Add job to state (synchronous, atomic, deduplicates)
     const result = safeAddJob(job);
@@ -523,7 +532,10 @@ async function connectWebSocket(): Promise<void> {
     
     // Check if we can print (using captured printer reference)
     if (!printerSystemName) {
-      const errorMessage = 'No printer selected';
+      const printerCount = currentState.printers?.length ?? 0;
+      const errorMessage = printerCount === 0 
+        ? 'No printer selected - please set up a printer first'
+        : `No printer selected (${printerCount} available) - please select a printer`;
       console.error(`[Main] Job ${job.id} failed: ${errorMessage}`);
       safeUpdateJob(job.id, 'failed', errorMessage);
       trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);
@@ -587,9 +599,18 @@ async function connectWebSocket(): Promise<void> {
         for (const job of jobsToPrint) {
           // Capture printer reference SYNCHRONOUSLY before processing this job
           // Note: We intentionally use the printer that was selected at job start time
-          const printer = getState().selectedPrinter;
+          const batchState = getState();
+          const printer = batchState.selectedPrinter;
           const printerName = printer?.name ?? null;
           const printerSystemName = printer?.systemName ?? null;
+          
+          // Debug: Log printer state at batch job processing
+          console.log(`[Main] Batch job ${job.id} printer state:`, {
+            selectedPrinter: printerName,
+            systemName: printerSystemName,
+            printersLoaded: batchState.printersLoaded,
+            printerCount: batchState.printers?.length ?? 0,
+          });
           
           // Immediately mark as picked_up - always update local state, use retry queue for server
           safeUpdateJob(job.id, 'picked_up');
@@ -597,7 +618,10 @@ async function connectWebSocket(): Promise<void> {
           console.log(`[Main] Batch job ${job.id} marked as picked_up (${sentPickedUp ? 'sent' : 'queued'})`);
           
           if (!printerSystemName) {
-            const errorMessage = 'No printer selected';
+            const printerCount = batchState.printers?.length ?? 0;
+            const errorMessage = printerCount === 0 
+              ? 'No printer selected - please set up a printer first'
+              : `No printer selected (${printerCount} available) - please select a printer`;
             console.error(`[Main] Batch job ${job.id} failed: ${errorMessage}`);
             safeUpdateJob(job.id, 'failed', errorMessage);
             trySendStatusUpdate(getCurrentWsClient(), job.id, 'failed', errorMessage);

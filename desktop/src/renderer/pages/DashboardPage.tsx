@@ -417,6 +417,64 @@ function DashboardPage({ state }: DashboardPageProps) {
             </button>
           </div>
           
+          {/* Prominent Printer Status Display */}
+          <div className="mb-3 p-3 rounded-lg bg-[#1c1c1c] border border-[#333]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  state.selectedPrinter 
+                    ? state.selectedPrinter.status === 'online'
+                      ? 'bg-green-500/20'
+                      : state.selectedPrinter.status === 'busy'
+                        ? 'bg-yellow-500/20'
+                        : 'bg-amber-500/20'
+                    : 'bg-red-500/20'
+                }`}>
+                  <Printer className={`w-4 h-4 ${
+                    state.selectedPrinter 
+                      ? state.selectedPrinter.status === 'online'
+                        ? 'text-green-500'
+                        : state.selectedPrinter.status === 'busy'
+                          ? 'text-yellow-500'
+                          : 'text-amber-500'
+                      : 'text-red-500'
+                  }`} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#666]">Printer:</span>
+                    <span className={`text-sm font-medium ${
+                      state.selectedPrinter ? 'text-white' : 'text-red-400'
+                    }`} data-testid="text-selected-printer-name">
+                      {state.selectedPrinter?.name || 'NOT SELECTED'}
+                    </span>
+                  </div>
+                  {state.selectedPrinter && (
+                    <span className={`text-xs ${
+                      state.selectedPrinter.status === 'online' 
+                        ? 'text-green-400' 
+                        : state.selectedPrinter.status === 'busy'
+                          ? 'text-yellow-400'
+                          : 'text-amber-400'
+                    }`}>
+                      {state.selectedPrinter.status === 'online' ? 'Ready' : 
+                       state.selectedPrinter.status === 'busy' ? 'Busy' : 'Offline'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {!state.selectedPrinter && (
+                <button
+                  onClick={() => setShowPrinterSetup(true)}
+                  data-testid="button-setup-printer-quick"
+                  className="text-xs px-2 py-1 rounded bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                >
+                  Set Up
+                </button>
+              )}
+            </div>
+          </div>
+          
           <div className="relative mb-3" ref={envDropdownRef}>
             <button
               onClick={() => setShowEnvDropdown(!showEnvDropdown)}
