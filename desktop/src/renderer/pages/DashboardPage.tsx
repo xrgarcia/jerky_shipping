@@ -257,9 +257,24 @@ function DashboardPage({ state }: DashboardPageProps) {
   const handleRetryJob = async (jobId: string) => {
     setRetryingJob(jobId);
     try {
-      await window.electronAPI.job.retry(jobId);
+      const result = await window.electronAPI.job.retry(jobId);
+      if (!result.success) {
+        // Show error message
+        setError(result.error || 'Failed to retry print job');
+        console.error('Retry failed:', result.error);
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setError(null), 5000);
+      } else {
+        // Clear any previous error on success
+        setError(null);
+        console.log('Retry initiated successfully for job:', jobId);
+      }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to retry job';
+      setError(errorMessage);
       console.error('Failed to retry job:', err);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setError(null), 5000);
     } finally {
       setRetryingJob(null);
     }
@@ -717,6 +732,24 @@ function DashboardPage({ state }: DashboardPageProps) {
             <h3 className="font-medium text-white">Recent Print Jobs</h3>
             <span className="text-xs text-[#666]">{state.printJobs.length} jobs</span>
           </div>
+          
+          {/* Retry error display */}
+          {error && (
+            <div className="mb-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-400 font-medium">Retry Failed</p>
+                <p className="text-xs text-red-400/80">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-400/60 hover:text-red-400 transition-colors"
+                data-testid="button-dismiss-error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {state.printJobs.length === 0 ? (
             <div className="text-center py-8">
