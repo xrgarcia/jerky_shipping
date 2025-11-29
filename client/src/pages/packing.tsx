@@ -126,6 +126,9 @@ type ShipmentWithItems = {
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
   qcSale?: QCSale | null; // SkuVault QC Sale data (includes PassedItems, expected Items)
   validationWarnings?: string[]; // Warnings if items don't match between systems
+  // Pre-calculated pending print jobs (immediate display on order load)
+  pendingPrintJobs?: PendingPrintJob[];
+  hasPendingPrintJobs?: boolean;
 };
 
 type PackingLog = {
@@ -335,16 +338,22 @@ export default function Packing() {
     createdAt: string;
   };
   
-  const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading, isFetching: isPendingJobsFetching } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
+  // Pending print jobs - use pre-calculated data from validate-order response for immediate display
+  // The query is kept as a fallback for WebSocket updates after initial load
+  const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
     queryKey: ['/api/print-jobs/shipment', currentShipment?.id],
     enabled: !!currentShipment?.id,
-    refetchInterval: 5000, // Refresh every 5 seconds to catch status changes
+    refetchInterval: 15000, // Relaxed polling - WebSocket handles real-time updates
+    // Initialize cache with pre-calculated data from validate-order response for instant display
+    placeholderData: currentShipment?.pendingPrintJobs 
+      ? { pendingJobs: currentShipment.pendingPrintJobs }
+      : undefined,
   });
   
-  const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || [];
-  // Only show pending job warning when query is settled (not loading for first time)
-  // Use optimistic state OR confirmed server data (when not initially loading)
-  const hasPendingPrintJob = justCreatedPrintJob || (!isPendingJobsLoading && pendingPrintJobs.length > 0);
+  // Use pre-calculated data from shipment (instant) OR query data (for updates after load)
+  const pendingPrintJobs = pendingPrintJobsData?.pendingJobs || currentShipment?.pendingPrintJobs || [];
+  // Immediate display: use pre-calculated flag (instant) or optimistic state or confirmed data
+  const hasPendingPrintJob = justCreatedPrintJob || currentShipment?.hasPendingPrintJobs || pendingPrintJobs.length > 0;
   
   // WebSocket subscription for real-time print job status updates
   useEffect(() => {

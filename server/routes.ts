@@ -3933,13 +3933,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validationWarnings.push(`SkuVault error: ${error.message}`);
       }
       
-      // 5. Return combined data
+      // 5. Fetch pending print jobs for this shipment (immediate display)
+      const allPrintJobs = await storage.getJobsByShipment(shipment.id.toString());
+      const pendingPrintJobs = allPrintJobs.filter(job => 
+        job.status === 'pending' || job.status === 'queued' || job.status === 'printing'
+      );
+      
+      // 6. Return combined data with pending print jobs
       res.json({
         ...shipment,
         items: shipmentItems,
         saleId, // SkuVault Sale ID for QC scanning
         qcSale, // Full SkuVault QC Sale data (includes PassedItems, Items, etc.)
         validationWarnings, // Array of warnings if items don't match
+        pendingPrintJobs, // Pre-calculated for immediate display
+        hasPendingPrintJobs: pendingPrintJobs.length > 0,
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
