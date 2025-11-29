@@ -33,10 +33,12 @@ import {
   Trash2, 
   RefreshCw,
   Monitor,
-  User
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Station } from "@shared/schema";
+import { useLocation, useSearch } from "wouter";
 
 interface StationWithSession extends Station {
   activeSession?: {
@@ -46,10 +48,18 @@ interface StationWithSession extends Station {
     startedAt: string;
     expiresAt: string;
   } | null;
+  isConnected?: boolean;
+}
+
+interface ConnectionStats {
+  total: number;
+  connected: number;
+  offline: number;
 }
 
 interface StationsResponse {
   stations: StationWithSession[];
+  connectionStats?: ConnectionStats;
 }
 
 function formatDate(dateValue: string | Date | null | undefined): string {
@@ -72,6 +82,11 @@ function formatDate(dateValue: string | Date | null | undefined): string {
 
 export default function Stations() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const connectionFilter = searchParams.get("connection") as "online" | "offline" | null;
+  
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -81,6 +96,14 @@ export default function Stations() {
   const { data, isLoading, refetch, isRefetching } = useQuery<StationsResponse>({
     queryKey: ["/api/stations"],
   });
+
+  const setConnectionFilter = (filter: "online" | "offline" | null) => {
+    if (filter) {
+      setLocation(`/stations?connection=${filter}`);
+    } else {
+      setLocation("/stations");
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; locationHint?: string }) => {
@@ -184,11 +207,17 @@ export default function Stations() {
     setShowDeleteDialog(true);
   };
 
-  const stations = data?.stations || [];
+  const allStations = data?.stations || [];
+  const connectionStats = data?.connectionStats;
+  
+  // Apply connection filter
+  const stations = connectionFilter
+    ? allStations.filter(s => connectionFilter === "online" ? s.isConnected : !s.isConnected)
+    : allStations;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold font-serif text-foreground" data-testid="text-page-title">
             Packing Stations
@@ -220,6 +249,41 @@ export default function Stations() {
           </Button>
         </div>
       </div>
+
+      {/* Connection filter tabs */}
+      {connectionStats && connectionStats.total > 0 && (
+        <div className="flex items-center gap-2 mb-6" data-testid="connection-filter-tabs">
+          <Button
+            variant={connectionFilter === null ? "default" : "outline"}
+            size="sm"
+            onClick={() => setConnectionFilter(null)}
+            className={connectionFilter === null ? "bg-[#6B8E23] hover:bg-[#5a7a1e] text-white" : ""}
+            data-testid="filter-all"
+          >
+            All ({connectionStats.total})
+          </Button>
+          <Button
+            variant={connectionFilter === "online" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setConnectionFilter("online")}
+            className={connectionFilter === "online" ? "bg-[#6B8E23] hover:bg-[#5a7a1e] text-white" : ""}
+            data-testid="filter-online"
+          >
+            <Wifi className="h-3.5 w-3.5 mr-1.5" />
+            Online ({connectionStats.connected})
+          </Button>
+          <Button
+            variant={connectionFilter === "offline" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setConnectionFilter("offline")}
+            className={connectionFilter === "offline" ? "bg-[#6B8E23] hover:bg-[#5a7a1e] text-white" : ""}
+            data-testid="filter-offline"
+          >
+            <WifiOff className="h-3.5 w-3.5 mr-1.5" />
+            Offline ({connectionStats.offline})
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -282,13 +346,35 @@ export default function Stations() {
                       </div>
                     )}
                   </div>
-                  <Badge 
-                    variant={station.isActive ? "default" : "secondary"}
-                    className={station.isActive ? "bg-[#6B8E23] hover:bg-[#5a7a1e]" : ""}
-                    data-testid={`badge-station-status-${station.id}`}
-                  >
-                    {station.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Badge 
+                      variant={station.isConnected ? "default" : "outline"}
+                      className={station.isConnected 
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                        : "text-muted-foreground border-muted-foreground/30"
+                      }
+                      data-testid={`badge-station-connection-${station.id}`}
+                    >
+                      {station.isConnected ? (
+                        <>
+                          <Wifi className="h-3 w-3 mr-1" />
+                          Online
+                        </>
+                      ) : (
+                        <>
+                          <WifiOff className="h-3 w-3 mr-1" />
+                          Offline
+                        </>
+                      )}
+                    </Badge>
+                    <Badge 
+                      variant={station.isActive ? "default" : "secondary"}
+                      className={station.isActive ? "bg-[#6B8E23] hover:bg-[#5a7a1e]" : ""}
+                      data-testid={`badge-station-status-${station.id}`}
+                    >
+                      {station.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
