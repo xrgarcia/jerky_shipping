@@ -127,6 +127,13 @@ type QueueStats = {
     errorsCount: number;
     lastError: string | null;
   };
+  stalePrintJobs?: {
+    totalStale: number;
+    warningCount: number;
+    criticalCount: number;
+    healthStatus: 'healthy' | 'warning' | 'critical';
+    lastCheckedAt: string;
+  };
 };
 
 type EnvironmentInfo = {
@@ -1312,6 +1319,65 @@ Please analyze this failure and help me understand:
                     <Monitor className="h-4 w-4" />
                     {stationConnectionStats?.connected ?? 0} online
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/print-queue">
+            <Card data-testid="card-stale-print-jobs" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Stale Print Jobs</CardTitle>
+                  <CardDescription>Jobs waiting too long</CardDescription>
+                </div>
+                {(() => {
+                  const staleHealth = queueStats?.stalePrintJobs?.healthStatus ?? 'healthy';
+                  
+                  return (
+                    <Badge
+                      data-testid={`badge-stale-print-${staleHealth}`}
+                      variant={
+                        staleHealth === "healthy" ? "default" :
+                        staleHealth === "warning" ? "secondary" : "destructive"
+                      }
+                    >
+                      {staleHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {staleHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                      {staleHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {staleHealth}
+                    </Badge>
+                  );
+                })()}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold" data-testid="text-stale-print-jobs">
+                      {!hasQueueData ? "-" : (queueStats?.stalePrintJobs?.totalStale ?? 0)}
+                    </span>
+                    <span className="text-muted-foreground">stale jobs</span>
+                  </div>
+                  {(queueStats?.stalePrintJobs?.totalStale ?? 0) > 0 && (
+                    <div className="flex items-center gap-3 text-sm">
+                      {(queueStats?.stalePrintJobs?.warningCount ?? 0) > 0 && (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          {queueStats?.stalePrintJobs?.warningCount} warning
+                        </span>
+                      )}
+                      {(queueStats?.stalePrintJobs?.criticalCount ?? 0) > 0 && (
+                        <span className="text-red-600 dark:text-red-400">
+                          {queueStats?.stalePrintJobs?.criticalCount} critical
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {queueStats?.stalePrintJobs?.lastCheckedAt && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      Checked {formatDistanceToNow(new Date(queueStats.stalePrintJobs.lastCheckedAt), { addSuffix: true })}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

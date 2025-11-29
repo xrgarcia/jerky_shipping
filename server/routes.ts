@@ -2876,13 +2876,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Worker not initialized yet
       }
 
-      // Get print queue worker status and stats
+      // Get print queue worker status, stats, and stale jobs metrics
       let printQueueWorkerStatus: 'sleeping' | 'running' = 'sleeping';
       let printQueueWorkerStats = undefined;
+      let stalePrintJobs = undefined;
       try {
-        const { getPrintQueueWorkerStatus, getPrintQueueWorkerStats } = await import("./print-queue-worker");
+        const { getPrintQueueWorkerStatus, getPrintQueueWorkerStats, getStaleJobsMetrics } = await import("./print-queue-worker");
         printQueueWorkerStatus = getPrintQueueWorkerStatus();
         printQueueWorkerStats = getPrintQueueWorkerStats();
+        const staleMetrics = getStaleJobsMetrics();
+        stalePrintJobs = {
+          totalStale: staleMetrics.totalStale,
+          warningCount: staleMetrics.warningCount,
+          criticalCount: staleMetrics.criticalCount,
+          healthStatus: staleMetrics.healthStatus,
+          lastCheckedAt: staleMetrics.lastCheckedAt.toISOString(),
+        };
       } catch (error) {
         // Worker not initialized yet
       }
@@ -2933,6 +2942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onHoldWorkerStats,
         printQueueWorkerStatus,
         printQueueWorkerStats,
+        stalePrintJobs,
         firestoreSessionSyncWorkerStatus,
         firestoreSessionSyncWorkerStats,
       });

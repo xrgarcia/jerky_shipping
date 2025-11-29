@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
-import { Printer, Check, Clock, AlertCircle, RefreshCw, XCircle } from "lucide-react";
+import { format, differenceInSeconds } from "date-fns";
+import { Printer, Check, Clock, AlertCircle, RefreshCw, XCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -172,6 +172,69 @@ export default function PrintQueuePage() {
 
   const jobs = jobsData?.jobs || [];
 
+  // Staleness thresholds (in seconds)
+  const WARNING_THRESHOLD = 35;
+  const CRITICAL_THRESHOLD = 60;
+
+  // Calculate job age and health status
+  const getJobHealth = (job: PrintJob): { ageSeconds: number; healthStatus: 'healthy' | 'warning' | 'critical' } | null => {
+    if (!['pending', 'sent', 'printing'].includes(job.status)) {
+      return null; // Terminal states don't have health status
+    }
+    
+    const now = Date.now();
+    let ageSeconds: number;
+    
+    if (job.status === 'pending') {
+      ageSeconds = differenceInSeconds(now, new Date(job.createdAt));
+    } else {
+      // For 'sent' and 'printing', use sentAt if available
+      ageSeconds = job.sentAt 
+        ? differenceInSeconds(now, new Date(job.sentAt))
+        : differenceInSeconds(now, new Date(job.createdAt));
+    }
+    
+    let healthStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
+    if (ageSeconds >= CRITICAL_THRESHOLD) {
+      healthStatus = 'critical';
+    } else if (ageSeconds >= WARNING_THRESHOLD) {
+      healthStatus = 'warning';
+    }
+    
+    return { ageSeconds, healthStatus };
+  };
+
+  const getHealthBadge = (job: PrintJob) => {
+    const health = getJobHealth(job);
+    if (!health || health.healthStatus === 'healthy') {
+      return null;
+    }
+    
+    if (health.healthStatus === 'warning') {
+      return (
+        <Badge 
+          variant="outline" 
+          className="ml-1 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
+          data-testid={`badge-health-warning-${job.id}`}
+        >
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          {health.ageSeconds}s
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge 
+        variant="destructive" 
+        className="ml-1"
+        data-testid={`badge-health-critical-${job.id}`}
+      >
+        <AlertCircle className="h-3 w-3 mr-1" />
+        {health.ageSeconds}s
+      </Badge>
+    );
+  };
+
   const getStatusBadge = (job: PrintJob) => {
     switch (job.status) {
       case "pending":
@@ -259,7 +322,12 @@ export default function PrintQueuePage() {
                     <TableCell data-testid={`text-tracking-${job.id}`}>
                       <span className="font-mono text-sm">{job.trackingNumber || '-'}</span>
                     </TableCell>
-                    <TableCell data-testid={`status-${job.id}`}>{getStatusBadge(job)}</TableCell>
+                    <TableCell data-testid={`status-${job.id}`}>
+                      <div className="flex items-center">
+                        {getStatusBadge(job)}
+                        {getHealthBadge(job)}
+                      </div>
+                    </TableCell>
                     <TableCell data-testid={`text-queued-at-${job.id}`}>
                       {job.queuedAt ? format(new Date(job.queuedAt), "MMM d, h:mm a") : "-"}
                     </TableCell>
