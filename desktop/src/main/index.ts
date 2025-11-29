@@ -363,7 +363,7 @@ async function connectWebSocket(): Promise<void> {
   });
   
   // Handle batch of pending jobs (sent when desktop reconnects to catch up on missed jobs)
-  wsClient.on('job:batch', (data: { stationId: string; jobs: PrintJob[] }) => {
+  wsClient.on('job:batch', async (data: { stationId: string; jobs: PrintJob[] }) => {
     console.log(`[Main] Received batch of ${data.jobs.length} pending job(s)`);
     
     // Merge by: keep all current jobs, add any incoming that don't exist yet
@@ -376,6 +376,36 @@ async function connectWebSocket(): Promise<void> {
       const finalJobs = [...trulyNewJobs, ...appState.printJobs];
       updateState({ printJobs: finalJobs });
       console.log(`[Main] Added ${trulyNewJobs.length} new job(s) from batch`);
+      
+      // Process pending jobs that need printing (only those with 'pending' status)
+      const jobsToPrint = trulyNewJobs.filter(j => j.status === 'pending');
+      if (jobsToPrint.length > 0 && appState.selectedPrinter && wsClient) {
+        console.log(`[Main] Printing ${jobsToPrint.length} pending job(s) from batch`);
+        
+        for (const job of jobsToPrint) {
+          try {
+            await printerService.print(job, appState.selectedPrinter.systemName);
+            wsClient.sendJobUpdate(job.id, 'completed');
+            updateState({
+              printJobs: appState.printJobs.map(j => 
+                j.id === job.id ? { ...j, status: 'completed' as const } : j
+              ),
+            });
+            console.log(`[Main] Batch job ${job.id} printed successfully`);
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            wsClient.sendJobUpdate(job.id, 'failed', errorMessage);
+            updateState({
+              printJobs: appState.printJobs.map(j => 
+                j.id === job.id ? { ...j, status: 'failed' as const, errorMessage } : j
+              ),
+            });
+            console.error(`[Main] Batch job ${job.id} failed:`, errorMessage);
+          }
+        }
+      } else if (jobsToPrint.length > 0 && !appState.selectedPrinter) {
+        console.warn(`[Main] Cannot print ${jobsToPrint.length} batch job(s): no printer selected`);
+      }
     } else {
       console.log(`[Main] All ${data.jobs.length} job(s) from batch already present`);
     }

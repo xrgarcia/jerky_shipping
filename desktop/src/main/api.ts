@@ -127,7 +127,7 @@ export class ApiClient {
   }
   
   async getPrinters(stationId: string): Promise<Printer[]> {
-    return this.request<Printer[]>('GET', `/api/desktop/stations/${stationId}/printers`);
+    return this.request<Printer[]>('GET', `/api/desktop/printers?stationId=${stationId}`);
   }
   
   async registerPrinter(data: {
