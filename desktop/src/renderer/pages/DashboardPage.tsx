@@ -14,6 +14,7 @@ import {
   Info
 } from 'lucide-react';
 import type { AppState, PrintJob } from '@shared/types';
+import logoImage from '../assets/logo.png';
 
 interface SystemPrinter {
   name: string;
@@ -245,14 +246,22 @@ function DashboardPage({ state }: DashboardPageProps) {
           )}
         </div>
         <span className="text-sm font-medium text-white">{state.station?.name}</span>
-        <button
-          onClick={handleLogout}
-          data-testid="button-logout"
-          className="p-2 rounded-lg hover:bg-[#333] transition-colors no-drag"
-          title="Sign out"
-        >
-          <LogOut className="w-4 h-4 text-[#999]" />
-        </button>
+        <div className="flex items-center gap-2 no-drag">
+          <img 
+            src={logoImage} 
+            alt="Jerky.com" 
+            className="h-6 object-contain"
+            data-testid="img-logo"
+          />
+          <button
+            onClick={handleLogout}
+            data-testid="button-logout"
+            className="p-2 rounded-lg hover:bg-[#333] transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4 text-[#999]" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">

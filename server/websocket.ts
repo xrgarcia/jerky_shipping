@@ -198,6 +198,26 @@ async function handleDesktopMessage(connection: DesktopConnection, message: any)
       }
       break;
 
+    case 'desktop:going_offline':
+      // Client is gracefully shutting down - clean up immediately
+      console.log(`[Desktop WS] Client ${connection.clientId} going offline gracefully`);
+      if (connection.stationId) {
+        const activeConnection = desktopStationConnections.get(connection.stationId);
+        if (activeConnection && activeConnection.ws === connection.ws) {
+          desktopStationConnections.delete(connection.stationId);
+          console.log(`[Desktop WS] Removed station ${connection.stationId} from active connections`);
+        }
+      }
+      desktopClientConnections.delete(connection.clientId);
+      
+      // Send ACK so client knows the message was received
+      try {
+        connection.ws.send(JSON.stringify({ type: 'desktop:going_offline_ack' }));
+      } catch (e) {
+        // Client may have already closed, ignore
+      }
+      break;
+
     default:
       console.log(`[Desktop WS] Unknown message type: ${message.type}`);
   }

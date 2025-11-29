@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog, nativeImage } from 'electron';
 import path from 'path';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
@@ -70,6 +70,22 @@ function createWindow(): void {
     ? path.join(__dirname, 'preload.js')
     : path.join(app.getAppPath(), 'dist', 'main', 'main', 'preload.js');
   
+  // Load the app icon
+  const iconPath = process.env.NODE_ENV === 'development'
+    ? path.join(__dirname, '..', 'renderer', 'assets', 'logo.png')
+    : path.join(app.getAppPath(), 'dist', 'renderer', 'assets', 'logo.png');
+  
+  let appIcon: Electron.NativeImage | undefined;
+  try {
+    appIcon = nativeImage.createFromPath(iconPath);
+    if (appIcon.isEmpty()) {
+      console.warn('[Main] App icon not found at:', iconPath);
+      appIcon = undefined;
+    }
+  } catch (error) {
+    console.warn('[Main] Failed to load app icon:', error);
+  }
+  
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: 480,
     height: 720,
@@ -82,6 +98,7 @@ function createWindow(): void {
     },
     show: false,
     backgroundColor: '#1a1a1a',
+    icon: appIcon,
   };
   
   if (isMac) {
@@ -544,6 +561,26 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
-  wsClient?.disconnect();
+let isQuitting = false;
+
+app.on('before-quit', async (event) => {
+  if (isQuitting) {
+    return; // Already handling quit
+  }
+  
+  // If we have a WebSocket connection, send offline notification first
+  if (wsClient) {
+    event.preventDefault(); // Prevent immediate quit
+    isQuitting = true;
+    
+    try {
+      // Notify server that we're going offline gracefully, then disconnect
+      await wsClient.sendGoingOfflineAndClose();
+    } catch (error) {
+      console.error('[Main] Error sending offline notification:', error);
+    }
+    
+    wsClient.disconnect();
+    app.quit(); // Now actually quit
+  }
 });

@@ -254,6 +254,64 @@ export class WebSocketClient extends EventEmitter {
     });
   }
   
+  private offlineAckResolver: (() => void) | null = null;
+  
+  async sendGoingOfflineAndClose(): Promise<void> {
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      console.log('[WebSocket] Not connected, skipping offline notification');
+      return;
+    }
+    
+    console.log('[WebSocket] Sending going offline notification...');
+    
+    const OFFLINE_TIMEOUT = 1000; // Max wait time for ACK
+    
+    return new Promise<void>((resolve) => {
+      let resolved = false;
+      
+      const cleanup = () => {
+        this.offlineAckResolver = null;
+      };
+      
+      const resolveOnce = () => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve();
+        }
+      };
+      
+      // Store resolver so handleMessage can call it when ACK arrives
+      this.offlineAckResolver = resolveOnce;
+      
+      // Timeout fallback - don't wait forever
+      const timeoutId = setTimeout(() => {
+        console.log('[WebSocket] Offline notification timeout, proceeding with shutdown');
+        resolveOnce();
+      }, OFFLINE_TIMEOUT);
+      
+      // When we resolve, clear the timeout
+      const originalResolveOnce = resolveOnce;
+      const wrappedResolveOnce = () => {
+        clearTimeout(timeoutId);
+        originalResolveOnce();
+      };
+      this.offlineAckResolver = wrappedResolveOnce;
+      
+      // Send the message with completion callback
+      const message = JSON.stringify({ type: 'desktop:going_offline' });
+      this.ws!.send(message, (error) => {
+        if (error) {
+          console.error('[WebSocket] Error sending offline notification:', error);
+          wrappedResolveOnce();
+        } else {
+          console.log('[WebSocket] Offline notification written to socket');
+          // Don't resolve here - wait for ACK or timeout
+        }
+      });
+    });
+  }
+  
   private send(message: WebSocketMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
@@ -311,6 +369,13 @@ export class WebSocketClient extends EventEmitter {
         break;
         
       case 'desktop:heartbeat':
+        break;
+      
+      case 'desktop:going_offline_ack':
+        console.log('[WebSocket] Received offline ACK from server');
+        if (this.offlineAckResolver) {
+          this.offlineAckResolver();
+        }
         break;
         
       case 'desktop:error':
