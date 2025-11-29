@@ -21,7 +21,7 @@ export interface Printer {
 export interface StationSession {
   id: string;
   stationId: string;
-  userId: number;
+  userId: string;
   desktopClientId: string;
   startedAt: string;
   expiresAt: string;
@@ -45,21 +45,17 @@ export interface PrintJob {
 
 export interface DesktopClient {
   id: string;
-  userId: number;
-  machineId: string;
-  machineName: string;
-  apiToken: string;
-  tokenExpiresAt: string;
-  lastConnectedAt: string | null;
-  isActive: boolean;
+  userId: string;
+  deviceName: string;
+  lastActiveAt: string | null;
   createdAt: string;
 }
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   displayName: string;
-  role: string;
+  role?: string;
 }
 
 export interface AuthState {

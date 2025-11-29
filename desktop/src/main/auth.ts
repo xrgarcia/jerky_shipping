@@ -212,11 +212,10 @@ export class AuthService {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${idToken}`,
                 },
                 body: JSON.stringify({
-                  machineId: this.getMachineId(),
-                  machineName: os.hostname(),
+                  googleIdToken: idToken,
+                  deviceName: os.hostname(),
                 }),
               }
             );
@@ -227,15 +226,26 @@ export class AuthService {
             }
             
             const registration = await registrationResponse.json() as {
-              id: string;
-              apiToken: string;
-              user: User;
+              clientId: string;
+              accessToken: string;
+              refreshToken: string;
+              accessTokenExpiresAt: string;
+              refreshTokenExpiresAt: string;
+              user: {
+                id: string;
+                email: string;
+                name: string;
+              };
             };
             
             const authResult: AuthResult = {
-              token: registration.apiToken,
-              clientId: registration.id,
-              user: registration.user,
+              token: registration.accessToken,
+              clientId: registration.clientId,
+              user: {
+                id: registration.user.id,
+                email: registration.user.email,
+                displayName: registration.user.name,
+              },
               serverUrl: serverUrl,
               environment: envName,
             };
