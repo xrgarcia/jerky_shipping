@@ -3574,6 +3574,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // PACKING STATION SESSIONS (web users selecting their station)
+  // ============================================================================
+  
+  // Get current user's active packing station session
+  app.get("/api/packing/station-session", requireAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const session = await storage.getActiveWebPackingSession(user.id);
+      
+      if (!session) {
+        return res.json({ session: null });
+      }
+      
+      // Get station details
+      const station = await storage.getStation(session.stationId);
+      
+      return res.json({
+        session: {
+          id: session.id,
+          stationId: session.stationId,
+          stationName: station?.name || 'Unknown Station',
+          stationLocationHint: station?.locationHint || null,
+          selectedAt: session.selectedAt,
+          expiresAt: session.expiresAt,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error fetching station session:", error);
+      res.status(500).json({ error: "Failed to fetch station session" });
+    }
+  });
+  
+  // Set user's packing station for the day (expires at midnight)
+  app.post("/api/packing/station-session", requireAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { stationId } = req.body;
+      
+      if (!stationId) {
+        return res.status(400).json({ error: "stationId is required" });
+      }
+      
+      // Verify station exists and is active
+      const station = await storage.getStation(stationId);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      if (!station.isActive) {
+        return res.status(400).json({ error: "Station is not active" });
+      }
+      
+      // Calculate next midnight Pacific time using date-fns-tz
+      const now = new Date();
+      const pacificTz = 'America/Los_Angeles';
+      
+      // Get current date in Pacific timezone
+      const pacificNow = toZonedTime(now, pacificTz);
+      
+      // Set to next midnight in Pacific time
+      const nextMidnight = new Date(pacificNow);
+      nextMidnight.setDate(nextMidnight.getDate() + 1);
+      nextMidnight.setHours(0, 0, 0, 0);
+      
+      // Convert back to UTC for storage
+      const expiresAt = fromZonedTime(nextMidnight, pacificTz);
+      
+      const session = await storage.createWebPackingSession(user.id, stationId, expiresAt);
+      
+      console.log(`[Packing] User ${user.email} selected station ${station.name} (expires ${expiresAt.toISOString()})`);
+      
+      return res.json({
+        session: {
+          id: session.id,
+          stationId: session.stationId,
+          stationName: station.name,
+          stationLocationHint: station.locationHint,
+          selectedAt: session.selectedAt,
+          expiresAt: session.expiresAt,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error setting station session:", error);
+      res.status(500).json({ error: "Failed to set station session" });
+    }
+  });
+  
+  // Get list of active stations for selection
+  app.get("/api/packing/stations", requireAuth, async (req, res) => {
+    try {
+      const stations = await storage.getAllStations(true); // Active only
+      res.json(stations);
+    } catch (error: any) {
+      console.error("[Packing] Error fetching stations:", error);
+      res.status(500).json({ error: "Failed to fetch stations" });
+    }
+  });
+
   // Validate order for packing - cross-validates ShipStation and SkuVault data
   app.get("/api/packing/validate-order/:orderNumber", requireAuth, async (req, res) => {
     try {

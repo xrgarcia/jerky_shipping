@@ -71,6 +71,9 @@ import {
   type DesktopConfig,
   type InsertDesktopConfig,
   desktopConfig,
+  // Web Packing Sessions
+  type WebPackingSession,
+  webPackingSessions,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -327,6 +330,11 @@ export interface IStorage {
   // Desktop Configuration
   getDesktopConfig(): Promise<DesktopConfig>;
   updateDesktopConfig(updates: Partial<InsertDesktopConfig>, updatedBy?: string): Promise<DesktopConfig>;
+
+  // Web Packing Sessions (daily station selection for web users)
+  getActiveWebPackingSession(userId: string): Promise<WebPackingSession | undefined>;
+  createWebPackingSession(userId: string, stationId: string, expiresAt: Date): Promise<WebPackingSession>;
+  deleteWebPackingSession(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2557,6 +2565,48 @@ export class DatabaseStorage implements IStorage {
       updatedBy: updatedBy ?? null,
     }).returning();
     return newConfig;
+  }
+
+  // ============================================================================
+  // WEB PACKING SESSIONS
+  // ============================================================================
+
+  async getActiveWebPackingSession(userId: string): Promise<WebPackingSession | undefined> {
+    const now = new Date();
+    const result = await db
+      .select()
+      .from(webPackingSessions)
+      .where(and(
+        eq(webPackingSessions.userId, userId),
+        gte(webPackingSessions.expiresAt, now)
+      ))
+      .orderBy(desc(webPackingSessions.selectedAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async createWebPackingSession(userId: string, stationId: string, expiresAt: Date): Promise<WebPackingSession> {
+    // Delete any existing sessions for this user first
+    await db.delete(webPackingSessions).where(eq(webPackingSessions.userId, userId));
+    
+    // Create new session
+    const [session] = await db
+      .insert(webPackingSessions)
+      .values({
+        userId,
+        stationId,
+        expiresAt,
+      })
+      .returning();
+    return session;
+  }
+
+  async deleteWebPackingSession(userId: string): Promise<boolean> {
+    const result = await db
+      .delete(webPackingSessions)
+      .where(eq(webPackingSessions.userId, userId))
+      .returning();
+    return result.length > 0;
   }
 }
 

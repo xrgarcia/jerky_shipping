@@ -881,3 +881,27 @@ export const insertDesktopConfigSchema = createInsertSchema(desktopConfig).omit(
 
 export type InsertDesktopConfig = z.infer<typeof insertDesktopConfigSchema>;
 export type DesktopConfig = typeof desktopConfig.$inferSelect;
+
+// Web Packing Sessions - Tracks which station web users are working at (daily sessions)
+// Expires at midnight local time each day, so users select their station each morning
+export const webPackingSessions = pgTable("web_packing_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stationId: varchar("station_id").notNull().references(() => stations.id),
+  selectedAt: timestamp("selected_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // Midnight local time
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("web_packing_sessions_user_id_idx").on(table.userId),
+  stationIdIdx: index("web_packing_sessions_station_id_idx").on(table.stationId),
+  expiresAtIdx: index("web_packing_sessions_expires_at_idx").on(table.expiresAt),
+}));
+
+export const insertWebPackingSessionSchema = createInsertSchema(webPackingSessions).omit({
+  id: true,
+  selectedAt: true,
+  createdAt: true,
+});
+
+export type InsertWebPackingSession = z.infer<typeof insertWebPackingSessionSchema>;
+export type WebPackingSession = typeof webPackingSessions.$inferSelect;

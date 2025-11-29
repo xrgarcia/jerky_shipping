@@ -13,6 +13,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   PackageCheck,
   Scan,
   CheckCircle2,
@@ -29,8 +36,26 @@ import {
   Zap,
   Boxes,
   Gift,
+  Building2,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
+
+// Station session types
+type StationSession = {
+  id: string;
+  stationId: string;
+  stationName: string;
+  stationLocationHint: string | null;
+  selectedAt: string;
+  expiresAt: string;
+};
+
+type Station = {
+  id: string;
+  name: string;
+  locationHint: string | null;
+  isActive: boolean;
+};
 
 type ShipmentItem = {
   id: string;
@@ -167,6 +192,52 @@ export default function Packing() {
   const [packingComplete, setPackingComplete] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [showStationModal, setShowStationModal] = useState(false);
+
+  // Fetch current user's station session
+  const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
+    queryKey: ['/api/packing/station-session'],
+  });
+
+  // Fetch available stations for selection
+  const { data: availableStations = [], isLoading: isLoadingStations } = useQuery<Station[]>({
+    queryKey: ['/api/packing/stations'],
+    enabled: showStationModal,
+  });
+
+  // Mutation to set station session
+  const setStationMutation = useMutation({
+    mutationFn: async (stationId: string) => {
+      return apiRequest('POST', '/api/packing/station-session', { stationId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packing/station-session'] });
+      setShowStationModal(false);
+      toast({
+        title: "Station Selected",
+        description: "You can now start packing orders.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to select station",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Current session state - check if session exists AND is not expired
+  const currentStation = stationSessionData?.session;
+  const isSessionExpired = currentStation ? new Date(currentStation.expiresAt) <= new Date() : true;
+  const hasValidSession = !!currentStation && !isSessionExpired;
+
+  // Show station modal if no valid session (once loading is complete)
+  useEffect(() => {
+    if (!isLoadingSession && !hasValidSession) {
+      setShowStationModal(true);
+    }
+  }, [isLoadingSession, hasValidSession]);
 
   // Fetch shipment tags to check for Gift tag
   const { data: shipmentTags = [] } = useQuery<ShipmentTag[]>({
@@ -921,6 +992,11 @@ export default function Packing() {
 
   const handleOrderScan = (e: React.FormEvent) => {
     e.preventDefault();
+    // Guard: require valid station session
+    if (!hasValidSession) {
+      setShowStationModal(true);
+      return;
+    }
     if (orderScan.trim()) {
       // Log order scan event
       logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
@@ -930,16 +1006,31 @@ export default function Packing() {
 
   const handleProductScan = (e: React.FormEvent) => {
     e.preventDefault();
+    // Guard: require valid station session
+    if (!hasValidSession) {
+      setShowStationModal(true);
+      return;
+    }
     if (productScan.trim() && currentShipment) {
       validateProductMutation.mutate(productScan.trim());
     }
   };
 
   const handleCompletePacking = () => {
+    // Guard: require valid station session
+    if (!hasValidSession) {
+      setShowStationModal(true);
+      return;
+    }
     completePackingMutation.mutate();
   };
 
   const handleManualVerify = async (progressKey: string) => {
+    // Guard: require valid station session
+    if (!hasValidSession) {
+      setShowStationModal(true);
+      return;
+    }
     const progress = skuProgress.get(progressKey);
     if (!progress || !progress.requiresManualVerification) {
       console.error("Invalid manual verification attempt");
@@ -1002,13 +1093,121 @@ export default function Packing() {
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
-      <div className="flex items-center gap-3 mb-4">
-        <PackageCheck className="h-7 w-7 text-primary" />
-        <h1 className="text-2xl font-bold">Packing Station</h1>
+      {/* Station Selection Modal */}
+      <Dialog open={showStationModal} onOpenChange={(open) => {
+        // Only allow closing if user has a valid session
+        if (!open && hasValidSession) {
+          setShowStationModal(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => {
+          // Prevent closing by clicking outside if no session
+          if (!hasValidSession) e.preventDefault();
+        }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Select Your Packing Station
+            </DialogTitle>
+            <DialogDescription>
+              Choose which station you're working at today. This selection resets at midnight.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {isLoadingStations ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : availableStations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No active stations available. Please contact an administrator.
+              </div>
+            ) : (
+              availableStations.map((station) => (
+                <Button
+                  key={station.id}
+                  variant={currentStation?.stationId === station.id ? "default" : "outline"}
+                  className="w-full justify-start h-auto py-4 px-4"
+                  onClick={() => setStationMutation.mutate(station.id)}
+                  disabled={setStationMutation.isPending}
+                  data-testid={`button-select-station-${station.id}`}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <div className="font-semibold text-lg">{station.name}</div>
+                    {station.locationHint && (
+                      <div className="text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {station.locationHint}
+                      </div>
+                    )}
+                  </div>
+                </Button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Page Header with Station Indicator */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <PackageCheck className="h-7 w-7 text-primary" />
+          <h1 className="text-2xl font-bold">Packing Station</h1>
+        </div>
+        
+        {/* Station Indicator */}
+        {isLoadingSession ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        ) : currentStation ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowStationModal(true)}
+            className="flex items-center gap-2"
+            data-testid="button-change-station"
+          >
+            <Building2 className="h-4 w-4" />
+            <span className="font-medium">{currentStation.stationName}</span>
+            {currentStation.stationLocationHint && (
+              <span className="text-muted-foreground text-xs">
+                ({currentStation.stationLocationHint})
+              </span>
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowStationModal(true)}
+            data-testid="button-select-station"
+          >
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Select Station
+          </Button>
+        )}
       </div>
 
       <div className="space-y-4">
-        {!currentShipment ? (
+        {/* Show blocking message if no station selected */}
+        {!hasValidSession && !isLoadingSession ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Station Selected</h3>
+                <p className="text-muted-foreground mb-4">
+                  Please select your packing station to start scanning orders.
+                </p>
+                <Button onClick={() => setShowStationModal(true)} data-testid="button-open-station-modal">
+                  Select Station
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : !currentShipment ? (
           /* No Order Loaded - Show Scan Order Input */
           <Card>
             <CardContent className="pt-6">
@@ -1023,7 +1222,7 @@ export default function Packing() {
                   placeholder="Scan order number..."
                   value={orderScan}
                   onChange={(e) => setOrderScan(e.target.value)}
-                  disabled={loadShipmentMutation.isPending}
+                  disabled={loadShipmentMutation.isPending || !hasValidSession}
                   className="text-2xl h-16 text-center font-mono"
                   data-testid="input-order-scan"
                 />
