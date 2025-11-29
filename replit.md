@@ -56,7 +56,14 @@ Preferred communication style: Simple, everyday language.
             - **Station Management**: Users can create new stations or claim existing ones for 20-hour shifts
             - **Printer Discovery**: Native macOS printer discovery and registration
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
-    - **Web-based Stations Management**: Full CRUD page at `/stations` for managing packing stations. When a station is deleted, active desktop sessions are automatically terminated and clients are notified via WebSocket (`desktop:station:deleted` message).
+    - **Web-based Stations Management**: Full CRUD page at `/stations` for managing packing stations. When a station is deleted, active desktop sessions are automatically terminated and clients are notified via WebSocket (`desktop:station:deleted` message). Includes real-time connection status tracking:
+        - Each station displays online/offline status with Wifi/WifiOff icons based on active WebSocket connections
+        - Filter tabs (All/Online/Offline) with URL-based filtering via `?connection=online|offline`
+        - Connection stats only count active stations (inactive stations excluded from health metrics)
+    - **Operations Dashboard Station Monitoring**: Pipeline Metrics section includes Offline Stations card showing:
+        - Count of active stations without WebSocket connections
+        - Health badge (healthy/warning/critical) based on offline percentage
+        - Click navigates to filtered stations list
     - **Real-Time Updates**: WebSocket server provides live order updates, queue status, print queue status, and notifications.
     - **Saved Views System**: Customizable column views for PO Recommendations page stored in `saved_views` table.
 - **Monorepo Structure**: Client, server, and shared code co-located.
