@@ -17,7 +17,7 @@ import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
-import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob } from "./websocket";
+import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
@@ -3587,6 +3587,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isDesktopJob) {
         // Use desktop print jobs method
         updatedJob = await storage.markJobCompleted(req.params.id);
+        
+        // Broadcast status update to desktop station so it reflects there too
+        if (updatedJob.stationId) {
+          broadcastDesktopJobUpdate(updatedJob.stationId, updatedJob.id, 'completed');
+        }
       } else {
         // Use old print queue method
         updatedJob = await storage.updatePrintJobStatus(req.params.id, "printed", new Date());
