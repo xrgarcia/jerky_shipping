@@ -453,21 +453,14 @@ function setupIpcHandlers(): void {
       if (!appState.station || !apiClient) {
         throw new Error('No station selected');
       }
+      
+      // Register printer with status included
       const printer = await apiClient.registerPrinter({
         name: printerData.name,
         systemName: printerData.systemName,
         stationId: appState.station.id,
+        status: printerData.status || 'offline', // Default to offline if not provided
       });
-      
-      // Update printer status if provided
-      if (printerData.status && printer.id) {
-        try {
-          await apiClient.updatePrinterStatus(printer.id, printerData.status);
-          printer.status = printerData.status as 'online' | 'offline' | 'error';
-        } catch (statusError) {
-          console.warn('Failed to update printer status:', statusError);
-        }
-      }
       
       updateState({ printers: [...(appState.printers || []), printer] });
       return { success: true, data: printer };

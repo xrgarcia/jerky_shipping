@@ -119,6 +119,7 @@ export class ApiClient {
     name: string;
     systemName: string;
     stationId: string;
+    status?: string;
   }): Promise<Printer> {
     return this.request<Printer>('POST', '/api/desktop/printers', data);
   }
