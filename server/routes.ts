@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabel as createShipStationLabel } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
@@ -4308,14 +4308,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check if shipment has a label URL - can't print without one
-      if (!shipment.labelUrl) {
-        console.warn(`[Packing] Shipment ${shipment.orderNumber} has no label URL yet - skipping print queue`);
+      // If no label URL, try to fetch or create one from ShipStation
+      let labelUrl = shipment.labelUrl;
+      let trackingNumber = shipment.trackingNumber;
+      
+      if (!labelUrl && shipment.shipmentId) {
+        console.log(`[Packing] Shipment ${shipment.orderNumber} has no label URL - fetching from ShipStation...`);
+        
+        try {
+          // Step 1: Try to fetch existing labels from ShipStation
+          const existingLabels = await getLabelsForShipment(shipment.shipmentId);
+          
+          if (existingLabels.length > 0) {
+            console.log(`[Packing] Found ${existingLabels.length} existing label(s) in ShipStation`);
+            const label = existingLabels[0];
+            labelUrl = label.label_download?.href || label.label_download || null;
+            trackingNumber = label.tracking_number || trackingNumber;
+            
+            if (labelUrl) {
+              // Save label URL to database for next time
+              await storage.updateShipment(shipment.id, { 
+                labelUrl, 
+                trackingNumber: trackingNumber || undefined 
+              });
+              console.log(`[Packing] Saved label URL to shipment: ${labelUrl}`);
+            }
+          }
+          
+          // Step 2: If still no label, try to create one
+          if (!labelUrl && shipment.shipmentData) {
+            console.log(`[Packing] No existing label found, creating new label for ${shipment.orderNumber}...`);
+            
+            // Strip ShipStation-managed fields from payload
+            const cleanShipmentData = { ...(shipment.shipmentData as any) };
+            delete cleanShipmentData.shipment_id;
+            delete cleanShipmentData.label_id;
+            delete cleanShipmentData.created_at;
+            delete cleanShipmentData.modified_at;
+            
+            const labelData = await createShipStationLabel(cleanShipmentData);
+            labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
+            trackingNumber = labelData.tracking_number || trackingNumber;
+            
+            if (labelUrl) {
+              await storage.updateShipment(shipment.id, { 
+                labelUrl, 
+                trackingNumber: trackingNumber || undefined 
+              });
+              console.log(`[Packing] Created and saved new label: ${labelUrl}`);
+            }
+          }
+        } catch (error: any) {
+          console.error(`[Packing] Error fetching/creating label for ${shipment.orderNumber}:`, error.message);
+          // Don't fail the whole operation - just log the error and continue without label
+        }
+      }
+      
+      // If still no label URL after trying to fetch/create
+      if (!labelUrl) {
+        console.warn(`[Packing] Shipment ${shipment.orderNumber} has no label URL and could not create one`);
         return res.json({ 
           success: true, 
           printQueued: false,
           noLabel: true,
-          message: "Order complete! No shipping label available yet. Label will print when ShipStation generates it.",
+          message: "Order complete! Could not get shipping label from ShipStation. Check if the order needs to be shipped first.",
           orderNumber: shipment.orderNumber
         });
       }
@@ -4327,9 +4383,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipmentId: shipment.id,
         jobType: "label",
         payload: { 
-          labelUrl: shipment.labelUrl || null,
+          labelUrl: labelUrl, // Use the fetched/created label URL
           orderNumber: shipment.orderNumber,
-          trackingNumber: shipment.trackingNumber,
+          trackingNumber: trackingNumber || shipment.trackingNumber,
           requestedBy: user.displayName || user.email || 'Unknown'
         },
         status: "pending" // Start as pending, desktop client will pick it up
