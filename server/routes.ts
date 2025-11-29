@@ -143,7 +143,7 @@ async function fetchShopifyOrder(orderId: string) {
 }
 
 // Google OAuth helper - generate authorization URL
-function getGoogleAuthUrl(redirectUri: string, state: string): string {
+function getGoogleAuthUrl(redirectUri: string, state: string, loginHint?: string): string {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID!,
     redirect_uri: redirectUri,
@@ -154,6 +154,12 @@ function getGoogleAuthUrl(redirectUri: string, state: string): string {
     prompt: "select_account",
     hd: ALLOWED_EMAIL_DOMAIN, // Restrict to jerky.com domain in Google's picker
   });
+  
+  // If a login hint is provided, add it to help Google pre-select the right account
+  if (loginHint) {
+    params.set("login_hint", loginHint);
+  }
+  
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
@@ -230,6 +236,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("[Google OAuth] Redirect URI:", redirectUri);
     const state = randomBytes(16).toString("hex");
     
+    // Optional login hint from query parameter (e.g., user's email)
+    const loginHint = req.query.login_hint as string | undefined;
+    
     res.cookie("oauth_state", state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -237,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sameSite: "lax",
     });
 
-    const authUrl = getGoogleAuthUrl(redirectUri, state);
+    const authUrl = getGoogleAuthUrl(redirectUri, state, loginHint);
     res.redirect(authUrl);
   });
 
