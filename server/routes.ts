@@ -4515,15 +4515,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      // Calculate connection stats for the response
-      const totalStations = stationsWithSessions.length;
-      const connectedCount = stationsWithSessions.filter(s => s.isConnected).length;
-      const offlineCount = totalStations - connectedCount;
+      // Calculate connection stats ONLY for active stations (inactive stations are intentionally disabled)
+      const activeStations = stationsWithSessions.filter(s => s.isActive);
+      const totalActiveStations = activeStations.length;
+      const connectedCount = activeStations.filter(s => s.isConnected).length;
+      const offlineCount = totalActiveStations - connectedCount;
       
       res.json({ 
         stations: stationsWithSessions,
         connectionStats: {
-          total: totalStations,
+          total: totalActiveStations,
           connected: connectedCount,
           offline: offlineCount,
         }

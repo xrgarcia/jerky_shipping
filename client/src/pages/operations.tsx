@@ -22,7 +22,9 @@ import {
   Copy,
   AlertTriangle,
   Pause,
-  Zap
+  Zap,
+  WifiOff,
+  Monitor
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -188,6 +190,20 @@ type ShipStationWebhook = {
   event: string;
   url: string;
   store_id: string | null;
+};
+
+type StationsResponse = {
+  stations: Array<{
+    id: string;
+    name: string;
+    isActive: boolean;
+    isConnected?: boolean;
+  }>;
+  connectionStats?: {
+    total: number;
+    connected: number;
+    offline: number;
+  };
 };
 
 function getQueueHealth(size: number, oldestMessageAt: number | null): "healthy" | "warning" | "critical" {
@@ -552,6 +568,14 @@ Please analyze this failure and help me understand:
   });
   
   const allBackfillJobs = backfillJobsData?.jobs || [];
+
+  // Fetch station connection stats
+  const { data: stationsData } = useQuery<StationsResponse>({
+    queryKey: ["/api/stations"],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+  
+  const stationConnectionStats = stationsData?.connectionStats;
 
   // Use live stats from WebSocket if available, otherwise fall back to initial fetch
   const queueStats = liveQueueStats || initialQueueStats;
@@ -1150,7 +1174,7 @@ Please analyze this failure and help me understand:
           <Package className="h-5 w-5" />
           Pipeline Metrics
         </h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-sessioned-today" className="hover-elevate min-h-[180px]">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <div>
@@ -1236,6 +1260,58 @@ Please analyze this failure and help me understand:
               </div>
             </CardContent>
           </Card>
+
+          <Link href="/stations?connection=offline">
+            <Card data-testid="card-offline-stations" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Offline Stations</CardTitle>
+                  <CardDescription>Active stations not connected</CardDescription>
+                </div>
+                {(() => {
+                  const offlineCount = stationConnectionStats?.offline ?? 0;
+                  const totalCount = stationConnectionStats?.total ?? 0;
+                  const stationsHealth = (() => {
+                    if (totalCount === 0) return "healthy";
+                    if (offlineCount === 0) return "healthy";
+                    if (offlineCount === totalCount) return "critical";
+                    return "warning";
+                  })();
+                  
+                  return (
+                    <Badge
+                      data-testid={`badge-stations-${stationsHealth}`}
+                      variant={
+                        stationsHealth === "healthy" ? "default" :
+                        stationsHealth === "warning" ? "secondary" : "destructive"
+                      }
+                    >
+                      {stationsHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {stationsHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {stationsHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {stationsHealth}
+                    </Badge>
+                  );
+                })()}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold" data-testid="text-offline-stations">
+                      {stationConnectionStats?.offline ?? 0}
+                    </span>
+                    <span className="text-muted-foreground">
+                      of {stationConnectionStats?.total ?? 0} stations
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Monitor className="h-4 w-4" />
+                    {stationConnectionStats?.connected ?? 0} online
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
 
