@@ -1277,8 +1277,14 @@ export class SkuVaultService {
         }
       }
       
+      // For network/connectivity errors, throw so caller knows SkuVault is unreachable
+      // This distinguishes from "order not found" (which returns null)
       console.error(`[SkuVault QC Sales] Error looking up order:`, error);
-      return null; // Return null for other errors to allow graceful degradation
+      throw new SkuVaultError(
+        `Could not reach SkuVault: ${(error as Error).message || 'Unknown error'}`,
+        503,
+        ['Connection error']
+      );
     }
   }
 
@@ -1376,8 +1382,13 @@ export class SkuVaultService {
         return true;
       }
       
+      // For network/connectivity errors, throw so caller knows SkuVault is unreachable
       console.error(`[SkuVault QC] Error passing item:`, error);
-      return false;
+      throw new SkuVaultError(
+        `Could not reach SkuVault: ${(error as Error).message || 'Unknown error'}`,
+        503,
+        ['Connection error']
+      );
     }
   }
 
