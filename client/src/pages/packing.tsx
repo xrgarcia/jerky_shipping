@@ -267,6 +267,7 @@ export default function Packing() {
   });
   
   // WebSocket for real-time stale job updates (before order is loaded)
+  // Uses setQueryData for instant updates without API round-trip
   useEffect(() => {
     if (!hasValidSession) return;
     
@@ -277,9 +278,15 @@ export default function Packing() {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'stale_jobs_update') {
-          // Invalidate stale metrics query to get fresh data
-          queryClient.invalidateQueries({ queryKey: ['/api/print-queue/stale-metrics'] });
+        if (message.type === 'stale_jobs_update' && message.metrics) {
+          // Update cache directly with WebSocket data - no API round-trip
+          queryClient.setQueryData(['/api/print-queue/stale-metrics'], {
+            totalStale: message.metrics.totalStale,
+            warningCount: message.metrics.warningCount,
+            criticalCount: message.metrics.criticalCount,
+            healthStatus: message.metrics.healthStatus,
+            lastCheckedAt: message.metrics.lastCheckedAt,
+          });
         }
       } catch (e) {
         // Ignore parse errors
