@@ -12,6 +12,7 @@ interface WebSocketMessage {
 const MAX_RECONNECT_ATTEMPTS = Infinity;
 const BASE_RECONNECT_DELAY = 2000;
 const MAX_RECONNECT_DELAY = 30000;
+const CONNECTION_TIMEOUT = 15000; // 15 seconds to establish connection
 
 export class WebSocketClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -19,6 +20,7 @@ export class WebSocketClient extends EventEmitter {
   private clientId: string;
   private wsUrl: string;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private subscribedStationId: string | null = null;
   private pendingStationSubscription: string | null = null;
@@ -60,6 +62,10 @@ export class WebSocketClient extends EventEmitter {
       return;
     }
     
+    // Clean up any existing connection attempt
+    this.clearConnectionTimeout();
+    this.clearReconnectTimer();
+    
     this.isIntentionalClose = false;
     this.isAuthenticated = false;
     
@@ -72,11 +78,36 @@ export class WebSocketClient extends EventEmitter {
         },
       });
       
+      // Set connection timeout - if we don't connect within this time, retry
+      this.connectionTimeout = setTimeout(() => {
+        console.log('[WebSocket] Connection timeout, retrying...');
+        this.lastError = 'Connection timeout';
+        
+        // Mark as intentional close to prevent the close handler from also scheduling a reconnect
+        // (ws.terminate() triggers the close event, which would otherwise double-schedule)
+        this.isIntentionalClose = true;
+        
+        // Clean up the stuck WebSocket
+        if (this.ws) {
+          try {
+            this.ws.terminate();
+          } catch (e) {
+            // Ignore terminate errors
+          }
+          this.ws = null;
+        }
+        
+        // Reset flag and schedule a retry (connect() will set isIntentionalClose = false)
+        this.isIntentionalClose = false;
+        this.scheduleReconnect();
+      }, CONNECTION_TIMEOUT);
+      
       // Emit connecting status now that ws is created
       this.emit('status-change', this.getConnectionInfo());
       
       this.ws.on('open', () => {
         console.log('[WebSocket] Connected, waiting for authentication...');
+        this.clearConnectionTimeout(); // Connection successful, clear timeout
         this.reconnectAttempt = 0;
         this.lastError = null;
         this.lastConnectedAt = new Date().toISOString();
@@ -97,6 +128,7 @@ export class WebSocketClient extends EventEmitter {
       this.ws.on('close', (code, reason) => {
         const reasonStr = reason?.toString() || 'Unknown';
         console.log(`[WebSocket] Disconnected: ${code} ${reasonStr}`);
+        this.clearConnectionTimeout();
         this.stopHeartbeat();
         this.isAuthenticated = false;
         
@@ -112,6 +144,7 @@ export class WebSocketClient extends EventEmitter {
       this.ws.on('error', (error) => {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         console.error('[WebSocket] Error:', errorMsg);
+        this.clearConnectionTimeout();
         this.lastError = errorMsg;
         
         // Don't emit error for expected reconnection scenarios (502, connection refused, etc.)
@@ -146,6 +179,7 @@ export class WebSocketClient extends EventEmitter {
       this.ws.on('unexpected-response', (req, res) => {
         const statusCode = res.statusCode || 'unknown';
         console.log(`[WebSocket] Unexpected response: ${statusCode} (server may be restarting)`);
+        this.clearConnectionTimeout();
         this.lastError = `Server unavailable (${statusCode})`;
         
         // Clean up
@@ -166,6 +200,7 @@ export class WebSocketClient extends EventEmitter {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Connection failed';
       console.error('[WebSocket] Connection error:', errorMsg);
+      this.clearConnectionTimeout();
       this.lastError = errorMsg;
       this.scheduleReconnect();
     }
@@ -175,6 +210,7 @@ export class WebSocketClient extends EventEmitter {
     this.isIntentionalClose = true;
     this.stopHeartbeat();
     this.clearReconnectTimer();
+    this.clearConnectionTimeout();
     
     if (this.ws) {
       this.ws.close(1000, 'Client disconnecting');
@@ -350,6 +386,13 @@ export class WebSocketClient extends EventEmitter {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  }
+  
+  private clearConnectionTimeout(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
     }
   }
 }
