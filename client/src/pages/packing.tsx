@@ -840,22 +840,21 @@ export default function Packing() {
     scannedValue?: string;
   };
 
-  // Queue SkuVault QC scan for async processing
-  const queueQCScanMutation = useMutation({
-    mutationFn: async (params: { saleId: string; sku: string; quantity: number; orderNumber: string }) => {
-      const response = await apiRequest("POST", "/api/packing/queue-qc-scan", params);
-      return (await response.json()) as { queued: boolean; deduplicated?: boolean; message: string };
-    },
-    onSuccess: (result, params) => {
-      if (result.queued) {
-        console.log(`[Packing] QC sync queued for ${params.sku}`);
-      } else if (result.deduplicated) {
-        console.log(`[Packing] QC scan deduplicated for ${params.sku} (already queued)`);
-      }
-    },
-    onError: (error: Error, params) => {
-      console.warn(`[Packing] Failed to queue QC sync for ${params.sku}:`, error);
-      // Non-blocking: QC queue failure shouldn't interrupt packing flow
+  // Synchronous SkuVault QC scan - verifies item in order and marks as passed
+  type QCScanResponse = {
+    success: boolean;
+    message?: string;
+    error?: string;
+    sku?: string;
+    orderNumber?: string;
+    quantity?: number;
+    skuVaultError?: boolean;
+  };
+
+  const qcScanMutation = useMutation({
+    mutationFn: async (params: { orderNumber: string; sku: string; quantity: number }) => {
+      const response = await apiRequest("POST", "/api/packing/qc-scan", params);
+      return (await response.json()) as QCScanResponse;
     },
   });
 
@@ -974,58 +973,130 @@ export default function Packing() {
 
       const currentProgress = matchingProgress;
 
-      // Log successful scan (validated via local database lookup - instant)
-      await createPackingLog({
-        action: "product_scanned",
-        productSku: data.sku,
-        scannedCode,
-        skuVaultProductId: data.variantId || null,
-        success: true,
-        errorMessage: null,
-      });
-
-      // Log shipment event for successful scan
-      logShipmentEvent("product_scan_success", {
-        sku: data.sku,
-        barcode: scannedCode,
-        itemId: matchingItemKey,
-        scannedCount: currentProgress.scanned + 1,
-        expectedCount: currentProgress.expected,
-        localValidation: true,
-      });
-
-      // Update progress (using item ID as key, tracking remaining units)
-      const newProgress = new Map(skuProgress);
-      newProgress.set(matchingItemKey!, {
-        ...currentProgress,
-        scanned: currentProgress.scanned + 1,
-        remaining: currentProgress.remaining - 1,
-      });
-      setSkuProgress(newProgress);
-
-      // Queue SkuVault QC sync in background (non-blocking, fire-and-forget)
-      // Only queue if shipment has a valid saleId from pre-synced Firestore session
-      if (currentShipment?.saleId) {
-        queueQCScanMutation.mutate({
-          saleId: currentShipment.saleId,
-          sku: data.sku,
-          quantity: 1,
-          orderNumber: currentShipment.orderNumber,
-        });
-      }
-
+      // Show pending feedback while QC sync happens
       showScanFeedback(
-        "success",
-        "SCAN ACCEPTED",
-        "Product validated instantly",
+        "info",
+        "VERIFYING WITH SKUVAULT...",
+        "Please wait",
         {
           sku: data.sku,
           productName: data.title || currentProgress.name,
           imageUrl: currentProgress.imageUrl,
-          scannedCount: currentProgress.scanned + 1,
-          expectedCount: currentProgress.expected,
         }
       );
+
+      // Synchronous SkuVault QC scan - verify item is in order and mark as passed
+      try {
+        const qcResult = await qcScanMutation.mutateAsync({
+          orderNumber: currentShipment!.orderNumber,
+          sku: data.sku,
+          quantity: 1,
+        });
+
+        if (!qcResult.success) {
+          // QC verification failed - item not in order or SkuVault error
+          await createPackingLog({
+            action: "product_scanned",
+            productSku: data.sku,
+            scannedCode,
+            skuVaultProductId: data.variantId || null,
+            success: false,
+            errorMessage: qcResult.error || "SkuVault QC verification failed",
+          });
+
+          logShipmentEvent("product_scan_failed", {
+            scannedCode,
+            sku: data.sku,
+            errorMessage: qcResult.error || "SkuVault QC verification failed",
+            skuVaultError: true,
+          });
+
+          showScanFeedback(
+            "error",
+            "SKUVAULT QC FAILED",
+            qcResult.error || "Could not verify item in SkuVault",
+            {
+              sku: data.sku,
+              productName: data.title || currentProgress.name,
+            }
+          );
+
+          setProductScan("");
+          setTimeout(() => productInputRef.current?.focus(), 0);
+          return;
+        }
+
+        // QC passed successfully - now update local progress
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: data.sku,
+          scannedCode,
+          skuVaultProductId: data.variantId || null,
+          success: true,
+          errorMessage: null,
+        });
+
+        logShipmentEvent("product_scan_success", {
+          sku: data.sku,
+          barcode: scannedCode,
+          itemId: matchingItemKey,
+          scannedCount: currentProgress.scanned + 1,
+          expectedCount: currentProgress.expected,
+          skuVaultVerified: true,
+        });
+
+        // Update progress (using item ID as key, tracking remaining units)
+        const newProgress = new Map(skuProgress);
+        newProgress.set(matchingItemKey!, {
+          ...currentProgress,
+          scanned: currentProgress.scanned + 1,
+          remaining: currentProgress.remaining - 1,
+        });
+        setSkuProgress(newProgress);
+
+        showScanFeedback(
+          "success",
+          "SCAN VERIFIED",
+          "Item confirmed in SkuVault",
+          {
+            sku: data.sku,
+            productName: data.title || currentProgress.name,
+            imageUrl: currentProgress.imageUrl,
+            scannedCount: currentProgress.scanned + 1,
+            expectedCount: currentProgress.expected,
+          }
+        );
+
+      } catch (qcError: any) {
+        // Network or unexpected error during QC
+        console.error("[Packing] QC scan error:", qcError);
+        
+        await createPackingLog({
+          action: "product_scanned",
+          productSku: data.sku,
+          scannedCode,
+          skuVaultProductId: data.variantId || null,
+          success: false,
+          errorMessage: qcError.message || "SkuVault QC request failed",
+        });
+
+        logShipmentEvent("product_scan_failed", {
+          scannedCode,
+          sku: data.sku,
+          errorMessage: qcError.message || "SkuVault QC request failed",
+          networkError: true,
+        });
+
+        showScanFeedback(
+          "error",
+          "QC VERIFICATION ERROR",
+          "Could not reach SkuVault. Try again.",
+          {
+            sku: data.sku,
+            productName: data.title || currentProgress.name,
+          }
+        );
+      }
 
       setProductScan("");
       setTimeout(() => productInputRef.current?.focus(), 0);

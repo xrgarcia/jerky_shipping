@@ -211,9 +211,10 @@ app.use((req, res, next) => {
     const { startPrintQueueWorker } = await import("./print-queue-worker");
     startPrintQueueWorker(10000); // Process print queue every 10 seconds
     
-    // Start SkuVault QC worker (async QC sync for optimistic packing)
-    const { startSkuVaultQCWorker } = await import("./skuvault-qc-worker");
-    startSkuVaultQCWorker(5000); // Process QC queue every 5 seconds
+    // SkuVault QC worker DISABLED - using synchronous QC scan instead
+    // The async worker was for optimistic packing, now replaced by sync /api/packing/qc-scan endpoint
+    // const { startSkuVaultQCWorker } = await import("./skuvault-qc-worker");
+    // startSkuVaultQCWorker(5000); // Process QC queue every 5 seconds
     
     // Resume any in-progress backfill jobs that were interrupted by server restart
     setImmediate(async () => {

@@ -4152,6 +4152,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Synchronous SkuVault QC scan - verifies item is in order then marks as passed
+  // Replaces async queue-based approach for immediate feedback
+  app.post("/api/packing/qc-scan", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber, sku, quantity = 1 } = req.body;
+      
+      // Validate required fields
+      if (!orderNumber || !sku) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Missing required fields: orderNumber, sku" 
+        });
+      }
+      
+      console.log(`[Packing QC] Synchronous QC scan: ${sku} x${quantity} for order ${orderNumber}`);
+      
+      // Step 1: Get QC sale data to verify item is in order
+      const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+      
+      if (!qcSale) {
+        console.warn(`[Packing QC] Order not found in SkuVault QC: ${orderNumber}`);
+        return res.status(404).json({ 
+          success: false, 
+          error: "Order not found in SkuVault QC system",
+          orderNumber
+        });
+      }
+      
+      // Step 2: Find the item in expected items by SKU (case-insensitive)
+      const normalizedSku = sku.toUpperCase().trim();
+      const expectedItem = qcSale.Items?.find(item => {
+        const itemSku = (item.Sku || '').toUpperCase().trim();
+        const itemCode = (item.Code || '').toUpperCase().trim();
+        const itemPartNumber = (item.PartNumber || '').toUpperCase().trim();
+        return itemSku === normalizedSku || itemCode === normalizedSku || itemPartNumber === normalizedSku;
+      });
+      
+      if (!expectedItem) {
+        console.warn(`[Packing QC] SKU ${sku} not found in order ${orderNumber}`);
+        return res.status(404).json({ 
+          success: false, 
+          error: `Item ${sku} is not in this order`,
+          orderNumber,
+          sku
+        });
+      }
+      
+      console.log(`[Packing QC] Found item in order:`, {
+        sku: expectedItem.Sku,
+        code: expectedItem.Code,
+        quantity: expectedItem.Quantity,
+        passedStatus: expectedItem.PassedStatus
+      });
+      
+      // Step 3: Call passItem to mark as QC passed
+      const saleId = qcSale.SaleId;
+      if (!saleId) {
+        console.error(`[Packing QC] No SaleId found for order ${orderNumber}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: "Order missing SaleId in SkuVault" 
+        });
+      }
+      
+      const passed = await skuVaultService.scanQCItem(saleId, sku, Number(quantity));
+      
+      if (passed) {
+        console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
+        return res.json({ 
+          success: true, 
+          message: "Item marked as QC passed in SkuVault",
+          sku,
+          orderNumber,
+          quantity: Number(quantity)
+        });
+      } else {
+        console.warn(`[Packing QC] Failed to pass QC: ${sku} for order ${orderNumber}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: "Failed to mark item as QC passed in SkuVault",
+          sku,
+          orderNumber
+        });
+      }
+      
+    } catch (error: any) {
+      console.error("[Packing QC] Error during synchronous QC scan:", error);
+      
+      // Handle specific SkuVault errors
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode || 500).json({ 
+          success: false, 
+          error: error.message,
+          skuVaultError: true
+        });
+      }
+      
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to process QC scan" 
+      });
+    }
+  });
+
   // Complete order packing
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
     try {
