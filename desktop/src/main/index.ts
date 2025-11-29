@@ -1026,6 +1026,59 @@ function setupIpcHandlers(): void {
     
     return { success: true };
   });
+  
+  // Job retry handler - requeue a failed job for printing
+  ipcMain.handle('job:retry', async (_event, jobId: string) => {
+    console.log(`[Main] Retry requested for job ${jobId}`);
+    
+    // Find the job in local state
+    const job = appState.printJobs.find(j => j.id === jobId);
+    if (!job) {
+      return { success: false, error: 'Job not found' };
+    }
+    
+    if (job.status !== 'failed') {
+      return { success: false, error: 'Only failed jobs can be retried' };
+    }
+    
+    // Get current printer
+    const printer = appState.selectedPrinter;
+    const printerName = printer?.name ?? null;
+    const printerSystemName = printer?.systemName ?? null;
+    
+    if (!printerSystemName) {
+      return { success: false, error: 'No printer selected' };
+    }
+    
+    // Reset job status locally and start processing
+    safeUpdateJob(jobId, 'picked_up');
+    const ws = getCurrentWsClient();
+    trySendStatusUpdate(ws, jobId, 'picked_up');
+    console.log(`[Main] Retry job ${jobId} marked as picked_up`);
+    
+    // Mark as sent - about to print
+    safeUpdateJob(jobId, 'sent');
+    trySendStatusUpdate(getCurrentWsClient(), jobId, 'sent');
+    console.log(`[Main] Retry job ${jobId} marked as sent, printing to ${printerName}`);
+    
+    try {
+      await printerService.print(job, printerSystemName);
+      
+      safeUpdateJob(jobId, 'completed');
+      trySendStatusUpdate(getCurrentWsClient(), jobId, 'completed');
+      console.log(`[Main] Retry job ${jobId} completed successfully on ${printerName}`);
+      
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      safeUpdateJob(jobId, 'failed', errorMessage);
+      trySendStatusUpdate(getCurrentWsClient(), jobId, 'failed', errorMessage);
+      console.error(`[Main] Retry job ${jobId} failed on ${printerName}:`, errorMessage);
+      
+      return { success: false, error: errorMessage };
+    }
+  });
 }
 
 async function loadEnvironmentSetting(): Promise<string> {

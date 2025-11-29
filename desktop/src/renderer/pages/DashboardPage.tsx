@@ -13,7 +13,9 @@ import {
   ChevronRight,
   Info,
   Server,
-  ChevronDown
+  ChevronDown,
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 import type { AppState, PrintJob } from '@shared/types';
 import logoImage from '../assets/logo.png';
@@ -47,6 +49,11 @@ function DashboardPage({ state }: DashboardPageProps) {
   const [showEnvDropdown, setShowEnvDropdown] = useState(false);
   const [switchingEnv, setSwitchingEnv] = useState(false);
   const envDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Job error display state
+  const [expandedJobErrors, setExpandedJobErrors] = useState<Set<string>>(new Set());
+  const [selectedJob, setSelectedJob] = useState<PrintJob | null>(null);
+  const [retryingJob, setRetryingJob] = useState<string | null>(null);
   
   // Use printersLoaded flag from main process to determine loading state
   const loadingPrinters = !state.printersLoaded;
@@ -232,6 +239,31 @@ function DashboardPage({ state }: DashboardPageProps) {
     const interval = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Toggle expanded state for job error details
+  const toggleJobError = (jobId: string) => {
+    setExpandedJobErrors(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  // Retry a failed job
+  const handleRetryJob = async (jobId: string) => {
+    setRetryingJob(jobId);
+    try {
+      await window.electronAPI.job.retry(jobId);
+    } catch (err) {
+      console.error('Failed to retry job:', err);
+    } finally {
+      setRetryingJob(null);
+    }
+  };
 
   const getConnectionStatusText = () => {
     const info = state.connectionInfo;
@@ -676,10 +708,59 @@ function DashboardPage({ state }: DashboardPageProps) {
                       {job.status}
                     </span>
                   </div>
-                  {job.status === 'failed' && job.errorMessage && (
-                    <div className="mt-2 p-2 rounded bg-red-500/10 flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-red-400">{job.errorMessage}</p>
+                  {job.status === 'failed' && (
+                    <div className="mt-2">
+                      {/* Clickable error indicator */}
+                      <button
+                        onClick={() => toggleJobError(job.id)}
+                        data-testid={`button-toggle-error-${job.id}`}
+                        className="w-full p-2 rounded bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          <span className="text-xs text-red-400 font-medium">Print Failed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-400/60">
+                            {expandedJobErrors.has(job.id) ? 'Hide details' : 'Show details'}
+                          </span>
+                          <ChevronDown 
+                            className={`w-3 h-3 text-red-400 transition-transform ${
+                              expandedJobErrors.has(job.id) ? 'rotate-180' : ''
+                            }`} 
+                          />
+                        </div>
+                      </button>
+                      
+                      {/* Expanded error details */}
+                      {expandedJobErrors.has(job.id) && (
+                        <div className="mt-2 p-3 rounded bg-red-500/5 border border-red-500/20">
+                          <div className="text-xs text-[#999] mb-1">Error Message:</div>
+                          <p className="text-sm text-red-400 mb-3 font-mono bg-[#1a1a1a] p-2 rounded">
+                            {job.errorMessage || 'Unknown error occurred'}
+                          </p>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleRetryJob(job.id)}
+                              disabled={retryingJob === job.id}
+                              data-testid={`button-retry-job-${job.id}`}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
+                            >
+                              <RotateCcw className={`w-3 h-3 ${retryingJob === job.id ? 'animate-spin' : ''}`} />
+                              {retryingJob === job.id ? 'Retrying...' : 'Retry Print'}
+                            </button>
+                            <button
+                              onClick={() => setSelectedJob(job)}
+                              data-testid={`button-view-job-${job.id}`}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#333] hover:bg-[#444] text-white text-xs font-medium transition-colors"
+                            >
+                              <Eye className="w-3 h-3" />
+                              View Details
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -688,6 +769,126 @@ function DashboardPage({ state }: DashboardPageProps) {
           )}
         </div>
       </div>
+
+      {/* Job Details Modal */}
+      {selectedJob && (
+        <div 
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedJob(null)}
+        >
+          <div 
+            className="bg-[#1c1c1c] rounded-xl border border-[#333] max-w-md w-full max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-[#333] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {getStatusIcon(selectedJob.status)}
+                <div>
+                  <h3 className="font-medium text-white">Print Job Details</h3>
+                  <p className="text-xs text-[#666]">{selectedJob.orderNumber || 'Unknown Order'}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedJob(null)}
+                data-testid="button-close-job-modal"
+                className="p-1 rounded hover:bg-[#333] transition-colors"
+              >
+                <X className="w-5 h-5 text-[#666]" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              {/* Job ID */}
+              <div>
+                <div className="text-xs text-[#666] mb-1">Job ID</div>
+                <p className="text-sm text-white font-mono bg-[#242424] p-2 rounded break-all">
+                  {selectedJob.id}
+                </p>
+              </div>
+              
+              {/* Status */}
+              <div>
+                <div className="text-xs text-[#666] mb-1">Status</div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
+                  selectedJob.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                  selectedJob.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                  selectedJob.status === 'sent' ? 'bg-blue-500/20 text-blue-400' :
+                  selectedJob.status === 'picked_up' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-[#333] text-[#999]'
+                }`}>
+                  {getStatusIcon(selectedJob.status)}
+                  {selectedJob.status}
+                </span>
+              </div>
+              
+              {/* Error Message (if failed) */}
+              {selectedJob.status === 'failed' && selectedJob.errorMessage && (
+                <div>
+                  <div className="text-xs text-[#666] mb-1">Error Message</div>
+                  <div className="p-3 rounded bg-red-500/10 border border-red-500/20">
+                    <p className="text-sm text-red-400 font-mono break-words">
+                      {selectedJob.errorMessage}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Timestamps */}
+              <div>
+                <div className="text-xs text-[#666] mb-1">Created</div>
+                <p className="text-sm text-white">
+                  {new Date(selectedJob.createdAt).toLocaleString()}
+                </p>
+              </div>
+              
+              {selectedJob.printedAt && (
+                <div>
+                  <div className="text-xs text-[#666] mb-1">Completed</div>
+                  <p className="text-sm text-white">
+                    {new Date(selectedJob.printedAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              
+              {/* Requested By */}
+              {selectedJob.requestedBy && (
+                <div>
+                  <div className="text-xs text-[#666] mb-1">Requested By</div>
+                  <p className="text-sm text-white">{selectedJob.requestedBy}</p>
+                </div>
+              )}
+              
+              {/* Label URL */}
+              {selectedJob.labelUrl && (
+                <div>
+                  <div className="text-xs text-[#666] mb-1">Label URL</div>
+                  <p className="text-xs text-[#888] font-mono bg-[#242424] p-2 rounded break-all">
+                    {selectedJob.labelUrl}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Actions */}
+            {selectedJob.status === 'failed' && (
+              <div className="p-4 border-t border-[#333]">
+                <button
+                  onClick={() => {
+                    handleRetryJob(selectedJob.id);
+                    setSelectedJob(null);
+                  }}
+                  disabled={retryingJob === selectedJob.id}
+                  data-testid="button-retry-job-modal"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                >
+                  <RotateCcw className={`w-4 h-4 ${retryingJob === selectedJob.id ? 'animate-spin' : ''}`} />
+                  {retryingJob === selectedJob.id ? 'Retrying...' : 'Retry Print Job'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

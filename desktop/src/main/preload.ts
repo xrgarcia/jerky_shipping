@@ -52,6 +52,10 @@ const api = {
     disconnect: () => ipcRenderer.invoke('ws:disconnect'),
   },
   
+  job: {
+    retry: (jobId: string) => ipcRenderer.invoke('job:retry', jobId),
+  },
+  
   environment: {
     list: (): Promise<IpcResponse<EnvironmentInfo[]>> => ipcRenderer.invoke('env:list'),
     get: (): Promise<IpcResponse<string>> => ipcRenderer.invoke('env:get'),
