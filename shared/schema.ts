@@ -854,3 +854,29 @@ export const insertPrintJobSchema = createInsertSchema(printJobs).omit({
 
 export type InsertPrintJob = z.infer<typeof insertPrintJobSchema>;
 export type PrintJob = typeof printJobs.$inferSelect;
+
+// Desktop Client Configuration - Global settings for all desktop clients
+// Single-row table pattern: id is always 'global'
+export const desktopConfig = pgTable("desktop_config", {
+  id: varchar("id").primaryKey().default("global"), // Always 'global' for single-row pattern
+  // WebSocket timing settings (in milliseconds)
+  connectionTimeout: integer("connection_timeout").notNull().default(15000), // 15 seconds
+  baseReconnectDelay: integer("base_reconnect_delay").notNull().default(2000), // 2 seconds
+  maxReconnectDelay: integer("max_reconnect_delay").notNull().default(30000), // 30 seconds
+  heartbeatInterval: integer("heartbeat_interval").notNull().default(30000), // 30 seconds
+  reconnectInterval: integer("reconnect_interval").notNull().default(5000), // 5 seconds
+  // Token/Auth timing
+  tokenRefreshInterval: integer("token_refresh_interval").notNull().default(3600000), // 1 hour
+  // Offline notification
+  offlineTimeout: integer("offline_timeout").notNull().default(1000), // 1 second
+  // Metadata
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: varchar("updated_by").references(() => users.id),
+});
+
+export const insertDesktopConfigSchema = createInsertSchema(desktopConfig).omit({
+  updatedAt: true,
+});
+
+export type InsertDesktopConfig = z.infer<typeof insertDesktopConfigSchema>;
+export type DesktopConfig = typeof desktopConfig.$inferSelect;
