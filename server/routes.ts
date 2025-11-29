@@ -4202,6 +4202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Packing QC] Found item in order:`, {
         sku: expectedItem.Sku,
         code: expectedItem.Code,
+        id: expectedItem.Id,
         quantity: expectedItem.Quantity,
         passedStatus: expectedItem.PassedStatus
       });
@@ -4216,9 +4217,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const passed = await skuVaultService.scanQCItem(saleId, sku, Number(quantity));
+      // Get the IdItem from the expected item - required for passQCItem
+      const idItem = expectedItem.Id;
+      if (!idItem) {
+        console.error(`[Packing QC] No IdItem found for SKU ${sku} in order ${orderNumber}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: "Item missing ID in SkuVault" 
+        });
+      }
       
-      if (passed) {
+      // Use passQCItem with correct JSON payload (not scanQCItem with form-urlencoded)
+      const qcPassRequest = {
+        IdItem: idItem,
+        IdSale: saleId,
+        Quantity: Number(quantity),
+        ScannedCode: String(sku), // The barcode/SKU that was scanned
+        SerialNumber: "", // Not using serial numbers for QC (empty string per schema)
+      };
+      
+      console.log(`[Packing QC] Calling passQCItem with:`, qcPassRequest);
+      
+      const result = await skuVaultService.passQCItem(qcPassRequest);
+      
+      if (result.Success) {
         console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
         return res.json({ 
           success: true, 
@@ -4228,10 +4250,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: Number(quantity)
         });
       } else {
-        console.warn(`[Packing QC] Failed to pass QC: ${sku} for order ${orderNumber}`);
+        console.warn(`[Packing QC] Failed to pass QC: ${sku} for order ${orderNumber}`, result.Errors);
         return res.status(500).json({ 
           success: false, 
-          error: "Failed to mark item as QC passed in SkuVault",
+          error: result.Errors?.join(', ') || "Failed to mark item as QC passed in SkuVault",
           sku,
           orderNumber
         });
