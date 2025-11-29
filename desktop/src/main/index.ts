@@ -388,6 +388,17 @@ function setupIpcHandlers(): void {
         wsClient.subscribeToStation(stationId);
       }
       
+      // Fetch printers for this station and auto-select if available
+      try {
+        const printers = await apiClient.getPrinters(stationId);
+        const selectedPrinter = printers.length > 0 
+          ? (printers.find(p => p.isDefault) || printers[0])
+          : null;
+        updateState({ printers, selectedPrinter });
+      } catch (printerError) {
+        console.warn('[Main] Failed to fetch printers after claiming station:', printerError);
+      }
+      
       return { success: true, data: { station, session } };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to claim station';
@@ -440,7 +451,22 @@ function setupIpcHandlers(): void {
         return { success: true, data: [] };
       }
       const printers = await apiClient.getPrinters(appState.station.id);
-      updateState({ printers });
+      
+      // Auto-select the first printer if there's no selected printer
+      // or if the selected printer is no longer in the list
+      let selectedPrinter = appState.selectedPrinter;
+      if (printers.length > 0) {
+        // If no printer selected, or selected printer not in list, select the first one
+        const selectedStillExists = selectedPrinter && printers.some(p => p.id === selectedPrinter?.id);
+        if (!selectedStillExists) {
+          // Prefer the default printer, otherwise use the first one
+          selectedPrinter = printers.find(p => p.isDefault) || printers[0];
+        }
+      } else {
+        selectedPrinter = null;
+      }
+      
+      updateState({ printers, selectedPrinter });
       return { success: true, data: printers };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load printers';
