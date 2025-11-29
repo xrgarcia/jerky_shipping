@@ -547,7 +547,7 @@ export function broadcastStationConnectionChange(stationId: string, isConnected:
 }
 
 // Broadcast printer updates to web clients (when desktop app registers/changes printer)
-export function broadcastStationPrinterUpdate(stationId: string, printer: { id: string; name: string; systemName: string; status?: string } | null): void {
+export function broadcastStationPrinterUpdate(stationId: string, printer: { id: string; name: string; systemName: string; status?: string; isDefault?: boolean } | null): void {
   if (!wss) {
     return;
   }

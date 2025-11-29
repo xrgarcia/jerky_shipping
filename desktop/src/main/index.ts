@@ -616,14 +616,41 @@ function setupIpcHandlers(): void {
   });
   
   ipcMain.handle('printer:set-default', async (_event, printerId: string) => {
+    // Save current state for rollback on error
+    const previousPrinter = appState.selectedPrinter;
+    const previousPrinters = appState.printers;
+    
     try {
+      if (!appState.station || !apiClient) {
+        throw new Error('No station selected');
+      }
+      
+      // Optimistically update local state first for responsiveness
       const printer = (appState.printers || []).find(p => p.id === printerId);
       if (printer) {
         updateState({ selectedPrinter: printer });
       }
-      return { success: true };
+      
+      // Call API to persist the default and broadcast to other clients
+      const updatedPrinter = await apiClient.setDefaultPrinter(appState.station.id, printerId);
+      
+      // Refresh the printers list to get updated isDefault flags and consistent ordering
+      const printers = await apiClient.getPrinters(appState.station.id);
+      const selectedPrinter = printers.find(p => p.id === printerId) || updatedPrinter;
+      updateState({ printers, selectedPrinter });
+      
+      console.log('[Main] Set default printer:', selectedPrinter.name);
+      
+      return { success: true, data: selectedPrinter };
     } catch (error) {
+      // Revert to previous state on error
+      updateState({ 
+        selectedPrinter: previousPrinter,
+        printers: previousPrinters,
+      });
+      
       const message = error instanceof Error ? error.message : 'Failed to set default printer';
+      console.error('[Main] Failed to set default printer:', message);
       return { success: false, error: message };
     }
   });

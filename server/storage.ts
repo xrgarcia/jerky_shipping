@@ -286,6 +286,7 @@ export interface IStorage {
   getAllPrinters(): Promise<Printer[]>;
   deletePrinter(id: string): Promise<boolean>;
   updatePrinterLastSeen(id: string): Promise<void>;
+  setDefaultPrinter(stationId: string, printerId: string): Promise<Printer | undefined>;
 
   // Desktop Clients
   createDesktopClient(client: InsertDesktopClient): Promise<DesktopClient>;
@@ -2188,11 +2189,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPrintersByStation(stationId: string): Promise<Printer[]> {
-    return await db.select().from(printers).where(eq(printers.stationId, stationId)).orderBy(printers.name);
+    // Sort by isDefault first (default printer at top), then by name for stable ordering
+    return await db
+      .select()
+      .from(printers)
+      .where(eq(printers.stationId, stationId))
+      .orderBy(desc(printers.isDefault), printers.name);
   }
 
   async getAllPrinters(): Promise<Printer[]> {
-    return await db.select().from(printers).orderBy(printers.name);
+    return await db.select().from(printers).orderBy(desc(printers.isDefault), printers.name);
   }
 
   async deletePrinter(id: string): Promise<boolean> {
@@ -2202,6 +2208,39 @@ export class DatabaseStorage implements IStorage {
 
   async updatePrinterLastSeen(id: string): Promise<void> {
     await db.update(printers).set({ lastSeenAt: new Date() }).where(eq(printers.id, id));
+  }
+
+  async setDefaultPrinter(stationId: string, printerId: string): Promise<Printer | undefined> {
+    // Use transaction to atomically clear other defaults and set the new one
+    return await db.transaction(async (tx) => {
+      // First verify the printer exists and belongs to this station
+      const targetPrinter = await tx
+        .select()
+        .from(printers)
+        .where(and(eq(printers.id, printerId), eq(printers.stationId, stationId)));
+      
+      if (targetPrinter.length === 0) {
+        return undefined;
+      }
+      
+      // Clear isDefault from all OTHER printers on this station
+      await tx
+        .update(printers)
+        .set({ isDefault: false, updatedAt: new Date() })
+        .where(and(
+          eq(printers.stationId, stationId),
+          ne(printers.id, printerId) // Exclude the target printer
+        ));
+      
+      // Set the specified printer as default
+      const result = await tx
+        .update(printers)
+        .set({ isDefault: true, updatedAt: new Date() })
+        .where(eq(printers.id, printerId))
+        .returning();
+      
+      return result[0];
+    });
   }
 
   // Desktop Clients

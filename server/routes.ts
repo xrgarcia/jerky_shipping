@@ -4760,6 +4760,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Set default printer for a station
+  app.post("/api/desktop/stations/:stationId/printers/:printerId/default", requireDesktopAuth, async (req, res) => {
+    try {
+      const { stationId, printerId } = req.params;
+      
+      // Verify the station exists
+      const station = await storage.getStation(stationId);
+      if (!station) {
+        return res.status(404).json({ error: "Station not found" });
+      }
+      
+      // Set the default printer (atomically clears other defaults)
+      const printer = await storage.setDefaultPrinter(stationId, printerId);
+      if (!printer) {
+        return res.status(404).json({ error: "Printer not found or not assigned to this station" });
+      }
+      
+      // Broadcast the printer update to all clients watching this station
+      broadcastStationPrinterUpdate(stationId, {
+        id: printer.id,
+        name: printer.name,
+        systemName: printer.systemName,
+        status: printer.status || 'offline',
+        isDefault: true,
+      });
+      
+      console.log(`[Desktop] Set default printer for station ${stationId}: ${printer.name} (${printer.id})`);
+      
+      res.json(printer);
+    } catch (error: any) {
+      console.error("[Desktop] Error setting default printer:", error);
+      res.status(500).json({ error: error.message || "Failed to set default printer" });
+    }
+  });
+
   // ==================== Desktop Client Authentication ====================
 
   // Register a new desktop client (called after OAuth flow from desktop app)

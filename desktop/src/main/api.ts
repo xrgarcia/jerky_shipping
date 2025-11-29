@@ -143,6 +143,10 @@ export class ApiClient {
     await this.request<void>('PATCH', `/api/desktop/printers/${printerId}`, { status });
   }
   
+  async setDefaultPrinter(stationId: string, printerId: string): Promise<Printer> {
+    return this.request<Printer>('POST', `/api/desktop/stations/${stationId}/printers/${printerId}/default`);
+  }
+  
   async getPrintJobs(stationId: string): Promise<PrintJob[]> {
     return this.request<PrintJob[]>('GET', `/api/desktop/stations/${stationId}/jobs`);
   }
