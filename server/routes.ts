@@ -152,7 +152,8 @@ function getGoogleAuthUrl(redirectUri: string, state: string, loginHint?: string
     access_type: "offline",
     state: state,
     prompt: "select_account",
-    hd: ALLOWED_EMAIL_DOMAIN, // Restrict to jerky.com domain in Google's picker
+    // Note: hd parameter removed - it was causing 403 errors when users have multiple Google accounts
+    // and their personal Gmail is the default. We verify the domain on the backend instead.
   });
   
   // If a login hint is provided, add it to help Google pre-select the right account
