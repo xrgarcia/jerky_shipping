@@ -3634,20 +3634,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Station is not active" });
       }
       
-      // Calculate next midnight Pacific time using date-fns-tz
+      // Calculate next midnight US Central time using date-fns-tz
       const now = new Date();
-      const pacificTz = 'America/Los_Angeles';
+      const centralTz = 'America/Chicago';
       
-      // Get current date in Pacific timezone
-      const pacificNow = toZonedTime(now, pacificTz);
+      // Get current date in Central timezone
+      const centralNow = toZonedTime(now, centralTz);
       
-      // Set to next midnight in Pacific time
-      const nextMidnight = new Date(pacificNow);
+      // Set to next midnight in Central time
+      const nextMidnight = new Date(centralNow);
       nextMidnight.setDate(nextMidnight.getDate() + 1);
       nextMidnight.setHours(0, 0, 0, 0);
       
       // Convert back to UTC for storage
-      const expiresAt = fromZonedTime(nextMidnight, pacificTz);
+      const expiresAt = fromZonedTime(nextMidnight, centralTz);
       
       const session = await storage.createWebPackingSession(user.id, stationId, expiresAt);
       

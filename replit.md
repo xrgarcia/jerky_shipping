@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and SkuVault QC Integration for packing.
     - **Packing Page**: Single-warehouse MVP for order fulfillment with SkuVault QC validation, scan-first workflow, individual unit scanning, and comprehensive audit trails. Integrates with the print queue. Features daily station selection requirement:
         - **Web Packing Sessions**: Separate from desktop station sessions, stored in `web_packing_sessions` table
-        - **Daily Expiration**: Sessions expire at midnight Pacific time (calculated using date-fns-tz)
+        - **Daily Expiration**: Sessions expire at midnight US Central time (calculated using date-fns-tz)
         - **Station Selection Modal**: Prompts user to select station before packing operations
         - **Action Gating**: All packing actions (order scan, product scan, manual verify, complete) require valid session
         - **Session Validation**: Both client and server validate session expiration
