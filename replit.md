@@ -58,6 +58,13 @@ Preferred communication style: Simple, everyday language.
             - **Print Job Queue**: Real-time job delivery via WebSocket with status updates
             - **Environment Switching**: Dashboard UI allows switching between development/production environments while logged in; auto-triggers re-authentication with new server and reconnects WebSocket
             - **Graceful Shutdown**: Sends `desktop:going_offline` message with ACK confirmation before closing, ensuring server properly tracks station status
+            - **Remote Configuration ("Mars Rover" Control)**: Desktop clients fetch timing settings from server on startup and receive real-time updates via WebSocket, eliminating need for desktop app redeployment:
+                - **Configurable Parameters**: connectionTimeout, baseReconnectDelay, maxReconnectDelay, heartbeatInterval, reconnectInterval, tokenRefreshInterval, offlineTimeout
+                - **Web Admin Page**: `/desktop-config` page with form to edit all 7 timing parameters with validation (minimum values enforced)
+                - **Real-time Updates**: Changes broadcast via `desktop:config_update` WebSocket message to all connected clients
+                - **Defensive Clamping**: Desktop runtime enforces minimum values as backstop even if server sends dangerous values
+                - **File Menu**: "View Configuration" option (Cmd+, / Ctrl+,) shows current settings in read-only dialog
+                - **Database Storage**: Single row in `desktop_config` table with ID 'default', tracks lastUpdatedBy and updatedAt
     - **Web-based Stations Management**: Full CRUD page at `/stations` for managing packing stations. When a station is deleted, active desktop sessions are automatically terminated and clients are notified via WebSocket (`desktop:station:deleted` message). Includes real-time connection status tracking:
         - Each station displays online/offline status with Wifi/WifiOff icons based on active WebSocket connections
         - Filter tabs (All/Online/Offline) with URL-based filtering via `?connection=online|offline`
