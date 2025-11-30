@@ -65,9 +65,14 @@ type ShipmentItem = {
   sku: string | null;
   name: string;
   quantity: number;
-  expectedQuantity: number | null; // From SkuVault session (preferred), falls back to ShipStation quantity
+  expectedQuantity: number | null; // From SkuVault (golden source)
   unitPrice: string | null;
   imageUrl: string | null;
+  // SkuVault-specific fields (present when items come from SkuVault)
+  skuvaultItemId?: string | null;
+  skuvaultCode?: string | null;
+  skuvaultPartNumber?: string | null;
+  passedStatus?: string | null;
 };
 
 type QCSale = {
@@ -137,6 +142,7 @@ type ShipmentWithItems = {
   saleId: string | null; // SkuVault SaleId (cached from initial lookup)
   qcSale?: QCSale | null; // SkuVault QC Sale data (includes PassedItems, expected Items)
   validationWarnings?: string[]; // Warnings if items don't match between systems
+  itemsSource?: 'skuvault' | 'shipstation'; // Which system provided the items list
   // Pre-calculated pending print jobs (immediate display on order load)
   pendingPrintJobs?: PendingPrintJob[];
   hasPendingPrintJobs?: boolean;
