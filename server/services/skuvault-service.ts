@@ -351,14 +351,15 @@ class QCSaleCache {
   async lookup(orderNumber: string, barcodeOrSku: string): Promise<BarcodeLookup> {
     try {
       const redis = getRedisClient();
-      const cacheData = await redis.get<string>(this.getCacheKey(orderNumber));
+      const cacheData = await redis.get(this.getCacheKey(orderNumber));
       
       if (!cacheData) {
         console.log(`[QCSaleCache] Cache miss for order ${orderNumber}`);
         return { found: false };
       }
       
-      const parsed = JSON.parse(cacheData);
+      // Upstash Redis auto-parses JSON, so handle both string and object
+      const parsed = typeof cacheData === 'string' ? JSON.parse(cacheData) : cacheData;
       const key = barcodeOrSku.toUpperCase();
       
       if (parsed.lookupMap && parsed.lookupMap[key]) {
