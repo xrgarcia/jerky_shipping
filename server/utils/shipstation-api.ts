@@ -759,7 +759,9 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
     shipment_number: newShipmentNumber,
   };
   
-  // Remove read-only fields that can't be sent back
+  // Remove read-only fields and identifiers that can't be sent back
+  // shipment_id must be removed because it's in the URL path - including it causes "identifiers_must_match" error
+  delete updatePayload.shipment_id;
   delete updatePayload.created_at;
   delete updatePayload.modified_at;
   delete updatePayload.label_id;
@@ -774,6 +776,9 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
   if (updatePayload.ship_from) {
     delete updatePayload.warehouse_id;
   }
+  
+  // Log the payload for debugging
+  console.log(`[ShipStation] Update payload keys:`, Object.keys(updatePayload));
 
   console.log(`[ShipStation] Updating shipment ${shipmentId} with new shipment_number: ${newShipmentNumber}`);
 
