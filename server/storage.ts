@@ -2129,7 +2129,10 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(shipments.orderNumber, orderNumbers))
       .orderBy(shipments.orderNumber, desc(shipments.createdAt));
 
-    // Step 3: Group shipments by order number and calculate indicators
+    // Step 3: Group shipments by order number, then determine which is original
+    // Key insight: When duplicates copy session/wave data from originals, multiple shipments
+    // can share the same session/wave. In that case, the OLDEST one is the original.
+    
     const groupedShipments = new Map<string, Array<{
       id: string;
       orderNumber: string | null;
@@ -2147,6 +2150,23 @@ export class DatabaseStorage implements IStorage {
       isLikelyOriginal: boolean;
     }>>();
     
+    // First pass: Process shipments and group by order
+    const tempShipments = new Map<string, Array<{
+      id: string;
+      orderNumber: string | null;
+      shipmentId: string | null;
+      trackingNumber: string | null;
+      carrierCode: string | null;
+      serviceCode: string | null;
+      status: string | null;
+      shipDate: Date | null;
+      createdAt: Date | null;
+      sessionId: string | null;
+      waveId: string | null;
+      externalShipmentId: string | null;
+      shipmentDataKeyCount: number;
+    }>>();
+    
     for (const shipment of shipmentsResult) {
       const orderNum = shipment.orderNumber;
       if (!orderNum) continue;
@@ -2158,20 +2178,10 @@ export class DatabaseStorage implements IStorage {
       // Count keys in shipment_data (originals have 30+ keys, duplicates have ~14 tracking-only keys)
       const shipmentDataKeyCount = shipmentData ? Object.keys(shipmentData).length : 0;
       
-      // Determine if this is likely the original shipment based on indicators:
-      // - Has session_id (went through wave picking)
-      // - Has wave_id (was in a wave)
-      // - Has external_shipment_id (Shopify linked)
-      // - Has 20+ keys in shipment_data (full shipment structure vs tracking-only)
-      const hasSessionIndicator = !!shipment.sessionId || !!shipment.waveId;
-      const hasShopifyLink = !!externalShipmentId;
-      const hasFullShipmentData = shipmentDataKeyCount >= 20;
-      const isLikelyOriginal = hasSessionIndicator || hasShopifyLink || hasFullShipmentData;
-      
-      if (!groupedShipments.has(orderNum)) {
-        groupedShipments.set(orderNum, []);
+      if (!tempShipments.has(orderNum)) {
+        tempShipments.set(orderNum, []);
       }
-      groupedShipments.get(orderNum)!.push({
+      tempShipments.get(orderNum)!.push({
         id: shipment.id,
         orderNumber: shipment.orderNumber,
         shipmentId: shipment.shipmentId,
@@ -2185,8 +2195,74 @@ export class DatabaseStorage implements IStorage {
         waveId: shipment.waveId,
         externalShipmentId,
         shipmentDataKeyCount,
-        isLikelyOriginal,
       });
+    }
+    
+    // Second pass: Determine which shipment is the original for each order
+    // Rules:
+    // 1. If a shipment has a unique externalShipmentId (Shopify link), it's likely original
+    // 2. If multiple shipments share the same session/wave, the OLDEST is the original
+    // 3. The original is the oldest shipment that has at least one indicator (session, wave, Shopify, or 20+ keys)
+    // 4. If no shipment has indicators, the oldest is assumed to be original
+    for (const [orderNum, orderShipments] of tempShipments) {
+      // Sort by createdAt ascending (oldest first)
+      const sortedShipments = [...orderShipments].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return aTime - bTime;
+      });
+      
+      // Track which session/wave combos we've seen - first occurrence is original
+      const seenSessionWaveCombos = new Set<string>();
+      let foundOriginalWithIndicators = false;
+      
+      const processedShipments = sortedShipments.map((shipment, index) => {
+        const hasSessionIndicator = !!shipment.sessionId || !!shipment.waveId;
+        const hasShopifyLink = !!shipment.externalShipmentId;
+        const hasFullShipmentData = shipment.shipmentDataKeyCount >= 20;
+        const hasAnyIndicator = hasSessionIndicator || hasShopifyLink || hasFullShipmentData;
+        
+        // Create a key for session/wave combo (or use 'none' if no session/wave)
+        const sessionWaveKey = shipment.sessionId || shipment.waveId 
+          ? `${shipment.sessionId || ''}:${shipment.waveId || ''}`
+          : null;
+        
+        let isLikelyOriginal = false;
+        
+        if (sessionWaveKey) {
+          // If this session/wave combo hasn't been seen yet, this is the original for that combo
+          if (!seenSessionWaveCombos.has(sessionWaveKey)) {
+            seenSessionWaveCombos.add(sessionWaveKey);
+            isLikelyOriginal = true;
+            foundOriginalWithIndicators = true;
+          }
+          // If we've seen this combo before, it's a duplicate (copied session/wave from original)
+        } else if (hasShopifyLink || hasFullShipmentData) {
+          // Has Shopify link or full data but no session/wave - mark as original if it's the first such one
+          if (!foundOriginalWithIndicators) {
+            isLikelyOriginal = true;
+            foundOriginalWithIndicators = true;
+          }
+        } else if (index === 0 && !foundOriginalWithIndicators) {
+          // Fallback: If this is the oldest and no original found yet with indicators, assume it's original
+          isLikelyOriginal = true;
+          foundOriginalWithIndicators = true;
+        }
+        
+        return {
+          ...shipment,
+          isLikelyOriginal,
+        };
+      });
+      
+      // Sort back to newest first for display (original order was desc by createdAt)
+      processedShipments.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+      
+      groupedShipments.set(orderNum, processedShipments);
     }
 
     // Step 4: Build result array
