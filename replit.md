@@ -28,6 +28,13 @@ Preferred communication style: Simple, everyday language.
         - **Station Selection Modal**: Prompts user to select station before packing operations
         - **Action Gating**: All packing actions (order scan, product scan, manual verify, complete) require valid session
         - **Session Validation**: Both client and server validate session expiration
+        - **Kit/Assembled Product Support**: SkuVault kit items are fully supported in the packing QC process:
+            - Kit detection via `IsKit` flag and `KitProducts` array from SkuVault QC API
+            - UI displays kit headers with purple "Kit" badge and instructional text ("Scan each component below")
+            - Kit components are indented with purple "Kit Item" badge and show parent kit name
+            - Component barcodes validated against `KitProducts[].Code`, `Sku`, and `PartNumber` fields
+            - QC scan uses component's `Id` (not parent kit ID) for proper SkuVault quantity decrement
+            - Legacy pattern matching fallback for kits without explicit `KitProducts` data
     - **Shipment Management**: Unified shipments page with workflow tabs (In Progress, Packing Queue, Shipped, All). Session info displayed inline on shipment cards. Tab-based filtering uses session status and ship date. Shipment details page with comprehensive metadata. Dual-ID Routing for all shipment-related API endpoints.
     - **Workflow Tabs**: 
         - **In Progress**: Orders currently being picked (sessionStatus = 'New' or 'Active')
