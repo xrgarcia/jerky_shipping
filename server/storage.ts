@@ -267,6 +267,12 @@ export interface IStorage {
       status: string | null;
       shipDate: Date | null;
       createdAt: Date | null;
+      // Duplicate detection indicators
+      sessionId: string | null;
+      waveId: string | null;
+      externalShipmentId: string | null;
+      shipmentDataKeyCount: number;
+      isLikelyOriginal: boolean;
     }>;
   }[]>;
 
@@ -2071,6 +2077,11 @@ export class DatabaseStorage implements IStorage {
       status: string | null;
       shipDate: Date | null;
       createdAt: Date | null;
+      sessionId: string | null;
+      waveId: string | null;
+      externalShipmentId: string | null;
+      shipmentDataKeyCount: number;
+      isLikelyOriginal: boolean;
     }>;
   }[]> {
     // Step 1: Find order_numbers with multiple shipments in the date range
@@ -2095,7 +2106,7 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
-    // Step 2: Get all shipments for those order numbers
+    // Step 2: Get all shipments for those order numbers with indicator fields
     const orderNumbers = duplicateOrdersResult.map(r => r.orderNumber).filter((n): n is string => n !== null);
     
     const shipmentsResult = await db
@@ -2109,37 +2120,80 @@ export class DatabaseStorage implements IStorage {
         status: shipments.status,
         shipDate: shipments.shipDate,
         createdAt: shipments.createdAt,
+        // Duplicate detection indicators
+        sessionId: shipments.sessionId,
+        waveId: shipments.waveId,
+        shipmentData: shipments.shipmentData,
       })
       .from(shipments)
       .where(inArray(shipments.orderNumber, orderNumbers))
       .orderBy(shipments.orderNumber, desc(shipments.createdAt));
 
-    // Step 3: Group shipments by order number
-    const groupedShipments = new Map<string, typeof shipmentsResult>();
+    // Step 3: Group shipments by order number and calculate indicators
+    const groupedShipments = new Map<string, Array<{
+      id: string;
+      orderNumber: string | null;
+      shipmentId: string | null;
+      trackingNumber: string | null;
+      carrierCode: string | null;
+      serviceCode: string | null;
+      status: string | null;
+      shipDate: Date | null;
+      createdAt: Date | null;
+      sessionId: string | null;
+      waveId: string | null;
+      externalShipmentId: string | null;
+      shipmentDataKeyCount: number;
+      isLikelyOriginal: boolean;
+    }>>();
+    
     for (const shipment of shipmentsResult) {
       const orderNum = shipment.orderNumber;
       if (!orderNum) continue;
       
+      // Extract external_shipment_id from shipment_data if available
+      const shipmentData = shipment.shipmentData as Record<string, unknown> | null;
+      const externalShipmentId = shipmentData?.external_shipment_id as string | null ?? null;
+      
+      // Count keys in shipment_data (originals have 30+ keys, duplicates have ~14 tracking-only keys)
+      const shipmentDataKeyCount = shipmentData ? Object.keys(shipmentData).length : 0;
+      
+      // Determine if this is likely the original shipment based on indicators:
+      // - Has session_id (went through wave picking)
+      // - Has wave_id (was in a wave)
+      // - Has external_shipment_id (Shopify linked)
+      // - Has 20+ keys in shipment_data (full shipment structure vs tracking-only)
+      const hasSessionIndicator = !!shipment.sessionId || !!shipment.waveId;
+      const hasShopifyLink = !!externalShipmentId;
+      const hasFullShipmentData = shipmentDataKeyCount >= 20;
+      const isLikelyOriginal = hasSessionIndicator || hasShopifyLink || hasFullShipmentData;
+      
       if (!groupedShipments.has(orderNum)) {
         groupedShipments.set(orderNum, []);
       }
-      groupedShipments.get(orderNum)!.push(shipment);
+      groupedShipments.get(orderNum)!.push({
+        id: shipment.id,
+        orderNumber: shipment.orderNumber,
+        shipmentId: shipment.shipmentId,
+        trackingNumber: shipment.trackingNumber,
+        carrierCode: shipment.carrierCode,
+        serviceCode: shipment.serviceCode,
+        status: shipment.status,
+        shipDate: shipment.shipDate,
+        createdAt: shipment.createdAt,
+        sessionId: shipment.sessionId,
+        waveId: shipment.waveId,
+        externalShipmentId,
+        shipmentDataKeyCount,
+        isLikelyOriginal,
+      });
     }
 
     // Step 4: Build result array
     return duplicateOrdersResult.map(r => ({
       orderNumber: r.orderNumber!,
       shipmentCount: r.count,
-      shipments: (groupedShipments.get(r.orderNumber!) || []).map(s => ({
-        id: s.id,
-        shipmentId: s.shipmentId,
-        trackingNumber: s.trackingNumber,
-        carrierCode: s.carrierCode,
-        serviceCode: s.serviceCode,
-        status: s.status,
-        shipDate: s.shipDate,
-        createdAt: s.createdAt,
-      })),
+      shipments: groupedShipments.get(r.orderNumber!) || [],
     }));
   }
 

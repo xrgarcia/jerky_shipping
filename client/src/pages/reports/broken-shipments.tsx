@@ -49,6 +49,12 @@ interface DuplicateShipment {
   status: string | null;
   shipDate: string | null;
   createdAt: string | null;
+  // Duplicate detection indicators
+  sessionId: string | null;
+  waveId: string | null;
+  externalShipmentId: string | null;
+  shipmentDataKeyCount: number;
+  isLikelyOriginal: boolean;
 }
 
 interface DuplicateOrder {
@@ -496,29 +502,38 @@ export default function BrokenShipmentsReport() {
                         <table className="w-full">
                           <thead>
                             <tr className="bg-muted/30 border-b">
+                              <th className="text-left py-2 px-4 text-sm font-medium">Type</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Shipment ID</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Tracking #</th>
-                              <th className="text-left py-2 px-4 text-sm font-medium">Carrier</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Status</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Ship Date</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Created</th>
+                              <th className="text-left py-2 px-4 text-sm font-medium">Indicators</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {order.shipments.map((shipment, idx) => (
+                            {order.shipments.map((shipment) => (
                               <tr 
                                 key={shipment.id} 
-                                className={`border-b last:border-b-0 ${idx === 0 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50/50 dark:bg-red-950/10'}`}
+                                className={`border-b last:border-b-0 ${shipment.isLikelyOriginal ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50/50 dark:bg-red-950/10'}`}
                                 data-testid={`row-shipment-detail-${shipment.id}`}
                               >
+                                <td className="py-2 px-4">
+                                  {shipment.isLikelyOriginal ? (
+                                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-300 dark:border-green-700">
+                                      Original
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border-red-300 dark:border-red-700">
+                                      Duplicate
+                                    </Badge>
+                                  )}
+                                </td>
                                 <td className="py-2 px-4 font-mono text-sm">
                                   {shipment.shipmentId || <span className="text-muted-foreground">—</span>}
                                 </td>
                                 <td className="py-2 px-4 font-mono text-sm">
                                   {shipment.trackingNumber || <span className="text-muted-foreground">—</span>}
-                                </td>
-                                <td className="py-2 px-4 text-sm">
-                                  {shipment.carrierCode || <span className="text-muted-foreground">—</span>}
                                 </td>
                                 <td className="py-2 px-4">
                                   <Badge variant="outline" className="text-xs">
@@ -531,15 +546,43 @@ export default function BrokenShipmentsReport() {
                                 <td className="py-2 px-4 text-sm text-muted-foreground">
                                   {formatShortDate(shipment.createdAt)}
                                 </td>
+                                <td className="py-2 px-4">
+                                  <div className="flex flex-wrap gap-1">
+                                    {shipment.sessionId && (
+                                      <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300">
+                                        Session
+                                      </Badge>
+                                    )}
+                                    {shipment.waveId && (
+                                      <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300">
+                                        Wave
+                                      </Badge>
+                                    )}
+                                    {shipment.externalShipmentId && (
+                                      <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
+                                        Shopify
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className={`text-xs ${shipment.shipmentDataKeyCount >= 20 ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300' : 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300'}`}>
+                                      {shipment.shipmentDataKeyCount} keys
+                                    </Badge>
+                                  </div>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        <div className="p-3 bg-muted/20 text-sm text-muted-foreground flex items-center gap-2">
-                          <span className="inline-block w-3 h-3 bg-green-200 dark:bg-green-900 rounded"></span>
-                          <span>Most recent (likely valid)</span>
-                          <span className="inline-block w-3 h-3 bg-red-100 dark:bg-red-950 rounded ml-4"></span>
-                          <span>Older duplicates (may need cleanup)</span>
+                        <div className="p-3 bg-muted/20 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 text-xs">Original</Badge>
+                              <span>Has session/wave ID, Shopify link, or full shipment data (20+ keys)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs">Duplicate</Badge>
+                              <span>Created by label bug - only has tracking data</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CollapsibleContent>
