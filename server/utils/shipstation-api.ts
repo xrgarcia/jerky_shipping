@@ -762,7 +762,6 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
   };
   
   // Remove read-only fields that the API won't accept
-  // IMPORTANT: Keep ship_from and warehouse_id - don't remove them!
   delete updatePayload.shipment_id;
   delete updatePayload.created_at;
   delete updatePayload.modified_at;
@@ -773,6 +772,31 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
   delete updatePayload.label_download;
   delete updatePayload.form_download;
   delete updatePayload.insurance_claim;
+  
+  // API requires ship_from OR warehouse_id - handle null values
+  // If both are null, provide a default ship_from address (Jerky.com warehouse)
+  if (updatePayload.ship_from === null && updatePayload.warehouse_id === null) {
+    console.log(`[ShipStation] Both ship_from and warehouse_id are null, using default ship_from`);
+    updatePayload.ship_from = {
+      name: "Jerky.com",
+      phone: "",
+      company_name: "Jerky.com",
+      address_line1: "3600 NW 10th St",
+      city_locality: "Oklahoma City",
+      state_province: "OK",
+      postal_code: "73107",
+      country_code: "US",
+    };
+    delete updatePayload.warehouse_id;
+  } else {
+    // Remove null values - API rejects them
+    if (updatePayload.ship_from === null) {
+      delete updatePayload.ship_from;
+    }
+    if (updatePayload.warehouse_id === null) {
+      delete updatePayload.warehouse_id;
+    }
+  }
 
   console.log(`[ShipStation] PUT updating shipment ${shipmentId} with new shipment_number: ${newShipmentNumber}`);
   console.log(`[ShipStation] Update payload keys:`, Object.keys(updatePayload).join(', '));
