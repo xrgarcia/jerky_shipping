@@ -68,6 +68,7 @@ type KitComponent = {
   name: string;
   quantity: number;
   scannedQuantity: number;
+  baseScannedQuantity?: number; // Immutable baseline from SkuVault (for idempotent restoration)
   picture: string | null;
   skuvaultItemId: string | null;
 };
@@ -669,6 +670,12 @@ export default function Packing() {
           const totalComponentsScanned = item.totalComponentsScanned || 0;
           const remaining = totalComponentsExpected - totalComponentsScanned;
           
+          // Set baseScannedQuantity on each component for idempotent restoration
+          const componentsWithBase = item.kitComponents.map(comp => ({
+            ...comp,
+            baseScannedQuantity: comp.scannedQuantity, // Capture SkuVault baseline
+          }));
+          
           progress.set(key, {
             itemId: item.id,
             sku: item.sku || "KIT",
@@ -682,7 +689,7 @@ export default function Packing() {
             skuvaultSynced: remaining === 0, // Synced if all components scanned
             skuvaultBaseScanned: totalComponentsScanned, // Immutable SkuVault baseline
             isKit: true,
-            kitComponents: item.kitComponents, // Keep components for collapsible UI
+            kitComponents: componentsWithBase, // Components with baseline for restoration
             totalComponentsExpected,
             totalComponentsScanned,
             skuvaultCode: item.skuvaultCode,
@@ -784,10 +791,22 @@ export default function Packing() {
         // Use the immutable SkuVault baseline, not the current scanned count
         // This prevents double-counting when logs are refetched
         const baseScanned = progress.skuvaultBaseScanned ?? 0;
+        
+        // For kits, also reset component scannedQuantity to their base values
+        let resetComponents = progress.kitComponents;
+        if (progress.isKit && progress.kitComponents) {
+          resetComponents = progress.kitComponents.map(comp => ({
+            ...comp,
+            scannedQuantity: comp.baseScannedQuantity ?? 0,
+          }));
+        }
+        
         updatedProgress.set(key, {
           ...progress,
           scanned: baseScanned,
           remaining: progress.expected - baseScanned,
+          kitComponents: resetComponents,
+          totalComponentsScanned: baseScanned,
         });
       });
       
@@ -802,19 +821,59 @@ export default function Packing() {
           const normalizedSku = isNoSku ? "" : normalizeSku(log.productSku);
           
           // Find the first item with this SKU that still has remaining capacity
+          let matched = false;
           for (const [key, progress] of Array.from(updatedProgress.entries())) {
-            const skuMatches = isNoSku 
-              ? progress.requiresManualVerification && progress.normalizedSku === ""
-              : progress.normalizedSku === normalizedSku;
-              
-            if (skuMatches && progress.scanned < progress.expected) {
-              // Increment this specific item's scan count
-              updatedProgress.set(key, {
-                ...progress,
-                scanned: progress.scanned + 1,
-                remaining: progress.remaining - 1,
-              });
-              break; // Only increment one item per scan
+            // For kit items, check if scanned SKU matches any component
+            if (progress.isKit && progress.kitComponents) {
+              for (let i = 0; i < progress.kitComponents.length; i++) {
+                const comp = progress.kitComponents[i];
+                const compNormalizedSku = comp.sku ? normalizeSku(comp.sku) : "";
+                const compNormalizedCode = comp.code ? normalizeSku(comp.code) : "";
+                const compNormalizedPartNumber = comp.partNumber ? normalizeSku(comp.partNumber) : "";
+                
+                const compMatches = normalizedSku === compNormalizedSku || 
+                                   normalizedSku === compNormalizedCode ||
+                                   normalizedSku === compNormalizedPartNumber;
+                
+                if (compMatches && comp.scannedQuantity < comp.quantity) {
+                  // Increment this component's scan count and update kit aggregate
+                  const updatedComponents = [...progress.kitComponents];
+                  updatedComponents[i] = {
+                    ...comp,
+                    scannedQuantity: comp.scannedQuantity + 1,
+                  };
+                  
+                  const newTotalScanned = updatedComponents.reduce((sum, c) => sum + c.scannedQuantity, 0);
+                  const totalExpected = progress.totalComponentsExpected || 0;
+                  
+                  updatedProgress.set(key, {
+                    ...progress,
+                    kitComponents: updatedComponents,
+                    scanned: newTotalScanned,
+                    remaining: totalExpected - newTotalScanned,
+                    totalComponentsScanned: newTotalScanned,
+                  });
+                  matched = true;
+                  break;
+                }
+              }
+              if (matched) break;
+            } else {
+              // Regular item matching
+              const skuMatches = isNoSku 
+                ? progress.requiresManualVerification && progress.normalizedSku === ""
+                : progress.normalizedSku === normalizedSku;
+                
+              if (skuMatches && progress.scanned < progress.expected) {
+                // Increment this specific item's scan count
+                updatedProgress.set(key, {
+                  ...progress,
+                  scanned: progress.scanned + 1,
+                  remaining: progress.remaining - 1,
+                });
+                matched = true;
+                break; // Only increment one item per scan
+              }
             }
           }
         }
