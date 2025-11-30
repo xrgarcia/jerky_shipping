@@ -464,7 +464,7 @@ export type SaleInformationResponse = z.infer<typeof saleInformationResponseSche
  * Item that has already been QC'd and passed in SkuVault
  */
 export const qcPassedItemSchema = z.object({
-  KitId: z.string().nullable().optional(),
+  KitId: z.union([z.string(), z.number()]).nullable().optional(), // Can be string or number from SkuVault API
   Code: z.string().nullable().optional(), // Barcode
   ScannedCode: z.string().nullable().optional(),
   LotNumber: z.string().nullable().optional(),
