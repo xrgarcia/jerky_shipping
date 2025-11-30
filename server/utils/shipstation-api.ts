@@ -775,6 +775,7 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
   delete updatePayload.insurance_claim;
 
   console.log(`[ShipStation] PUT updating shipment ${shipmentId} with new shipment_number: ${newShipmentNumber}`);
+  console.log(`[ShipStation] Update payload keys:`, Object.keys(updatePayload).join(', '));
 
   const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   const updateResponse = await fetch(updateUrl, {
@@ -788,7 +789,8 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
 
   if (!updateResponse.ok) {
     const errorText = await updateResponse.text();
-    console.error(`[ShipStation] Failed to PUT shipment ${shipmentId}:`, errorText);
+    console.error(`[ShipStation] Failed to PUT shipment ${shipmentId}:`, updateResponse.status, errorText);
+    console.error(`[ShipStation] Full payload was:`, JSON.stringify(updatePayload, null, 2));
     return { success: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
   }
 
