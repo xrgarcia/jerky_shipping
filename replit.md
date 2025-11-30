@@ -114,7 +114,11 @@ Preferred communication style: Simple, everyday language.
         - TODO comments for fields needing warehouse clarification: `IsSerialized`, `IsLotted`, `LotPrioritySetting`
     - **Service Methods**:
         - `getProductDetailsByCode()`: Returns typed ProductDetails discriminated union
-        - Endpoint: `/api/skuvault/qc/product-details/:searchTerm`
+        - `passKitQCItem()`: Marks kit components as QC passed with KitId tracking
+        - Endpoints:
+            - `GET /api/skuvault/qc/product-details/:searchTerm`: Lookup product with type classification
+            - `POST /api/skuvault/qc/pass-item`: Mark individual items as QC passed
+            - `POST /api/skuvault/qc/pass-kit-item`: Mark kit components as QC passed (includes KitId)
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database (primary).
