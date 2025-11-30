@@ -203,6 +203,7 @@ type SkuProgress = {
   requiresManualVerification?: boolean; // For items without SKU
   imageUrl?: string | null; // Product image URL
   skuvaultSynced?: boolean; // True if this item was found in SkuVault PassedItems
+  skuvaultBaseScanned?: number; // Immutable SkuVault baseline for idempotent restoration
   // Kit-related fields (for kits: shows aggregate component progress)
   isKit?: boolean; // True if this is a kit parent
   kitComponents?: KitComponent[] | null; // Nested components for collapsible UI
@@ -677,6 +678,7 @@ export default function Packing() {
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
             skuvaultSynced: remaining === 0, // Synced if all components scanned
+            skuvaultBaseScanned: totalComponentsScanned, // Immutable SkuVault baseline
             isKit: true,
             kitComponents: item.kitComponents, // Keep components for collapsible UI
             totalComponentsExpected,
@@ -714,6 +716,7 @@ export default function Packing() {
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
             skuvaultSynced, // Flag if already scanned in SkuVault
+            skuvaultBaseScanned: scannedInSkuvault, // Immutable SkuVault baseline
             isKit: item.isKit || false,
             skuvaultCode: item.skuvaultCode || null,
           });
@@ -733,6 +736,7 @@ export default function Packing() {
             requiresManualVerification: true,
             imageUrl: item.imageUrl,
             skuvaultSynced: false,
+            skuvaultBaseScanned: 0, // No SkuVault baseline for items without SKU
             isKit: false,
             skuvaultCode: item.skuvaultCode || null,
           });
@@ -770,13 +774,18 @@ export default function Packing() {
     const chronologicalLogs = [...packingLogs].reverse();
     
     setSkuProgress((prevProgress) => {
-      // Reset all counters to 0 to make restoration idempotent
+      // IDEMPOTENT restoration using immutable SkuVault baseline
+      // Use skuvaultBaseScanned (set during initial load) as the starting point
+      // This ensures repeated runs produce the same result
       const updatedProgress = new Map<string, SkuProgress>();
       prevProgress.forEach((progress, key) => {
+        // Use the immutable SkuVault baseline, not the current scanned count
+        // This prevents double-counting when logs are refetched
+        const baseScanned = progress.skuvaultBaseScanned ?? 0;
         updatedProgress.set(key, {
           ...progress,
-          scanned: 0,
-          remaining: progress.expected,
+          scanned: baseScanned,
+          remaining: progress.expected - baseScanned,
         });
       });
       

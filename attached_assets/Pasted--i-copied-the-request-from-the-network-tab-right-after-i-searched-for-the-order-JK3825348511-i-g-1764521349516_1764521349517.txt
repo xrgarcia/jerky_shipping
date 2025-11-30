@@ -1,0 +1,20 @@
+// i copied the request from the network tab. right after i searched for the order JK3825348511, i get this in the network tab
+//
+fetch("https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=JK3825348511", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-US,en;q=0.9",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "cookie": "_ga=GA1.2.619730640.1763847433; ss-pid=mSJeCJHl0tMJahOCDXVr; ss-id=RSUepjxmEVbaSgVbj3cE; sv-zc=352444; last-visited-page-Ray_Garcia=https%3A%2F%2Fapp.skuvault.com%2Fproducts%2FProduct%2FList; sv-zd=372919; unified-list-fulfillment-type=Merchant; sv-culture=en-US; sv-t=sv-4mnu/N7Gfy9CLXYoSMvNVDoNHj+B4qV2+lCoEg+V/l1CGfNuPV41mTdGG+RQ6zU8a9E0leQPJfDopdnIFf0WkAIrdVHWTsMJordPOL6DflkrA1k2uneG8N9imJ0jhHtT0gnIgSSVqr5ERGlfKezK2Il8YGCVSGIJbkdUBFzdpZsXQedmBrxnWEyjFPy4eGUPJ6DcDGRS1PIHx6HaVztn+00mlkoEQfUivmU9TsH1u7rJJbCUA8j5Q46kQGuAFd5hRLDMPPcCfhZnmBS1vXGnISHdU1/owKRCqL3fUJ5ViQoRARkMWu8g6/1xO016l6VE3Kw0VRRQg+IHSHhsGAYUpL2AcDfpMbdAvGmGZL4SkePQHqpAWm5b0Qu6vXM0ikaIQZ5tSzJdiFMvtrE20KsOEWKsIP7vUu3q/vWNizP/dU0YqCCcx6nK8lEuLHUoddC2NyObzDQ1864RdIax4HKLEUerGMhqs0MEPNC5ecju4ijaO+iXkl4d6FhNWYIbwL1aXSZBd+Ap+/qp6eArmjjKjcJWrZdXk8s2XMqXNHOcIbANKr0mfQL8JCpLQDU32do2aP/jjt8FiZBltqyoya+9ogMb0cKKXb4whXRPaVhPif0Ou79mtsVhYomxVePnNv+D8Dd427kAph6o5tVVeK0JAUAUntoXnrL0RTcH1LY9aDMIA+e/T+lrTu7B97MDAOo7z4RAcWtrr7jw88opsQxwjtrxnjqjNGvKN+o+latO+d48SEFeRxQ7zwba9MS08RVdmRgXYeQJZXzjWenwuNkzG+JOdX1Q5KtwfxP8dsl9n675OQHoObwIlnjK8IbUCSQYGmlrnV2Kuvwt8OGq8gxfdAnw6B+I65xQUau0aNWWuwzl2rLkiUQ36cx4nZG3mQdrnHeDodi0vhTKbSEOaM0q80wfhz5TYMMKWZeFwCQFPTbfzbrBc8tl6iTnJ5vjLasqEShZbbjkUczVN2EVKExTcR6cfVs1iM1CdZsR7ZCK/tiYe7pC8sRxIWYfY70QyPzj+m2DluwdHEHiMevPc+a8riCZ29nDzsNahy2Fq3AHCPHQC1UIoOl3Tn6CWT2JiYdteUBUugbw++rGHr/znCHgs1dUaOzdJgLAsn4ljLQLgdKjvn2bykCX0G4K/1NHPSl4sq91cYTqF2sXOQ6H3Bv6dxTeDDejitsX+T3g76AUNGQ97v1SnZbyFg3g7mXTnG+DNg/YCfhn9pZ9vEkofhCNPrzgQ7UdN++qoubKA/5VcTCHaKyZ7z6nVbQ/HtTaEAZmyPAKW/WIAvvtOwPquV1YIN3L4XC4d9/dIR9oB5icpAA=-rywUViOlrCENrTYgGoAA8tuB7ClREWu++rV4DfK/UZntSyJQv6lssED1NyPn3iB5YXmmYFsRHUOqOiPXBCCZSeXQQcTTmSyc+bfHYlOAQsyN+HfEEp9rPz3BzBFCxxN9eNpx8gfAGImAuZnB4CC4qgzCwlvqsEVGlU8YckWp+Ps=; _gid=GA1.2.1331925450.1764457397; _ga_HGD4BZ2VQ4=GS2.2.s1764463263$o4$g1$t1764463896$j60$l0$h0; last-visited-page-Ray=https%3A%2F%2Fapp.skuvault.com%2Fsales%2FQualityControl",
+    "Referer": "https://app.skuvault.com/sales/QualityControl"
+  },
+  "body": null,
+  "method": "GET"
+});
+
