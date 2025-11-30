@@ -3960,15 +3960,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         job.status === 'pending' || job.status === 'queued' || job.status === 'printing'
       );
       
-      // 6. Return combined data with pending print jobs
+      // 6. Build items array - USE SKUVAULT AS GOLDEN SOURCE when available
+      // Transform SkuVault Items to match ShipmentItem format for frontend compatibility
+      let itemsToReturn = shipmentItems; // Fallback to ShipStation if SkuVault unavailable
+      
+      if (qcSale?.Items && qcSale.Items.length > 0) {
+        console.log(`[Packing Validation] Using SkuVault as golden source for items (${qcSale.Items.length} items)`);
+        
+        itemsToReturn = qcSale.Items.map((svItem, index) => {
+          // Try to find matching ShipStation item for additional data (imageUrl, etc.)
+          const matchingSSItem = shipmentItems.find(ssItem => 
+            ssItem.sku && svItem.Sku && 
+            ssItem.sku.trim().toUpperCase() === svItem.Sku.trim().toUpperCase()
+          );
+          
+          return {
+            id: `sv-${svItem.Id || index}`, // Use SkuVault item ID
+            shipmentId: shipment.id,
+            orderItemId: svItem.Id || null,
+            sku: svItem.Sku || null,
+            name: svItem.Title || svItem.Sku || 'Unknown Item',
+            quantity: svItem.Quantity || 1,
+            expectedQuantity: svItem.Quantity || 1, // SkuVault quantity is the expected quantity
+            unitPrice: svItem.UnitPrice?.a?.toString() || null,
+            imageUrl: svItem.Picture || matchingSSItem?.imageUrl || null,
+            // Include SkuVault-specific fields for QC
+            skuvaultItemId: svItem.Id || null,
+            skuvaultCode: svItem.Code || null,
+            skuvaultPartNumber: svItem.PartNumber || null,
+            passedStatus: svItem.PassedStatus || null,
+          };
+        });
+        
+        console.log(`[Packing Validation] Transformed ${itemsToReturn.length} SkuVault items for packing`);
+      } else {
+        console.log(`[Packing Validation] No SkuVault items available, falling back to ShipStation (${shipmentItems.length} items)`);
+        validationWarnings.push("Using ShipStation items - SkuVault data unavailable");
+      }
+      
+      // 7. Return combined data with pending print jobs
       res.json({
         ...shipment,
-        items: shipmentItems,
+        items: itemsToReturn, // SkuVault items (golden source) or ShipStation fallback
         saleId, // SkuVault Sale ID for QC scanning
         qcSale, // Full SkuVault QC Sale data (includes PassedItems, Items, etc.)
         validationWarnings, // Array of warnings if items don't match
         pendingPrintJobs, // Pre-calculated for immediate display
         hasPendingPrintJobs: pendingPrintJobs.length > 0,
+        itemsSource: qcSale?.Items?.length ? 'skuvault' : 'shipstation', // Tell frontend which source was used
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
