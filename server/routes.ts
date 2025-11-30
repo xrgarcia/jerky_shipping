@@ -4652,20 +4652,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: expectedItem.Id,
           quantity: expectedItem.Quantity,
           passedStatus: expectedItem.PassedStatus,
-          isKitComponentMatch,
+          frontendIsKitComponent: isKitComponent, // What frontend claimed
+          fallbackIsKitComponentMatch: isKitComponentMatch, // What fallback determined
           componentId: matchedKitComponent?.Id,
           componentSku: matchedKitComponent?.Sku,
         });
         
         // Get the IdItem and KitId based on whether this is a kit component match
+        // Three branches:
+        // 1. KIT_COMPONENT: Fallback found kit component via KitProducts - use component data for passKitQCItem
+        // 2. KIT_MISMATCH: Frontend claimed kit but fallback couldn't confirm - return error
+        // 3. REGULAR_ITEM: Both agree it's a regular item - use item data for passQCItem
+        
         if (isKitComponentMatch && matchedKitComponent?.Id) {
-          // For kit components: IdItem is the component ID, KitId is the parent kit's ID
+          // BRANCH: KIT_COMPONENT - Fallback confirmed kit component via KitProducts match
           idItem = matchedKitComponent.Id;
           kitId = expectedItem.Id || null; // Parent kit's SkuVault ID
-          console.log(`[Packing QC] Using kit component: componentId=${idItem}, parentKitId=${kitId}, componentSku=${matchedKitComponent.Sku}`);
+          console.log(`[Packing QC] BRANCH: KIT_COMPONENT - componentId=${idItem}, parentKitId=${kitId}, componentSku=${matchedKitComponent.Sku}`);
+        } else if (isKitComponent) {
+          // BRANCH: KIT_MISMATCH - Frontend claimed kit component but:
+          // a) KitProducts match failed (no matchedKitComponent), or
+          // b) Legacy pattern matched parent kit only
+          // Return error - don't silently use wrong endpoint
+          console.error(`[Packing QC] BRANCH: KIT_MISMATCH - Frontend claimed kit component for SKU=${sku} but fallback couldn't find component data. Matched item: ${expectedItem.Sku}, isKitComponentMatch=${isKitComponentMatch}, hasMatchedComponent=${!!matchedKitComponent}`);
+          return res.status(409).json({
+            success: false,
+            error: "Kit component data mismatch - please refresh order data and try again",
+            orderNumber,
+            sku,
+            requiresRefresh: true,
+            details: `Frontend indicated kit component but SkuVault couldn't confirm component data for: ${expectedItem.Sku}`
+          });
         } else {
-          // For regular items: IdItem is the item's own ID
+          // BRANCH: REGULAR_ITEM - Frontend said regular item and fallback confirms
           idItem = expectedItem.Id || null;
+          kitId = null; // Ensure no stale kit data
+          isKitComponentMatch = false; // Ensure consistent state
+          console.log(`[Packing QC] BRANCH: REGULAR_ITEM - idItem=${idItem}, sku=${expectedItem.Sku}`);
         }
       } else {
         // Fast path: Using cached SaleId, IdItem, and KitId from frontend
@@ -4690,20 +4713,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // For kit components, we also need the parent kit's ID
-      if (isKitComponentMatch && !kitId) {
-        console.error(`[Packing QC] Kit component scan missing KitId for SKU ${sku} in order ${orderNumber}`);
-        return res.status(500).json({ 
-          success: false, 
-          error: "Kit component missing parent Kit ID in SkuVault" 
-        });
-      }
-      
       // Log the passQCItem API call
       let result: import('@shared/skuvault-types').QCPassItemResponse;
       
-      // Branch: Use passKitQCItem for kit components, passQCItem for regular items
-      if (isKitComponentMatch && kitId) {
+      // Endpoint selection is based on kitId presence - this is the authoritative signal for kit scans
+      // kitId is only set when we have confirmed kit component data (from cache or KitProducts match)
+      if (kitId) {
         // Kit component scan - use passKitSaleItem endpoint with KitId
         const qcPassKitRequest = {
           KitId: kitId,        // Parent kit's SkuVault ID
