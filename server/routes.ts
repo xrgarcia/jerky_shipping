@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabel as createShipStationLabel } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabel as createShipStationLabel, updateShipmentNumber } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
@@ -2598,6 +2598,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching duplicate shipments:", error);
       res.status(500).json({ error: "Failed to fetch duplicate shipments" });
+    }
+  });
+
+  // Fix shipment number in ShipStation - updates to format: [orderNumber]-[shipmentIdNumber]
+  app.post("/api/shipments/:id/fix-shipment-number", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get the shipment from our database
+      const shipment = await storage.getShipment(id);
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      if (!shipment.shipmentId) {
+        return res.status(400).json({ error: "Shipment has no ShipStation shipment ID" });
+      }
+      
+      if (!shipment.orderNumber) {
+        return res.status(400).json({ error: "Shipment has no order number" });
+      }
+      
+      // Extract the numeric part from the shipment_id (e.g., "se-924665462" -> "924665462")
+      const shipmentIdNumber = shipment.shipmentId.replace(/^se-/, '');
+      
+      // Construct the new shipment_number format: orderNumber-shipmentIdNumber
+      const newShipmentNumber = `${shipment.orderNumber}-${shipmentIdNumber}`;
+      
+      console.log(`[Fix Shipment Number] Updating ${shipment.shipmentId} from order ${shipment.orderNumber} to shipment_number: ${newShipmentNumber}`);
+      
+      // Call ShipStation API to update the shipment_number
+      const result = await updateShipmentNumber(shipment.shipmentId, newShipmentNumber);
+      
+      if (!result.success) {
+        console.error(`[Fix Shipment Number] Failed: ${result.error}`);
+        return res.status(500).json({ error: result.error || "Failed to update shipment number in ShipStation" });
+      }
+      
+      // Update our local shipmentData if it exists
+      if (shipment.shipmentData) {
+        const updatedShipmentData = {
+          ...(shipment.shipmentData as any),
+          shipment_number: newShipmentNumber,
+        };
+        await storage.updateShipment(shipment.id, { shipmentData: updatedShipmentData });
+      }
+      
+      console.log(`[Fix Shipment Number] Successfully updated ${shipment.shipmentId} shipment_number to: ${newShipmentNumber}`);
+      
+      res.json({ 
+        success: true,
+        shipmentId: shipment.shipmentId,
+        oldShipmentNumber: shipment.orderNumber,
+        newShipmentNumber,
+        message: `Successfully updated shipment_number to ${newShipmentNumber}`
+      });
+    } catch (error: any) {
+      console.error("Error fixing shipment number:", error);
+      res.status(500).json({ error: error.message || "Failed to fix shipment number" });
     }
   });
 

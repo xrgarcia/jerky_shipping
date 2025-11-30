@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertTriangle, RefreshCw, ExternalLink, Package, Link2Off, Loader2, Copy, Calendar, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, RefreshCw, ExternalLink, Package, Link2Off, Loader2, Copy, Calendar, ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Collapsible,
   CollapsibleContent,
@@ -148,6 +149,45 @@ export default function BrokenShipmentsReport() {
   const handleRefreshAll = () => {
     refetch();
     refetchDuplicates();
+  };
+
+  // State to track which shipment is being fixed
+  const [fixingShipmentId, setFixingShipmentId] = useState<string | null>(null);
+
+  // Mutation to fix shipment number in ShipStation
+  const fixShipmentNumberMutation = useMutation({
+    mutationFn: async (shipmentId: string) => {
+      const response = await apiRequest('POST', `/api/shipments/${shipmentId}/fix-shipment-number`);
+      return response.json();
+    },
+    onMutate: (shipmentId) => {
+      setFixingShipmentId(shipmentId);
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Shipment Number Fixed",
+        description: `Updated to: ${data.newShipmentNumber}`,
+      });
+      // Refresh the duplicates list
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/duplicate-shipments'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Fix Shipment Number",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setFixingShipmentId(null);
+    },
+  });
+
+  // Helper to generate what the new shipment_number will be
+  const getExpectedNewShipmentNumber = (orderNumber: string, shipmentId: string | null) => {
+    if (!shipmentId) return null;
+    const numericPart = shipmentId.replace(/^se-/, '');
+    return `${orderNumber}-${numericPart}`;
   };
 
   return (
@@ -509,6 +549,7 @@ export default function BrokenShipmentsReport() {
                               <th className="text-left py-2 px-4 text-sm font-medium">Ship Date</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Created</th>
                               <th className="text-left py-2 px-4 text-sm font-medium">Indicators</th>
+                              <th className="text-left py-2 px-4 text-sm font-medium">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -567,6 +608,27 @@ export default function BrokenShipmentsReport() {
                                       {shipment.shipmentDataKeyCount} keys
                                     </Badge>
                                   </div>
+                                </td>
+                                <td className="py-2 px-4">
+                                  {shipment.shipmentId && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => fixShipmentNumberMutation.mutate(shipment.id)}
+                                      disabled={fixingShipmentId === shipment.id}
+                                      title={`Fix to: ${getExpectedNewShipmentNumber(order.orderNumber, shipment.shipmentId)}`}
+                                      data-testid={`button-fix-shipment-${shipment.id}`}
+                                    >
+                                      {fixingShipmentId === shipment.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Wrench className="h-3 w-3 mr-1" />
+                                          Fix #
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             ))}
