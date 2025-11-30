@@ -4477,7 +4477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity = 1, 
         saleId: cachedSaleId,      // Cached from initial order load
         idItem: cachedIdItem,       // Cached item ID (component ID for kits)
-        isKitComponent: cachedIsKitComponent
+        isKitComponent: cachedIsKitComponent,
+        kitId: cachedKitId          // Parent kit's SkuVault ID (for kit component scans)
       } = req.body;
       
       // Validate required fields
@@ -4504,9 +4505,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let saleId: string | null = cachedSaleId || null;
       let idItem: string | null = cachedIdItem || null;
       let isKitComponentMatch = cachedIsKitComponent || false;
+      let kitId: string | null = cachedKitId || null; // Parent kit's SkuVault ID
       
       // Track whether we're using the fast path (cached data) or fallback (fresh lookup)
-      const usingCachedData = !!saleId && !!idItem;
+      // For kit components, we also need kitId for the fast path
+      const usingCachedData = !!saleId && !!idItem && (!isKitComponentMatch || !!kitId);
       
       // Only fetch from SkuVault if we don't have cached values
       if (!usingCachedData) {
@@ -4654,17 +4657,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           componentSku: matchedKitComponent?.Sku,
         });
         
-        // Get the IdItem - use component ID if kit component match, otherwise use parent item ID
+        // Get the IdItem and KitId based on whether this is a kit component match
         if (isKitComponentMatch && matchedKitComponent?.Id) {
+          // For kit components: IdItem is the component ID, KitId is the parent kit's ID
           idItem = matchedKitComponent.Id;
-          console.log(`[Packing QC] Using kit component ID: ${idItem} (component ${matchedKitComponent.Sku})`);
+          kitId = expectedItem.Id || null; // Parent kit's SkuVault ID
+          console.log(`[Packing QC] Using kit component: componentId=${idItem}, parentKitId=${kitId}, componentSku=${matchedKitComponent.Sku}`);
         } else {
+          // For regular items: IdItem is the item's own ID
           idItem = expectedItem.Id || null;
         }
       } else {
-        // Fast path: Using cached SaleId and IdItem from frontend
+        // Fast path: Using cached SaleId, IdItem, and KitId from frontend
         // This saves 1 SkuVault API call (~45% reduction in API traffic for SkuVault-sourced orders)
-        console.log(`[Packing QC] OPTIMIZATION: Using cached data - SaleId=${saleId}, IdItem=${idItem}, isKit=${isKitComponentMatch}`);
+        console.log(`[Packing QC] OPTIMIZATION: Using cached data - SaleId=${saleId}, IdItem=${idItem}, KitId=${kitId}, isKit=${isKitComponentMatch}`);
       }
       
       // Validate we have required IDs
@@ -4684,43 +4690,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Use passQCItem with correct JSON payload (not scanQCItem with form-urlencoded)
-      const qcPassRequest = {
-        IdItem: idItem,
-        IdSale: saleId,
-        Quantity: Number(quantity),
-        ScannedCode: String(sku), // The barcode/SKU that was scanned
-        SerialNumber: "", // Not using serial numbers for QC (empty string per schema)
-      };
-      
-      console.log(`[Packing QC] Calling passQCItem with:`, qcPassRequest);
+      // For kit components, we also need the parent kit's ID
+      if (isKitComponentMatch && !kitId) {
+        console.error(`[Packing QC] Kit component scan missing KitId for SKU ${sku} in order ${orderNumber}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: "Kit component missing parent Kit ID in SkuVault" 
+        });
+      }
       
       // Log the passQCItem API call
       let result: import('@shared/skuvault-types').QCPassItemResponse;
-      try {
-        result = await skuVaultService.passQCItem(qcPassRequest);
+      
+      // Branch: Use passKitQCItem for kit components, passQCItem for regular items
+      if (isKitComponentMatch && kitId) {
+        // Kit component scan - use passKitSaleItem endpoint with KitId
+        const qcPassKitRequest = {
+          KitId: kitId,        // Parent kit's SkuVault ID
+          IdItem: idItem,       // Component's SkuVault ID
+          IdSale: saleId,
+          Quantity: Number(quantity),
+          ScannedCode: String(sku),
+          SerialNumber: "",
+        };
         
-        // Log the response
-        await logSkuVaultApiCall(
-          "skuvault_api_passQCItem",
-          orderNumber,
-          "passQCItem",
-          qcPassRequest,
-          result,
-          result.Success,
-          result.Success ? undefined : (result.Errors?.join(', ') || "Unknown error")
-        );
-      } catch (apiError: any) {
-        await logSkuVaultApiCall(
-          "skuvault_api_passQCItem",
-          orderNumber,
-          "passQCItem",
-          qcPassRequest,
-          null,
-          false,
-          apiError.message || "Unknown error"
-        );
-        throw apiError;
+        console.log(`[Packing QC] Calling passKitQCItem for kit component:`, qcPassKitRequest);
+        
+        try {
+          result = await skuVaultService.passKitQCItem(qcPassKitRequest);
+          
+          // Log the response
+          await logSkuVaultApiCall(
+            "skuvault_api_passKitQCItem",
+            orderNumber,
+            "passKitQCItem",
+            qcPassKitRequest,
+            result,
+            !!result.Success,
+            result.Success ? undefined : (result.Errors?.join(', ') || "Unknown error")
+          );
+        } catch (apiError: any) {
+          await logSkuVaultApiCall(
+            "skuvault_api_passKitQCItem",
+            orderNumber,
+            "passKitQCItem",
+            qcPassKitRequest,
+            null,
+            false,
+            apiError.message || "Unknown error"
+          );
+          throw apiError;
+        }
+      } else {
+        // Regular item scan - use passQCItem endpoint
+        const qcPassRequest = {
+          IdItem: idItem,
+          IdSale: saleId,
+          Quantity: Number(quantity),
+          ScannedCode: String(sku),
+          SerialNumber: "",
+        };
+        
+        console.log(`[Packing QC] Calling passQCItem with:`, qcPassRequest);
+        
+        try {
+          result = await skuVaultService.passQCItem(qcPassRequest);
+          
+          // Log the response
+          await logSkuVaultApiCall(
+            "skuvault_api_passQCItem",
+            orderNumber,
+            "passQCItem",
+            qcPassRequest,
+            result,
+            !!result.Success,
+            result.Success ? undefined : (result.Errors?.join(', ') || "Unknown error")
+          );
+        } catch (apiError: any) {
+          await logSkuVaultApiCall(
+            "skuvault_api_passQCItem",
+            orderNumber,
+            "passQCItem",
+            qcPassRequest,
+            null,
+            false,
+            apiError.message || "Unknown error"
+          );
+          throw apiError;
+        }
       }
       
       if (result.Success) {
