@@ -1164,7 +1164,7 @@ export default function Packing() {
         "Please wait",
         {
           sku: data.sku,
-          productName: data.title || currentProgress.name,
+          productName: currentProgress.name || data.title,
           imageUrl: currentProgress.imageUrl,
         }
       );
@@ -1240,7 +1240,7 @@ export default function Packing() {
             qcResult.error || "Could not verify item in SkuVault",
             {
               sku: data.sku,
-              productName: data.title || currentProgress.name,
+              productName: currentProgress.name || data.title,
             }
           );
 
@@ -1317,7 +1317,7 @@ export default function Packing() {
             sku: data.sku,
             productName: currentProgress.isKit 
               ? `${currentProgress.kitComponents?.[matchingComponentIndex!]?.name || data.title}`
-              : (data.title || currentProgress.name),
+              : (currentProgress.name || data.title),
             imageUrl: currentProgress.isKit 
               ? currentProgress.kitComponents?.[matchingComponentIndex!]?.picture || currentProgress.imageUrl
               : currentProgress.imageUrl,
@@ -1352,7 +1352,7 @@ export default function Packing() {
           "Could not reach SkuVault. Try again.",
           {
             sku: data.sku,
-            productName: data.title || currentProgress.name,
+            productName: currentProgress.name || data.title,
           }
         );
       }
