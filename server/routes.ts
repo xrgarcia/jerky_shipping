@@ -4234,6 +4234,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Synchronous SkuVault QC scan - verifies item is in order then marks as passed
   // Replaces async queue-based approach for immediate feedback
   app.post("/api/packing/qc-scan", requireAuth, async (req, res) => {
+    const userEmail = req.user?.email || "unknown";
+    
+    // Helper to log SkuVault API calls to shipment_events for troubleshooting
+    async function logSkuVaultApiCall(
+      eventName: string,
+      orderNumber: string,
+      apiOperation: string,
+      requestData: any,
+      responseData: any,
+      success: boolean,
+      errorMessage?: string
+    ) {
+      try {
+        await storage.createShipmentEvent({
+          username: userEmail,
+          station: "packing",
+          eventName,
+          orderNumber,
+          metadata: {
+            apiOperation,
+            request: requestData,
+            response: responseData,
+            success,
+            errorMessage,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (logError) {
+        console.error("[Packing QC] Failed to log SkuVault API call:", logError);
+      }
+    }
+    
     try {
       const { orderNumber, sku, quantity = 1 } = req.body;
       
@@ -4248,7 +4280,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Packing QC] Synchronous QC scan: ${sku} x${quantity} for order ${orderNumber}`);
       
       // Step 1: Get QC sale data to verify item is in order
-      const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+      // Log the API request
+      const getQcSalesRequest = { searchTerm: orderNumber };
+      let qcSale: import('@shared/skuvault-types').QCSale | null = null;
+      let getQcSalesError: string | undefined;
+      
+      try {
+        qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        
+        // Log successful response
+        await logSkuVaultApiCall(
+          "skuvault_api_getQCSales",
+          orderNumber,
+          "getQCSalesByOrderNumber",
+          getQcSalesRequest,
+          qcSale ? {
+            SaleId: qcSale.SaleId,
+            OrderId: qcSale.OrderId,
+            Status: qcSale.Status,
+            TotalItems: qcSale.TotalItems,
+            PassedItems: qcSale.PassedItems?.length || 0,
+            FailedItems: qcSale.FailedItems?.length || 0,
+            ItemCount: qcSale.Items?.length || 0,
+            Items: qcSale.Items?.map(item => ({
+              Id: item.Id,
+              Sku: item.Sku,
+              Code: item.Code,
+              PartNumber: item.PartNumber,
+              Quantity: item.Quantity,
+              PassedStatus: item.PassedStatus,
+              FailedStatus: item.FailedStatus,
+            })),
+          } : null,
+          !!qcSale,
+          qcSale ? undefined : "Order not found in SkuVault QC"
+        );
+      } catch (apiError: any) {
+        getQcSalesError = apiError.message || "Unknown error";
+        await logSkuVaultApiCall(
+          "skuvault_api_getQCSales",
+          orderNumber,
+          "getQCSalesByOrderNumber",
+          getQcSalesRequest,
+          null,
+          false,
+          getQcSalesError
+        );
+        throw apiError;
+      }
       
       if (!qcSale) {
         console.warn(`[Packing QC] Order not found in SkuVault QC: ${orderNumber}`);
@@ -4333,7 +4412,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Packing QC] Calling passQCItem with:`, qcPassRequest);
       
-      const result = await skuVaultService.passQCItem(qcPassRequest);
+      // Log the passQCItem API call
+      let result: import('@shared/skuvault-types').QCPassItemResponse;
+      try {
+        result = await skuVaultService.passQCItem(qcPassRequest);
+        
+        // Log the response
+        await logSkuVaultApiCall(
+          "skuvault_api_passQCItem",
+          orderNumber,
+          "passQCItem",
+          qcPassRequest,
+          result,
+          result.Success,
+          result.Success ? undefined : (result.Errors?.join(', ') || "Unknown error")
+        );
+      } catch (apiError: any) {
+        await logSkuVaultApiCall(
+          "skuvault_api_passQCItem",
+          orderNumber,
+          "passQCItem",
+          qcPassRequest,
+          null,
+          false,
+          apiError.message || "Unknown error"
+        );
+        throw apiError;
+      }
       
       if (result.Success) {
         console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
