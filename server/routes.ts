@@ -3967,32 +3967,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (qcSale?.Items && qcSale.Items.length > 0) {
         console.log(`[Packing Validation] Using SkuVault as golden source for items (${qcSale.Items.length} items)`);
         
-        itemsToReturn = qcSale.Items.map((svItem, index) => {
+        // Flatten items - kits expand into their component items
+        const flattenedItems: any[] = [];
+        
+        qcSale.Items.forEach((svItem, index) => {
           // Try to find matching ShipStation item for additional data (imageUrl, etc.)
           const matchingSSItem = shipmentItems.find(ssItem => 
             ssItem.sku && svItem.Sku && 
             ssItem.sku.trim().toUpperCase() === svItem.Sku.trim().toUpperCase()
           );
           
-          return {
-            id: `sv-${svItem.Id || index}`, // Use SkuVault item ID
+          const baseItem = {
+            id: `sv-${svItem.Id || index}`,
             shipmentId: shipment.id,
             orderItemId: svItem.Id || null,
             sku: svItem.Sku || null,
             name: svItem.Title || svItem.Sku || 'Unknown Item',
             quantity: svItem.Quantity || 1,
-            expectedQuantity: svItem.Quantity || 1, // SkuVault quantity is the expected quantity
+            expectedQuantity: svItem.Quantity || 1,
             unitPrice: svItem.UnitPrice?.a?.toString() || null,
             imageUrl: svItem.Picture || matchingSSItem?.imageUrl || null,
-            // Include SkuVault-specific fields for QC
             skuvaultItemId: svItem.Id || null,
             skuvaultCode: svItem.Code || null,
             skuvaultPartNumber: svItem.PartNumber || null,
             passedStatus: svItem.PassedStatus || null,
+            // Kit-related fields
+            isKit: svItem.IsKit || false,
+            isKitComponent: false, // This is a parent item, not a component
+            parentKitSku: null,
+            parentKitId: null,
+            kitProducts: svItem.KitProducts || null, // Include for reference
+            allKitItemsAndSubstitutes: svItem.AllKitItemsAndSubstitutes || null,
+            alternateSkus: svItem.AlternateSkus || null,
+            alternateCodes: svItem.AlternateCodes || null,
           };
+          
+          // If this is a kit, add the parent kit item first
+          if (svItem.IsKit && svItem.KitProducts && svItem.KitProducts.length > 0) {
+            // Add kit parent as a header row (quantity 0 - it's not directly scannable)
+            flattenedItems.push({
+              ...baseItem,
+              quantity: 0, // Kit parent shows 0 qty - components have the real quantities
+              expectedQuantity: 0,
+              isKitHeader: true, // Special flag for UI to render differently
+            });
+            
+            // Add each kit component as a separate scannable item
+            svItem.KitProducts.forEach((component, compIndex) => {
+              // Calculate total quantity: component qty * kit qty ordered
+              const componentTotalQty = (component.Quantity || 1) * (svItem.Quantity || 1);
+              
+              flattenedItems.push({
+                id: `sv-${svItem.Id || index}-kit-${compIndex}`,
+                shipmentId: shipment.id,
+                orderItemId: component.Id || null,
+                sku: component.Sku || null,
+                name: component.Title || component.Sku || 'Unknown Component',
+                quantity: componentTotalQty,
+                expectedQuantity: componentTotalQty,
+                unitPrice: null, // Components don't have separate prices
+                imageUrl: component.Picture || null,
+                skuvaultItemId: component.Id || null,
+                skuvaultCode: component.Code || null, // This is the scannable barcode
+                skuvaultPartNumber: component.PartNumber || null,
+                passedStatus: null,
+                // Kit component flags
+                isKit: false,
+                isKitComponent: true, // This is a component item
+                parentKitSku: svItem.Sku,
+                parentKitId: svItem.Id,
+                parentKitTitle: svItem.Title,
+                isKitHeader: false,
+                kitProducts: null,
+                allKitItemsAndSubstitutes: null,
+                alternateSkus: null,
+                alternateCodes: null,
+              });
+            });
+            
+            console.log(`[Packing Validation] Expanded kit ${svItem.Sku} into ${svItem.KitProducts.length} components`);
+          } else {
+            // Regular item (not a kit) - add as-is
+            flattenedItems.push(baseItem);
+          }
         });
         
-        console.log(`[Packing Validation] Transformed ${itemsToReturn.length} SkuVault items for packing`);
+        itemsToReturn = flattenedItems;
+        console.log(`[Packing Validation] Transformed ${qcSale.Items.length} SkuVault items into ${flattenedItems.length} flattened items (kits expanded)`);
       } else {
         console.log(`[Packing Validation] No SkuVault items available, falling back to ShipStation (${shipmentItems.length} items)`);
         validationWarnings.push("Using ShipStation items - SkuVault data unavailable");
