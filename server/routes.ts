@@ -4208,6 +4208,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to check if a scanned SKU is a component of a kit SKU
+  // Kit pattern: base SKU with -X2, -X3, -X4, etc. suffix (e.g., JCB-POJ-6-16-X2)
+  // Component pattern: base SKU without multiplier (e.g., JCB-POJ-6-16)
+  function isComponentOfKit(scannedSku: string, kitSku: string): boolean {
+    const normalizedScanned = scannedSku.toUpperCase().trim();
+    const normalizedKit = kitSku.toUpperCase().trim();
+    
+    // Check for kit multiplier pattern: -X2, -X3, -X4, -X5, etc.
+    const kitMultiplierPattern = /^(.+)-X(\d+)$/;
+    const match = normalizedKit.match(kitMultiplierPattern);
+    
+    if (match) {
+      const baseSku = match[1]; // The base SKU without multiplier
+      // Check if scanned SKU matches the base SKU of the kit
+      if (normalizedScanned === baseSku) {
+        console.log(`[Packing QC] Kit match: scanned ${scannedSku} is component of kit ${kitSku}`);
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
   // Synchronous SkuVault QC scan - verifies item is in order then marks as passed
   // Replaces async queue-based approach for immediate feedback
   app.post("/api/packing/qc-scan", requireAuth, async (req, res) => {
@@ -4237,16 +4260,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Step 2: Find the item in expected items by SKU (case-insensitive)
+      // Supports exact match AND kit-component matching (e.g., scanning JCB-POJ-6-16 matches kit JCB-POJ-6-16-X2)
       const normalizedSku = sku.toUpperCase().trim();
-      const expectedItem = qcSale.Items?.find(item => {
+      let expectedItem = qcSale.Items?.find(item => {
         const itemSku = (item.Sku || '').toUpperCase().trim();
         const itemCode = (item.Code || '').toUpperCase().trim();
         const itemPartNumber = (item.PartNumber || '').toUpperCase().trim();
         return itemSku === normalizedSku || itemCode === normalizedSku || itemPartNumber === normalizedSku;
       });
       
+      // If no exact match, try kit-component matching
+      // This allows scanning a component barcode (e.g., JCB-POJ-6-16) to match a kit SKU (e.g., JCB-POJ-6-16-X2)
       if (!expectedItem) {
-        console.warn(`[Packing QC] SKU ${sku} not found in order ${orderNumber}`);
+        expectedItem = qcSale.Items?.find(item => {
+          const itemSku = item.Sku || '';
+          const itemCode = item.Code || '';
+          // Check if scanned SKU is a component of any kit SKU in the order
+          return isComponentOfKit(normalizedSku, itemSku) || isComponentOfKit(normalizedSku, itemCode);
+        });
+        
+        if (expectedItem) {
+          console.log(`[Packing QC] Matched via kit-component: scanned ${sku} → kit ${expectedItem.Sku}`);
+        }
+      }
+      
+      if (!expectedItem) {
+        console.warn(`[Packing QC] SKU ${sku} not found in order ${orderNumber} (checked exact match and kit-component match)`);
         return res.status(404).json({ 
           success: false, 
           error: `Item ${sku} is not in this order`,

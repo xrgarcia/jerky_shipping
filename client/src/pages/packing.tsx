@@ -412,6 +412,44 @@ export default function Packing() {
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
   
+  // Helper to check if a scanned SKU is a component of a kit SKU
+  // Kit pattern: base SKU with -X2, -X3, -X4, etc. suffix (e.g., JCB-POJ-6-16-X2)
+  // Component pattern: base SKU without multiplier (e.g., JCB-POJ-6-16)
+  const isComponentOfKit = (scannedSku: string, kitSku: string): boolean => {
+    const normalizedScanned = scannedSku.toUpperCase().trim();
+    const normalizedKit = kitSku.toUpperCase().trim();
+    
+    // Check for kit multiplier pattern: -X2, -X3, -X4, -X5, etc.
+    const kitMultiplierPattern = /^(.+)-X(\d+)$/;
+    const match = normalizedKit.match(kitMultiplierPattern);
+    
+    if (match) {
+      const baseSku = match[1]; // The base SKU without multiplier
+      // Check if scanned SKU matches the base SKU of the kit
+      return normalizedScanned === baseSku;
+    }
+    
+    return false;
+  };
+  
+  // Check if scanned SKU matches expected SKU (exact match or kit-component match)
+  const skuMatchesExpected = (scannedSku: string, expectedSku: string): boolean => {
+    const normalizedScanned = normalizeSku(scannedSku);
+    const normalizedExpected = normalizeSku(expectedSku);
+    
+    // Exact match
+    if (normalizedScanned === normalizedExpected) {
+      return true;
+    }
+    
+    // Kit-component match (scanned component matches kit SKU)
+    if (isComponentOfKit(normalizedScanned, normalizedExpected)) {
+      return true;
+    }
+    
+    return false;
+  };
+  
   // Helper to format order age
   const formatOrderAge = (orderDate: string | null): string => {
     if (!orderDate) return 'N/A';
@@ -905,11 +943,13 @@ export default function Packing() {
       const normalizedSku = normalizeSku(data.sku);
       
       // STEP 1: Find ANY matching SKU (regardless of remaining quantity)
+      // Supports exact match AND kit-component matching (e.g., scanning JCB-POJ-6-16 matches kit JCB-POJ-6-16-X2)
       let matchingItemKey: string | null = null;
       let matchingProgress: SkuProgress | null = null;
       
       for (const [key, progress] of Array.from(skuProgress.entries())) {
-        if (progress.normalizedSku === normalizedSku) {
+        // Use skuMatchesExpected which handles both exact and kit-component matches
+        if (skuMatchesExpected(normalizedSku, progress.normalizedSku)) {
           // Found a matching SKU - prioritize items with remaining units
           if (!matchingProgress || progress.remaining > 0) {
             matchingItemKey = key;
