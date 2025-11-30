@@ -5168,8 +5168,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[Packing] No existing label found, creating new label for ${shipment.orderNumber}...`);
             
             // Strip ShipStation-managed fields from payload
+            // CRITICAL: Keep shipment_id to attach label to existing shipment (prevents duplicates)
             const cleanShipmentData = { ...(shipment.shipmentData as any) };
-            delete cleanShipmentData.shipment_id;
+            // DO NOT delete shipment_id - we need it to attach label to existing shipment
             delete cleanShipmentData.label_id;
             delete cleanShipmentData.created_at;
             delete cleanShipmentData.modified_at;
@@ -5182,6 +5183,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (cleanShipmentData.ship_from) {
               delete cleanShipmentData.warehouse_id;
             }
+            
+            // Log the shipment_id to confirm it's being preserved
+            console.log(`[Packing] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id || 'MISSING (will create new shipment!)'}`);
             
             const labelData = await createShipStationLabel(cleanShipmentData);
             labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
