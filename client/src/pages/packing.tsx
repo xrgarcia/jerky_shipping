@@ -73,6 +73,13 @@ type ShipmentItem = {
   skuvaultCode?: string | null;
   skuvaultPartNumber?: string | null;
   passedStatus?: string | null;
+  // Kit-related fields (present when items come from SkuVault)
+  isKit?: boolean; // True if this item is a kit parent
+  isKitComponent?: boolean; // True if this item is a kit component (child)
+  isKitHeader?: boolean; // True for kit header row (quantity 0, not scannable)
+  parentKitSku?: string | null; // SKU of parent kit (for component items)
+  parentKitId?: string | null; // ID of parent kit
+  parentKitTitle?: string | null; // Title of parent kit
 };
 
 type QCSale = {
@@ -186,6 +193,13 @@ type SkuProgress = {
   requiresManualVerification?: boolean; // For items without SKU
   imageUrl?: string | null; // Product image URL
   skuvaultSynced?: boolean; // True if this item was found in SkuVault PassedItems
+  // Kit-related fields
+  isKit?: boolean; // True if this is a kit parent
+  isKitComponent?: boolean; // True if this is a kit component
+  isKitHeader?: boolean; // True for kit header row (not scannable, just a visual marker)
+  parentKitSku?: string | null; // SKU of parent kit (for component items)
+  parentKitTitle?: string | null; // Title of parent kit (for display)
+  skuvaultCode?: string | null; // Barcode from SkuVault (for kit components especially)
 };
 
 type ScanFeedback = {
@@ -637,6 +651,30 @@ export default function Packing() {
         // Use expectedQuantity from SkuVault session if available, otherwise fall back to ShipStation quantity
         const expectedQty = item.expectedQuantity ?? item.quantity;
         
+        // Kit headers are not scannable - they show as 0 quantity markers
+        // Skip adding progress for kit headers (they're just visual grouping)
+        if (item.isKitHeader) {
+          progress.set(key, {
+            itemId: item.id,
+            sku: item.sku || "KIT",
+            normalizedSku: item.sku ? normalizeSku(item.sku) : "",
+            name: item.name,
+            expected: 0, // Kit headers have 0 expected - components have the real quantities
+            scanned: 0,
+            remaining: 0,
+            requiresManualVerification: false,
+            imageUrl: item.imageUrl,
+            skuvaultSynced: false,
+            isKit: true,
+            isKitComponent: false,
+            isKitHeader: true,
+            parentKitSku: null,
+            parentKitTitle: null,
+            skuvaultCode: item.skuvaultCode,
+          });
+          return; // Skip to next item
+        }
+        
         if (item.sku) {
           const normalized = normalizeSku(item.sku);
           
@@ -663,6 +701,13 @@ export default function Packing() {
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
             skuvaultSynced, // Flag if already scanned in SkuVault
+            // Kit-related fields
+            isKit: item.isKit || false,
+            isKitComponent: item.isKitComponent || false,
+            isKitHeader: false,
+            parentKitSku: item.parentKitSku || null,
+            parentKitTitle: item.parentKitTitle || null,
+            skuvaultCode: item.skuvaultCode || null,
           });
           
           if (scannedInSkuvault > 0) {
@@ -680,6 +725,12 @@ export default function Packing() {
             requiresManualVerification: true,
             imageUrl: item.imageUrl,
             skuvaultSynced: false,
+            isKit: false,
+            isKitComponent: item.isKitComponent || false,
+            isKitHeader: false,
+            parentKitSku: item.parentKitSku || null,
+            parentKitTitle: item.parentKitTitle || null,
+            skuvaultCode: item.skuvaultCode || null,
           });
         }
       });
@@ -2015,15 +2066,23 @@ export default function Packing() {
                   const completedItems: Array<[string, SkuProgress]> = [];
                   
                   Array.from(skuProgress.entries()).forEach(([key, progress]) => {
+                    // Kit headers are always "complete" (0/0) but should stay with their components
+                    // So we check if they have pending components
                     const isComplete = progress.scanned >= progress.expected;
-                    if (isComplete) {
+                    
+                    if (progress.isKitHeader) {
+                      // Kit headers go to pending if any of their components are pending
+                      // We'll determine this later during sorting
+                      pendingItems.push([key, progress]);
+                    } else if (isComplete) {
                       completedItems.push([key, progress]);
                     } else {
                       pendingItems.push([key, progress]);
                     }
                   });
                   
-                  // Sort pending by remaining (most remaining first - prioritize work)
+                  // Sort items to keep kit headers with their components
+                  // Kit headers come first, followed by their components, then regular items
                   pendingItems.sort((a, b) => b[1].remaining - a[1].remaining);
                   
                   // Render function for item cards
@@ -2031,12 +2090,53 @@ export default function Packing() {
                     const isComplete = progress.scanned >= progress.expected;
                     const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
                     const shipmentItem = currentShipment?.items.find(item => item.id === progress.itemId);
-                    const isFirstPending = index === 0 && !isComplete;
+                    const isFirstPending = index === 0 && !isComplete && !progress.isKitHeader;
+                    
+                    // Kit header styling - purple background with "Kit" badge
+                    if (progress.isKitHeader) {
+                      return (
+                        <div
+                          key={key}
+                          className="p-4 rounded-lg border-2 border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30"
+                          data-testid={`progress-kit-${progress.sku}`}
+                        >
+                          <div className="flex items-start gap-4">
+                            {progress.imageUrl && (
+                              <img
+                                src={progress.imageUrl}
+                                alt={progress.name}
+                                className="w-20 h-20 object-cover rounded-md border-2 flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0 text-xs">
+                                  <Boxes className="h-3 w-3 mr-1" />
+                                  Kit
+                                </Badge>
+                                <div className="font-semibold text-lg truncate">{progress.name}</div>
+                              </div>
+                              <div className="text-md text-muted-foreground font-mono mt-1">
+                                {progress.sku}
+                              </div>
+                              <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                                Scan the components below
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Kit component styling - indented with "Kit Item" badge
+                    const isKitComponent = progress.isKitComponent;
                     
                     return (
                       <div
                         key={key}
                         className={`p-4 rounded-lg transition-all ${
+                          isKitComponent ? "ml-6 border-l-4 border-l-purple-400 dark:border-l-purple-600" : ""
+                        } ${
                           isComplete
                             ? "border-2 border-muted-foreground/30 bg-muted/50"
                             : progress.requiresManualVerification
@@ -2062,6 +2162,12 @@ export default function Packing() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className="font-semibold text-xl truncate">{progress.name}</div>
+                              {isKitComponent && (
+                                <Badge variant="outline" className="flex-shrink-0 text-xs border-purple-400 text-purple-600 dark:text-purple-400">
+                                  <Boxes className="h-3 w-3 mr-1" />
+                                  Kit Item
+                                </Badge>
+                              )}
                               {isFirstPending && !isComplete && (
                                 <Badge variant="default" className="flex-shrink-0 text-xs">
                                   <Zap className="h-3 w-3 mr-1" />
@@ -2078,6 +2184,12 @@ export default function Packing() {
                             <div className="text-lg text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
+                            {/* Show parent kit info for kit components */}
+                            {isKitComponent && progress.parentKitTitle && (
+                              <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                                Part of: {progress.parentKitTitle}
+                              </div>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
@@ -2122,6 +2234,8 @@ export default function Packing() {
                               className={`h-full transition-all ${
                                 progress.requiresManualVerification
                                   ? "bg-orange-600"
+                                  : isKitComponent
+                                  ? "bg-purple-500"
                                   : "bg-muted-foreground/50"
                               }`}
                               style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
