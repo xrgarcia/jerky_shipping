@@ -39,7 +39,7 @@ import {
   Gift,
   Building2,
   CircleDashed,
-  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -2338,7 +2338,7 @@ export default function Packing() {
                                             {compComplete ? (
                                               <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
                                             ) : compPartial ? (
-                                              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+                                              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-500" />
                                             ) : (
                                               <CircleDashed className="h-5 w-5 text-purple-500 dark:text-purple-400" />
                                             )}
