@@ -938,15 +938,21 @@ export default function Packing() {
     },
   });
 
-  // Local barcode validation (instant lookup from local database)
+  // SkuVault barcode validation (cached lookup including kit components)
   type LocalBarcodeResponse = {
     valid: boolean;
     sku?: string;
     barcode?: string;
     title?: string;
-    variantId?: string;
-    productId?: string;
+    quantity?: number;
+    itemId?: string;          // SkuVault Item ID
+    saleId?: string;          // SkuVault Sale ID
+    isKitComponent?: boolean; // True if this is a kit component
+    kitId?: string;           // Parent kit's SkuVault ID (for kit components)
+    kitSku?: string;          // Parent kit's SKU
+    kitTitle?: string;        // Parent kit's title
     error?: string;
+    orderNumber?: string;
     scannedValue?: string;
   };
 
@@ -979,10 +985,15 @@ export default function Packing() {
     },
   });
 
-  // Validate product with local barcode lookup (replaces SkuVault API call)
+  // Validate product with SkuVault cached lookup (includes kit components)
   const validateProductMutation = useMutation({
     mutationFn: async (scannedCode: string) => {
-      const response = await apiRequest("GET", `/api/packing/validate-barcode/${encodeURIComponent(scannedCode)}`);
+      // Use orderNumber from currentShipment to look up in SkuVault cache
+      const orderNumber = currentShipment?.orderNumber;
+      if (!orderNumber) {
+        return { valid: false, error: "No order selected" } as LocalBarcodeResponse;
+      }
+      const response = await apiRequest("GET", `/api/packing/validate-barcode/${encodeURIComponent(orderNumber)}/${encodeURIComponent(scannedCode)}`);
       return (await response.json()) as LocalBarcodeResponse;
     },
     onSuccess: async (data, scannedCode) => {
@@ -1078,7 +1089,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: data.sku,
           scannedCode,
-          skuVaultProductId: data.variantId || null,
+          skuVaultProductId: data.itemId || null,
           success: false,
           errorMessage: `SKU ${data.sku} not in this shipment`,
         });
@@ -1127,7 +1138,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: data.sku,
           scannedCode,
-          skuVaultProductId: data.variantId || null,
+          skuVaultProductId: data.itemId || null,
           success: false,
           errorMessage: errorMsg,
         });
@@ -1232,7 +1243,7 @@ export default function Packing() {
             action: "product_scanned",
             productSku: data.sku,
             scannedCode,
-            skuVaultProductId: data.variantId || null,
+            skuVaultProductId: data.itemId || null,
             success: false,
             errorMessage: qcResult.error || "SkuVault QC verification failed",
           });
@@ -1264,7 +1275,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: data.sku,
           scannedCode,
-          skuVaultProductId: data.variantId || null,
+          skuVaultProductId: data.itemId || null,
           success: true,
           errorMessage: null,
         });
@@ -1344,7 +1355,7 @@ export default function Packing() {
           action: "product_scanned",
           productSku: data.sku,
           scannedCode,
-          skuVaultProductId: data.variantId || null,
+          skuVaultProductId: data.itemId || null,
           success: false,
           errorMessage: qcError.message || "SkuVault QC request failed",
         });

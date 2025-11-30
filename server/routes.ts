@@ -21,7 +21,7 @@ import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, 
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
-import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
+import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -3977,6 +3977,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             PassedItems: qcSale.PassedItems?.length ?? 0,
           });
           
+          // Cache QCSale data for barcode validation (includes kit components)
+          await qcSaleCache.set(orderNumber, qcSale);
+          
           // 3. Cross-validate items between ShipStation and SkuVault
           const skuVaultSkus = new Set((qcSale.Items ?? []).map(item => item.Sku).filter(Boolean));
           const shipStationSkus = new Set(shipmentItems.map(item => item.sku).filter(Boolean));
@@ -4311,10 +4314,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fast barcode validation for packing - uses local indexed lookup (instant)
-  app.get("/api/packing/validate-barcode/:barcode", requireAuth, async (req, res) => {
+  // Fast barcode validation for packing - uses SkuVault cached data (includes kit components)
+  // Requires orderNumber to look up in the cached QCSale data
+  app.get("/api/packing/validate-barcode/:orderNumber/:barcode", requireAuth, async (req, res) => {
     try {
-      const { barcode } = req.params;
+      const { orderNumber, barcode } = req.params;
+      
+      if (!orderNumber || orderNumber.trim() === '') {
+        return res.status(400).json({ 
+          valid: false, 
+          error: "Order number is required" 
+        });
+      }
       
       if (!barcode || barcode.trim() === '') {
         return res.status(400).json({ 
@@ -4323,30 +4334,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // First try exact barcode match (most common case)
-      let variant = await storage.getVariantByBarcode(barcode);
+      // Look up barcode in cached QCSale data (includes regular items AND kit components)
+      const lookupResult = await qcSaleCache.lookup(orderNumber, barcode);
       
-      // If not found by barcode, try SKU lookup (some items may be scanned by SKU)
-      if (!variant) {
-        variant = await storage.getVariantBySku(barcode);
-      }
-      
-      if (!variant) {
+      if (!lookupResult.found) {
+        // Cache miss or barcode not in order - try to refresh cache
+        console.log(`[Packing Validation] Barcode ${barcode} not found in cache for order ${orderNumber}, fetching fresh data`);
+        
+        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        if (qcSale) {
+          await qcSaleCache.set(orderNumber, qcSale);
+          
+          // Retry lookup with fresh cache
+          const retryResult = await qcSaleCache.lookup(orderNumber, barcode);
+          if (retryResult.found) {
+            console.log(`[Packing Validation] Barcode ${barcode} found after cache refresh: ${retryResult.sku} (kit=${retryResult.isKitComponent})`);
+            return res.json({
+              valid: true,
+              sku: retryResult.sku,
+              barcode: retryResult.code,
+              title: retryResult.title,
+              quantity: retryResult.quantity,
+              itemId: retryResult.itemId,
+              saleId: retryResult.saleId,
+              isKitComponent: retryResult.isKitComponent,
+              kitId: retryResult.kitId,
+              kitSku: retryResult.kitSku,
+              kitTitle: retryResult.kitTitle,
+            });
+          }
+        }
+        
         return res.status(404).json({ 
           valid: false, 
-          error: "Product not found",
-          scannedValue: barcode
+          error: "Product not found in order",
+          scannedValue: barcode,
+          orderNumber,
         });
       }
       
-      // Return minimal data needed for packing validation
+      console.log(`[Packing Validation] Barcode ${barcode} validated: ${lookupResult.sku} (kit=${lookupResult.isKitComponent})`);
+      
+      // Return full data needed for packing validation (SkuVault-sourced)
       res.json({
         valid: true,
-        sku: variant.sku,
-        barcode: variant.barCode,
-        title: variant.title,
-        variantId: variant.id,
-        productId: variant.productId
+        sku: lookupResult.sku,
+        barcode: lookupResult.code,
+        title: lookupResult.title,
+        quantity: lookupResult.quantity,
+        itemId: lookupResult.itemId,
+        saleId: lookupResult.saleId,
+        isKitComponent: lookupResult.isKitComponent,
+        kitId: lookupResult.kitId,
+        kitSku: lookupResult.kitSku,
+        kitTitle: lookupResult.kitTitle,
       });
     } catch (error: any) {
       console.error("[Packing] Error validating barcode:", error);

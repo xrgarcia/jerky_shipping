@@ -198,6 +198,215 @@ class LockoutCache {
 }
 
 /**
+ * Barcode lookup result from QCSale cache
+ * Contains all info needed for validation and QC scanning
+ */
+export interface BarcodeLookupResult {
+  found: true;
+  sku: string;
+  code: string | null; // Barcode
+  title: string | null;
+  quantity: number;
+  itemId: string | null; // SkuVault Item ID (for passQCItem)
+  saleId: string;
+  isKitComponent: boolean;
+  kitId?: string | null; // Parent kit's SkuVault ID (for passKitQCItem)
+  kitSku?: string | null; // Parent kit's SKU
+  kitTitle?: string | null; // Parent kit's title
+}
+
+export interface BarcodeLookupNotFound {
+  found: false;
+  saleId?: string;
+}
+
+export type BarcodeLookup = BarcodeLookupResult | BarcodeLookupNotFound;
+
+/**
+ * Redis-based QCSale cache for order validation
+ * Stores QCSale data with a flattened barcode/SKU lookup map
+ * Includes both regular items AND kit component items for comprehensive validation
+ * Uses short TTL (2 minutes) to keep data fresh
+ */
+class QCSaleCache {
+  private readonly KEY_PREFIX = 'skuvault:qcsale:';
+  private readonly TTL_SECONDS = 120; // 2 minutes - short TTL for fresh data
+
+  private getCacheKey(orderNumber: string): string {
+    return `${this.KEY_PREFIX}${orderNumber}`;
+  }
+
+  /**
+   * Cache QCSale data with a flattened barcode lookup map
+   * Builds lookup map from both regular items AND kit components
+   */
+  async set(orderNumber: string, qcSale: import('@shared/skuvault-types').QCSale): Promise<void> {
+    try {
+      const redis = getRedisClient();
+      const saleId = qcSale.SaleId || '';
+      
+      // Build flattened lookup map: barcode/SKU -> item info
+      const lookupMap: Record<string, BarcodeLookupResult> = {};
+      
+      for (const item of qcSale.Items || []) {
+        const regularItemResult: BarcodeLookupResult = {
+          found: true,
+          sku: item.Sku || '',
+          code: item.Code || null,
+          title: item.Title || null,
+          quantity: item.Quantity || 1,
+          itemId: item.Id || null,
+          saleId,
+          isKitComponent: false,
+        };
+        
+        // Add regular item by Code (barcode)
+        if (item.Code) {
+          lookupMap[item.Code.toUpperCase()] = regularItemResult;
+        }
+        
+        // Add regular item by SKU
+        if (item.Sku) {
+          lookupMap[item.Sku.toUpperCase()] = regularItemResult;
+        }
+        
+        // Add regular item by PartNumber (UPC barcode)
+        if (item.PartNumber) {
+          lookupMap[item.PartNumber.toUpperCase()] = regularItemResult;
+        }
+        
+        // Add kit component items
+        if (item.KitProducts && item.KitProducts.length > 0) {
+          for (const component of item.KitProducts) {
+            const componentResult: BarcodeLookupResult = {
+              found: true,
+              sku: component.Sku || '',
+              code: component.Code || null,
+              title: component.Title || null,
+              quantity: component.Quantity || 1,
+              itemId: component.Id || null, // Component's SkuVault ID
+              saleId,
+              isKitComponent: true,
+              kitId: item.Id || null, // Parent kit's SkuVault ID
+              kitSku: item.Sku || null,
+              kitTitle: item.Title || null,
+            };
+            
+            // Add kit component by Code (barcode)
+            if (component.Code) {
+              lookupMap[component.Code.toUpperCase()] = componentResult;
+            }
+            
+            // Add kit component by SKU
+            if (component.Sku) {
+              lookupMap[component.Sku.toUpperCase()] = componentResult;
+            }
+            
+            // Add kit component by PartNumber (UPC barcode)
+            // This is critical - many scanners return PartNumber, not Code
+            if (component.PartNumber) {
+              lookupMap[component.PartNumber.toUpperCase()] = componentResult;
+            }
+          }
+        }
+        
+        // Also check AlternateCodes for item and kit components
+        if (item.AlternateCodes) {
+          for (const altCode of item.AlternateCodes) {
+            if (altCode && !lookupMap[altCode.toUpperCase()]) {
+              lookupMap[altCode.toUpperCase()] = {
+                found: true,
+                sku: item.Sku || '',
+                code: altCode,
+                title: item.Title || null,
+                quantity: item.Quantity || 1,
+                itemId: item.Id || null,
+                saleId,
+                isKitComponent: false,
+              };
+            }
+          }
+        }
+      }
+      
+      const cacheData = {
+        saleId,
+        orderNumber,
+        cachedAt: Date.now(),
+        lookupMap,
+      };
+      
+      await redis.set(this.getCacheKey(orderNumber), JSON.stringify(cacheData), { ex: this.TTL_SECONDS });
+      console.log(`[QCSaleCache] Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[QCSaleCache] Redis unavailable for caching: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Look up a barcode/SKU in the cached order data
+   * Returns item info if found, or not-found result
+   */
+  async lookup(orderNumber: string, barcodeOrSku: string): Promise<BarcodeLookup> {
+    try {
+      const redis = getRedisClient();
+      const cacheData = await redis.get<string>(this.getCacheKey(orderNumber));
+      
+      if (!cacheData) {
+        console.log(`[QCSaleCache] Cache miss for order ${orderNumber}`);
+        return { found: false };
+      }
+      
+      const parsed = JSON.parse(cacheData);
+      const key = barcodeOrSku.toUpperCase();
+      
+      if (parsed.lookupMap && parsed.lookupMap[key]) {
+        console.log(`[QCSaleCache] Cache hit for ${barcodeOrSku} in order ${orderNumber}`);
+        return parsed.lookupMap[key];
+      }
+      
+      console.log(`[QCSaleCache] Barcode ${barcodeOrSku} not found in cached order ${orderNumber}`);
+      return { found: false, saleId: parsed.saleId };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[QCSaleCache] Redis unavailable for lookup: ${errorMsg}`);
+      return { found: false };
+    }
+  }
+
+  /**
+   * Check if order is cached
+   */
+  async has(orderNumber: string): Promise<boolean> {
+    try {
+      const redis = getRedisClient();
+      const exists = await redis.exists(this.getCacheKey(orderNumber));
+      return exists > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Clear cache for an order (e.g., after QC changes)
+   */
+  async clear(orderNumber: string): Promise<void> {
+    try {
+      const redis = getRedisClient();
+      await redis.del(this.getCacheKey(orderNumber));
+      console.log(`[QCSaleCache] Cleared cache for order ${orderNumber}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[QCSaleCache] Redis unavailable for cache clear: ${errorMsg}`);
+    }
+  }
+}
+
+// Export singleton instance for use in routes
+export const qcSaleCache = new QCSaleCache();
+
+/**
  * Parse SkuVault error message to detect and extract lockout duration
  * Returns duration in minutes, or null if no lockout detected
  */
