@@ -38,6 +38,8 @@ import {
   Boxes,
   Gift,
   Building2,
+  CircleDashed,
+  AlertTriangle,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -2283,35 +2285,83 @@ export default function Packing() {
                                 <div className="space-y-2 mt-2">
                                   {progress.kitComponents.map((comp) => {
                                     const compComplete = comp.scannedQuantity >= comp.quantity;
+                                    const compPartial = comp.scannedQuantity > 0 && comp.scannedQuantity < comp.quantity;
+                                    const progressPercent = comp.quantity > 0 ? (comp.scannedQuantity / comp.quantity) * 100 : 0;
+                                    
+                                    // Determine status colors - purple accent for untouched state
+                                    const statusColor = compComplete 
+                                      ? "text-green-600 dark:text-green-500" 
+                                      : compPartial 
+                                        ? "text-amber-600 dark:text-amber-500" 
+                                        : "text-purple-500 dark:text-purple-400";
+                                    const progressBarColor = compComplete 
+                                      ? "bg-green-500" 
+                                      : compPartial 
+                                        ? "bg-amber-500" 
+                                        : "bg-purple-200 dark:bg-purple-800";
+                                    const borderColor = compComplete
+                                      ? "border-green-200 dark:border-green-800"
+                                      : compPartial
+                                        ? "border-amber-200 dark:border-amber-800"
+                                        : "border-purple-200 dark:border-purple-800";
+                                    
                                     return (
                                       <div 
                                         key={comp.id}
-                                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                                        className={`p-3 rounded-lg border ${
                                           compComplete 
-                                            ? "bg-muted/50 border-muted-foreground/20" 
-                                            : "bg-white dark:bg-background border-purple-200 dark:border-purple-800"
-                                        }`}
+                                            ? "bg-green-50/50 dark:bg-green-950/20" 
+                                            : compPartial
+                                              ? "bg-amber-50/50 dark:bg-amber-950/20"
+                                              : "bg-white dark:bg-background"
+                                        } ${borderColor}`}
+                                        data-testid={`kit-component-${comp.sku || comp.id}`}
                                       >
-                                        {comp.picture && (
-                                          <img
-                                            src={comp.picture}
-                                            alt={comp.name}
-                                            className="w-12 h-12 object-cover rounded-md border flex-shrink-0"
-                                          />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <div className="font-medium text-sm truncate">{comp.name}</div>
-                                          <div className="text-xs text-muted-foreground font-mono">
-                                            {comp.code || comp.sku || 'No barcode'}
+                                        <div className="flex items-start gap-3">
+                                          {/* Component Product Image */}
+                                          {comp.picture && (
+                                            <img
+                                              src={comp.picture}
+                                              alt={comp.name}
+                                              className="w-14 h-14 object-cover rounded-md border-2 flex-shrink-0"
+                                              data-testid={`img-component-${comp.sku || comp.id}`}
+                                            />
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm truncate">{comp.name}</div>
+                                            <div className="text-xs text-muted-foreground font-mono">
+                                              {comp.code || comp.sku || 'No barcode'}
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-2 flex-shrink-0">
+                                            {/* Status Icon */}
+                                            {compComplete ? (
+                                              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
+                                            ) : compPartial ? (
+                                              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+                                            ) : (
+                                              <CircleDashed className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                                            )}
+                                            {/* Progress Text */}
+                                            <span className={`font-bold text-sm min-w-[3rem] text-right ${statusColor}`}>
+                                              {comp.scannedQuantity} / {comp.quantity}
+                                            </span>
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                          {compComplete && (
-                                            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                                          )}
-                                          <span className={`font-semibold text-sm ${compComplete ? 'text-muted-foreground' : ''}`}>
-                                            {comp.scannedQuantity} / {comp.quantity}
-                                          </span>
+                                        {/* Mini Progress Bar */}
+                                        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                                          <div
+                                            className={`h-full transition-all ${progressBarColor}`}
+                                            style={{ width: `${progressPercent}%` }}
+                                          />
+                                        </div>
+                                        {/* Status Label */}
+                                        <div className={`mt-1 text-xs ${statusColor}`}>
+                                          {compComplete 
+                                            ? "Complete" 
+                                            : compPartial 
+                                              ? `${comp.scannedQuantity} of ${comp.quantity} picked` 
+                                              : "Not started"}
                                         </div>
                                       </div>
                                     );
