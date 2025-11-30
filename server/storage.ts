@@ -230,6 +230,7 @@ export interface IStorage {
   getShipmentEventsByOrderNumber(orderNumber: string): Promise<ShipmentEvent[]>;
   getShipmentEventsByUser(username: string, limit?: number): Promise<ShipmentEvent[]>;
   getShipmentEventsByDateRange(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
+  getPackingCompletedEvents(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
   deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void>;
   
   // Shipment Sync Failures
@@ -1897,6 +1898,20 @@ export class DatabaseStorage implements IStorage {
       .from(shipmentEvents)
       .where(
         and(
+          gte(shipmentEvents.occurredAt, startDate),
+          lte(shipmentEvents.occurredAt, endDate)
+        )
+      )
+      .orderBy(desc(shipmentEvents.occurredAt));
+  }
+
+  async getPackingCompletedEvents(startDate: Date, endDate: Date): Promise<ShipmentEvent[]> {
+    return await db
+      .select()
+      .from(shipmentEvents)
+      .where(
+        and(
+          eq(shipmentEvents.eventName, 'packing_completed'),
           gte(shipmentEvents.occurredAt, startDate),
           lte(shipmentEvents.occurredAt, endDate)
         )

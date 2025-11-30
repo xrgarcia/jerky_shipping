@@ -2542,6 +2542,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Packed shipments report - shows shipments by date they were packed
+  app.get("/api/reports/packed-shipments", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Parse YYYY-MM-DD strings as Central Time
+      const start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // Get all packing_completed events in the date range
+      const packingEvents = await storage.getPackingCompletedEvents(start, end);
+      
+      // Group events by date (in Central Time)
+      const byDate: Record<string, typeof packingEvents> = {};
+      const byUser: Record<string, number> = {};
+      
+      for (const event of packingEvents) {
+        // Format date as YYYY-MM-DD in Central Time
+        const dateKey = formatInTimeZone(event.occurredAt, CST_TIMEZONE, 'yyyy-MM-dd');
+        
+        if (!byDate[dateKey]) {
+          byDate[dateKey] = [];
+        }
+        byDate[dateKey].push(event);
+        
+        // Count by user
+        byUser[event.username] = (byUser[event.username] || 0) + 1;
+      }
+      
+      // Convert to array sorted by date descending
+      const dailySummary = Object.entries(byDate)
+        .map(([date, events]) => {
+          // Count by user for this day
+          const userBreakdown: Record<string, number> = {};
+          for (const event of events) {
+            userBreakdown[event.username] = (userBreakdown[event.username] || 0) + 1;
+          }
+          
+          return {
+            date,
+            count: events.length,
+            userBreakdown,
+            orders: events.map(e => ({
+              orderNumber: e.orderNumber,
+              packedAt: e.occurredAt,
+              packedBy: e.username,
+            })),
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+      
+      res.json({
+        startDate,
+        endDate,
+        totalPacked: packingEvents.length,
+        userSummary: Object.entries(byUser)
+          .map(([username, count]) => ({ username, count }))
+          .sort((a, b) => b.count - a.count),
+        dailySummary,
+      });
+    } catch (error) {
+      console.error("Error fetching packed shipments:", error);
+      res.status(500).json({ error: "Failed to fetch packed shipments" });
+    }
+  });
+
   app.get("/api/reports/summary", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

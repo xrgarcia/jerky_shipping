@@ -144,6 +144,11 @@ export function AppSidebar() {
       icon: Store,
     },
     {
+      title: "Packed Shipments",
+      url: "/reports/packed-shipments",
+      icon: PackageCheck,
+    },
+    {
       title: "Broken Shipments",
       url: "/reports/broken-shipments",
       icon: AlertTriangle,

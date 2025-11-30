@@ -18,6 +18,7 @@ import PrintQueue from "@/pages/print-queue";
 import Profile from "@/pages/profile";
 import ShopifySalesReport from "@/pages/reports/shopify-sales";
 import BrokenShipmentsReport from "@/pages/reports/broken-shipments";
+import PackedShipmentsReport from "@/pages/reports/packed-shipments";
 import Sessions from "@/pages/sessions";
 import Operations from "@/pages/operations";
 import PORecommendations from "@/pages/po-recommendations";
@@ -77,6 +78,7 @@ function AppContent() {
       <Route path="/print-queue" component={PrintQueue} />
       <Route path="/reports/shopify-sales" component={ShopifySalesReport} />
       <Route path="/reports/broken-shipments" component={BrokenShipmentsReport} />
+      <Route path="/reports/packed-shipments" component={PackedShipmentsReport} />
       <Route path="/reports">
         <Redirect to="/reports/shopify-sales" />
       </Route>
