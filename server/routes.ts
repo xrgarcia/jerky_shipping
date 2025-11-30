@@ -677,7 +677,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(`Failed to fetch PDF: ${response.statusText}`);
       }
 
+      // Check content type to ensure we got a PDF, not an error page
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/pdf') && !contentType.includes('application/octet-stream')) {
+        // Log the first part of the response for debugging
+        const textContent = await response.text();
+        console.error(`[Label Proxy] Expected PDF but got ${contentType}:`, textContent.substring(0, 200));
+        return res.status(502).json({ error: "Label unavailable - ShipStation returned invalid content" });
+      }
+
       const pdfBuffer = await response.arrayBuffer();
+      
+      // Additional check: PDF files start with %PDF
+      const pdfBytes = new Uint8Array(pdfBuffer);
+      const header = String.fromCharCode(...pdfBytes.slice(0, 4));
+      if (header !== '%PDF') {
+        console.error(`[Label Proxy] Invalid PDF header:`, header);
+        return res.status(502).json({ error: "Label unavailable - invalid PDF content" });
+      }
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename="label.pdf"');
