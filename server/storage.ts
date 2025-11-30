@@ -254,6 +254,22 @@ export interface IStorage {
     shopifyOrderSyncFailures: number;
   }>;
 
+  // Broken Shipments Report - Duplicate shipments detection
+  getDuplicateShipments(startDate: Date, endDate: Date): Promise<{
+    orderNumber: string;
+    shipmentCount: number;
+    shipments: Array<{
+      id: string;
+      shipmentId: string | null;
+      trackingNumber: string | null;
+      carrierCode: string | null;
+      serviceCode: string | null;
+      status: string | null;
+      shipDate: Date | null;
+      createdAt: Date | null;
+    }>;
+  }[]>;
+
   // Pipeline Metrics (SkuVault session workflow)
   getPipelineMetrics(): Promise<{
     sessionedToday: number;
@@ -2029,6 +2045,91 @@ export class DatabaseStorage implements IStorage {
       shipmentSyncFailures: syncFailuresResult[0]?.count || 0,
       shopifyOrderSyncFailures: shopifyOrderSyncFailuresResult[0]?.count || 0,
     };
+  }
+
+  // Broken Shipments Report - Find orders with duplicate shipments
+  async getDuplicateShipments(startDate: Date, endDate: Date): Promise<{
+    orderNumber: string;
+    shipmentCount: number;
+    shipments: Array<{
+      id: string;
+      shipmentId: string | null;
+      trackingNumber: string | null;
+      carrierCode: string | null;
+      serviceCode: string | null;
+      status: string | null;
+      shipDate: Date | null;
+      createdAt: Date | null;
+    }>;
+  }[]> {
+    // Step 1: Find order_numbers with multiple shipments in the date range
+    const duplicateOrdersResult = await db
+      .select({
+        orderNumber: shipments.orderNumber,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(shipments)
+      .where(
+        and(
+          isNotNull(shipments.orderNumber),
+          gte(shipments.createdAt, startDate),
+          lte(shipments.createdAt, endDate)
+        )
+      )
+      .groupBy(shipments.orderNumber)
+      .having(sql`count(*) > 1`)
+      .orderBy(sql`count(*) DESC`);
+
+    if (duplicateOrdersResult.length === 0) {
+      return [];
+    }
+
+    // Step 2: Get all shipments for those order numbers
+    const orderNumbers = duplicateOrdersResult.map(r => r.orderNumber).filter((n): n is string => n !== null);
+    
+    const shipmentsResult = await db
+      .select({
+        id: shipments.id,
+        orderNumber: shipments.orderNumber,
+        shipmentId: shipments.shipmentId,
+        trackingNumber: shipments.trackingNumber,
+        carrierCode: shipments.carrierCode,
+        serviceCode: shipments.serviceCode,
+        status: shipments.status,
+        shipDate: shipments.shipDate,
+        createdAt: shipments.createdAt,
+      })
+      .from(shipments)
+      .where(inArray(shipments.orderNumber, orderNumbers))
+      .orderBy(shipments.orderNumber, desc(shipments.createdAt));
+
+    // Step 3: Group shipments by order number
+    const groupedShipments = new Map<string, typeof shipmentsResult>();
+    for (const shipment of shipmentsResult) {
+      const orderNum = shipment.orderNumber;
+      if (!orderNum) continue;
+      
+      if (!groupedShipments.has(orderNum)) {
+        groupedShipments.set(orderNum, []);
+      }
+      groupedShipments.get(orderNum)!.push(shipment);
+    }
+
+    // Step 4: Build result array
+    return duplicateOrdersResult.map(r => ({
+      orderNumber: r.orderNumber!,
+      shipmentCount: r.count,
+      shipments: (groupedShipments.get(r.orderNumber!) || []).map(s => ({
+        id: s.id,
+        shipmentId: s.shipmentId,
+        trackingNumber: s.trackingNumber,
+        carrierCode: s.carrierCode,
+        serviceCode: s.serviceCode,
+        status: s.status,
+        shipDate: s.shipDate,
+        createdAt: s.createdAt,
+      })),
+    }));
   }
 
   // Pipeline Metrics - Track SkuVault session workflow progress

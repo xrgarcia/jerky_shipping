@@ -2542,6 +2542,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Duplicate shipments report - finds orders with multiple shipments
+  app.get("/api/reports/duplicate-shipments", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Parse YYYY-MM-DD strings as Central Time
+      const start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // Get orders with duplicate shipments
+      const duplicates = await storage.getDuplicateShipments(start, end);
+      
+      // Calculate totals
+      const totalOrders = duplicates.length;
+      const totalDuplicateShipments = duplicates.reduce((sum, d) => sum + d.shipmentCount, 0);
+      
+      res.json({
+        startDate,
+        endDate,
+        totalOrders,
+        totalDuplicateShipments,
+        duplicates: duplicates.map(d => ({
+          ...d,
+          shipments: d.shipments.map(s => ({
+            ...s,
+            shipDate: s.shipDate?.toISOString() || null,
+            createdAt: s.createdAt?.toISOString() || null,
+          })),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching duplicate shipments:", error);
+      res.status(500).json({ error: "Failed to fetch duplicate shipments" });
+    }
+  });
+
   // Packed shipments report - shows shipments by date they were packed
   app.get("/api/reports/packed-shipments", requireAuth, async (req, res) => {
     try {
