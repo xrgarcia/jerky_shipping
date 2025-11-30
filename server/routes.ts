@@ -4400,16 +4400,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Step 2: Find the item in expected items by SKU (case-insensitive)
-      // Supports exact match AND kit-component matching (e.g., scanning JCB-POJ-6-16 matches kit JCB-POJ-6-16-X2)
+      // Supports:
+      // 1. Exact SKU/Code/PartNumber match
+      // 2. Kit component barcode match (from KitProducts[].Code array)
+      // 3. Legacy kit-component pattern matching (e.g., scanning JCB-POJ-6-16 matches kit JCB-POJ-6-16-X2)
       const normalizedSku = sku.toUpperCase().trim();
-      let expectedItem = qcSale.Items?.find(item => {
+      let expectedItem: import('@shared/skuvault-types').QCExpectedItem | undefined;
+      let matchedKitComponent: import('@shared/skuvault-types').KitProduct | undefined;
+      let isKitComponentMatch = false;
+      
+      // First try exact match on top-level items
+      expectedItem = qcSale.Items?.find(item => {
         const itemSku = (item.Sku || '').toUpperCase().trim();
         const itemCode = (item.Code || '').toUpperCase().trim();
         const itemPartNumber = (item.PartNumber || '').toUpperCase().trim();
         return itemSku === normalizedSku || itemCode === normalizedSku || itemPartNumber === normalizedSku;
       });
       
-      // If no exact match, try kit-component matching
+      // If no exact match, check if this is a kit component barcode
+      // Kit components have their barcodes in KitProducts[].Code array
+      if (!expectedItem) {
+        for (const item of (qcSale.Items || [])) {
+          // Only check items that are kits with KitProducts
+          if (!item.IsKit || !item.KitProducts || item.KitProducts.length === 0) {
+            continue;
+          }
+          
+          // Check if scanned barcode matches any kit component's Code (barcode)
+          const component = item.KitProducts.find(comp => {
+            const componentCode = (comp.Code || '').toUpperCase().trim();
+            const componentSku = (comp.Sku || '').toUpperCase().trim();
+            const componentPartNumber = (comp.PartNumber || '').toUpperCase().trim();
+            return componentCode === normalizedSku || componentSku === normalizedSku || componentPartNumber === normalizedSku;
+          });
+          
+          if (component) {
+            expectedItem = item;
+            matchedKitComponent = component;
+            isKitComponentMatch = true;
+            console.log(`[Packing QC] Matched kit component: scanned ${sku} → component ${component.Sku} (ID: ${component.Id}) of kit ${item.Sku}`);
+            break;
+          }
+        }
+      }
+      
+      // If still no match, try legacy kit-component pattern matching
       // This allows scanning a component barcode (e.g., JCB-POJ-6-16) to match a kit SKU (e.g., JCB-POJ-6-16-X2)
       if (!expectedItem) {
         expectedItem = qcSale.Items?.find(item => {
@@ -4420,7 +4455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (expectedItem) {
-          console.log(`[Packing QC] Matched via kit-component: scanned ${sku} → kit ${expectedItem.Sku}`);
+          console.log(`[Packing QC] Matched via legacy kit-component pattern: scanned ${sku} → kit ${expectedItem.Sku}`);
         }
       }
       
@@ -4439,7 +4474,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code: expectedItem.Code,
         id: expectedItem.Id,
         quantity: expectedItem.Quantity,
-        passedStatus: expectedItem.PassedStatus
+        passedStatus: expectedItem.PassedStatus,
+        isKitComponentMatch,
+        componentId: matchedKitComponent?.Id,
+        componentSku: matchedKitComponent?.Sku,
       });
       
       // Step 3: Call passItem to mark as QC passed
@@ -4452,8 +4490,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get the IdItem from the expected item - required for passQCItem
-      const idItem = expectedItem.Id;
+      // Get the IdItem - use component ID if kit component match, otherwise use parent item ID
+      // For kit components, we need to use the component's ID to properly decrement its quantity
+      let idItem: string | null = null;
+      
+      if (isKitComponentMatch && matchedKitComponent?.Id) {
+        // Use the kit component's ID for proper quantity tracking
+        idItem = matchedKitComponent.Id;
+        console.log(`[Packing QC] Using kit component ID: ${idItem} (component ${matchedKitComponent.Sku})`);
+      } else {
+        // Use the parent item's ID for non-kit items or legacy matches
+        idItem = expectedItem.Id || null;
+      }
+      
       if (!idItem) {
         console.error(`[Packing QC] No IdItem found for SKU ${sku} in order ${orderNumber}`);
         return res.status(500).json({ 
