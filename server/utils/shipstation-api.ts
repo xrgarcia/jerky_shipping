@@ -719,7 +719,7 @@ export async function unsubscribeWebhook(webhookId: string): Promise<void> {
 
 /**
  * Update shipment_number for an existing shipment in ShipStation
- * Uses PUT /v2/shipments/{shipment_id} to update the shipment
+ * Uses PATCH /v2/shipments/{shipment_id} for partial update - only sends the field being changed
  * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462")
  * @param newShipmentNumber The new shipment_number value (e.g., "JK3825346033-924665462")
  */
@@ -728,64 +728,16 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  // First, get the current shipment data
-  const getUrl = `${SHIPSTATION_API_BASE}/v2/shipments?shipment_id=${encodeURIComponent(shipmentId)}`;
-  
-  const getResponse = await fetch(getUrl, {
-    headers: {
-      'api-key': SHIPSTATION_API_KEY,
-      'Content-Type': 'application/json',
-    },
-  });
+  console.log(`[ShipStation] PATCH updating shipment ${shipmentId} with new shipment_number: ${newShipmentNumber}`);
 
-  if (!getResponse.ok) {
-    const errorText = await getResponse.text();
-    return { success: false, error: `Failed to fetch shipment: ${getResponse.status} ${errorText}` };
-  }
-
-  const getData = await getResponse.json();
-  const shipments = getData.shipments || [];
-  
-  if (shipments.length === 0) {
-    return { success: false, error: `Shipment ${shipmentId} not found in ShipStation` };
-  }
-
-  const currentShipment = shipments[0];
-  
-  // Update the shipment with the new shipment_number
-  // Use PUT /v2/shipments/{shipment_id} to update the existing shipment
+  // Use PATCH for partial update - only send the field we want to change
+  const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   const updatePayload = {
-    ...currentShipment,
     shipment_number: newShipmentNumber,
   };
-  
-  // Remove read-only fields and identifiers that can't be sent back
-  // shipment_id must be removed because it's in the URL path - including it causes "identifiers_must_match" error
-  delete updatePayload.shipment_id;
-  delete updatePayload.created_at;
-  delete updatePayload.modified_at;
-  delete updatePayload.label_id;
-  delete updatePayload.shipment_status;
-  delete updatePayload.label_status;
-  delete updatePayload.tracking_number;
-  delete updatePayload.label_download;
-  delete updatePayload.form_download;
-  delete updatePayload.insurance_claim;
-  
-  // If ship_from is provided, remove warehouse_id (mutually exclusive)
-  if (updatePayload.ship_from) {
-    delete updatePayload.warehouse_id;
-  }
-  
-  // Log the payload for debugging
-  console.log(`[ShipStation] Update payload keys:`, Object.keys(updatePayload));
 
-  console.log(`[ShipStation] Updating shipment ${shipmentId} with new shipment_number: ${newShipmentNumber}`);
-
-  // Use PUT to update the existing shipment
-  const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   const updateResponse = await fetch(updateUrl, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: {
       'api-key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
@@ -795,7 +747,7 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
 
   if (!updateResponse.ok) {
     const errorText = await updateResponse.text();
-    console.error(`[ShipStation] Failed to update shipment ${shipmentId}:`, errorText);
+    console.error(`[ShipStation] Failed to PATCH shipment ${shipmentId}:`, errorText);
     return { success: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
   }
 
