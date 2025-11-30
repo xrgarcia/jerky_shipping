@@ -378,6 +378,24 @@ export const qcPassItemRequestSchema = z.object({
 export type QCPassItemRequest = z.infer<typeof qcPassItemRequestSchema>;
 
 /**
+ * Request payload for marking a kit component as QC passed
+ * Used when scanning components of a kit/assembled product
+ * Endpoint: POST /sales/QualityControl/passKitSaleItem
+ */
+export const qcPassKitSaleItemRequestSchema = z.object({
+  KitId: z.string(),              // Parent kit's product ID
+  IdItem: z.string(),             // Component item's product ID
+  Quantity: z.coerce.number().min(1),
+  IdSale: z.string().nullable().optional(), // Cached SaleId (may be null)
+  OrderNumber: z.string().optional(), // Fallback for backend lookup
+  Note: z.string().nullable().optional(),
+  ScannedCode: z.string(),
+  SerialNumber: z.string().nullable().optional().default(""),
+});
+
+export type QCPassKitSaleItemRequest = z.infer<typeof qcPassKitSaleItemRequestSchema>;
+
+/**
  * Response from QC pass item endpoint
  * SkuVault returns: {"Data": null, "Errors": [], "Success": true}
  */

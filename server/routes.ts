@@ -22,7 +22,7 @@ import { ShipStationShipmentService } from "./services/shipstation-shipment-serv
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError } from "./services/skuvault-service";
-import { qcPassItemRequestSchema } from "@shared/skuvault-types";
+import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
 import type { PORecommendation } from "@shared/reporting-schema";
@@ -1328,6 +1328,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(500).json({ 
         error: "Failed to mark item as QC passed",
+        message: error.message 
+      });
+    }
+  });
+
+  // Mark a kit component as QC passed
+  app.post("/api/skuvault/qc/pass-kit-item", requireAuth, async (req, res) => {
+    try {
+      // Validate and parse request body with Zod schema
+      const parseResult = qcPassKitSaleItemRequestSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          message: "Request body validation failed",
+          details: parseResult.error.format()
+        });
+      }
+      
+      // Hybrid approach: Use cached SaleId if available
+      let saleId = parseResult.data.IdSale;
+      
+      if (parseResult.data.IdSale === undefined && parseResult.data.OrderNumber) {
+        try {
+          console.log(`[QC Kit Pass] No cached SaleId, looking up for order: ${parseResult.data.OrderNumber}`);
+          const saleInfo = await skuVaultService.getSaleInformation(parseResult.data.OrderNumber);
+          if (saleInfo?.SaleId) {
+            saleId = saleInfo.SaleId;
+            console.log(`[QC Kit Pass] Found SaleId: ${saleId}`);
+          } else {
+            console.log(`[QC Kit Pass] Order not in SkuVault - skipping QC pass (non-blocking)`);
+          }
+        } catch (error: any) {
+          console.log(`[QC Kit Pass] Lookup failed - skipping QC pass (non-blocking):`, error.message);
+        }
+      } else if (parseResult.data.IdSale === null) {
+        console.log(`[QC Kit Pass] SaleId already looked up (not found) - skipping QC pass`);
+      }
+      
+      // Only call SkuVault QC if we have a valid SaleId
+      if (saleId) {
+        try {
+          const qcData = {
+            ...parseResult.data,
+            IdSale: saleId,
+          };
+          
+          console.log(`[QC Kit Pass] Attempting kit QC pass with SaleId: ${saleId}, KitId: ${qcData.KitId}`);
+          const result = await skuVaultService.passKitQCItem(qcData);
+          res.json(result);
+        } catch (error: any) {
+          // Graceful degradation: Log but return success so packing continues
+          console.warn(`[QC Kit Pass] SkuVault kit QC pass failed (non-blocking):`, error.message);
+          
+          res.json({
+            Success: true,
+            Data: null,
+            Errors: [],
+          });
+        }
+      } else {
+        // No SaleId available - skip QC pass but return success
+        console.log(`[QC Kit Pass] No valid SaleId - skipping QC pass (order not in SkuVault)`);
+        res.json({
+          Success: true,
+          Data: null,
+          Errors: [],
+        });
+      }
+    } catch (error: any) {
+      console.error("Error marking kit component as QC passed:", error);
+      
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to mark kit component as QC passed",
         message: error.message 
       });
     }

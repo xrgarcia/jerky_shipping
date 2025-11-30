@@ -27,6 +27,7 @@ import {
   productLookupResponseSchema,
   type ProductLookupResponse,
   type QCPassItemRequest,
+  type QCPassKitSaleItemRequest,
   qcPassItemResponseSchema,
   type QCPassItemResponse,
   saleInformationResponseSchema,
@@ -1108,6 +1109,42 @@ export class SkuVaultService {
 
     } catch (error) {
       console.error(`[SkuVault QC] Error passing QC item:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a kit component as QC passed for a specific order
+   * Used when scanning individual components of a kit or assembled product
+   * 
+   * Endpoint: POST /sales/QualityControl/passKitSaleItem
+   * 
+   * @param itemData - Kit QC pass item request data (includes KitId)
+   * @returns Response indicating success or failure
+   */
+  async passKitQCItem(itemData: QCPassKitSaleItemRequest): Promise<QCPassItemResponse> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = '/sales/QualityControl/passKitSaleItem';
+      console.log(`[SkuVault QC] Marking kit component as QC passed:`, {
+        KitId: itemData.KitId,
+        IdItem: itemData.IdItem,
+        Quantity: itemData.Quantity,
+        IdSale: itemData.IdSale,
+        ScannedCode: itemData.ScannedCode,
+      });
+      
+      const response = await this.makeQCRequest<any>('POST', endpoint, itemData);
+      
+      // SkuVault returns: {"Data": null, "Errors": [], "Success": true}
+      const validatedResponse = qcPassItemResponseSchema.parse(response);
+      
+      console.log(`[SkuVault QC] Kit component QC passed successfully, response:`, validatedResponse);
+      return validatedResponse;
+
+    } catch (error) {
+      console.error(`[SkuVault QC] Error passing kit component QC:`, error);
       throw error;
     }
   }
