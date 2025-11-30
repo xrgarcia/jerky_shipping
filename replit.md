@@ -106,6 +106,15 @@ Preferred communication style: Simple, everyday language.
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, utilizing webhooks.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning. Features automatic authentication with Redis-backed token caching.
+    - **Product Lookup Types** (`shared/skuvault-types.ts`): Discriminated union type system for product classification:
+        - `ProductType`: 'individual' | 'kit' | 'assembledProduct'
+        - `ProductLookupEnvelope`: Full Zod schema for API response validation
+        - `ProductDetails`: Discriminated union (IndividualProductDetails | KitProductDetails | AssembledProductDetails)
+        - `transformProductLookup()`: Normalizes API response into typed ProductDetails
+        - TODO comments for fields needing warehouse clarification: `IsSerialized`, `IsLotted`, `LotPrioritySetting`
+    - **Service Methods**:
+        - `getProductDetailsByCode()`: Returns typed ProductDetails discriminated union
+        - Endpoint: `/api/skuvault/qc/product-details/:searchTerm`
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database (primary).

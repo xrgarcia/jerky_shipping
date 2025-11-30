@@ -1208,6 +1208,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Look up a product with full type discrimination (individual/kit/assembled)
+  // Returns discriminated union type with all product details
+  app.get("/api/skuvault/qc/product-details/:searchTerm", requireAuth, async (req, res) => {
+    try {
+      const { searchTerm } = req.params;
+      console.log(`Looking up product details for QC: ${searchTerm}`);
+      
+      const { product, rawResponse } = await skuVaultService.getProductDetailsByCode(searchTerm);
+      
+      if (!product) {
+        return res.status(404).json({ 
+          error: "Product not found",
+          message: `No product found with code/SKU: ${searchTerm}`,
+          rawResponse
+        });
+      }
+      
+      res.json({ 
+        product,
+        productType: product.productType,
+        rawResponse
+      });
+    } catch (error: any) {
+      console.error("Error looking up product details for QC:", error);
+      
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to lookup product details",
+        message: error.message 
+      });
+    }
+  });
+
   // Mark an item as QC passed
   app.post("/api/skuvault/qc/pass-item", requireAuth, async (req, res) => {
     try {

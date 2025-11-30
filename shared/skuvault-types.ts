@@ -596,3 +596,333 @@ export const qcSalesResponseSchema = z.object({
 });
 
 export type QCSalesResponse = z.infer<typeof qcSalesResponseSchema>;
+
+/**
+ * =============================================================================
+ * Product Lookup Types (getProductOrKitByCodeOrSkuOrPartNumber endpoint)
+ * =============================================================================
+ * 
+ * These types represent the full response from the product lookup endpoint,
+ * which is called when scanning barcodes during QC to identify the product.
+ * 
+ * Uses a discriminated union pattern to differentiate between:
+ * - Individual products (IsKit=false, IsAssembledProduct=false)
+ * - Kit products (IsKit=true) - bundles of components
+ * - Assembled products (IsAssembledProduct=true) - similar to kits but assembled
+ * 
+ * TODO (Ray): Ask warehouse manager to clarify the differences between kits
+ * and assembled products for proper handling in the packing workflow.
+ */
+
+/**
+ * Product type discriminator
+ * Used to explicitly categorize products for type-safe branching
+ */
+export type ProductType = 'individual' | 'kit' | 'assembledProduct';
+
+/**
+ * Supplier information for a product
+ */
+export const productSupplierSchema = z.object({
+  Id: z.string().nullable().optional(),
+  Name: z.string().nullable().optional(),
+  Cost: z.number().nullable().optional(),
+  LeadTime: z.number().nullable().optional(),
+  IsLeadTimeUsesGlobalValue: z.boolean().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  Active: z.boolean().nullable().optional(),
+});
+
+export type ProductSupplier = z.infer<typeof productSupplierSchema>;
+
+/**
+ * Currency/price value structure from SkuVault
+ */
+export const priceValueSchema = z.object({
+  a: z.number().nullable().optional(), // Amount
+  s: z.string().nullable().optional(), // Currency symbol (e.g., "$")
+});
+
+export type PriceValue = z.infer<typeof priceValueSchema>;
+
+/**
+ * Product picture from SkuVault
+ */
+export const productPictureSchema = z.object({
+  Url: z.string().nullable().optional(),
+});
+
+export type ProductPicture = z.infer<typeof productPictureSchema>;
+
+/**
+ * Base product fields shared by all product types
+ * These fields are present regardless of whether the product is
+ * an individual item, kit, or assembled product.
+ */
+export const baseProductDataSchema = z.object({
+  Id: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(), // Barcode
+  Sku: z.string().nullable().optional(),
+  SkuJson: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+  TitleJson: z.string().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  
+  Classification: z.object({
+    Id: z.string().nullable().optional(),
+    Name: z.string().nullable().optional(),
+  }).nullable().optional(),
+  ClassificationId: z.string().nullable().optional(),
+  ClassificationName: z.string().nullable().optional(),
+  
+  BrandId: z.string().nullable().optional(),
+  BrandName: z.string().nullable().optional(),
+  
+  PrimarySupplier: productSupplierSchema.nullable().optional(),
+  SupplierId: z.string().nullable().optional(),
+  Suppliers: z.array(productSupplierSchema).nullable().optional(),
+  SupplierNames: z.array(z.string().nullable()).nullable().optional(),
+  
+  Cost: priceValueSchema.nullable().optional(),
+  SalePrice: priceValueSchema.nullable().optional(),
+  RetailPrice: priceValueSchema.nullable().optional(),
+  
+  Weight: z.any().nullable().optional(),
+  WeightValue: z.number().nullable().optional(),
+  WeightUnit: z.string().nullable().optional(),
+  
+  ReorderPoint: z.number().nullable().optional(),
+  IncrementalQuantity: z.number().nullable().optional(),
+  
+  // Inventory quantities (global, not order-specific)
+  QuantityOnHand: z.number().nullable().optional(),
+  QuantityOnHandCase: z.number().nullable().optional(),
+  QuantityPending: z.number().nullable().optional(),
+  IncomingQuantity: z.number().nullable().optional(),
+  QuantityAvailable: z.number().nullable().optional(),
+  ExternalQuantityAvailable: z.number().nullable().optional(),
+  PickedQuantity: z.number().nullable().optional(),
+  PickedQuantityCase: z.number().nullable().optional(),
+  TotalQuantity: z.number().nullable().optional(),
+  TotalCaseQuantity: z.number().nullable().optional(),
+  TotalNotCountedQuantity: z.number().nullable().optional(),
+  TotalSecondaryQuantity: z.number().nullable().optional(),
+  TotalSecondaryCaseQuantity: z.number().nullable().optional(),
+  TotalCountedCaseQuantity: z.number().nullable().optional(),
+  TotalNotCountedCaseQuantity: z.number().nullable().optional(),
+  TotalQuantityOnHold: z.number().nullable().optional(),
+  TotalQuantityCasedOnHold: z.number().nullable().optional(),
+  
+  CreateDate: z.string().nullable().optional(),
+  ModifiedDate: z.string().nullable().optional(),
+  
+  FbaInventory: z.any().nullable().optional(),
+  WfsInventory: z.any().nullable().optional(),
+  
+  Attributes: z.array(z.any()).nullable().optional(),
+  Pictures: z.array(productPictureSchema).nullable().optional(),
+  WeightUnits: z.array(z.any()).nullable().optional(),
+  AlternateCodes: z.array(z.string()).nullable().optional(),
+  AlternateSkus: z.array(z.any()).nullable().optional(),
+  
+  // Product type flags - used to determine ProductType
+  IsKit: z.boolean().nullable().optional(),
+  IsAssembledProduct: z.boolean().nullable().optional(),
+  IsCasePack: z.boolean().nullable().optional(),
+  IsQuickCreation: z.boolean().nullable().optional(),
+  
+  CorrespondingKitQuantity: z.number().nullable().optional(),
+  MinimumOrderQuantity: z.any().nullable().optional(),
+  MinimumOrderQuantityInfo: z.any().nullable().optional(),
+  
+  Note: z.string().nullable().optional(),
+  StatusesIds: z.array(z.any()).nullable().optional(),
+  StatusesNames: z.array(z.string()).nullable().optional(),
+  LongDescription: z.string().nullable().optional(),
+  ShortDescription: z.string().nullable().optional(),
+  VariationParentSku: z.string().nullable().optional(),
+  DontSendQty: z.boolean().nullable().optional(),
+  CountAmazonChannelAccounts: z.number().nullable().optional(),
+  ExternalInventory: z.any().nullable().optional(),
+  
+  // TODO (Ray): Ask warehouse manager about these serialization/lot fields.
+  // We don't fully understand when IsSerialized or IsLotted would be true
+  // and what additional validation that requires during QC scanning.
+  IsSerialized: z.boolean().nullable().optional(),
+  IsFoundBySerialNumber: z.boolean().nullable().optional(),
+  IsLotted: z.boolean().nullable().optional(),
+  LotScanned: z.boolean().nullable().optional(),
+  LotPrioritySetting: z.string().nullable().optional(), // e.g., "Global"
+  LotPriorities: z.array(z.any()).nullable().optional(),
+  
+  ClientId: z.string().nullable().optional(),
+  ClientName: z.string().nullable().optional(),
+  
+  // FN SKU info (Amazon FBA)
+  FnSkuInfo: z.any().nullable().optional(),
+});
+
+export type BaseProductData = z.infer<typeof baseProductDataSchema>;
+
+/**
+ * API response envelope for product lookup
+ * SkuVault returns: {"Errors": [], "Messages": [], "Data": {...}, "Status": "Data"}
+ * Note: Response is prefixed with anti-XSSI token )]}'
+ */
+export const productLookupEnvelopeSchema = z.object({
+  Errors: z.array(z.string()).nullable().optional(),
+  Messages: z.array(z.string()).nullable().optional(),
+  Data: baseProductDataSchema.nullable().optional(),
+  Status: z.string().nullable().optional(), // "Data", "Blank", etc.
+});
+
+export type ProductLookupEnvelope = z.infer<typeof productLookupEnvelopeSchema>;
+
+/**
+ * Determine the product type from raw API flags
+ * Kit and AssembledProduct are mutually exclusive based on SkuVault's design
+ */
+export function determineProductType(data: BaseProductData | null): ProductType {
+  if (!data) return 'individual';
+  if (data.IsKit) return 'kit';
+  if (data.IsAssembledProduct) return 'assembledProduct';
+  return 'individual';
+}
+
+/**
+ * Individual product (not a kit or assembled product)
+ */
+export interface IndividualProductDetails {
+  productType: 'individual';
+  id: string;
+  sku: string;
+  code: string | null;
+  partNumber: string | null;
+  title: string;
+  pictures: string[];
+  weightValue: number | null;
+  weightUnit: string | null;
+  quantityAvailable: number;
+  isSerialized: boolean;
+  isLotted: boolean;
+  rawData: BaseProductData;
+}
+
+/**
+ * Kit product - contains multiple component products
+ * When scanned, each component must be verified individually
+ * 
+ * TODO: Add kitComponents array once we understand the response
+ * structure when looking up a kit product specifically
+ */
+export interface KitProductDetails {
+  productType: 'kit';
+  id: string;
+  sku: string;
+  code: string | null;
+  partNumber: string | null;
+  title: string;
+  pictures: string[];
+  weightValue: number | null;
+  weightUnit: string | null;
+  quantityAvailable: number;
+  isSerialized: boolean;
+  isLotted: boolean;
+  correspondingKitQuantity: number;
+  rawData: BaseProductData;
+}
+
+/**
+ * Assembled product - similar to kit but with differences
+ * 
+ * TODO (Ray): Ask warehouse manager to clarify:
+ * 1. How is an assembled product different from a kit in practice?
+ * 2. Does scanning behavior differ for assembled products?
+ * 3. Are components pre-assembled or assembled at pack time?
+ */
+export interface AssembledProductDetails {
+  productType: 'assembledProduct';
+  id: string;
+  sku: string;
+  code: string | null;
+  partNumber: string | null;
+  title: string;
+  pictures: string[];
+  weightValue: number | null;
+  weightUnit: string | null;
+  quantityAvailable: number;
+  isSerialized: boolean;
+  isLotted: boolean;
+  rawData: BaseProductData;
+}
+
+/**
+ * Discriminated union of all product types
+ * Use productType field to narrow the type in TypeScript
+ * 
+ * @example
+ * ```typescript
+ * function handleProduct(product: ProductDetails) {
+ *   switch (product.productType) {
+ *     case 'individual':
+ *       // Handle regular item
+ *       break;
+ *     case 'kit':
+ *       // Handle kit with components
+ *       break;
+ *     case 'assembledProduct':
+ *       // Handle assembled product
+ *       break;
+ *   }
+ * }
+ * ```
+ */
+export type ProductDetails = IndividualProductDetails | KitProductDetails | AssembledProductDetails;
+
+/**
+ * Transform raw API response into typed ProductDetails
+ * Normalizes the SkuVault response into our discriminated union
+ */
+export function transformProductLookup(envelope: ProductLookupEnvelope): ProductDetails | null {
+  const data = envelope.Data;
+  if (!data || !data.Id) {
+    return null;
+  }
+
+  const productType = determineProductType(data);
+  const pictures = data.Pictures?.map(p => p.Url).filter((url): url is string => !!url) || [];
+
+  const baseFields = {
+    id: data.Id,
+    sku: data.Sku || '',
+    code: data.Code || null,
+    partNumber: data.PartNumber || null,
+    title: data.Title || '',
+    pictures,
+    weightValue: data.WeightValue || null,
+    weightUnit: data.WeightUnit || null,
+    quantityAvailable: data.QuantityAvailable || 0,
+    isSerialized: data.IsSerialized || false,
+    isLotted: data.IsLotted || false,
+    rawData: data,
+  };
+
+  switch (productType) {
+    case 'kit':
+      return {
+        ...baseFields,
+        productType: 'kit',
+        correspondingKitQuantity: data.CorrespondingKitQuantity || 0,
+      };
+    case 'assembledProduct':
+      return {
+        ...baseFields,
+        productType: 'assembledProduct',
+      };
+    default:
+      return {
+        ...baseFields,
+        productType: 'individual',
+      };
+  }
+}

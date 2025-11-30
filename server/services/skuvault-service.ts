@@ -1018,6 +1018,67 @@ export class SkuVaultService {
   }
 
   /**
+   * Look up a product by barcode, SKU, or part number with full type discrimination
+   * Returns a discriminated union of IndividualProduct, KitProduct, or AssembledProduct
+   * 
+   * This is the preferred method for product lookup during QC scanning as it:
+   * - Validates the full API response structure
+   * - Provides type-safe product discrimination (individual vs kit vs assembled)
+   * - Includes TODO comments for fields needing warehouse clarification
+   * 
+   * @param searchTerm - Barcode, SKU, or part number to search for
+   * @returns ProductDetails discriminated union or null if not found, plus raw response
+   */
+  async getProductDetailsByCode(searchTerm: string): Promise<{ 
+    product: import('@shared/skuvault-types').ProductDetails | null; 
+    rawResponse: import('@shared/skuvault-types').ProductLookupEnvelope;
+  }> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/products/product/getProductOrKitByCodeOrSkuOrPartNumber?SearchTerm=${encodeURIComponent(searchTerm)}`;
+      console.log(`[SkuVault Product Lookup] Looking up product: ${searchTerm}`);
+      
+      const response = await this.makeQCRequest<any>('GET', endpoint);
+      
+      // Import types and schemas
+      const { productLookupEnvelopeSchema, transformProductLookup } = await import('@shared/skuvault-types');
+      
+      // Validate full response envelope with Zod
+      const envelope = productLookupEnvelopeSchema.parse(response);
+      
+      // Check for API errors
+      if (envelope.Errors && envelope.Errors.length > 0) {
+        console.error(`[SkuVault Product Lookup] API errors:`, envelope.Errors);
+        return { product: null, rawResponse: envelope };
+      }
+      
+      // Transform to discriminated union type
+      const product = transformProductLookup(envelope);
+      
+      if (!product) {
+        console.log(`[SkuVault Product Lookup] No product found for: ${searchTerm}`);
+        return { product: null, rawResponse: envelope };
+      }
+      
+      console.log(`[SkuVault Product Lookup] Found ${product.productType}: ${product.sku} (ID: ${product.id})`);
+      
+      // Log additional info for kits/assembled products
+      if (product.productType === 'kit') {
+        console.log(`[SkuVault Product Lookup] Kit details - correspondingKitQuantity: ${product.correspondingKitQuantity}`);
+      } else if (product.productType === 'assembledProduct') {
+        console.log(`[SkuVault Product Lookup] Assembled product detected - TODO: clarify handling with warehouse`);
+      }
+      
+      return { product, rawResponse: envelope };
+
+    } catch (error) {
+      console.error(`[SkuVault Product Lookup] Error looking up product ${searchTerm}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Mark an item as QC passed for a specific order
    * 
    * @param itemData - QC pass item request data
