@@ -3967,8 +3967,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (qcSale?.Items && qcSale.Items.length > 0) {
         console.log(`[Packing Validation] Using SkuVault as golden source for items (${qcSale.Items.length} items)`);
         
-        // Flatten items - kits expand into their component items
-        const flattenedItems: any[] = [];
+        // Build PassedItems map for tracking scanned components
+        const passedItemsBySku = new Map<string, number>();
+        (qcSale.PassedItems ?? []).forEach(passedItem => {
+          if (passedItem.Sku) {
+            const sku = passedItem.Sku.trim().toUpperCase();
+            const qty = passedItem.Quantity || 0;
+            passedItemsBySku.set(sku, (passedItemsBySku.get(sku) || 0) + qty);
+          }
+        });
+        
+        // Transform items - kits stay as single items with nested components
+        const transformedItems: any[] = [];
         
         qcSale.Items.forEach((svItem, index) => {
           // Try to find matching ShipStation item for additional data (imageUrl, etc.)
@@ -3977,7 +3987,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ssItem.sku.trim().toUpperCase() === svItem.Sku.trim().toUpperCase()
           );
           
-          const baseItem = {
+          // For kits: build nested components array and calculate aggregate quantities
+          let kitComponents: any[] = [];
+          let totalComponentsExpected = 0;
+          let totalComponentsScanned = 0;
+          
+          if (svItem.IsKit && svItem.KitProducts && svItem.KitProducts.length > 0) {
+            kitComponents = svItem.KitProducts.map((component, compIndex) => {
+              // Calculate total quantity: component qty * kit qty ordered
+              const componentTotalQty = (component.Quantity || 1) * (svItem.Quantity || 1);
+              totalComponentsExpected += componentTotalQty;
+              
+              // Check if this component has been scanned (from PassedItems)
+              const componentSku = (component.Sku || '').toUpperCase().trim();
+              const scannedQty = passedItemsBySku.get(componentSku) || 0;
+              totalComponentsScanned += Math.min(scannedQty, componentTotalQty);
+              
+              return {
+                id: `sv-${svItem.Id || index}-kit-${compIndex}`,
+                sku: component.Sku || null,
+                code: component.Code || null, // Scannable barcode
+                partNumber: component.PartNumber || null,
+                name: component.Title || component.Sku || 'Unknown Component',
+                quantity: componentTotalQty,
+                scannedQuantity: Math.min(scannedQty, componentTotalQty),
+                picture: component.Picture || null,
+                skuvaultItemId: component.Id || null,
+              };
+            });
+            
+            console.log(`[Packing Validation] Kit ${svItem.Sku}: ${kitComponents.length} components, ${totalComponentsScanned}/${totalComponentsExpected} scanned`);
+          }
+          
+          const item = {
             id: `sv-${svItem.Id || index}`,
             shipmentId: shipment.id,
             orderItemId: svItem.Id || null,
@@ -3993,67 +4035,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             passedStatus: svItem.PassedStatus || null,
             // Kit-related fields
             isKit: svItem.IsKit || false,
-            isKitComponent: false, // This is a parent item, not a component
-            parentKitSku: null,
-            parentKitId: null,
-            kitProducts: svItem.KitProducts || null, // Include for reference
+            kitComponents: kitComponents.length > 0 ? kitComponents : null,
+            totalComponentsExpected: svItem.IsKit ? totalComponentsExpected : null,
+            totalComponentsScanned: svItem.IsKit ? totalComponentsScanned : null,
             allKitItemsAndSubstitutes: svItem.AllKitItemsAndSubstitutes || null,
             alternateSkus: svItem.AlternateSkus || null,
             alternateCodes: svItem.AlternateCodes || null,
           };
           
-          // If this is a kit, add the parent kit item first
-          if (svItem.IsKit && svItem.KitProducts && svItem.KitProducts.length > 0) {
-            // Add kit parent as a header row (quantity 0 - it's not directly scannable)
-            flattenedItems.push({
-              ...baseItem,
-              quantity: 0, // Kit parent shows 0 qty - components have the real quantities
-              expectedQuantity: 0,
-              isKitHeader: true, // Special flag for UI to render differently
-            });
-            
-            // Add each kit component as a separate scannable item
-            svItem.KitProducts.forEach((component, compIndex) => {
-              // Calculate total quantity: component qty * kit qty ordered
-              const componentTotalQty = (component.Quantity || 1) * (svItem.Quantity || 1);
-              
-              flattenedItems.push({
-                id: `sv-${svItem.Id || index}-kit-${compIndex}`,
-                shipmentId: shipment.id,
-                orderItemId: component.Id || null,
-                sku: component.Sku || null,
-                name: component.Title || component.Sku || 'Unknown Component',
-                quantity: componentTotalQty,
-                expectedQuantity: componentTotalQty,
-                unitPrice: null, // Components don't have separate prices
-                imageUrl: component.Picture || null,
-                skuvaultItemId: component.Id || null,
-                skuvaultCode: component.Code || null, // This is the scannable barcode
-                skuvaultPartNumber: component.PartNumber || null,
-                passedStatus: null,
-                // Kit component flags
-                isKit: false,
-                isKitComponent: true, // This is a component item
-                parentKitSku: svItem.Sku,
-                parentKitId: svItem.Id,
-                parentKitTitle: svItem.Title,
-                isKitHeader: false,
-                kitProducts: null,
-                allKitItemsAndSubstitutes: null,
-                alternateSkus: null,
-                alternateCodes: null,
-              });
-            });
-            
-            console.log(`[Packing Validation] Expanded kit ${svItem.Sku} into ${svItem.KitProducts.length} components`);
-          } else {
-            // Regular item (not a kit) - add as-is
-            flattenedItems.push(baseItem);
-          }
+          transformedItems.push(item);
         });
         
-        itemsToReturn = flattenedItems;
-        console.log(`[Packing Validation] Transformed ${qcSale.Items.length} SkuVault items into ${flattenedItems.length} flattened items (kits expanded)`);
+        itemsToReturn = transformedItems;
+        console.log(`[Packing Validation] Transformed ${qcSale.Items.length} SkuVault items (kits have nested components)`);
       } else {
         console.log(`[Packing Validation] No SkuVault items available, falling back to ShipStation (${shipmentItems.length} items)`);
         validationWarnings.push("Using ShipStation items - SkuVault data unavailable");
@@ -4552,13 +4546,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (result.Success) {
         console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
-        return res.json({ 
+        
+        // Build response with kit info if applicable
+        const response: any = { 
           success: true, 
           message: "Item marked as QC passed in SkuVault",
           sku,
           orderNumber,
-          quantity: Number(quantity)
-        });
+          quantity: Number(quantity),
+        };
+        
+        // If this was a kit component scan, include parent kit info for UI update
+        if (isKitComponentMatch && matchedKitComponent && expectedItem) {
+          response.isKitComponent = true;
+          response.parentKitId = expectedItem.Id;
+          response.parentKitSku = expectedItem.Sku;
+          response.componentId = matchedKitComponent.Id;
+          response.componentSku = matchedKitComponent.Sku;
+        }
+        
+        return res.json(response);
       } else {
         console.warn(`[Packing QC] Failed to pass QC: ${sku} for order ${orderNumber}`, result.Errors);
         return res.status(500).json({ 

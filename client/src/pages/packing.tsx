@@ -58,6 +58,18 @@ type Station = {
   isActive: boolean;
 };
 
+type KitComponent = {
+  id: string;
+  sku: string | null;
+  code: string | null; // Scannable barcode
+  partNumber: string | null;
+  name: string;
+  quantity: number;
+  scannedQuantity: number;
+  picture: string | null;
+  skuvaultItemId: string | null;
+};
+
 type ShipmentItem = {
   id: string;
   shipmentId: string;
@@ -75,11 +87,9 @@ type ShipmentItem = {
   passedStatus?: string | null;
   // Kit-related fields (present when items come from SkuVault)
   isKit?: boolean; // True if this item is a kit parent
-  isKitComponent?: boolean; // True if this item is a kit component (child)
-  isKitHeader?: boolean; // True for kit header row (quantity 0, not scannable)
-  parentKitSku?: string | null; // SKU of parent kit (for component items)
-  parentKitId?: string | null; // ID of parent kit
-  parentKitTitle?: string | null; // Title of parent kit
+  kitComponents?: KitComponent[] | null; // Nested components for kit items
+  totalComponentsExpected?: number | null; // Total component units expected
+  totalComponentsScanned?: number | null; // Total component units scanned
 };
 
 type QCSale = {
@@ -193,13 +203,12 @@ type SkuProgress = {
   requiresManualVerification?: boolean; // For items without SKU
   imageUrl?: string | null; // Product image URL
   skuvaultSynced?: boolean; // True if this item was found in SkuVault PassedItems
-  // Kit-related fields
+  // Kit-related fields (for kits: shows aggregate component progress)
   isKit?: boolean; // True if this is a kit parent
-  isKitComponent?: boolean; // True if this is a kit component
-  isKitHeader?: boolean; // True for kit header row (not scannable, just a visual marker)
-  parentKitSku?: string | null; // SKU of parent kit (for component items)
-  parentKitTitle?: string | null; // Title of parent kit (for display)
-  skuvaultCode?: string | null; // Barcode from SkuVault (for kit components especially)
+  kitComponents?: KitComponent[] | null; // Nested components for collapsible UI
+  totalComponentsExpected?: number; // Total component units expected (sum of all component quantities)
+  totalComponentsScanned?: number; // Total component units scanned (sum of all component scans)
+  skuvaultCode?: string | null; // Barcode from SkuVault
 };
 
 type ScanFeedback = {
@@ -651,27 +660,31 @@ export default function Packing() {
         // Use expectedQuantity from SkuVault session if available, otherwise fall back to ShipStation quantity
         const expectedQty = item.expectedQuantity ?? item.quantity;
         
-        // Kit headers are not scannable - they show as 0 quantity markers
-        // Skip adding progress for kit headers (they're just visual grouping)
-        if (item.isKitHeader) {
+        // Handle kit items specially - show as single row with aggregate component progress
+        if (item.isKit && item.kitComponents && item.kitComponents.length > 0) {
+          const totalComponentsExpected = item.totalComponentsExpected || 0;
+          const totalComponentsScanned = item.totalComponentsScanned || 0;
+          const remaining = totalComponentsExpected - totalComponentsScanned;
+          
           progress.set(key, {
             itemId: item.id,
             sku: item.sku || "KIT",
             normalizedSku: item.sku ? normalizeSku(item.sku) : "",
             name: item.name,
-            expected: 0, // Kit headers have 0 expected - components have the real quantities
-            scanned: 0,
-            remaining: 0,
+            expected: totalComponentsExpected, // Total component units
+            scanned: totalComponentsScanned,
+            remaining: remaining,
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
-            skuvaultSynced: false,
+            skuvaultSynced: remaining === 0, // Synced if all components scanned
             isKit: true,
-            isKitComponent: false,
-            isKitHeader: true,
-            parentKitSku: null,
-            parentKitTitle: null,
+            kitComponents: item.kitComponents, // Keep components for collapsible UI
+            totalComponentsExpected,
+            totalComponentsScanned,
             skuvaultCode: item.skuvaultCode,
           });
+          
+          console.log(`[Packing] Kit ${item.sku}: ${totalComponentsScanned}/${totalComponentsExpected} component units scanned`);
           return; // Skip to next item
         }
         
@@ -701,12 +714,7 @@ export default function Packing() {
             requiresManualVerification: false,
             imageUrl: item.imageUrl,
             skuvaultSynced, // Flag if already scanned in SkuVault
-            // Kit-related fields
             isKit: item.isKit || false,
-            isKitComponent: item.isKitComponent || false,
-            isKitHeader: false,
-            parentKitSku: item.parentKitSku || null,
-            parentKitTitle: item.parentKitTitle || null,
             skuvaultCode: item.skuvaultCode || null,
           });
           
@@ -726,10 +734,6 @@ export default function Packing() {
             imageUrl: item.imageUrl,
             skuvaultSynced: false,
             isKit: false,
-            isKitComponent: item.isKitComponent || false,
-            isKitHeader: false,
-            parentKitSku: item.parentKitSku || null,
-            parentKitTitle: item.parentKitTitle || null,
             skuvaultCode: item.skuvaultCode || null,
           });
         }
@@ -993,20 +997,53 @@ export default function Packing() {
       // Normalize scanned SKU for comparison
       const normalizedSku = normalizeSku(data.sku);
       
-      // STEP 1: Find ANY matching SKU (regardless of remaining quantity)
-      // Supports exact match AND kit-component matching (e.g., scanning JCB-POJ-6-16 matches kit JCB-POJ-6-16-X2)
+      // STEP 1: Find ANY matching SKU (supports regular items AND kit components)
       let matchingItemKey: string | null = null;
       let matchingProgress: SkuProgress | null = null;
+      let matchingComponentIndex: number | null = null; // Track which component was matched for kits
       
       for (const [key, progress] of Array.from(skuProgress.entries())) {
-        // Use skuMatchesExpected which handles both exact and kit-component matches
-        if (skuMatchesExpected(normalizedSku, progress.normalizedSku)) {
-          // Found a matching SKU - prioritize items with remaining units
-          if (!matchingProgress || progress.remaining > 0) {
-            matchingItemKey = key;
-            matchingProgress = progress;
-            if (progress.remaining > 0) {
-              break; // Use first item with remaining units
+        // For kit items, check if scanned barcode matches any component
+        if (progress.isKit && progress.kitComponents && progress.kitComponents.length > 0) {
+          for (let i = 0; i < progress.kitComponents.length; i++) {
+            const comp = progress.kitComponents[i];
+            const compRemaining = comp.quantity - comp.scannedQuantity;
+            // Match against component code, SKU, or part number
+            const compNormalizedCode = comp.code ? normalizeSku(comp.code) : "";
+            const compNormalizedSku = comp.sku ? normalizeSku(comp.sku) : "";
+            const compNormalizedPartNumber = comp.partNumber ? normalizeSku(comp.partNumber) : "";
+            
+            if (normalizedSku === compNormalizedCode || 
+                normalizedSku === compNormalizedSku || 
+                normalizedSku === compNormalizedPartNumber) {
+              // Found matching component - prioritize those with remaining units
+              if (!matchingProgress || compRemaining > 0) {
+                matchingItemKey = key;
+                matchingProgress = progress;
+                matchingComponentIndex = i;
+                if (compRemaining > 0) {
+                  break; // Use first component with remaining units
+                }
+              }
+            }
+          }
+          if (matchingProgress && matchingComponentIndex !== null) {
+            const comp = matchingProgress.kitComponents![matchingComponentIndex];
+            if (comp.quantity - comp.scannedQuantity > 0) {
+              break; // Found a kit component with remaining - stop searching
+            }
+          }
+        } else {
+          // Regular item - use skuMatchesExpected for exact and pattern matches
+          if (skuMatchesExpected(normalizedSku, progress.normalizedSku)) {
+            // Found a matching SKU - prioritize items with remaining units
+            if (!matchingProgress || progress.remaining > 0) {
+              matchingItemKey = key;
+              matchingProgress = progress;
+              matchingComponentIndex = null; // Not a kit component
+              if (progress.remaining > 0) {
+                break; // Use first item with remaining units
+              }
             }
           }
         }
@@ -1040,26 +1077,55 @@ export default function Packing() {
       }
       
       // STEP 3: Check if already fully scanned (duplicate scan)
-      if (matchingProgress.remaining === 0) {
+      // For kit components, check the specific component's remaining quantity
+      let componentRemaining = 0;
+      let componentName = "";
+      let componentExpected = 0;
+      let componentScanned = 0;
+      
+      if (matchingProgress.isKit && matchingComponentIndex !== null && matchingProgress.kitComponents) {
+        const comp = matchingProgress.kitComponents[matchingComponentIndex];
+        componentRemaining = comp.quantity - comp.scannedQuantity;
+        componentName = comp.name;
+        componentExpected = comp.quantity;
+        componentScanned = comp.scannedQuantity;
+      } else {
+        componentRemaining = matchingProgress.remaining;
+        componentName = matchingProgress.name;
+        componentExpected = matchingProgress.expected;
+        componentScanned = matchingProgress.scanned;
+      }
+      
+      if (componentRemaining === 0) {
+        const errorMsg = matchingProgress.isKit && matchingComponentIndex !== null
+          ? `Kit component ${componentName} already fully scanned (${componentScanned}/${componentExpected})`
+          : `Already scanned ${matchingProgress.scanned}/${matchingProgress.expected} units of ${data.sku}`;
+          
         await createPackingLog({
           action: "product_scanned",
           productSku: data.sku,
           scannedCode,
           skuVaultProductId: data.variantId || null,
           success: false,
-          errorMessage: `Already scanned ${matchingProgress.scanned}/${matchingProgress.expected} units of ${data.sku}`,
+          errorMessage: errorMsg,
         });
 
         showScanFeedback(
           "info",
-          "ALREADY COMPLETE",
-          "This item is fully scanned. Scan next item.",
+          matchingProgress.isKit ? "COMPONENT COMPLETE" : "ALREADY COMPLETE",
+          matchingProgress.isKit 
+            ? `This kit component is fully scanned. Scan a different component.`
+            : "This item is fully scanned. Scan next item.",
           {
-            sku: matchingProgress.sku,
-            productName: matchingProgress.name,
-            imageUrl: matchingProgress.imageUrl,
-            scannedCount: matchingProgress.scanned,
-            expectedCount: matchingProgress.expected,
+            sku: matchingProgress.isKit && matchingProgress.kitComponents 
+              ? matchingProgress.kitComponents[matchingComponentIndex!].sku || data.sku
+              : matchingProgress.sku,
+            productName: componentName,
+            imageUrl: matchingProgress.isKit && matchingProgress.kitComponents
+              ? matchingProgress.kitComponents[matchingComponentIndex!].picture || matchingProgress.imageUrl
+              : matchingProgress.imageUrl,
+            scannedCount: componentScanned,
+            expectedCount: componentExpected,
           }
         );
 
@@ -1140,26 +1206,62 @@ export default function Packing() {
           scannedCount: currentProgress.scanned + 1,
           expectedCount: currentProgress.expected,
           skuVaultVerified: true,
+          isKitComponent: matchingComponentIndex !== null,
         });
 
         // Update progress (using item ID as key, tracking remaining units)
         const newProgress = new Map(skuProgress);
-        newProgress.set(matchingItemKey!, {
-          ...currentProgress,
-          scanned: currentProgress.scanned + 1,
-          remaining: currentProgress.remaining - 1,
-        });
+        
+        // Handle kit component scanning vs regular item scanning
+        if (currentProgress.isKit && matchingComponentIndex !== null && currentProgress.kitComponents) {
+          // Kit component scan - update component scannedQuantity and recalculate aggregates
+          const updatedComponents = [...currentProgress.kitComponents];
+          updatedComponents[matchingComponentIndex] = {
+            ...updatedComponents[matchingComponentIndex],
+            scannedQuantity: updatedComponents[matchingComponentIndex].scannedQuantity + 1,
+          };
+          
+          // Recalculate kit aggregate totals
+          const newTotalScanned = updatedComponents.reduce((sum, c) => sum + c.scannedQuantity, 0);
+          const totalExpected = currentProgress.totalComponentsExpected || 0;
+          
+          newProgress.set(matchingItemKey!, {
+            ...currentProgress,
+            kitComponents: updatedComponents,
+            scanned: newTotalScanned,
+            remaining: totalExpected - newTotalScanned,
+            totalComponentsScanned: newTotalScanned,
+          });
+          
+          console.log(`[Packing] Kit component scan: ${data.sku}, kit aggregate now ${newTotalScanned}/${totalExpected}`);
+        } else {
+          // Regular item scan
+          newProgress.set(matchingItemKey!, {
+            ...currentProgress,
+            scanned: currentProgress.scanned + 1,
+            remaining: currentProgress.remaining - 1,
+          });
+        }
         setSkuProgress(newProgress);
 
+        // Show appropriate feedback
+        const newScannedCount = currentProgress.isKit && matchingComponentIndex !== null
+          ? currentProgress.scanned + 1  // Kit aggregate
+          : currentProgress.scanned + 1;
+          
         showScanFeedback(
           "success",
-          "SCAN VERIFIED",
-          "Item confirmed in SkuVault",
+          currentProgress.isKit ? "KIT COMPONENT VERIFIED" : "SCAN VERIFIED",
+          currentProgress.isKit ? `Component added to ${currentProgress.name}` : "Item confirmed in SkuVault",
           {
             sku: data.sku,
-            productName: data.title || currentProgress.name,
-            imageUrl: currentProgress.imageUrl,
-            scannedCount: currentProgress.scanned + 1,
+            productName: currentProgress.isKit 
+              ? `${currentProgress.kitComponents?.[matchingComponentIndex!]?.name || data.title}`
+              : (data.title || currentProgress.name),
+            imageUrl: currentProgress.isKit 
+              ? currentProgress.kitComponents?.[matchingComponentIndex!]?.picture || currentProgress.imageUrl
+              : currentProgress.imageUrl,
+            scannedCount: newScannedCount,
             expectedCount: currentProgress.expected,
           }
         );
@@ -2066,77 +2168,158 @@ export default function Packing() {
                   const completedItems: Array<[string, SkuProgress]> = [];
                   
                   Array.from(skuProgress.entries()).forEach(([key, progress]) => {
-                    // Kit headers are always "complete" (0/0) but should stay with their components
-                    // So we check if they have pending components
                     const isComplete = progress.scanned >= progress.expected;
                     
-                    if (progress.isKitHeader) {
-                      // Kit headers go to pending if any of their components are pending
-                      // We'll determine this later during sorting
-                      pendingItems.push([key, progress]);
-                    } else if (isComplete) {
+                    if (isComplete) {
                       completedItems.push([key, progress]);
                     } else {
                       pendingItems.push([key, progress]);
                     }
                   });
                   
-                  // Sort items to keep kit headers with their components
-                  // Kit headers come first, followed by their components, then regular items
+                  // Sort by remaining items (most remaining first)
                   pendingItems.sort((a, b) => b[1].remaining - a[1].remaining);
                   
                   // Render function for item cards
                   const renderItem = ([key, progress]: [string, SkuProgress], index: number) => {
                     const isComplete = progress.scanned >= progress.expected;
                     const isPartial = progress.scanned > 0 && progress.scanned < progress.expected;
-                    const shipmentItem = currentShipment?.items.find(item => item.id === progress.itemId);
-                    const isFirstPending = index === 0 && !isComplete && !progress.isKitHeader;
+                    const isFirstPending = index === 0 && !isComplete;
                     
-                    // Kit header styling - purple background with "Kit" badge
-                    if (progress.isKitHeader) {
+                    // Kit item with collapsible components
+                    if (progress.isKit && progress.kitComponents && progress.kitComponents.length > 0) {
                       return (
                         <div
                           key={key}
-                          className="p-4 rounded-lg border-2 border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30"
+                          className={`rounded-lg transition-all border-2 ${
+                            isComplete
+                              ? "border-muted-foreground/30 bg-muted/50"
+                              : isFirstPending
+                              ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30 border-l-8 border-l-primary"
+                              : "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30"
+                          }`}
                           data-testid={`progress-kit-${progress.sku}`}
                         >
-                          <div className="flex items-start gap-4">
-                            {progress.imageUrl && (
-                              <img
-                                src={progress.imageUrl}
-                                alt={progress.name}
-                                className="w-20 h-20 object-cover rounded-md border-2 flex-shrink-0"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0 text-xs">
-                                  <Boxes className="h-3 w-3 mr-1" />
-                                  Kit
-                                </Badge>
-                                <div className="font-semibold text-lg truncate">{progress.name}</div>
+                          {/* Kit Header with Progress */}
+                          <div className="p-4">
+                            <div className="flex items-start gap-4 mb-3">
+                              {progress.imageUrl && (
+                                <img
+                                  src={progress.imageUrl}
+                                  alt={progress.name}
+                                  className="w-28 h-28 object-cover rounded-md border-2 flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge className="bg-purple-600 hover:bg-purple-700 text-white flex-shrink-0 text-xs">
+                                    <Boxes className="h-3 w-3 mr-1" />
+                                    Kit
+                                  </Badge>
+                                  <div className="font-semibold text-xl truncate">{progress.name}</div>
+                                  {isFirstPending && !isComplete && (
+                                    <Badge variant="default" className="flex-shrink-0 text-xs">
+                                      <Zap className="h-3 w-3 mr-1" />
+                                      Scan Next
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-lg text-muted-foreground font-mono mt-1">
+                                  {progress.sku}
+                                </div>
+                                <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                                  {progress.kitComponents.length} component{progress.kitComponents.length !== 1 ? 's' : ''} • Scan any component barcode
+                                </div>
                               </div>
-                              <div className="text-md text-muted-foreground font-mono mt-1">
-                                {progress.sku}
+                              <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                                {isComplete ? (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <CheckCircle2 className="h-6 w-6 flex-shrink-0" />
+                                    <span className="font-medium text-sm">Complete</span>
+                                  </div>
+                                ) : null}
+                                <span className="text-2xl font-bold whitespace-nowrap">
+                                  {progress.scanned} / {progress.expected}
+                                </span>
                               </div>
-                              <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
-                                Scan the components below
+                            </div>
+                            
+                            {/* Kit Progress Bar */}
+                            <div>
+                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span>
+                                  {isComplete ? "All components scanned" : `${progress.remaining} remaining`}
+                                </span>
+                                <span>{progress.expected > 0 ? Math.round((progress.scanned / progress.expected) * 100) : 0}%</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-purple-500 transition-all"
+                                  style={{ width: `${progress.expected > 0 ? (progress.scanned / progress.expected) * 100 : 0}%` }}
+                                />
                               </div>
                             </div>
                           </div>
+                          
+                          {/* Collapsible Components Section */}
+                          <Accordion type="single" collapsible className="border-t border-purple-200 dark:border-purple-800">
+                            <AccordionItem value="components" className="border-0">
+                              <AccordionTrigger className="px-4 py-2 hover:no-underline text-sm text-purple-600 dark:text-purple-400">
+                                <span className="flex items-center gap-2">
+                                  <Boxes className="h-4 w-4" />
+                                  View {progress.kitComponents.length} Component{progress.kitComponents.length !== 1 ? 's' : ''}
+                                </span>
+                              </AccordionTrigger>
+                              <AccordionContent className="px-4 pb-4">
+                                <div className="space-y-2 mt-2">
+                                  {progress.kitComponents.map((comp) => {
+                                    const compComplete = comp.scannedQuantity >= comp.quantity;
+                                    return (
+                                      <div 
+                                        key={comp.id}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                                          compComplete 
+                                            ? "bg-muted/50 border-muted-foreground/20" 
+                                            : "bg-white dark:bg-background border-purple-200 dark:border-purple-800"
+                                        }`}
+                                      >
+                                        {comp.picture && (
+                                          <img
+                                            src={comp.picture}
+                                            alt={comp.name}
+                                            className="w-12 h-12 object-cover rounded-md border flex-shrink-0"
+                                          />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm truncate">{comp.name}</div>
+                                          <div className="text-xs text-muted-foreground font-mono">
+                                            {comp.code || comp.sku || 'No barcode'}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          {compComplete && (
+                                            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                          <span className={`font-semibold text-sm ${compComplete ? 'text-muted-foreground' : ''}`}>
+                                            {comp.scannedQuantity} / {comp.quantity}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
                         </div>
                       );
                     }
                     
-                    // Kit component styling - indented with "Kit Item" badge
-                    const isKitComponent = progress.isKitComponent;
-                    
+                    // Regular item (non-kit)
                     return (
                       <div
                         key={key}
                         className={`p-4 rounded-lg transition-all ${
-                          isKitComponent ? "ml-6 border-l-4 border-l-purple-400 dark:border-l-purple-600" : ""
-                        } ${
                           isComplete
                             ? "border-2 border-muted-foreground/30 bg-muted/50"
                             : progress.requiresManualVerification
@@ -2162,12 +2345,6 @@ export default function Packing() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className="font-semibold text-xl truncate">{progress.name}</div>
-                              {isKitComponent && (
-                                <Badge variant="outline" className="flex-shrink-0 text-xs border-purple-400 text-purple-600 dark:text-purple-400">
-                                  <Boxes className="h-3 w-3 mr-1" />
-                                  Kit Item
-                                </Badge>
-                              )}
                               {isFirstPending && !isComplete && (
                                 <Badge variant="default" className="flex-shrink-0 text-xs">
                                   <Zap className="h-3 w-3 mr-1" />
@@ -2184,12 +2361,6 @@ export default function Packing() {
                             <div className="text-lg text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
-                            {/* Show parent kit info for kit components */}
-                            {isKitComponent && progress.parentKitTitle && (
-                              <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
-                                Part of: {progress.parentKitTitle}
-                              </div>
-                            )}
                           </div>
                           
                           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
@@ -2234,8 +2405,6 @@ export default function Packing() {
                               className={`h-full transition-all ${
                                 progress.requiresManualVerification
                                   ? "bg-orange-600"
-                                  : isKitComponent
-                                  ? "bg-purple-500"
                                   : "bg-muted-foreground/50"
                               }`}
                               style={{ width: `${(progress.scanned / progress.expected) * 100}%` }}
