@@ -3967,15 +3967,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (qcSale?.Items && qcSale.Items.length > 0) {
         console.log(`[Packing Validation] Using SkuVault as golden source for items (${qcSale.Items.length} items)`);
         
-        // Build PassedItems map for tracking scanned components
+        // Build PassedItems maps for tracking scanned components
+        // We need to track by both SKU and Code (barcode) since scans can match either
         const passedItemsBySku = new Map<string, number>();
+        const passedItemsByCode = new Map<string, number>();
+        console.log(`[Packing Validation] Processing ${(qcSale.PassedItems ?? []).length} PassedItems for progress tracking`);
+        
         (qcSale.PassedItems ?? []).forEach(passedItem => {
+          const qty = passedItem.Quantity || 0;
+          if (qty <= 0) return;
+          
+          console.log(`[Packing Validation] PassedItem: Sku=${passedItem.Sku}, Code=${passedItem.Code}, ScannedCode=${passedItem.ScannedCode}, Qty=${qty}`);
+          
+          // Track by SKU
           if (passedItem.Sku) {
             const sku = passedItem.Sku.trim().toUpperCase();
-            const qty = passedItem.Quantity || 0;
             passedItemsBySku.set(sku, (passedItemsBySku.get(sku) || 0) + qty);
           }
+          // Track by Code (barcode) - this is often what gets scanned
+          if (passedItem.Code) {
+            const code = passedItem.Code.trim().toUpperCase();
+            passedItemsByCode.set(code, (passedItemsByCode.get(code) || 0) + qty);
+          }
+          // Also track by ScannedCode if different from Code
+          if (passedItem.ScannedCode && passedItem.ScannedCode !== passedItem.Code) {
+            const scannedCode = passedItem.ScannedCode.trim().toUpperCase();
+            passedItemsByCode.set(scannedCode, (passedItemsByCode.get(scannedCode) || 0) + qty);
+          }
         });
+        
+        console.log(`[Packing Validation] PassedItems maps: bySku=${JSON.stringify([...passedItemsBySku])}, byCode=${JSON.stringify([...passedItemsByCode])}`);
         
         // Transform items - kits stay as single items with nested components
         const transformedItems: any[] = [];
@@ -3999,8 +4020,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalComponentsExpected += componentTotalQty;
               
               // Check if this component has been scanned (from PassedItems)
+              // Try matching by SKU first, then by Code (barcode)
               const componentSku = (component.Sku || '').toUpperCase().trim();
-              const scannedQty = passedItemsBySku.get(componentSku) || 0;
+              const componentCode = (component.Code || '').toUpperCase().trim();
+              
+              // Get scanned quantity - check both SKU and Code maps
+              let scannedQty = passedItemsBySku.get(componentSku) || 0;
+              if (scannedQty === 0 && componentCode) {
+                scannedQty = passedItemsByCode.get(componentCode) || 0;
+              }
               totalComponentsScanned += Math.min(scannedQty, componentTotalQty);
               
               return {
