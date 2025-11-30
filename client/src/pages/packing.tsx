@@ -784,21 +784,32 @@ export default function Packing() {
     
     setSkuProgress((prevProgress) => {
       // IDEMPOTENT restoration using immutable SkuVault baseline
-      // Use skuvaultBaseScanned (set during initial load) as the starting point
-      // This ensures repeated runs produce the same result
+      // The baseline represents scans already in SkuVault. Logs may include scans
+      // that contributed to that baseline, so we must "consume" the baseline first
+      // before counting logs as new increments.
       const updatedProgress = new Map<string, SkuProgress>();
+      
+      // Track remaining baseline to consume per item/component
+      // Key format: "itemKey" for regular items, "itemKey:compIndex" for components
+      const baselineRemaining = new Map<string, number>();
+      
       prevProgress.forEach((progress, key) => {
-        // Use the immutable SkuVault baseline, not the current scanned count
-        // This prevents double-counting when logs are refetched
         const baseScanned = progress.skuvaultBaseScanned ?? 0;
         
-        // For kits, also reset component scannedQuantity to their base values
+        // For kits, track baseline per component
         let resetComponents = progress.kitComponents;
         if (progress.isKit && progress.kitComponents) {
-          resetComponents = progress.kitComponents.map(comp => ({
-            ...comp,
-            scannedQuantity: comp.baseScannedQuantity ?? 0,
-          }));
+          resetComponents = progress.kitComponents.map((comp, idx) => {
+            const compBase = comp.baseScannedQuantity ?? 0;
+            baselineRemaining.set(`${key}:${idx}`, compBase);
+            return {
+              ...comp,
+              scannedQuantity: compBase, // Start at baseline
+            };
+          });
+        } else {
+          // For regular items, track baseline
+          baselineRemaining.set(key, baseScanned);
         }
         
         updatedProgress.set(key, {
@@ -835,26 +846,36 @@ export default function Packing() {
                                    normalizedSku === compNormalizedCode ||
                                    normalizedSku === compNormalizedPartNumber;
                 
-                if (compMatches && comp.scannedQuantity < comp.quantity) {
-                  // Increment this component's scan count and update kit aggregate
-                  const updatedComponents = [...progress.kitComponents];
-                  updatedComponents[i] = {
-                    ...comp,
-                    scannedQuantity: comp.scannedQuantity + 1,
-                  };
+                if (compMatches) {
+                  const baseKey = `${key}:${i}`;
+                  const remaining = baselineRemaining.get(baseKey) ?? 0;
                   
-                  const newTotalScanned = updatedComponents.reduce((sum, c) => sum + c.scannedQuantity, 0);
-                  const totalExpected = progress.totalComponentsExpected || 0;
-                  
-                  updatedProgress.set(key, {
-                    ...progress,
-                    kitComponents: updatedComponents,
-                    scanned: newTotalScanned,
-                    remaining: totalExpected - newTotalScanned,
-                    totalComponentsScanned: newTotalScanned,
-                  });
-                  matched = true;
-                  break;
+                  if (remaining > 0) {
+                    // This log is part of the baseline - consume it, don't increment
+                    baselineRemaining.set(baseKey, remaining - 1);
+                    matched = true;
+                    break;
+                  } else if (comp.scannedQuantity < comp.quantity) {
+                    // Baseline consumed - this is a new scan, increment
+                    const updatedComponents = [...progress.kitComponents];
+                    updatedComponents[i] = {
+                      ...comp,
+                      scannedQuantity: comp.scannedQuantity + 1,
+                    };
+                    
+                    const newTotalScanned = updatedComponents.reduce((sum, c) => sum + c.scannedQuantity, 0);
+                    const totalExpected = progress.totalComponentsExpected || 0;
+                    
+                    updatedProgress.set(key, {
+                      ...progress,
+                      kitComponents: updatedComponents,
+                      scanned: newTotalScanned,
+                      remaining: totalExpected - newTotalScanned,
+                      totalComponentsScanned: newTotalScanned,
+                    });
+                    matched = true;
+                    break;
+                  }
                 }
               }
               if (matched) break;
@@ -864,15 +885,24 @@ export default function Packing() {
                 ? progress.requiresManualVerification && progress.normalizedSku === ""
                 : progress.normalizedSku === normalizedSku;
                 
-              if (skuMatches && progress.scanned < progress.expected) {
-                // Increment this specific item's scan count
-                updatedProgress.set(key, {
-                  ...progress,
-                  scanned: progress.scanned + 1,
-                  remaining: progress.remaining - 1,
-                });
-                matched = true;
-                break; // Only increment one item per scan
+              if (skuMatches) {
+                const remaining = baselineRemaining.get(key) ?? 0;
+                
+                if (remaining > 0) {
+                  // This log is part of the baseline - consume it, don't increment
+                  baselineRemaining.set(key, remaining - 1);
+                  matched = true;
+                  break;
+                } else if (progress.scanned < progress.expected) {
+                  // Baseline consumed - this is a new scan, increment
+                  updatedProgress.set(key, {
+                    ...progress,
+                    scanned: progress.scanned + 1,
+                    remaining: progress.remaining - 1,
+                  });
+                  matched = true;
+                  break;
+                }
               }
             }
           }

@@ -4146,12 +4146,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Try matching by SKU first, then by Code (barcode)
               const componentSku = (component.Sku || '').toUpperCase().trim();
               const componentCode = (component.Code || '').toUpperCase().trim();
+              const componentPartNumber = (component.PartNumber || '').toUpperCase().trim();
               
               // Get scanned quantity - check both SKU and Code maps
               let scannedQty = passedItemsBySku.get(componentSku) || 0;
+              const scannedFromSku = scannedQty;
               if (scannedQty === 0 && componentCode) {
                 scannedQty = passedItemsByCode.get(componentCode) || 0;
               }
+              const scannedFromCode = scannedQty > scannedFromSku ? scannedQty : 0;
+              
+              // Also check PartNumber as fallback
+              if (scannedQty === 0 && componentPartNumber) {
+                scannedQty = passedItemsByCode.get(componentPartNumber) || 0;
+              }
+              
+              console.log(`[Packing Validation] Component ${compIndex}: Sku=${componentSku}, Code=${componentCode}, PartNumber=${componentPartNumber}, scannedFromSku=${scannedFromSku}, scannedFromCode=${scannedFromCode}, finalScanned=${scannedQty}/${componentTotalQty}`);
+              
               totalComponentsScanned += Math.min(scannedQty, componentTotalQty);
               
               return {
