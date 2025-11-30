@@ -153,15 +153,23 @@ export default function BrokenShipmentsReport() {
 
   // State to track which shipment is being fixed
   const [fixingShipmentId, setFixingShipmentId] = useState<string | null>(null);
+  
+  // State to track errors for display in the UI
+  const [lastError, setLastError] = useState<{ shipmentId: string; error: string; timestamp: Date } | null>(null);
 
   // Mutation to fix shipment number in ShipStation
   const fixShipmentNumberMutation = useMutation({
     mutationFn: async (shipmentId: string) => {
       const response = await apiRequest('POST', `/api/shipments/${shipmentId}/fix-shipment-number`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${response.status}: ${text}`);
+      }
       return response.json();
     },
     onMutate: (shipmentId) => {
       setFixingShipmentId(shipmentId);
+      setLastError(null); // Clear previous error
     },
     onSuccess: (data: any) => {
       toast({
@@ -171,10 +179,16 @@ export default function BrokenShipmentsReport() {
       // Refresh the duplicates list
       queryClient.invalidateQueries({ queryKey: ['/api/reports/duplicate-shipments'] });
     },
-    onError: (error: any) => {
+    onError: (error: any, shipmentId: string) => {
+      const errorMessage = error.message || "An error occurred";
+      setLastError({
+        shipmentId,
+        error: errorMessage,
+        timestamp: new Date(),
+      });
       toast({
         title: "Failed to Fix Shipment Number",
-        description: error.message || "An error occurred",
+        description: "See error details below",
         variant: "destructive",
       });
     },
@@ -493,6 +507,52 @@ export default function BrokenShipmentsReport() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Error Display Panel */}
+            {lastError && (
+              <div className="mb-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Fix Shipment Number Error
+                    </h4>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      Shipment ID: {lastError.shipmentId}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDate(lastError.timestamp.toISOString())}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setLastError(null)}
+                    className="text-red-600 hover:text-red-800 dark:text-red-400"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+                <div className="mt-3">
+                  <pre className="text-xs bg-red-100 dark:bg-red-900/50 p-3 rounded overflow-x-auto whitespace-pre-wrap break-all font-mono text-red-800 dark:text-red-200 select-all">
+                    {lastError.error}
+                  </pre>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(lastError.error);
+                    toast({ title: "Copied to clipboard" });
+                  }}
+                  data-testid="button-copy-error"
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy Error
+                </Button>
+              </div>
+            )}
+            
             {/* Duplicates List */}
             {duplicatesLoading ? (
               <div className="flex items-center justify-center py-12">
