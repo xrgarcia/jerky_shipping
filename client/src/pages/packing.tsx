@@ -232,6 +232,7 @@ export default function Packing() {
   const [, setLocation] = useLocation();
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
+  const progressRestoredRef = useRef(false); // Track if initial restoration has been done
 
   const [orderScan, setOrderScan] = useState("");
   const [productScan, setProductScan] = useState("");
@@ -776,8 +777,14 @@ export default function Packing() {
   });
 
   // Restore SKU progress from historical packing logs when they load
+  // IMPORTANT: This should only run ONCE when the order is first loaded, not after every new scan
   useEffect(() => {
+    // Skip if already restored for this session - prevents overwriting live scan updates
+    if (progressRestoredRef.current) return;
     if (!packingLogs || packingLogs.length === 0 || skuProgress.size === 0) return;
+    
+    // Mark as restored so we don't run again when logs are refetched
+    progressRestoredRef.current = true;
     
     // Process logs chronologically (reverse since backend returns newest first)
     const chronologicalLogs = [...packingLogs].reverse();
@@ -956,6 +963,7 @@ export default function Packing() {
 
       setCurrentShipment(shipment);
       setPackingComplete(false);
+      progressRestoredRef.current = false; // Reset so restoration runs for new order
       
       // Log order loaded event
       logShipmentEvent("order_loaded", {
@@ -1014,6 +1022,7 @@ export default function Packing() {
       setScanFeedback(null);
       setPackingComplete(false);
       setOrderScan(""); // Clear the order scan input
+      progressRestoredRef.current = false; // Reset for next order
       
       // Set focus to order scan input
       setTimeout(() => orderInputRef.current?.focus(), 100);
@@ -1581,6 +1590,7 @@ export default function Packing() {
         setPackingComplete(false);
         setOrderScan("");
         setSkuProgress(new Map());
+        progressRestoredRef.current = false; // Reset for next order
         orderInputRef.current?.focus();
       }, 2000);
     },
@@ -1999,6 +2009,7 @@ export default function Packing() {
                     setOrderScan("");
                     setPackingComplete(false);
                     setSkuProgress(new Map());
+                    progressRestoredRef.current = false; // Reset for next order
                     orderInputRef.current?.focus();
                   }}
                   data-testid="button-clear-order"
