@@ -2621,41 +2621,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all packing_completed events in the date range
       const packingEvents = await storage.getPackingCompletedEvents(start, end);
       
-      // Group events by date (in Central Time)
-      const byDate: Record<string, typeof packingEvents> = {};
-      const byUser: Record<string, number> = {};
+      // First, group events by order number to deduplicate
+      // Keep the most recent packing event for each order
+      const orderMap: Record<string, { 
+        orderNumber: string;
+        packedAt: Date;
+        packedBy: string;
+        eventCount: number;
+      }> = {};
       
       for (const event of packingEvents) {
+        const existing = orderMap[event.orderNumber];
+        if (!existing || event.occurredAt > existing.packedAt) {
+          orderMap[event.orderNumber] = {
+            orderNumber: event.orderNumber,
+            packedAt: event.occurredAt,
+            packedBy: event.username,
+            eventCount: existing ? existing.eventCount + 1 : 1,
+          };
+        } else {
+          existing.eventCount++;
+        }
+      }
+      
+      const uniqueOrders = Object.values(orderMap);
+      
+      // Group unique orders by date (in Central Time)
+      const byDate: Record<string, typeof uniqueOrders> = {};
+      const byUser: Record<string, number> = {};
+      
+      for (const order of uniqueOrders) {
         // Format date as YYYY-MM-DD in Central Time
-        const dateKey = formatInTimeZone(event.occurredAt, CST_TIMEZONE, 'yyyy-MM-dd');
+        const dateKey = formatInTimeZone(order.packedAt, CST_TIMEZONE, 'yyyy-MM-dd');
         
         if (!byDate[dateKey]) {
           byDate[dateKey] = [];
         }
-        byDate[dateKey].push(event);
+        byDate[dateKey].push(order);
         
-        // Count by user
-        byUser[event.username] = (byUser[event.username] || 0) + 1;
+        // Count unique orders by user
+        byUser[order.packedBy] = (byUser[order.packedBy] || 0) + 1;
       }
       
       // Convert to array sorted by date descending
       const dailySummary = Object.entries(byDate)
-        .map(([date, events]) => {
-          // Count by user for this day
+        .map(([date, orders]) => {
+          // Count unique orders by user for this day
           const userBreakdown: Record<string, number> = {};
-          for (const event of events) {
-            userBreakdown[event.username] = (userBreakdown[event.username] || 0) + 1;
+          for (const order of orders) {
+            userBreakdown[order.packedBy] = (userBreakdown[order.packedBy] || 0) + 1;
           }
           
           return {
             date,
-            count: events.length,
+            count: orders.length,
             userBreakdown,
-            orders: events.map(e => ({
-              orderNumber: e.orderNumber,
-              packedAt: e.occurredAt,
-              packedBy: e.username,
-            })),
+            orders: orders
+              .sort((a, b) => b.packedAt.getTime() - a.packedAt.getTime())
+              .map(o => ({
+                orderNumber: o.orderNumber,
+                packedAt: o.packedAt,
+                packedBy: o.packedBy,
+              })),
           };
         })
         .sort((a, b) => b.date.localeCompare(a.date));
@@ -2663,7 +2690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         startDate,
         endDate,
-        totalPacked: packingEvents.length,
+        totalPacked: uniqueOrders.length,
         userSummary: Object.entries(byUser)
           .map(([username, count]) => ({ username, count }))
           .sort((a, b) => b.count - a.count),
