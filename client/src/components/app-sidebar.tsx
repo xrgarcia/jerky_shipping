@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,6 +13,11 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings } from "lucide-react";
+import { Package, Truck, Box, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -28,6 +34,10 @@ import type { User } from "@shared/schema";
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Auto-expand Reports section if on a reports page
+  const isReportsPage = location.startsWith('/reports');
+  const [reportsOpen, setReportsOpen] = useState(isReportsPage);
 
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -95,11 +105,6 @@ export function AppSidebar() {
       icon: Printer,
     },
     {
-      title: "Reports",
-      url: "/reports",
-      icon: BarChart3,
-    },
-    {
       title: "PO Recommend",
       url: "/po-recommendations",
       icon: ShoppingCart,
@@ -130,6 +135,20 @@ export function AppSidebar() {
       icon: UserIcon,
     },
   ];
+  
+  // Reports submenu items
+  const reportsItems = [
+    {
+      title: "Shopify Sales",
+      url: "/reports/shopify-sales",
+      icon: Store,
+    },
+    {
+      title: "Broken Shipments",
+      url: "/reports/broken-shipments",
+      icon: AlertTriangle,
+    },
+  ];
 
   return (
     <Sidebar>
@@ -148,7 +167,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems.slice(0, 8).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
@@ -157,7 +176,62 @@ export function AppSidebar() {
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
                         : 'text-sidebar-foreground'
                     }`}
-                    data-testid={`link-${item.title.toLowerCase()}`}
+                    data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuItem>
+              ))}
+              
+              {/* Collapsible Reports Section */}
+              <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger 
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                      isReportsPage
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
+                    data-testid="link-reports"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="flex-1 text-left">Reports</span>
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${reportsOpen ? 'rotate-90' : ''}`} />
+                  </CollapsibleTrigger>
+                </SidebarMenuItem>
+                <CollapsibleContent>
+                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
+                    {reportsItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <Link 
+                          href={item.url}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                            location === item.url 
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                              : 'text-sidebar-foreground'
+                          }`}
+                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuItem>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+              
+              {menuItems.slice(8).map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <Link 
+                    href={item.url}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                      location === item.url 
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
+                    data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>

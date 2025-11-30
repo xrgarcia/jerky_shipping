@@ -2490,6 +2490,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Broken shipments report - finds shipments with data integrity issues
+  app.get("/api/reports/broken-shipments", requireAuth, async (req, res) => {
+    try {
+      // Get shipments with data integrity issues:
+      // 1. Has labelUrl but no trackingNumber (label created but tracking lost)
+      // 2. Has shipmentId but we can't retrieve it from ShipStation (orphaned)
+      // 3. Missing shipmentData entirely
+      const brokenShipments = await storage.getBrokenShipments();
+      
+      // Categorize the issues
+      let hasLabelNoTracking = 0;
+      let orphanedShipmentId = 0;
+      let missingShipmentData = 0;
+      
+      for (const shipment of brokenShipments) {
+        if (shipment.labelUrl && !shipment.trackingNumber) {
+          hasLabelNoTracking++;
+        }
+        if (shipment.shipmentId && !shipment.shipmentData) {
+          orphanedShipmentId++;
+        }
+        if (!shipment.shipmentData && !shipment.shipmentId) {
+          missingShipmentData++;
+        }
+      }
+      
+      res.json({
+        shipments: brokenShipments.map(s => ({
+          id: s.id,
+          orderId: s.orderId,
+          orderNumber: s.orderNumber,
+          shipmentId: s.shipmentId,
+          trackingNumber: s.trackingNumber,
+          labelUrl: s.labelUrl,
+          carrierCode: s.carrierCode,
+          status: s.status,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        })),
+        total: brokenShipments.length,
+        summary: {
+          hasLabelNoTracking,
+          orphanedShipmentId,
+          missingShipmentData,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching broken shipments:", error);
+      res.status(500).json({ error: "Failed to fetch broken shipments" });
+    }
+  });
+
   app.get("/api/reports/summary", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

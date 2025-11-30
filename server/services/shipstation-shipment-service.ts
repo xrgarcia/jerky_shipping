@@ -241,9 +241,11 @@ export class ShipStationShipmentService {
           };
         }
 
-        // Strip ShipStation-managed fields from payload
+        // Strip ShipStation-managed fields from payload, but KEEP shipment_id
+        // CRITICAL: Keeping shipment_id ensures the label is attached to the existing 
+        // shipment rather than creating a new one (which would orphan the original)
         const cleanShipmentData = { ...shipment.shipmentData };
-        delete cleanShipmentData.shipment_id;
+        // Keep shipment_id to attach label to existing shipment
         delete cleanShipmentData.label_id;
         delete cleanShipmentData.created_at;
         delete cleanShipmentData.modified_at;
@@ -257,11 +259,21 @@ export class ShipStationShipmentService {
           delete cleanShipmentData.warehouse_id;
         }
 
+        console.log(`[ShipmentService] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id}`);
         const labelData = await createShipStationLabel(cleanShipmentData);
         labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
+        
+        // Extract tracking number from label response
+        const trackingNumber = labelData.tracking_number || null;
 
         if (labelUrl) {
-          await this.storage.updateShipment(shipment.id, { labelUrl });
+          // Update both labelUrl and tracking number if available
+          const updateData: any = { labelUrl };
+          if (trackingNumber) {
+            updateData.trackingNumber = trackingNumber;
+            console.log(`[ShipmentService] Saved tracking number: ${trackingNumber}`);
+          }
+          await this.storage.updateShipment(shipment.id, updateData);
         }
       }
 

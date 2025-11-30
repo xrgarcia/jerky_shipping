@@ -175,6 +175,7 @@ export interface IStorage {
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
+  getBrokenShipments(): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -1011,6 +1012,30 @@ export class DatabaseStorage implements IStorage {
       createdAt: row.createdAt,
       shipment: row.shipment!,
     }));
+  }
+
+  async getBrokenShipments(): Promise<Shipment[]> {
+    // Find shipments with data integrity issues:
+    // 1. Has labelUrl but no trackingNumber (label created but tracking lost)
+    // 2. Has shipmentId but missing shipmentData (can't be re-synced from ShipStation)
+    return await db
+      .select()
+      .from(shipments)
+      .where(
+        or(
+          // Has label but no tracking - the main bug we're tracking
+          and(
+            isNotNull(shipments.labelUrl),
+            isNull(shipments.trackingNumber)
+          ),
+          // Has shipmentId but no shipmentData - orphaned reference
+          and(
+            isNotNull(shipments.shipmentId),
+            isNull(shipments.shipmentData)
+          )
+        )
+      )
+      .orderBy(desc(shipments.createdAt));
   }
 
   async getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }> {
