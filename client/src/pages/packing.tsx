@@ -969,6 +969,7 @@ export default function Packing() {
     saleId?: string | null;      // Cached from initial order load
     idItem?: string | null;      // Cached item ID from SkuVault (component ID for kits)
     isKitComponent?: boolean;    // True if scanning a kit component
+    kitId?: string | null;       // Parent kit's SkuVault ID (required for kit component scans)
   };
 
   const qcScanMutation = useMutation({
@@ -1178,6 +1179,7 @@ export default function Packing() {
         // Determine the IdItem based on whether this is a kit component or regular item
         const isKitComponent = currentProgress.isKit && matchingComponentIndex !== null;
         let idItem: string | null = null;
+        let kitId: string | null = null; // Parent kit's SkuVault ID (for kit component scans)
         
         // Cache optimization only works for SkuVault-sourced orders
         // ShipStation-only orders won't have skuvaultItemId and will use fallback path
@@ -1185,10 +1187,17 @@ export default function Packing() {
           // For kit components, use the component's skuvaultItemId (from SkuVault KitProducts[].Id)
           const component = currentProgress.kitComponents[matchingComponentIndex!];
           idItem = component.skuvaultItemId || null;
-          if (!idItem) {
-            console.log(`[Packing] Kit component ${component.sku} missing skuvaultItemId - will use fallback lookup`);
+          
+          // Get the parent kit's SkuVault ID from the shipment item
+          const matchingKitItem = currentShipment?.items.find(item => 
+            item.id === currentProgress.itemId
+          );
+          kitId = matchingKitItem?.skuvaultItemId || null;
+          
+          if (!idItem || !kitId) {
+            console.log(`[Packing] Kit component ${component.sku} missing IDs - componentId=${idItem}, kitId=${kitId} - will use fallback lookup`);
           } else {
-            console.log(`[Packing] Kit component scan: componentIndex=${matchingComponentIndex}, skuvaultItemId=${idItem}, componentSku=${component.sku}`);
+            console.log(`[Packing] Kit component scan: componentIndex=${matchingComponentIndex}, componentId=${idItem}, kitId=${kitId}, componentSku=${component.sku}`);
           }
         } else {
           // For regular items, use the item's skuvaultItemId from the shipment (from SkuVault Items[].Id)
@@ -1204,8 +1213,8 @@ export default function Packing() {
         }
         
         const cachedSaleId = currentShipment!.saleId;
-        const usingCachedData = !!cachedSaleId && !!idItem;
-        console.log(`[Packing] QC scan: saleId=${cachedSaleId}, idItem=${idItem}, isKitComponent=${isKitComponent}, usingCache=${usingCachedData}`);
+        const usingCachedData = !!cachedSaleId && !!idItem && (!isKitComponent || !!kitId);
+        console.log(`[Packing] QC scan: saleId=${cachedSaleId}, idItem=${idItem}, kitId=${kitId}, isKitComponent=${isKitComponent}, usingCache=${usingCachedData}`);
         
         const qcResult = await qcScanMutation.mutateAsync({
           orderNumber: currentShipment!.orderNumber,
@@ -1214,6 +1223,7 @@ export default function Packing() {
           saleId: currentShipment!.saleId,  // Pass cached SaleId
           idItem,                            // Pass cached IdItem (component ID for kits)
           isKitComponent,
+          kitId,                             // Pass parent kit's SkuVault ID (for kit components)
         });
 
         if (!qcResult.success) {
