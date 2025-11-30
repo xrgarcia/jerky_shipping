@@ -77,17 +77,20 @@ export default function BrokenShipmentsReport() {
   const [endDate, setEndDate] = useState(today);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   
-  // Existing broken shipments query
+  // Broken shipments query - now with date filtering
   const { data, isLoading, refetch, isRefetching } = useQuery<BrokenShipmentsResponse>({
-    queryKey: ['/api/reports/broken-shipments'],
-    queryFn: async () => {
-      const res = await fetch('/api/reports/broken-shipments', { credentials: "include" });
+    queryKey: ['/api/reports/broken-shipments', startDate, endDate],
+    queryFn: async ({ queryKey }) => {
+      const [endpoint, start, end] = queryKey as [string, string, string];
+      const url = `${endpoint}?startDate=${start}&endDate=${end}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
         const text = (await res.text()) || res.statusText;
         throw new Error(`${res.status}: ${text}`);
       }
       return await res.json();
     },
+    enabled: !!startDate && !!endDate,
   });
 
   // Duplicate shipments query
@@ -164,6 +167,81 @@ export default function BrokenShipmentsReport() {
             Refresh
           </Button>
         </div>
+
+        {/* Date Range Filter - applies to all data */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Date Range:</span>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="start-date" className="text-xs text-muted-foreground">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-[160px]"
+                  data-testid="input-start-date"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="end-date" className="text-xs text-muted-foreground">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-[160px]"
+                  data-testid="input-end-date"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const now = toZonedTime(new Date(), CST_TIMEZONE);
+                    setStartDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
+                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
+                  }}
+                  data-testid="button-today"
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const now = toZonedTime(new Date(), CST_TIMEZONE);
+                    setStartDate(formatInTimeZone(subDays(now, 7), CST_TIMEZONE, 'yyyy-MM-dd'));
+                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
+                  }}
+                  data-testid="button-7-days"
+                >
+                  Last 7 Days
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const now = toZonedTime(new Date(), CST_TIMEZONE);
+                    setStartDate(formatInTimeZone(subDays(now, 30), CST_TIMEZONE, 'yyyy-MM-dd'));
+                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
+                  }}
+                  data-testid="button-30-days"
+                >
+                  Last 30 Days
+                </Button>
+              </div>
+              <span className="text-sm text-muted-foreground ml-auto">
+                All times in Central Time (CST/CDT)
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Summary Cards */}
         {(data?.summary || duplicatesData) && (
@@ -368,71 +446,7 @@ export default function BrokenShipmentsReport() {
               Orders that have multiple shipment records created - often caused by label printing bugs
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Date Range Filter */}
-            <div className="flex flex-wrap items-end gap-4 pb-4 border-b">
-              <div className="space-y-2">
-                <Label htmlFor="dup-start-date">Start Date</Label>
-                <Input
-                  id="dup-start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-[180px]"
-                  data-testid="input-dup-start-date"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dup-end-date">End Date</Label>
-                <Input
-                  id="dup-end-date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-[180px]"
-                  data-testid="input-dup-end-date"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const now = toZonedTime(new Date(), CST_TIMEZONE);
-                    setStartDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
-                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
-                  }}
-                  data-testid="button-dup-today"
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const now = toZonedTime(new Date(), CST_TIMEZONE);
-                    setStartDate(formatInTimeZone(subDays(now, 7), CST_TIMEZONE, 'yyyy-MM-dd'));
-                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
-                  }}
-                  data-testid="button-dup-7-days"
-                >
-                  Last 7 Days
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const now = toZonedTime(new Date(), CST_TIMEZONE);
-                    setStartDate(formatInTimeZone(subDays(now, 30), CST_TIMEZONE, 'yyyy-MM-dd'));
-                    setEndDate(formatInTimeZone(now, CST_TIMEZONE, 'yyyy-MM-dd'));
-                  }}
-                  data-testid="button-dup-30-days"
-                >
-                  Last 30 Days
-                </Button>
-              </div>
-            </div>
-
+          <CardContent>
             {/* Duplicates List */}
             {duplicatesLoading ? (
               <div className="flex items-center justify-center py-12">

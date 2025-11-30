@@ -175,7 +175,7 @@ export interface IStorage {
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
-  getBrokenShipments(): Promise<Shipment[]>;
+  getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
 
   // Products
@@ -1031,27 +1031,38 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getBrokenShipments(): Promise<Shipment[]> {
+  async getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]> {
     // Find shipments with data integrity issues:
     // 1. Has labelUrl but no trackingNumber (label created but tracking lost)
     // 2. Has shipmentId but missing shipmentData (can't be re-synced from ShipStation)
+    
+    const conditions = [
+      or(
+        // Has label but no tracking - the main bug we're tracking
+        and(
+          isNotNull(shipments.labelUrl),
+          isNull(shipments.trackingNumber)
+        ),
+        // Has shipmentId but no shipmentData - orphaned reference
+        and(
+          isNotNull(shipments.shipmentId),
+          isNull(shipments.shipmentData)
+        )
+      )
+    ];
+    
+    // Add date range filter if provided
+    if (startDate) {
+      conditions.push(gte(shipments.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(shipments.createdAt, endDate));
+    }
+    
     return await db
       .select()
       .from(shipments)
-      .where(
-        or(
-          // Has label but no tracking - the main bug we're tracking
-          and(
-            isNotNull(shipments.labelUrl),
-            isNull(shipments.trackingNumber)
-          ),
-          // Has shipmentId but no shipmentData - orphaned reference
-          and(
-            isNotNull(shipments.shipmentId),
-            isNull(shipments.shipmentData)
-          )
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(shipments.createdAt));
   }
 

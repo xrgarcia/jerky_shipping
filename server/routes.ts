@@ -2493,11 +2493,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broken shipments report - finds shipments with data integrity issues
   app.get("/api/reports/broken-shipments", requireAuth, async (req, res) => {
     try {
+      const { startDate, endDate } = req.query;
+      
+      // Parse optional date range (Central Time)
+      let start: Date | undefined;
+      let end: Date | undefined;
+      
+      if (startDate && typeof startDate === 'string') {
+        start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+        if (isNaN(start.getTime())) start = undefined;
+      }
+      if (endDate && typeof endDate === 'string') {
+        end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+        if (isNaN(end.getTime())) end = undefined;
+      }
+      
       // Get shipments with data integrity issues:
       // 1. Has labelUrl but no trackingNumber (label created but tracking lost)
       // 2. Has shipmentId but we can't retrieve it from ShipStation (orphaned)
       // 3. Missing shipmentData entirely
-      const brokenShipments = await storage.getBrokenShipments();
+      const brokenShipments = await storage.getBrokenShipments(start, end);
       
       // Categorize the issues
       let hasLabelNoTracking = 0;
