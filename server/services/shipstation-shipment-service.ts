@@ -251,6 +251,11 @@ export class ShipStationShipmentService {
         delete cleanShipmentData.label_status;    // Cannot be set/modified
         delete cleanShipmentData.tracking_number; // Will be set by ShipStation
         delete cleanShipmentData.label_download;  // Read-only field
+        
+        // If ship_from is provided, remove warehouse_id (mutually exclusive)
+        if (cleanShipmentData.ship_from) {
+          delete cleanShipmentData.warehouse_id;
+        }
 
         const labelData = await createShipStationLabel(cleanShipmentData);
         labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
