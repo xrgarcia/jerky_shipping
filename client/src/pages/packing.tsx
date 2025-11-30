@@ -961,8 +961,18 @@ export default function Packing() {
     skuVaultError?: boolean;
   };
 
+  // QC scan parameters - saleId and idItem are optional cached values to reduce API calls
+  type QCScanParams = {
+    orderNumber: string;
+    sku: string;
+    quantity: number;
+    saleId?: string | null;      // Cached from initial order load
+    idItem?: string | null;      // Cached item ID from SkuVault (component ID for kits)
+    isKitComponent?: boolean;    // True if scanning a kit component
+  };
+
   const qcScanMutation = useMutation({
-    mutationFn: async (params: { orderNumber: string; sku: string; quantity: number }) => {
+    mutationFn: async (params: QCScanParams) => {
       const response = await apiRequest("POST", "/api/packing/qc-scan", params);
       return (await response.json()) as QCScanResponse;
     },
@@ -1160,11 +1170,50 @@ export default function Packing() {
       );
 
       // Synchronous SkuVault QC scan - verify item is in order and mark as passed
+      // OPTIMIZATION: Pass cached SaleId and IdItem to avoid redundant SkuVault API calls
+      // When both saleId and idItem are available (SkuVault-sourced orders), we skip the
+      // getQCSalesByOrderNumber call and go directly to passQCItem (~45% API reduction).
+      // For ShipStation-only orders or stale data, backend falls back to fresh SkuVault lookup.
       try {
+        // Determine the IdItem based on whether this is a kit component or regular item
+        const isKitComponent = currentProgress.isKit && matchingComponentIndex !== null;
+        let idItem: string | null = null;
+        
+        // Cache optimization only works for SkuVault-sourced orders
+        // ShipStation-only orders won't have skuvaultItemId and will use fallback path
+        if (isKitComponent && currentProgress.kitComponents) {
+          // For kit components, use the component's skuvaultItemId (from SkuVault KitProducts[].Id)
+          const component = currentProgress.kitComponents[matchingComponentIndex!];
+          idItem = component.skuvaultItemId || null;
+          if (!idItem) {
+            console.log(`[Packing] Kit component ${component.sku} missing skuvaultItemId - will use fallback lookup`);
+          } else {
+            console.log(`[Packing] Kit component scan: componentIndex=${matchingComponentIndex}, skuvaultItemId=${idItem}, componentSku=${component.sku}`);
+          }
+        } else {
+          // For regular items, use the item's skuvaultItemId from the shipment (from SkuVault Items[].Id)
+          const matchingItem = currentShipment?.items.find(item => 
+            item.id === currentProgress.itemId
+          );
+          idItem = matchingItem?.skuvaultItemId || null;
+          if (!idItem) {
+            console.log(`[Packing] Item ${currentProgress.sku} missing skuvaultItemId - will use fallback lookup`);
+          } else {
+            console.log(`[Packing] Regular item scan: itemId=${currentProgress.itemId}, skuvaultItemId=${idItem}`);
+          }
+        }
+        
+        const cachedSaleId = currentShipment!.saleId;
+        const usingCachedData = !!cachedSaleId && !!idItem;
+        console.log(`[Packing] QC scan: saleId=${cachedSaleId}, idItem=${idItem}, isKitComponent=${isKitComponent}, usingCache=${usingCachedData}`);
+        
         const qcResult = await qcScanMutation.mutateAsync({
           orderNumber: currentShipment!.orderNumber,
           sku: data.sku,
           quantity: 1,
+          saleId: currentShipment!.saleId,  // Pass cached SaleId
+          idItem,                            // Pass cached IdItem (component ID for kits)
+          isKitComponent,
         });
 
         if (!qcResult.success) {
