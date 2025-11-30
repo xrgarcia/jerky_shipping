@@ -493,7 +493,33 @@ export const qcFailedItemSchema = qcPassedItemSchema;
 export type QCFailedItem = z.infer<typeof qcFailedItemSchema>;
 
 /**
+ * Alternate SKU reference (e.g., for products with multiple SKUs)
+ */
+export const alternateSkuSchema = z.object({
+  Sku: z.string().nullable().optional(),
+});
+
+export type AlternateSku = z.infer<typeof alternateSkuSchema>;
+
+/**
+ * Kit component product - an individual item within a kit
+ * Contains barcode (Code), SKU, quantity, and other scannable product info
+ */
+export const kitProductSchema = z.object({
+  Sku: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(), // Barcode for this component
+  PartNumber: z.string().nullable().optional(),
+  Quantity: z.number().nullable().optional(), // How many of this component in the kit
+  Title: z.string().nullable().optional(),
+  Picture: z.string().nullable().optional(),
+  Id: z.string().nullable().optional(),
+});
+
+export type KitProduct = z.infer<typeof kitProductSchema>;
+
+/**
  * Expected item in the order (not yet scanned or in progress)
+ * Now includes kit-related fields for proper kit handling
  */
 export const qcExpectedItemSchema = z.object({
   Code: z.string().nullable().optional(), // Barcode
@@ -510,6 +536,20 @@ export const qcExpectedItemSchema = z.object({
   Id: z.string().nullable().optional(), // SkuVault Item ID
   Picture: z.string().nullable().optional(),
   Title: z.string().nullable().optional(),
+  // Kit-related fields
+  IsKit: z.boolean().nullable().optional(), // true if this item is a kit
+  KitLines: z.any().nullable().optional(), // Kit line information
+  KitProducts: z.array(kitProductSchema).nullable().optional(), // Component products in the kit
+  AllKitItemsAndSubstitutes: z.array(z.string()).nullable().optional(), // SKUs of all kit components
+  AlternateCodes: z.array(z.string()).nullable().optional(), // Alternative barcodes
+  AlternateSkus: z.array(alternateSkuSchema).nullable().optional(), // Alternative SKUs
+  // Additional status fields
+  Locations: z.array(z.any()).nullable().optional(),
+  IsFulfilled: z.boolean().nullable().optional(),
+  IsDeleted: z.boolean().nullable().optional(),
+  IsNonAssignabled: z.boolean().nullable().optional(),
+  IsSerialized: z.boolean().nullable().optional(),
+  IsLotted: z.boolean().nullable().optional(),
 });
 
 export type QCExpectedItem = z.infer<typeof qcExpectedItemSchema>;
