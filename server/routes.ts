@@ -20,6 +20,7 @@ import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/sho
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
+import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
@@ -5178,10 +5179,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get shipment
-      const shipment = await storage.getShipment(shipmentId);
+      let shipment = await storage.getShipment(shipmentId);
       
       if (!shipment) {
         return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // CRITICAL: Refresh shipment data from ShipStation to ensure we have the latest hold status
+      // This fixes the issue where hold removal in ShipStation doesn't get reflected in our cached data
+      if (shipment.shipmentId) {
+        try {
+          console.log(`[Packing] Refreshing shipment ${shipment.orderNumber} from ShipStation...`);
+          const freshShipmentResponse = await getShipmentByShipmentId(shipment.shipmentId);
+          
+          if (freshShipmentResponse.data) {
+            const freshShipmentData = freshShipmentResponse.data;
+            
+            // Check if hold status has changed
+            const cachedHoldDate = (shipment.shipmentData as any)?.hold_until_date;
+            const freshHoldDate = freshShipmentData.hold_until_date;
+            
+            if (cachedHoldDate !== freshHoldDate) {
+              console.log(`[Packing] Hold status changed for ${shipment.orderNumber}: ${cachedHoldDate || 'null'} -> ${freshHoldDate || 'null'}`);
+            }
+            
+            // Process through ETL service to update our database with fresh data
+            await shipStationShipmentETL.processShipment(freshShipmentData, shipment.orderId);
+            
+            // Re-fetch the shipment to get the updated record
+            const updatedShipment = await storage.getShipment(shipmentId);
+            if (updatedShipment) {
+              shipment = updatedShipment;
+              console.log(`[Packing] Shipment ${shipment.orderNumber} refreshed from ShipStation (hold_until_date: ${freshHoldDate || 'null'})`);
+            }
+          }
+        } catch (refreshError: any) {
+          // Log but don't fail - we can continue with cached data if refresh fails
+          console.warn(`[Packing] Failed to refresh shipment from ShipStation: ${refreshError.message}`);
+        }
       }
       
       // Check if shipment is linked to Shopify order
