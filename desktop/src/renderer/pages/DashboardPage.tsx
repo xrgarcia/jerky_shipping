@@ -18,7 +18,7 @@ import {
   Eye,
   ExternalLink
 } from 'lucide-react';
-import type { AppState, PrintJob } from '@shared/types';
+import type { AppState, PrintJob, PdfViewerInfo } from '@shared/types';
 import logoImage from '../assets/logo.png';
 
 interface EnvironmentInfo {
@@ -56,6 +56,10 @@ function DashboardPage({ state }: DashboardPageProps) {
   const [selectedJob, setSelectedJob] = useState<PrintJob | null>(null);
   const [retryingJob, setRetryingJob] = useState<string | null>(null);
   
+  // PDF viewer detection state
+  const [pdfViewerInfo, setPdfViewerInfo] = useState<PdfViewerInfo | null>(null);
+  const [pdfViewerChecked, setPdfViewerChecked] = useState(false);
+  
   // Use printersLoaded flag from main process to determine loading state
   const loadingPrinters = !state.printersLoaded;
   
@@ -92,6 +96,38 @@ function DashboardPage({ state }: DashboardPageProps) {
   useEffect(() => {
     if (showPrinterSetup) {
       discoverPrinters();
+      
+      // Check for PDF viewer when printer setup is shown
+      // Clear cache and recheck each time printer setup is opened
+      const checkPdfViewer = async () => {
+        // Reset local state immediately so UI shows loading/fresh state
+        setPdfViewerInfo(null);
+        setPdfViewerChecked(false);
+        
+        try {
+          console.log('[Dashboard] Clearing PDF viewer cache and rechecking...');
+          
+          // Clear cache first so we get fresh detection
+          const clearResult = await window.electronAPI.printer.clearPdfViewerCache();
+          if (!clearResult.success) {
+            console.error('[Dashboard] Failed to clear PDF viewer cache:', clearResult.error);
+            // Continue anyway, detection will use cached result
+          }
+          
+          const result = await window.electronAPI.printer.detectPdfViewer();
+          console.log('[Dashboard] PDF viewer check result:', result);
+          if (result.success && result.data) {
+            setPdfViewerInfo(result.data);
+          } else if (!result.success) {
+            console.error('[Dashboard] PDF viewer detection failed:', result.error);
+          }
+        } catch (err) {
+          console.error('[Dashboard] Failed to detect PDF viewer:', err);
+        } finally {
+          setPdfViewerChecked(true);
+        }
+      };
+      checkPdfViewer();
     }
   }, [showPrinterSetup]);
 
@@ -684,28 +720,46 @@ function DashboardPage({ state }: DashboardPageProps) {
                 </div>
               )}
               
-              {/* PDF Viewer requirement notice for Windows */}
-              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-blue-300">
-                    <p className="font-medium mb-1">PDF Viewer Required</p>
-                    <p className="text-blue-300/80 mb-2">
-                      To print shipping labels, you need a PDF viewer installed. We recommend SumatraPDF for best compatibility with label printers.
-                    </p>
-                    <a 
-                      href="https://www.sumatrapdfreader.org/download-free-pdf-viewer"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 underline"
-                      data-testid="link-download-sumatra"
-                    >
-                      Download SumatraPDF (free)
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+              {/* PDF Viewer status - only show on Windows */}
+              {pdfViewerChecked && (
+                pdfViewerInfo?.installed ? (
+                  <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-green-300">
+                        <p className="font-medium">PDF Viewer: {pdfViewerInfo.viewer}</p>
+                        {pdfViewerInfo.path && (
+                          <p className="text-green-300/60 text-[10px] mt-0.5 truncate" title={pdfViewerInfo.path}>
+                            {pdfViewerInfo.path}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                ) : (
+                  <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-amber-300">
+                        <p className="font-medium mb-1">PDF Viewer Required</p>
+                        <p className="text-amber-300/80 mb-2">
+                          To print shipping labels, you need a PDF viewer installed. We recommend SumatraPDF for best compatibility with label printers.
+                        </p>
+                        <a 
+                          href="https://www.sumatrapdfreader.org/download-free-pdf-viewer"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 underline"
+                          data-testid="link-download-sumatra"
+                        >
+                          Download SumatraPDF (free)
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           ) : state.selectedPrinter ? (
             (() => {

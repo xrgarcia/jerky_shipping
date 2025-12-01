@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo, RemoteConfig } from '../shared/types';
+import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo, RemoteConfig, PdfViewerInfo } from '../shared/types';
 
 const api = {
   invoke: <T = unknown>(channel: IpcChannel, data?: unknown): Promise<IpcResponse<T>> => {
@@ -45,6 +45,10 @@ const api = {
     register: (data: { name: string; systemName: string; status?: string }) => 
       ipcRenderer.invoke('printer:register', data),
     setDefault: (printerId: string) => ipcRenderer.invoke('printer:set-default', printerId),
+    detectPdfViewer: (): Promise<IpcResponse<PdfViewerInfo>> => 
+      ipcRenderer.invoke('printer:detect-pdf-viewer'),
+    clearPdfViewerCache: (): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('printer:clear-pdf-viewer-cache'),
   },
   
   ws: {

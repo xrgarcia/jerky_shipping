@@ -14,13 +14,118 @@ interface SystemPrinter {
   status: string;
 }
 
+interface PdfViewerInfo {
+  installed: boolean;
+  viewer: string | null;
+  path: string | null;
+}
+
 export class PrinterService {
   private tempDir: string;
   private platform: NodeJS.Platform;
+  private cachedPdfViewer: PdfViewerInfo | null = null;
   
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'jerky-ship-connect');
     this.platform = process.platform;
+  }
+  
+  /**
+   * Detect if a PDF viewer is installed on Windows.
+   * Returns cached result after first detection.
+   * macOS always returns installed since it uses lp command.
+   */
+  async detectPdfViewer(): Promise<PdfViewerInfo> {
+    console.log('[PrinterService] detectPdfViewer called');
+    
+    // macOS uses lp which doesn't need a PDF viewer
+    if (this.platform !== 'win32') {
+      console.log('[PrinterService] macOS detected - using native lp command, no PDF viewer needed');
+      return { installed: true, viewer: 'lp (macOS native)', path: null };
+    }
+    
+    // Return cached result if available
+    if (this.cachedPdfViewer) {
+      console.log('[PrinterService] Returning cached PDF viewer info:', this.cachedPdfViewer);
+      return this.cachedPdfViewer;
+    }
+    
+    console.log('[PrinterService] Searching for PDF viewers on Windows...');
+    
+    // Check SumatraPDF first (preferred for label printing)
+    const sumatraPaths = [
+      'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
+      'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
+      `${process.env.LOCALAPPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+      `${process.env.APPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+      `${process.env.USERPROFILE}\\SumatraPDF\\SumatraPDF.exe`,
+      `${process.env.USERPROFILE}\\Downloads\\SumatraPDF.exe`,
+    ];
+    
+    for (const sumatraPath of sumatraPaths) {
+      if (!sumatraPath) continue;
+      console.log(`[PrinterService] Checking SumatraPDF at: ${sumatraPath}`);
+      try {
+        await fs.access(sumatraPath);
+        console.log(`[PrinterService] FOUND SumatraPDF at: ${sumatraPath}`);
+        this.cachedPdfViewer = { installed: true, viewer: 'SumatraPDF', path: sumatraPath };
+        return this.cachedPdfViewer;
+      } catch {
+        // Continue to next path
+      }
+    }
+    
+    // Check Adobe Reader
+    const adobePaths = [
+      'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe',
+      'C:\\Program Files (x86)\\Adobe\\Acrobat Reader DC\\Reader\\AcroRd32.exe',
+      'C:\\Program Files\\Adobe\\Reader 11.0\\Reader\\AcroRd32.exe',
+    ];
+    
+    for (const adobePath of adobePaths) {
+      console.log(`[PrinterService] Checking Adobe Reader at: ${adobePath}`);
+      try {
+        await fs.access(adobePath);
+        console.log(`[PrinterService] FOUND Adobe Reader at: ${adobePath}`);
+        this.cachedPdfViewer = { installed: true, viewer: 'Adobe Reader', path: adobePath };
+        return this.cachedPdfViewer;
+      } catch {
+        // Continue to next path
+      }
+    }
+    
+    // Check if there's a default PDF handler via registry/associations
+    try {
+      console.log('[PrinterService] Checking for default PDF handler via file association...');
+      const { stdout } = await execAsync('cmd /c assoc .pdf', { encoding: 'utf8' });
+      console.log(`[PrinterService] PDF association: ${stdout.trim()}`);
+      
+      if (stdout.includes('=')) {
+        const { stdout: ftypeOutput } = await execAsync('cmd /c ftype ' + stdout.split('=')[1]?.trim(), { encoding: 'utf8' });
+        console.log(`[PrinterService] PDF handler: ${ftypeOutput.trim()}`);
+        
+        // Case-insensitive check for .exe (Windows registry can have uppercase .EXE)
+        if (ftypeOutput.toLowerCase().includes('.exe')) {
+          console.log('[PrinterService] Found a default PDF handler via file association');
+          this.cachedPdfViewer = { installed: true, viewer: 'System Default', path: null };
+          return this.cachedPdfViewer;
+        }
+      }
+    } catch (err) {
+      console.log('[PrinterService] Could not determine PDF file association:', err);
+    }
+    
+    console.log('[PrinterService] No PDF viewer found');
+    this.cachedPdfViewer = { installed: false, viewer: null, path: null };
+    return this.cachedPdfViewer;
+  }
+  
+  /**
+   * Clear the cached PDF viewer info (useful if user installs viewer while app is running)
+   */
+  clearPdfViewerCache(): void {
+    console.log('[PrinterService] Clearing PDF viewer cache');
+    this.cachedPdfViewer = null;
   }
   
   async discoverPrinters(): Promise<SystemPrinter[]> {

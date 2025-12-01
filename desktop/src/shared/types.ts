@@ -109,6 +109,12 @@ export interface RemoteConfig {
   updatedAt?: string;
 }
 
+export interface PdfViewerInfo {
+  installed: boolean;
+  viewer: string | null;
+  path: string | null;
+}
+
 export type IpcChannel = 
   | 'auth:login'
   | 'auth:logout'
@@ -121,6 +127,7 @@ export type IpcChannel =
   | 'printer:list'
   | 'printer:register'
   | 'printer:set-default'
+  | 'printer:detect-pdf-viewer'
   | 'print:queue'
   | 'print:status'
   | 'ws:connect'

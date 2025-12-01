@@ -13,6 +13,8 @@ interface SavedAuth {
   serverUrl: string;
   environment?: string;
   stationId?: string; // Persisted station ID for session restoration
+  refreshToken?: string; // For silent token refresh
+  accessTokenExpiresAt?: string; // Token expiry time
 }
 
 interface AuthResult {
@@ -148,6 +150,93 @@ export class AuthService {
     console.log('[Auth] Updated stationId in keychain:', stationId);
   }
   
+  /**
+   * Attempt to silently refresh the access token using the saved refresh token.
+   * Returns the refreshed AuthResult on success, or null if refresh fails (requiring interactive login).
+   */
+  async refreshToken(): Promise<AuthResult | null> {
+    const savedAuth = await this.loadSavedAuth();
+    
+    if (!savedAuth) {
+      console.log('[Auth] No saved auth found for token refresh');
+      return null;
+    }
+    
+    if (!savedAuth.refreshToken) {
+      console.log('[Auth] No refresh token saved - cannot refresh silently');
+      return null;
+    }
+    
+    if (!savedAuth.serverUrl) {
+      console.log('[Auth] No server URL saved - cannot refresh');
+      return null;
+    }
+    
+    console.log('[Auth] Attempting silent token refresh...');
+    
+    try {
+      const refreshResponse = await httpRequest(
+        `${savedAuth.serverUrl}/api/desktop/clients/refresh`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clientId: savedAuth.clientId,
+            refreshToken: savedAuth.refreshToken,
+          }),
+        }
+      );
+      
+      if (!refreshResponse.ok) {
+        console.log('[Auth] Token refresh failed:', refreshResponse.status);
+        // Refresh token may be expired or revoked
+        return null;
+      }
+      
+      const refreshData = await refreshResponse.json() as {
+        accessToken: string;
+        refreshToken?: string;
+        accessTokenExpiresAt: string;
+        refreshTokenExpiresAt?: string;
+        user: {
+          id: string;
+          email: string;
+          name: string;
+        };
+      };
+      
+      console.log('[Auth] Token refresh successful');
+      
+      // Update saved auth with new tokens
+      const updatedAuth: SavedAuth = {
+        ...savedAuth,
+        token: refreshData.accessToken,
+        accessTokenExpiresAt: refreshData.accessTokenExpiresAt,
+        // Update refresh token if a new one was provided
+        refreshToken: refreshData.refreshToken || savedAuth.refreshToken,
+      };
+      
+      await this.saveAuth(updatedAuth);
+      
+      return {
+        token: refreshData.accessToken,
+        clientId: savedAuth.clientId, // clientId doesn't change on refresh
+        user: {
+          id: refreshData.user.id,
+          email: refreshData.user.email,
+          displayName: refreshData.user.name,
+        },
+        serverUrl: savedAuth.serverUrl,
+        environment: savedAuth.environment || 'production',
+      };
+    } catch (error) {
+      console.error('[Auth] Token refresh error:', error);
+      return null;
+    }
+  }
+  
   async login(envName: string): Promise<AuthResult> {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
@@ -273,6 +362,8 @@ export class AuthService {
               clientId: authResult.clientId,
               serverUrl: serverUrl,
               environment: envName,
+              refreshToken: registration.refreshToken,
+              accessTokenExpiresAt: registration.accessTokenExpiresAt,
             });
             
             console.log('[Auth] Desktop client registered successfully');

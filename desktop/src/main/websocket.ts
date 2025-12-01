@@ -172,11 +172,32 @@ export class WebSocketClient extends EventEmitter {
         }
       });
       
-      // Handle unexpected upgrade errors (like 502 during server restart)
+      // Handle unexpected upgrade errors (like 502 during server restart, 401/403 for auth issues)
       this.ws.on('unexpected-response', (req, res) => {
-        const statusCode = res.statusCode || 'unknown';
-        console.log(`[WebSocket] Unexpected response: ${statusCode} (server may be restarting)`);
+        const statusCode = res.statusCode || 0;
+        console.log(`[WebSocket] Unexpected response: ${statusCode}`);
         this.clearConnectionTimeout();
+        
+        // Auth errors require re-authentication, not just reconnection
+        if (statusCode === 401 || statusCode === 403) {
+          console.log('[WebSocket] Authentication error detected - token may be invalid');
+          this.lastError = `Authentication failed (${statusCode})`;
+          
+          // Clean up
+          if (this.ws) {
+            try {
+              this.ws.terminate();
+            } catch (e) {
+              // Ignore
+            }
+            this.ws = null;
+          }
+          
+          // Emit auth-failed event so main process can handle re-authentication
+          this.emit('auth-failed', { statusCode, reason: 'Token rejected by server' });
+          return; // Don't schedule reconnect - wait for re-auth
+        }
+        
         this.lastError = `Server unavailable (${statusCode})`;
         
         // Clean up
@@ -189,7 +210,7 @@ export class WebSocketClient extends EventEmitter {
           this.ws = null;
         }
         
-        // Schedule reconnect
+        // Schedule reconnect for non-auth errors
         if (!this.isIntentionalClose && !this.reconnectTimer) {
           this.scheduleReconnect();
         }
@@ -213,6 +234,37 @@ export class WebSocketClient extends EventEmitter {
       this.ws.close(1000, 'Client disconnecting');
       this.ws = null;
     }
+  }
+  
+  /**
+   * Update the authentication credentials (for silent re-auth scenarios)
+   * This allows reconnection with fresh token/clientId after auth failure
+   * 
+   * @param newToken - The refreshed access token (required)
+   * @param newClientId - The clientId from auth response (required for handshake)
+   */
+  updateCredentials(newToken: string, newClientId: string): void {
+    if (!newToken || !newClientId) {
+      console.error('[WebSocket] updateCredentials called with invalid params:', {
+        hasToken: !!newToken,
+        hasClientId: !!newClientId,
+      });
+      return;
+    }
+    console.log('[WebSocket] Credentials updated, clientId:', newClientId);
+    this.token = newToken;
+    this.clientId = newClientId;
+  }
+  
+  /**
+   * Trigger a reconnection attempt (e.g., after token refresh)
+   */
+  reconnectNow(): void {
+    console.log('[WebSocket] Manual reconnect triggered');
+    this.isIntentionalClose = false;
+    this.reconnectAttempt = 0;
+    this.lastError = null;
+    this.connect();
   }
   
   subscribeToStation(stationId: string): void {

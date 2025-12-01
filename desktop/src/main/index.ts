@@ -490,6 +490,65 @@ async function connectWebSocket(): Promise<void> {
     flushPendingStatusUpdates();
   });
   
+  // Handle authentication failures - attempt silent token refresh first
+  // This provides seamless recovery from transient auth failures during server restarts.
+  // Falls back to prompting for re-login only when refresh token is unavailable or expired.
+  wsClient.on('auth-failed', async (data: { statusCode: number; reason: string }) => {
+    console.log('[Main] WebSocket auth failed:', data);
+    
+    // First, try silent token refresh using saved refresh token
+    console.log('[Main] Attempting silent token refresh...');
+    const refreshResult = await authService.refreshToken();
+    
+    if (refreshResult) {
+      console.log('[Main] Silent token refresh successful');
+      
+      // Update API client with new token
+      apiClient = new ApiClient(refreshResult.token, refreshResult.serverUrl);
+      
+      // Update state with refreshed auth
+      updateState({
+        auth: {
+          isAuthenticated: true,
+          user: refreshResult.user,
+          token: refreshResult.token,
+          clientId: refreshResult.clientId,
+        },
+      });
+      
+      // Update WebSocket credentials and reconnect
+      if (wsClient) {
+        console.log('[Main] Updating WebSocket with refreshed token, clientId:', refreshResult.clientId);
+        wsClient.updateCredentials(refreshResult.token, refreshResult.clientId);
+        wsClient.reconnectNow();
+      }
+      return;
+    }
+    
+    // Silent refresh failed - prompt user to re-login
+    // Note: For stations that logged in before refresh token support was added,
+    // this will require a one-time re-login to obtain a refresh token.
+    // After that, subsequent auth failures will be handled silently.
+    console.log('[Main] Silent token refresh failed - prompting user to re-login');
+    console.log('[Main] (If this is the first time since app update, one-time re-login is required to enable silent refresh)');
+    
+    updateState({
+      auth: {
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        clientId: null,
+      },
+      connectionStatus: 'disconnected',
+      connectionInfo: { 
+        status: 'disconnected', 
+        reconnectAttempt: 0, 
+        lastError: `Session expired (${data.statusCode}) - please log in again`, 
+        lastConnectedAt: null 
+      },
+    });
+  });
+  
   wsClient.on('job:new', async (job: PrintJob) => {
     console.log(`[Main] Received new job ${job.id}`);
     
@@ -959,6 +1018,31 @@ function setupIpcHandlers(): void {
       
       const message = error instanceof Error ? error.message : 'Failed to set default printer';
       console.error('[Main] Failed to set default printer:', message);
+      return { success: false, error: message };
+    }
+  });
+  
+  ipcMain.handle('printer:detect-pdf-viewer', async () => {
+    try {
+      console.log('[Main] printer:detect-pdf-viewer called');
+      const pdfViewerInfo = await printerService.detectPdfViewer();
+      console.log('[Main] PDF viewer detection result:', pdfViewerInfo);
+      return { success: true, data: pdfViewerInfo };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to detect PDF viewer';
+      console.error('[Main] PDF viewer detection failed:', message);
+      return { success: false, error: message };
+    }
+  });
+  
+  ipcMain.handle('printer:clear-pdf-viewer-cache', async () => {
+    try {
+      console.log('[Main] printer:clear-pdf-viewer-cache called');
+      printerService.clearPdfViewerCache();
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clear PDF viewer cache';
+      console.error('[Main] Failed to clear PDF viewer cache:', message);
       return { success: false, error: message };
     }
   });
