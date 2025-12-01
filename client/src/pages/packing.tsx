@@ -40,6 +40,9 @@ import {
   Building2,
   CircleDashed,
   Clock,
+  Printer,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -58,6 +61,19 @@ type Station = {
   name: string;
   locationHint: string | null;
   isActive: boolean;
+};
+
+type StationPrinterStatus = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isConnected: boolean;
+  printer: {
+    id: string;
+    name: string;
+    systemName: string;
+    status: string;
+  } | null;
 };
 
 type KitComponent = {
@@ -284,6 +300,102 @@ export default function Packing() {
   const currentStation = stationSessionData?.session;
   const isSessionExpired = currentStation ? new Date(currentStation.expiresAt) <= new Date() : true;
   const hasValidSession = !!currentStation && !isSessionExpired;
+
+  // Track real-time station connection status (updated via WebSocket)
+  const [stationConnected, setStationConnected] = useState<boolean | null>(null);
+
+  // Fetch station printer status for the current station
+  type StationsResponse = {
+    stations: StationPrinterStatus[];
+    connectionStats: { total: number; connected: number; offline: number };
+  };
+  const { data: stationsData, isLoading: isLoadingStationStatus } = useQuery<StationsResponse>({
+    queryKey: ['/api/stations'],
+    enabled: hasValidSession && !!currentStation?.stationId,
+    refetchInterval: 30000, // Refresh every 30 seconds as fallback
+  });
+
+  // Find the current station's printer status from the stations list
+  const currentStationStatus = stationsData?.stations.find(s => s.id === currentStation?.stationId);
+  const printerInfo = currentStationStatus?.printer ?? null;
+  
+  // Use WebSocket-updated connection status if available, otherwise use API data
+  const isStationConnected = stationConnected ?? currentStationStatus?.isConnected ?? false;
+  // Normalize printer status to lowercase for comparison (API may return 'ONLINE' or 'online')
+  const printerStatusNormalized = printerInfo?.status?.toLowerCase() ?? '';
+  const isPrinterReady = isStationConnected && printerInfo !== null && printerStatusNormalized === 'online';
+  const printerNotConfigured = printerInfo === null;
+  const printerOffline = printerInfo !== null && printerStatusNormalized !== 'online';
+
+  // WebSocket ref for station status updates (prevents leaks across re-renders)
+  const stationWsRef = useRef<WebSocket | null>(null);
+
+  // WebSocket subscription for real-time station connection and printer status updates
+  useEffect(() => {
+    if (!hasValidSession || !currentStation?.stationId) return;
+    
+    // Close any existing socket before creating new one
+    if (stationWsRef.current) {
+      stationWsRef.current.close();
+      stationWsRef.current = null;
+    }
+    
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
+    stationWsRef.current = ws;
+    
+    ws.onopen = () => {
+      console.log("[Packing] WebSocket connected for station status");
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        const stationId = currentStation?.stationId;
+        
+        // Handle station connection status updates
+        if (message.type === 'station:connection' && message.stationId === stationId) {
+          console.log(`[Packing] Station connection update: ${message.isConnected ? 'online' : 'offline'}`);
+          setStationConnected(message.isConnected);
+          // Refresh stations query to get updated printer info
+          queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
+        }
+        
+        // Handle printer status updates (when printer goes online/offline)
+        if (message.type === 'printer:status' && message.stationId === stationId) {
+          console.log(`[Packing] Printer status update: ${message.status}`);
+          // Refresh stations query to get updated printer status
+          queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
+        }
+        
+        // Handle print job updates (may indicate printer issues)
+        if (message.type === 'print:job:update' && message.stationId === stationId) {
+          // Refresh stations query in case printer status changed
+          queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    };
+    
+    ws.onerror = () => {
+      console.error("[Packing] WebSocket error for station status");
+    };
+    
+    return () => {
+      // Always close the socket on cleanup
+      if (stationWsRef.current) {
+        stationWsRef.current.close();
+        stationWsRef.current = null;
+      }
+    };
+  }, [hasValidSession, currentStation?.stationId]);
+
+  // Reset connection status when station changes
+  useEffect(() => {
+    setStationConnected(null);
+  }, [currentStation?.stationId]);
 
   // Show station modal if no valid session (once loading is complete)
   useEffect(() => {
@@ -1768,28 +1880,73 @@ export default function Packing() {
           <h1 className="text-2xl font-bold">Packing Station</h1>
         </div>
         
-        {/* Station Indicator */}
+        {/* Station Indicator with Printer Status */}
         {isLoadingSession ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Loading...</span>
           </div>
         ) : currentStation ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowStationModal(true)}
-            className="flex items-center gap-2"
-            data-testid="button-change-station"
-          >
-            <Building2 className="h-4 w-4" />
-            <span className="font-medium">{currentStation.stationName}</span>
-            {currentStation.stationLocationHint && (
-              <span className="text-muted-foreground text-xs">
-                ({currentStation.stationLocationHint})
-              </span>
+          <div className="flex items-center gap-2">
+            {/* Station/Printer Status Indicator */}
+            {isLoadingStationStatus ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Checking...</span>
+              </div>
+            ) : isPrinterReady ? (
+              <div 
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-100 dark:bg-green-950 border border-green-200 dark:border-green-800"
+                data-testid="indicator-printer-ready"
+              >
+                <Wifi className="h-3 w-3 text-green-600 dark:text-green-400" />
+                <Printer className="h-3 w-3 text-green-600 dark:text-green-400" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-300">Ready</span>
+              </div>
+            ) : printerNotConfigured ? (
+              <div 
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-950 border border-amber-200 dark:border-amber-800"
+                data-testid="indicator-printer-not-configured"
+              >
+                <Printer className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">No Printer</span>
+              </div>
+            ) : !isStationConnected ? (
+              <div 
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-100 dark:bg-red-950 border border-red-200 dark:border-red-800"
+                data-testid="indicator-station-offline"
+              >
+                <WifiOff className="h-3 w-3 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-300">Station Offline</span>
+              </div>
+            ) : (
+              <div 
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-950 border border-amber-200 dark:border-amber-800"
+                data-testid="indicator-printer-offline"
+              >
+                <Wifi className="h-3 w-3 text-green-600 dark:text-green-400" />
+                <Printer className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Printer Offline</span>
+              </div>
             )}
-          </Button>
+            
+            {/* Station Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowStationModal(true)}
+              className="flex items-center gap-2"
+              data-testid="button-change-station"
+            >
+              <Building2 className="h-4 w-4" />
+              <span className="font-medium">{currentStation.stationName}</span>
+              {currentStation.stationLocationHint && (
+                <span className="text-muted-foreground text-xs">
+                  ({currentStation.stationLocationHint})
+                </span>
+              )}
+            </Button>
+          </div>
         ) : (
           <Button
             variant="destructive"
@@ -2724,10 +2881,42 @@ export default function Packing() {
                 </div>
               )}
 
+              {/* Printer Not Ready Warning */}
+              {!isPrinterReady && !isLoadingStationStatus && (
+                <div 
+                  className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-2"
+                  data-testid="alert-printer-not-ready"
+                >
+                  <div className="flex items-start gap-3">
+                    {!isStationConnected ? (
+                      <WifiOff className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <Printer className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-medium text-red-800 dark:text-red-200">
+                        {!isStationConnected 
+                          ? 'Station Offline' 
+                          : printerNotConfigured 
+                            ? 'No Printer Configured'
+                            : 'Printer Offline'}
+                      </h4>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        {!isStationConnected 
+                          ? 'The desktop printing app is not connected. Please start the app on this station.' 
+                          : printerNotConfigured 
+                            ? 'No printer is configured for this station. Please set up a printer in the desktop app.'
+                            : 'The printer is not responding. Please check the printer connection.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Complete Packing Button */}
               <Button
                 onClick={handleCompletePacking}
-                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob}
+                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady}
                 className="w-full"
                 size="lg"
                 data-testid="button-complete-packing"
@@ -2736,6 +2925,11 @@ export default function Packing() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Completing...
+                  </>
+                ) : !isPrinterReady ? (
+                  <>
+                    <WifiOff className="h-4 w-4 mr-2" />
+                    Printer Not Ready
                   </>
                 ) : hasPendingPrintJob ? (
                   <>
