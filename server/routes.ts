@@ -5185,22 +5185,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Shipment not found" });
       }
       
-      // CRITICAL: Refresh shipment data from ShipStation to ensure we have the latest hold status
+      // CRITICAL: Refresh shipment data from ShipStation if the cached data shows it's on hold
       // This fixes the issue where hold removal in ShipStation doesn't get reflected in our cached data
-      if (shipment.shipmentId) {
+      // Only refresh if: 1) We have a ShipStation ID, AND 2) Cached data shows a hold_until_date
+      const cachedHoldDate = (shipment.shipmentData as any)?.hold_until_date;
+      if (shipment.shipmentId && cachedHoldDate) {
         try {
-          console.log(`[Packing] Refreshing shipment ${shipment.orderNumber} from ShipStation...`);
+          console.log(`[Packing] Shipment ${shipment.orderNumber} shows hold_until_date in cache - refreshing from ShipStation...`);
           const freshShipmentResponse = await getShipmentByShipmentId(shipment.shipmentId);
           
           if (freshShipmentResponse.data) {
             const freshShipmentData = freshShipmentResponse.data;
-            
-            // Check if hold status has changed
-            const cachedHoldDate = (shipment.shipmentData as any)?.hold_until_date;
             const freshHoldDate = freshShipmentData.hold_until_date;
             
             if (cachedHoldDate !== freshHoldDate) {
-              console.log(`[Packing] Hold status changed for ${shipment.orderNumber}: ${cachedHoldDate || 'null'} -> ${freshHoldDate || 'null'}`);
+              console.log(`[Packing] Hold status changed for ${shipment.orderNumber}: ${cachedHoldDate} -> ${freshHoldDate || 'null (removed)'}`);
             }
             
             // Process through ETL service to update our database with fresh data
