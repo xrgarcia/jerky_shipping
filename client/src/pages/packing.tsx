@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Accordion,
@@ -252,7 +251,6 @@ type LabelError = {
 };
 
 export default function Packing() {
-  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -296,17 +294,10 @@ export default function Packing() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/packing/station-session'] });
       setShowStationModal(false);
-      toast({
-        title: "Station Selected",
-        description: "You can now start packing orders.",
-      });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to select station",
-        variant: "destructive",
-      });
+      // Error is visible in the modal UI
+      console.error('[Packing] Station selection failed:', error.message);
     },
   });
 
@@ -1056,35 +1047,10 @@ export default function Packing() {
     },
     onSuccess: (shipment) => {
       if (!shipment.items || shipment.items.length === 0) {
-        toast({
-          title: "No Items Found",
-          description: "This shipment has no items to pack",
-          variant: "destructive",
-        });
+        // No items - clear and refocus for next scan
         setOrderScan("");
-        // Re-focus order input for next scan attempt
         setTimeout(() => orderInputRef.current?.focus(), 100);
         return;
-      }
-
-      // Warn about items without SKUs - they'll require manual verification
-      const itemsWithoutSku = shipment.items.filter((item) => !item.sku);
-      if (itemsWithoutSku.length > 0) {
-        toast({
-          title: "Manual Verification Required",
-          description: `${itemsWithoutSku.length} item(s) without SKU. Verify manually before completing.`,
-        });
-      }
-
-      // Display validation warnings from SkuVault cross-validation
-      if (shipment.validationWarnings && shipment.validationWarnings.length > 0) {
-        shipment.validationWarnings.forEach((warning) => {
-          toast({
-            title: "SkuVault Validation",
-            description: warning,
-            variant: "default",
-          });
-        });
       }
 
       setCurrentShipment(shipment);
@@ -1103,31 +1069,13 @@ export default function Packing() {
         skuvaultPassedItems: shipment.qcSale?.PassedItems?.length ?? 0,
       }, shipment.orderNumber);
       
-      // Show how many items are already scanned in SkuVault
-      const passedItemsCount = shipment.qcSale?.PassedItems?.length ?? 0;
-      if (passedItemsCount > 0) {
-        toast({
-          title: "Order Loaded",
-          description: `${shipment.items.length} item(s) ready • ${passedItemsCount} already scanned in SkuVault`,
-        });
-      } else {
-        toast({
-          title: "Order Loaded",
-          description: `${shipment.items.length} item(s) ready for packing`,
-        });
-      }
-      
       // Focus product input after loading shipment
       setTimeout(() => productInputRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Order Not Found",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Order not found - clear and refocus for next scan
+      console.error('[Packing] Order load failed:', error.message);
       setOrderScan("");
-      // Re-focus order input for next scan attempt
       setTimeout(() => orderInputRef.current?.focus(), 100);
     },
   });
@@ -1139,11 +1087,6 @@ export default function Packing() {
       return (await response.json()) as { success: boolean; message: string };
     },
     onSuccess: () => {
-      toast({
-        title: "History Cleared",
-        description: "Returning to scan order page...",
-      });
-      
       // Clear current shipment to return to scan order page
       setCurrentShipment(null);
       setSkuProgress(new Map());
@@ -1156,11 +1099,7 @@ export default function Packing() {
       setTimeout(() => orderInputRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error('[Packing] Clear history failed:', error.message);
     },
   });
 
@@ -1815,11 +1754,6 @@ export default function Packing() {
       remaining: 0,
     });
     setSkuProgress(newProgress);
-
-    toast({
-      title: "Manual Verification Complete",
-      description: `${progress.name} (${progress.expected} unit${progress.expected > 1 ? 's' : ''}) verified by supervisor`,
-    });
     
     // Return focus to product input
     setTimeout(() => productInputRef.current?.focus(), 0);
