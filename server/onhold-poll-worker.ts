@@ -125,14 +125,12 @@ export async function pollOnHoldShipments(): Promise<number> {
     if (backfillActive) {
       const jobId = await workerCoordinator.getActiveBackfillJobId();
       log(`Backfill job ${jobId} is active - pausing poll worker`);
-      try {
-        workerStatus = 'awaiting_backfill_job';
-        await broadcastWorkerStatus();
-      } finally {
-        // Reset to sleeping after broadcasting degraded status
-        workerStatus = 'sleeping';
-        await broadcastWorkerStatus();
-      }
+      workerStatus = 'awaiting_backfill_job';
+      await broadcastWorkerStatus();
+      // Keep status as awaiting_backfill_job for a few seconds so UI can observe it
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      workerStatus = 'sleeping';
+      await broadcastWorkerStatus();
       return 0;
     }
   } catch (error) {
@@ -266,6 +264,9 @@ export async function pollOnHoldShipments(): Promise<number> {
       log(`Error polling on_hold shipments: ${error.message}`);
       return 0;
     } finally {
+      // Delay before setting to sleeping so the UI can observe the "running" state
+      // Without this delay, the running state is too brief for the UI to catch
+      await new Promise(resolve => setTimeout(resolve, 3000));
       workerStatus = 'sleeping';
       await broadcastWorkerStatus();  // Notify frontend of status change
     }
