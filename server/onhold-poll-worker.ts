@@ -268,8 +268,8 @@ export async function pollOnHoldShipments(): Promise<number> {
  * - The sync worker handles rate limiting, API calls, and status comparison
  * 
  * Time-based filtering prevents the same shipments from being re-enqueued every poll cycle:
- * - lastStatusCheckAt is updated by the sync worker when it verifies a shipment
- * - Only shipments with NULL or stale (>5 min) lastStatusCheckAt are enqueued
+ * - reverseSyncLastCheckedAt is updated by the sync worker when it verifies a shipment
+ * - Only shipments with NULL or stale (>5 min) reverseSyncLastCheckedAt are enqueued
  * 
  * Benefits:
  * - No API calls in reverse sync (no rate limit contention)
@@ -289,8 +289,8 @@ export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; sk
     .from(shipments)
     .where(
       sql`${shipments.shipmentStatus} = 'on_hold' AND (
-        ${shipments.lastStatusCheckAt} IS NULL OR 
-        ${shipments.lastStatusCheckAt} < ${staleThreshold}
+        ${shipments.reverseSyncLastCheckedAt} IS NULL OR 
+        ${shipments.reverseSyncLastCheckedAt} < ${staleThreshold}
       )`
     )
     .orderBy(asc(shipments.createdAt)); // Process oldest first
