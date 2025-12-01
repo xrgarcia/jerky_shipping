@@ -177,118 +177,53 @@ export async function pollOnHoldShipments(): Promise<number> {
       workerStatus = 'running';
       await broadcastWorkerStatus();  // Notify frontend of status change
       
-      // Fetch ALL on_hold shipments without date filtering
-      // We previously used a date floor (modified_at_start) to minimize API calls, but this
-      // caused shipments to be missed if they were put on hold more than 30 minutes ago.
-      // With ~100 on_hold shipments typically, fetching all is acceptable.
-    
-    let totalQueued = 0;
-    let page = 1;
-    let hasMorePages = true;
-    
-    // Fetch all pages of on_hold shipments (no date filter - get everything)
-    while (hasMorePages) {
-      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
+      // Fetch all on_hold shipments from ShipStation and push each onto the sync queue
+      let totalQueued = 0;
+      let page = 1;
+      let hasMorePages = true;
       
-      log(`Fetching page ${page} of on_hold shipments...`);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'api-key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`ShipStation API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const pageShipments = data.shipments || [];
-      
-      // Log the full API response info for debugging
-      log(`Page ${page}: Found ${pageShipments.length} on_hold shipment(s) (total: ${data.total || 'unknown'}, pages: ${data.pages || 'unknown'})`);
-      
-      // Log first few shipment_numbers for debugging
-      if (page === 1 && pageShipments.length > 0) {
-        const sampleNumbers = pageShipments.slice(0, 5).map((s: any) => s.shipment_number).join(', ');
-        log(`Sample shipment_numbers from page 1: ${sampleNumbers}...`);
-      }
-      
-      // If we got fewer than 100 shipments, this is the last page
-      hasMorePages = pageShipments.length === 100;
-      
-      let pageQueued = 0;
-      let skippedExisting = 0;
-      let skippedNoNumber = 0;
-      
-      for (const shipmentData of pageShipments) {
-        const orderNumber = shipmentData.shipment_number;
-        const shipmentId = shipmentData.shipment_id;
-        const trackingNumber = shipmentData.tracking_number;
+      while (hasMorePages) {
+        const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
         
-        // Debug logging for specific shipment we're tracking
-        const isDebugTarget = orderNumber === 'JK3825348884' || shipmentId === 'se-929114240';
-        if (isDebugTarget) {
-          log(`[DEBUG] Found target shipment: ${orderNumber} (${shipmentId})`);
-        }
+        log(`Fetching page ${page} of on_hold shipments...`);
         
-        if (!orderNumber) {
-          log(`Skipping shipment ${shipmentId} - missing shipment_number`);
-          skippedNoNumber++;
-          continue;
-        }
-        
-        // Check if we already have this shipment
-        const existing = await storage.getShipmentByShipmentId(String(shipmentId));
-        if (isDebugTarget) {
-          log(`[DEBUG] ${orderNumber} existing check: ${existing ? 'found in DB' : 'NOT in DB'}`);
-        }
-        if (existing) {
-          // Only queue if modified timestamp is newer than our last update
-          const shipmentModified = new Date(shipmentData.modified_at);
-          const ourUpdated = existing.updatedAt ? new Date(existing.updatedAt) : new Date(existing.createdAt);
-          
-          if (shipmentModified <= ourUpdated) {
-            skippedExisting++;
-            if (isDebugTarget) {
-              log(`[DEBUG] ${orderNumber} skipped - already up to date`);
-            }
-            continue; // Skip - we already have the latest version
-          }
-        }
-        
-        // Queue for sync with inline shipment data
-        // Clone shipmentData to prevent any reference-sharing issues
-        const shipmentDataSnapshot = JSON.parse(JSON.stringify(shipmentData));
-        const queueResult = await enqueueShipmentSync({
-          orderNumber,
-          shipmentId,
-          trackingNumber,
-          reason: 'manual',
-          enqueuedAt: Date.now(),
-          webhookData: shipmentDataSnapshot,
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
         });
+
+        if (!response.ok) {
+          throw new Error(`ShipStation API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const pageShipments = data.shipments || [];
         
-        if (isDebugTarget) {
-          log(`[DEBUG] ${orderNumber} enqueue result: ${queueResult ? 'SUCCESS' : 'FAILED'}`);
+        log(`Page ${page}: Found ${pageShipments.length} on_hold shipment(s)`);
+        
+        // If we got fewer than 100 shipments, this is the last page
+        hasMorePages = pageShipments.length === 100;
+        
+        // Push each shipment onto the queue - let the sync worker handle everything else
+        for (const shipment of pageShipments) {
+          await enqueueShipmentSync({
+            orderNumber: shipment.shipment_number,
+            shipmentId: shipment.shipment_id,
+            trackingNumber: shipment.tracking_number,
+            reason: 'manual',
+            enqueuedAt: Date.now(),
+            webhookData: shipment,
+          });
         }
         
-        pageQueued++;
+        totalQueued += pageShipments.length;
+        page++;
       }
       
-      log(`Page ${page}: Queued ${pageQueued}, skipped ${skippedExisting} existing, ${skippedNoNumber} no number`);
-      
-      totalQueued += pageQueued;
-      page++;
-    }
-    
-    if (totalQueued > 0) {
-      log(`Total: Queued ${totalQueued} on_hold shipment(s) across ${page - 1} page(s)`);
-    } else {
-      log(`No new on_hold shipments to queue`);
-    }
+      log(`Total: Queued ${totalQueued} on_hold shipment(s)`)
     
       // Update worker statistics
       workerStats.lastProcessedCount = totalQueued;
