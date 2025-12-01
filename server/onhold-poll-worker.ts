@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { enqueueShipmentSync, enqueueShipmentSyncBatch } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
-import { desc, eq, asc, or, isNull, lt, sql } from 'drizzle-orm';
+import { desc, eq, asc, or, isNull, lt, sql, inArray, gt, and } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
@@ -227,7 +227,10 @@ export async function pollOnHoldShipments(): Promise<number> {
             .select({ shipmentId: shipments.shipmentId })
             .from(shipments)
             .where(
-              sql`${shipments.shipmentId} = ANY(ARRAY[${sql.join(shipmentIds.map((id: string) => sql`${id}`), sql`, `)}]::text[]) AND ${shipments.updatedAt} > ${freshnessThreshold}`
+              and(
+                inArray(shipments.shipmentId, shipmentIds),
+                gt(shipments.updatedAt, freshnessThreshold)
+              )
             );
           recentlySyncedIds = new Set(recentShipments.map(s => s.shipmentId).filter((id): id is string => id !== null));
         }
