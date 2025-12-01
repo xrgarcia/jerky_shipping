@@ -4729,6 +4729,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // FALLBACK: Order not sessioned in SkuVault (no QC Sale data)
+        // Use direct product lookup and match against shipment items
+        console.log(`[Packing Validation] No QC Sale data for order ${orderNumber}, trying direct product lookup`);
+        
+        try {
+          // 1. Look up product by barcode in SkuVault
+          const { product } = await skuVaultService.getProductByCode(barcode);
+          
+          if (product && product.Sku) {
+            // 2. Get shipment items for this order from our database
+            const orderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
+            
+            if (orderShipments.length > 0) {
+              // Get items from the most recent shipment (first one due to DESC order)
+              const shipmentItemsList = await storage.getShipmentItems(orderShipments[0].id);
+              
+              // 3. Match SKU against shipment items (case-insensitive)
+              const matchedItem = shipmentItemsList.find(item => 
+                item.sku?.toUpperCase() === product.Sku?.toUpperCase()
+              );
+              
+              if (matchedItem) {
+                console.log(`[Packing Validation] Fallback match: barcode ${barcode} -> SKU ${product.Sku} found in shipment items`);
+                return res.json({
+                  valid: true,
+                  sku: product.Sku,
+                  barcode: barcode,
+                  title: matchedItem.name || product.Description || 'Unknown Product',
+                  quantity: matchedItem.quantity,
+                  itemId: null, // No SkuVault item ID for unsessioned orders
+                  saleId: null, // No SkuVault sale ID for unsessioned orders
+                  isKitComponent: false,
+                  kitId: null,
+                  kitSku: null,
+                  kitTitle: null,
+                  fallbackValidation: true, // Flag indicating this used fallback path
+                });
+              } else {
+                console.log(`[Packing Validation] Product ${product.Sku} not in order ${orderNumber}'s shipment items`);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error(`[Packing Validation] Fallback product lookup failed:`, fallbackError);
+        }
+        
         return res.status(404).json({ 
           valid: false, 
           error: "Product not found in order",
