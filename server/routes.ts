@@ -5303,26 +5303,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Complete order packing
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
+    const { shipmentId } = req.body;
+    const user = req.user!;
+    let orderNumber = 'unknown';
+    let shipment: Awaited<ReturnType<typeof storage.getShipment>> | null = null;
+    
+    // Helper to log packing actions with request/response data
+    async function logPackingAction(
+      action: string, 
+      success: boolean, 
+      details: { 
+        errorMessage?: string; 
+        requestData?: any; 
+        responseData?: any;
+        sku?: string;
+        scannedCode?: string;
+      } = {}
+    ) {
+      try {
+        if (!shipment) return; // Can't log without shipment context
+        await storage.createPackingLog({
+          userId: user.id,
+          shipmentId: shipment.id,
+          orderNumber: orderNumber,
+          action,
+          productSku: details.sku || null,
+          scannedCode: details.scannedCode || null,
+          skuVaultProductId: null,
+          success,
+          errorMessage: details.errorMessage || null,
+          skuVaultRawResponse: details.responseData || details.requestData ? {
+            request: details.requestData,
+            response: details.responseData,
+          } : null,
+        });
+      } catch (logError) {
+        console.error(`[Packing] Failed to create audit log for action ${action}:`, logError);
+      }
+    }
+    
     try {
-      const { shipmentId } = req.body;
-      const user = req.user!;
-      
       // Get user's current web packing session to get station ID
       const webSession = await storage.getActiveWebPackingSession(user.id);
       if (!webSession) {
-        return res.status(400).json({ error: "No active station session. Please select a station first." });
+        return res.status(400).json({ 
+          success: false,
+          error: {
+            code: 'NO_STATION_SESSION',
+            message: 'No active station session',
+            resolution: 'Please select a packing station first before completing orders.'
+          }
+        });
       }
       
       // Get shipment
-      let shipment = await storage.getShipment(shipmentId);
+      shipment = await storage.getShipment(shipmentId);
       
       if (!shipment) {
-        return res.status(404).json({ error: "Shipment not found" });
+        return res.status(404).json({ 
+          success: false,
+          error: {
+            code: 'SHIPMENT_NOT_FOUND',
+            message: 'Shipment not found',
+            resolution: 'The shipment may have been deleted. Return to the shipments list to select another order.'
+          }
+        });
       }
+      
+      orderNumber = shipment.orderNumber;
+      
+      // Log the packing completion attempt
+      await logPackingAction('complete_order_start', true, {
+        requestData: { shipmentId, stationId: webSession.stationId, hasLabelUrl: !!shipment.labelUrl }
+      });
       
       // Check if shipment is linked to Shopify order
       if (!shipment.orderId) {
         console.warn(`[Packing] Shipment ${shipment.orderNumber} has no orderId - skipping print queue`);
+        await logPackingAction('complete_order_no_shopify', true, {
+          responseData: { message: 'No Shopify order linked - manual label print required' }
+        });
         return res.json({ 
           success: true, 
           printQueued: false,
@@ -5341,6 +5401,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           // Step 1: Try to fetch existing labels from ShipStation
+          await logPackingAction('fetch_existing_labels', true, {
+            requestData: { shipStationShipmentId: shipment.shipmentId }
+          });
           const existingLabels = await getLabelsForShipment(shipment.shipmentId);
           
           if (existingLabels.length > 0) {
@@ -5348,6 +5411,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const label = existingLabels[0];
             labelUrl = label.label_download?.href || label.label_download || null;
             trackingNumber = label.tracking_number || trackingNumber;
+            
+            await logPackingAction('label_fetched_existing', true, {
+              responseData: { labelsFound: existingLabels.length, labelUrl, trackingNumber }
+            });
             
             if (labelUrl) {
               // Save label URL to database for next time
@@ -5365,11 +5432,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!labelUrl && shipment.shipmentId) {
             console.log(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId}...`);
             
+            await logPackingAction('label_create_attempt', true, {
+              requestData: { shipStationShipmentId: shipment.shipmentId, action: 'createLabelForExistingShipment' }
+            });
+            
             const labelData = await createLabelForExistingShipment(shipment.shipmentId);
             
             // Handle dry run mode - returns null when DRY_RUN is enabled
             if (labelData === null) {
               console.log(`[Packing] DRY RUN mode - no label created, skipping print job for ${shipment.orderNumber}`);
+              await logPackingAction('label_create_dry_run', true, {
+                responseData: { dryRun: true, message: 'Label creation skipped in dry run mode' }
+              });
               return res.json({ 
                 success: true, 
                 printQueued: false,
@@ -5382,6 +5456,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Extract label URL from response - API returns label_download with pdf/png/zpl URLs
             labelUrl = labelData.label_download?.href || labelData.label_download?.pdf || labelData.label_download || null;
             trackingNumber = labelData.tracking_number || trackingNumber;
+            
+            await logPackingAction('label_created', !!labelUrl, {
+              responseData: { labelUrl, trackingNumber, rawResponse: labelData }
+            });
             
             if (labelUrl) {
               await storage.updateShipment(shipment.id, { 
@@ -5438,6 +5516,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               resolution: 'Check ShipStation for more details about this order. The shipment may need to be configured before a label can be created.'
             };
           }
+          
+          // Log the label creation failure with full error details
+          await logPackingAction('label_creation_error', false, {
+            errorMessage: labelError.message,
+            responseData: { 
+              errorCode: labelError.code, 
+              shipStationError: labelError.shipStationError,
+              resolution: labelError.resolution,
+              rawError: error.message,
+              stack: error.stack
+            }
+          });
         }
       }
       
@@ -5455,15 +5545,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
         
+        // Log the failure before returning
+        const finalError = labelError || {
+          code: 'NO_LABEL_AVAILABLE',
+          message: 'Could not get shipping label from ShipStation',
+          resolution: 'Check if the shipment exists in ShipStation and is ready to ship. The order may need to be processed first.'
+        };
+        
+        await logPackingAction('complete_order_failed', false, {
+          errorMessage: finalError.message,
+          responseData: { 
+            errorCode: finalError.code,
+            resolution: finalError.resolution,
+            shipStationError: labelError?.shipStationError 
+          }
+        });
+        
         // Return structured error response
         console.warn(`[Packing] Shipment ${shipment.orderNumber} has no label URL and could not create one`);
         return res.status(422).json({ 
           success: false,
-          error: labelError || {
-            code: 'NO_LABEL_AVAILABLE',
-            message: 'Could not get shipping label from ShipStation',
-            resolution: 'Check if the shipment exists in ShipStation and is ready to ship. The order may need to be processed first.'
-          },
+          error: finalError,
           orderNumber: shipment.orderNumber
         });
       }
@@ -5494,6 +5596,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Packing] Created print job ${printJob.id} for station ${webSession.stationId}`);
       
+      // Log successful completion
+      await logPackingAction('complete_order_success', true, {
+        responseData: { 
+          printJobId: printJob.id, 
+          stationId: webSession.stationId,
+          labelUrl,
+          trackingNumber: trackingNumber || shipment.trackingNumber 
+        }
+      });
+      
       res.json({ 
         success: true, 
         printQueued: true, 
@@ -5502,7 +5614,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("[Packing] Error completing order:", error);
-      res.status(500).json({ error: "Failed to complete order" });
+      
+      // Log unexpected errors with full context
+      if (shipment) {
+        await logPackingAction('complete_order_unexpected_error', false, {
+          errorMessage: error.message || 'Unknown error',
+          responseData: { 
+            errorCode: 'UNEXPECTED_ERROR',
+            rawError: error.message,
+            stack: error.stack
+          }
+        });
+      }
+      
+      // Return structured error even for unexpected errors
+      res.status(500).json({ 
+        success: false,
+        error: {
+          code: 'UNEXPECTED_ERROR',
+          message: 'An unexpected error occurred while completing the order',
+          resolution: 'Please try again. If the problem persists, contact support with order number: ' + orderNumber
+        },
+        orderNumber
+      });
     }
   });
 
