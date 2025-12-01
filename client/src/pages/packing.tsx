@@ -243,6 +243,13 @@ type ScanFeedback = {
   timestamp: number;
 };
 
+type LabelError = {
+  code: string;
+  message: string;
+  shipStationError?: string;
+  resolution: string;
+};
+
 export default function Packing() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -262,6 +269,9 @@ export default function Packing() {
   
   // Optimistic state for print job creation (immediately shows warning after completing packing)
   const [justCreatedPrintJob, setJustCreatedPrintJob] = useState(false);
+  
+  // State for label creation error (displayed inline on packing page)
+  const [labelError, setLabelError] = useState<LabelError | null>(null);
 
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({

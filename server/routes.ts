@@ -5198,6 +5198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If no label URL, try to fetch or create one from ShipStation
       let labelUrl = shipment.labelUrl;
       let trackingNumber = shipment.trackingNumber;
+      let labelError: { code: string; message: string; shipStationError?: string; resolution: string } | null = null;
       
       if (!labelUrl && shipment.shipmentId) {
         console.log(`[Packing] Shipment ${shipment.orderNumber} has no label URL - fetching from ShipStation...`);
@@ -5273,18 +5274,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (error: any) {
           console.error(`[Packing] Error fetching/creating label for ${shipment.orderNumber}:`, error.message);
-          // Don't fail the whole operation - just log the error and continue without label
+          
+          // Parse the ShipStation error to determine the specific issue
+          const errorMessage = error.message || 'Unknown error';
+          const shipStationError = errorMessage;
+          
+          // Check for specific error patterns and set appropriate error code/resolution
+          if (errorMessage.toLowerCase().includes('on_hold') || 
+              errorMessage.toLowerCase().includes('hold_until') ||
+              errorMessage.toLowerCase().includes('cannot be shipped') ||
+              (shipment.shipmentData as any)?.hold_until_date) {
+            labelError = {
+              code: 'SHIPMENT_ON_HOLD',
+              message: 'This shipment is on hold in ShipStation',
+              shipStationError,
+              resolution: 'Go to ShipStation, find this order, and remove the hold. Then click Retry below.'
+            };
+          } else if (errorMessage.includes('rate') || errorMessage.includes('429')) {
+            labelError = {
+              code: 'RATE_LIMIT_EXCEEDED',
+              message: 'ShipStation API rate limit reached',
+              shipStationError,
+              resolution: 'Wait a minute and try again. ShipStation limits how quickly labels can be created.'
+            };
+          } else if (errorMessage.includes('address') || errorMessage.includes('validation')) {
+            labelError = {
+              code: 'ADDRESS_VALIDATION_FAILED',
+              message: 'The shipping address could not be validated',
+              shipStationError,
+              resolution: 'Check the shipping address in ShipStation and correct any issues. Then click Retry.'
+            };
+          } else if (errorMessage.includes('carrier') || errorMessage.includes('service')) {
+            labelError = {
+              code: 'CARRIER_ERROR',
+              message: 'The carrier or shipping service is unavailable',
+              shipStationError,
+              resolution: 'Check ShipStation to verify the carrier and service are available for this shipment.'
+            };
+          } else {
+            labelError = {
+              code: 'LABEL_CREATION_FAILED',
+              message: 'Could not create shipping label',
+              shipStationError,
+              resolution: 'Check ShipStation for more details about this order. The shipment may need to be configured before a label can be created.'
+            };
+          }
         }
       }
       
       // If still no label URL after trying to fetch/create
       if (!labelUrl) {
+        // Check if shipment is on hold even if we didn't get an error
+        const shipmentData = shipment.shipmentData as any;
+        if (shipmentData?.hold_until_date) {
+          const holdDate = new Date(shipmentData.hold_until_date);
+          console.warn(`[Packing] Shipment ${shipment.orderNumber} is on hold until ${holdDate.toISOString()}`);
+          labelError = {
+            code: 'SHIPMENT_ON_HOLD',
+            message: `This shipment is on hold until ${holdDate.toLocaleDateString()}`,
+            resolution: 'Go to ShipStation, find this order, and remove the hold. Then click Retry below.'
+          };
+        }
+        
+        // Return structured error response
         console.warn(`[Packing] Shipment ${shipment.orderNumber} has no label URL and could not create one`);
-        return res.json({ 
-          success: true, 
-          printQueued: false,
-          noLabel: true,
-          message: "Order complete! Could not get shipping label from ShipStation. Check if the order needs to be shipped first.",
+        return res.status(422).json({ 
+          success: false,
+          error: labelError || {
+            code: 'NO_LABEL_AVAILABLE',
+            message: 'Could not get shipping label from ShipStation',
+            resolution: 'Check if the shipment exists in ShipStation and is ready to ship. The order may need to be processed first.'
+          },
           orderNumber: shipment.orderNumber
         });
       }
