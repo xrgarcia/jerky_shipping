@@ -37,6 +37,9 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
 - **On-Hold Shipment Refresh Strategy**: ShipStation does not provide webhooks for hold status changes. The on-hold poll worker queries `shipment_status=on_hold` to detect new holds, but when holds are removed, shipments drop out of that query. To prevent stale hold data from blocking packing, the packing completion endpoint refreshes shipment data from ShipStation when the cached `hold_until_date` is present, then updates the database via the ETL service before proceeding.
+- **ShipStation Label Creation Endpoints**: ShipStation V2 API has two distinct label creation endpoints:
+    - `POST /v2/labels/shipment/{shipment_id}` - For EXISTING shipments. Takes shipment_id in URL path, body contains only label format options. This is what we use in packing completion to avoid creating duplicate shipments.
+    - `POST /v2/labels` - For creating NEW shipments with labels inline. The body contains full shipment data but shipment_id MUST be null/empty (ShipStation rejects requests with shipment_id because this endpoint creates new shipments).
 
 ## External Dependencies
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.

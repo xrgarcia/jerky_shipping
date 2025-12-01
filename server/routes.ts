@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabel as createShipStationLabel, updateShipmentNumber } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
@@ -5262,33 +5262,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          // Step 2: If still no label, try to create one
-          if (!labelUrl && shipment.shipmentData) {
-            console.log(`[Packing] No existing label found, creating new label for ${shipment.orderNumber}...`);
+          // Step 2: If still no label, create one for the existing shipment
+          // Use POST /v2/labels/shipment/{shipment_id} - the correct endpoint for existing shipments
+          // This attaches a label to the existing shipment without creating duplicates
+          if (!labelUrl && shipment.shipmentId) {
+            console.log(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId}...`);
             
-            // Strip ShipStation-managed fields from payload
-            // CRITICAL: Keep shipment_id to attach label to existing shipment (prevents duplicates)
-            const cleanShipmentData = { ...(shipment.shipmentData as any) };
-            // DO NOT delete shipment_id - we need it to attach label to existing shipment
-            delete cleanShipmentData.label_id;
-            delete cleanShipmentData.created_at;
-            delete cleanShipmentData.modified_at;
-            delete cleanShipmentData.shipment_status; // Cannot be set/modified
-            delete cleanShipmentData.label_status;    // Cannot be set/modified
-            delete cleanShipmentData.tracking_number; // Will be set by ShipStation
-            delete cleanShipmentData.label_download;  // Read-only field
+            const labelData = await createLabelForExistingShipment(shipment.shipmentId);
             
-            // If ship_from is provided, remove warehouse_id (mutually exclusive)
-            if (cleanShipmentData.ship_from) {
-              delete cleanShipmentData.warehouse_id;
-            }
-            
-            // Log the shipment_id to confirm it's being preserved
-            console.log(`[Packing] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id || 'MISSING (will create new shipment!)'}`);
-            
-            const labelData = await createShipStationLabel(cleanShipmentData);
-            
-            // Handle dry run mode - createLabel returns null when DRY_RUN is enabled
+            // Handle dry run mode - returns null when DRY_RUN is enabled
             if (labelData === null) {
               console.log(`[Packing] DRY RUN mode - no label created, skipping print job for ${shipment.orderNumber}`);
               return res.json({ 
@@ -5300,7 +5282,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
             
-            labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
+            // Extract label URL from response - API returns label_download with pdf/png/zpl URLs
+            labelUrl = labelData.label_download?.href || labelData.label_download?.pdf || labelData.label_download || null;
             trackingNumber = labelData.tracking_number || trackingNumber;
             
             if (labelUrl) {

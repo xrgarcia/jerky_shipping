@@ -139,44 +139,127 @@ export async function getLabelByLabelId(labelId: string): Promise<any> {
 }
 
 /**
- * Create a label for a shipment
- * Returns label data including PDF URL
+ * Create a label for an EXISTING shipment in ShipStation
  * 
- * CRITICAL: shipmentData MUST contain shipment_id to attach the label to an
- * existing shipment. Without it, ShipStation creates a NEW shipment.
+ * Uses: POST /v2/labels/shipment/{shipment_id}
+ * 
+ * This is the correct endpoint for shipments that already exist in ShipStation.
+ * It attaches a label to the existing shipment without creating duplicates.
+ * 
+ * The shipment_id goes in the URL path (not the request body).
+ * The body only contains label formatting options.
+ * 
+ * @param shipmentId - The ShipStation shipment ID (e.g., "se-928749725")
+ * @param options - Optional label format options
+ * @returns Label data including PDF download URLs
  */
-export async function createLabel(shipmentData: any): Promise<any> {
+export async function createLabelForExistingShipment(
+  shipmentId: string,
+  options: {
+    label_format?: 'pdf' | 'png' | 'zpl';
+    label_layout?: '4x6' | 'letter';
+    label_download_type?: 'url' | 'inline';
+    validate_address?: 'no_validation' | 'validate_only' | 'validate_and_clean';
+    test_label?: boolean;
+  } = {}
+): Promise<any> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  // VALIDATION: Ensure shipment_id is present to prevent orphaned shipments
-  if (!shipmentData.shipment_id) {
-    console.error('[ShipStation] CRITICAL: shipment_id is MISSING from label request payload!');
-    console.error('[ShipStation] Payload received:', JSON.stringify(shipmentData, null, 2));
-    throw new Error('Cannot create label: shipment_id is missing from shipmentData. This would create a duplicate shipment.');
+  if (!shipmentId) {
+    throw new Error('shipmentId is required to create a label for an existing shipment');
   }
 
-  const url = `${SHIPSTATION_API_BASE}/v2/labels`;
-  const requestPayload = { shipment: shipmentData };
+  const url = `${SHIPSTATION_API_BASE}/v2/labels/shipment/${encodeURIComponent(shipmentId)}`;
+  
+  // Default label options - 4x6 PDF is standard for shipping labels
+  const requestPayload = {
+    label_format: options.label_format || 'pdf',
+    label_layout: options.label_layout || '4x6',
+    label_download_type: options.label_download_type || 'url',
+    ...(options.validate_address && { validate_address: options.validate_address }),
+    ...(options.test_label !== undefined && { test_label: options.test_label }),
+  };
   
   // DRY RUN MODE: Log the request but DO NOT return a fake label
-  // This prevents print jobs from being created with invalid URLs
   if (DRY_RUN_PRINT_LABELS) {
     console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] Label creation request (API call SKIPPED)');
+    console.log('[ShipStation DRY RUN] Label creation for EXISTING shipment (API call SKIPPED)');
     console.log('='.repeat(80));
     console.log('[ShipStation DRY RUN] URL:', url);
     console.log('[ShipStation DRY RUN] Method: POST');
-    console.log('[ShipStation DRY RUN] shipment_id:', shipmentData.shipment_id);
+    console.log('[ShipStation DRY RUN] shipment_id (in URL):', shipmentId);
+    console.log('[ShipStation DRY RUN] Request payload:');
+    console.log(JSON.stringify(requestPayload, null, 2));
+    console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] Returning null - NO fake label URL will be created');
+    console.log('='.repeat(80));
+    return null;
+  }
+  
+  console.log(`[ShipStation] Creating label for existing shipment: ${shipmentId}`);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestPayload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation label creation failed: ${response.status} ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[ShipStation] Label created successfully for shipment ${shipmentId}`);
+  return result;
+}
+
+/**
+ * Create a NEW shipment with label in one request
+ * 
+ * Uses: POST /v2/labels
+ * 
+ * WARNING: This endpoint creates a NEW shipment. Use createLabelForExistingShipment()
+ * if the shipment already exists in ShipStation to avoid duplicates.
+ * 
+ * This function is for cases where we need to create both the shipment and label
+ * together (e.g., direct-to-ShipStation orders not synced yet).
+ * 
+ * Note: shipment_id MUST be null/empty in the payload - ShipStation rejects
+ * requests with shipment_id because this endpoint creates new shipments.
+ */
+export async function createNewShipmentWithLabel(shipmentData: any): Promise<any> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  // Remove shipment_id if present - this endpoint creates NEW shipments
+  const cleanShipmentData = { ...shipmentData };
+  if (cleanShipmentData.shipment_id) {
+    console.warn('[ShipStation] Removing shipment_id from payload - use createLabelForExistingShipment() for existing shipments');
+    delete cleanShipmentData.shipment_id;
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/labels`;
+  const requestPayload = { shipment: cleanShipmentData };
+  
+  // DRY RUN MODE
+  if (DRY_RUN_PRINT_LABELS) {
+    console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] NEW shipment + label creation (API call SKIPPED)');
+    console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] URL:', url);
+    console.log('[ShipStation DRY RUN] Method: POST');
     console.log('[ShipStation DRY RUN] Full request payload:');
     console.log(JSON.stringify(requestPayload, null, 2));
     console.log('='.repeat(80));
     console.log('[ShipStation DRY RUN] Returning null - NO fake label URL will be created');
     console.log('='.repeat(80));
-    
-    // Return null to indicate dry run - caller should handle this
-    // DO NOT return fake URLs that will cause print job failures
     return null;
   }
   
@@ -195,6 +278,25 @@ export async function createLabel(shipmentData: any): Promise<any> {
   }
 
   return response.json();
+}
+
+/**
+ * @deprecated Use createLabelForExistingShipment() for existing shipments
+ * or createNewShipmentWithLabel() for new shipments.
+ * 
+ * This function had incorrect logic - it tried to use POST /v2/labels with
+ * shipment_id in the body, but that endpoint rejects shipment_id because
+ * it's designed for creating NEW shipments only.
+ */
+export async function createLabel(shipmentData: any): Promise<any> {
+  // If shipment_id exists, use the correct endpoint for existing shipments
+  if (shipmentData.shipment_id) {
+    console.log('[ShipStation] Redirecting to createLabelForExistingShipment()');
+    return createLabelForExistingShipment(shipmentData.shipment_id);
+  }
+  
+  // Otherwise, create a new shipment with label
+  return createNewShipmentWithLabel(shipmentData);
 }
 
 /**
