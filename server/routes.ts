@@ -5247,6 +5247,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[Packing] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id || 'MISSING (will create new shipment!)'}`);
             
             const labelData = await createShipStationLabel(cleanShipmentData);
+            
+            // Handle dry run mode - createLabel returns null when DRY_RUN is enabled
+            if (labelData === null) {
+              console.log(`[Packing] DRY RUN mode - no label created, skipping print job for ${shipment.orderNumber}`);
+              return res.json({ 
+                success: true, 
+                printQueued: false,
+                dryRun: true,
+                message: "DRY RUN: Order complete! Label creation was skipped (dry run mode enabled).",
+                orderNumber: shipment.orderNumber
+              });
+            }
+            
             labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
             trackingNumber = labelData.tracking_number || trackingNumber;
             

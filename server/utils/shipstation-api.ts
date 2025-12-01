@@ -160,7 +160,8 @@ export async function createLabel(shipmentData: any): Promise<any> {
   const url = `${SHIPSTATION_API_BASE}/v2/labels`;
   const requestPayload = { shipment: shipmentData };
   
-  // DRY RUN MODE: Log the request and return mock response without calling API
+  // DRY RUN MODE: Log the request but DO NOT return a fake label
+  // This prevents print jobs from being created with invalid URLs
   if (DRY_RUN_PRINT_LABELS) {
     console.log('='.repeat(80));
     console.log('[ShipStation DRY RUN] Label creation request (API call SKIPPED)');
@@ -171,17 +172,12 @@ export async function createLabel(shipmentData: any): Promise<any> {
     console.log('[ShipStation DRY RUN] Full request payload:');
     console.log(JSON.stringify(requestPayload, null, 2));
     console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] Returning null - NO fake label URL will be created');
+    console.log('='.repeat(80));
     
-    // Return a mock response so the flow can continue for testing
-    return {
-      label_id: 'dry-run-label-id',
-      shipment_id: shipmentData.shipment_id,
-      tracking_number: 'DRY-RUN-TRACKING-123',
-      label_download: {
-        href: 'https://dry-run-label-url.example.com/label.pdf'
-      },
-      dry_run: true,
-    };
+    // Return null to indicate dry run - caller should handle this
+    // DO NOT return fake URLs that will cause print job failures
+    return null;
   }
   
   const response = await fetch(url, {
