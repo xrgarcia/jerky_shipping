@@ -6,6 +6,10 @@
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 
+// DRY RUN MODE: When true, label creation will log the request payload
+// and skip the actual API call. Used for debugging label creation issues.
+const DRY_RUN_PRINT_LABELS = true;
+
 interface ShipStationShipment {
   shipmentId: number;
   orderId: number;
@@ -137,13 +141,48 @@ export async function getLabelByLabelId(labelId: string): Promise<any> {
 /**
  * Create a label for a shipment
  * Returns label data including PDF URL
+ * 
+ * CRITICAL: shipmentData MUST contain shipment_id to attach the label to an
+ * existing shipment. Without it, ShipStation creates a NEW shipment.
  */
 export async function createLabel(shipmentData: any): Promise<any> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
+  // VALIDATION: Ensure shipment_id is present to prevent orphaned shipments
+  if (!shipmentData.shipment_id) {
+    console.error('[ShipStation] CRITICAL: shipment_id is MISSING from label request payload!');
+    console.error('[ShipStation] Payload received:', JSON.stringify(shipmentData, null, 2));
+    throw new Error('Cannot create label: shipment_id is missing from shipmentData. This would create a duplicate shipment.');
+  }
+
   const url = `${SHIPSTATION_API_BASE}/v2/labels`;
+  const requestPayload = { shipment: shipmentData };
+  
+  // DRY RUN MODE: Log the request and return mock response without calling API
+  if (DRY_RUN_PRINT_LABELS) {
+    console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] Label creation request (API call SKIPPED)');
+    console.log('='.repeat(80));
+    console.log('[ShipStation DRY RUN] URL:', url);
+    console.log('[ShipStation DRY RUN] Method: POST');
+    console.log('[ShipStation DRY RUN] shipment_id:', shipmentData.shipment_id);
+    console.log('[ShipStation DRY RUN] Full request payload:');
+    console.log(JSON.stringify(requestPayload, null, 2));
+    console.log('='.repeat(80));
+    
+    // Return a mock response so the flow can continue for testing
+    return {
+      label_id: 'dry-run-label-id',
+      shipment_id: shipmentData.shipment_id,
+      tracking_number: 'DRY-RUN-TRACKING-123',
+      label_download: {
+        href: 'https://dry-run-label-url.example.com/label.pdf'
+      },
+      dry_run: true,
+    };
+  }
   
   const response = await fetch(url, {
     method: 'POST',
@@ -151,9 +190,7 @@ export async function createLabel(shipmentData: any): Promise<any> {
       'api-key': SHIPSTATION_API_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      shipment: shipmentData,
-    }),
+    body: JSON.stringify(requestPayload),
   });
 
   if (!response.ok) {

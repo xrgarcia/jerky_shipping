@@ -241,10 +241,36 @@ export class ShipStationShipmentService {
           };
         }
 
+        // VALIDATION: Check shipment_id exists in the raw shipmentData BEFORE any processing
+        const rawShipmentId = shipment.shipmentData.shipment_id || shipment.shipmentData.shipmentId;
+        if (!rawShipmentId) {
+          console.error(`[ShipmentService] CRITICAL: shipment_id is MISSING from stored shipmentData!`);
+          console.error(`[ShipmentService] Shipment DB record ID: ${shipment.id}`);
+          console.error(`[ShipmentService] Shipment shipmentId field: ${shipment.shipmentId}`);
+          console.error(`[ShipmentService] shipmentData keys:`, Object.keys(shipment.shipmentData));
+          console.error(`[ShipmentService] Full shipmentData:`, JSON.stringify(shipment.shipmentData, null, 2));
+          
+          await this.storage.updatePrintJob(printJob.id, { 
+            status: 'failed',
+            error: 'Missing shipment_id in ShipStation data' 
+          });
+          return { 
+            success: false, 
+            printJob,
+            error: 'Shipment data is missing shipment_id. Cannot create label without it. Please re-sync shipment from ShipStation.' 
+          };
+        }
+
         // Strip ShipStation-managed fields from payload, but KEEP shipment_id
         // CRITICAL: Keeping shipment_id ensures the label is attached to the existing 
         // shipment rather than creating a new one (which would orphan the original)
         const cleanShipmentData = { ...shipment.shipmentData };
+        
+        // Ensure shipment_id is present in snake_case format (ShipStation V2 API format)
+        if (!cleanShipmentData.shipment_id && cleanShipmentData.shipmentId) {
+          cleanShipmentData.shipment_id = cleanShipmentData.shipmentId;
+        }
+        
         // Keep shipment_id to attach label to existing shipment
         delete cleanShipmentData.label_id;
         delete cleanShipmentData.created_at;
@@ -257,6 +283,20 @@ export class ShipStationShipmentService {
         // If ship_from is provided, remove warehouse_id (mutually exclusive)
         if (cleanShipmentData.ship_from) {
           delete cleanShipmentData.warehouse_id;
+        }
+
+        // Final validation: ensure shipment_id survived the cleaning
+        if (!cleanShipmentData.shipment_id) {
+          console.error(`[ShipmentService] CRITICAL: shipment_id was lost during payload cleaning!`);
+          await this.storage.updatePrintJob(printJob.id, { 
+            status: 'failed',
+            error: 'shipment_id lost during processing' 
+          });
+          return { 
+            success: false, 
+            printJob,
+            error: 'Internal error: shipment_id was lost during payload processing.' 
+          };
         }
 
         console.log(`[ShipmentService] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id}`);
