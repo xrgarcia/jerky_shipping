@@ -17,6 +17,7 @@ import {
   enqueueShopifyOrderSync,
   enqueueShipmentSync,
   removeShipmentSyncFromInflight,
+  clearShipmentSyncInflight,
   type ShipmentSyncMessage,
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
@@ -85,8 +86,24 @@ async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
 /**
+ * Result of processing a single shipment sync message
+ * Used to control cleanup behavior in the main loop
+ */
+interface ProcessingResult {
+  processed: boolean;           // Whether the message was processed (success or logged to DLQ)
+  shouldRequeue: boolean;       // Whether to requeue the message (e.g., rate limit)
+  requeuedMessage?: ShipmentSyncMessage; // The message to requeue (with updated retry count)
+  waitForRateLimit?: number;    // Seconds to wait for rate limit reset
+  breakBatch?: boolean;         // Whether to break out of batch processing
+}
+
+/**
  * Process a batch of shipment sync messages
  * Returns the number of successfully processed messages
+ * 
+ * ARCHITECTURE NOTE: Each message is processed with guaranteed in-flight cleanup.
+ * The cleanup happens in the main loop's finally block, NOT inside the processing logic.
+ * This ensures no code path can skip cleanup, regardless of how processing exits.
  */
 export async function processShipmentSyncBatch(batchSize: number): Promise<number> {
   const messages = await dequeueShipmentSyncBatch(batchSize);
@@ -106,7 +123,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     let fastPathError: Error | null = null;
-    let removedFromInflight = false; // Track if we already removed from in-flight
+    let skipInflightCleanup = false; // Only true if we requeue (need key to stay for dedupe)
     
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId, webhookData } = message;
@@ -167,9 +184,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             
             log(`[${trackingNumber}] Updated shipment status for order-linked shipment (0 API calls)`);
             processedCount++;
-            await removeShipmentSyncFromInflight(message);
-            removedFromInflight = true;
-            continue; // Success - skip to next message without API call
+            continue; // Success - cleanup happens in finally block
           } catch (error: any) {
             // Store fast-path error and fall through to API sync fallback
             fastPathError = error;
@@ -249,9 +264,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       
                       log(`[${trackingNumber}] Updated shipment via label lookup (1 API call total)`);
                       processedCount++;
-                      await removeShipmentSyncFromInflight(message);
-                      removedFromInflight = true;
-                      continue;
+                      continue; // Cleanup happens in finally block
                     } else {
                       // Shipment doesn't exist in DB yet - fetch full data from ShipStation and create it
                       log(`[${trackingNumber}] Shipment not in DB, fetching from ShipStation via shipment_id: ${resolvedShipmentId}`);
@@ -282,9 +295,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                         
                         log(`[${trackingNumber}] Created shipment via label lookup (2 API calls total)`);
                         processedCount++;
-                        await removeShipmentSyncFromInflight(message);
-                        removedFromInflight = true;
-                        continue;
+                        continue; // Cleanup happens in finally block
                       } else {
                         log(`[${trackingNumber}] No order number in fetched shipment data`);
                         // Fall through to DLQ
@@ -315,9 +326,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             });
             log(`[${trackingNumber}] Logged to DLQ: no order number in webhook data and label lookup failed`);
             processedCount++;
-            await removeShipmentSyncFromInflight(message);
-            removedFromInflight = true;
-            continue;
+            continue; // Cleanup happens in finally block
           }
           
           // We have an order number - lookup order and create/update shipment
@@ -336,9 +345,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               failedAt: new Date(),
             });
             processedCount++;
-            await removeShipmentSyncFromInflight(message);
-            removedFromInflight = true;
-            continue;
+            continue; // Cleanup happens in finally block
           }
           
           // Use ETL service to process complete shipment (creates/updates record + items + tags)
@@ -617,7 +624,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             
             // Remove from inflight BEFORE requeueing to avoid dedupe blocking
             await removeShipmentSyncFromInflight(message);
-            removedFromInflight = true;
+            skipInflightCleanup = true;
             
             // Requeue with backoff (increment retry count)
             const retryCount = (message.retryCount || 0) + 1;
@@ -735,7 +742,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         try {
           // CRITICAL: Remove from in-flight BEFORE requeueing to avoid dedupe blocking
           await removeShipmentSyncFromInflight(message);
-          removedFromInflight = true;
+          skipInflightCleanup = true;
           
           // Now requeue the message so it's not lost
           const enqueued = await enqueueShipmentSync(message);
@@ -851,9 +858,16 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         processedCount++;
       }
     } finally {
-      // Only remove from in-flight if we haven't already (rate limit errors remove early to allow requeue)
-      if (!removedFromInflight) {
-        await removeShipmentSyncFromInflight(message);
+      // CRITICAL: This is the single cleanup point for all message processing paths.
+      // Only skip cleanup when we've explicitly requeued the message (skipInflightCleanup = true).
+      // The finally block ALWAYS runs after try/catch, including after `continue` statements.
+      if (!skipInflightCleanup) {
+        try {
+          await removeShipmentSyncFromInflight(message);
+        } catch (cleanupError: any) {
+          // Log but don't throw - cleanup failure shouldn't crash the worker
+          log(`[WARN] Failed to remove message from in-flight set: ${cleanupError.message}`);
+        }
       }
     }
   }
@@ -885,7 +899,7 @@ declare global {
  * Uses singleton pattern to prevent duplicate workers on hot-reload
  * Uses activeRunId mutex (null = idle, number = active) to prevent overlapping batches
  */
-export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Timeout {
+export async function startShipmentSyncWorker(intervalMs: number = 10000): Promise<NodeJS.Timeout> {
   // Prevent duplicate workers (survives hot-reload)
   if (globalThis.__shipmentSyncWorkerInterval) {
     log('Shipment sync worker already running, skipping duplicate start');
@@ -898,6 +912,17 @@ export function startShipmentSyncWorker(intervalMs: number = 10000): NodeJS.Time
   }
   // Persist run ID counter so IDs never collide across stop/start cycles
   globalThis.__shipmentSyncWorkerNextRunId = globalThis.__shipmentSyncWorkerNextRunId ?? 0;
+  
+  // CRITICAL: Clear stale in-flight entries from previous/crashed runs
+  // This prevents shipments from being permanently blocked in deduplication
+  try {
+    const clearedCount = await clearShipmentSyncInflight();
+    if (clearedCount > 0) {
+      log(`Cleared ${clearedCount} stale in-flight entries from previous runs`);
+    }
+  } catch (error: any) {
+    log(`[WARN] Failed to clear in-flight entries on startup: ${error.message}`);
+  }
   
   log(`Shipment sync worker started (interval: ${intervalMs}ms, batch size: 50)`);
   

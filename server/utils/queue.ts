@@ -24,7 +24,8 @@ const QUEUE_KEY = 'shopify:webhooks:orders';
 
 export async function enqueueWebhook(webhookData: any): Promise<void> {
   const redis = getRedisClient();
-  await redis.lpush(QUEUE_KEY, JSON.stringify(webhookData));
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+  await redis.rpush(QUEUE_KEY, JSON.stringify(webhookData));
 }
 
 export async function enqueueOrderId(orderId: string, jobId?: string): Promise<void> {
@@ -34,7 +35,8 @@ export async function enqueueOrderId(orderId: string, jobId?: string): Promise<v
     orderId,
     jobId: jobId || null,
   };
-  await redis.lpush(QUEUE_KEY, JSON.stringify(queueItem));
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+  await redis.rpush(QUEUE_KEY, JSON.stringify(queueItem));
 }
 
 export async function dequeueWebhook(): Promise<any | null> {
@@ -114,7 +116,8 @@ export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise
   
   // If no dedupe key (no tracking or order number), enqueue anyway
   if (!dedupeKey) {
-    await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+    // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
     return true;
   }
   
@@ -129,8 +132,8 @@ export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
   
-  // Enqueue the message
-  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
   return true;
 }
 
@@ -174,9 +177,9 @@ export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]):
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
   
-  // Enqueue all messages
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
   const serialized = toEnqueue.map(msg => JSON.stringify(msg));
-  await redis.lpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
   
   return toEnqueue.length;
 }
@@ -241,6 +244,37 @@ export async function clearShipmentSyncQueue(): Promise<number> {
     await redis.del(SHIPMENT_SYNC_QUEUE_KEY);
   }
   return length;
+}
+
+/**
+ * Clear all in-flight shipment sync entries
+ * Use this on worker startup to clear stale entries from crashed runs
+ */
+export async function clearShipmentSyncInflight(): Promise<number> {
+  const redis = getRedisClient();
+  const size = await redis.scard(SHIPMENT_SYNC_INFLIGHT_KEY) || 0;
+  if (size > 0) {
+    await redis.del(SHIPMENT_SYNC_INFLIGHT_KEY);
+  }
+  return size;
+}
+
+/**
+ * Get the current size of the in-flight set (for debugging)
+ */
+export async function getShipmentSyncInflightSize(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.scard(SHIPMENT_SYNC_INFLIGHT_KEY) || 0;
+}
+
+/**
+ * Get all members of the in-flight set (for debugging)
+ * Returns dedupe keys like "shipment:se-123456" or "tracking:1Z..."
+ */
+export async function getShipmentSyncInflightMembers(): Promise<string[]> {
+  const redis = getRedisClient();
+  const members = await redis.smembers(SHIPMENT_SYNC_INFLIGHT_KEY);
+  return members || [];
 }
 
 export async function getOldestShopifyQueueMessage(): Promise<{ enqueuedAt: number | null }> {
@@ -330,8 +364,8 @@ export async function enqueueShopifyOrderSync(message: ShopifyOrderSyncMessage):
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, 3600);
   
-  // Enqueue the message
-  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, JSON.stringify(message));
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+  await redis.rpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, JSON.stringify(message));
   return true;
 }
 
@@ -369,9 +403,9 @@ export async function enqueueShopifyOrderSyncBatch(messages: ShopifyOrderSyncMes
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SHOPIFY_ORDER_SYNC_INFLIGHT_KEY, 3600);
   
-  // Enqueue all messages
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
   const serialized = toEnqueue.map(msg => JSON.stringify(msg));
-  await redis.lpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
+  await redis.rpush(SHOPIFY_ORDER_SYNC_QUEUE_KEY, ...serialized);
   
   return toEnqueue.length;
 }
@@ -511,8 +545,8 @@ export async function enqueueSkuVaultQCSync(message: SkuVaultQCSyncMessage): Pro
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SKUVAULT_QC_INFLIGHT_KEY, 3600);
   
-  // Enqueue the message
-  await redis.lpush(SKUVAULT_QC_QUEUE_KEY, JSON.stringify(message));
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
+  await redis.rpush(SKUVAULT_QC_QUEUE_KEY, JSON.stringify(message));
   return true;
 }
 
@@ -549,9 +583,9 @@ export async function enqueueSkuVaultQCSyncBatch(messages: SkuVaultQCSyncMessage
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SKUVAULT_QC_INFLIGHT_KEY, 3600);
   
-  // Enqueue all messages
+  // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
   const serialized = toEnqueue.map(msg => JSON.stringify(msg));
-  await redis.lpush(SKUVAULT_QC_QUEUE_KEY, ...serialized);
+  await redis.rpush(SKUVAULT_QC_QUEUE_KEY, ...serialized);
   
   return toEnqueue.length;
 }
