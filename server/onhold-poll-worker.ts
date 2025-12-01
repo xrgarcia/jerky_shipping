@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { enqueueShipmentSync } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, lt, and } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
@@ -15,6 +15,7 @@ import {
 import { shipmentSyncFailures } from '@shared/schema';
 import { count } from 'drizzle-orm';
 import { workerCoordinator } from './worker-coordinator';
+import { getShipmentByShipmentId } from './utils/shipstation-api';
 
 const log = (message: string) => console.log(`[onhold-poll] ${message}`);
 
@@ -27,7 +28,14 @@ let workerStats = {
   lastProcessedCount: 0,
   workerStartedAt: new Date(),
   lastCompletedAt: null as Date | null,
+  // Reverse sync stats
+  reverseSyncProcessed: 0,
+  reverseSyncUpdated: 0,
+  lastReverseSyncAt: null as Date | null,
 };
+
+// Store the poll interval for use in reverse sync threshold calculation
+let currentPollIntervalMs = 60000; // Default 1 minute
 
 export function getOnHoldWorkerStatus(): 'sleeping' | 'running' | 'awaiting_backfill_job' {
   return workerStatus;
@@ -42,6 +50,9 @@ export function getOnHoldWorkerStats() {
   return {
     ...workerStats,
     status: workerStatus,
+    reverseSyncProcessed: workerStats.reverseSyncProcessed,
+    reverseSyncUpdated: workerStats.reverseSyncUpdated,
+    lastReverseSyncAt: workerStats.lastReverseSyncAt?.toISOString() || null,
   };
 }
 
@@ -261,6 +272,131 @@ export async function pollOnHoldShipments(): Promise<number> {
 }
 
 /**
+ * Reverse sync: Check shipments in our DB marked as on_hold that weren't updated recently.
+ * If the on-hold poll worker just ran and a shipment wasn't touched, it means ShipStation
+ * didn't return it in the on_hold query - so it's probably no longer on hold.
+ * 
+ * This function fetches current status from ShipStation for stale on_hold shipments
+ * and updates them if their status has changed.
+ * 
+ * @param staleThresholdMs - How old updatedAt must be to consider a shipment "stale"
+ *                           Default: 2x poll interval (ensures poll had a chance to update it)
+ */
+export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Promise<{ checked: number; updated: number }> {
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  
+  if (!apiKey) {
+    log('[reverse-sync] ShipStation API key not configured, skipping');
+    return { checked: 0, updated: 0 };
+  }
+
+  // Use 2x poll interval as threshold to ensure the poll had a chance to update fresh shipments
+  const threshold = staleThresholdMs ?? (currentPollIntervalMs * 2);
+  const staleDate = new Date(Date.now() - threshold);
+  
+  log(`[reverse-sync] Looking for on_hold shipments not updated since ${staleDate.toISOString()}`);
+  
+  // Find shipments in our DB that are marked on_hold but haven't been updated recently
+  const staleOnHoldShipments = await db
+    .select()
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.shipmentStatus, 'on_hold'),
+        lt(shipments.updatedAt, staleDate)
+      )
+    )
+    .limit(50); // Limit batch size to avoid API rate limits
+  
+  if (staleOnHoldShipments.length === 0) {
+    log('[reverse-sync] No stale on_hold shipments found');
+    return { checked: 0, updated: 0 };
+  }
+  
+  log(`[reverse-sync] Found ${staleOnHoldShipments.length} stale on_hold shipment(s) to check`);
+  
+  let checked = 0;
+  let updated = 0;
+  
+  for (const shipment of staleOnHoldShipments) {
+    if (!shipment.shipmentId) {
+      log(`[reverse-sync] Skipping shipment without shipmentId: order ${shipment.orderNumber}`);
+      // Touch updatedAt to prevent retrying shipments with no shipmentId
+      await db
+        .update(shipments)
+        .set({ updatedAt: new Date() })
+        .where(eq(shipments.id, shipment.id));
+      continue;
+    }
+    
+    try {
+      // Fetch current status from ShipStation
+      const result = await getShipmentByShipmentId(shipment.shipmentId);
+      checked++;
+      
+      if (!result.data) {
+        log(`[reverse-sync] Shipment ${shipment.shipmentId} not found in ShipStation`);
+        // Touch updatedAt to prevent tight retry loop on missing shipments
+        await db
+          .update(shipments)
+          .set({ updatedAt: new Date() })
+          .where(eq(shipments.id, shipment.id));
+        continue;
+      }
+      
+      const currentStatus = result.data.shipment_status;
+      
+      // If status has changed from on_hold, queue for sync
+      if (currentStatus !== 'on_hold') {
+        log(`[reverse-sync] Shipment ${shipment.shipmentId} status changed: on_hold -> ${currentStatus}`);
+        
+        await enqueueShipmentSync({
+          orderNumber: shipment.orderNumber || undefined,
+          shipmentId: shipment.shipmentId,
+          trackingNumber: result.data.tracking_number || shipment.trackingNumber || undefined,
+          reason: 'manual',
+          enqueuedAt: Date.now(),
+          webhookData: result.data, // Pass full shipment data
+        });
+        
+        updated++;
+      } else {
+        // Still on hold - update the updatedAt to prevent checking again next cycle
+        await db
+          .update(shipments)
+          .set({ updatedAt: new Date() })
+          .where(eq(shipments.id, shipment.id));
+      }
+      
+      // Small delay to respect rate limits
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error: any) {
+      log(`[reverse-sync] Error checking shipment ${shipment.shipmentId}: ${error.message}`);
+      // Touch updatedAt even on error to prevent tight retry loop
+      // The shipment will be rechecked after threshold period expires again
+      try {
+        await db
+          .update(shipments)
+          .set({ updatedAt: new Date() })
+          .where(eq(shipments.id, shipment.id));
+      } catch (dbError) {
+        log(`[reverse-sync] Failed to update timestamp for shipment ${shipment.shipmentId}`);
+      }
+    }
+  }
+  
+  log(`[reverse-sync] Complete: checked ${checked}, updated ${updated}`);
+  
+  // Update stats
+  workerStats.reverseSyncProcessed += checked;
+  workerStats.reverseSyncUpdated += updated;
+  workerStats.lastReverseSyncAt = new Date();
+  
+  return { checked, updated };
+}
+
+/**
  * Start the on_hold shipments polling worker
  */
 export function startOnHoldPollWorker(intervalMs: number = 300000): NodeJS.Timeout {
@@ -270,11 +406,19 @@ export function startOnHoldPollWorker(intervalMs: number = 300000): NodeJS.Timeo
     return globalThis.__onHoldPollWorkerInterval;
   }
 
+  // Store poll interval for reverse sync threshold calculation
+  currentPollIntervalMs = intervalMs;
+
   log(`On-hold poll worker started (interval: ${intervalMs}ms = ${intervalMs / 60000} minutes)`);
   
   const pollTask = async () => {
     try {
+      // First: Poll for on_hold shipments (forward sync)
       await pollOnHoldShipments();
+      
+      // Then: Check stale on_hold shipments (reverse sync)
+      // This catches shipments that fell off the on_hold query
+      await reverseSyncOnHoldShipments();
     } catch (error) {
       console.error("On-hold poll worker error:", error);
     }

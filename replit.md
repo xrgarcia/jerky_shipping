@@ -36,7 +36,10 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
-- **On-Hold Shipment Refresh Strategy**: ShipStation does not provide webhooks for hold status changes. The on-hold poll worker queries `shipment_status=on_hold` to detect new holds, but when holds are removed, shipments drop out of that query. To prevent stale hold data from blocking packing, the packing completion endpoint refreshes shipment data from ShipStation when the cached `hold_until_date` is present, then updates the database via the ETL service before proceeding.
+- **On-Hold Shipment Sync Strategy**: ShipStation does not provide webhooks for hold status changes (V2 API only supports 4 webhook events: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`). The on-hold sync uses a bi-directional approach:
+    - **Forward Poll**: Queries ShipStation for `shipment_status=on_hold` to detect new holds and queue them for sync. Uses smart date floor based on most recent on_hold shipment to minimize API calls.
+    - **Reverse Sync**: Checks DB shipments marked as `on_hold` that weren't updated by the forward poll (stale threshold = 2x poll interval). Fetches current status from ShipStation for each stale shipment; if no longer on hold, queues for sync. This catches shipments that transitioned off hold (which don't appear in the on_hold query anymore).
+    - **On-Pack Refresh**: The packing completion endpoint refreshes shipment data from ShipStation when a cached `hold_until_date` is present, ensuring fresh hold status before proceeding.
 - **ShipStation Label Creation Endpoints**: ShipStation V2 API has two distinct label creation endpoints:
     - `POST /v2/labels/shipment/{shipment_id}` - For EXISTING shipments. Takes shipment_id in URL path, body contains only label format options. This is what we use in packing completion to avoid creating duplicate shipments.
     - `POST /v2/labels` - For creating NEW shipments with labels inline. The body contains full shipment data but shipment_id MUST be null/empty (ShipStation rejects requests with shipment_id because this endpoint creates new shipments).
