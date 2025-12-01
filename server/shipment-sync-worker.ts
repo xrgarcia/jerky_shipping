@@ -167,6 +167,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             
             log(`[${trackingNumber}] Updated shipment status for order-linked shipment (0 API calls)`);
             processedCount++;
+            await removeShipmentSyncFromInflight(message);
+            removedFromInflight = true;
             continue; // Success - skip to next message without API call
           } catch (error: any) {
             // Store fast-path error and fall through to API sync fallback
@@ -247,6 +249,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       
                       log(`[${trackingNumber}] Updated shipment via label lookup (1 API call total)`);
                       processedCount++;
+                      await removeShipmentSyncFromInflight(message);
+                      removedFromInflight = true;
                       continue;
                     } else {
                       // Shipment doesn't exist in DB yet - fetch full data from ShipStation and create it
@@ -278,6 +282,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                         
                         log(`[${trackingNumber}] Created shipment via label lookup (2 API calls total)`);
                         processedCount++;
+                        await removeShipmentSyncFromInflight(message);
+                        removedFromInflight = true;
                         continue;
                       } else {
                         log(`[${trackingNumber}] No order number in fetched shipment data`);
@@ -309,6 +315,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             });
             log(`[${trackingNumber}] Logged to DLQ: no order number in webhook data and label lookup failed`);
             processedCount++;
+            await removeShipmentSyncFromInflight(message);
+            removedFromInflight = true;
             continue;
           }
           
@@ -328,6 +336,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
               failedAt: new Date(),
             });
             processedCount++;
+            await removeShipmentSyncFromInflight(message);
+            removedFromInflight = true;
             continue;
           }
           
