@@ -69,9 +69,13 @@ export async function clearQueue(): Promise<number> {
   return length;
 }
 
-// Shipment Sync Queue operations
-const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync';
+// Shipment Sync Queue operations - Priority-based with high/low queues
+const SHIPMENT_SYNC_QUEUE_KEY_HIGH = 'shipstation:shipment-sync:high';
+const SHIPMENT_SYNC_QUEUE_KEY_LOW = 'shipstation:shipment-sync:low';
+const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync'; // Legacy - still used for queue length checks
 const SHIPMENT_SYNC_INFLIGHT_KEY = 'shipstation:shipment-sync:inflight';
+
+export type ShipmentSyncPriority = 'high' | 'low';
 
 export interface ShipmentSyncMessage {
   reason: 'backfill' | 'webhook' | 'webhook_tracking' | 'webhook_fulfillment' | 'manual' | 'reverse_sync';
@@ -85,6 +89,35 @@ export interface ShipmentSyncMessage {
   jobId?: string; // Optional backfill job ID for tracking
   originalWebhook?: any; // Optional: preserve original webhook payload for troubleshooting
   retryCount?: number; // Retry count to prevent infinite loops
+  priority?: ShipmentSyncPriority; // Queue priority - high for webhooks, low for reverse_sync
+}
+
+/**
+ * Determine the priority for a shipment sync message based on its reason
+ * - Webhooks get high priority (often have inline data, customer-facing)
+ * - Reverse sync gets low priority (background verification, always needs API)
+ * - Backfill and manual get high priority (explicit user actions)
+ */
+function getShipmentSyncPriority(message: ShipmentSyncMessage): ShipmentSyncPriority {
+  // Explicit priority takes precedence
+  if (message.priority) {
+    return message.priority;
+  }
+  
+  // Reverse sync always low priority - background verification work
+  if (message.reason === 'reverse_sync') {
+    return 'low';
+  }
+  
+  // Everything else is high priority - webhooks, manual, backfill
+  return 'high';
+}
+
+/**
+ * Get the queue key for a given priority
+ */
+function getShipmentSyncQueueKey(priority: ShipmentSyncPriority): string {
+  return priority === 'high' ? SHIPMENT_SYNC_QUEUE_KEY_HIGH : SHIPMENT_SYNC_QUEUE_KEY_LOW;
 }
 
 /**
@@ -106,18 +139,24 @@ function getShipmentSyncDedupeKey(message: ShipmentSyncMessage): string | null {
 }
 
 /**
- * Enqueue a shipment sync message with deduplication
+ * Enqueue a shipment sync message with deduplication and priority routing
  * Returns true if enqueued, false if already in queue
  * Uses SADD's atomic return value to prevent race conditions
+ * Priority: webhooks -> high, reverse_sync -> low
  */
 export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise<boolean> {
   const redis = getRedisClient();
   const dedupeKey = getShipmentSyncDedupeKey(message);
+  const priority = getShipmentSyncPriority(message);
+  const queueKey = getShipmentSyncQueueKey(priority);
+  
+  // Store priority in message for logging/debugging
+  const messageWithPriority = { ...message, priority };
   
   // If no dedupe key (no tracking or order number), enqueue anyway
   if (!dedupeKey) {
     // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
-    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+    await redis.rpush(queueKey, JSON.stringify(messageWithPriority));
     return true;
   }
   
@@ -133,28 +172,36 @@ export async function enqueueShipmentSync(message: ShipmentSyncMessage): Promise
   await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
   
   // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
-  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, JSON.stringify(message));
+  await redis.rpush(queueKey, JSON.stringify(messageWithPriority));
   return true;
 }
 
 /**
- * Enqueue multiple shipment sync messages with deduplication
+ * Enqueue multiple shipment sync messages with deduplication and priority routing
  * Returns count of messages successfully enqueued (deduplicated messages are skipped)
  * Handles both in-batch duplicates and existing queue duplicates atomically
+ * Messages are routed to high/low priority queues based on their reason
  */
 export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]): Promise<number> {
   if (messages.length === 0) return 0;
   
   const redis = getRedisClient();
-  const toEnqueue: ShipmentSyncMessage[] = [];
+  const highPriorityMessages: ShipmentSyncMessage[] = [];
+  const lowPriorityMessages: ShipmentSyncMessage[] = [];
   const seenKeys = new Set<string>(); // Track duplicates within this batch
   
   for (const message of messages) {
     const dedupeKey = getShipmentSyncDedupeKey(message);
+    const priority = getShipmentSyncPriority(message);
+    const messageWithPriority = { ...message, priority };
     
     // If no dedupe key, always enqueue
     if (!dedupeKey) {
-      toEnqueue.push(message);
+      if (priority === 'high') {
+        highPriorityMessages.push(messageWithPriority);
+      } else {
+        lowPriorityMessages.push(messageWithPriority);
+      }
       continue;
     }
     
@@ -167,21 +214,33 @@ export async function enqueueShipmentSyncBatch(messages: ShipmentSyncMessage[]):
     const added = await redis.sadd(SHIPMENT_SYNC_INFLIGHT_KEY, dedupeKey);
     
     if (added === 1) {
-      toEnqueue.push(message);
+      if (priority === 'high') {
+        highPriorityMessages.push(messageWithPriority);
+      } else {
+        lowPriorityMessages.push(messageWithPriority);
+      }
       seenKeys.add(dedupeKey);
     }
   }
   
-  if (toEnqueue.length === 0) return 0;
+  const totalToEnqueue = highPriorityMessages.length + lowPriorityMessages.length;
+  if (totalToEnqueue === 0) return 0;
   
   // Set expiry on the set (1 hour as safety net)
   await redis.expire(SHIPMENT_SYNC_INFLIGHT_KEY, 3600);
   
   // CRITICAL: Use RPUSH (add to tail) with RPOP (remove from tail) = FIFO queue
-  const serialized = toEnqueue.map(msg => JSON.stringify(msg));
-  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+  // Enqueue to respective priority queues
+  if (highPriorityMessages.length > 0) {
+    const serialized = highPriorityMessages.map(msg => JSON.stringify(msg));
+    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY_HIGH, ...serialized);
+  }
+  if (lowPriorityMessages.length > 0) {
+    const serialized = lowPriorityMessages.map(msg => JSON.stringify(msg));
+    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY_LOW, ...serialized);
+  }
   
-  return toEnqueue.length;
+  return totalToEnqueue;
 }
 
 /**
@@ -197,9 +256,25 @@ export async function removeShipmentSyncFromInflight(message: ShipmentSyncMessag
   }
 }
 
+/**
+ * Dequeue a shipment sync message, prioritizing high priority queue
+ * Checks high priority queue first, then falls back to low priority
+ */
 export async function dequeueShipmentSync(): Promise<ShipmentSyncMessage | null> {
   const redis = getRedisClient();
-  const data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY);
+  
+  // Try high priority first
+  let data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY_HIGH);
+  
+  // Fall back to low priority if high is empty
+  if (!data) {
+    data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY_LOW);
+  }
+  
+  // Also check legacy queue for backward compatibility during transition
+  if (!data) {
+    data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY);
+  }
   
   if (!data) {
     return null;
@@ -213,35 +288,77 @@ export async function dequeueShipmentSync(): Promise<ShipmentSyncMessage | null>
   return JSON.parse(data as string);
 }
 
+/**
+ * Dequeue a batch of shipment sync messages, prioritizing high priority queue
+ * Drains high priority first, then low priority, then legacy until count is reached
+ * Continues across queues to ensure we get as many messages as possible up to count
+ */
 export async function dequeueShipmentSyncBatch(count: number): Promise<ShipmentSyncMessage[]> {
   const redis = getRedisClient();
   const messages: ShipmentSyncMessage[] = [];
+  const queues = [SHIPMENT_SYNC_QUEUE_KEY_HIGH, SHIPMENT_SYNC_QUEUE_KEY_LOW, SHIPMENT_SYNC_QUEUE_KEY];
   
-  for (let i = 0; i < count; i++) {
-    const data = await redis.rpop(SHIPMENT_SYNC_QUEUE_KEY);
-    if (!data) break;
-    
-    // Handle case where Redis returns an object instead of a string
-    if (typeof data === 'object') {
-      messages.push(data as ShipmentSyncMessage);
-    } else {
-      messages.push(JSON.parse(data as string));
+  // Try each queue in priority order until we have enough messages
+  for (const queueKey of queues) {
+    while (messages.length < count) {
+      const data = await redis.rpop(queueKey);
+      if (!data) break; // This queue is empty, move to next
+      
+      if (typeof data === 'object') {
+        messages.push(data as ShipmentSyncMessage);
+      } else {
+        messages.push(JSON.parse(data as string));
+      }
     }
+    
+    // Stop if we have enough messages
+    if (messages.length >= count) break;
   }
   
   return messages;
 }
 
+/**
+ * Get total length of all shipment sync queues (high + low + legacy)
+ */
 export async function getShipmentSyncQueueLength(): Promise<number> {
   const redis = getRedisClient();
-  return await redis.llen(SHIPMENT_SYNC_QUEUE_KEY) || 0;
+  const [high, low, legacy] = await Promise.all([
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY_HIGH),
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY_LOW),
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY),
+  ]);
+  return (high || 0) + (low || 0) + (legacy || 0);
 }
 
+/**
+ * Get length of each priority queue separately (for monitoring)
+ */
+export async function getShipmentSyncQueueLengthByPriority(): Promise<{ high: number; low: number; legacy: number; total: number }> {
+  const redis = getRedisClient();
+  const [high, low, legacy] = await Promise.all([
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY_HIGH),
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY_LOW),
+    redis.llen(SHIPMENT_SYNC_QUEUE_KEY),
+  ]);
+  const highLen = high || 0;
+  const lowLen = low || 0;
+  const legacyLen = legacy || 0;
+  return { high: highLen, low: lowLen, legacy: legacyLen, total: highLen + lowLen + legacyLen };
+}
+
+/**
+ * Clear all shipment sync queues (high + low + legacy)
+ */
 export async function clearShipmentSyncQueue(): Promise<number> {
   const redis = getRedisClient();
   const length = await getShipmentSyncQueueLength();
   if (length > 0) {
-    await redis.del(SHIPMENT_SYNC_QUEUE_KEY);
+    await Promise.all([
+      redis.del(SHIPMENT_SYNC_QUEUE_KEY_HIGH),
+      redis.del(SHIPMENT_SYNC_QUEUE_KEY_LOW),
+      redis.del(SHIPMENT_SYNC_QUEUE_KEY),
+    ]);
   }
   return length;
 }
@@ -293,34 +410,80 @@ export async function getOldestShopifyQueueMessage(): Promise<{ enqueuedAt: numb
   }
 }
 
+/**
+ * Get the oldest message timestamp from all shipment sync queues
+ * Returns the oldest enqueuedAt across high, low, and legacy queues
+ */
 export async function getOldestShipmentSyncQueueMessage(): Promise<{ enqueuedAt: number | null }> {
   const redis = getRedisClient();
-  const data = await redis.lindex(SHIPMENT_SYNC_QUEUE_KEY, -1);
   
-  if (!data) {
+  // Check all queues in parallel
+  const [highData, lowData, legacyData] = await Promise.all([
+    redis.lindex(SHIPMENT_SYNC_QUEUE_KEY_HIGH, -1),
+    redis.lindex(SHIPMENT_SYNC_QUEUE_KEY_LOW, -1),
+    redis.lindex(SHIPMENT_SYNC_QUEUE_KEY, -1),
+  ]);
+  
+  const timestamps: number[] = [];
+  
+  for (const data of [highData, lowData, legacyData]) {
+    if (data) {
+      try {
+        const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
+        if (parsed.enqueuedAt) {
+          timestamps.push(parsed.enqueuedAt);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }
+  
+  if (timestamps.length === 0) {
     return { enqueuedAt: null };
   }
   
-  try {
-    const parsed = typeof data === 'object' ? data : JSON.parse(data as string);
-    return { enqueuedAt: parsed.enqueuedAt || null };
-  } catch {
-    return { enqueuedAt: null };
-  }
+  // Return the oldest (minimum) timestamp
+  return { enqueuedAt: Math.min(...timestamps) };
 }
 
 /**
  * Requeue shipment sync messages back to the front of the queue (FIFO order preserved)
+ * Routes messages to the appropriate priority queue based on their priority field
  * Used when worker needs to stop processing due to rate limits
+ * 
+ * With RPOP (removes from tail), we use RPUSH (adds to tail) so requeued items
+ * are processed BEFORE existing items. Reverse maintains original processing order.
  */
 export async function requeueShipmentSyncMessages(messages: ShipmentSyncMessage[]): Promise<void> {
   if (messages.length === 0) return;
   
   const redis = getRedisClient();
-  // RPUSH adds to the end of the queue (which is the front for RPOP consumers)
-  // Reverse the array to maintain FIFO order - first message should be processed first
-  const serialized = messages.reverse().map(msg => JSON.stringify(msg));
-  await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY, ...serialized);
+  
+  // Separate by priority
+  const highPriority: ShipmentSyncMessage[] = [];
+  const lowPriority: ShipmentSyncMessage[] = [];
+  
+  for (const msg of messages) {
+    const priority = getShipmentSyncPriority(msg);
+    if (priority === 'high') {
+      highPriority.push(msg);
+    } else {
+      lowPriority.push(msg);
+    }
+  }
+  
+  // RPUSH adds to tail, RPOP removes from tail
+  // Requeued items go to tail so RPOP sees them first (before existing items)
+  // Reverse to maintain original order: [m1,m2] reversed + RPUSH = RPOP gets m1,m2
+  if (highPriority.length > 0) {
+    const serialized = highPriority.reverse().map(msg => JSON.stringify(msg));
+    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY_HIGH, ...serialized);
+  }
+  if (lowPriority.length > 0) {
+    const serialized = lowPriority.reverse().map(msg => JSON.stringify(msg));
+    await redis.rpush(SHIPMENT_SYNC_QUEUE_KEY_LOW, ...serialized);
+  }
 }
 
 // Shopify Order Sync Queue operations
