@@ -37,7 +37,7 @@ interface TabCounts {
 
 type WorkflowTab = 'in_progress' | 'packing_queue' | 'shipped' | 'all';
 
-function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
+function ShipmentCard({ shipment, tags }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -48,11 +48,6 @@ function ShipmentCard({ shipment }: { shipment: ShipmentWithItemCount }) {
   const { data: items, isLoading: isLoadingItems } = useQuery<ShipmentItem[]>({
     queryKey: ['/api/shipments', shipmentIdOrUuid, 'items'],
     enabled: isExpanded && !!shipmentIdOrUuid,
-  });
-
-  const { data: tags } = useQuery<ShipmentTag[]>({
-    queryKey: ['/api/shipments', shipmentIdOrUuid, 'tags'],
-    enabled: !!shipmentIdOrUuid,
   });
 
   const isOrphanedShipment = (shipment: ShipmentWithItemCount) => {
@@ -781,6 +776,18 @@ export default function Shipments() {
   const total = !isError && shipmentsData?.total ? shipmentsData.total : 0;
   const totalPages = !isError && shipmentsData?.totalPages ? shipmentsData.totalPages : 1;
 
+  // Batch fetch tags for all shipments (reduces N+1 queries from 50+ to 1)
+  const shipmentIds = shipments.map(s => s.id);
+  const { data: batchTagsData } = useQuery<Record<string, ShipmentTag[]>>({
+    queryKey: ["/api/shipments/tags/batch", shipmentIds],
+    queryFn: async () => {
+      if (shipmentIds.length === 0) return {};
+      const response = await apiRequest("POST", "/api/shipments/tags/batch", { shipmentIds });
+      return response.json();
+    },
+    enabled: shipmentIds.length > 0,
+  });
+
   const clearFilters = () => {
     setSearch("");
     setStatus("");
@@ -1254,7 +1261,11 @@ export default function Shipments() {
             {/* Shipment Cards */}
             <div className="grid gap-4">
               {shipments.map((shipment) => (
-                <ShipmentCard key={shipment.id} shipment={shipment} />
+                <ShipmentCard 
+                  key={shipment.id} 
+                  shipment={shipment} 
+                  tags={batchTagsData?.[shipment.id]}
+                />
               ))}
             </div>
 

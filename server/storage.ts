@@ -173,6 +173,7 @@ export interface IStorage {
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
+  getShipmentTagsBatch(shipmentIds: string[]): Promise<Map<string, ShipmentTag[]>>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
@@ -965,6 +966,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(shipmentTags.shipmentId, shipmentId))
       .orderBy(asc(shipmentTags.createdAt));
     return result;
+  }
+
+  async getShipmentTagsBatch(shipmentIds: string[]): Promise<Map<string, ShipmentTag[]>> {
+    if (shipmentIds.length === 0) {
+      return new Map();
+    }
+    
+    const result = await db
+      .select()
+      .from(shipmentTags)
+      .where(inArray(shipmentTags.shipmentId, shipmentIds))
+      .orderBy(asc(shipmentTags.createdAt));
+    
+    const tagsByShipment = new Map<string, ShipmentTag[]>();
+    for (const tag of result) {
+      const existing = tagsByShipment.get(tag.shipmentId) || [];
+      existing.push(tag);
+      tagsByShipment.set(tag.shipmentId, existing);
+    }
+    return tagsByShipment;
   }
 
   async getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>> {

@@ -1495,6 +1495,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch fetch shipment tags - reduces N+1 queries on shipments list page
+  app.post("/api/shipments/tags/batch", requireAuth, async (req, res) => {
+    try {
+      const { shipmentIds } = req.body;
+      
+      if (!Array.isArray(shipmentIds)) {
+        return res.status(400).json({ error: "shipmentIds must be an array" });
+      }
+      
+      if (shipmentIds.length > 100) {
+        return res.status(400).json({ error: "Maximum 100 shipments per batch request" });
+      }
+      
+      // Fetch all tags in one query
+      const tagsMap = await storage.getShipmentTagsBatch(shipmentIds);
+      
+      // Convert Map to object for JSON response
+      const result: Record<string, any[]> = {};
+      for (const [shipmentId, tags] of tagsMap.entries()) {
+        result[shipmentId] = tags;
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching batch shipment tags:", error);
+      res.status(500).json({ error: "Failed to fetch shipment tags" });
+    }
+  });
+
   // Get shipment items for a specific order item (to show which shipments contain this item)
   app.get("/api/order-items/:orderItemId/shipment-items", requireAuth, async (req, res) => {
     try {
