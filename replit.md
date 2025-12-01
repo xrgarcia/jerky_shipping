@@ -36,6 +36,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
+- **On-Hold Shipment Refresh Strategy**: ShipStation does not provide webhooks for hold status changes. The on-hold poll worker queries `shipment_status=on_hold` to detect new holds, but when holds are removed, shipments drop out of that query. To prevent stale hold data from blocking packing, the packing completion endpoint refreshes shipment data from ShipStation when the cached `hold_until_date` is present, then updates the database via the ETL service before proceeding.
 
 ## External Dependencies
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
