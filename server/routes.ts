@@ -4705,7 +4705,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Cache miss or barcode not in order - try to refresh cache
         console.log(`[Packing Validation] Barcode ${barcode} not found in cache for order ${orderNumber}, fetching fresh data`);
         
-        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        // Wrap in try-catch to allow fallback when getQCSalesByOrderNumber throws (e.g., unsessioned orders)
+        let qcSale = null;
+        try {
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        } catch (qcError) {
+          console.log(`[Packing Validation] QC Sale lookup failed for ${orderNumber} (order may not be sessioned):`, qcError);
+          // Continue to fallback - don't re-throw
+        }
+        
         if (qcSale) {
           await qcSaleCache.set(orderNumber, qcSale);
           
