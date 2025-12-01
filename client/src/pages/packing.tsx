@@ -43,6 +43,7 @@ import {
   Printer,
   Wifi,
   WifiOff,
+  RotateCcw,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -1085,6 +1086,7 @@ export default function Packing() {
 
       setCurrentShipment(shipment);
       setPackingComplete(false);
+      setLabelError(null); // Clear any previous label errors when loading new order
       progressRestoredRef.current = false; // Reset so restoration runs for new order
       
       // Log order loaded event
@@ -1712,16 +1714,36 @@ export default function Packing() {
         setPackingComplete(false);
         setOrderScan("");
         setSkuProgress(new Map());
+        setLabelError(null); // Clear any previous label errors
         progressRestoredRef.current = false; // Reset for next order
         orderInputRef.current?.focus();
       }, 2000);
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      // Clear optimistic state on error
+      setJustCreatedPrintJob(false);
+      
+      // Try to extract structured error from the response (ApiError includes parsed data)
+      let parsedError: LabelError | null = null;
+      
+      // Check if error has structured data from ApiError
+      if (error.data?.error) {
+        parsedError = error.data.error as LabelError;
+      }
+      
+      if (parsedError) {
+        // Set the label error state to display inline on the page
+        setLabelError(parsedError);
+        console.log('[Packing] Label creation failed:', parsedError);
+      } else {
+        // Fallback: create a generic error for inline display
+        setLabelError({
+          code: 'UNKNOWN_ERROR',
+          message: 'Failed to complete packing',
+          shipStationError: error.message || 'Unknown error occurred',
+          resolution: 'Please try again. If the problem persists, check ShipStation for this order.'
+        });
+      }
     },
   });
 
@@ -2958,6 +2980,128 @@ export default function Packing() {
                   </>
                 )}
               </Button>
+
+              {/* Label Creation Error Panel */}
+              {labelError && (() => {
+                // Error codes that cannot be fixed from the packing page - no retry
+                const nonRetriableCodes = ['SHIPMENT_ON_HOLD', 'ADDRESS_VALIDATION_FAILED', 'CARRIER_ERROR'];
+                const canRetry = !nonRetriableCodes.includes(labelError.code);
+                
+                return (
+                <div 
+                  className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-700 rounded-lg p-4 space-y-3"
+                  data-testid="alert-label-error"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-2">
+                      <h4 className="font-semibold text-red-800 dark:text-red-200 text-lg">
+                        {labelError.code === 'SHIPMENT_ON_HOLD' 
+                          ? 'Shipment On Hold - Cannot Print Label'
+                          : labelError.code === 'ADDRESS_VALIDATION_FAILED'
+                            ? 'Address Error - Cannot Create Label'
+                            : labelError.code === 'CARRIER_ERROR'
+                              ? 'Carrier Issue - Cannot Create Label'
+                              : labelError.message}
+                      </h4>
+                      
+                      {/* Show specific guidance based on error code */}
+                      {labelError.code === 'SHIPMENT_ON_HOLD' && (
+                        <div className="bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded p-3 space-y-2">
+                          <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                            This order has a hold date set in ShipStation.
+                          </p>
+                          <p className="text-sm text-amber-700 dark:text-amber-300">
+                            Labels cannot be created until the hold is removed. Someone needs to go into ShipStation and release the hold on this shipment.
+                          </p>
+                          {labelError.shipStationError && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 font-mono bg-amber-50 dark:bg-amber-950 p-2 rounded">
+                              {labelError.shipStationError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {labelError.code === 'ADDRESS_VALIDATION_FAILED' && (
+                        <div className="bg-orange-100 dark:bg-orange-900 border border-orange-300 dark:border-orange-700 rounded p-3">
+                          <p className="text-sm text-orange-800 dark:text-orange-200">
+                            The shipping address could not be validated. Check and correct the address in ShipStation before trying again.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {labelError.code === 'CARRIER_ERROR' && (
+                        <div className="bg-orange-100 dark:bg-orange-900 border border-orange-300 dark:border-orange-700 rounded p-3">
+                          <p className="text-sm text-orange-800 dark:text-orange-200">
+                            There's an issue with the shipping carrier or service. Check ShipStation to verify the carrier is available.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {labelError.code === 'RATE_LIMIT_EXCEEDED' && (
+                        <div className="bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 rounded p-3">
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            ShipStation is temporarily limiting requests. Wait 30-60 seconds before retrying.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Show raw ShipStation error for debugging (except for on-hold which shows it inline) */}
+                      {labelError.shipStationError && labelError.code !== 'SHIPMENT_ON_HOLD' && (
+                        <div className="bg-red-100 dark:bg-red-900 rounded p-2">
+                          <p className="text-xs text-red-600 dark:text-red-400 font-mono break-all">
+                            {labelError.shipStationError}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start gap-2 mt-2">
+                        <span className="text-sm font-medium text-red-800 dark:text-red-200">How to fix:</span>
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          {labelError.resolution}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2 border-t border-red-200 dark:border-red-800">
+                    {/* Only show Retry for errors that can potentially be fixed by retrying */}
+                    {canRetry && (
+                      <Button
+                        onClick={() => {
+                          setLabelError(null);
+                          // Revalidate printer status before retrying
+                          queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
+                          completePackingMutation.mutate();
+                        }}
+                        disabled={completePackingMutation.isPending}
+                        size="sm"
+                        data-testid="button-retry-label"
+                      >
+                        {completePackingMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Retry
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setLabelError(null)}
+                      variant="ghost"
+                      size="sm"
+                      data-testid="button-dismiss-error"
+                    >
+                      {!canRetry ? 'Acknowledge' : 'Dismiss'}
+                    </Button>
+                  </div>
+                </div>
+                );
+              })()}
                 </CardContent>
               </Card>
             )}
