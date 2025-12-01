@@ -172,9 +172,9 @@ export async function pollOnHoldShipments(): Promise<number> {
     let hasMorePages = true;
     
     // Fetch all pages of on_hold shipments
-    // Using sort_dir=desc&sort_by=created_at for more reliable/consistent ordering
+    // ShipStation V2 API uses snake_case query parameters
     while (hasMorePages) {
-      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_date_start=${modifiedSince}&sort_dir=desc&sort_by=created_at&page_size=100&page=${page}`;
+      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_date_start=${modifiedSince}&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
       
       log(`Fetching page ${page} of on_hold shipments...`);
       
@@ -193,7 +193,14 @@ export async function pollOnHoldShipments(): Promise<number> {
       const data = await response.json();
       const pageShipments = data.shipments || [];
       
-      log(`Page ${page}: Found ${pageShipments.length} on_hold shipment(s)`);
+      // Log the full API response info for debugging
+      log(`Page ${page}: Found ${pageShipments.length} on_hold shipment(s) (total: ${data.total || 'unknown'}, pages: ${data.pages || 'unknown'})`);
+      
+      // Log first few shipment_numbers for debugging
+      if (page === 1 && pageShipments.length > 0) {
+        const sampleNumbers = pageShipments.slice(0, 5).map((s: any) => s.shipment_number).join(', ');
+        log(`Sample shipment_numbers from page 1: ${sampleNumbers}...`);
+      }
       
       // If we got fewer than 100 shipments, this is the last page
       hasMorePages = pageShipments.length === 100;

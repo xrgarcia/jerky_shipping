@@ -1601,40 +1601,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sync a single shipment by order number or shipment ID
-  app.post("/api/shipments/sync-single", requireAuth, async (req, res) => {
-    try {
-      const { orderNumber, shipmentId } = req.body;
-      
-      if (!orderNumber && !shipmentId) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Either orderNumber or shipmentId is required" 
-        });
-      }
-      
-      console.log(`[sync-single] Syncing shipment: orderNumber=${orderNumber}, shipmentId=${shipmentId}`);
-      
-      await enqueueShipmentSync({
-        orderNumber: orderNumber || undefined,
-        shipmentId: shipmentId || undefined,
-        reason: 'manual',
-        enqueuedAt: Date.now(),
-      });
-      
-      res.json({ 
-        success: true, 
-        message: `Queued shipment for sync: ${orderNumber || shipmentId}` 
-      });
-    } catch (error: any) {
-      console.error("Error syncing single shipment:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message || "Failed to sync shipment" 
-      });
-    }
-  });
-
   // Sync tracking status for non-delivered shipments
   app.post("/api/shipments/sync-tracking", requireAuth, async (req, res) => {
     try {
