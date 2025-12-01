@@ -82,22 +82,9 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               if (linkedCount > 0) {
                 console.log(`[background-worker] Linked ${linkedCount} existing shipment(s) to order ${orderData.orderNumber}`);
               }
-            } else {
-              // No shipments found at all - enqueue a sync to check ShipStation
-              const enqueued = await enqueueShipmentSync({
-                reason: 'webhook',
-                orderNumber: orderData.orderNumber,
-                enqueuedAt: Date.now(),
-                originalWebhook: {
-                  source: 'shopify',
-                  topic: webhookData.topic,
-                },
-              });
-              
-              if (enqueued) {
-                console.log(`[background-worker] Order ${orderData.orderNumber} has no shipments, triggered shipment sync`);
-              }
             }
+            // DISABLED: Don't trigger ShipStation API calls from Shopify webhooks
+            // ShipStation data comes from ShipStation webhooks only
           }
         } catch (shipmentCheckError) {
           // Don't fail order processing if shipment check fails

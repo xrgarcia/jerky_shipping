@@ -36,6 +36,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - **Low Priority** (`shipstation:shipment-sync:low`): Reverse sync messages (always require API calls for verification)
     - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
     - Requeue function preserves FIFO ordering within each priority level using RPUSH with reverse
+- **Shopify → ShipStation Sync DISABLED**: Shopify webhooks do NOT trigger ShipStation API calls. ShipStation data comes exclusively from ShipStation webhooks. This prevents queue flooding when Shopify order volume is high.
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices
