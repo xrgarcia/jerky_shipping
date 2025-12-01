@@ -145,36 +145,18 @@ export async function pollOnHoldShipments(): Promise<number> {
       workerStatus = 'running';
       await broadcastWorkerStatus();  // Notify frontend of status change
       
-      // Get the most recent on_hold shipment from our database
-      const mostRecentOnHold = await db
-      .select()
-      .from(shipments)
-      .where(eq(shipments.shipmentStatus, 'on_hold'))
-      .orderBy(desc(shipments.updatedAt))
-      .limit(1);
-    
-    // Use most recent on_hold shipment date as floor, minus a 30-minute buffer to catch timing gaps
-    // The buffer ensures shipments created/modified slightly before our floor aren't missed
-    const LOOKBACK_BUFFER_MS = 30 * 60 * 1000; // 30 minutes
-    
-    let modifiedSince: string;
-    if (mostRecentOnHold.length > 0 && mostRecentOnHold[0].updatedAt) {
-      const floorWithBuffer = new Date(new Date(mostRecentOnHold[0].updatedAt).getTime() - LOOKBACK_BUFFER_MS);
-      modifiedSince = floorWithBuffer.toISOString();
-      log(`Using floor with 30-min buffer: ${modifiedSince} (original: ${mostRecentOnHold[0].updatedAt})`);
-    } else {
-      modifiedSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      log(`No on_hold shipments in DB, using 30 day lookback: ${modifiedSince}`);
-    }
+      // Fetch ALL on_hold shipments without date filtering
+      // We previously used a date floor (modified_at_start) to minimize API calls, but this
+      // caused shipments to be missed if they were put on hold more than 30 minutes ago.
+      // With ~100 on_hold shipments typically, fetching all is acceptable.
     
     let totalQueued = 0;
     let page = 1;
     let hasMorePages = true;
     
-    // Fetch all pages of on_hold shipments
-    // ShipStation V2 API parameters: modified_at_start (NOT modified_date_start!)
+    // Fetch all pages of on_hold shipments (no date filter - get everything)
     while (hasMorePages) {
-      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_at_start=${modifiedSince}&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
+      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
       
       log(`Fetching page ${page} of on_hold shipments...`);
       
