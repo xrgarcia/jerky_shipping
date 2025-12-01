@@ -188,30 +188,47 @@ export async function pollOnHoldShipments(): Promise<number> {
       hasMorePages = pageShipments.length === 100;
       
       let pageQueued = 0;
+      let skippedExisting = 0;
+      let skippedNoNumber = 0;
+      
       for (const shipmentData of pageShipments) {
         const orderNumber = shipmentData.shipment_number;
         const shipmentId = shipmentData.shipment_id;
         const trackingNumber = shipmentData.tracking_number;
         
+        // Debug logging for specific shipment we're tracking
+        const isDebugTarget = orderNumber === 'JK3825348884' || shipmentId === 'se-929114240';
+        if (isDebugTarget) {
+          log(`[DEBUG] Found target shipment: ${orderNumber} (${shipmentId})`);
+        }
+        
         if (!orderNumber) {
           log(`Skipping shipment ${shipmentId} - missing shipment_number`);
+          skippedNoNumber++;
           continue;
         }
         
         // Check if we already have this shipment
         const existing = await storage.getShipmentByShipmentId(String(shipmentId));
+        if (isDebugTarget) {
+          log(`[DEBUG] ${orderNumber} existing check: ${existing ? 'found in DB' : 'NOT in DB'}`);
+        }
         if (existing) {
           // Only queue if modified timestamp is newer than our last update
           const shipmentModified = new Date(shipmentData.modified_at);
           const ourUpdated = existing.updatedAt ? new Date(existing.updatedAt) : new Date(existing.createdAt);
           
           if (shipmentModified <= ourUpdated) {
+            skippedExisting++;
+            if (isDebugTarget) {
+              log(`[DEBUG] ${orderNumber} skipped - already up to date`);
+            }
             continue; // Skip - we already have the latest version
           }
         }
         
         // Queue for sync with inline shipment data
-        await enqueueShipmentSync({
+        const queueResult = await enqueueShipmentSync({
           orderNumber,
           shipmentId,
           trackingNumber,
@@ -220,12 +237,14 @@ export async function pollOnHoldShipments(): Promise<number> {
           webhookData: shipmentData, // Pass shipment data directly (no API call needed!)
         });
         
+        if (isDebugTarget) {
+          log(`[DEBUG] ${orderNumber} enqueue result: ${queueResult ? 'SUCCESS' : 'FAILED'}`);
+        }
+        
         pageQueued++;
       }
       
-      if (pageQueued > 0) {
-        log(`Page ${page}: Queued ${pageQueued} shipment(s)`);
-      }
+      log(`Page ${page}: Queued ${pageQueued}, skipped ${skippedExisting} existing, ${skippedNoNumber} no number`);
       
       totalQueued += pageQueued;
       page++;

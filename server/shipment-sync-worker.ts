@@ -96,6 +96,11 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   }
 
   log(`Processing ${messages.length} shipment sync message(s)`);
+  
+  // Debug: Log which specific messages are being processed
+  const messageKeys = messages.map(m => m.orderNumber || m.trackingNumber || m.shipmentId || 'unknown');
+  log(`[DEBUG] Message keys in batch: ${messageKeys.join(', ')}`);
+  
   let processedCount = 0;
   
   for (let i = 0; i < messages.length; i++) {
