@@ -1782,7 +1782,7 @@ export default function Packing() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Select Your Packing Station
+              Select Your Boxing Station
             </DialogTitle>
             <DialogDescription>
               Choose which station you're working at today. This selection resets at midnight.
@@ -1827,7 +1827,7 @@ export default function Packing() {
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <PackageCheck className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold">Packing Station</h1>
+          <h1 className="text-2xl font-bold">Boxing Station</h1>
         </div>
         
         {/* Station Indicator with Printer Status */}
@@ -2889,7 +2889,7 @@ export default function Packing() {
                 ) : allItemsScanned ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Complete Packing
+                    Complete Boxing
                   </>
                 ) : (
                   <>
@@ -2909,7 +2909,7 @@ export default function Packing() {
                     <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 space-y-2">
                       <h4 className="font-semibold text-green-800 dark:text-green-200 text-xl">
-                        Packing Complete!
+                        Boxing Complete!
                       </h4>
                       <p className="text-base text-green-700 dark:text-green-300">
                         {completionSuccess.message}
@@ -3070,14 +3070,14 @@ export default function Packing() {
               </Card>
             )}
 
-            {/* Packing Complete Message - Only show when complete */}
+            {/* Boxing Complete Message - Only show when complete */}
             {packingComplete && (
               <Card className="border-green-600">
                 <CardContent className="pt-6">
                   <div className="text-center space-y-4">
                     <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto" />
                     <div>
-                      <h3 className="text-2xl font-bold text-green-600">Packing Complete!</h3>
+                      <h3 className="text-2xl font-bold text-green-600">Boxing Complete!</h3>
                       <p className="text-muted-foreground mt-2">Loading next order...</p>
                     </div>
                   </div>
@@ -3225,7 +3225,7 @@ export default function Packing() {
                             'order_loaded': 'Order Loaded',
                             'product_scan_failed': 'Scan Failed',
                             'manual_verification': 'Manual Verification',
-                            'packing_completed': 'Packing Completed',
+                            'packing_completed': 'Boxing Completed',
                           };
                           return nameMap[eventName] || eventName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                         };

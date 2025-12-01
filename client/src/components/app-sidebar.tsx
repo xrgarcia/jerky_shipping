@@ -75,7 +75,7 @@ export function AppSidebar() {
       icon: Truck,
     },
     {
-      title: "Packing",
+      title: "Boxing",
       url: "/packing",
       icon: PackageCheck,
     },

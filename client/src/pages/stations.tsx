@@ -294,10 +294,10 @@ export default function Stations() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold font-serif text-foreground" data-testid="text-page-title">
-            Packing Stations
+            Boxing Stations
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage packing stations for the desktop print app
+            Manage boxing stations for the desktop print app
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -553,7 +553,7 @@ export default function Stations() {
           <DialogHeader>
             <DialogTitle className="text-xl font-serif">Create New Station</DialogTitle>
             <DialogDescription>
-              Add a new packing station for the warehouse
+              Add a new boxing station for the warehouse
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate}>
@@ -564,7 +564,7 @@ export default function Stations() {
                 </Label>
                 <Input
                   id="create-name"
-                  placeholder="e.g., Packing Station 1"
+                  placeholder="e.g., Boxing Station 1"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="h-11"
@@ -626,7 +626,7 @@ export default function Stations() {
                 </Label>
                 <Input
                   id="edit-name"
-                  placeholder="e.g., Packing Station 1"
+                  placeholder="e.g., Boxing Station 1"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="h-11"
