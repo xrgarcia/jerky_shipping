@@ -729,10 +729,10 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  // First, get the current shipment data
-  const getUrl = `${SHIPSTATION_API_BASE}/v2/shipments?shipment_id=${encodeURIComponent(shipmentId)}`;
+  // First, get the current shipment data using direct path (not query param)
+  const getUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   
-  console.log(`[ShipStation] Fetching current shipment data for ${shipmentId}`);
+  console.log(`[ShipStation] Fetching current shipment data for ${shipmentId} via GET ${getUrl}`);
   
   const getResponse = await fetch(getUrl, {
     headers: {
@@ -746,14 +746,13 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
     return { success: false, error: `Failed to fetch shipment: ${getResponse.status} ${errorText}` };
   }
 
-  const getData = await getResponse.json();
-  const shipments = getData.shipments || [];
+  const currentShipment = await getResponse.json();
   
-  if (shipments.length === 0) {
+  if (!currentShipment || !currentShipment.shipment_id) {
     return { success: false, error: `Shipment ${shipmentId} not found in ShipStation` };
   }
-
-  const currentShipment = shipments[0];
+  
+  console.log(`[ShipStation] Got shipment with external_shipment_id: ${currentShipment.external_shipment_id}, ship_from: ${currentShipment.ship_from ? 'present' : 'null'}`);
   
   // Update only the shipment_number field
   const updatePayload = {
