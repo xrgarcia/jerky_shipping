@@ -408,9 +408,9 @@ export function startOnHoldPollWorker(intervalMs: number = 300000): NodeJS.Timeo
       // First: Poll for on_hold shipments (forward sync)
       await pollOnHoldShipments();
       
-      // Then: Check stale on_hold shipments (reverse sync)
-      // This catches shipments that fell off the on_hold query
-      await reverseSyncOnHoldShipments();
+      // DISABLED: Reverse sync is causing data corruption issues
+      // TODO: Fix the reference-sharing bug in reverse sync before re-enabling
+      // await reverseSyncOnHoldShipments();
     } catch (error) {
       console.error("On-hold poll worker error:", error);
     }
