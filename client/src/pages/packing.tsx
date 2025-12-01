@@ -273,6 +273,9 @@ export default function Packing() {
   
   // State for label creation error (displayed inline on packing page)
   const [labelError, setLabelError] = useState<LabelError | null>(null);
+  
+  // State for manual print required message (displayed inline when no automated print)
+  const [manualPrintInfo, setManualPrintInfo] = useState<{ message: string; labelUrl?: string } | null>(null);
 
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
@@ -1087,6 +1090,7 @@ export default function Packing() {
       setCurrentShipment(shipment);
       setPackingComplete(false);
       setLabelError(null); // Clear any previous label errors when loading new order
+      setManualPrintInfo(null); // Clear any previous manual print info
       progressRestoredRef.current = false; // Reset so restoration runs for new order
       
       // Log order loaded event
@@ -1681,7 +1685,7 @@ export default function Packing() {
       const response = await apiRequest("POST", "/api/packing/complete", {
         shipmentId: currentShipment!.id,
       });
-      return (await response.json()) as { success: boolean; printQueued: boolean; noLabel?: boolean; message?: string };
+      return (await response.json()) as { success: boolean; printQueued: boolean; noLabel?: boolean; message?: string; labelUrl?: string };
     },
     onSuccess: (result) => {
       setPackingComplete(true);
@@ -1700,24 +1704,48 @@ export default function Packing() {
           description: result.message || "No shipping label available yet",
           variant: "destructive",
         });
-      } else {
+        // Reset for next order after 2 seconds
+        setTimeout(() => {
+          setJustCreatedPrintJob(false);
+          setCurrentShipment(null);
+          setPackingComplete(false);
+          setOrderScan("");
+          setSkuProgress(new Map());
+          setLabelError(null);
+          setManualPrintInfo(null);
+          progressRestoredRef.current = false;
+          orderInputRef.current?.focus();
+        }, 2000);
+      } else if (!result.printQueued) {
+        // No automated printing - show manual print info panel (don't auto-transition)
+        setManualPrintInfo({
+          message: result.message || "Order complete. Print label manually.",
+          labelUrl: result.labelUrl
+        });
         toast({
           title: "Packing Complete",
-          description: result.printQueued ? "Label queued for printing" : result.message || "Order complete",
+          description: "Manual printing required - see details on screen",
         });
+        // Don't auto-transition - user must acknowledge the manual print message
+      } else {
+        // Label queued successfully
+        toast({
+          title: "Packing Complete",
+          description: "Label queued for printing",
+        });
+        // Reset for next order after 2 seconds
+        setTimeout(() => {
+          setJustCreatedPrintJob(false);
+          setCurrentShipment(null);
+          setPackingComplete(false);
+          setOrderScan("");
+          setSkuProgress(new Map());
+          setLabelError(null);
+          setManualPrintInfo(null);
+          progressRestoredRef.current = false;
+          orderInputRef.current?.focus();
+        }, 2000);
       }
-
-      // Reset for next order
-      setTimeout(() => {
-        setJustCreatedPrintJob(false); // Clear optimistic state before clearing shipment
-        setCurrentShipment(null);
-        setPackingComplete(false);
-        setOrderScan("");
-        setSkuProgress(new Map());
-        setLabelError(null); // Clear any previous label errors
-        progressRestoredRef.current = false; // Reset for next order
-        orderInputRef.current?.focus();
-      }, 2000);
     },
     onError: (error: any) => {
       // Clear optimistic state on error
@@ -2980,6 +3008,58 @@ export default function Packing() {
                   </>
                 )}
               </Button>
+
+              {/* Manual Print Required Panel */}
+              {manualPrintInfo && (
+                <div 
+                  className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 rounded-lg p-4 space-y-3"
+                  data-testid="alert-manual-print"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-2">
+                      <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-lg">
+                        Manual Printing Required
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        {manualPrintInfo.message}
+                      </p>
+                      {manualPrintInfo.labelUrl && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <a
+                            href={manualPrintInfo.labelUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-amber-800 dark:text-amber-200 hover:underline font-medium"
+                          >
+                            <Printer className="h-4 w-4" />
+                            Open Label for Printing
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2 border-t border-amber-200 dark:border-amber-800">
+                    <Button
+                      onClick={() => {
+                        setManualPrintInfo(null);
+                        setJustCreatedPrintJob(false);
+                        setCurrentShipment(null);
+                        setPackingComplete(false);
+                        setOrderScan("");
+                        setSkuProgress(new Map());
+                        progressRestoredRef.current = false;
+                        orderInputRef.current?.focus();
+                      }}
+                      size="sm"
+                      data-testid="button-acknowledge-manual-print"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Got It - Next Order
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Label Creation Error Panel */}
               {labelError && (() => {
