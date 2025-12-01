@@ -8,7 +8,7 @@ const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 
 // DRY RUN MODE: When true, label creation will log the request payload
 // and skip the actual API call. Used for debugging label creation issues.
-const DRY_RUN_PRINT_LABELS = true;
+const DRY_RUN_PRINT_LABELS = false;
 
 interface ShipStationShipment {
   shipmentId: number;
