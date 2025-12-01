@@ -130,6 +130,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
       
       // REVERSE SYNC PATH: Verify on_hold shipments are still on_hold
       // If status changed, update DB. If still on_hold, skip (no update needed).
+      // CRITICAL: Always update lastStatusCheckAt after successful verification to prevent re-enqueueing
       if (reason === 'reverse_sync' && shipmentId) {
         log(`[reverse-sync] Verifying shipment ${shipmentId} (order: ${orderNumber || 'unknown'})`);
         
@@ -146,13 +147,16 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
           }
           
+          // Get the DB shipment record for timestamp updates
+          const dbShipment = await storage.getShipmentByShipmentId(shipmentId);
+          
           if (!shipmentData) {
             // Shipment not found in ShipStation - mark as cancelled
             log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marking as cancelled`);
-            const dbShipment = await storage.getShipmentByShipmentId(shipmentId);
             if (dbShipment) {
               await storage.updateShipment(dbShipment.id, {
                 shipmentStatus: 'cancelled',
+                lastStatusCheckAt: new Date(), // Mark as verified
               });
               log(`[reverse-sync] [${shipmentId}] Marked as cancelled`);
             }
@@ -162,9 +166,14 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           
           const currentStatus = shipmentData.shipment_status;
           
-          // If still on_hold, nothing to do - skip
+          // If still on_hold, just update the timestamp to prevent re-enqueueing
           if (currentStatus === 'on_hold') {
-            log(`[reverse-sync] [${shipmentId}] Still on_hold - no update needed`);
+            if (dbShipment) {
+              await storage.updateShipment(dbShipment.id, {
+                lastStatusCheckAt: new Date(), // Mark as verified
+              });
+            }
+            log(`[reverse-sync] [${shipmentId}] Still on_hold - timestamp updated`);
             processedCount++;
             continue;
           }
@@ -177,6 +186,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           
           // Use ETL service to process the shipment with fresh data
           await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+          
+          // Update the timestamp after ETL processing
+          if (dbShipment) {
+            await storage.updateShipment(dbShipment.id, {
+              lastStatusCheckAt: new Date(),
+            });
+          }
           
           log(`[reverse-sync] [${shipmentId}] Updated successfully`);
           
@@ -191,6 +207,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         } catch (error: any) {
           log(`[reverse-sync] [${shipmentId}] Error: ${error.message}`);
           // Log to DLQ for investigation
+          // NOTE: Don't update lastStatusCheckAt on error - retry should happen
           await logShipmentSyncFailure({
             orderNumber: orderNumber || 'unknown',
             reason: 'reverse_sync',

@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { enqueueShipmentSync, enqueueShipmentSyncBatch } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
-import { desc, eq, asc } from 'drizzle-orm';
+import { desc, eq, asc, or, isNull, lt, sql } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
@@ -259,32 +259,46 @@ export async function pollOnHoldShipments(): Promise<number> {
 }
 
 /**
- * Queue-based reverse sync: Enqueue ALL on_hold shipments for verification.
+ * Queue-based reverse sync: Enqueue on_hold shipments that haven't been checked recently.
  * 
  * This is now a simple "enqueue and let the sync worker handle it" approach:
- * - Queries ALL shipments with status=on_hold in our DB
+ * - Queries shipments with status=on_hold in our DB that haven't been verified in 5+ minutes
  * - Batch enqueues them to the shipment-sync queue with reason='reverse_sync'
  * - Dedup naturally filters out shipments already queued by forward sync
  * - The sync worker handles rate limiting, API calls, and status comparison
  * 
+ * Time-based filtering prevents the same shipments from being re-enqueued every poll cycle:
+ * - lastStatusCheckAt is updated by the sync worker when it verifies a shipment
+ * - Only shipments with NULL or stale (>5 min) lastStatusCheckAt are enqueued
+ * 
  * Benefits:
  * - No API calls in reverse sync (no rate limit contention)
  * - Single place for rate limit handling (shipment-sync worker)
- * - Dedup prevents redundant checks for truly on_hold shipments
+ * - Time-based filtering prevents redundant re-enqueueing
  * - Progress is automatic as queue drains over time
  */
+const REVERSE_SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; skipped: number }> {
-  // Get ALL on_hold shipments from our DB
+  // Calculate the threshold time - shipments checked before this time are "stale"
+  const staleThreshold = new Date(Date.now() - REVERSE_SYNC_COOLDOWN_MS);
+  
+  // Get on_hold shipments that need verification (never checked OR checked > 5 min ago)
   const allOnHoldShipments = await db
     .select()
     .from(shipments)
-    .where(eq(shipments.shipmentStatus, 'on_hold'))
+    .where(
+      sql`${shipments.shipmentStatus} = 'on_hold' AND (
+        ${shipments.lastStatusCheckAt} IS NULL OR 
+        ${shipments.lastStatusCheckAt} < ${staleThreshold}
+      )`
+    )
     .orderBy(asc(shipments.createdAt)); // Process oldest first
   
   const totalCount = allOnHoldShipments.length;
   
   if (totalCount === 0) {
-    log('[reverse-sync] No on_hold shipments in DB to verify');
+    log('[reverse-sync] No stale on_hold shipments to verify (all checked within 5 min)');
     return { queued: 0, skipped: 0 };
   }
   
