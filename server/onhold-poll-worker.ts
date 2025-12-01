@@ -208,14 +208,17 @@ export async function pollOnHoldShipments(): Promise<number> {
         hasMorePages = pageShipments.length === 100;
         
         // Push each shipment onto the queue - let the sync worker handle everything else
+        // CRITICAL: Deep-clone each shipment before enqueueing to prevent object reference sharing
+        // Without cloning, all queued messages can end up with the same webhookData
         for (const shipment of pageShipments) {
+          const shipmentSnapshot = JSON.parse(JSON.stringify(shipment));
           await enqueueShipmentSync({
-            orderNumber: shipment.shipment_number,
-            shipmentId: shipment.shipment_id,
-            trackingNumber: shipment.tracking_number,
+            orderNumber: shipmentSnapshot.shipment_number,
+            shipmentId: shipmentSnapshot.shipment_id,
+            trackingNumber: shipmentSnapshot.tracking_number,
             reason: 'manual',
             enqueuedAt: Date.now(),
-            webhookData: shipment,
+            webhookData: shipmentSnapshot,
           });
         }
         
