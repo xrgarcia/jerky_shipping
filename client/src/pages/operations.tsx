@@ -117,6 +117,14 @@ type QueueStats = {
     workerStartedAt: string;
     lastCompletedAt: string | null;
   };
+  reverseSyncProgress?: {
+    inProgress: boolean;
+    currentPage: number;
+    totalStaleAtStart: number;
+    checkedThisRun: number;
+    updatedThisRun: number;
+    startedAt: string | null;
+  };
   firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
   firestoreSessionSyncWorkerStats?: {
     totalSynced: number;
@@ -672,6 +680,10 @@ Please analyze this failure and help me understand:
               onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
                 ? message.data.onHoldWorkerStats 
                 : (prev?.onHoldWorkerStats ?? initial?.onHoldWorkerStats),
+              // Reverse sync progress - live status of on_hold reverse sync
+              reverseSyncProgress: message.data.reverseSyncProgress !== undefined
+                ? message.data.reverseSyncProgress
+                : prev?.reverseSyncProgress,
               // Firestore worker status - use WebSocket data if defined
               firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus 
                 ?? prev?.firestoreSessionSyncWorkerStatus 
@@ -1674,6 +1686,22 @@ Please analyze this failure and help me understand:
                     {queueStats.onHoldWorkerStats.lastCompletedAt && (
                       <div>Last run: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.lastCompletedAt), { addSuffix: true })}</div>
                     )}
+                  </div>
+                )}
+                {queueStats?.reverseSyncProgress?.inProgress && (
+                  <div className="mt-2 p-2 border rounded bg-muted/30" data-testid="reverse-sync-progress">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      Reverse Sync In Progress
+                    </div>
+                    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
+                      <div>Page: {queueStats.reverseSyncProgress.currentPage} of ~{Math.ceil(queueStats.reverseSyncProgress.totalStaleAtStart / 50)}</div>
+                      <div>Checked: {queueStats.reverseSyncProgress.checkedThisRun.toLocaleString()} / {queueStats.reverseSyncProgress.totalStaleAtStart.toLocaleString()}</div>
+                      <div>Updated: {queueStats.reverseSyncProgress.updatedThisRun.toLocaleString()}</div>
+                      {queueStats.reverseSyncProgress.startedAt && (
+                        <div>Started: {formatDistanceToNow(new Date(queueStats.reverseSyncProgress.startedAt), { addSuffix: true })}</div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

@@ -732,6 +732,14 @@ export function broadcastQueueStatus(data: {
     workerStartedAt: string;
     lastCompletedAt: string | null;
   };
+  reverseSyncProgress?: {
+    inProgress: boolean;
+    currentPage: number;
+    totalStaleAtStart: number;
+    checkedThisRun: number;
+    updatedThisRun: number;
+    startedAt: string | null;
+  };
   printQueueWorkerStatus?: 'sleeping' | 'running';
   printQueueWorkerStats?: {
     totalProcessedCount: number;

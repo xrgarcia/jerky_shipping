@@ -28,10 +28,20 @@ let workerStats = {
   lastProcessedCount: 0,
   workerStartedAt: new Date(),
   lastCompletedAt: null as Date | null,
-  // Reverse sync stats
+  // Reverse sync stats (cumulative)
   reverseSyncProcessed: 0,
   reverseSyncUpdated: 0,
   lastReverseSyncAt: null as Date | null,
+};
+
+// Real-time reverse sync progress tracking
+let reverseSyncProgress = {
+  inProgress: false,
+  currentPage: 0,
+  totalStaleAtStart: 0,
+  checkedThisRun: 0,
+  updatedThisRun: 0,
+  startedAt: null as Date | null,
 };
 
 // Store the poll interval for use in reverse sync threshold calculation
@@ -53,6 +63,22 @@ export function getOnHoldWorkerStats() {
     reverseSyncProcessed: workerStats.reverseSyncProcessed,
     reverseSyncUpdated: workerStats.reverseSyncUpdated,
     lastReverseSyncAt: workerStats.lastReverseSyncAt?.toISOString() || null,
+    // Real-time reverse sync progress
+    reverseSyncProgress: {
+      inProgress: reverseSyncProgress.inProgress,
+      currentPage: reverseSyncProgress.currentPage,
+      totalStaleAtStart: reverseSyncProgress.totalStaleAtStart,
+      checkedThisRun: reverseSyncProgress.checkedThisRun,
+      updatedThisRun: reverseSyncProgress.updatedThisRun,
+      startedAt: reverseSyncProgress.startedAt?.toISOString() || null,
+    },
+  };
+}
+
+export function getReverseSyncProgress() {
+  return {
+    ...reverseSyncProgress,
+    startedAt: reverseSyncProgress.startedAt?.toISOString() || null,
   };
 }
 
@@ -89,6 +115,14 @@ async function broadcastWorkerStatus() {
         lastProcessedCount: workerStats.lastProcessedCount,
         workerStartedAt: workerStats.workerStartedAt.toISOString(),
         lastCompletedAt: workerStats.lastCompletedAt?.toISOString() || null,
+      },
+      reverseSyncProgress: {
+        inProgress: reverseSyncProgress.inProgress,
+        currentPage: reverseSyncProgress.currentPage,
+        totalStaleAtStart: reverseSyncProgress.totalStaleAtStart,
+        checkedThisRun: reverseSyncProgress.checkedThisRun,
+        updatedThisRun: reverseSyncProgress.updatedThisRun,
+        startedAt: reverseSyncProgress.startedAt?.toISOString() || null,
       },
       dataHealth,
       pipeline,
@@ -310,12 +344,34 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
   
   log(`[reverse-sync] Looking for on_hold shipments not updated since ${staleDate.toISOString()}`);
   
+  // Get initial count of stale shipments for progress tracking
+  const [{ count: initialStaleCount }] = await db
+    .select({ count: count() })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.shipmentStatus, 'on_hold'),
+        lt(shipments.updatedAt, staleDate)
+      )
+    );
+  
+  // Initialize progress tracking
+  reverseSyncProgress = {
+    inProgress: true,
+    currentPage: 0,
+    totalStaleAtStart: Number(initialStaleCount) || 0,
+    checkedThisRun: 0,
+    updatedThisRun: 0,
+    startedAt: new Date(),
+  };
+  
   let totalChecked = 0;
   let totalUpdated = 0;
   let page = 1;
   const pageSize = 50;
   let hasMorePages = true;
   
+  try {
   // Page through ALL stale on_hold shipments, processing oldest first
   while (hasMorePages) {
     // Find shipments in our DB that are marked on_hold but haven't been updated recently
@@ -341,6 +397,9 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
     }
     
     log(`[reverse-sync] Page ${page}: Processing ${staleOnHoldShipments.length} stale on_hold shipment(s)`);
+    
+    // Update progress tracking for current page
+    reverseSyncProgress.currentPage = page;
     
     let pageChecked = 0;
     let pageUpdated = 0;
@@ -414,6 +473,10 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
     totalChecked += pageChecked;
     totalUpdated += pageUpdated;
     
+    // Update progress tracking after each page
+    reverseSyncProgress.checkedThisRun = totalChecked;
+    reverseSyncProgress.updatedThisRun = totalUpdated;
+    
     log(`[reverse-sync] Page ${page} complete: checked ${pageChecked}, updated ${pageUpdated}`);
     
     // If we got fewer than pageSize, we've processed all stale shipments
@@ -430,12 +493,16 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
   
   log(`[reverse-sync] Complete: checked ${totalChecked}, updated ${totalUpdated} across ${page} page(s)`);
   
-  // Update stats
+  // Update cumulative stats
   workerStats.reverseSyncProcessed += totalChecked;
   workerStats.reverseSyncUpdated += totalUpdated;
   workerStats.lastReverseSyncAt = new Date();
   
   return { checked: totalChecked, updated: totalUpdated };
+  } finally {
+    // Always mark progress as complete, even if an exception occurred
+    reverseSyncProgress.inProgress = false;
+  }
 }
 
 /**
