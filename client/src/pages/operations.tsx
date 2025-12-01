@@ -483,6 +483,7 @@ export default function OperationsPage() {
   // Ref to access initialQueueStats in WebSocket handler without adding to dependencies
   const initialQueueStatsRef = useRef<QueueStats | undefined>(undefined);
   const [showReregisterDialog, setShowReregisterDialog] = useState(false);
+  const [showShipStationReregisterDialog, setShowShipStationReregisterDialog] = useState(false);
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
   const [showClearOrderDataDialog, setShowClearOrderDataDialog] = useState(false);
@@ -971,6 +972,50 @@ Please analyze this failure and help me understand:
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete ShipStation webhook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reregisterShipStationWebhooksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/operations/reregister-shipstation-webhooks", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      
+      if (response.status === 207) {
+        return { ...data, partialSuccess: true };
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to register webhooks");
+      }
+      
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data.partialSuccess) {
+        const failedEvents = data.failedEvents?.map((f: any) => f.event).join(", ") || "unknown";
+        toast({
+          title: "Partial Registration",
+          description: `Some webhooks failed to register: ${failedEvents}. This may require elevated ShipStation plan permissions.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Webhooks Re-registered",
+          description: data.message || `Successfully re-registered ${data.after} webhook(s)`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/shipstation-webhooks"] });
+      setShowShipStationReregisterDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Re-registration Failed",
+        description: error.message || "Failed to re-register ShipStation webhooks",
         variant: "destructive",
       });
     },
@@ -2003,6 +2048,21 @@ Please analyze this failure and help me understand:
                 <p className="text-sm text-muted-foreground">No webhooks registered</p>
               )}
             </div>
+            <div className="pt-4 border-t">
+              <Button
+                onClick={() => setShowShipStationReregisterDialog(true)}
+                variant="outline"
+                size="sm"
+                className="w-full"
+                data-testid="button-reregister-shipstation-webhooks"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Re-register Webhooks
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Re-register ShipStation webhooks for shipment and tracking updates
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -2328,6 +2388,40 @@ Please analyze this failure and help me understand:
               disabled={reregisterWebhooksMutation.isPending}
             >
               {reregisterWebhooksMutation.isPending ? "Re-registering..." : "Re-register Webhooks"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showShipStationReregisterDialog} onOpenChange={setShowShipStationReregisterDialog}>
+        <AlertDialogContent data-testid="dialog-reregister-shipstation-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-register ShipStation Webhooks</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                This will register all available ShipStation webhooks including:
+              </p>
+              <div className="rounded-md bg-muted p-3 space-y-1 text-sm">
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>fulfillment_shipped_v2</strong> - Shipment shipped events</li>
+                  <li><strong>fulfillment_rejected_v2</strong> - Fulfillment rejections</li>
+                  <li><strong>track</strong> - Tracking updates</li>
+                  <li><strong>batch</strong> - Batch operations</li>
+                </ul>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                <strong>Note:</strong> Existing webhooks for your environment will be preserved if already registered. On-hold status changes are tracked via the background polling worker.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-reregister-shipstation">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-reregister-shipstation"
+              onClick={() => reregisterShipStationWebhooksMutation.mutate()}
+              disabled={reregisterShipStationWebhooksMutation.isPending}
+            >
+              {reregisterShipStationWebhooksMutation.isPending ? "Re-registering..." : "Re-register Webhooks"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

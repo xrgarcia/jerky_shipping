@@ -3791,6 +3791,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Re-register all ShipStation webhooks
+  app.post("/api/operations/reregister-shipstation-webhooks", requireAuth, async (req, res) => {
+    try {
+      const apiKey = process.env.SHIPSTATION_API_KEY;
+
+      if (!apiKey) {
+        return res.status(400).json({ 
+          error: "Missing ShipStation API key. Ensure SHIPSTATION_API_KEY is set." 
+        });
+      }
+
+      // Use shared webhook URL detection logic
+      const { getWebhookBaseUrl } = await import("./utils/webhook-url.js");
+      const webhookBaseUrl = getWebhookBaseUrl();
+
+      if (!webhookBaseUrl) {
+        return res.status(400).json({ 
+          error: "Cannot determine webhook base URL. Check environment configuration (WEBHOOK_BASE_URL or REPLIT_DOMAINS)." 
+        });
+      }
+
+      // Audit log
+      const user = req.user as any;
+      const timestamp = new Date().toISOString();
+      console.log(`[AUDIT] ShipStation webhook re-registration initiated by user ${user?.email || 'unknown'} at ${timestamp}`);
+      console.log(`[AUDIT] Using webhook base URL: ${webhookBaseUrl}`);
+
+      const { ensureShipStationWebhooksRegistered, listShipStationWebhooks } = await import("./utils/shipstation-webhook");
+      
+      // Get count before
+      const webhooksBefore = await listShipStationWebhooks(apiKey);
+      const countBefore = webhooksBefore.length;
+      
+      // Re-register webhooks and get detailed result
+      const registrationResult = await ensureShipStationWebhooksRegistered(webhookBaseUrl);
+      
+      // Get count after
+      const webhooksAfter = await listShipStationWebhooks(apiKey);
+      const countAfter = webhooksAfter.length;
+      
+      console.log(`[AUDIT] ShipStation webhooks re-registered. Before: ${countBefore}, After: ${countAfter}`);
+      console.log(`[AUDIT] Registration result: registered=${registrationResult.registeredEvents.length}, existing=${registrationResult.existingEvents.length}, failed=${registrationResult.failedEvents.length}`);
+      
+      // If some events failed to register, return partial success with 207 status
+      if (!registrationResult.success) {
+        const failedEventsList = registrationResult.failedEvents.map(f => f.event).join(', ');
+        const failedDetails = registrationResult.failedEvents.map(f => `${f.event}: ${f.error}`).join('; ');
+        console.error(`[AUDIT] Failed to register some webhooks: ${failedDetails}`);
+        
+        return res.status(207).json({
+          success: false,
+          before: countBefore,
+          after: countAfter,
+          webhooks: webhooksAfter,
+          registeredEvents: registrationResult.registeredEvents,
+          existingEvents: registrationResult.existingEvents,
+          failedEvents: registrationResult.failedEvents,
+          message: `Partially registered webhooks. Failed events: ${failedEventsList}`,
+          error: `Some webhook events failed to register: ${failedEventsList}. This may indicate missing permissions or plan limitations.`
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        before: countBefore,
+        after: countAfter,
+        webhooks: webhooksAfter,
+        registeredEvents: registrationResult.registeredEvents,
+        existingEvents: registrationResult.existingEvents,
+        cleanedUpCount: registrationResult.cleanedUpCount,
+        message: `Successfully re-registered ShipStation webhooks (${countAfter} total)`
+      });
+    } catch (error: any) {
+      console.error("Error re-registering ShipStation webhooks:", error);
+      res.status(500).json({ 
+        error: "Failed to re-register ShipStation webhooks",
+        details: error.message 
+      });
+    }
+  });
+
   app.get("/api/operations/failures", requireAuth, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
