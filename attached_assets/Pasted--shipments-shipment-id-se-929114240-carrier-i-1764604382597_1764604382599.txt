@@ -1,0 +1,213 @@
+{
+    "shipments": [
+        {
+            "shipment_id": "se-929114240",
+            "carrier_id": "se-435388",
+            "service_code": "ups_ground",
+            "requested_shipment_service": "UPS® Ground",
+            "external_shipment_id": "6878859002170-7868470853946",
+            "shipment_number": "JK3825348884",
+            "hold_until_date": "2026-12-01T08:00:00Z",
+            "ship_date": null,
+            "ship_by_date": "2025-12-02T00:00:00Z",
+            "created_at": "2025-12-01T14:53:02.507Z",
+            "modified_at": "2025-12-01T15:04:03.667Z",
+            "shipment_status": "on_hold",
+            "ship_to": {
+                "geolocation": null,
+                "instructions": null,
+                "name": "Kenneth Tedrick",
+                "phone": "5132902620",
+                "email": "atedrickx@gmail.com",
+                "company_name": null,
+                "address_line1": "1300 MILLSTREAM DR",
+                "address_line2": "",
+                "address_line3": null,
+                "city_locality": "AMELIA",
+                "state_province": "OH",
+                "postal_code": "45102-2818",
+                "country_code": "US",
+                "address_residential_indicator": "yes"
+            },
+            "ship_from": {
+                "instructions": null,
+                "name": "JERKY. COM",
+                "phone": "8779753759",
+                "email": "talktous@jerky.com",
+                "company_name": "Over 100 Kinds of Jerky",
+                "address_line1": "4132 Will Rogers Pkwy  ",
+                "address_line2": "Suite #1000",
+                "address_line3": "",
+                "city_locality": "Oklahoma City",
+                "state_province": "OK",
+                "postal_code": "73108",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            },
+            "warehouse_id": "se-228129",
+            "return_to": {
+                "instructions": null,
+                "name": "JERKY. COM",
+                "phone": "8779753759",
+                "email": "talktous@jerky.com",
+                "company_name": "Over 100 Kinds of Jerky",
+                "address_line1": "4132 Will Rogers Pkwy  ",
+                "address_line2": "Suite #1000",
+                "address_line3": "",
+                "city_locality": "Oklahoma City",
+                "state_province": "OK",
+                "postal_code": "73108",
+                "country_code": "US",
+                "address_residential_indicator": "no"
+            },
+            "is_return": false,
+            "confirmation": "none",
+            "customs": null,
+            "external_order_id": null,
+            "order_source_code": null,
+            "advanced_options": {
+                "bill_to_account": null,
+                "bill_to_country_code": null,
+                "bill_to_party": null,
+                "bill_to_postal_code": null,
+                "bill_to_name": null,
+                "bill_to_address_line1": null,
+                "contains_alcohol": false,
+                "delivered_duty_paid": false,
+                "non_machinable": false,
+                "saturday_delivery": false,
+                "dry_ice": false,
+                "dry_ice_weight": null,
+                "fedex_freight": null,
+                "third_party_consignee": false,
+                "guaranteed_duties_and_taxes": false,
+                "ancillary_endorsements_option": null,
+                "freight_class": null,
+                "custom_field1": "accept",
+                "custom_field2": "2",
+                "custom_field3": "",
+                "collect_on_delivery": null,
+                "return_pickup_attempts": null,
+                "additional_handling": false,
+                "own_document_upload": false,
+                "limited_quantity": false,
+                "event_notification": false,
+                "import_services": false,
+                "override_holiday": false
+            },
+            "comparison_rate_type": null,
+            "retail_rate": null,
+            "shipping_rule_id": null,
+            "insurance_provider": "none",
+            "tags": [
+                {
+                    "tag_id": 0,
+                    "name": "All Orders",
+                    "color": null
+                },
+                {
+                    "tag_id": 0,
+                    "name": "MOVE OVER",
+                    "color": null
+                }
+            ],
+            "store_id": "se-138162",
+            "packages": [
+                {
+                    "shipment_package_id": null,
+                    "package_id": "se-3",
+                    "package_code": "package",
+                    "package_name": "Package",
+                    "weight": {
+                        "value": 32.00,
+                        "unit": "ounce"
+                    },
+                    "dimensions": {
+                        "unit": "inch",
+                        "length": 0.0,
+                        "width": 0.0,
+                        "height": 0.0
+                    },
+                    "insured_value": {
+                        "currency": "usd",
+                        "amount": 0.00
+                    },
+                    "label_messages": {
+                        "reference1": null,
+                        "reference2": null,
+                        "reference3": null
+                    },
+                    "external_package_id": null,
+                    "content_description": null,
+                    "products": null,
+                    "dangerous_goods_package_info": null
+                }
+            ],
+            "total_weight": {
+                "value": 32.00,
+                "unit": "ounce"
+            },
+            "items": [
+                {
+                    "sales_order_id": null,
+                    "sales_order_item_id": null,
+                    "quantity": 1,
+                    "name": "Premium Roast Sunflower Seeds - Smoked Jalapeno - 4X the Snacks",
+                    "sku": "BTG-SFS-38-5-X4",
+                    "bundle_sku": null,
+                    "external_order_id": null,
+                    "external_order_item_id": "16646118703418",
+                    "asin": null,
+                    "order_source_code": null,
+                    "item_id": "1662113270",
+                    "allocation_status": null,
+                    "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/products/Seeds_Smoked-Jalapeno_quad-pouch.png?v=1627990431",
+                    "weight": {
+                        "value": 34.00,
+                        "unit": "ounce"
+                    },
+                    "unit_price": 21.99,
+                    "tax_amount": 0.00,
+                    "shipping_amount": null,
+                    "inventory_location": null,
+                    "options": [],
+                    "product_id": "3604013",
+                    "fullfilment_sku": null,
+                    "upc": "BTG-SFS-38-5-X4"
+                }
+            ],
+            "notes_from_buyer": null,
+            "notes_for_gift": null,
+            "is_gift": false,
+            "assigned_user": null,
+            "amount_paid": {
+                "currency": "usd",
+                "amount": 34.19
+            },
+            "shipping_paid": {
+                "currency": "usd",
+                "amount": 12.20
+            },
+            "tax_paid": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "zone": 5,
+            "dangerous_goods_declaration": null,
+            "sender_info": null
+        }
+    ],
+    "total": 1,
+    "page": 1,
+    "pages": 1,
+    "links": {
+        "first": {
+            "href": "https://api.shipstation.com/v2/shipments?sort_dir=desc&sort_by=created_at&shipment_number=JK3825348884&page=1&page_size=25"
+        },
+        "last": {
+            "href": "https://api.shipstation.com/v2/shipments?sort_dir=desc&sort_by=created_at&shipment_number=JK3825348884&page=1&page_size=25"
+        },
+        "prev": {},
+        "next": {}
+    }
+}
