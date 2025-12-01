@@ -5374,22 +5374,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log the packing completion attempt
       await logPackingAction('complete_order_start', true, {
-        requestData: { shipmentId, stationId: webSession.stationId, hasLabelUrl: !!shipment.labelUrl }
+        requestData: { shipmentId, stationId: webSession.stationId, hasLabelUrl: !!shipment.labelUrl, hasOrderId: !!shipment.orderId }
       });
-      
-      // Check if shipment is linked to Shopify order
-      if (!shipment.orderId) {
-        console.warn(`[Packing] Shipment ${shipment.orderNumber} has no orderId - skipping print queue`);
-        await logPackingAction('complete_order_no_shopify', true, {
-          responseData: { message: 'No Shopify order linked - manual label print required' }
-        });
-        return res.json({ 
-          success: true, 
-          printQueued: false,
-          message: "Order complete. Print label manually from shipment details.",
-          labelUrl: shipment.labelUrl
-        });
-      }
       
       // If no label URL, try to fetch or create one from ShipStation
       let labelUrl = shipment.labelUrl;
@@ -5571,9 +5557,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create print job with shipment label URL and station from web session
+      // orderId is optional - we can print labels for orders not linked to Shopify
       const printJob = await storage.createPrintJob({
         stationId: webSession.stationId,
-        orderId: shipment.orderId, // Non-null, safe to insert
+        orderId: shipment.orderId || undefined, // Nullable - not all orders are in Shopify
         shipmentId: shipment.id,
         jobType: "label",
         payload: { 

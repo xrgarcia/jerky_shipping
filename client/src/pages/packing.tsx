@@ -274,8 +274,8 @@ export default function Packing() {
   // State for label creation error (displayed inline on packing page)
   const [labelError, setLabelError] = useState<LabelError | null>(null);
   
-  // State for manual print required message (displayed inline when no automated print)
-  const [manualPrintInfo, setManualPrintInfo] = useState<{ message: string; labelUrl?: string } | null>(null);
+  // State for successful completion (displayed inline, requires acknowledgment)
+  const [completionSuccess, setCompletionSuccess] = useState<{ printJobId: string; message: string } | null>(null);
 
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
@@ -1090,7 +1090,7 @@ export default function Packing() {
       setCurrentShipment(shipment);
       setPackingComplete(false);
       setLabelError(null); // Clear any previous label errors when loading new order
-      setManualPrintInfo(null); // Clear any previous manual print info
+      setCompletionSuccess(null); // Clear any previous success state
       progressRestoredRef.current = false; // Reset so restoration runs for new order
       
       // Log order loaded event
@@ -1685,11 +1685,10 @@ export default function Packing() {
       const response = await apiRequest("POST", "/api/packing/complete", {
         shipmentId: currentShipment!.id,
       });
-      return (await response.json()) as { success: boolean; printQueued: boolean; noLabel?: boolean; message?: string; labelUrl?: string };
+      return (await response.json()) as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
     },
     onSuccess: (result) => {
       setPackingComplete(true);
-      // Keep optimistic state true - it will be cleared when order resets or print job completes
       
       // Log packing completed event
       const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
@@ -1698,54 +1697,11 @@ export default function Packing() {
         printQueued: result.printQueued,
       });
       
-      if (result.noLabel) {
-        toast({
-          title: "Packing Complete - No Label",
-          description: result.message || "No shipping label available yet",
-          variant: "destructive",
-        });
-        // Reset for next order after 2 seconds
-        setTimeout(() => {
-          setJustCreatedPrintJob(false);
-          setCurrentShipment(null);
-          setPackingComplete(false);
-          setOrderScan("");
-          setSkuProgress(new Map());
-          setLabelError(null);
-          setManualPrintInfo(null);
-          progressRestoredRef.current = false;
-          orderInputRef.current?.focus();
-        }, 2000);
-      } else if (!result.printQueued) {
-        // No automated printing - show manual print info panel (don't auto-transition)
-        setManualPrintInfo({
-          message: result.message || "Order complete. Print label manually.",
-          labelUrl: result.labelUrl
-        });
-        toast({
-          title: "Packing Complete",
-          description: "Manual printing required - see details on screen",
-        });
-        // Don't auto-transition - user must acknowledge the manual print message
-      } else {
-        // Label queued successfully
-        toast({
-          title: "Packing Complete",
-          description: "Label queued for printing",
-        });
-        // Reset for next order after 2 seconds
-        setTimeout(() => {
-          setJustCreatedPrintJob(false);
-          setCurrentShipment(null);
-          setPackingComplete(false);
-          setOrderScan("");
-          setSkuProgress(new Map());
-          setLabelError(null);
-          setManualPrintInfo(null);
-          progressRestoredRef.current = false;
-          orderInputRef.current?.focus();
-        }, 2000);
-      }
+      // Show success panel on-page - NO auto-transition, user must acknowledge
+      setCompletionSuccess({
+        printJobId: result.printJobId || '',
+        message: result.message || "Order complete! Label queued for printing."
+      });
     },
     onError: (error: any) => {
       // Clear optimistic state on error
@@ -3009,53 +2965,47 @@ export default function Packing() {
                 )}
               </Button>
 
-              {/* Manual Print Required Panel */}
-              {manualPrintInfo && (
+              {/* Success Completion Panel - Requires acknowledgment before moving to next order */}
+              {completionSuccess && (
                 <div 
-                  className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 rounded-lg p-4 space-y-3"
-                  data-testid="alert-manual-print"
+                  className="bg-green-50 dark:bg-green-950 border border-green-300 dark:border-green-700 rounded-lg p-4 space-y-3"
+                  data-testid="alert-completion-success"
                 >
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 space-y-2">
-                      <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-lg">
-                        Manual Printing Required
+                      <h4 className="font-semibold text-green-800 dark:text-green-200 text-xl">
+                        Packing Complete!
                       </h4>
-                      <p className="text-sm text-amber-700 dark:text-amber-300">
-                        {manualPrintInfo.message}
+                      <p className="text-base text-green-700 dark:text-green-300">
+                        {completionSuccess.message}
                       </p>
-                      {manualPrintInfo.labelUrl && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <a
-                            href={manualPrintInfo.labelUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 text-amber-800 dark:text-amber-200 hover:underline font-medium"
-                          >
-                            <Printer className="h-4 w-4" />
-                            Open Label for Printing
-                          </a>
-                        </div>
+                      {completionSuccess.printJobId && (
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          Print Job ID: {completionSuccess.printJobId}
+                        </p>
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2 pt-2 border-t border-amber-200 dark:border-amber-800">
+                  <div className="flex gap-2 pt-3 border-t border-green-200 dark:border-green-800">
                     <Button
                       onClick={() => {
-                        setManualPrintInfo(null);
+                        setCompletionSuccess(null);
                         setJustCreatedPrintJob(false);
                         setCurrentShipment(null);
                         setPackingComplete(false);
                         setOrderScan("");
                         setSkuProgress(new Map());
+                        setLabelError(null);
                         progressRestoredRef.current = false;
                         orderInputRef.current?.focus();
                       }}
-                      size="sm"
-                      data-testid="button-acknowledge-manual-print"
+                      size="lg"
+                      className="w-full"
+                      data-testid="button-next-order"
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Got It - Next Order
+                      <CheckCircle2 className="h-5 w-5 mr-2" />
+                      Next Order
                     </Button>
                   </div>
                 </div>
