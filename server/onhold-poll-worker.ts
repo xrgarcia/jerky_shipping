@@ -7,6 +7,7 @@ import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
   getShipmentSyncQueueLength,
+  getShipmentSyncQueueLengthByPriority,
   getShopifyOrderSyncQueueLength,
   getOldestShopifyQueueMessage,
   getOldestShipmentSyncQueueMessage,
@@ -269,21 +270,37 @@ export async function pollOnHoldShipments(): Promise<number> {
  * 
  * Time-based filtering prevents the same shipments from being re-enqueued every poll cycle:
  * - reverseSyncLastCheckedAt is updated by the sync worker when it verifies a shipment
- * - Only shipments with NULL or stale (>5 min) reverseSyncLastCheckedAt are enqueued
+ * - Only shipments with NULL or stale (>6 hours) reverseSyncLastCheckedAt are enqueued
  * 
  * Benefits:
  * - No API calls in reverse sync (no rate limit contention)
  * - Single place for rate limit handling (shipment-sync worker)
  * - Time-based filtering prevents redundant re-enqueueing
  * - Progress is automatic as queue drains over time
+ * 
+ * MICRO-BATCH STRATEGY (added Dec 2025):
+ * - Only enqueue 10 shipments per cycle (not all 1,400)
+ * - Only enqueue if low-priority queue is empty (LLEN check)
+ * - Use 6-hour freshness window (not 5 minutes)
+ * - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
  */
-const REVERSE_SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const REVERSE_SYNC_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours - only re-check shipments not verified in 6 hours
+const REVERSE_SYNC_BATCH_SIZE = 10; // Only enqueue 10 shipments per cycle
 
 export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; skipped: number }> {
+  // GATE: Check if low-priority queue is empty before adding more
+  // This prevents flooding - if previous batch isn't processed, don't add more
+  const queueLengths = await getShipmentSyncQueueLengthByPriority();
+  if (queueLengths.low > 0) {
+    log(`[reverse-sync] Low-priority queue has ${queueLengths.low} messages, skipping this cycle (waiting for queue to drain)`);
+    return { queued: 0, skipped: 0 };
+  }
+  
   // Calculate the threshold time - shipments checked before this time are "stale"
   const staleThreshold = new Date(Date.now() - REVERSE_SYNC_COOLDOWN_MS);
   
-  // Get on_hold shipments that need verification (never checked OR checked > 5 min ago)
+  // Get on_hold shipments that need verification (never checked OR checked > 6 hours ago)
+  // Use reverseSyncLastCheckedAt as progress cursor - oldest unchecked first
   const allOnHoldShipments = await db
     .select()
     .from(shipments)
@@ -293,22 +310,27 @@ export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; sk
         ${shipments.reverseSyncLastCheckedAt} < ${staleThreshold}
       )`
     )
-    .orderBy(asc(shipments.createdAt)); // Process oldest first
+    .orderBy(
+      // NULL values first (never checked), then oldest checked
+      sql`${shipments.reverseSyncLastCheckedAt} IS NOT NULL`,
+      asc(shipments.reverseSyncLastCheckedAt)
+    )
+    .limit(REVERSE_SYNC_BATCH_SIZE); // Only fetch the batch we need
   
-  const totalCount = allOnHoldShipments.length;
+  const batchCount = allOnHoldShipments.length;
   
-  if (totalCount === 0) {
-    log('[reverse-sync] No stale on_hold shipments to verify (all checked within 5 min)');
+  if (batchCount === 0) {
+    log('[reverse-sync] No stale on_hold shipments to verify (all checked within 6 hours)');
     return { queued: 0, skipped: 0 };
   }
   
   // Filter to only shipments with ShipStation ID (can't sync without it)
   const syncableShipments = allOnHoldShipments.filter(s => s.shipmentId);
-  const skippedNoId = totalCount - syncableShipments.length;
+  const skippedNoId = batchCount - syncableShipments.length;
   
   if (syncableShipments.length === 0) {
-    log(`[reverse-sync] ${totalCount} on_hold shipments in DB, but none have ShipStation ID`);
-    return { queued: 0, skipped: totalCount };
+    log(`[reverse-sync] ${batchCount} on_hold shipments in batch, but none have ShipStation ID`);
+    return { queued: 0, skipped: batchCount };
   }
   
   // Build messages for batch enqueue
@@ -324,7 +346,7 @@ export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; sk
   const enqueuedCount = await enqueueShipmentSyncBatch(messages);
   const dedupedCount = syncableShipments.length - enqueuedCount;
   
-  log(`[reverse-sync] Enqueued ${enqueuedCount} of ${totalCount} on_hold shipments for verification (${dedupedCount} already in queue, ${skippedNoId} missing ShipStation ID)`);
+  log(`[reverse-sync] Enqueued ${enqueuedCount} of ${batchCount} on_hold shipments (batch of ${REVERSE_SYNC_BATCH_SIZE}, ${dedupedCount} already in queue, ${skippedNoId} missing ID)`);
   
   // Update stats
   workerStats.reverseSyncProcessed += enqueuedCount;
@@ -334,7 +356,7 @@ export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; sk
   reverseSyncProgress = {
     inProgress: false, // Not really "in progress" anymore - just enqueued
     currentPage: 1,
-    totalStaleAtStart: totalCount,
+    totalStaleAtStart: batchCount,
     checkedThisRun: 0, // Will be updated by sync worker
     updatedThisRun: enqueuedCount,
     startedAt: new Date(),
@@ -363,8 +385,11 @@ export function startOnHoldPollWorker(intervalMs: number = 300000): NodeJS.Timeo
       // First: Poll for on_hold shipments (forward sync)
       await pollOnHoldShipments();
       
-      // DISABLED: Reverse sync was flooding queue with 1000+ messages per cycle
-      // await reverseSyncOnHoldShipments();
+      // Re-enabled with micro-batch strategy (Dec 2025):
+      // - Only enqueues 10 shipments per cycle
+      // - Checks if low-priority queue is empty before adding more
+      // - Uses 6-hour freshness window
+      await reverseSyncOnHoldShipments();
     } catch (error) {
       console.error("On-hold poll worker error:", error);
     }
