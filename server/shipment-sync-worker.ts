@@ -539,6 +539,11 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             : await storage.getShipmentByShipmentId(String(rawShipmentId));
           
           // Use ETL service to process complete shipment (creates/updates record + items + tags)
+          // DEBUG: Log the webhookData shipment_id and order_number before ETL
+          const webhookShipmentId = webhookData.shipment_id || webhookData.shipmentId;
+          const webhookOrderNum = webhookData.shipment_number || webhookData.order_number || webhookData.orderNumber;
+          log(`[${orderNumber}] [DEBUG] webhookData has shipment_id=${webhookShipmentId}, order_number=${webhookOrderNum}`);
+          
           const finalShipmentId = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
           
           if (existingShipment) {

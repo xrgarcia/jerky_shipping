@@ -100,6 +100,11 @@ export class ShipStationShipmentETLService {
     const { status, statusDescription } = this.normalizeShipmentStatus(shipmentData);
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
+    // Debug logging for shipmentStatus extraction
+    if (shipmentStatus) {
+      console.log(`[ETL] Extracted shipmentStatus: ${shipmentStatus} for order ${this.extractOrderNumber(shipmentData)}`);
+    }
+    
     // Extract carrier and service
     const carrierCode = this.extractCarrierCode(shipmentData);
     const serviceCode = this.extractServiceCode(shipmentData);
@@ -442,6 +447,13 @@ export class ShipStationShipmentETLService {
    */
   private extractShipmentStatus(shipmentData: any): string | null {
     if (!shipmentData) return null;
+    
+    // DEBUG: Log what keys are at top level for on_hold shipments
+    const orderNumber = this.extractOrderNumber(shipmentData);
+    const topLevelStatus = shipmentData.shipment_status || shipmentData.shipmentStatus;
+    if (!topLevelStatus && orderNumber && orderNumber.startsWith('JK')) {
+      console.log(`[ETL] [DEBUG] No top-level shipment_status for ${orderNumber}. Keys:`, Object.keys(shipmentData).slice(0, 20).join(', '));
+    }
     
     // Check top-level fields first
     if (shipmentData.shipment_status) return shipmentData.shipment_status;

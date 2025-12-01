@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { enqueueShipmentSync } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
-import { desc, eq, lt, and, asc } from 'drizzle-orm';
+import { desc, eq, asc } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
@@ -260,13 +260,15 @@ export async function pollOnHoldShipments(): Promise<number> {
         }
         
         // Queue for sync with inline shipment data
+        // Clone shipmentData to prevent any reference-sharing issues
+        const shipmentDataSnapshot = JSON.parse(JSON.stringify(shipmentData));
         const queueResult = await enqueueShipmentSync({
           orderNumber,
           shipmentId,
           trackingNumber,
           reason: 'manual',
           enqueuedAt: Date.now(),
-          webhookData: shipmentData, // Pass shipment data directly (no API call needed!)
+          webhookData: shipmentDataSnapshot,
         });
         
         if (isDebugTarget) {
@@ -320,112 +322,19 @@ export async function pollOnHoldShipments(): Promise<number> {
 }
 
 /**
- * Process a batch of on_hold shipments by checking their current status in ShipStation.
- * Returns counts of checked and updated shipments.
+ * SIMPLIFIED Reverse sync: Check ALL on_hold shipments in our DB against ShipStation.
  * 
- * Idempotent behavior:
- * - Only touches updatedAt AFTER successfully confirming status (still on_hold or enqueued for sync)
- * - If ShipStation API fails, leaves shipment stale for retry next cycle
- * - If enqueue fails, leaves shipment stale for retry (doesn't mark as fresh)
+ * With only ~80-100 on_hold shipments at peak, we can afford to check ALL of them
+ * each cycle without worrying about stale thresholds or timestamps.
+ * 
+ * Key behavior:
+ * - Queries ALL shipments with status=on_hold in our DB
+ * - Fetches each from ShipStation API to get current status
+ * - Only updates DB if status ACTUALLY CHANGED (on_hold -> something else)
+ * - Does NOT touch any records that are still on_hold (no timestamp bumping)
+ * - This eliminates the "freshness" problem entirely
  */
-async function processOnHoldBatch(
-  shipmentsToProcess: typeof shipments.$inferSelect[],
-  batchLabel: string
-): Promise<{ checked: number; updated: number }> {
-  let checked = 0;
-  let updated = 0;
-  
-  for (const shipment of shipmentsToProcess) {
-    if (!shipment.shipmentId) {
-      // Touch updatedAt to prevent retrying shipments with no shipmentId
-      await db
-        .update(shipments)
-        .set({ updatedAt: new Date() })
-        .where(eq(shipments.id, shipment.id));
-      continue;
-    }
-    
-    try {
-      // Fetch current status from ShipStation
-      const result = await getShipmentByShipmentId(shipment.shipmentId);
-      checked++;
-      
-      if (!result.data) {
-        log(`[reverse-sync] ${batchLabel} Shipment ${shipment.shipmentId} not found in ShipStation`);
-        // Touch updatedAt to prevent tight retry loop on missing shipments
-        await db
-          .update(shipments)
-          .set({ updatedAt: new Date() })
-          .where(eq(shipments.id, shipment.id));
-        continue;
-      }
-      
-      const currentStatus = result.data.shipment_status;
-      
-      // If status has changed from on_hold, queue for sync
-      if (currentStatus !== 'on_hold') {
-        log(`[reverse-sync] ${batchLabel} Shipment ${shipment.shipmentId} (${shipment.orderNumber}) status changed: on_hold -> ${currentStatus}`);
-        
-        try {
-          await enqueueShipmentSync({
-            orderNumber: shipment.orderNumber || undefined,
-            shipmentId: shipment.shipmentId,
-            trackingNumber: result.data.tracking_number || shipment.trackingNumber || undefined,
-            reason: 'manual',
-            enqueuedAt: Date.now(),
-            webhookData: result.data, // Pass full shipment data
-          });
-          
-          // Only mark as updated after successful enqueue
-          updated++;
-          
-          // Touch updatedAt to prevent re-processing before sync completes
-          await db
-            .update(shipments)
-            .set({ updatedAt: new Date() })
-            .where(eq(shipments.id, shipment.id));
-        } catch (enqueueError: any) {
-          // Enqueue failed (e.g., Redis outage) - DON'T touch updatedAt
-          // Leave shipment stale so it gets retried next cycle
-          log(`[reverse-sync] ${batchLabel} Failed to enqueue sync for ${shipment.shipmentId}: ${enqueueError.message} - will retry next cycle`);
-        }
-      } else {
-        // Still on hold - update the updatedAt to prevent checking again next cycle
-        await db
-          .update(shipments)
-          .set({ updatedAt: new Date() })
-          .where(eq(shipments.id, shipment.id));
-      }
-      
-      // Small delay to respect rate limits (100ms = max 600 requests/minute)
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-    } catch (error: any) {
-      // ShipStation API error - DON'T touch updatedAt, leave stale for retry
-      log(`[reverse-sync] ${batchLabel} Error checking shipment ${shipment.shipmentId}: ${error.message} - will retry next cycle`);
-      // Continue to next shipment without touching updatedAt
-    }
-  }
-  
-  return { checked, updated };
-}
-
-/**
- * Reverse sync: Check shipments in our DB marked as on_hold that weren't updated recently.
- * If the on-hold poll worker just ran and a shipment wasn't touched, it means ShipStation
- * didn't return it in the on_hold query - so it's probably no longer on hold.
- * 
- * This function pages through ALL stale on_hold shipments and fetches their current status
- * from ShipStation, updating them if their status has changed.
- * 
- * Two-pass approach:
- * 1. PRIORITY PASS: Process oldest shipments by created_at first (prevents old orders from being stuck)
- * 2. NORMAL PASS: Process remaining stale shipments by updated_at (processes most stale first)
- * 
- * @param staleThresholdMs - How old updatedAt must be to consider a shipment "stale"
- *                           Default: 2x poll interval (ensures poll had a chance to update it)
- */
-export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Promise<{ checked: number; updated: number }> {
+export async function reverseSyncOnHoldShipments(): Promise<{ checked: number; updated: number }> {
   const apiKey = process.env.SHIPSTATION_API_KEY;
   
   if (!apiKey) {
@@ -433,132 +342,110 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
     return { checked: 0, updated: 0 };
   }
 
-  // Use 2x poll interval as threshold to ensure the poll had a chance to update fresh shipments
-  const threshold = staleThresholdMs ?? (currentPollIntervalMs * 2);
-  const staleDate = new Date(Date.now() - threshold);
-  
-  log(`[reverse-sync] Looking for on_hold shipments not updated since ${staleDate.toISOString()}`);
-  
-  // Get initial count of stale shipments for progress tracking
-  const [{ count: initialStaleCount }] = await db
-    .select({ count: count() })
+  // Get ALL on_hold shipments from our DB - no stale threshold, no filtering
+  const allOnHoldShipments = await db
+    .select()
     .from(shipments)
-    .where(
-      and(
-        eq(shipments.shipmentStatus, 'on_hold'),
-        lt(shipments.updatedAt, staleDate)
-      )
-    );
+    .where(eq(shipments.shipmentStatus, 'on_hold'))
+    .orderBy(asc(shipments.createdAt)); // Process oldest first
+  
+  const totalCount = allOnHoldShipments.length;
+  log(`[reverse-sync] Found ${totalCount} on_hold shipment(s) in DB - checking ALL against ShipStation`);
+  
+  if (totalCount === 0) {
+    return { checked: 0, updated: 0 };
+  }
   
   // Initialize progress tracking
   reverseSyncProgress = {
     inProgress: true,
-    currentPage: 0,
-    totalStaleAtStart: Number(initialStaleCount) || 0,
+    currentPage: 1,
+    totalStaleAtStart: totalCount,
     checkedThisRun: 0,
     updatedThisRun: 0,
     startedAt: new Date(),
   };
   
-  let totalChecked = 0;
-  let totalUpdated = 0;
-  let page = 1;
-  // Increased page size from 50 to 200 for faster processing
-  const pageSize = 200;
-  let hasMorePages = true;
+  let checked = 0;
+  let updated = 0;
   
   try {
-  // PRIORITY PASS: Process oldest on_hold shipments by created_at first
-  // This ensures old orders don't get stuck behind recently-touched shipments
-  const priorityBatchSize = 50;
-  const priorityShipments = await db
-    .select()
-    .from(shipments)
-    .where(
-      and(
-        eq(shipments.shipmentStatus, 'on_hold'),
-        lt(shipments.updatedAt, staleDate)
-      )
-    )
-    .orderBy(asc(shipments.createdAt)) // Order by CREATED date, not updated
-    .limit(priorityBatchSize);
-  
-  if (priorityShipments.length > 0) {
-    log(`[reverse-sync] PRIORITY PASS: Processing ${priorityShipments.length} oldest on_hold shipment(s) by creation date`);
-    const priorityResult = await processOnHoldBatch(priorityShipments, '[PRIORITY]');
-    totalChecked += priorityResult.checked;
-    totalUpdated += priorityResult.updated;
-    reverseSyncProgress.checkedThisRun = totalChecked;
-    reverseSyncProgress.updatedThisRun = totalUpdated;
-    log(`[reverse-sync] PRIORITY PASS complete: checked ${priorityResult.checked}, updated ${priorityResult.updated}`);
-    
-    // Small delay before normal pass
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  
-  // NORMAL PASS: Page through remaining stale on_hold shipments by updated_at
-  while (hasMorePages) {
-    // Find shipments in our DB that are marked on_hold but haven't been updated recently
-    // ORDER BY updated_at ASC ensures we check the oldest (most stale) shipments first
-    const staleOnHoldShipments = await db
-      .select()
-      .from(shipments)
-      .where(
-        and(
-          eq(shipments.shipmentStatus, 'on_hold'),
-          lt(shipments.updatedAt, staleDate)
-        )
-      )
-      .orderBy(asc(shipments.updatedAt))
-      .limit(pageSize);
-    
-    if (staleOnHoldShipments.length === 0) {
-      if (page === 1) {
-        log('[reverse-sync] No stale on_hold shipments found');
+    for (const shipment of allOnHoldShipments) {
+      if (!shipment.shipmentId) {
+        // Skip shipments without ShipStation ID - can't look them up
+        continue;
       }
-      hasMorePages = false;
-      break;
+      
+      try {
+        // Fetch current status from ShipStation
+        const result = await getShipmentByShipmentId(shipment.shipmentId);
+        checked++;
+        
+        // Update progress
+        reverseSyncProgress.checkedThisRun = checked;
+        
+        if (!result.data) {
+          // Shipment not found in ShipStation - mark as cancelled
+          log(`[reverse-sync] Shipment ${shipment.shipmentId} (${shipment.orderNumber}) not found in ShipStation - marking as cancelled`);
+          await db
+            .update(shipments)
+            .set({ 
+              shipmentStatus: 'cancelled',
+              updatedAt: new Date()
+            })
+            .where(eq(shipments.id, shipment.id));
+          updated++;
+          reverseSyncProgress.updatedThisRun = updated;
+          continue;
+        }
+        
+        const currentStatus = result.data.shipment_status;
+        
+        // ONLY update if status actually changed
+        if (currentStatus !== 'on_hold') {
+          log(`[reverse-sync] Shipment ${shipment.shipmentId} (${shipment.orderNumber}) status changed: on_hold -> ${currentStatus}`);
+          
+          try {
+            // CRITICAL: Deep-clone the API response data before enqueueing!
+            // The ShipStation API client reuses/mutates the response object across calls.
+            // Without cloning, all queued messages end up with the same (last fetched) data.
+            const shipmentDataSnapshot = JSON.parse(JSON.stringify(result.data));
+            
+            // Queue for full sync to get all updated data
+            await enqueueShipmentSync({
+              orderNumber: shipment.orderNumber || undefined,
+              shipmentId: shipment.shipmentId,
+              trackingNumber: shipmentDataSnapshot.tracking_number || shipment.trackingNumber || undefined,
+              reason: 'manual',
+              enqueuedAt: Date.now(),
+              webhookData: shipmentDataSnapshot,
+            });
+            updated++;
+            reverseSyncProgress.updatedThisRun = updated;
+          } catch (enqueueError: any) {
+            log(`[reverse-sync] Failed to enqueue sync for ${shipment.shipmentId}: ${enqueueError.message}`);
+          }
+        }
+        // If still on_hold, do NOTHING - don't touch any fields
+        
+        // Small delay to respect rate limits (100ms = max 600 requests/minute)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error: any) {
+        log(`[reverse-sync] Error checking shipment ${shipment.shipmentId}: ${error.message}`);
+        // Continue to next shipment
+      }
     }
     
-    log(`[reverse-sync] Page ${page}: Processing ${staleOnHoldShipments.length} stale on_hold shipment(s)`);
+    log(`[reverse-sync] Complete: checked ${checked}/${totalCount}, updated ${updated}`);
     
-    // Update progress tracking for current page
-    reverseSyncProgress.currentPage = page;
+    // Update cumulative stats
+    workerStats.reverseSyncProcessed += checked;
+    workerStats.reverseSyncUpdated += updated;
+    workerStats.lastReverseSyncAt = new Date();
     
-    // Process this page using the helper function
-    const pageResult = await processOnHoldBatch(staleOnHoldShipments, `[Page ${page}]`);
-    
-    totalChecked += pageResult.checked;
-    totalUpdated += pageResult.updated;
-    
-    // Update progress tracking after each page
-    reverseSyncProgress.checkedThisRun = totalChecked;
-    reverseSyncProgress.updatedThisRun = totalUpdated;
-    
-    log(`[reverse-sync] Page ${page} complete: checked ${pageResult.checked}, updated ${pageResult.updated}`);
-    
-    // If we got fewer than pageSize, we've processed all stale shipments
-    // Note: We query again each page because updatedAt gets bumped during processing,
-    // so previously stale shipments are no longer in the result set
-    if (staleOnHoldShipments.length < pageSize) {
-      hasMorePages = false;
-    } else {
-      page++;
-      // Add a small delay between pages to be nice to the database
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-  }
-  
-  log(`[reverse-sync] Complete: checked ${totalChecked}, updated ${totalUpdated} across ${page} page(s)`);
-  
-  // Update cumulative stats
-  workerStats.reverseSyncProcessed += totalChecked;
-  workerStats.reverseSyncUpdated += totalUpdated;
-  workerStats.lastReverseSyncAt = new Date();
-  
-  return { checked: totalChecked, updated: totalUpdated };
+    return { checked, updated };
   } finally {
-    // Always mark progress as complete, even if an exception occurred
     reverseSyncProgress.inProgress = false;
   }
 }

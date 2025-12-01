@@ -115,7 +115,10 @@ export async function getLabelByLabelId(labelId: string): Promise<any> {
     throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
 
-  const url = `${SHIPSTATION_API_BASE}/v2/labels?label_id=${encodeURIComponent(labelId)}`;
+  // ShipStation V2 API: Use direct label lookup instead of list endpoint
+  // The list endpoint at /v2/labels with label_id filter doesn't reliably filter
+  // Instead, get the label directly from /v2/labels/{label_id}
+  const url = `${SHIPSTATION_API_BASE}/v2/labels/${encodeURIComponent(labelId)}`;
   
   const response = await fetch(url, {
     headers: {
@@ -125,17 +128,22 @@ export async function getLabelByLabelId(labelId: string): Promise<any> {
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`No label found for label_id: ${labelId}`);
+    }
     throw new Error(`ShipStation API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
-  const labels = data.labels || [];
+  // Direct label lookup returns a single label object
+  const label = await response.json();
   
-  if (labels.length === 0) {
-    throw new Error(`No label found for label_id: ${labelId}`);
+  if (!label || !label.label_id) {
+    throw new Error(`Invalid label response for label_id: ${labelId}`);
   }
   
-  return labels[0]; // Return the first (and typically only) label
+  console.log(`[ShipStation API] Label lookup for ${labelId}: shipment_id=${label.shipment_id}`);
+  
+  return label;
 }
 
 /**
