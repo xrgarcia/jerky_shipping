@@ -37,7 +37,12 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
     - Requeue function preserves FIFO ordering within each priority level using RPUSH with reverse
 - **Shopify → ShipStation Sync DISABLED**: Shopify webhooks do NOT trigger ShipStation API calls. ShipStation data comes exclusively from ShipStation webhooks. This prevents queue flooding when Shopify order volume is high.
-- **Reverse Sync DISABLED**: The reverse sync (checking if on_hold shipments changed status) was flooding the queue with 1000+ messages per cycle. Disabled until a rate-limited approach is implemented.
+- **Forward Poll Freshness Filtering** (Dec 2025): The on-hold poll worker now checks if shipments were synced within the last 5 minutes before re-queuing them. This prevents queue flooding when all ~133 on_hold shipments get re-queued every 60 seconds.
+- **Reverse Sync RE-ENABLED** (Dec 2025): Using micro-batch strategy with guardrails:
+    - Only enqueues 10 shipments per cycle (not all 1,400+)
+    - Only enqueues if low-priority queue is empty (LLEN check)
+    - Uses 6-hour freshness window (only re-checks shipments not verified in 6 hours)
+    - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices

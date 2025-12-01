@@ -19,6 +19,10 @@ import { workerCoordinator } from './worker-coordinator';
 
 const log = (message: string) => console.log(`[onhold-poll] ${message}`);
 
+// Skip re-queuing shipments that were synced within this window
+// This prevents queue flooding when poll runs frequently
+const FORWARD_SYNC_FRESHNESS_MS = 5 * 60 * 1000; // 5 minutes
+
 // Global worker status - now includes awaiting_backfill_job
 let workerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
 
@@ -207,10 +211,40 @@ export async function pollOnHoldShipments(): Promise<number> {
         // If we got fewer than 100 shipments, this is the last page
         hasMorePages = pageShipments.length === 100;
         
+        // OPTIMIZATION: Filter out shipments that were recently synced
+        // This prevents queue flooding when poll runs every 60 seconds
+        const freshnessThreshold = new Date(Date.now() - FORWARD_SYNC_FRESHNESS_MS);
+        
+        // Get list of ShipStation IDs from this page
+        const shipmentIds = pageShipments
+          .map((s: any) => s.shipment_id)
+          .filter((id: string | null) => id);
+        
+        // Batch query to find which shipments were recently synced
+        let recentlySyncedIds = new Set<string>();
+        if (shipmentIds.length > 0) {
+          const recentShipments = await db
+            .select({ shipmentId: shipments.shipmentId })
+            .from(shipments)
+            .where(
+              sql`${shipments.shipmentId} = ANY(ARRAY[${sql.join(shipmentIds.map((id: string) => sql`${id}`), sql`, `)}]::text[]) AND ${shipments.updatedAt} > ${freshnessThreshold}`
+            );
+          recentlySyncedIds = new Set(recentShipments.map(s => s.shipmentId).filter((id): id is string => id !== null));
+        }
+        
         // Push each shipment onto the queue - let the sync worker handle everything else
         // CRITICAL: Deep-clone each shipment before enqueueing to prevent object reference sharing
         // Without cloning, all queued messages can end up with the same webhookData
+        let pageQueued = 0;
+        let pageSkipped = 0;
+        
         for (const shipment of pageShipments) {
+          // Skip if recently synced (within last 5 minutes)
+          if (shipment.shipment_id && recentlySyncedIds.has(shipment.shipment_id)) {
+            pageSkipped++;
+            continue;
+          }
+          
           const shipmentSnapshot = JSON.parse(JSON.stringify(shipment));
           await enqueueShipmentSync({
             orderNumber: shipmentSnapshot.shipment_number,
@@ -220,9 +254,14 @@ export async function pollOnHoldShipments(): Promise<number> {
             enqueuedAt: Date.now(),
             webhookData: shipmentSnapshot,
           });
+          pageQueued++;
         }
         
-        totalQueued += pageShipments.length;
+        if (pageSkipped > 0) {
+          log(`Page ${page}: Queued ${pageQueued}, skipped ${pageSkipped} (recently synced)`);
+        }
+        
+        totalQueued += pageQueued;
         page++;
       }
       
