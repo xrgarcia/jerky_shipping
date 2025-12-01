@@ -5198,18 +5198,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const freshShipmentData = freshShipmentResponse.data;
             const freshHoldDate = freshShipmentData.hold_until_date;
             
+            console.log(`[Packing] Fresh data from ShipStation - shipment_id: ${freshShipmentData.shipment_id}, hold_until_date: ${freshHoldDate || 'null'}`);
+            
             if (cachedHoldDate !== freshHoldDate) {
               console.log(`[Packing] Hold status changed for ${shipment.orderNumber}: ${cachedHoldDate} -> ${freshHoldDate || 'null (removed)'}`);
             }
             
             // Process through ETL service to update our database with fresh data
+            console.log(`[Packing] Processing through ETL service...`);
             await shipStationShipmentETL.processShipment(freshShipmentData, shipment.orderId);
+            console.log(`[Packing] ETL processing complete`);
             
             // Re-fetch the shipment to get the updated record
             const updatedShipment = await storage.getShipment(shipmentId);
             if (updatedShipment) {
               shipment = updatedShipment;
-              console.log(`[Packing] Shipment ${shipment.orderNumber} refreshed from ShipStation (hold_until_date: ${freshHoldDate || 'null'})`);
+              const newCachedHoldDate = (shipment.shipmentData as any)?.hold_until_date;
+              console.log(`[Packing] Shipment ${shipment.orderNumber} re-fetched from DB - hold_until_date in shipmentData: ${newCachedHoldDate || 'null'}`);
             }
           }
         } catch (refreshError: any) {

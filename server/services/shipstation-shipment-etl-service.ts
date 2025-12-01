@@ -60,7 +60,19 @@ export class ShipStationShipmentETLService {
     let finalShipmentId: string;
     
     if (existing) {
-      await this.storage.updateShipment(existing.id, shipmentRecord);
+      console.log(`[ETL] Updating existing shipment ${existing.id} (ShipStation ID: ${shipmentId})`);
+      console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
+      console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
+      
+      const updatedShipment = await this.storage.updateShipment(existing.id, shipmentRecord);
+      
+      if (updatedShipment) {
+        const updatedHoldDate = (updatedShipment.shipmentData as any)?.hold_until_date || 'null';
+        console.log(`[ETL] Update succeeded - new hold_until_date in DB: ${updatedHoldDate}`);
+      } else {
+        console.warn(`[ETL] WARNING: updateShipment returned undefined for ${existing.id}`);
+      }
+      
       finalShipmentId = existing.id;
     } else {
       const created = await this.storage.createShipment(shipmentRecord);
