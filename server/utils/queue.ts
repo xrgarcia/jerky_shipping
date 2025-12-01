@@ -74,7 +74,7 @@ const SHIPMENT_SYNC_QUEUE_KEY = 'shipstation:shipment-sync';
 const SHIPMENT_SYNC_INFLIGHT_KEY = 'shipstation:shipment-sync:inflight';
 
 export interface ShipmentSyncMessage {
-  reason: 'backfill' | 'webhook' | 'webhook_tracking' | 'webhook_fulfillment' | 'manual';
+  reason: 'backfill' | 'webhook' | 'webhook_tracking' | 'webhook_fulfillment' | 'manual' | 'reverse_sync';
   orderNumber?: string; // Optional: use for order-based sync
   trackingNumber?: string; // Optional: use for tracking-based sync
   labelUrl?: string; // Optional: label URL for shipment ID extraction
