@@ -172,9 +172,9 @@ export async function pollOnHoldShipments(): Promise<number> {
     let hasMorePages = true;
     
     // Fetch all pages of on_hold shipments
-    // ShipStation V2 API uses snake_case query parameters
+    // ShipStation V2 API parameters: modified_at_start (NOT modified_date_start!)
     while (hasMorePages) {
-      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_date_start=${modifiedSince}&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
+      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_at_start=${modifiedSince}&sort_dir=desc&sort_by=modified_at&page_size=100&page=${page}`;
       
       log(`Fetching page ${page} of on_hold shipments...`);
       

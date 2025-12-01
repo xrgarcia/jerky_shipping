@@ -47,6 +47,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 ## External Dependencies
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling. Supported webhooks: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`. Note: ShipStation V2 does NOT support `fulfillment_created_v2` or `fulfillment_canceled_v2` events - on-hold status changes must be tracked via the background poll worker.
+    - **CRITICAL API Parameter**: ShipStation V2 API uses `modified_at_start` and `modified_at_end` for date filtering (NOT `modified_date_start`). ShipStation silently ignores invalid parameters without error, making debugging difficult. Always verify parameters against official documentation.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning, featuring automatic authentication and Redis-backed token caching. Includes a discriminated union type system for product classification and optimized QC scan API with a cache-with-fallback pattern.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
