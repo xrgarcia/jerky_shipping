@@ -153,11 +153,15 @@ export async function pollOnHoldShipments(): Promise<number> {
       .orderBy(desc(shipments.updatedAt))
       .limit(1);
     
-    // Use most recent on_hold shipment date as floor, or default to 30 days ago
+    // Use most recent on_hold shipment date as floor, minus a 30-minute buffer to catch timing gaps
+    // The buffer ensures shipments created/modified slightly before our floor aren't missed
+    const LOOKBACK_BUFFER_MS = 30 * 60 * 1000; // 30 minutes
+    
     let modifiedSince: string;
     if (mostRecentOnHold.length > 0 && mostRecentOnHold[0].updatedAt) {
-      modifiedSince = new Date(mostRecentOnHold[0].updatedAt).toISOString();
-      log(`Using most recent on_hold shipment date as floor: ${modifiedSince}`);
+      const floorWithBuffer = new Date(new Date(mostRecentOnHold[0].updatedAt).getTime() - LOOKBACK_BUFFER_MS);
+      modifiedSince = floorWithBuffer.toISOString();
+      log(`Using floor with 30-min buffer: ${modifiedSince} (original: ${mostRecentOnHold[0].updatedAt})`);
     } else {
       modifiedSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       log(`No on_hold shipments in DB, using 30 day lookback: ${modifiedSince}`);
@@ -168,8 +172,9 @@ export async function pollOnHoldShipments(): Promise<number> {
     let hasMorePages = true;
     
     // Fetch all pages of on_hold shipments
+    // Using sort_dir=desc&sort_by=created_at for more reliable/consistent ordering
     while (hasMorePages) {
-      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_date_start=${modifiedSince}&page_size=100&page=${page}`;
+      const url = `https://api.shipstation.com/v2/shipments?shipment_status=on_hold&modified_date_start=${modifiedSince}&sort_dir=desc&sort_by=created_at&page_size=100&page=${page}`;
       
       log(`Fetching page ${page} of on_hold shipments...`);
       
