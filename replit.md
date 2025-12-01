@@ -31,6 +31,11 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 - **Monorepo Structure**: Client, server, and shared code are co-located.
 - **Centralized ETL Architecture**: `ShopifyOrderETLService` and `ShipStationShipmentETLService` classes standardize data transformations.
 - **Worker Coordination System**: Production-ready coordination for poll workers and backfill jobs using Redis-backed mutex.
+- **Priority Queue System**: The shipment-sync queue uses a two-tier priority system to prevent webhook starvation:
+    - **High Priority** (`shipstation:shipment-sync:high`): Webhooks (often have inline data, skip API calls), backfill, and manual triggers
+    - **Low Priority** (`shipstation:shipment-sync:low`): Reverse sync messages (always require API calls for verification)
+    - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
+    - Requeue function preserves FIFO ordering within each priority level using RPUSH with reverse
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices
