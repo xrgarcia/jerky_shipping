@@ -1,5 +1,5 @@
 import { storage } from './storage';
-import { enqueueShipmentSync } from './utils/queue';
+import { enqueueShipmentSync, enqueueShipmentSyncBatch } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
 import { desc, eq, asc } from 'drizzle-orm';
@@ -15,7 +15,6 @@ import {
 import { shipmentSyncFailures } from '@shared/schema';
 import { count } from 'drizzle-orm';
 import { workerCoordinator } from './worker-coordinator';
-import { getShipmentByShipmentId } from './utils/shipstation-api';
 
 const log = (message: string) => console.log(`[onhold-poll] ${message}`);
 
@@ -260,27 +259,22 @@ export async function pollOnHoldShipments(): Promise<number> {
 }
 
 /**
- * SIMPLIFIED Reverse sync: Check ALL on_hold shipments in our DB against ShipStation.
+ * Queue-based reverse sync: Enqueue ALL on_hold shipments for verification.
  * 
- * With only ~80-100 on_hold shipments at peak, we can afford to check ALL of them
- * each cycle without worrying about stale thresholds or timestamps.
- * 
- * Key behavior:
+ * This is now a simple "enqueue and let the sync worker handle it" approach:
  * - Queries ALL shipments with status=on_hold in our DB
- * - Fetches each from ShipStation API to get current status
- * - Only updates DB if status ACTUALLY CHANGED (on_hold -> something else)
- * - Does NOT touch any records that are still on_hold (no timestamp bumping)
- * - This eliminates the "freshness" problem entirely
+ * - Batch enqueues them to the shipment-sync queue with reason='reverse_sync'
+ * - Dedup naturally filters out shipments already queued by forward sync
+ * - The sync worker handles rate limiting, API calls, and status comparison
+ * 
+ * Benefits:
+ * - No API calls in reverse sync (no rate limit contention)
+ * - Single place for rate limit handling (shipment-sync worker)
+ * - Dedup prevents redundant checks for truly on_hold shipments
+ * - Progress is automatic as queue drains over time
  */
-export async function reverseSyncOnHoldShipments(): Promise<{ checked: number; updated: number }> {
-  const apiKey = process.env.SHIPSTATION_API_KEY;
-  
-  if (!apiKey) {
-    log('[reverse-sync] ShipStation API key not configured, skipping');
-    return { checked: 0, updated: 0 };
-  }
-
-  // Get ALL on_hold shipments from our DB - no stale threshold, no filtering
+export async function reverseSyncOnHoldShipments(): Promise<{ queued: number; skipped: number }> {
+  // Get ALL on_hold shipments from our DB
   const allOnHoldShipments = await db
     .select()
     .from(shipments)
@@ -288,104 +282,51 @@ export async function reverseSyncOnHoldShipments(): Promise<{ checked: number; u
     .orderBy(asc(shipments.createdAt)); // Process oldest first
   
   const totalCount = allOnHoldShipments.length;
-  log(`[reverse-sync] Found ${totalCount} on_hold shipment(s) in DB - checking ALL against ShipStation`);
   
   if (totalCount === 0) {
-    return { checked: 0, updated: 0 };
+    log('[reverse-sync] No on_hold shipments in DB to verify');
+    return { queued: 0, skipped: 0 };
   }
   
-  // Initialize progress tracking
+  // Filter to only shipments with ShipStation ID (can't sync without it)
+  const syncableShipments = allOnHoldShipments.filter(s => s.shipmentId);
+  const skippedNoId = totalCount - syncableShipments.length;
+  
+  if (syncableShipments.length === 0) {
+    log(`[reverse-sync] ${totalCount} on_hold shipments in DB, but none have ShipStation ID`);
+    return { queued: 0, skipped: totalCount };
+  }
+  
+  // Build messages for batch enqueue
+  const messages = syncableShipments.map(shipment => ({
+    reason: 'reverse_sync' as const,
+    orderNumber: shipment.orderNumber || undefined,
+    shipmentId: shipment.shipmentId!,
+    trackingNumber: shipment.trackingNumber || undefined,
+    enqueuedAt: Date.now(),
+  }));
+  
+  // Batch enqueue - dedup will filter out shipments already in queue from forward sync
+  const enqueuedCount = await enqueueShipmentSyncBatch(messages);
+  const dedupedCount = syncableShipments.length - enqueuedCount;
+  
+  log(`[reverse-sync] Enqueued ${enqueuedCount} of ${totalCount} on_hold shipments for verification (${dedupedCount} already in queue, ${skippedNoId} missing ShipStation ID)`);
+  
+  // Update stats
+  workerStats.reverseSyncProcessed += enqueuedCount;
+  workerStats.lastReverseSyncAt = new Date();
+  
+  // Update progress tracking for UI
   reverseSyncProgress = {
-    inProgress: true,
+    inProgress: false, // Not really "in progress" anymore - just enqueued
     currentPage: 1,
     totalStaleAtStart: totalCount,
-    checkedThisRun: 0,
-    updatedThisRun: 0,
+    checkedThisRun: 0, // Will be updated by sync worker
+    updatedThisRun: enqueuedCount,
     startedAt: new Date(),
   };
   
-  let checked = 0;
-  let updated = 0;
-  
-  try {
-    for (const shipment of allOnHoldShipments) {
-      if (!shipment.shipmentId) {
-        // Skip shipments without ShipStation ID - can't look them up
-        continue;
-      }
-      
-      try {
-        // Fetch current status from ShipStation
-        const result = await getShipmentByShipmentId(shipment.shipmentId);
-        checked++;
-        
-        // Update progress
-        reverseSyncProgress.checkedThisRun = checked;
-        
-        if (!result.data) {
-          // Shipment not found in ShipStation - mark as cancelled
-          log(`[reverse-sync] Shipment ${shipment.shipmentId} (${shipment.orderNumber}) not found in ShipStation - marking as cancelled`);
-          await db
-            .update(shipments)
-            .set({ 
-              shipmentStatus: 'cancelled',
-              updatedAt: new Date()
-            })
-            .where(eq(shipments.id, shipment.id));
-          updated++;
-          reverseSyncProgress.updatedThisRun = updated;
-          continue;
-        }
-        
-        const currentStatus = result.data.shipment_status;
-        
-        // ONLY update if status actually changed
-        if (currentStatus !== 'on_hold') {
-          log(`[reverse-sync] Shipment ${shipment.shipmentId} (${shipment.orderNumber}) status changed: on_hold -> ${currentStatus}`);
-          
-          try {
-            // CRITICAL: Deep-clone the API response data before enqueueing!
-            // The ShipStation API client reuses/mutates the response object across calls.
-            // Without cloning, all queued messages end up with the same (last fetched) data.
-            const shipmentDataSnapshot = JSON.parse(JSON.stringify(result.data));
-            
-            // Queue for full sync to get all updated data
-            await enqueueShipmentSync({
-              orderNumber: shipment.orderNumber || undefined,
-              shipmentId: shipment.shipmentId,
-              trackingNumber: shipmentDataSnapshot.tracking_number || shipment.trackingNumber || undefined,
-              reason: 'manual',
-              enqueuedAt: Date.now(),
-              webhookData: shipmentDataSnapshot,
-            });
-            updated++;
-            reverseSyncProgress.updatedThisRun = updated;
-          } catch (enqueueError: any) {
-            log(`[reverse-sync] Failed to enqueue sync for ${shipment.shipmentId}: ${enqueueError.message}`);
-          }
-        }
-        // If still on_hold, do NOTHING - don't touch any fields
-        
-        // Small delay to respect rate limits (100ms = max 600 requests/minute)
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-      } catch (error: any) {
-        log(`[reverse-sync] Error checking shipment ${shipment.shipmentId}: ${error.message}`);
-        // Continue to next shipment
-      }
-    }
-    
-    log(`[reverse-sync] Complete: checked ${checked}/${totalCount}, updated ${updated}`);
-    
-    // Update cumulative stats
-    workerStats.reverseSyncProcessed += checked;
-    workerStats.reverseSyncUpdated += updated;
-    workerStats.lastReverseSyncAt = new Date();
-    
-    return { checked, updated };
-  } finally {
-    reverseSyncProgress.inProgress = false;
-  }
+  return { queued: enqueuedCount, skipped: dedupedCount + skippedNoId };
 }
 
 /**

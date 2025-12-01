@@ -21,7 +21,7 @@ import {
   type ShipmentSyncMessage,
   type ShopifyOrderSyncMessage,
 } from './utils/queue';
-import { getShipmentsByOrderNumber } from './utils/shipstation-api';
+import { getShipmentsByOrderNumber, getShipmentByShipmentId } from './utils/shipstation-api';
 import { linkTrackingToOrder, type TrackingData } from './utils/shipment-linkage';
 import { 
   shipmentSyncFailures, 
@@ -127,6 +127,83 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
     
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId, webhookData } = message;
+      
+      // REVERSE SYNC PATH: Verify on_hold shipments are still on_hold
+      // If status changed, update DB. If still on_hold, skip (no update needed).
+      if (reason === 'reverse_sync' && shipmentId) {
+        log(`[reverse-sync] Verifying shipment ${shipmentId} (order: ${orderNumber || 'unknown'})`);
+        
+        try {
+          // Fetch current status from ShipStation
+          const { data: shipmentData, rateLimit } = await getShipmentByShipmentId(shipmentId);
+          
+          log(`[reverse-sync] [${shipmentId}] API response received, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
+          
+          // Handle rate limit exhaustion - wait and requeue
+          if (rateLimit.remaining <= 0) {
+            const waitSeconds = rateLimit.reset || 60;
+            log(`[reverse-sync] Rate limit exhausted. Waiting ${waitSeconds}s before continuing...`);
+            await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+          }
+          
+          if (!shipmentData) {
+            // Shipment not found in ShipStation - mark as cancelled
+            log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marking as cancelled`);
+            const dbShipment = await storage.getShipmentByShipmentId(shipmentId);
+            if (dbShipment) {
+              await storage.updateShipment(dbShipment.id, {
+                shipmentStatus: 'cancelled',
+              });
+              log(`[reverse-sync] [${shipmentId}] Marked as cancelled`);
+            }
+            processedCount++;
+            continue;
+          }
+          
+          const currentStatus = shipmentData.shipment_status;
+          
+          // If still on_hold, nothing to do - skip
+          if (currentStatus === 'on_hold') {
+            log(`[reverse-sync] [${shipmentId}] Still on_hold - no update needed`);
+            processedCount++;
+            continue;
+          }
+          
+          // Status changed! Process the full update using ETL service
+          log(`[reverse-sync] [${shipmentId}] Status changed: on_hold -> ${currentStatus}`);
+          
+          // Find the order in our database (may be null for multi-channel orders)
+          const order = orderNumber ? await storage.getOrderByOrderNumber(orderNumber) : null;
+          
+          // Use ETL service to process the shipment with fresh data
+          await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+          
+          log(`[reverse-sync] [${shipmentId}] Updated successfully`);
+          
+          // Broadcast update if we have an order
+          if (order) {
+            broadcastOrderUpdate(order);
+          }
+          
+          processedCount++;
+          continue;
+          
+        } catch (error: any) {
+          log(`[reverse-sync] [${shipmentId}] Error: ${error.message}`);
+          // Log to DLQ for investigation
+          await logShipmentSyncFailure({
+            orderNumber: orderNumber || 'unknown',
+            reason: 'reverse_sync',
+            errorMessage: error.message,
+            requestData: { shipmentId, message },
+            responseData: null,
+            retryCount: message.retryCount || 0,
+            failedAt: new Date(),
+          });
+          processedCount++;
+          continue;
+        }
+      }
       
       // OPTIMIZATION: If this message includes inline webhookData, we can use it directly (no API call!)
       // This applies to webhooks AND polling workers that fetch data upfront
