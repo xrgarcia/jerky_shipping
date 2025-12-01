@@ -1,0 +1,76 @@
+SHIPMENT SYNC FAILURE ANALYSIS
+=====================================
+
+Order Number: 1ZHH36200313821288
+Failure ID: efacfc88-d9e1-42bb-80ab-9616ba378635
+Failed At: 12/1/2025, 10:27:13 AM
+Created At: 12/1/2025, 10:27:13 AM
+Retry Count: 0
+Reason: webhook_tracking
+
+Error Message:
+removedFromInflight is not defined
+
+Request Data:
+{
+  "errors": {
+    "apiError": {
+      "stack": "ReferenceError: removedFromInflight is not defined\n    at processShipmentSyncBatch (/home/runner/workspace/server/shipment-sync-worker.ts:333:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Timeout.processQueue (/home/runner/workspace/server/shipment-sync-worker.ts:933:27)",
+      "message": "removedFromInflight is not defined"
+    }
+  },
+  "queueMessage": {
+    "reason": "webhook_tracking",
+    "labelUrl": "https://api.shipengine.com/v1/labels/se-597565800",
+    "enqueuedAt": 1764606422948,
+    "webhookData": {
+      "events": [
+        {
+          "signer": "",
+          "latitude": null,
+          "longitude": null,
+          "event_code": "M",
+          "description": "Shipper created a label, UPS has not received the package yet.",
+          "occurred_at": "2025-12-01T16:23:23Z",
+          "postal_code": "",
+          "status_code": "NY",
+          "company_name": null,
+          "country_code": "US",
+          "city_locality": "",
+          "state_province": "",
+          "event_description": "Shipper created a label, UPS has not received the package yet.",
+          "status_description": null,
+          "status_detail_code": null,
+          "carrier_detail_code": "MP",
+          "carrier_occurred_at": "2025-12-01T10:23:23",
+          "proof_of_delivery_url": null,
+          "status_detail_description": null
+        }
+      ],
+      "label_url": "https://api.shipengine.com/v1/labels/se-597565800",
+      "ship_date": null,
+      "status_code": "NY",
+      "tracking_number": "1ZHH36200313821288",
+      "status_description": "Not Yet In System",
+      "status_detail_code": null,
+      "carrier_detail_code": "MP",
+      "carrier_status_code": "M",
+      "actual_delivery_date": null,
+      "exception_description": null,
+      "estimated_delivery_date": "2025-12-03T00:00:00",
+      "status_detail_description": null,
+      "carrier_status_description": "Shipper created a label, UPS has not received the package yet."
+    },
+    "trackingNumber": "1ZHH36200313821288"
+  },
+  "originalWebhook": null
+}
+
+Response Data:
+null
+
+=====================================
+Please analyze this failure and help me understand:
+1. What caused this shipment sync to fail?
+2. Is this a data issue, API issue, or integration issue?
+3. What steps should I take to fix it?
