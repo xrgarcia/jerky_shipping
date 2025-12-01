@@ -1627,20 +1627,25 @@ export default function Packing() {
       return (await response.json()) as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
     },
     onSuccess: (result) => {
-      setPackingComplete(true);
-      
-      // Log packing completed event
+      // Log packing completed event before resetting state
       const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
       logShipmentEvent("packing_completed", {
         totalScans,
         printQueued: result.printQueued,
       });
       
-      // Show success panel on-page - NO auto-transition, user must acknowledge
-      setCompletionSuccess({
-        printJobId: result.printJobId || '',
-        message: result.message || "Order complete! Label queued for printing."
-      });
+      // Auto-reset to order scan state - ready for next order
+      setCompletionSuccess(null);
+      setJustCreatedPrintJob(false);
+      setCurrentShipment(null);
+      setPackingComplete(false);
+      setOrderScan("");
+      setSkuProgress(new Map());
+      setLabelError(null);
+      progressRestoredRef.current = false;
+      
+      // Focus the order input after state resets
+      setTimeout(() => orderInputRef.current?.focus(), 0);
     },
     onError: (error: any) => {
       // Clear optimistic state on error
