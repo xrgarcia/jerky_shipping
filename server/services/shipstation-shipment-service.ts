@@ -242,7 +242,9 @@ export class ShipStationShipmentService {
         }
 
         // VALIDATION: Check shipment_id exists in the raw shipmentData BEFORE any processing
-        const rawShipmentId = shipment.shipmentData.shipment_id || shipment.shipmentData.shipmentId;
+        // Cast to any since shipmentData is stored as JSON with dynamic structure
+        const rawData = shipment.shipmentData as any;
+        const rawShipmentId = rawData.shipment_id || rawData.shipmentId;
         if (!rawShipmentId) {
           console.error(`[ShipmentService] CRITICAL: shipment_id is MISSING from stored shipmentData!`);
           console.error(`[ShipmentService] Shipment DB record ID: ${shipment.id}`);
@@ -264,7 +266,7 @@ export class ShipStationShipmentService {
         // Strip ShipStation-managed fields from payload, but KEEP shipment_id
         // CRITICAL: Keeping shipment_id ensures the label is attached to the existing 
         // shipment rather than creating a new one (which would orphan the original)
-        const cleanShipmentData = { ...shipment.shipmentData };
+        const cleanShipmentData: any = { ...shipment.shipmentData };
         
         // Ensure shipment_id is present in snake_case format (ShipStation V2 API format)
         if (!cleanShipmentData.shipment_id && cleanShipmentData.shipmentId) {
