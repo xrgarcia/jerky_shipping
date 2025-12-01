@@ -268,6 +268,7 @@ export const shipments = pgTable("shipments", {
   pickStartedAt: timestamp("pick_started_at"), // When picking began
   pickEndedAt: timestamp("pick_ended_at"), // When picking finished
   savedCustomField2: boolean("saved_custom_field_2"), // SkuVault custom field flag
+  lastStatusCheckAt: timestamp("last_status_check_at"), // When reverse sync last verified status with ShipStation
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
