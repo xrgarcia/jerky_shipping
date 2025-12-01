@@ -559,7 +559,7 @@ export const qcExpectedItemSchema = z.object({
   KitLines: z.any().nullable().optional(), // Kit line information
   KitProducts: z.array(kitProductSchema).nullable().optional(), // Component products in the kit
   AllKitItemsAndSubstitutes: z.array(z.string()).nullable().optional(), // SKUs of all kit components
-  AlternateCodes: z.array(z.string()).nullable().optional(), // Alternative barcodes
+  AlternateCodes: z.array(z.union([z.string(), z.object({}).passthrough()])).nullable().optional(), // Alternative barcodes (can be strings or objects)
   AlternateSkus: z.array(alternateSkuSchema).nullable().optional(), // Alternative SKUs
   // Additional status fields
   Locations: z.array(z.any()).nullable().optional(),
@@ -740,7 +740,7 @@ export const baseProductDataSchema = z.object({
   Attributes: z.array(z.any()).nullable().optional(),
   Pictures: z.array(productPictureSchema).nullable().optional(),
   WeightUnits: z.array(z.any()).nullable().optional(),
-  AlternateCodes: z.array(z.string()).nullable().optional(),
+  AlternateCodes: z.array(z.union([z.string(), z.object({}).passthrough()])).nullable().optional(), // Can be strings or objects
   AlternateSkus: z.array(z.any()).nullable().optional(),
   
   // Product type flags - used to determine ProductType
