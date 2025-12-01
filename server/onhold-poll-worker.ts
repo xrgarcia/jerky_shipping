@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { enqueueShipmentSync } from './utils/queue';
 import { db } from './db';
 import { shipments } from '@shared/schema';
-import { desc, eq, lt, and } from 'drizzle-orm';
+import { desc, eq, lt, and, asc } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import { 
   getQueueLength, 
@@ -290,8 +290,8 @@ export async function pollOnHoldShipments(): Promise<number> {
  * If the on-hold poll worker just ran and a shipment wasn't touched, it means ShipStation
  * didn't return it in the on_hold query - so it's probably no longer on hold.
  * 
- * This function fetches current status from ShipStation for stale on_hold shipments
- * and updates them if their status has changed.
+ * This function pages through ALL stale on_hold shipments and fetches their current status
+ * from ShipStation, updating them if their status has changed.
  * 
  * @param staleThresholdMs - How old updatedAt must be to consider a shipment "stale"
  *                           Default: 2x poll interval (ensures poll had a chance to update it)
@@ -310,47 +310,44 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
   
   log(`[reverse-sync] Looking for on_hold shipments not updated since ${staleDate.toISOString()}`);
   
-  // Find shipments in our DB that are marked on_hold but haven't been updated recently
-  const staleOnHoldShipments = await db
-    .select()
-    .from(shipments)
-    .where(
-      and(
-        eq(shipments.shipmentStatus, 'on_hold'),
-        lt(shipments.updatedAt, staleDate)
+  let totalChecked = 0;
+  let totalUpdated = 0;
+  let page = 1;
+  const pageSize = 50;
+  let hasMorePages = true;
+  
+  // Page through ALL stale on_hold shipments, processing oldest first
+  while (hasMorePages) {
+    // Find shipments in our DB that are marked on_hold but haven't been updated recently
+    // ORDER BY updated_at ASC ensures we check the oldest (most stale) shipments first
+    const staleOnHoldShipments = await db
+      .select()
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'on_hold'),
+          lt(shipments.updatedAt, staleDate)
+        )
       )
-    )
-    .limit(50); // Limit batch size to avoid API rate limits
-  
-  if (staleOnHoldShipments.length === 0) {
-    log('[reverse-sync] No stale on_hold shipments found');
-    return { checked: 0, updated: 0 };
-  }
-  
-  log(`[reverse-sync] Found ${staleOnHoldShipments.length} stale on_hold shipment(s) to check`);
-  
-  let checked = 0;
-  let updated = 0;
-  
-  for (const shipment of staleOnHoldShipments) {
-    if (!shipment.shipmentId) {
-      log(`[reverse-sync] Skipping shipment without shipmentId: order ${shipment.orderNumber}`);
-      // Touch updatedAt to prevent retrying shipments with no shipmentId
-      await db
-        .update(shipments)
-        .set({ updatedAt: new Date() })
-        .where(eq(shipments.id, shipment.id));
-      continue;
+      .orderBy(asc(shipments.updatedAt))
+      .limit(pageSize);
+    
+    if (staleOnHoldShipments.length === 0) {
+      if (page === 1) {
+        log('[reverse-sync] No stale on_hold shipments found');
+      }
+      hasMorePages = false;
+      break;
     }
     
-    try {
-      // Fetch current status from ShipStation
-      const result = await getShipmentByShipmentId(shipment.shipmentId);
-      checked++;
-      
-      if (!result.data) {
-        log(`[reverse-sync] Shipment ${shipment.shipmentId} not found in ShipStation`);
-        // Touch updatedAt to prevent tight retry loop on missing shipments
+    log(`[reverse-sync] Page ${page}: Processing ${staleOnHoldShipments.length} stale on_hold shipment(s)`);
+    
+    let pageChecked = 0;
+    let pageUpdated = 0;
+    
+    for (const shipment of staleOnHoldShipments) {
+      if (!shipment.shipmentId) {
+        // Touch updatedAt to prevent retrying shipments with no shipmentId
         await db
           .update(shipments)
           .set({ updatedAt: new Date() })
@@ -358,56 +355,87 @@ export async function reverseSyncOnHoldShipments(staleThresholdMs?: number): Pro
         continue;
       }
       
-      const currentStatus = result.data.shipment_status;
-      
-      // If status has changed from on_hold, queue for sync
-      if (currentStatus !== 'on_hold') {
-        log(`[reverse-sync] Shipment ${shipment.shipmentId} status changed: on_hold -> ${currentStatus}`);
-        
-        await enqueueShipmentSync({
-          orderNumber: shipment.orderNumber || undefined,
-          shipmentId: shipment.shipmentId,
-          trackingNumber: result.data.tracking_number || shipment.trackingNumber || undefined,
-          reason: 'manual',
-          enqueuedAt: Date.now(),
-          webhookData: result.data, // Pass full shipment data
-        });
-        
-        updated++;
-      } else {
-        // Still on hold - update the updatedAt to prevent checking again next cycle
-        await db
-          .update(shipments)
-          .set({ updatedAt: new Date() })
-          .where(eq(shipments.id, shipment.id));
-      }
-      
-      // Small delay to respect rate limits
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-    } catch (error: any) {
-      log(`[reverse-sync] Error checking shipment ${shipment.shipmentId}: ${error.message}`);
-      // Touch updatedAt even on error to prevent tight retry loop
-      // The shipment will be rechecked after threshold period expires again
       try {
-        await db
-          .update(shipments)
-          .set({ updatedAt: new Date() })
-          .where(eq(shipments.id, shipment.id));
-      } catch (dbError) {
-        log(`[reverse-sync] Failed to update timestamp for shipment ${shipment.shipmentId}`);
+        // Fetch current status from ShipStation
+        const result = await getShipmentByShipmentId(shipment.shipmentId);
+        pageChecked++;
+        
+        if (!result.data) {
+          log(`[reverse-sync] Shipment ${shipment.shipmentId} not found in ShipStation`);
+          // Touch updatedAt to prevent tight retry loop on missing shipments
+          await db
+            .update(shipments)
+            .set({ updatedAt: new Date() })
+            .where(eq(shipments.id, shipment.id));
+          continue;
+        }
+        
+        const currentStatus = result.data.shipment_status;
+        
+        // If status has changed from on_hold, queue for sync
+        if (currentStatus !== 'on_hold') {
+          log(`[reverse-sync] Shipment ${shipment.shipmentId} (${shipment.orderNumber}) status changed: on_hold -> ${currentStatus}`);
+          
+          await enqueueShipmentSync({
+            orderNumber: shipment.orderNumber || undefined,
+            shipmentId: shipment.shipmentId,
+            trackingNumber: result.data.tracking_number || shipment.trackingNumber || undefined,
+            reason: 'manual',
+            enqueuedAt: Date.now(),
+            webhookData: result.data, // Pass full shipment data
+          });
+          
+          pageUpdated++;
+        } else {
+          // Still on hold - update the updatedAt to prevent checking again next cycle
+          await db
+            .update(shipments)
+            .set({ updatedAt: new Date() })
+            .where(eq(shipments.id, shipment.id));
+        }
+        
+        // Small delay to respect rate limits (100ms = max 600 requests/minute)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error: any) {
+        log(`[reverse-sync] Error checking shipment ${shipment.shipmentId}: ${error.message}`);
+        // Touch updatedAt even on error to prevent tight retry loop
+        try {
+          await db
+            .update(shipments)
+            .set({ updatedAt: new Date() })
+            .where(eq(shipments.id, shipment.id));
+        } catch (dbError) {
+          log(`[reverse-sync] Failed to update timestamp for shipment ${shipment.shipmentId}`);
+        }
       }
+    }
+    
+    totalChecked += pageChecked;
+    totalUpdated += pageUpdated;
+    
+    log(`[reverse-sync] Page ${page} complete: checked ${pageChecked}, updated ${pageUpdated}`);
+    
+    // If we got fewer than pageSize, we've processed all stale shipments
+    // Note: We query again each page because updatedAt gets bumped during processing,
+    // so previously stale shipments are no longer in the result set
+    if (staleOnHoldShipments.length < pageSize) {
+      hasMorePages = false;
+    } else {
+      page++;
+      // Add a small delay between pages to be nice to the database
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
   
-  log(`[reverse-sync] Complete: checked ${checked}, updated ${updated}`);
+  log(`[reverse-sync] Complete: checked ${totalChecked}, updated ${totalUpdated} across ${page} page(s)`);
   
   // Update stats
-  workerStats.reverseSyncProcessed += checked;
-  workerStats.reverseSyncUpdated += updated;
+  workerStats.reverseSyncProcessed += totalChecked;
+  workerStats.reverseSyncUpdated += totalUpdated;
   workerStats.lastReverseSyncAt = new Date();
   
-  return { checked, updated };
+  return { checked: totalChecked, updated: totalUpdated };
 }
 
 /**
