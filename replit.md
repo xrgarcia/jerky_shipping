@@ -38,7 +38,10 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
 - **On-Hold Shipment Sync Strategy**: ShipStation does not provide webhooks for hold status changes (V2 API only supports 4 webhook events: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`). The on-hold sync uses a bi-directional approach:
     - **Forward Poll**: Queries ShipStation for `shipment_status=on_hold` to detect new holds and queue them for sync. Uses smart date floor based on most recent on_hold shipment to minimize API calls.
-    - **Reverse Sync**: Checks DB shipments marked as `on_hold` that weren't updated by the forward poll (stale threshold = 2x poll interval). Pages through ALL stale shipments ordered by `updated_at ASC` (oldest first) to prevent indefinite stuck shipments. For each stale shipment, fetches current status from ShipStation; if no longer on hold, queues for sync. Uses 100ms delays between API calls to respect rate limits. Progress tracked via WebSocket broadcasts showing current page, total stale, checked count, and updated count on Operations dashboard.
+    - **Reverse Sync**: Uses a two-pass approach for checking DB shipments marked as `on_hold` that weren't updated by the forward poll (stale threshold = 2x poll interval):
+        - **Priority Pass**: Processes 50 oldest shipments by `created_at` first, ensuring old orders aren't stuck behind recently-touched shipments.
+        - **Normal Pass**: Pages through remaining stale shipments (200 per page) ordered by `updated_at ASC` (oldest first).
+        - For each stale shipment, fetches current status from ShipStation; if no longer on hold, queues for sync. Uses 100ms delays between API calls to respect rate limits. Progress tracked via WebSocket broadcasts showing current page, total stale, checked count, and updated count on Operations dashboard.
 - **Packing Completion Audit Logging**: The packing completion endpoint (`POST /api/packing/complete`) logs all actions to the `packing_logs` table:
     - `complete_order_start` - Initial request with shipment ID and station
     - `fetch_existing_labels` / `label_fetched_existing` - Label lookup from ShipStation
