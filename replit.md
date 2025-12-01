@@ -37,6 +37,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
     - Requeue function preserves FIFO ordering within each priority level using RPUSH with reverse
 - **Shopify → ShipStation Sync DISABLED**: Shopify webhooks do NOT trigger ShipStation API calls. ShipStation data comes exclusively from ShipStation webhooks. This prevents queue flooding when Shopify order volume is high.
+- **Reverse Sync DISABLED**: The reverse sync (checking if on_hold shipments changed status) was flooding the queue with 1000+ messages per cycle. Disabled until a rate-limited approach is implemented.
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices

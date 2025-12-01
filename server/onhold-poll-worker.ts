@@ -363,10 +363,8 @@ export function startOnHoldPollWorker(intervalMs: number = 300000): NodeJS.Timeo
       // First: Poll for on_hold shipments (forward sync)
       await pollOnHoldShipments();
       
-      // Then: Check if any DB on_hold shipments have changed status in ShipStation (reverse sync)
-      // Uses queue-based approach: detects status change -> enqueues to shipment-sync queue
-      // Data corruption prevented via deep-clone before enqueueing (JSON.parse/stringify)
-      await reverseSyncOnHoldShipments();
+      // DISABLED: Reverse sync was flooding queue with 1000+ messages per cycle
+      // await reverseSyncOnHoldShipments();
     } catch (error) {
       console.error("On-hold poll worker error:", error);
     }
