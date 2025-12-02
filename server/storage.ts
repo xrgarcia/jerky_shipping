@@ -2058,6 +2058,7 @@ export class DatabaseStorage implements IStorage {
     
     // Query 4: Shipped shipments without tracking numbers
     // Exclude label_purchased (label printed but not picked up by carrier yet - expected to have no tracking)
+    // Exclude shipments created in the last 48 hours (give time for tracking to come through)
     // Focus on shipments that claim to be shipped/in_transit/delivered but still have no tracking
     const shipmentsWithoutStatusResult = await db
       .select({ count: count() })
@@ -2065,7 +2066,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         sql`${shipments.status} IN ('shipped', 'in_transit', 'delivered') 
             AND ${shipments.trackingNumber} IS NULL
-            AND (${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('label_purchased', 'on_hold'))`
+            AND (${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('label_purchased', 'on_hold'))
+            AND ${shipments.createdAt} < NOW() - INTERVAL '48 hours'`
       );
     
     // Query 5: Shipment sync failures count
