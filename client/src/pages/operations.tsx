@@ -1635,20 +1635,26 @@ Please analyze this failure and help me understand:
         </Link>
 
         <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-warning">
-          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px] border-yellow-500/50">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
-                <AlertTriangle className="h-5 w-5" />
-                No Tracking (24-48h)
-              </CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">Warning: Shipped 24-48 hours ago</span>
-                <Badge variant="outline" className="text-xs">ShipStation</Badge>
-              </CardDescription>
+          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  No Tracking (24-48h)
+                </CardTitle>
+                <CardDescription className="space-y-1">
+                  <span className="block">Shipped 24-48 hours ago, no tracking yet</span>
+                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                warning
+              </Badge>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-500" data-testid="text-shipments-without-status-warning">
+                <div className="text-3xl font-bold" data-testid="text-shipments-without-status-warning">
                   {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0).toLocaleString()}
                 </div>
               </div>
@@ -1657,20 +1663,26 @@ Please analyze this failure and help me understand:
         </Link>
 
         <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-critical">
-          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px] border-red-500/50">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-red-600 dark:text-red-500">
-                <AlertCircle className="h-5 w-5" />
-                No Tracking (48h+)
-              </CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">Critical: Shipped over 48 hours ago</span>
-                <Badge variant="outline" className="text-xs">ShipStation</Badge>
-              </CardDescription>
+          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  No Tracking (48h+)
+                </CardTitle>
+                <CardDescription className="space-y-1">
+                  <span className="block">Shipped over 48 hours ago, still no tracking</span>
+                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
+                </CardDescription>
+              </div>
+              <Badge variant="destructive">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                critical
+              </Badge>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-red-600 dark:text-red-500" data-testid="text-shipments-without-status-critical">
+                <div className="text-3xl font-bold" data-testid="text-shipments-without-status-critical">
                   {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0).toLocaleString()}
                 </div>
               </div>
