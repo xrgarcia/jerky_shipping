@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer } from "lucide-react";
+import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -35,7 +35,17 @@ interface TabCounts {
   all: number;
 }
 
+interface LifecycleTabCounts {
+  picking: number;
+  packingReady: number;
+  shipped: number;
+  attention: number;
+  all: number;
+}
+
 type WorkflowTab = 'in_progress' | 'packing_queue' | 'shipped' | 'all';
+type LifecycleTab = 'picking' | 'packing_ready' | 'shipped' | 'attention' | 'all';
+type ViewMode = 'workflow' | 'lifecycle';
 
 function ShipmentCard({ shipment, tags }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -464,8 +474,10 @@ export default function Shipments() {
   const [isInitialized, setIsInitialized] = useState(false);
   const lastSyncedSearchRef = useRef<string>('');
 
-  // Workflow tab state
+  // View mode and tab state
+  const [viewMode, setViewMode] = useState<ViewMode>('lifecycle');
   const [activeTab, setActiveTab] = useState<WorkflowTab>('in_progress');
+  const [activeLifecycleTab, setActiveLifecycleTab] = useState<LifecycleTab>('packing_ready');
 
   // Filter states
   const [search, setSearch] = useState("");
@@ -681,8 +693,12 @@ export default function Shipments() {
   const buildQueryString = () => {
     const params = new URLSearchParams();
     
-    // Add workflow tab filter
-    params.append('workflowTab', activeTab);
+    // Add tab filter based on view mode
+    if (viewMode === 'workflow') {
+      params.append('workflowTab', activeTab);
+    } else {
+      params.append('lifecycleTab', activeLifecycleTab);
+    }
     
     if (search) params.append('search', search);
     if (status) params.append('status', status); // Single status value
@@ -710,6 +726,13 @@ export default function Shipments() {
   });
 
   const tabCounts = tabCountsData || { inProgress: 0, packingQueue: 0, shipped: 0, all: 0 };
+
+  // Fetch lifecycle tab counts
+  const { data: lifecycleCountsData } = useQuery<LifecycleTabCounts>({
+    queryKey: ["/api/shipments/lifecycle-counts"],
+  });
+
+  const lifecycleCounts = lifecycleCountsData || { picking: 0, packingReady: 0, shipped: 0, attention: 0, all: 0 };
 
   // Fetch distinct statuses for the status filter dropdown
   const { data: statusesData } = useQuery<{ statuses: string[] }>({
@@ -743,7 +766,7 @@ export default function Shipments() {
   const shipmentStatuses = shipmentStatusesData?.shipmentStatuses || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -820,20 +843,39 @@ export default function Shipments() {
   };
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value as WorkflowTab);
+    if (viewMode === 'workflow') {
+      setActiveTab(value as WorkflowTab);
+    } else {
+      setActiveLifecycleTab(value as LifecycleTab);
+    }
     setPage(1);
   };
 
   const getTabDescription = () => {
-    switch (activeTab) {
-      case 'in_progress':
-        return 'Orders currently being picked (New or Active sessions)';
-      case 'packing_queue':
-        return 'Orders ready to pack (all items picked, awaiting shipment)';
-      case 'shipped':
-        return 'Orders that have been shipped';
-      case 'all':
-        return 'All shipments regardless of status';
+    if (viewMode === 'workflow') {
+      switch (activeTab) {
+        case 'in_progress':
+          return 'Orders currently being picked (New or Active sessions)';
+        case 'packing_queue':
+          return 'Orders ready to pack (all items picked, awaiting shipment)';
+        case 'shipped':
+          return 'Orders that have been shipped';
+        case 'all':
+          return 'All shipments regardless of status';
+      }
+    } else {
+      switch (activeLifecycleTab) {
+        case 'picking':
+          return 'Orders currently being picked in the warehouse (New or Active sessions)';
+        case 'packing_ready':
+          return 'Orders ready to pack - picking complete, cache is warmed for fast scanning';
+        case 'shipped':
+          return 'Orders that have been shipped with tracking numbers';
+        case 'attention':
+          return 'Orders that are stuck or paused (Inactive sessions) - needs supervisor attention';
+        case 'all':
+          return 'All shipments regardless of lifecycle stage';
+      }
     }
   };
 
@@ -847,55 +889,149 @@ export default function Shipments() {
           </p>
         </div>
 
-        {/* Workflow Tabs */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 h-auto p-1">
-            <TabsTrigger 
-              value="in_progress" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              data-testid="tab-in-progress"
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === 'lifecycle' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('lifecycle')}
+              className="gap-2"
+              data-testid="button-view-lifecycle"
             >
-              <div className="flex items-center gap-2">
-                <Play className="h-4 w-4" />
-                <span className="font-semibold">In Progress</span>
-              </div>
-              <span className="text-xs opacity-80">{tabCounts.inProgress} orders</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="packing_queue" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              data-testid="tab-packing-queue"
+              <Zap className="h-4 w-4" />
+              Lifecycle View
+            </Button>
+            <Button
+              variant={viewMode === 'workflow' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('workflow')}
+              className="gap-2"
+              data-testid="button-view-workflow"
             >
-              <div className="flex items-center gap-2">
-                <PackageOpen className="h-4 w-4" />
-                <span className="font-semibold">Packing Queue</span>
-              </div>
-              <span className="text-xs opacity-80">{tabCounts.packingQueue} orders</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="shipped" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              data-testid="tab-shipped"
-            >
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                <span className="font-semibold">Shipped</span>
-              </div>
-              <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="all" 
-              className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              data-testid="tab-all"
-            >
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                <span className="font-semibold">All</span>
-              </div>
-              <span className="text-xs opacity-80">{tabCounts.all} total</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+              <Boxes className="h-4 w-4" />
+              Workflow View
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground hidden md:block">
+            {viewMode === 'lifecycle' 
+              ? 'Track orders through warehouse lifecycle stages' 
+              : 'Traditional fulfillment workflow view'}
+          </p>
+        </div>
+
+        {/* Lifecycle Tabs */}
+        {viewMode === 'lifecycle' ? (
+          <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+              <TabsTrigger 
+                value="picking" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-lifecycle-picking"
+              >
+                <div className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  <span className="font-semibold">Picking</span>
+                </div>
+                <span className="text-xs opacity-80">{lifecycleCounts.picking} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="packing_ready" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-green-600 data-[state=active]:text-white"
+                data-testid="tab-lifecycle-packing-ready"
+              >
+                <div className="flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4" />
+                  <span className="font-semibold">Packing Ready</span>
+                </div>
+                <span className="text-xs opacity-80">{lifecycleCounts.packingReady} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="shipped" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-lifecycle-shipped"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-semibold">Shipped</span>
+                </div>
+                <span className="text-xs opacity-80">{lifecycleCounts.shipped} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="attention" 
+                className={`flex flex-col gap-1 py-3 data-[state=active]:bg-amber-600 data-[state=active]:text-white ${lifecycleCounts.attention > 0 ? 'border-2 border-amber-500' : ''}`}
+                data-testid="tab-lifecycle-attention"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-semibold">Attention</span>
+                </div>
+                <span className="text-xs opacity-80">{lifecycleCounts.attention} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="all" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-lifecycle-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  <span className="font-semibold">All</span>
+                </div>
+                <span className="text-xs opacity-80">{lifecycleCounts.all} total</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        ) : (
+          /* Workflow Tabs */
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+              <TabsTrigger 
+                value="in_progress" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-in-progress"
+              >
+                <div className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  <span className="font-semibold">In Progress</span>
+                </div>
+                <span className="text-xs opacity-80">{tabCounts.inProgress} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="packing_queue" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-packing-queue"
+              >
+                <div className="flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4" />
+                  <span className="font-semibold">Packing Queue</span>
+                </div>
+                <span className="text-xs opacity-80">{tabCounts.packingQueue} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="shipped" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-shipped"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-semibold">Shipped</span>
+                </div>
+                <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="all" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                data-testid="tab-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  <span className="font-semibold">All</span>
+                </div>
+                <span className="text-xs opacity-80">{tabCounts.all} total</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Tab Description */}
         <p className="text-sm text-muted-foreground italic">{getTabDescription()}</p>
@@ -1208,6 +1344,16 @@ export default function Shipments() {
               <p className="text-muted-foreground">
                 {activeFiltersCount > 0
                   ? "Try adjusting your filters or clearing them to see more results"
+                  : viewMode === 'lifecycle'
+                  ? activeLifecycleTab === 'picking'
+                    ? "No orders are currently being picked"
+                    : activeLifecycleTab === 'packing_ready'
+                    ? "No orders are ready for packing"
+                    : activeLifecycleTab === 'shipped'
+                    ? "No shipped orders match your criteria"
+                    : activeLifecycleTab === 'attention'
+                    ? "No orders need attention - all sessions are progressing normally"
+                    : "Shipments will appear here when orders are fulfilled"
                   : activeTab === 'in_progress'
                   ? "No orders are currently being picked"
                   : activeTab === 'packing_queue'
