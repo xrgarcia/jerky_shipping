@@ -1440,7 +1440,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Packing Ready: Orders ready to pack (closed session, no tracking number, not cancelled)
+    // Packing Ready: Orders ready to pack (closed session, no tracking, no ship date, not cancelled/on_hold)
     // This uses the partial index: shipments_cache_warmer_ready_idx
     const packingReadyResult = await db
       .select({ count: count() })
@@ -1449,7 +1449,12 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(shipments.sessionStatus, 'closed'),
           isNull(shipments.trackingNumber),
-          ne(shipments.status, 'cancelled')
+          isNull(shipments.shipDate),
+          ne(shipments.status, 'cancelled'),
+          or(
+            isNull(shipments.shipmentStatus),
+            ne(shipments.shipmentStatus, 'on_hold')
+          )
         )
       );
 
