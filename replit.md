@@ -48,6 +48,15 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Uses `Promise.allSettled` to handle individual failures without blocking the batch
     - Waits for rate limit reset only when the batch exhausts the quota AND more messages remain
     - Processes ~40 shipments per minute vs ~1/minute with sequential processing (40x speedup)
+- **Unified Shipment Sync Worker** (Dec 2025): Crash-safe cursor-based polling replaces Redis queue approach:
+    - **Cursor-based sync**: Uses `sync_cursors` table to track last processed `modified_at` timestamp
+    - **7-day lookback**: Initial cursor starts 168 hours in the past for comprehensive catch-up
+    - **Dynamic overlap**: 30-second overlap when caught up, no overlap when catching up to ensure forward progress
+    - **Failure-safe advancement**: Cursor caps at earliest failed shipment, guaranteeing retry on next poll
+    - **Immediate webhook triggers**: ShipStation webhooks wake idle worker for sub-minute freshness
+    - **MAX_PAGES handling**: When 10 pages processed, schedules 1-second follow-up to continue
+    - **Credential detection**: Gracefully detects missing SHIPSTATION_API_SECRET and surfaces in Operations dashboard
+    - API endpoints: `/api/operations/unified-sync-status`, `/api/operations/trigger-unified-sync`, `/api/operations/force-unified-resync`
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices
