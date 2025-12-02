@@ -302,9 +302,9 @@ export const shipments = pgTable("shipments", {
   lastShipstationSyncAtIdx: index("shipments_last_shipstation_sync_at_idx").on(table.lastShipstationSyncAt.desc().nullsLast()),
   // Index for shipmentStatus filtering (on_hold verification)
   shipmentStatusIdx: index("shipments_shipment_status_idx").on(table.shipmentStatus).where(sql`${table.shipmentStatus} IS NOT NULL`),
-  // CACHE WARMER INDEXES: Partial index for ready-to-pack orders (closed session, no tracking)
-  // This is the exact query the cache warmer uses to find orders to pre-warm
-  cacheWarmerReadyIdx: index("shipments_cache_warmer_ready_idx").on(table.updatedAt.desc()).where(sql`${table.sessionStatus} = 'closed' AND ${table.trackingNumber} IS NULL`),
+  // CACHE WARMER INDEXES: Partial index for ready-to-pack orders (closed session, no tracking, no ship date)
+  // This is the exact query the cache warmer and packing_ready tab use to find orders awaiting packing
+  cacheWarmerReadyIdx: index("shipments_cache_warmer_ready_idx").on(table.updatedAt.desc()).where(sql`${table.sessionStatus} = 'closed' AND ${table.trackingNumber} IS NULL AND ${table.shipDate} IS NULL`),
   // Index for lifecycle-filtered shipment queries (new/active/inactive/closed tabs on shipments page)
   sessionStatusUpdatedAtIdx: index("shipments_session_status_updated_at_idx").on(table.sessionStatus, table.updatedAt.desc()),
   // Index for cache warming tracking (when was this order's cache warmed)

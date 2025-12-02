@@ -338,8 +338,9 @@ export async function lookupInWarmCache(orderNumber: string, barcodeOrSku: strin
 }
 
 /**
- * Get shipments that are ready to pack (closed session, no tracking)
+ * Get shipments that are ready to pack (closed session, no tracking, no ship date)
  * These are the orders we should pre-warm the cache for
+ * If shipDate is set, the order has already shipped even without tracking synced
  */
 export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POLL): Promise<string[]> {
   try {
@@ -352,6 +353,8 @@ export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POL
           eq(shipments.sessionStatus, 'closed'),
           // No tracking number (not yet labeled)
           isNull(shipments.trackingNumber),
+          // No ship date (not yet shipped)
+          isNull(shipments.shipDate),
           // Has a session ID
           isNotNull(shipments.sessionId),
           // Not on hold or cancelled
