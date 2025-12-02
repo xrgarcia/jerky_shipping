@@ -171,7 +171,8 @@ export default function Orders() {
             queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
             if (isMounted) {
               // Get descriptive title and message based on event type
-              const orderNumber = data.order?.orderNumber || data.order?.shipmentId || 'Unknown';
+              // For orders, use orderNumber. For shipments, check order_number field too.
+              const orderNumber = data.order?.orderNumber || data.order?.order_number || 'Unknown';
               const eventType = data.eventType || 'order_updated';
               
               const eventMessages: Record<string, { title: string; description: string }> = {
