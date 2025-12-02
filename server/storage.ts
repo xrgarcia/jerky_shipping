@@ -1196,18 +1196,12 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'on_dock':
-          // On Dock: Session closed, has tracking, in transit (not delivered yet)
-          // Status codes: IT = In Transit, AC = Accepted, in_transit, shipped
+          // On Dock: Label purchased, in transit (IT status)
+          // shipment_status = 'label_purchased' AND status = 'IT'
           conditions.push(
             and(
-              eq(shipments.sessionStatus, 'closed'),
-              isNotNull(shipments.trackingNumber),
-              or(
-                eq(shipments.status, 'IT'),
-                eq(shipments.status, 'AC'),
-                eq(shipments.status, 'in_transit'),
-                eq(shipments.status, 'shipped')
-              )
+              eq(shipments.shipmentStatus, 'label_purchased'),
+              eq(shipments.status, 'IT')
             )
           );
           break;
@@ -1451,22 +1445,15 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // On Dock: Session closed, has tracking, in transit (not delivered yet)
-    // Status codes: IT = In Transit, AC = Accepted, in_transit, shipped
-    // Excluded: DE = Delivered, delivered, SP = Delivered Parcel Locker, cancelled
+    // On Dock: Label purchased, in transit (IT status)
+    // shipment_status = 'label_purchased' AND status = 'IT'
     const onDockResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
         and(
-          eq(shipments.sessionStatus, 'closed'),
-          isNotNull(shipments.trackingNumber),
-          or(
-            eq(shipments.status, 'IT'),
-            eq(shipments.status, 'AC'),
-            eq(shipments.status, 'in_transit'),
-            eq(shipments.status, 'shipped')
-          )
+          eq(shipments.shipmentStatus, 'label_purchased'),
+          eq(shipments.status, 'IT')
         )
       );
 
