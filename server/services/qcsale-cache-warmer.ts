@@ -27,7 +27,7 @@
 import { getRedisClient } from '../utils/queue';
 import { db } from '../db';
 import { shipments } from '@shared/schema';
-import { eq, and, isNull, isNotNull, ne, or } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, ne, or, lt, sql } from 'drizzle-orm';
 import { skuVaultService } from './skuvault-service';
 
 const log = (message: string) => console.log(`[QCSaleWarmer] ${message}`);
@@ -35,7 +35,7 @@ const error = (message: string) => console.error(`[QCSaleWarmer] ${message}`);
 
 // Constants
 const WARM_CACHE_KEY_PREFIX = 'skuvault:qcsale:warm:';
-const WARM_TTL_SECONDS = 600; // 10 minutes for pre-warmed entries (vs 2 min for regular cache)
+const WARM_TTL_SECONDS = 172800; // 48 hours for pre-warmed entries
 const WARMED_SET_KEY = 'skuvault:qcsale:warmed_orders';
 const POLL_INTERVAL_MS = 30000; // 30 seconds
 const MAX_ORDERS_PER_POLL = 10; // Limit API calls per poll cycle
@@ -341,9 +341,17 @@ export async function lookupInWarmCache(orderNumber: string, barcodeOrSku: strin
  * Get shipments that are ready to pack (closed session, no tracking, pending status)
  * These are the orders we should pre-warm the cache for
  * Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
+ * 
+ * IMPORTANT: 
+ * - Excludes orders that are already warmed (cacheWarmedAt is set) AND cache hasn't expired
+ * - Includes orders where cacheWarmedAt is older than TTL (cache has expired in Redis)
+ * - This avoids repeatedly fetching same orders while ensuring expired caches get re-warmed
  */
 export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POLL): Promise<string[]> {
   try {
+    // Calculate the expiry threshold - orders warmed before this need re-warming
+    const expiryThreshold = new Date(Date.now() - WARM_TTL_SECONDS * 1000);
+    
     const result = await db
       .select({ orderNumber: shipments.orderNumber })
       .from(shipments)
@@ -356,7 +364,12 @@ export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POL
           // Pending status (not yet shipped)
           eq(shipments.shipmentStatus, 'pending'),
           // Has a session ID
-          isNotNull(shipments.sessionId)
+          isNotNull(shipments.sessionId),
+          // Either: never warmed OR cache has expired (warmed more than TTL ago)
+          or(
+            isNull(shipments.cacheWarmedAt),
+            lt(shipments.cacheWarmedAt, expiryThreshold)
+          )
         )
       )
       .limit(limit);
