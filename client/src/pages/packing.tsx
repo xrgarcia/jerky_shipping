@@ -179,6 +179,8 @@ type ShipmentWithItems = {
   qcSale?: QCSale | null; // SkuVault QC Sale data (includes PassedItems, expected Items)
   validationWarnings?: string[]; // Warnings if items don't match between systems
   itemsSource?: 'skuvault' | 'shipstation'; // Which system provided the items list
+  cacheSource?: 'warm_cache' | 'skuvault_api'; // Whether data came from pre-warmed cache or API
+  sessionStatus?: string | null; // SkuVault session status (new, active, inactive, closed)
   // Pre-calculated pending print jobs (immediate display on order load)
   pendingPrintJobs?: PendingPrintJob[];
   hasPendingPrintJobs?: boolean;
@@ -1100,6 +1102,37 @@ export default function Packing() {
     },
     onError: (error: Error) => {
       console.error('[Packing] Clear history failed:', error.message);
+    },
+  });
+
+  // Refresh cache for current order (used when customer service makes order changes)
+  const refreshCacheMutation = useMutation({
+    mutationFn: async (orderNumber: string) => {
+      const response = await apiRequest("POST", `/api/packing/refresh-cache/${encodeURIComponent(orderNumber)}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || data.resolution || 'Failed to refresh cache');
+      }
+      return data as { success: boolean; message: string };
+    },
+    onSuccess: (data, orderNumber) => {
+      console.log(`[Packing] Cache refreshed for order ${orderNumber}`);
+      toast({
+        title: "Cache Refreshed",
+        description: "Order data has been refreshed from SkuVault.",
+      });
+      // Re-validate the order to pick up fresh cache
+      if (currentShipment) {
+        validateOrderMutation.mutate(currentShipment);
+      }
+    },
+    onError: (error: Error) => {
+      console.error('[Packing] Cache refresh failed:', error.message);
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Could not refresh order data. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -2112,6 +2145,22 @@ export default function Packing() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Show refresh button only for orders that are ready to pack (session closed, no tracking) */}
+                {/* This is for when customer service makes order changes and packing needs fresh data */}
+                {currentShipment?.sessionStatus === 'closed' && !currentShipment?.trackingNumber && currentShipment?.orderNumber && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refreshCacheMutation.mutate(currentShipment.orderNumber)}
+                    disabled={refreshCacheMutation.isPending}
+                    title="Refresh order data from SkuVault (use if customer service made changes)"
+                    data-testid="button-refresh-cache"
+                  >
+                    <RotateCcw className={`h-4 w-4 mr-1 ${refreshCacheMutation.isPending ? 'animate-spin' : ''}`} />
+                    {refreshCacheMutation.isPending ? "Refreshing..." : "Refresh"}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

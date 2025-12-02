@@ -251,6 +251,19 @@ app.use((req, res, next) => {
     log("Skipping Firestore session sync worker - Firebase not configured");
   }
 
+  // Start QCSale cache warmer (pre-warms cache for ready-to-pack orders)
+  // This dramatically reduces SkuVault API calls during active packing operations
+  // Must start after Firestore worker since cache warming targets sessioned shipments
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    try {
+      const { startCacheWarmer } = await import("./services/qcsale-cache-warmer");
+      startCacheWarmer();
+      log("QCSale cache warmer started");
+    } catch (error) {
+      console.error("Failed to start QCSale cache warmer:", error);
+    }
+  }
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.

@@ -4,6 +4,7 @@ import { shipments, shipmentItems } from '@shared/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
+import { onSessionClosed } from './services/qcsale-cache-warmer';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
 
@@ -153,6 +154,18 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
       }
     } else {
       log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
+    }
+
+    // CACHE WARMING: When session becomes 'closed', proactively warm the QCSale cache
+    // This dramatically reduces SkuVault API calls during active packing operations
+    // See replit.md "Warehouse Session Lifecycle" for critical system knowledge
+    if (session.session_status === 'closed') {
+      const hasTrackingNumber = !!shipment.trackingNumber;
+      log(`Session ${session.session_id} is closed, triggering cache ${hasTrackingNumber ? 'invalidation' : 'warming'} for order ${session.order_number}`);
+      // Fire and forget - don't block session sync on cache warming
+      onSessionClosed(session.order_number, hasTrackingNumber).catch(err => {
+        log(`Cache warming error for order ${session.order_number}: ${err.message}`);
+      });
     }
 
     return true;

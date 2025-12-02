@@ -23,6 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
+import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments } from "./services/qcsale-cache-warmer";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -4384,14 +4385,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shipment = shipmentResults[0];
       const shipmentItems = await storage.getShipmentItems(shipment.id);
       
-      // 2. Fetch QC Sales data from SkuVault
+      // 2. Fetch QC Sales data from SkuVault (check warm cache first!)
       let qcSale: import('@shared/skuvault-types').QCSale | null = null;
       let saleId: string | null = null;
       const validationWarnings: string[] = [];
+      let cacheSource: 'warm_cache' | 'skuvault_api' = 'skuvault_api';
       
       try {
-        console.log(`[Packing Validation] Fetching SkuVault QC Sale for order: ${orderNumber}`);
-        qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        // PERFORMANCE OPTIMIZATION: Check warm cache first (pre-warmed for ready-to-pack orders)
+        // The cache warmer service pre-loads QCSale data for orders with sessionStatus='closed' and no tracking
+        const warmCacheData = await getWarmCache(orderNumber);
+        if (warmCacheData?.qcSale) {
+          console.log(`[Packing Validation] WARM CACHE HIT for order: ${orderNumber} (cached at ${new Date(warmCacheData.warmedAt).toISOString()})`);
+          qcSale = warmCacheData.qcSale as import('@shared/skuvault-types').QCSale;
+          cacheSource = 'warm_cache';
+        } else {
+          console.log(`[Packing Validation] Warm cache miss, fetching from SkuVault API for order: ${orderNumber}`);
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        }
         
         if (qcSale) {
           saleId = qcSale.SaleId ?? null;
@@ -4650,10 +4661,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingPrintJobs, // Pre-calculated for immediate display
         hasPendingPrintJobs: pendingPrintJobs.length > 0,
         itemsSource: qcSale?.Items?.length ? 'skuvault' : 'shipstation', // Tell frontend which source was used
+        cacheSource, // Whether data came from warm cache or direct API call
+        sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
       res.status(500).json({ error: "Failed to validate order" });
+    }
+  });
+
+  // Manual cache refresh for a single order
+  // Used when customer service makes order changes and packing needs fresh data
+  app.post("/api/packing/refresh-cache/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      
+      console.log(`[Packing] Manual cache refresh requested for order: ${orderNumber}`);
+      
+      // Verify the order exists and is in a valid state for refreshing
+      const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
+      
+      if (shipmentResults.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "Order not found",
+          orderNumber 
+        });
+      }
+      
+      const shipment = shipmentResults[0];
+      
+      // Only allow refresh for orders that are ready to pack (closed session, no tracking)
+      if (shipment.trackingNumber) {
+        return res.status(400).json({
+          success: false,
+          error: "Cannot refresh cache for orders that already have a label",
+          orderNumber,
+          resolution: "This order has already been packed and has a tracking number."
+        });
+      }
+      
+      // Verify the session is closed (order has been picked and is ready to pack)
+      if (shipment.sessionStatus && shipment.sessionStatus !== 'closed') {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot refresh cache for orders in '${shipment.sessionStatus}' session status`,
+          orderNumber,
+          sessionStatus: shipment.sessionStatus,
+          resolution: shipment.sessionStatus === 'active' 
+            ? "This order is currently being picked. Wait for picking to complete."
+            : shipment.sessionStatus === 'inactive'
+              ? "This order is paused mid-pick. It needs supervisor attention."
+              : "This order is not yet ready to pack."
+        });
+      }
+      
+      // Force refresh the cache from SkuVault
+      const success = await refreshCacheForOrder(orderNumber);
+      
+      if (success) {
+        res.json({
+          success: true,
+          message: "Cache refreshed successfully",
+          orderNumber
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: "Failed to refresh cache - order may not be sessioned in SkuVault",
+          orderNumber,
+          resolution: "The order may not have been picked yet. Check SkuVault session status."
+        });
+      }
+    } catch (error: any) {
+      console.error("[Packing] Error refreshing cache:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to refresh cache",
+        message: error.message 
+      });
+    }
+  });
+
+  // Get cache warmer status and metrics
+  app.get("/api/operations/cache-warmer-status", requireAuth, async (req, res) => {
+    try {
+      const metrics = getCacheWarmerMetrics();
+      res.json({
+        status: metrics.workerStatus,
+        metrics: {
+          ordersWarmed: metrics.ordersWarmed,
+          cacheHits: metrics.cacheHits,
+          cacheMisses: metrics.cacheMisses,
+          invalidations: metrics.invalidations,
+          manualRefreshes: metrics.manualRefreshes,
+          apiCallsSaved: metrics.apiCallsSaved,
+        },
+        lastPollAt: metrics.lastPollAt?.toISOString() || null,
+        lastError: metrics.lastError,
+      });
+    } catch (error: any) {
+      console.error("[Operations] Error fetching cache warmer status:", error);
+      res.status(500).json({ error: "Failed to fetch cache warmer status" });
+    }
+  });
+
+  // Get inactive session shipments (stuck orders needing attention)
+  app.get("/api/operations/inactive-sessions", requireAuth, async (req, res) => {
+    try {
+      const inactiveShipments = await getInactiveSessionShipments();
+      res.json({
+        count: inactiveShipments.length,
+        shipments: inactiveShipments,
+        message: inactiveShipments.length > 0 
+          ? `${inactiveShipments.length} orders are stuck in 'inactive' session status and need supervisor attention`
+          : "No inactive sessions found - all orders are progressing normally"
+      });
+    } catch (error: any) {
+      console.error("[Operations] Error fetching inactive sessions:", error);
+      res.status(500).json({ error: "Failed to fetch inactive sessions" });
     }
   });
 
@@ -5525,6 +5651,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 trackingNumber: trackingNumber || undefined 
               });
               console.log(`[Packing] Created and saved new label: ${labelUrl}`);
+              
+              // CACHE INVALIDATION: Label created means order is complete, invalidate warm cache
+              // This prevents stale data from being served for completed orders
+              if (shipment.orderNumber) {
+                onLabelCreated(shipment.orderNumber).catch(err => {
+                  console.warn(`[Packing] Cache invalidation error for ${shipment.orderNumber}:`, err.message);
+                });
+              }
             }
           }
         } catch (error: any) {

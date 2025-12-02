@@ -122,6 +122,33 @@ This is the core warehouse workflow that governs order fulfillment. The system M
 - **active**: Order is currently being picked by a warehouse worker
 - **inactive**: Order was being picked but picker paused/abandoned it. REQUIRES ATTENTION.
 - **closed**: Order picking is complete. If no tracking number, it's ready to pack. If has tracking, it's ready for carrier pickup.
+
+### QCSale Cache Warmer Service (Dec 2025)
+The QCSale cache warmer proactively pre-loads SkuVault QC Sale data for orders ready to be packed, significantly reducing SkuVault API calls during active packing operations.
+
+**Implementation Files:**
+- `server/services/qcsale-cache-warmer.ts` - Main cache warmer service with background polling
+- `server/firestore-session-sync-worker.ts` - Triggers cache warming when session status changes to 'closed'
+- `server/routes.ts` - API endpoints for manual refresh and metrics
+
+**API Endpoints:**
+- `POST /api/packing/refresh-cache/:orderNumber` - Manual cache refresh for single order
+- `GET /api/operations/cache-warmer-status` - Cache warmer metrics and status
+- `GET /api/operations/inactive-sessions` - List orders with 'inactive' session status (stuck orders)
+
+**Cache TTL Strategy:**
+- Warm cache entries: 10 minutes (600 seconds) - extended for pre-warmed data
+- Regular QCSale cache: 2 minutes (120 seconds) - for on-demand lookups
+
+**Cache Invalidation:**
+- On label creation: Invalidated in packing completion endpoint (`POST /api/packing/complete`)
+- Manual refresh: Forces fresh SkuVault API call and re-caches with extended TTL
+
+**Frontend Integration:**
+- Packing page shows "Refresh" button for all loaded orders
+- Button triggers manual cache refresh + re-validation
+- `cacheSource` field in validation response indicates 'warm_cache' or 'skuvault_api'
+
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database.
