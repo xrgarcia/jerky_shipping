@@ -97,6 +97,7 @@ export interface OrderFilters {
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
   workflowTab?: 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
+  lifecycleTab?: 'picking' | 'packing_ready' | 'shipped' | 'attention' | 'all'; // Warehouse lifecycle tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
   shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
@@ -168,6 +169,7 @@ export interface IStorage {
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }>;
+  getLifecycleTabCounts(): Promise<{ picking: number; packingReady: number; shipped: number; attention: number; all: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -1097,6 +1099,7 @@ export class DatabaseStorage implements IStorage {
     const {
       search,
       workflowTab,
+      lifecycleTab,
       status: statusFilter,
       statusDescription,
       shipmentStatus,
@@ -1150,6 +1153,53 @@ export class DatabaseStorage implements IStorage {
           break;
         case 'all':
           // All: No additional filter, shows everything
+          break;
+      }
+    }
+
+    // Lifecycle tab filter - warehouse session lifecycle stages
+    // Note: This is mutually exclusive with workflowTab
+    if (lifecycleTab && !workflowTab) {
+      switch (lifecycleTab) {
+        case 'picking':
+          // Picking: Orders currently being picked (new or active sessions)
+          conditions.push(
+            and(
+              isNotNull(shipments.sessionId),
+              or(
+                eq(shipments.sessionStatus, 'new'),
+                eq(shipments.sessionStatus, 'active')
+              ),
+              isNull(shipments.trackingNumber)
+            )
+          );
+          break;
+        case 'packing_ready':
+          // Packing Ready: Sessions closed, no tracking yet, not cancelled
+          // Uses index: shipments_cache_warmer_ready_idx
+          conditions.push(
+            and(
+              eq(shipments.sessionStatus, 'closed'),
+              isNull(shipments.trackingNumber),
+              ne(shipments.status, 'cancelled')
+            )
+          );
+          break;
+        case 'shipped':
+          // Shipped: Has tracking number
+          conditions.push(isNotNull(shipments.trackingNumber));
+          break;
+        case 'attention':
+          // Attention: Inactive sessions (stuck/paused) needing review
+          conditions.push(
+            and(
+              eq(shipments.sessionStatus, 'inactive'),
+              isNull(shipments.trackingNumber)
+            )
+          );
+          break;
+        case 'all':
+          // All: No additional filter
           break;
       }
     }
@@ -1320,6 +1370,80 @@ export class DatabaseStorage implements IStorage {
       inProgress: Number(inProgressResult[0]?.count) || 0,
       packingQueue: Number(packingQueueResult[0]?.count) || 0,
       shipped: Number(shippedResult[0]?.count) || 0,
+      all: Number(allResult[0]?.count) || 0,
+    };
+  }
+
+  /**
+   * Get counts for warehouse lifecycle tabs
+   * 
+   * WAREHOUSE SESSION LIFECYCLE:
+   * ┌─────────────────────────────────────────────────────────────────────────────┐
+   * │   SESSION STATUS    │  TRACKING   │  WAREHOUSE STATE       │  TAB         │
+   * │   ──────────────────┼─────────────┼────────────────────────┼──────────────│
+   * │   "new"/"active"    │  -          │  Being picked now      │  Picking     │
+   * │   "inactive"        │  -          │  ⚠️ PAUSED/STUCK       │  Attention   │
+   * │   "closed"          │  NULL       │  ✅ READY TO PACK      │  Packing Ready│
+   * │   "closed"          │  Has value  │  Ready for carrier     │  Shipped     │
+   * │   Any               │  Has value  │  Has tracking          │  Shipped     │
+   * └─────────────────────────────────────────────────────────────────────────────┘
+   */
+  async getLifecycleTabCounts(): Promise<{ picking: number; packingReady: number; shipped: number; attention: number; all: number }> {
+    // Picking: Orders currently being picked (new or active sessions, no tracking yet)
+    const pickingResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          isNotNull(shipments.sessionId),
+          or(
+            eq(shipments.sessionStatus, 'new'),
+            eq(shipments.sessionStatus, 'active')
+          ),
+          isNull(shipments.trackingNumber)
+        )
+      );
+
+    // Packing Ready: Orders ready to pack (closed session, no tracking number, not cancelled)
+    // This uses the partial index: shipments_cache_warmer_ready_idx
+    const packingReadyResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.sessionStatus, 'closed'),
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
+        )
+      );
+
+    // Shipped: Orders that have been shipped (has tracking number)
+    const shippedResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(isNotNull(shipments.trackingNumber));
+
+    // Attention: Orders needing attention (inactive session status - stuck/paused)
+    const attentionResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.sessionStatus, 'inactive'),
+          isNull(shipments.trackingNumber)
+        )
+      );
+
+    // All: Total count
+    const allResult = await db
+      .select({ count: count() })
+      .from(shipments);
+
+    return {
+      picking: Number(pickingResult[0]?.count) || 0,
+      packingReady: Number(packingReadyResult[0]?.count) || 0,
+      shipped: Number(shippedResult[0]?.count) || 0,
+      attention: Number(attentionResult[0]?.count) || 0,
       all: Number(allResult[0]?.count) || 0,
     };
   }

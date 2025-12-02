@@ -754,6 +754,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get lifecycle tab counts for warehouse flow visibility
+  app.get("/api/shipments/lifecycle-counts", requireAuth, async (req, res) => {
+    try {
+      const counts = await storage.getLifecycleTabCounts();
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching lifecycle counts:", error);
+      res.status(500).json({ error: "Failed to fetch lifecycle counts" });
+    }
+  });
+
   app.get("/api/shipments", requireAuth, async (req, res) => {
     try {
       // Parse filter parameters from query string
@@ -768,6 +779,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse workflow tab filter
       if (req.query.workflowTab) {
         filters.workflowTab = req.query.workflowTab as string;
+      }
+
+      // Parse lifecycle tab filter (mutually exclusive with workflowTab)
+      if (req.query.lifecycleTab) {
+        filters.lifecycleTab = req.query.lifecycleTab as string;
       }
 
       // Parse status as single value (for cascading filter)
