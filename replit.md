@@ -31,7 +31,10 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 - **Monorepo Structure**: Client, server, and shared code are co-located.
 - **Centralized ETL Architecture**: `ShopifyOrderETLService` and `ShipStationShipmentETLService` classes standardize data transformations.
 - **Worker Coordination System**: Production-ready coordination for poll workers and backfill jobs using Redis-backed mutex.
-- **Priority Queue System**: The shipment-sync queue uses a two-tier priority system to prevent webhook starvation:
+- **Dual Shipment Sync Architecture**: Two complementary systems ensure 100% accurate ShipStation data:
+    1. **Unified Shipment Sync Worker** (cursor-based polling): Systematically polls ShipStation API on a schedule to catch all changes. Uses cursor stored in `sync_cursors` table for crash-safe recovery. This is the primary mechanism for ensuring complete data coverage.
+    2. **Webhook Processing Queue** (real-time events): Processes ShipStation webhook events as they arrive for sub-minute freshness. Handles tracking updates, fulfillment events, and manual triggers. See `shipment-sync-worker.ts`.
+- **Webhook Processing Queue Priority System**: The webhook queue uses a two-tier priority system to prevent webhook starvation:
     - **High Priority** (`shipstation:shipment-sync:high`): Webhooks (often have inline data, skip API calls), backfill, and manual triggers
     - **Low Priority** (`shipstation:shipment-sync:low`): Reverse sync messages (always require API calls for verification)
     - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
@@ -48,7 +51,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Uses `Promise.allSettled` to handle individual failures without blocking the batch
     - Waits for rate limit reset only when the batch exhausts the quota AND more messages remain
     - Processes ~40 shipments per minute vs ~1/minute with sequential processing (40x speedup)
-- **Unified Shipment Sync Worker** (Dec 2025): Crash-safe cursor-based polling replaces Redis queue approach:
+- **Unified Shipment Sync Worker Details** (Dec 2025): Part of the Dual Shipment Sync Architecture (see above). Implementation details:
     - **Cursor-based sync**: Uses `sync_cursors` table to track last processed `modified_at` timestamp
     - **7-day lookback**: Initial cursor starts 168 hours in the past for comprehensive catch-up
     - **Dynamic overlap**: 30-second overlap when caught up, no overlap when catching up to ensure forward progress

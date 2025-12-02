@@ -1165,8 +1165,8 @@ Please analyze this failure and help me understand:
         <Card data-testid="card-shipment-sync-queue" className="min-h-[280px]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
-              <CardTitle className="text-lg">Shipment Sync Queue</CardTitle>
-              <CardDescription>Shipments awaiting enrichment</CardDescription>
+              <CardTitle className="text-lg">Webhook Processing Queue</CardTitle>
+              <CardDescription>Real-time ShipStation events: tracking, fulfillments, backfill, manual triggers</CardDescription>
             </div>
             <Badge
               data-testid={`badge-health-${shipmentHealth}`}

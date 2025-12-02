@@ -1,7 +1,32 @@
 /**
- * Shipment Sync Worker
- * Processes shipment sync requests from Redis queue asynchronously
- * Handles ShipStation rate limiting and logs failures to dead letter queue
+ * Webhook Processing Queue Worker (shipment-sync-worker)
+ * 
+ * PURPOSE:
+ * This worker processes real-time ShipStation webhook events from a Redis queue.
+ * It is ONE HALF of the Dual Shipment Sync Architecture:
+ * 
+ *   1. Unified Shipment Sync Worker (unified-shipment-sync-worker.ts)
+ *      - Cursor-based polling of ShipStation API on a schedule
+ *      - Ensures 100% data coverage by systematically processing all changes
+ *      - Primary mechanism for catching missed or delayed updates
+ * 
+ *   2. THIS WORKER (shipment-sync-worker.ts)
+ *      - Processes webhook events from Redis queue for sub-minute freshness
+ *      - Handles: tracking updates, fulfillment events, backfill jobs, manual syncs
+ *      - Provides real-time responsiveness to ShipStation events
+ * 
+ * The two systems are complementary - the unified worker guarantees coverage,
+ * while this webhook queue provides immediate response to live events.
+ * 
+ * QUEUE STRUCTURE:
+ * - High Priority (shipstation:shipment-sync:high): Webhooks, backfill, manual triggers
+ * - Low Priority (shipstation:shipment-sync:low): Reverse sync verification
+ * 
+ * FEATURES:
+ * - ShipStation rate limit handling with intelligent backoff
+ * - Dead letter queue for failed messages (logged to shipment_sync_failures table)
+ * - Inline webhook data optimization (skip API calls when data is in webhook payload)
+ * - Parallel processing for reverse sync batches (40x speedup)
  */
 
 import { storage } from './storage';
