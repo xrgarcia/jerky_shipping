@@ -436,6 +436,10 @@ export async function startUnifiedShipmentSyncWorker(): Promise<void> {
     return;
   }
   
+  // Check credentials at startup and log for debugging
+  const credentials = checkCredentialsConfigured();
+  console.log('[UnifiedSync] Credential check:', credentials.configured ? 'OK' : `MISSING - ${credentials.error}`);
+  
   console.log('[UnifiedSync] Starting unified shipment sync worker');
   isRunning = true;
   
@@ -518,6 +522,9 @@ function checkCredentialsConfigured(): { configured: boolean; error: string | nu
 export async function getWorkerStatus(): Promise<WorkerStatus> {
   const cursor = await getCursor();
   const credentials = checkCredentialsConfigured();
+  
+  // Debug log for credential check
+  console.log('[UnifiedSync] Status check - credentialsConfigured:', credentials.configured, 'error:', credentials.error);
   
   // If credentials are not configured, always show as error state
   const effectiveError = !credentials.configured 
