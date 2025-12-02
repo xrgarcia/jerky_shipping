@@ -81,10 +81,34 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Set up WebSocket server
+  // Set up WebSocket server (lightweight, can stay before listen)
   setupWebSocket(server);
   log("WebSocket server initialized");
 
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || '5000', 10);
+  
+  // Start listening IMMEDIATELY - defer all expensive operations to after port opens
+  server.listen({
+    port,
+    host: "0.0.0.0",
+    reusePort: true,
+  }, () => {
+    log(`serving on port ${port}`);
+    
+    // All expensive initialization happens AFTER port is open
+    // This ensures deployment health checks pass quickly
+    setImmediate(async () => {
+      await initializeAfterListen(storage);
+    });
+  });
+})();
+
+// All expensive initialization that can be deferred until after the port is open
+async function initializeAfterListen(storage: any) {
   // Broadcast comprehensive initial queue status to ensure clients get fresh data immediately after restart
   try {
     const { broadcastQueueStatus } = await import("./websocket");
@@ -110,7 +134,7 @@ app.use((req, res, next) => {
       .from(shipmentSyncFailures)
       .then(rows => rows[0]?.count || 0);
     const allBackfillJobs = await storage.getAllBackfillJobs();
-    const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
+    const activeBackfillJob = allBackfillJobs.find((j: any) => j.status === 'running' || j.status === 'pending') || null;
     // Data health metrics are already in the correct format (dates as ISO strings)
     const dataHealth = await storage.getDataHealthMetrics();
     // Pipeline metrics for operations dashboard
@@ -209,11 +233,6 @@ app.use((req, res, next) => {
     const { startPrintQueueWorker } = await import("./print-queue-worker");
     startPrintQueueWorker(10000); // Process print queue every 10 seconds
     
-    // SkuVault QC worker DISABLED - using synchronous QC scan instead
-    // The async worker was for optimistic packing, now replaced by sync /api/packing/qc-scan endpoint
-    // const { startSkuVaultQCWorker } = await import("./skuvault-qc-worker");
-    // startSkuVaultQCWorker(5000); // Process QC queue every 5 seconds
-    
     // Resume any in-progress backfill jobs that were interrupted by server restart
     setImmediate(async () => {
       try {
@@ -264,30 +283,15 @@ app.use((req, res, next) => {
     }
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-    
-    // Bootstrap products asynchronously after server starts
-    if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
-      setImmediate(async () => {
-        try {
-          log("Starting async product bootstrap from Shopify...");
-          const { bootstrapProductsFromShopify } = await import("./utils/shopify-sync");
-          await bootstrapProductsFromShopify();
-          log("Product bootstrap completed");
-        } catch (error) {
-          console.error("Failed to bootstrap products from Shopify:", error);
-        }
-      });
+  // Bootstrap products asynchronously after server starts
+  if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
+    try {
+      log("Starting async product bootstrap from Shopify...");
+      const { bootstrapProductsFromShopify } = await import("./utils/shopify-sync");
+      await bootstrapProductsFromShopify();
+      log("Product bootstrap completed");
+    } catch (error) {
+      console.error("Failed to bootstrap products from Shopify:", error);
     }
-  });
-})();
+  }
+}
