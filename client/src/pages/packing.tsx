@@ -2582,14 +2582,13 @@ export default function Packing() {
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="text-lg text-muted-foreground font-mono mt-1">
-                                  {progress.sku}
+                                <div className="text-sm text-muted-foreground font-mono mt-1" data-testid={`text-kit-sku-${progress.sku}`}>
+                                  SKU: {progress.sku}
                                 </div>
-                                {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
-                                  <div className="text-sm text-muted-foreground/70 font-mono flex items-center gap-1">
-                                    <span className="text-xs">Barcode:</span> {progress.skuvaultCode}
-                                  </div>
-                                )}
+                                <div className="text-lg font-mono font-semibold bg-muted/50 px-2 py-1 rounded mt-1 inline-block" data-testid={`text-kit-barcode-${progress.sku}`}>
+                                  <span className="text-xs text-muted-foreground mr-1">Barcode:</span> 
+                                  {progress.skuvaultCode || progress.sku || 'N/A'}
+                                </div>
                                 <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                                   {progress.kitComponents.length} component{progress.kitComponents.length !== 1 ? 's' : ''} • Scan any component barcode
                                 </div>
@@ -2681,8 +2680,11 @@ export default function Packing() {
                                           )}
                                           <div className="flex-1 min-w-0">
                                             <div className="font-medium text-sm truncate">{comp.name}</div>
-                                            <div className="text-xs text-muted-foreground font-mono">
-                                              {comp.code || comp.sku || 'No barcode'}
+                                            <div className="text-xs text-muted-foreground font-mono" data-testid={`text-comp-sku-${comp.sku || comp.id}`}>
+                                              SKU: {comp.sku || 'N/A'}
+                                            </div>
+                                            <div className="text-sm font-mono font-semibold bg-muted/50 px-1.5 py-0.5 rounded mt-0.5 inline-block" data-testid={`text-comp-barcode-${comp.sku || comp.id}`}>
+                                              <span className="text-xs text-muted-foreground">Barcode:</span> {comp.code || comp.sku || 'N/A'}
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -2769,14 +2771,13 @@ export default function Packing() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-lg text-muted-foreground font-mono">
-                              {progress.sku}
+                            <div className="text-sm text-muted-foreground font-mono" data-testid={`text-sku-${progress.sku}`}>
+                              SKU: {progress.sku}
                             </div>
-                            {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
-                              <div className="text-sm text-muted-foreground/70 font-mono flex items-center gap-1">
-                                <span className="text-xs">Barcode:</span> {progress.skuvaultCode}
-                              </div>
-                            )}
+                            <div className="text-lg font-mono font-semibold bg-muted/50 px-2 py-1 rounded mt-1 inline-block" data-testid={`text-barcode-${progress.sku}`}>
+                              <span className="text-xs text-muted-foreground mr-1">Barcode:</span> 
+                              {progress.skuvaultCode || progress.sku || 'N/A'}
+                            </div>
                           </div>
                           
                           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
