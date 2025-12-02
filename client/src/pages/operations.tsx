@@ -143,17 +143,23 @@ type QueueStats = {
     lastCheckedAt: string;
   };
   unifiedSyncWorker?: {
-    status: 'running' | 'sleeping' | 'idle' | 'error';
-    cursor: string | null;
-    cursorAge: number | null;
-    cursorAgeLabel: string | null;
-    lastPollAt: string | null;
-    lastPollDuration: number | null;
-    pollIntervalSeconds: number;
-    shipmentsProcessedTotal: number;
-    shipmentsProcessedLastPoll: number;
-    workerStartedAt: string;
-    error: string | null;
+    isRunning: boolean;
+    isPolling: boolean;
+    lastPollTime: string | null;
+    pollCount: number;
+    errorCount: number;
+    lastError: string | null;
+    cursorPosition: string | null;
+    lastCursorUpdate: string | null;
+    credentialsConfigured: boolean;
+    syncStats: {
+      totalShipments: number;
+      syncedLast5Minutes: number;
+      syncedLast1Hour: number;
+      neverSynced: number;
+      onHoldCount: number;
+      staleOnHoldCount: number;
+    };
   };
 };
 
@@ -1791,23 +1797,29 @@ Please analyze this failure and help me understand:
               <div className="flex-1">
                 <p className="font-medium">Unified Shipment Sync Worker</p>
                 <p className="text-sm text-muted-foreground">
-                  {queueStats?.unifiedSyncWorker?.error 
+                  {!queueStats?.unifiedSyncWorker?.credentialsConfigured 
+                    ? 'Missing ShipStation API credentials' 
+                    : queueStats?.unifiedSyncWorker?.lastError 
                     ? 'Error syncing shipments' 
-                    : `Cursor-based sync, ${queueStats?.unifiedSyncWorker?.pollIntervalSeconds || 30}s intervals`}
+                    : 'Cursor-based incremental sync, 60s intervals'}
                 </p>
                 {queueStats?.unifiedSyncWorker && (
                   <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
-                    {queueStats.unifiedSyncWorker.cursor && (
-                      <div>Cursor: {new Date(queueStats.unifiedSyncWorker.cursor).toLocaleString()} {queueStats.unifiedSyncWorker.cursorAgeLabel && `(${queueStats.unifiedSyncWorker.cursorAgeLabel} old)`}</div>
+                    {queueStats.unifiedSyncWorker.cursorPosition && (
+                      <div>Cursor: {new Date(queueStats.unifiedSyncWorker.cursorPosition).toLocaleString()}</div>
                     )}
-                    <div>Last poll: {queueStats.unifiedSyncWorker.shipmentsProcessedLastPoll.toLocaleString()} shipments</div>
-                    <div>Total synced: {queueStats.unifiedSyncWorker.shipmentsProcessedTotal.toLocaleString()} shipments</div>
-                    {queueStats.unifiedSyncWorker.lastPollAt && (
-                      <div>Last sync: {formatDistanceToNow(new Date(queueStats.unifiedSyncWorker.lastPollAt), { addSuffix: true })} {queueStats.unifiedSyncWorker.lastPollDuration && `(${queueStats.unifiedSyncWorker.lastPollDuration}ms)`}</div>
+                    {queueStats.unifiedSyncWorker.syncStats && (
+                      <>
+                        <div>Synced last 5min: {queueStats.unifiedSyncWorker.syncStats.syncedLast5Minutes.toLocaleString()} / {queueStats.unifiedSyncWorker.syncStats.totalShipments.toLocaleString()}</div>
+                        <div>On-hold: {queueStats.unifiedSyncWorker.syncStats.onHoldCount.toLocaleString()} ({queueStats.unifiedSyncWorker.syncStats.staleOnHoldCount.toLocaleString()} stale)</div>
+                      </>
                     )}
-                    <div>Started: {formatDistanceToNow(new Date(queueStats.unifiedSyncWorker.workerStartedAt), { addSuffix: true })}</div>
-                    {queueStats.unifiedSyncWorker.error && (
-                      <div className="text-destructive">Error: {queueStats.unifiedSyncWorker.error}</div>
+                    {queueStats.unifiedSyncWorker.lastPollTime && (
+                      <div>Last poll: {formatDistanceToNow(new Date(queueStats.unifiedSyncWorker.lastPollTime), { addSuffix: true })}</div>
+                    )}
+                    <div>Polls: {queueStats.unifiedSyncWorker.pollCount} (errors: {queueStats.unifiedSyncWorker.errorCount})</div>
+                    {queueStats.unifiedSyncWorker.lastError && (
+                      <div className="text-destructive">Error: {queueStats.unifiedSyncWorker.lastError}</div>
                     )}
                   </div>
                 )}
@@ -1817,11 +1829,12 @@ Please analyze this failure and help me understand:
                     variant="outline"
                     onClick={async () => {
                       try {
-                        await apiRequest('/api/operations/trigger-unified-sync', { method: 'POST' });
+                        await apiRequest('POST', '/api/operations/trigger-unified-sync');
                       } catch (err) {
                         console.error('Failed to trigger sync:', err);
                       }
                     }}
+                    disabled={!queueStats?.unifiedSyncWorker?.credentialsConfigured}
                     data-testid="button-trigger-unified-sync"
                   >
                     <Zap className="h-3 w-3 mr-1" />
@@ -1832,11 +1845,12 @@ Please analyze this failure and help me understand:
                     variant="outline"
                     onClick={async () => {
                       try {
-                        await apiRequest('/api/operations/force-unified-resync', { method: 'POST' });
+                        await apiRequest('POST', '/api/operations/force-unified-resync');
                       } catch (err) {
                         console.error('Failed to force resync:', err);
                       }
                     }}
+                    disabled={!queueStats?.unifiedSyncWorker?.credentialsConfigured}
                     data-testid="button-force-unified-resync"
                   >
                     <RefreshCw className="h-3 w-3 mr-1" />
@@ -1846,27 +1860,31 @@ Please analyze this failure and help me understand:
               </div>
               <Badge 
                 variant={
-                  queueStats?.unifiedSyncWorker?.status === 'running' 
-                    ? 'default' 
-                    : queueStats?.unifiedSyncWorker?.status === 'error'
+                  !queueStats?.unifiedSyncWorker?.credentialsConfigured
                     ? 'destructive'
-                    : 'secondary'
+                    : queueStats?.unifiedSyncWorker?.lastError
+                    ? 'destructive'
+                    : queueStats?.unifiedSyncWorker?.isPolling
+                    ? 'default'
+                    : queueStats?.unifiedSyncWorker?.isRunning
+                    ? 'secondary'
+                    : 'outline'
                 } 
-                data-testid={`badge-unified-sync-worker-${queueStats?.unifiedSyncWorker?.status || 'unknown'}`}
+                data-testid={`badge-unified-sync-worker-${queueStats?.unifiedSyncWorker?.isRunning ? 'running' : 'stopped'}`}
               >
-                {queueStats?.unifiedSyncWorker?.status === 'running' && <Activity className="h-3 w-3 mr-1" />}
-                {queueStats?.unifiedSyncWorker?.status === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
-                {queueStats?.unifiedSyncWorker?.status === 'idle' && <Clock className="h-3 w-3 mr-1" />}
-                {queueStats?.unifiedSyncWorker?.status === 'error' && <AlertCircle className="h-3 w-3 mr-1" />}
-                {queueStats?.unifiedSyncWorker?.status === 'running' 
-                  ? 'Running' 
-                  : queueStats?.unifiedSyncWorker?.status === 'sleeping' 
-                  ? 'Sleeping' 
-                  : queueStats?.unifiedSyncWorker?.status === 'idle'
-                  ? 'Idle'
-                  : queueStats?.unifiedSyncWorker?.status === 'error'
+                {!queueStats?.unifiedSyncWorker?.credentialsConfigured && <AlertCircle className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.credentialsConfigured && queueStats?.unifiedSyncWorker?.lastError && <AlertCircle className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.credentialsConfigured && !queueStats?.unifiedSyncWorker?.lastError && queueStats?.unifiedSyncWorker?.isPolling && <Activity className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.credentialsConfigured && !queueStats?.unifiedSyncWorker?.lastError && !queueStats?.unifiedSyncWorker?.isPolling && queueStats?.unifiedSyncWorker?.isRunning && <Clock className="h-3 w-3 mr-1" />}
+                {!queueStats?.unifiedSyncWorker?.credentialsConfigured
+                  ? 'Missing Credentials'
+                  : queueStats?.unifiedSyncWorker?.lastError
                   ? 'Error'
-                  : 'Unknown'}
+                  : queueStats?.unifiedSyncWorker?.isPolling 
+                  ? 'Polling' 
+                  : queueStats?.unifiedSyncWorker?.isRunning
+                  ? 'Idle'
+                  : 'Stopped'}
               </Badge>
             </div>
           </div>

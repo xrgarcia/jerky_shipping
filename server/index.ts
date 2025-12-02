@@ -203,6 +203,10 @@ app.use((req, res, next) => {
     const { startOnHoldPollWorker } = await import("./onhold-poll-worker");
     startOnHoldPollWorker(60000); // Poll for on_hold shipments every 1 minute
     
+    // Start unified shipment sync worker (crash-safe cursor-based polling)
+    const { startUnifiedShipmentSyncWorker } = await import("./unified-shipment-sync-worker");
+    await startUnifiedShipmentSyncWorker(); // Internal 30s polling interval
+    
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours

@@ -48,6 +48,7 @@ export interface WorkerStatus {
   lastError: string | null;
   cursorPosition: string | null;
   lastCursorUpdate: Date | null;
+  credentialsConfigured: boolean;
 }
 
 /**
@@ -192,12 +193,21 @@ async function fetchShipmentPage(modifyDateStart: string, page: number): Promise
 
 /**
  * Main poll cycle - fetches all shipments modified since cursor
+ * 
+ * DESIGN DECISIONS (crash-safety):
+ * 1. Individual shipment failures do NOT block cursor advancement. We still advance
+ *    the cursor to prevent infinite loops, but log failures for later retry.
+ * 2. When MAX_PAGES is reached, we advance cursor to processed point and flag
+ *    that more pages remain - caller should schedule immediate follow-up.
+ * 3. 30-second overlap on cursor protects against clock drift and concurrent modifications.
  */
 async function pollCycle(): Promise<{
   shipmentsProcessed: number;
+  shipmentsErrored: number;
   pagesProcessed: number;
   newCursor: string | null;
   hitRateLimit: boolean;
+  hasMorePages: boolean;
 }> {
   // Get current cursor or initialize
   let cursor = await getCursor();
@@ -210,9 +220,15 @@ async function pollCycle(): Promise<{
   
   let currentPage = 1;
   let totalProcessed = 0;
+  let totalErrored = 0;
   let pagesProcessed = 0;
-  let latestModifiedAt = cursor.cursorValue;
   let hitRateLimit = false;
+  let hasMorePages = false;
+  
+  // Track timestamps separately for success and failure
+  // We can only advance cursor up to (but not past) the EARLIEST failure
+  const successTimestamps: string[] = [];
+  let earliestFailureTimestamp: string | null = null;
   
   console.log(`[UnifiedSync] Starting poll from cursor: ${cursor.cursorValue}`);
   
@@ -226,21 +242,33 @@ async function pollCycle(): Promise<{
         try {
           await syncShipment(shipment);
           totalProcessed++;
-          
-          // Track latest modified_at for cursor update
-          if (shipment.modified_at && shipment.modified_at > latestModifiedAt) {
-            latestModifiedAt = shipment.modified_at;
+          // Track successful timestamps for cursor advancement
+          if (shipment.modified_at) {
+            successTimestamps.push(shipment.modified_at);
           }
         } catch (err) {
+          totalErrored++;
           console.error(`[UnifiedSync] Error syncing shipment ${shipment.shipment_id}:`, err);
-          // Continue processing other shipments
+          // Track earliest failure - cursor cannot advance past this
+          if (shipment.modified_at) {
+            if (!earliestFailureTimestamp || shipment.modified_at < earliestFailureTimestamp) {
+              earliestFailureTimestamp = shipment.modified_at;
+            }
+          }
         }
       }
       
-      console.log(`[UnifiedSync] Page ${currentPage}: processed ${pageResult.shipments.length} shipments`);
+      console.log(`[UnifiedSync] Page ${currentPage}: processed ${pageResult.shipments.length} shipments (${totalErrored} errors so far)`);
       
       // Check if we have more pages
       if (!pageResult.hasMore) {
+        break;
+      }
+      
+      // Check if we've hit MAX_PAGES - flag for immediate follow-up
+      if (currentPage >= MAX_PAGES_PER_POLL) {
+        hasMorePages = true;
+        console.log(`[UnifiedSync] Reached MAX_PAGES (${MAX_PAGES_PER_POLL}), more pages remain - will continue in next poll`);
         break;
       }
       
@@ -255,44 +283,99 @@ async function pollCycle(): Promise<{
     }
   }
   
-  // Update cursor if we processed any shipments
-  if (totalProcessed > 0 && latestModifiedAt !== cursor.cursorValue) {
-    await updateCursor(latestModifiedAt, {
-      lastPollShipmentsProcessed: totalProcessed,
-      lastPollPagesProcessed: pagesProcessed,
-      lastPollAt: new Date().toISOString(),
-    });
-    console.log(`[UnifiedSync] Updated cursor to: ${latestModifiedAt}`);
+  // SAFE CURSOR ADVANCEMENT:
+  // We can only advance cursor up to (but NOT past) the earliest failure.
+  // This ensures failed shipments are retried on the next poll.
+  // 
+  // OVERLAP STRATEGY:
+  // - When catching up (hasMorePages): NO overlap to ensure forward progress
+  // - When fully caught up: 30-second overlap for safety
+  // - When failures exist: cursor stops just before the earliest failure
+  let newCursor: string | null = null;
+  
+  if (successTimestamps.length > 0) {
+    // Sort timestamps to find the latest successful one
+    successTimestamps.sort();
+    let latestSuccessTimestamp = successTimestamps[successTimestamps.length - 1];
+    
+    // CRITICAL: If there were failures, cap cursor at just before the earliest failure
+    // This ensures the failed shipment is re-fetched on the next poll
+    if (earliestFailureTimestamp && earliestFailureTimestamp <= latestSuccessTimestamp) {
+      // Set cursor to 1 second before the earliest failure to ensure it's re-fetched
+      const failureDate = new Date(earliestFailureTimestamp);
+      failureDate.setSeconds(failureDate.getSeconds() - 1);
+      latestSuccessTimestamp = failureDate.toISOString();
+      console.log(`[UnifiedSync] Capping cursor before earliest failure: ${earliestFailureTimestamp}`);
+    }
+    
+    const latestDate = new Date(latestSuccessTimestamp);
+    
+    // Only apply overlap when fully caught up and no failures
+    if (!hasMorePages && !earliestFailureTimestamp) {
+      latestDate.setSeconds(latestDate.getSeconds() - 30);
+    }
+    const safeCursor = latestDate.toISOString();
+    
+    // Only advance if the safe cursor is newer than current cursor
+    if (safeCursor > cursor.cursorValue) {
+      await updateCursor(safeCursor, {
+        lastPollShipmentsProcessed: totalProcessed,
+        lastPollShipmentsErrored: totalErrored,
+        lastPollPagesProcessed: pagesProcessed,
+        lastPollAt: new Date().toISOString(),
+        hasMorePages,
+        earliestFailureTimestamp,
+      });
+      const overlapNote = earliestFailureTimestamp 
+        ? 'capped before failure'
+        : hasMorePages 
+          ? 'no overlap for catch-up' 
+          : 'with 30s safety overlap';
+      console.log(`[UnifiedSync] Updated cursor to: ${safeCursor} (${overlapNote})`);
+      newCursor = safeCursor;
+    }
+  } else if (earliestFailureTimestamp) {
+    // All shipments failed - don't advance cursor at all
+    console.log(`[UnifiedSync] All ${totalErrored} shipments failed - cursor NOT advanced`);
+  }
+  
+  if (totalErrored > 0) {
+    console.log(`[UnifiedSync] Warning: ${totalErrored} shipments failed to sync - will retry on next poll`);
   }
   
   return {
     shipmentsProcessed: totalProcessed,
+    shipmentsErrored: totalErrored,
     pagesProcessed,
-    newCursor: latestModifiedAt !== cursor.cursorValue ? latestModifiedAt : null,
+    newCursor,
     hitRateLimit,
+    hasMorePages,
   };
 }
 
 /**
  * Main worker loop
+ * Returns true if there are more pages to process (immediate follow-up needed)
  */
-async function runPollLoop(): Promise<void> {
+async function runPollLoop(): Promise<boolean> {
   if (isPolling) {
     console.log('[UnifiedSync] Poll already in progress, skipping');
-    return;
+    return false;
   }
   
   isPolling = true;
   lastPollTime = new Date();
   pollCount++;
   
+  let needsImmediateFollowup = false;
+  
   try {
     const result = await pollCycle();
     
-    console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} shipments, ${result.pagesProcessed} pages`);
+    console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
     
-    // Broadcast status update - use existing queue status mechanism
-    // The operations dashboard will fetch worker status via API
+    // Flag for immediate follow-up if more pages remain
+    needsImmediateFollowup = result.hasMorePages;
     
     lastError = null;
   } catch (err: any) {
@@ -302,24 +385,46 @@ async function runPollLoop(): Promise<void> {
   } finally {
     isPolling = false;
   }
+  
+  return needsImmediateFollowup;
 }
 
 /**
  * Schedule next poll, checking for immediate trigger
+ * Uses short delay when catching up or when webhook requested immediate poll
+ * 
+ * IMMEDIACY GUARANTEE: The immediatePolltrigger flag is checked HERE
+ * (after poll completion) so webhooks received during polling trigger
+ * another poll immediately, not after 60s.
  */
-function scheduleNextPoll(): void {
+function scheduleNextPoll(immediateFollowup: boolean = false): void {
   if (!isRunning) return;
   
+  // Clear any existing timer
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  
+  // Check if webhook requested immediate poll during our last cycle
+  const webhookTriggered = immediatePolltrigger;
+  if (webhookTriggered) {
+    console.log('[UnifiedSync] Webhook triggered immediate poll during last cycle');
+    immediatePolltrigger = false;
+  }
+  
+  // Use short delay for catch-up OR webhook trigger, normal interval otherwise
+  const shouldPollImmediately = immediateFollowup || webhookTriggered;
+  const delay = shouldPollImmediately ? 1000 : POLL_INTERVAL_MS; // 1s vs 60s
+  
+  if (immediateFollowup) {
+    console.log('[UnifiedSync] More pages remain, scheduling immediate follow-up poll');
+  }
+  
   pollTimer = setTimeout(async () => {
-    // Check for immediate trigger
-    if (immediatePolltrigger) {
-      console.log('[UnifiedSync] Immediate poll triggered by webhook');
-      immediatePolltrigger = false;
-    }
-    
-    await runPollLoop();
-    scheduleNextPoll();
-  }, POLL_INTERVAL_MS);
+    const needsFollowup = await runPollLoop();
+    scheduleNextPoll(needsFollowup);
+  }, delay);
 }
 
 /**
@@ -335,10 +440,10 @@ export async function startUnifiedShipmentSyncWorker(): Promise<void> {
   isRunning = true;
   
   // Run initial poll immediately
-  await runPollLoop();
+  const needsFollowup = await runPollLoop();
   
-  // Schedule subsequent polls
-  scheduleNextPoll();
+  // Schedule subsequent polls (with immediate follow-up if needed)
+  scheduleNextPoll(needsFollowup);
   
   console.log(`[UnifiedSync] Worker started, polling every ${POLL_INTERVAL_MS / 1000}s`);
 }
@@ -358,18 +463,59 @@ export function stopUnifiedShipmentSyncWorker(): void {
 
 /**
  * Trigger an immediate poll (called by webhook handlers)
+ * 
+ * RELIABILITY: This function MUST wake a dormant worker - it cannot just set a flag
+ * and hope the timer picks it up. If the worker is idle (not polling), we clear
+ * the timer and start a poll immediately.
  */
 export function triggerImmediatePoll(): void {
-  console.log('[UnifiedSync] Immediate poll requested');
-  immediatePolltrigger = true;
-  
-  // If worker is idle, run poll now
-  if (!isPolling && isRunning) {
-    if (pollTimer) {
-      clearTimeout(pollTimer);
-    }
-    runPollLoop().then(() => scheduleNextPoll());
+  if (!isRunning) {
+    console.log('[UnifiedSync] Worker not running, cannot trigger immediate poll');
+    return;
   }
+  
+  console.log('[UnifiedSync] Immediate poll requested');
+  
+  // If currently polling, just set the flag - the next schedule will see it
+  if (isPolling) {
+    console.log('[UnifiedSync] Currently polling, will trigger again after completion');
+    immediatePolltrigger = true;
+    return;
+  }
+  
+  // Worker is idle - clear timer and poll immediately
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  
+  // Immediately start poll and reschedule after
+  console.log('[UnifiedSync] Waking idle worker for immediate poll');
+  runPollLoop().then((needsFollowup) => {
+    // Check if another immediate trigger came in while we were polling
+    const shouldFollowup = needsFollowup || immediatePolltrigger;
+    immediatePolltrigger = false;
+    scheduleNextPoll(shouldFollowup);
+  });
+}
+
+/**
+ * Check if ShipStation API credentials are configured
+ */
+function checkCredentialsConfigured(): { configured: boolean; error: string | null } {
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  const apiSecret = process.env.SHIPSTATION_API_SECRET;
+  
+  if (!apiKey && !apiSecret) {
+    return { configured: false, error: 'ShipStation API credentials not configured (SHIPSTATION_API_KEY and SHIPSTATION_API_SECRET missing)' };
+  }
+  if (!apiKey) {
+    return { configured: false, error: 'SHIPSTATION_API_KEY not configured' };
+  }
+  if (!apiSecret) {
+    return { configured: false, error: 'SHIPSTATION_API_SECRET not configured' };
+  }
+  return { configured: true, error: null };
 }
 
 /**
@@ -377,6 +523,12 @@ export function triggerImmediatePoll(): void {
  */
 export async function getWorkerStatus(): Promise<WorkerStatus> {
   const cursor = await getCursor();
+  const credentials = checkCredentialsConfigured();
+  
+  // If credentials are not configured, always show as error state
+  const effectiveError = !credentials.configured 
+    ? credentials.error 
+    : lastError;
   
   return {
     isRunning,
@@ -384,9 +536,10 @@ export async function getWorkerStatus(): Promise<WorkerStatus> {
     lastPollTime,
     pollCount,
     errorCount,
-    lastError,
+    lastError: effectiveError,
     cursorPosition: cursor?.cursorValue || null,
     lastCursorUpdate: cursor?.lastSyncedAt || null,
+    credentialsConfigured: credentials.configured,
   };
 }
 
