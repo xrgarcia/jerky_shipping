@@ -231,8 +231,18 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
       );
     }
     
-    // 7. No session yet - awaiting session
-    if (!sessionStatus && shipmentStatus === 'pending') {
+    // 7. On Hold - shipment is on hold
+    if (shipmentStatus === 'on_hold') {
+      return (
+        <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Clock className="h-3 w-3" />
+          On Hold
+        </Badge>
+      );
+    }
+    
+    // 8. No session yet - awaiting pick session
+    if (!sessionStatus) {
       return (
         <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <Clock className="h-3 w-3" />
@@ -241,7 +251,13 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
       );
     }
     
-    return null;
+    // Fallback - unknown state
+    return (
+      <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+        <Clock className="h-3 w-3" />
+        Processing
+      </Badge>
+    );
   };
 
   return (
