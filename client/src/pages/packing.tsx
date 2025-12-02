@@ -2946,7 +2946,7 @@ export default function Packing() {
                 ref={completeButtonRef}
                 onClick={handleCompletePacking}
                 disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady}
-                className="w-full"
+                className="w-full focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] transition-all"
                 size="lg"
                 data-testid="button-complete-packing"
               >
