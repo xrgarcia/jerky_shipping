@@ -43,6 +43,11 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Only enqueues if low-priority queue is empty (LLEN check)
     - Uses 6-hour freshness window (only re-checks shipments not verified in 6 hours)
     - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
+- **Parallel Reverse Sync Processing** (Dec 2025): The shipment sync worker processes reverse sync messages in parallel batches:
+    - Fires up to 40 concurrent API requests (matching ShipStation's rate limit per minute)
+    - Uses `Promise.allSettled` to handle individual failures without blocking the batch
+    - Waits for rate limit reset only when the batch exhausts the quota AND more messages remain
+    - Processes ~40 shipments per minute vs ~1/minute with sequential processing (40x speedup)
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
 ### System Design Choices
@@ -50,13 +55,14 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
 - **On-Hold Shipment Sync Strategy**: ShipStation does not provide webhooks for hold status changes (V2 API only supports 4 webhook events: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`). The on-hold sync uses a bi-directional approach:
     - **Forward Poll**: Queries ShipStation for `shipment_status=on_hold` to detect new holds and queue them for sync. Uses smart date floor based on most recent on_hold shipment to minimize API calls.
-    - **Reverse Sync**: SIMPLIFIED approach - checks ALL on_hold shipments in our DB against ShipStation each cycle (~80-100 at peak). Key behavior:
-        - Queries all shipments with `shipment_status=on_hold` in DB, ordered by creation date
-        - Fetches each from ShipStation API to verify current status
+    - **Reverse Sync**: Micro-batch approach - checks 10 on_hold shipments per cycle with 6-hour freshness window. Key behavior:
+        - Only enqueues to low-priority queue if queue is empty (prevents flooding)
+        - Queries shipments with `shipment_status=on_hold` in DB, ordered by creation date
+        - Uses 6-hour freshness window (skips shipments verified recently)
+        - Parallel API processing: fires up to 40 concurrent requests per batch
         - Only updates DB if status ACTUALLY CHANGED (on_hold -> something else)
         - Does NOT touch records still on_hold (no timestamp bumping)
-        - Uses 100ms delays between API calls for rate limiting
-        - This eliminates the "freshness" problem where updatedAt timestamps prevented stale detection.
+        - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
 - **Packing Completion Audit Logging**: The packing completion endpoint (`POST /api/packing/complete`) logs all actions to the `packing_logs` table:
     - `complete_order_start` - Initial request with shipment ID and station
     - `fetch_existing_labels` / `label_fetched_existing` - Label lookup from ShipStation

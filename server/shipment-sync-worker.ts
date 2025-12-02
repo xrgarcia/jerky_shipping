@@ -85,6 +85,9 @@ async function waitForRateLimitReset(resetSeconds: number): Promise<void> {
 
 const MAX_SHIPMENT_RETRY_COUNT = 3; // Maximum retries before giving up on shipment sync
 
+// ShipStation rate limit is 40 requests per minute window
+const SHIPSTATION_RATE_LIMIT = 40;
+
 /**
  * Result of processing a single shipment sync message
  * Used to control cleanup behavior in the main loop
@@ -95,6 +98,199 @@ interface ProcessingResult {
   requeuedMessage?: ShipmentSyncMessage; // The message to requeue (with updated retry count)
   waitForRateLimit?: number;    // Seconds to wait for rate limit reset
   breakBatch?: boolean;         // Whether to break out of batch processing
+}
+
+/**
+ * Result of a single reverse sync verification
+ */
+interface ReverseSyncResult {
+  message: ShipmentSyncMessage;
+  success: boolean;
+  statusChanged: boolean;
+  error?: string;
+  rateLimit?: { remaining: number; reset: number; limit: number };
+  isRateLimited?: boolean;  // True if this request was rate limited
+}
+
+/**
+ * Process a single reverse sync message (for parallel execution)
+ * Returns result without side effects on rate limit waiting
+ */
+async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<ReverseSyncResult> {
+  const { orderNumber, shipmentId } = message;
+  
+  if (!shipmentId) {
+    return { message, success: false, statusChanged: false, error: 'Missing shipmentId' };
+  }
+  
+  try {
+    // Fetch current status from ShipStation
+    const { data: shipmentData, rateLimit } = await getShipmentByShipmentId(shipmentId);
+    
+    // Get the DB shipment record for timestamp updates
+    const dbShipment = await storage.getShipmentByShipmentId(shipmentId);
+    
+    if (!shipmentData) {
+      // Shipment not found in ShipStation - mark as cancelled
+      if (dbShipment) {
+        await storage.updateShipment(dbShipment.id, {
+          shipmentStatus: 'cancelled',
+          reverseSyncLastCheckedAt: new Date(),
+        });
+        log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marked as cancelled`);
+      }
+      return { message, success: true, statusChanged: true, rateLimit };
+    }
+    
+    const currentStatus = shipmentData.shipment_status;
+    
+    // If still on_hold, just update the timestamp to prevent re-enqueueing
+    if (currentStatus === 'on_hold') {
+      if (dbShipment) {
+        await storage.updateShipment(dbShipment.id, {
+          reverseSyncLastCheckedAt: new Date(),
+        });
+      }
+      return { message, success: true, statusChanged: false, rateLimit };
+    }
+    
+    // Status changed! Process the full update using ETL service
+    log(`[reverse-sync] [${shipmentId}] Status changed: on_hold -> ${currentStatus}`);
+    
+    // Find the order in our database (may be null for multi-channel orders)
+    const order = orderNumber ? await storage.getOrderByOrderNumber(orderNumber) : null;
+    
+    // Use ETL service to process the shipment with fresh data
+    await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+    
+    // Update the timestamp after ETL processing
+    if (dbShipment) {
+      await storage.updateShipment(dbShipment.id, {
+        reverseSyncLastCheckedAt: new Date(),
+      });
+    }
+    
+    // Broadcast update if we have an order
+    if (order) {
+      broadcastOrderUpdate(order);
+    }
+    
+    return { message, success: true, statusChanged: true, rateLimit };
+    
+  } catch (error: any) {
+    // Check if this is a rate limit error
+    const rateLimited = isRateLimitError(error);
+    
+    return { 
+      message, 
+      success: false, 
+      statusChanged: false, 
+      error: error.message,
+      isRateLimited: rateLimited,
+      // If rate limited, provide default wait time of 60 seconds
+      rateLimit: rateLimited ? { remaining: 0, reset: 60, limit: 40 } : undefined
+    };
+  }
+}
+
+/**
+ * Process reverse sync messages in parallel batches
+ * Uses full rate limit quota (40 requests) per batch, then waits for reset
+ */
+async function processReverseSyncBatch(messages: ShipmentSyncMessage[]): Promise<number> {
+  if (messages.length === 0) return 0;
+  
+  log(`[reverse-sync] Processing ${messages.length} messages in parallel batches of ${SHIPSTATION_RATE_LIMIT}`);
+  
+  let processedCount = 0;
+  let messagesRemaining = [...messages];
+  
+  while (messagesRemaining.length > 0) {
+    // Take up to SHIPSTATION_RATE_LIMIT messages for this batch
+    const batchMessages = messagesRemaining.slice(0, SHIPSTATION_RATE_LIMIT);
+    messagesRemaining = messagesRemaining.slice(SHIPSTATION_RATE_LIMIT);
+    
+    log(`[reverse-sync] Firing ${batchMessages.length} parallel API requests...`);
+    
+    // Fire all API requests in parallel
+    const results = await Promise.allSettled(
+      batchMessages.map(msg => processReverseSyncMessage(msg))
+    );
+    
+    // Process results and collect rate limit info
+    let lowestRateLimit: { remaining: number; reset: number } | null = null;
+    let successCount = 0;
+    let errorCount = 0;
+    let statusChangedCount = 0;
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const message = batchMessages[i];
+      
+      if (result.status === 'fulfilled') {
+        const { success, statusChanged, error, rateLimit } = result.value;
+        
+        if (success) {
+          successCount++;
+          if (statusChanged) statusChangedCount++;
+        } else {
+          errorCount++;
+          // Log error to DLQ
+          await logShipmentSyncFailure({
+            orderNumber: message.orderNumber || 'unknown',
+            reason: 'reverse_sync',
+            errorMessage: error || 'Unknown error',
+            requestData: { shipmentId: message.shipmentId, message },
+            responseData: null,
+            retryCount: message.retryCount || 0,
+            failedAt: new Date(),
+          });
+        }
+        
+        // Track lowest rate limit remaining
+        if (rateLimit && (!lowestRateLimit || rateLimit.remaining < lowestRateLimit.remaining)) {
+          lowestRateLimit = { remaining: rateLimit.remaining, reset: rateLimit.reset };
+        }
+        
+        processedCount++;
+      } else {
+        // Promise rejected (unexpected error)
+        errorCount++;
+        log(`[reverse-sync] Unexpected error for ${message.shipmentId}: ${result.reason}`);
+        
+        await logShipmentSyncFailure({
+          orderNumber: message.orderNumber || 'unknown',
+          reason: 'reverse_sync',
+          errorMessage: `Promise rejected: ${result.reason}`,
+          requestData: { shipmentId: message.shipmentId, message },
+          responseData: null,
+          retryCount: message.retryCount || 0,
+          failedAt: new Date(),
+        });
+        
+        processedCount++;
+      }
+      
+      // Clean up in-flight tracking
+      try {
+        await removeShipmentSyncFromInflight(message);
+      } catch (cleanupError: any) {
+        log(`[WARN] Failed to remove message from in-flight set: ${cleanupError.message}`);
+      }
+    }
+    
+    log(`[reverse-sync] Batch complete: ${successCount} success (${statusChangedCount} changed), ${errorCount} errors`);
+    
+    // If we have more messages AND rate limit is exhausted, wait for reset
+    if (messagesRemaining.length > 0 && lowestRateLimit && lowestRateLimit.remaining <= 0) {
+      const waitSeconds = lowestRateLimit.reset || 60;
+      log(`[reverse-sync] Rate limit exhausted. Waiting ${waitSeconds}s before next batch...`);
+      await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+      log(`[reverse-sync] Rate limit reset. Continuing with ${messagesRemaining.length} remaining messages...`);
+    }
+  }
+  
+  return processedCount;
 }
 
 /**
@@ -118,109 +314,26 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
   const messageKeys = messages.map(m => m.orderNumber || m.trackingNumber || m.shipmentId || 'unknown');
   log(`[DEBUG] Message keys in batch: ${messageKeys.join(', ')}`);
   
+  // OPTIMIZATION: Separate reverse sync messages for parallel processing
+  const reverseSyncMessages = messages.filter(m => m.reason === 'reverse_sync' && m.shipmentId);
+  const otherMessages = messages.filter(m => !(m.reason === 'reverse_sync' && m.shipmentId));
+  
   let processedCount = 0;
   
-  for (let i = 0; i < messages.length; i++) {
-    const message = messages[i];
+  // Process reverse sync messages in parallel (up to 40 at a time)
+  if (reverseSyncMessages.length > 0) {
+    const reverseSyncProcessed = await processReverseSyncBatch(reverseSyncMessages);
+    processedCount += reverseSyncProcessed;
+  }
+  
+  // Process non-reverse-sync messages sequentially (webhooks, backfill, etc.)
+  for (let i = 0; i < otherMessages.length; i++) {
+    const message = otherMessages[i];
     let fastPathError: Error | null = null;
     let skipInflightCleanup = false; // Only true if we requeue (need key to stay for dedupe)
     
     try {
       const { orderNumber, trackingNumber, labelUrl, shipmentId, trackingData: webhookTrackingData, reason, jobId, webhookData } = message;
-      
-      // REVERSE SYNC PATH: Verify on_hold shipments are still on_hold
-      // If status changed, update DB. If still on_hold, skip (no update needed).
-      // CRITICAL: Always update reverseSyncLastCheckedAt after successful verification to prevent re-enqueueing
-      if (reason === 'reverse_sync' && shipmentId) {
-        log(`[reverse-sync] Verifying shipment ${shipmentId} (order: ${orderNumber || 'unknown'})`);
-        
-        try {
-          // Fetch current status from ShipStation
-          const { data: shipmentData, rateLimit } = await getShipmentByShipmentId(shipmentId);
-          
-          log(`[reverse-sync] [${shipmentId}] API response received, ${rateLimit.remaining}/${rateLimit.limit} API calls remaining`);
-          
-          // Handle rate limit exhaustion - wait and requeue
-          if (rateLimit.remaining <= 0) {
-            const waitSeconds = rateLimit.reset || 60;
-            log(`[reverse-sync] Rate limit exhausted. Waiting ${waitSeconds}s before continuing...`);
-            await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
-          }
-          
-          // Get the DB shipment record for timestamp updates
-          const dbShipment = await storage.getShipmentByShipmentId(shipmentId);
-          
-          if (!shipmentData) {
-            // Shipment not found in ShipStation - mark as cancelled
-            log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marking as cancelled`);
-            if (dbShipment) {
-              await storage.updateShipment(dbShipment.id, {
-                shipmentStatus: 'cancelled',
-                reverseSyncLastCheckedAt: new Date(), // Mark as verified
-              });
-              log(`[reverse-sync] [${shipmentId}] Marked as cancelled`);
-            }
-            processedCount++;
-            continue;
-          }
-          
-          const currentStatus = shipmentData.shipment_status;
-          
-          // If still on_hold, just update the timestamp to prevent re-enqueueing
-          if (currentStatus === 'on_hold') {
-            if (dbShipment) {
-              await storage.updateShipment(dbShipment.id, {
-                reverseSyncLastCheckedAt: new Date(), // Mark as verified
-              });
-            }
-            log(`[reverse-sync] [${shipmentId}] Still on_hold - timestamp updated`);
-            processedCount++;
-            continue;
-          }
-          
-          // Status changed! Process the full update using ETL service
-          log(`[reverse-sync] [${shipmentId}] Status changed: on_hold -> ${currentStatus}`);
-          
-          // Find the order in our database (may be null for multi-channel orders)
-          const order = orderNumber ? await storage.getOrderByOrderNumber(orderNumber) : null;
-          
-          // Use ETL service to process the shipment with fresh data
-          await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
-          
-          // Update the timestamp after ETL processing
-          if (dbShipment) {
-            await storage.updateShipment(dbShipment.id, {
-              reverseSyncLastCheckedAt: new Date(),
-            });
-          }
-          
-          log(`[reverse-sync] [${shipmentId}] Updated successfully`);
-          
-          // Broadcast update if we have an order
-          if (order) {
-            broadcastOrderUpdate(order);
-          }
-          
-          processedCount++;
-          continue;
-          
-        } catch (error: any) {
-          log(`[reverse-sync] [${shipmentId}] Error: ${error.message}`);
-          // Log to DLQ for investigation
-          // NOTE: Don't update reverseSyncLastCheckedAt on error - retry should happen
-          await logShipmentSyncFailure({
-            orderNumber: orderNumber || 'unknown',
-            reason: 'reverse_sync',
-            errorMessage: error.message,
-            requestData: { shipmentId, message },
-            responseData: null,
-            retryCount: message.retryCount || 0,
-            failedAt: new Date(),
-          });
-          processedCount++;
-          continue;
-        }
-      }
       
       // OPTIMIZATION: If this message includes inline webhookData, we can use it directly (no API call!)
       // This applies to webhooks AND polling workers that fetch data upfront
