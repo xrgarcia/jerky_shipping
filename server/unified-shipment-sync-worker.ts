@@ -26,6 +26,7 @@ const MAX_PAGES_PER_POLL = 10; // Limit pages per poll cycle to stay under rate 
 const PAGE_SIZE = 100; // ShipStation max per page
 const CURSOR_ID = 'shipstation:modified_at';
 const LOOKBACK_HOURS = 168; // 7 days lookback for initial cursor
+const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 
 // Worker state
 let isPolling = false;
@@ -139,6 +140,7 @@ async function syncShipment(shipmentData: any): Promise<string> {
 /**
  * Fetch a page of shipments from ShipStation API
  * Uses modifyDateStart for incremental sync
+ * Uses the same api-key header authentication as the rest of the codebase
  */
 async function fetchShipmentPage(modifyDateStart: string, page: number): Promise<{
   shipments: any[];
@@ -146,13 +148,10 @@ async function fetchShipmentPage(modifyDateStart: string, page: number): Promise
   hasMore: boolean;
 }> {
   const apiKey = process.env.SHIPSTATION_API_KEY;
-  const apiSecret = process.env.SHIPSTATION_API_SECRET;
   
-  if (!apiKey || !apiSecret) {
-    throw new Error('ShipStation API credentials not configured');
+  if (!apiKey) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
   }
-  
-  const authHeader = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
   
   // Build URL with proper V2 API parameters
   const params = new URLSearchParams({
@@ -163,12 +162,13 @@ async function fetchShipmentPage(modifyDateStart: string, page: number): Promise
     sort_dir: 'asc', // Oldest first so we can update cursor progressively
   });
   
+  // ShipStation V2 API uses api-key header (lowercase) - same as rest of codebase
   const response = await fetch(
-    `https://api.shipstation.com/v2/shipments?${params.toString()}`,
+    `${SHIPSTATION_API_BASE}/v2/shipments?${params.toString()}`,
     {
       method: 'GET',
       headers: {
-        'Authorization': `Basic ${authHeader}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
     }
@@ -501,19 +501,13 @@ export function triggerImmediatePoll(): void {
 
 /**
  * Check if ShipStation API credentials are configured
+ * Uses the same api-key pattern as the rest of the codebase
  */
 function checkCredentialsConfigured(): { configured: boolean; error: string | null } {
   const apiKey = process.env.SHIPSTATION_API_KEY;
-  const apiSecret = process.env.SHIPSTATION_API_SECRET;
   
-  if (!apiKey && !apiSecret) {
-    return { configured: false, error: 'ShipStation API credentials not configured (SHIPSTATION_API_KEY and SHIPSTATION_API_SECRET missing)' };
-  }
   if (!apiKey) {
     return { configured: false, error: 'SHIPSTATION_API_KEY not configured' };
-  }
-  if (!apiSecret) {
-    return { configured: false, error: 'SHIPSTATION_API_SECRET not configured' };
   }
   return { configured: true, error: null };
 }
