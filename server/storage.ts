@@ -97,7 +97,7 @@ export interface OrderFilters {
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
   workflowTab?: 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
-  lifecycleTab?: 'picking' | 'packing_ready' | 'shipped' | 'attention' | 'all'; // Warehouse lifecycle tab filter
+  lifecycleTab?: 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues'; // Warehouse lifecycle tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
   shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
@@ -169,7 +169,7 @@ export interface IStorage {
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }>;
-  getLifecycleTabCounts(): Promise<{ picking: number; packingReady: number; shipped: number; attention: number; all: number }>;
+  getLifecycleTabCounts(): Promise<{ all: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -1161,15 +1161,23 @@ export class DatabaseStorage implements IStorage {
     // Note: This is mutually exclusive with workflowTab
     if (lifecycleTab && !workflowTab) {
       switch (lifecycleTab) {
-        case 'picking':
-          // Picking: Orders currently being picked (new or active sessions)
+        case 'all':
+          // All: No additional filter
+          break;
+        case 'ready_to_pick':
+          // Ready to Pick: Session status = 'new' (ready to be picked)
           conditions.push(
             and(
-              isNotNull(shipments.sessionId),
-              or(
-                eq(shipments.sessionStatus, 'new'),
-                eq(shipments.sessionStatus, 'active')
-              ),
+              eq(shipments.sessionStatus, 'new'),
+              isNull(shipments.trackingNumber)
+            )
+          );
+          break;
+        case 'picking':
+          // Picking: Session status = 'active' (currently being picked)
+          conditions.push(
+            and(
+              eq(shipments.sessionStatus, 'active'),
               isNull(shipments.trackingNumber)
             )
           );
@@ -1185,21 +1193,30 @@ export class DatabaseStorage implements IStorage {
             )
           );
           break;
-        case 'shipped':
-          // Shipped: Has tracking number
-          conditions.push(isNotNull(shipments.trackingNumber));
+        case 'on_dock':
+          // On Dock: Session closed, has tracking, in transit (not delivered yet)
+          // Status codes: IT = In Transit, AC = Accepted, in_transit, shipped
+          conditions.push(
+            and(
+              eq(shipments.sessionStatus, 'closed'),
+              isNotNull(shipments.trackingNumber),
+              or(
+                eq(shipments.status, 'IT'),
+                eq(shipments.status, 'AC'),
+                eq(shipments.status, 'in_transit'),
+                eq(shipments.status, 'shipped')
+              )
+            )
+          );
           break;
-        case 'attention':
-          // Attention: Inactive sessions (stuck/paused) needing review
+        case 'picking_issues':
+          // Picking Issues: Inactive sessions (stuck/paused) needing review
           conditions.push(
             and(
               eq(shipments.sessionStatus, 'inactive'),
               isNull(shipments.trackingNumber)
             )
           );
-          break;
-        case 'all':
-          // All: No additional filter
           break;
       }
     }
@@ -1378,28 +1395,41 @@ export class DatabaseStorage implements IStorage {
    * Get counts for warehouse lifecycle tabs
    * 
    * WAREHOUSE SESSION LIFECYCLE:
-   * ┌─────────────────────────────────────────────────────────────────────────────┐
-   * │   SESSION STATUS    │  TRACKING   │  WAREHOUSE STATE       │  TAB         │
-   * │   ──────────────────┼─────────────┼────────────────────────┼──────────────│
-   * │   "new"/"active"    │  -          │  Being picked now      │  Picking     │
-   * │   "inactive"        │  -          │  ⚠️ PAUSED/STUCK       │  Attention   │
-   * │   "closed"          │  NULL       │  ✅ READY TO PACK      │  Packing Ready│
-   * │   "closed"          │  Has value  │  Ready for carrier     │  Shipped     │
-   * │   Any               │  Has value  │  Has tracking          │  Shipped     │
-   * └─────────────────────────────────────────────────────────────────────────────┘
+   * ┌───────────────────────────────────────────────────────────────────────────────────┐
+   * │   SESSION STATUS    │  TRACKING   │  STATUS     │  WAREHOUSE STATE   │  TAB        │
+   * │   ──────────────────┼─────────────┼─────────────┼────────────────────┼─────────────│
+   * │   "new"             │  -          │  -          │  Ready to pick     │  Ready to Pick│
+   * │   "active"          │  -          │  -          │  Being picked now  │  Picking     │
+   * │   "inactive"        │  -          │  -          │  ⚠️ PAUSED/STUCK   │  Picking Issues│
+   * │   "closed"          │  NULL       │  -          │  ✅ READY TO PACK  │  Packing Ready│
+   * │   "closed"          │  Has value  │  IT/AC      │  Ready for pickup  │  On Dock     │
+   * │   "closed"          │  Has value  │  DE/SP/etc  │  Delivered         │  (excluded)  │
+   * └───────────────────────────────────────────────────────────────────────────────────┘
    */
-  async getLifecycleTabCounts(): Promise<{ picking: number; packingReady: number; shipped: number; attention: number; all: number }> {
-    // Picking: Orders currently being picked (new or active sessions, no tracking yet)
+  async getLifecycleTabCounts(): Promise<{ all: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
+    // All: Total count
+    const allResult = await db
+      .select({ count: count() })
+      .from(shipments);
+
+    // Ready to Pick: Orders ready to be picked (session_status = 'new')
+    const readyToPickResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.sessionStatus, 'new'),
+          isNull(shipments.trackingNumber)
+        )
+      );
+
+    // Picking: Orders currently being picked (session_status = 'active')
     const pickingResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
         and(
-          isNotNull(shipments.sessionId),
-          or(
-            eq(shipments.sessionStatus, 'new'),
-            eq(shipments.sessionStatus, 'active')
-          ),
+          eq(shipments.sessionStatus, 'active'),
           isNull(shipments.trackingNumber)
         )
       );
@@ -1417,14 +1447,27 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Shipped: Orders that have been shipped (has tracking number)
-    const shippedResult = await db
+    // On Dock: Session closed, has tracking, in transit (not delivered yet)
+    // Status codes: IT = In Transit, AC = Accepted, in_transit, shipped
+    // Excluded: DE = Delivered, delivered, SP = Delivered Parcel Locker, cancelled
+    const onDockResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(isNotNull(shipments.trackingNumber));
+      .where(
+        and(
+          eq(shipments.sessionStatus, 'closed'),
+          isNotNull(shipments.trackingNumber),
+          or(
+            eq(shipments.status, 'IT'),
+            eq(shipments.status, 'AC'),
+            eq(shipments.status, 'in_transit'),
+            eq(shipments.status, 'shipped')
+          )
+        )
+      );
 
-    // Attention: Orders needing attention (inactive session status - stuck/paused)
-    const attentionResult = await db
+    // Picking Issues: Orders with inactive session status (stuck/paused)
+    const pickingIssuesResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
@@ -1434,17 +1477,13 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // All: Total count
-    const allResult = await db
-      .select({ count: count() })
-      .from(shipments);
-
     return {
+      all: Number(allResult[0]?.count) || 0,
+      readyToPick: Number(readyToPickResult[0]?.count) || 0,
       picking: Number(pickingResult[0]?.count) || 0,
       packingReady: Number(packingReadyResult[0]?.count) || 0,
-      shipped: Number(shippedResult[0]?.count) || 0,
-      attention: Number(attentionResult[0]?.count) || 0,
-      all: Number(allResult[0]?.count) || 0,
+      onDock: Number(onDockResult[0]?.count) || 0,
+      pickingIssues: Number(pickingIssuesResult[0]?.count) || 0,
     };
   }
 
