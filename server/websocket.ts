@@ -636,7 +636,22 @@ export function broadcastStationPrinterUpdate(stationId: string, printer: { id: 
   console.log(`[WS] Broadcast station ${stationId} printer update: ${printer ? `${printer.name} (${printer.status || 'unknown'})` : 'none'}`);
 }
 
-export function broadcastOrderUpdate(order: any): void {
+// Event types for more informative notifications
+export type OrderEventType = 
+  | 'new_order'           // New order placed
+  | 'order_paid'          // Order payment received
+  | 'order_updated'       // Order details updated
+  | 'refund_issued'       // Refund processed
+  | 'shipment_created'    // New shipment created in ShipStation
+  | 'shipment_synced'     // Shipment data synced from ShipStation
+  | 'tracking_received'   // Tracking number received
+  | 'label_printed'       // Shipping label printed
+  | 'shipped'             // Order shipped/in transit
+  | 'delivered'           // Order delivered
+  | 'on_hold'             // Shipment put on hold
+  | 'hold_released';      // Shipment released from hold
+
+export function broadcastOrderUpdate(order: any, eventType?: OrderEventType): void {
   if (!wss) {
     return;
   }
@@ -644,6 +659,7 @@ export function broadcastOrderUpdate(order: any): void {
   const message = JSON.stringify({
     type: 'order_update',
     order,
+    eventType: eventType || 'order_updated',
   });
 
   // Broadcast to home, orders, and default rooms (not operations or backfill)

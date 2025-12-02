@@ -170,9 +170,65 @@ export default function Orders() {
           if (data.type === 'order_update') {
             queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
             if (isMounted) {
+              // Get descriptive title and message based on event type
+              const orderNumber = data.order?.orderNumber || data.order?.shipmentId || 'Unknown';
+              const eventType = data.eventType || 'order_updated';
+              
+              const eventMessages: Record<string, { title: string; description: string }> = {
+                new_order: {
+                  title: "New order placed",
+                  description: `Order #${orderNumber} has been received.`,
+                },
+                order_paid: {
+                  title: "Payment received",
+                  description: `Order #${orderNumber} has been paid.`,
+                },
+                order_updated: {
+                  title: "Order updated",
+                  description: `Order #${orderNumber} has been updated.`,
+                },
+                refund_issued: {
+                  title: "Refund issued",
+                  description: `A refund has been processed for order #${orderNumber}.`,
+                },
+                shipment_created: {
+                  title: "Shipment created",
+                  description: `A new shipment has been created for order #${orderNumber}.`,
+                },
+                shipment_synced: {
+                  title: "Shipment synced",
+                  description: `Shipment data updated for order #${orderNumber}.`,
+                },
+                tracking_received: {
+                  title: "Tracking updated",
+                  description: `Tracking info received for order #${orderNumber}.`,
+                },
+                label_printed: {
+                  title: "Label printed",
+                  description: `Shipping label printed for order #${orderNumber}.`,
+                },
+                shipped: {
+                  title: "Order shipped",
+                  description: `Order #${orderNumber} is now in transit.`,
+                },
+                delivered: {
+                  title: "Order delivered",
+                  description: `Order #${orderNumber} has been delivered.`,
+                },
+                on_hold: {
+                  title: "Shipment on hold",
+                  description: `Shipment for order #${orderNumber} has been put on hold.`,
+                },
+                hold_released: {
+                  title: "Hold released",
+                  description: `Shipment for order #${orderNumber} has been released from hold.`,
+                },
+              };
+              
+              const message = eventMessages[eventType] || eventMessages.order_updated;
               toast({
-                title: "Order updated",
-                description: `Order #${data.order.orderNumber} has been updated.`,
+                title: message.title,
+                description: message.description,
               });
             }
           } else if (data.type === 'print_queue_update') {

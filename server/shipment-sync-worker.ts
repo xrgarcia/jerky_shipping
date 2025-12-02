@@ -52,7 +52,7 @@ import {
   shipmentSyncFailures, 
   type InsertShipmentSyncFailure 
 } from '@shared/schema';
-import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
+import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
 
 function log(message: string) {
@@ -195,9 +195,9 @@ async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<
       });
     }
     
-    // Broadcast update if we have an order
+    // Broadcast update if we have an order - status changed from on_hold
     if (order) {
-      broadcastOrderUpdate(order);
+      broadcastOrderUpdate(order, 'hold_released');
     }
     
     return { message, success: true, statusChanged: true, rateLimit };
@@ -411,7 +411,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // Broadcast realtime update to WebSocket clients
             const order = await storage.getOrder(cachedShipment.orderId);
             if (order) {
-              broadcastOrderUpdate(order);
+              broadcastOrderUpdate(order, 'tracking_received');
             }
             
             log(`[${trackingNumber}] Updated shipment status for order-linked shipment (0 API calls)`);
@@ -490,7 +490,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       if (dbShipment.orderId) {
                         const order = await storage.getOrder(dbShipment.orderId);
                         if (order) {
-                          broadcastOrderUpdate(order);
+                          broadcastOrderUpdate(order, 'tracking_received');
                         }
                       }
                       
@@ -522,7 +522,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                         
                         // Broadcast if linked to order
                         if (order) {
-                          broadcastOrderUpdate(order);
+                          broadcastOrderUpdate(order, 'shipment_created');
                         }
                         
                         log(`[${trackingNumber}] Created shipment via label lookup (2 API calls total)`);
@@ -589,9 +589,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             log(`[${trackingNumber}] Created shipment from webhook (0 API calls)`);
           }
           
-          // Broadcast update
+          // Broadcast update - use 'shipment_created' for new shipments, 'shipment_synced' for updates
           if (order) {
-            broadcastOrderUpdate(order);
+            broadcastOrderUpdate(order, cachedShipment ? 'shipment_synced' : 'shipment_created');
           }
           
           processedCount++;
@@ -732,7 +732,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         }
         
         // Broadcast order update via WebSocket
-        broadcastOrderUpdate(order);
+        broadcastOrderUpdate(order, existingShipment ? 'shipment_synced' : 'shipment_created');
         
         processedCount++;
         
@@ -784,9 +784,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             log(`[${orderNumber}] Created shipment from webhook (0 API calls)`);
           }
           
-          // Broadcast update
+          // Broadcast update - use 'shipment_created' for new shipments, 'shipment_synced' for updates
           if (order) {
-            broadcastOrderUpdate(order);
+            broadcastOrderUpdate(order, existingShipment ? 'shipment_synced' : 'shipment_created');
           }
           
           processedCount++;
@@ -946,7 +946,7 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
 
         // Broadcast order update via WebSocket (if order exists)
         if (order) {
-          broadcastOrderUpdate(order);
+          broadcastOrderUpdate(order, 'shipment_synced');
         }
         
         processedCount++;

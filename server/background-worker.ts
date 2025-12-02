@@ -3,7 +3,7 @@ import { fetchShipStationResource } from "./utils/shipstation-api";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { storage } from "./storage";
-import { broadcastOrderUpdate, broadcastQueueStatus } from "./websocket";
+import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from "./websocket";
 import { log } from "./vite";
 
 /**
@@ -35,6 +35,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
         processedCount++;
       } else if (webhookData.type === 'shopify') {
         const shopifyOrder = webhookData.order;
+        const topic = webhookData.topic as string;
         const orderData = {
           id: shopifyOrder.id.toString(),
           orderNumber: extractActualOrderNumber(shopifyOrder),
@@ -53,11 +54,20 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
         };
 
         const existing = await storage.getOrder(orderData.id);
+        const isNewOrder = !existing;
         
         if (existing) {
           await storage.updateOrder(orderData.id, orderData);
         } else {
           await storage.createOrder(orderData);
+        }
+        
+        // Determine event type based on webhook topic and order state
+        let eventType: OrderEventType = 'order_updated';
+        if (topic === 'orders/create' || isNewOrder) {
+          eventType = 'new_order';
+        } else if (shopifyOrder.financial_status === 'paid' && existing?.financialStatus !== 'paid') {
+          eventType = 'order_paid';
         }
 
         // Process refunds and line items using centralized ETL service
@@ -91,7 +101,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
           console.error('[background-worker] Failed to check/enqueue shipments:', shipmentCheckError);
         }
 
-        broadcastOrderUpdate(orderData);
+        broadcastOrderUpdate(orderData, eventType);
       } else if (webhookData.type === 'shopify-product') {
         const shopifyProduct = webhookData.product;
         const topic = webhookData.topic;

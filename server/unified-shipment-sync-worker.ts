@@ -18,7 +18,7 @@ import { db } from './db';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
-import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
+import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
 import { 
   getQueueLength, 
   getShipmentSyncQueueLength, 
@@ -135,13 +135,13 @@ async function syncShipment(shipmentData: any): Promise<string> {
     })
     .where(eq(shipments.id, shipmentDbId));
   
-  // Broadcast update via WebSocket
+  // Broadcast update via WebSocket with shipment_synced event type
   broadcastOrderUpdate({
     type: 'shipment_synced',
     shipmentId: shipmentDbId,
     orderNumber: shipmentData.order_number || null,
     syncedAt: now.toISOString(),
-  });
+  }, 'shipment_synced');
   
   return shipmentDbId;
 }
