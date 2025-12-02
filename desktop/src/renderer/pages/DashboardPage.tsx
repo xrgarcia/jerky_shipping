@@ -32,6 +32,7 @@ interface SystemPrinter {
   systemName: string;
   isDefault: boolean;
   status: string;
+  suggestRawMode?: boolean; // Auto-detected suggestion for industrial printers
 }
 
 interface DashboardPageProps {
@@ -708,6 +709,14 @@ function DashboardPage({ state }: DashboardPageProps) {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {printer.suggestRawMode && (
+                            <span 
+                              className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400"
+                              title="Industrial printer detected - will use direct printing mode"
+                            >
+                              Industrial
+                            </span>
+                          )}
                           {printer.isDefault && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400">
                               Default
