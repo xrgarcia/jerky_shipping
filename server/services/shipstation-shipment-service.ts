@@ -55,13 +55,27 @@ export class ShipStationShipmentService {
             continue;
           }
           
-          // Check if shipment already exists
+          // Check if shipment already exists by ShipStation shipment ID
           const existing = await this.storage.getShipmentsByOrderId(order.id);
-          const existingShipment = existing.find(s => s.shipmentId === normalizedShipment.shipmentId);
+          let existingShipment = existing.find(s => s.shipmentId === normalizedShipment.shipmentId);
+          
+          // FALLBACK: If not found by shipmentId, find a session-derived shipment (from SkuVault session sync)
+          // These are shipments with closed session status but no shipmentId or trackingNumber yet
+          if (!existingShipment) {
+            const sessionDerivedShipment = existing.find(s => 
+              !s.trackingNumber && 
+              !s.shipmentId && 
+              s.sessionStatus === 'closed'
+            );
+            if (sessionDerivedShipment) {
+              console.log(`[ShipmentService] Found session-derived shipment ${sessionDerivedShipment.id} by orderNumber (sessionStatus=closed), linking to ShipStation ID ${normalizedShipment.shipmentId}`);
+              existingShipment = sessionDerivedShipment;
+            }
+          }
 
           let savedShipment;
           if (existingShipment) {
-            console.log(`[ShipmentService] Updating existing shipment ${normalizedShipment.shipmentId}`);
+            console.log(`[ShipmentService] Updating existing shipment ${existingShipment.id} with ShipStation ID ${normalizedShipment.shipmentId}`);
             savedShipment = await this.storage.updateShipment(existingShipment.id, normalizedShipment);
           } else {
             console.log(`[ShipmentService] Creating new shipment ${normalizedShipment.shipmentId}`);

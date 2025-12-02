@@ -23,7 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder } from "./services/qcsale-cache-warmer";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -4825,6 +4825,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Operations] Error fetching inactive sessions:", error);
       res.status(500).json({ error: "Failed to fetch inactive sessions" });
+    }
+  });
+
+  // Backfill tracking numbers for shipments with closed sessions but no tracking
+  // This syncs from ShipStation to hydrate missing tracking numbers
+  app.post("/api/operations/backfill-tracking-numbers", requireAuth, async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      
+      // Find shipments with closed session but no tracking number
+      const { shipments } = await storage.getFilteredShipments({
+        lifecycleTab: 'packing_ready' // sessionStatus='closed' AND trackingNumber IS NULL AND status != 'cancelled'
+      });
+      
+      const shipmentsToProcess = shipments.slice(0, limit);
+      console.log(`[TrackingBackfill] Processing ${shipmentsToProcess.length} of ${shipments.length} shipments`);
+      
+      const results = {
+        total: shipments.length,
+        processed: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+        details: [] as any[]
+      };
+      
+      for (const shipment of shipmentsToProcess) {
+        if (!shipment.orderNumber) {
+          results.skipped++;
+          continue;
+        }
+        
+        try {
+          const syncResult = await shipmentService.syncShipmentsForOrder(shipment.orderNumber);
+          results.processed++;
+          
+          if (syncResult.success && syncResult.shipments.length > 0) {
+            // Check if any synced shipment now has a tracking number
+            const updatedShipment = syncResult.shipments.find((s: any) => s.trackingNumber);
+            if (updatedShipment) {
+              results.updated++;
+              results.details.push({
+                orderNumber: shipment.orderNumber,
+                status: 'updated',
+                trackingNumber: updatedShipment.trackingNumber
+              });
+              // Invalidate cache for this order since it now has tracking
+              try {
+                await invalidateCacheForOrder(shipment.orderNumber);
+                console.log(`[TrackingBackfill] Invalidated cache for ${shipment.orderNumber}`);
+              } catch (cacheError: any) {
+                console.error(`[TrackingBackfill] Failed to invalidate cache for ${shipment.orderNumber}:`, cacheError.message);
+              }
+            }
+          }
+          
+          // Respect rate limits - wait between API calls
+          if (syncResult.rateLimit?.remaining && syncResult.rateLimit.remaining < 10) {
+            const waitMs = (syncResult.rateLimit.resetInSeconds || 60) * 1000;
+            console.log(`[TrackingBackfill] Rate limit low (${syncResult.rateLimit.remaining}), waiting ${waitMs}ms`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+          } else {
+            // Small delay between requests to be nice to the API
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (error: any) {
+          results.errors++;
+          console.error(`[TrackingBackfill] Error syncing ${shipment.orderNumber}:`, error.message);
+        }
+      }
+      
+      console.log(`[TrackingBackfill] Complete: ${results.updated} updated, ${results.errors} errors`);
+      res.json({
+        message: `Processed ${results.processed} shipments, updated ${results.updated} with tracking numbers`,
+        ...results
+      });
+    } catch (error: any) {
+      console.error("[Operations] Error in tracking backfill:", error);
+      res.status(500).json({ error: "Failed to backfill tracking numbers" });
     }
   });
 

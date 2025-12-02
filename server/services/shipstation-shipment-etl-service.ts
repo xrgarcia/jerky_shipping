@@ -32,12 +32,29 @@ export class ShipStationShipmentETLService {
       throw new Error('Shipment data missing shipment_id field');
     }
     
-    // Check if shipment already exists
-    const existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
+    // Check if shipment already exists by ShipStation shipment ID
+    let existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
     
     // If no orderId provided, try to link to existing order using order number
     let resolvedOrderId = orderId;
     const orderNumber = this.extractOrderNumber(shipmentData);
+    
+    // FALLBACK: If not found by shipmentId, try to find by orderNumber
+    // This handles shipments created by SkuVault session sync (which have no shipmentId yet)
+    // We look for a session-derived shipment: no tracking, no shipmentId, and session is closed (ready to pack)
+    if (!existing && orderNumber) {
+      const shipmentsByOrder = await this.storage.getShipmentsByOrderNumber(orderNumber);
+      // Find a session-derived shipment ready for label: no tracking, no shipmentId, session closed
+      const sessionDerivedShipment = shipmentsByOrder.find(s => 
+        !s.trackingNumber && 
+        !s.shipmentId && 
+        s.sessionStatus === 'closed'
+      );
+      if (sessionDerivedShipment) {
+        console.log(`[ETL] Found session-derived shipment ${sessionDerivedShipment.id} by orderNumber ${orderNumber} (sessionStatus=closed), linking to ShipStation ID ${shipmentId}`);
+        existing = sessionDerivedShipment;
+      }
+    }
     
     if (!resolvedOrderId) {
       // Check if existing shipment has an orderId we should preserve
