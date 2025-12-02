@@ -1,7 +1,7 @@
 import { firestoreStorage } from './firestore-storage';
 import { db } from './db';
 import { shipments, shipmentItems } from '@shared/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray, isNotNull } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 import { onSessionClosed } from './services/qcsale-cache-warmer';
@@ -175,8 +175,101 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
 }
 
 /**
+ * Detect sessions that have transitioned from non-closed to closed
+ * This is critical because when a session becomes 'closed', it disappears from
+ * our getNonClosedSessions() query. We need to:
+ * 1. Find DB shipments that still show non-closed sessionStatus
+ * 2. Check if their sessionId is in the Firestore non-closed set
+ * 3. If NOT in the set, look up the session in Firestore to confirm it's closed
+ * 4. Update DB and trigger cache warming for closed sessions
+ */
+async function detectClosedSessionTransitions(
+  nonClosedSessionIds: Set<string>
+): Promise<number> {
+  // Find shipments in DB that still show non-closed sessionStatus
+  const nonClosedStatuses = ['new', 'active', 'inactive'];
+  const dbNonClosedShipments = await db
+    .select({
+      id: shipments.id,
+      orderNumber: shipments.orderNumber,
+      sessionId: shipments.sessionId,
+      sessionStatus: shipments.sessionStatus,
+      trackingNumber: shipments.trackingNumber,
+    })
+    .from(shipments)
+    .where(
+      and(
+        inArray(shipments.sessionStatus, nonClosedStatuses),
+        isNotNull(shipments.sessionId)
+      )
+    );
+
+  let closedCount = 0;
+
+  for (const shipment of dbNonClosedShipments) {
+    if (!shipment.sessionId) continue;
+
+    // Check if this session is still in the Firestore non-closed set
+    if (nonClosedSessionIds.has(shipment.sessionId)) {
+      continue; // Still non-closed, nothing to do
+    }
+
+    // Session is NOT in non-closed set - it must have transitioned to closed
+    // Look it up in Firestore to confirm and get full data
+    const firestoreSessions = await firestoreStorage.getSkuVaultOrderSessionByPicklistId(
+      shipment.sessionId
+    );
+
+    if (firestoreSessions.length === 0) {
+      // Session not found in Firestore - weird, skip
+      log(`Session ${shipment.sessionId} for order ${shipment.orderNumber} not found in Firestore`);
+      continue;
+    }
+
+    const session = firestoreSessions[0];
+    if (session.session_status === 'closed') {
+      // Use session.order_number from Firestore as authoritative source
+      // (shipment.orderNumber may be null for historical records)
+      const orderNumber = session.order_number || shipment.orderNumber;
+      
+      // Confirmed closed! Update DB
+      log(`Detected session ${session.session_id} transitioned to closed for order ${orderNumber}`);
+      
+      await db
+        .update(shipments)
+        .set({
+          sessionStatus: 'closed',
+          pickEndedAt: session.pick_end_datetime,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipments.id, shipment.id));
+
+      // Trigger cache warming (only if we have a valid order number)
+      if (orderNumber) {
+        const hasTrackingNumber = !!shipment.trackingNumber;
+        log(`Triggering cache ${hasTrackingNumber ? 'invalidation' : 'warming'} for closed session ${session.session_id}`);
+        onSessionClosed(orderNumber, hasTrackingNumber).catch(err => {
+          log(`Cache warming error for order ${orderNumber}: ${err.message}`);
+        });
+      } else {
+        log(`Skipping cache warming for session ${session.session_id} - no order number available`);
+      }
+
+      closedCount++;
+    }
+  }
+
+  if (closedCount > 0) {
+    log(`Detected ${closedCount} session(s) that transitioned to closed`);
+  }
+
+  return closedCount;
+}
+
+/**
  * Main sync function - queries Firestore for ALL non-closed sessions
  * and compares with our database. Updates only if fields have changed.
+ * Also detects sessions that have transitioned to 'closed'.
  * 
  * This is simpler and more reliable than cursor-based sync because:
  * - Firestore is the source of truth for session status
@@ -190,13 +283,11 @@ export async function syncFirestoreSessions(): Promise<number> {
     // Query Firestore for ALL non-closed sessions (new, active, inactive)
     log('Fetching all non-closed sessions from Firestore...');
     const sessions = await firestoreStorage.getNonClosedSessions();
-    
-    if (sessions.length === 0) {
-      log('No non-closed sessions found');
-      workerStats.lastSyncAt = new Date();
-      workerStatus = 'sleeping';
-      return 0;
-    }
+
+    // Build a set of session IDs from Firestore for closed transition detection
+    const nonClosedSessionIds = new Set<string>(
+      sessions.map(s => s.session_id.toString())
+    );
 
     log(`Found ${sessions.length} non-closed session(s) to check`);
 
@@ -213,12 +304,17 @@ export async function syncFirestoreSessions(): Promise<number> {
       }
     }
 
+    // CRITICAL: Also detect sessions that transitioned to 'closed'
+    // These disappear from our non-closed query, so we need to find them
+    const closedCount = await detectClosedSessionTransitions(nonClosedSessionIds);
+    syncedCount += closedCount;
+
     // Update stats
     workerStats.totalSynced += syncedCount;
     workerStats.lastSyncCount = syncedCount;
     workerStats.lastSyncAt = new Date();
 
-    log(`Synced ${syncedCount} sessions, skipped ${skippedCount} unchanged`);
+    log(`Synced ${syncedCount} sessions (${closedCount} closed), skipped ${skippedCount} unchanged`);
 
     workerStatus = 'sleeping';
     return syncedCount;
