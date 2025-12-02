@@ -158,7 +158,8 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     // CACHE WARMING: When session becomes 'closed', proactively warm the QCSale cache
     // This dramatically reduces SkuVault API calls during active packing operations
     // See replit.md "Warehouse Session Lifecycle" for critical system knowledge
-    if (session.session_status === 'closed') {
+    // Normalize to lowercase - Firestore stores "Closed" with capital C
+    if (session.session_status?.toLowerCase() === 'closed') {
       const hasTrackingNumber = !!shipment.trackingNumber;
       log(`Session ${session.session_id} is closed, triggering cache ${hasTrackingNumber ? 'invalidation' : 'warming'} for order ${session.order_number}`);
       // Fire and forget - don't block session sync on cache warming
@@ -227,7 +228,8 @@ async function detectClosedSessionTransitions(
     }
 
     const session = firestoreSessions[0];
-    if (session.session_status === 'closed') {
+    // Normalize to lowercase - Firestore stores "Closed" with capital C
+    if (session.session_status?.toLowerCase() === 'closed') {
       // Use session.order_number from Firestore as authoritative source
       // (shipment.orderNumber may be null for historical records)
       const orderNumber = session.order_number || shipment.orderNumber;
