@@ -55,6 +55,7 @@ interface StationWithSession extends Station {
     name: string;
     systemName: string;
     status?: string;
+    useRawMode?: boolean;
   } | null;
 }
 
@@ -233,6 +234,24 @@ export default function Stations() {
     onError: (error: Error) => {
       toast({
         title: "Failed to delete station",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePrinterMutation = useMutation({
+    mutationFn: async ({ printerId, data }: { printerId: string; data: { useRawMode?: boolean } }) => {
+      const res = await apiRequest("PATCH", `/api/desktop/printers/${printerId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Printer settings updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update printer settings",
         description: error.message,
         variant: "destructive",
       });
@@ -473,48 +492,79 @@ export default function Stations() {
                   </div>
                 )}
                 
-                <div className="flex items-center gap-3 p-3 rounded-lg border bg-background/50">
-                  <Printer className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-muted-foreground">Printer</span>
-                    {station.printer ? (
-                      <div className="flex items-center gap-2">
+                <div className="p-3 rounded-lg border bg-background/50 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Printer className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs text-muted-foreground">Printer</span>
+                      {station.printer ? (
+                        <div className="flex items-center gap-2">
+                          <p 
+                            className="text-sm font-medium text-foreground truncate"
+                            data-testid={`text-printer-name-${station.id}`}
+                            title={station.printer.name}
+                          >
+                            {station.printer.name}
+                          </p>
+                          <span 
+                            className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${
+                              station.printer.status === 'online' 
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : station.printer.status === 'busy'
+                                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            }`}
+                            data-testid={`text-printer-status-${station.id}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              station.printer.status === 'online' 
+                                ? 'bg-green-500'
+                                : station.printer.status === 'busy'
+                                  ? 'bg-yellow-500'
+                                  : 'bg-amber-500'
+                            }`} />
+                            {station.printer.status === 'online' ? 'Online' : station.printer.status === 'busy' ? 'Busy' : 'Offline'}
+                          </span>
+                        </div>
+                      ) : (
                         <p 
-                          className="text-sm font-medium text-foreground truncate"
-                          data-testid={`text-printer-name-${station.id}`}
-                          title={station.printer.name}
+                          className="text-sm font-medium text-red-500"
+                          data-testid={`text-printer-none-${station.id}`}
                         >
-                          {station.printer.name}
+                          None
                         </p>
-                        <span 
-                          className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${
-                            station.printer.status === 'online' 
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : station.printer.status === 'busy'
-                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                          }`}
-                          data-testid={`text-printer-status-${station.id}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            station.printer.status === 'online' 
-                              ? 'bg-green-500'
-                              : station.printer.status === 'busy'
-                                ? 'bg-yellow-500'
-                                : 'bg-amber-500'
-                          }`} />
-                          {station.printer.status === 'online' ? 'Online' : station.printer.status === 'busy' ? 'Busy' : 'Offline'}
-                        </span>
-                      </div>
-                    ) : (
-                      <p 
-                        className="text-sm font-medium text-red-500"
-                        data-testid={`text-printer-none-${station.id}`}
-                      >
-                        None
-                      </p>
-                    )}
+                      )}
+                    </div>
                   </div>
+                  {station.printer && (
+                    <div className="flex items-center justify-between pl-8 pt-2 border-t border-dashed">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor={`raw-mode-${station.id}`}
+                          className="text-xs font-medium cursor-pointer"
+                        >
+                          Industrial Print Mode
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Direct printing for SATO, Zebra, Honeywell
+                        </p>
+                      </div>
+                      <Switch
+                        id={`raw-mode-${station.id}`}
+                        checked={station.printer.useRawMode ?? false}
+                        disabled={updatePrinterMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          if (station.printer) {
+                            updatePrinterMutation.mutate({
+                              printerId: station.printer.id,
+                              data: { useRawMode: checked },
+                            });
+                          }
+                        }}
+                        data-testid={`switch-raw-mode-${station.id}`}
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between pt-2 border-t">

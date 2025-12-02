@@ -6590,6 +6590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               name: selectedPrinter.name,
               systemName: selectedPrinter.systemName,
               status: selectedPrinter.status || 'offline',
+              useRawMode: selectedPrinter.useRawMode ?? false,
             } : null,
           };
         })
