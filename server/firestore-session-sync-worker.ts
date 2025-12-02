@@ -362,6 +362,35 @@ export function stopFirestoreSessionSyncWorker(): void {
 }
 
 /**
+ * Force a full re-sync of all sessions from Firestore
+ * Resets the sync cursor and triggers initialSync to re-fetch everything
+ * Useful for correcting stale data when Firestore documents weren't re-fetched
+ */
+export async function forceFullResync(): Promise<{ success: boolean; message: string; syncedCount?: number }> {
+  try {
+    log('Force re-sync requested - resetting sync cursor');
+    
+    // Reset the sync timestamp to force re-fetch all sessions
+    lastSyncTimestamp = null;
+    
+    // Run initial sync which will fetch all sessions from past year
+    const syncedCount = await initialSync();
+    
+    return {
+      success: true,
+      message: `Force re-sync complete: ${syncedCount} sessions synced`,
+      syncedCount,
+    };
+  } catch (error: any) {
+    log(`Force re-sync error: ${error.message}`);
+    return {
+      success: false,
+      message: `Force re-sync failed: ${error.message}`,
+    };
+  }
+}
+
+/**
  * Get count of sessioned shipments (orders in packing queue)
  */
 export async function getSessionedShipmentCount(): Promise<number> {

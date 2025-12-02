@@ -3673,6 +3673,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force full Firestore session resync (reset cursor and re-fetch all sessions)
+  app.post("/api/operations/force-firestore-resync", requireAuth, async (req, res) => {
+    try {
+      const { forceFullResync } = await import("./firestore-session-sync-worker");
+      const result = await forceFullResync();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error forcing Firestore resync:", error);
+      res.status(500).json({ success: false, message: `Failed to force Firestore resync: ${error.message}` });
+    }
+  });
+
   // List all registered Shopify webhooks (diagnostic endpoint)
   app.get("/api/operations/list-shopify-webhooks", requireAuth, async (req, res) => {
     try {
