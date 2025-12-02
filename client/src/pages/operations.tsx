@@ -1551,8 +1551,8 @@ Please analyze this failure and help me understand:
           Shipping Data Health
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
-        <Link href="/orders?hasShipment=false">
-          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
+        <Link href="/orders?hasShipment=false" className="h-full">
+          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
@@ -1608,8 +1608,8 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Link href="/shipments?withoutOrders=true">
-          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer">
+        <Link href="/shipments?withoutOrders=true" className="h-full">
+          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Truck className="h-4 w-4 text-muted-foreground" />
@@ -1636,17 +1636,30 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-warning">
-          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer">
+        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-warning" className="h-full">
+          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 No Tracking (24-48h)
               </CardTitle>
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                warning
-              </Badge>
+              {(() => {
+                const count = queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0;
+                if (count === 0) {
+                  return (
+                    <Badge variant="default">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      healthy
+                    </Badge>
+                  );
+                }
+                return (
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    warning
+                  </Badge>
+                );
+              })()}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center py-2">
@@ -1664,17 +1677,30 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-critical">
-          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer">
+        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-critical" className="h-full">
+          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
                 No Tracking (48h+)
               </CardTitle>
-              <Badge variant="destructive">
-                <AlertCircle className="h-3 w-3 mr-1" />
-                critical
-              </Badge>
+              {(() => {
+                const count = queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0;
+                if (count === 0) {
+                  return (
+                    <Badge variant="default">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      healthy
+                    </Badge>
+                  );
+                }
+                return (
+                  <Badge variant="destructive">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    critical
+                  </Badge>
+                );
+              })()}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center py-2">
@@ -1692,7 +1718,7 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Card data-testid="card-shipment-sync-failures">
+        <Card data-testid="card-shipment-sync-failures" className="h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -1755,7 +1781,7 @@ Please analyze this failure and help me understand:
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shopify-order-sync-failures">
+        <Card data-testid="card-shopify-order-sync-failures" className="h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
