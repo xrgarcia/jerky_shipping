@@ -37,13 +37,30 @@ export class ShipStationShipmentETLService {
     
     // If no orderId provided, try to link to existing order using order number
     let resolvedOrderId = orderId;
+    const orderNumber = this.extractOrderNumber(shipmentData);
+    
     if (!resolvedOrderId) {
-      // CRITICAL: Preserve existing orderId to prevent de-linking on updates
+      // Check if existing shipment has an orderId we should preserve
       if (existing && existing.orderId) {
-        resolvedOrderId = existing.orderId;
+        // Verify the existing link is correct by checking order_number matches
+        const linkedOrder = await this.storage.getOrder(existing.orderId);
+        if (linkedOrder && linkedOrder.orderNumber === orderNumber) {
+          // Existing link is correct, preserve it
+          resolvedOrderId = existing.orderId;
+        } else {
+          // Existing link is wrong or order was deleted - re-lookup
+          if (linkedOrder && orderNumber) {
+            console.log(`[ETL] Fixing incorrect order link: shipment ${orderNumber} was linked to order ${linkedOrder.orderNumber}, re-looking up`);
+          }
+          if (orderNumber) {
+            const correctOrder = await this.storage.getOrderByOrderNumber(orderNumber);
+            if (correctOrder) {
+              resolvedOrderId = correctOrder.id;
+            }
+          }
+        }
       } else {
-        // Try to find order by order number
-        const orderNumber = this.extractOrderNumber(shipmentData);
+        // No existing link, try to find order by order number
         if (orderNumber) {
           const order = await this.storage.getOrderByOrderNumber(orderNumber);
           if (order) {
