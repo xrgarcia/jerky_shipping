@@ -1183,7 +1183,7 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'packing_ready':
-          // Packing Ready: Sessions closed, no tracking yet, no ship date yet, not cancelled
+          // Packing Ready: Sessions closed, no tracking yet, no ship date yet, not cancelled/on_hold
           // If shipDate is set, the order has already shipped even without tracking number synced
           // Uses index: shipments_cache_warmer_ready_idx
           conditions.push(
@@ -1191,7 +1191,11 @@ export class DatabaseStorage implements IStorage {
               eq(shipments.sessionStatus, 'closed'),
               isNull(shipments.trackingNumber),
               isNull(shipments.shipDate),
-              ne(shipments.status, 'cancelled')
+              ne(shipments.status, 'cancelled'),
+              or(
+                isNull(shipments.shipmentStatus),
+                ne(shipments.shipmentStatus, 'on_hold')
+              )
             )
           );
           break;
