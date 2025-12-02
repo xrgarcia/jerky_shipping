@@ -1183,19 +1183,15 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'packing_ready':
-          // Packing Ready: Sessions closed, no tracking yet, no ship date yet, not cancelled/on_hold
-          // If shipDate is set, the order has already shipped even without tracking number synced
+          // Packing Ready: Sessions closed, no tracking yet, shipment still pending
+          // Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
           // Uses index: shipments_cache_warmer_ready_idx
           conditions.push(
             and(
               eq(shipments.sessionStatus, 'closed'),
               isNull(shipments.trackingNumber),
-              isNull(shipments.shipDate),
-              ne(shipments.status, 'cancelled'),
-              or(
-                isNull(shipments.shipmentStatus),
-                ne(shipments.shipmentStatus, 'on_hold')
-              )
+              eq(shipments.shipmentStatus, 'pending'),
+              ne(shipments.status, 'cancelled')
             )
           );
           break;
@@ -1440,7 +1436,8 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Packing Ready: Orders ready to pack (closed session, no tracking, no ship date, not cancelled/on_hold)
+    // Packing Ready: Orders ready to pack (closed session, no tracking, pending shipment status)
+    // Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
     // This uses the partial index: shipments_cache_warmer_ready_idx
     const packingReadyResult = await db
       .select({ count: count() })
@@ -1449,12 +1446,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(shipments.sessionStatus, 'closed'),
           isNull(shipments.trackingNumber),
-          isNull(shipments.shipDate),
-          ne(shipments.status, 'cancelled'),
-          or(
-            isNull(shipments.shipmentStatus),
-            ne(shipments.shipmentStatus, 'on_hold')
-          )
+          eq(shipments.shipmentStatus, 'pending'),
+          ne(shipments.status, 'cancelled')
         )
       );
 
