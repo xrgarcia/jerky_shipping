@@ -443,11 +443,6 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
 
-            {/* Status Badge */}
-            <div className="flex flex-col gap-1.5 lg:items-end">
-              {getStatusBadge(shipment.status)}
-            </div>
-
             {/* Workflow Step Badge */}
             <div className="flex flex-col gap-1.5 lg:items-end">
               {getWorkflowStepBadge()}
