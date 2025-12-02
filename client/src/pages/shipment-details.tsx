@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -74,6 +74,99 @@ export default function ShipmentDetails() {
       return null;
     }
   };
+
+  const getWorkflowStepBadge = (shipment: ShipmentWithOrder): { badge: JSX.Element; step: string; reason: string; matchedFields: string[] } => {
+    const hasTracking = !!shipment.trackingNumber;
+    const sessionStatus = shipment.sessionStatus?.toLowerCase();
+    const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
+    const status = shipment.status?.toLowerCase();
+
+    if (status === 'delivered') {
+      return {
+        step: 'Delivered',
+        reason: `status = 'delivered'`,
+        matchedFields: ['status'],
+        badge: <Badge className="bg-green-600 text-white">Delivered</Badge>
+      };
+    }
+
+    if (shipmentStatus === 'on_hold') {
+      return {
+        step: 'On Hold',
+        reason: `shipmentStatus = 'on_hold' (checked before tracking/session)`,
+        matchedFields: ['shipmentStatus'],
+        badge: <Badge className="bg-amber-600 text-white">On Hold</Badge>
+      };
+    }
+
+    if (hasTracking && (status === 'in_transit' || status === 'shipped' || shipmentStatus === 'label_purchased')) {
+      const matchedCriteria = [];
+      const matchedFields = ['trackingNumber'];
+      if (status === 'in_transit') { matchedCriteria.push(`status = 'in_transit'`); matchedFields.push('status'); }
+      if (status === 'shipped') { matchedCriteria.push(`status = 'shipped'`); matchedFields.push('status'); }
+      if (shipmentStatus === 'label_purchased') { matchedCriteria.push(`shipmentStatus = 'label_purchased'`); matchedFields.push('shipmentStatus'); }
+      return {
+        step: 'On the Dock',
+        reason: `trackingNumber = '${shipment.trackingNumber?.substring(0, 15)}...' AND (${matchedCriteria.join(' OR ')})`,
+        matchedFields,
+        badge: <Badge className="bg-blue-600 text-white">On the Dock</Badge>
+      };
+    }
+
+    if (sessionStatus === 'inactive') {
+      return {
+        step: 'Picking Issues',
+        reason: `sessionStatus = 'inactive' (flagged for supervisor attention)`,
+        matchedFields: ['sessionStatus'],
+        badge: <Badge className="bg-orange-600 text-white">Picking Issues</Badge>
+      };
+    }
+
+    if (sessionStatus === 'closed' && !hasTracking) {
+      return {
+        step: 'Packing Ready',
+        reason: `sessionStatus = 'closed' AND trackingNumber = null (cache is warmed)`,
+        matchedFields: ['sessionStatus', 'trackingNumber'],
+        badge: <Badge className="bg-purple-600 text-white">Packing Ready</Badge>
+      };
+    }
+
+    if (sessionStatus === 'active') {
+      return {
+        step: 'Picking',
+        reason: `sessionStatus = 'active' (picker is working on it)`,
+        matchedFields: ['sessionStatus'],
+        badge: <Badge className="bg-cyan-600 text-white">Picking</Badge>
+      };
+    }
+
+    if (sessionStatus === 'new') {
+      return {
+        step: 'Ready to Pick',
+        reason: `sessionStatus = 'new' (in pick queue)`,
+        matchedFields: ['sessionStatus'],
+        badge: <Badge className="bg-yellow-600 text-white">Ready to Pick</Badge>
+      };
+    }
+
+    return {
+      step: 'Awaiting Pick',
+      reason: `No sessionStatus (value: ${shipment.sessionStatus || 'null'}), shipmentStatus = '${shipment.shipmentStatus || 'null'}'`,
+      matchedFields: [],
+      badge: <Badge variant="outline">Awaiting Pick</Badge>
+    };
+  };
+
+  const workflowCriteria = [
+    { step: 'Delivered', criteria: "status = 'delivered'", colorClass: 'bg-green-600', order: 1 },
+    { step: 'On Hold', criteria: "shipmentStatus = 'on_hold' (checked FIRST, before tracking)", colorClass: 'bg-amber-600', order: 2 },
+    { step: 'On the Dock', criteria: "trackingNumber exists AND (status IN ['in_transit', 'shipped'] OR shipmentStatus = 'label_purchased')", colorClass: 'bg-blue-600', order: 3 },
+    { step: 'Picking Issues', criteria: "sessionStatus = 'inactive'", colorClass: 'bg-orange-600', order: 4 },
+    { step: 'Packing Ready', criteria: "sessionStatus = 'closed' AND no trackingNumber", colorClass: 'bg-purple-600', order: 5 },
+    { step: 'Picking', criteria: "sessionStatus = 'active'", colorClass: 'bg-cyan-600', order: 6 },
+    { step: 'Ready to Pick', criteria: "sessionStatus = 'new'", colorClass: 'bg-yellow-600', order: 7 },
+    { step: 'Awaiting Pick', criteria: "No matching conditions (fallback)", colorClass: 'bg-gray-600', order: 8 },
+  ];
 
   if (isLoading) {
     return (
@@ -175,6 +268,183 @@ export default function ShipmentDetails() {
             <p className="text-lg text-muted-foreground mt-2">{shipment.statusDescription}</p>
           )}
         </CardHeader>
+      </Card>
+
+      {/* Workflow Status Debug Card */}
+      <Card className="border-2 border-dashed border-muted-foreground/30">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              Workflow Status Debug
+            </CardTitle>
+            {(() => {
+              const workflow = getWorkflowStepBadge(shipment);
+              return (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Current Step:</span>
+                  {workflow.badge}
+                </div>
+              );
+            })()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Why This Category */}
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="font-semibold">Why This Category?</span>
+            </div>
+            <code className="text-sm bg-background px-2 py-1 rounded block">
+              {getWorkflowStepBadge(shipment).reason}
+            </code>
+          </div>
+
+          {/* Current Status Values */}
+          {(() => {
+            const workflow = getWorkflowStepBadge(shipment);
+            const isMatched = (field: string) => workflow.matchedFields.includes(field);
+            const matchedClass = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500';
+            const notMatchedClass = 'bg-muted';
+            
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
+                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
+                    {shipment.status || 'null'}
+                  </code>
+                  <p className="text-xs text-muted-foreground">status field {isMatched('status') && '✓ matched'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
+                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
+                    {shipment.shipmentStatus || 'null'}
+                  </code>
+                  <p className="text-xs text-muted-foreground">shipmentStatus field {isMatched('shipmentStatus') && '✓ matched'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Status</p>
+                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
+                    {shipment.sessionStatus || 'null'}
+                  </code>
+                  <p className="text-xs text-muted-foreground">sessionStatus field {isMatched('sessionStatus') && '✓ matched'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
+                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
+                    {shipment.trackingNumber ? 'YES' : 'NO'}
+                  </code>
+                  <p className="text-xs text-muted-foreground truncate" title={shipment.trackingNumber || undefined}>
+                    {isMatched('trackingNumber') ? '✓ matched • ' : ''}{shipment.trackingNumber ? shipment.trackingNumber.substring(0, 16) + (shipment.trackingNumber.length > 16 ? '...' : '') : 'No tracking'}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Label Preview & Session Info Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Label Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Shipping Label</span>
+              </div>
+              {shipment.labelUrl ? (
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
+                    Label Available
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(shipment.labelUrl!, '_blank')}
+                    data-testid="button-debug-view-label"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    View Label
+                  </Button>
+                </div>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">
+                  No Label Generated
+                </Badge>
+              )}
+            </div>
+
+            {/* Session Info */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Boxes className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Session Info</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {shipment.sessionId ? (
+                  <Badge variant="secondary">Session: {shipment.sessionId}</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-muted-foreground">No Session</Badge>
+                )}
+                {shipment.pickerName && (
+                  <Badge variant="secondary">Picker: {shipment.pickerName}</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Timestamps */}
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Timestamps</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Pick Started</p>
+                <p className="font-mono">{shipment.pickStartedAt ? new Date(shipment.pickStartedAt).toLocaleString() : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pick Ended</p>
+                <p className="font-mono">{shipment.pickEndedAt ? new Date(shipment.pickEndedAt).toLocaleString() : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ship Date</p>
+                <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleString() : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Last Updated</p>
+                <p className="font-mono">{shipment.updatedAt ? new Date(shipment.updatedAt).toLocaleString() : '—'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Workflow Criteria Reference */}
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Play className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">All Workflow Stages & Criteria</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              {workflowCriteria.map((item) => {
+                const currentStep = getWorkflowStepBadge(shipment).step;
+                const isActive = item.step === currentStep;
+                return (
+                  <div 
+                    key={item.step}
+                    className={`flex items-start gap-2 p-2 rounded ${isActive ? 'bg-primary/10 ring-1 ring-primary' : ''}`}
+                  >
+                    <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${item.colorClass}`} />
+                    <div>
+                      <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>{item.step}</span>
+                      <p className="text-xs text-muted-foreground font-mono">{item.criteria}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
