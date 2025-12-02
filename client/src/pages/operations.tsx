@@ -54,6 +54,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -1158,155 +1159,158 @@ Please analyze this failure and help me understand:
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card data-testid="card-shopify-queue" className="min-h-[280px]">
+        <Card data-testid="card-shopify-queue">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-lg">Shopify Queue</CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">Order webhooks awaiting processing</span>
-                <Badge variant="outline" className="text-xs">Redis</Badge>
-              </CardDescription>
-            </div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              Shopify Queue
+            </CardTitle>
             <Badge
               data-testid={`badge-health-${shopifyHealth}`}
               variant={
                 shopifyHealth === "healthy" ? "default" :
                 shopifyHealth === "warning" ? "secondary" : "destructive"
               }
+              className={shopifyHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
             >
               {shopifyHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-              {shopifyHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+              {shopifyHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
               {shopifyHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
               {shopifyHealth}
             </Badge>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold" data-testid="text-shopify-queue-size">
-                  {!hasQueueData ? "-" : queueStats?.shopifyQueue.size.toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">messages</span>
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-bold" data-testid="text-shopify-queue-size">
+                {!hasQueueData ? "-" : queueStats?.shopifyQueue.size.toLocaleString()}
               </div>
-              {queueStats?.shopifyQueue.oldestMessageAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  Oldest: {formatDistanceToNow(new Date(queueStats.shopifyQueue.oldestMessageAt), { addSuffix: true })}
-                </div>
-              )}
-              <Button
-                data-testid="button-purge-shopify"
-                variant="outline"
-                size="sm"
-                onClick={() => setPurgeAction("shopify")}
-                disabled={!queueStats || queueStats.shopifyQueue.size === 0}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Purge Queue
-              </Button>
+              <p className="text-sm text-muted-foreground">messages</p>
+            </div>
+            {queueStats?.shopifyQueue.oldestMessageAt && (
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Oldest: {formatDistanceToNow(new Date(queueStats.shopifyQueue.oldestMessageAt), { addSuffix: true })}
+              </div>
+            )}
+            <Button
+              data-testid="button-purge-shopify"
+              variant="outline"
+              size="sm"
+              onClick={() => setPurgeAction("shopify")}
+              disabled={!queueStats || queueStats.shopifyQueue.size === 0}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Purge Queue
+            </Button>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Order webhooks awaiting processing</p>
+              <Badge variant="outline" className="text-xs">Redis</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shipment-sync-queue" className="min-h-[280px]">
+        <Card data-testid="card-shipment-sync-queue">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-lg">Webhook Processing Queue</CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">ShipStation tracking, fulfillments, backfill</span>
-                <Badge variant="outline" className="text-xs">Redis</Badge>
-              </CardDescription>
-            </div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Truck className="h-4 w-4 text-muted-foreground" />
+              Webhook Processing Queue
+            </CardTitle>
             <Badge
               data-testid={`badge-health-${shipmentHealth}`}
               variant={
                 shipmentHealth === "healthy" ? "default" :
                 shipmentHealth === "warning" ? "secondary" : "destructive"
               }
+              className={shipmentHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
             >
               {shipmentHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-              {shipmentHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+              {shipmentHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
               {shipmentHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
               {shipmentHealth}
             </Badge>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold" data-testid="text-shipment-queue-size">
-                  {!hasQueueData ? "-" : queueStats?.shipmentSyncQueue.size.toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">messages</span>
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-bold" data-testid="text-shipment-queue-size">
+                {!hasQueueData ? "-" : queueStats?.shipmentSyncQueue.size.toLocaleString()}
               </div>
-              {queueStats?.shipmentSyncQueue.oldestMessageAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  Oldest: {formatDistanceToNow(new Date(queueStats.shipmentSyncQueue.oldestMessageAt), { addSuffix: true })}
-                </div>
-              )}
-              <Button
-                data-testid="button-purge-shipment-sync"
-                variant="outline"
-                size="sm"
-                onClick={() => setPurgeAction("shipment")}
-                disabled={!queueStats || queueStats.shipmentSyncQueue.size === 0}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Purge Queue
-              </Button>
+              <p className="text-sm text-muted-foreground">messages</p>
+            </div>
+            {queueStats?.shipmentSyncQueue.oldestMessageAt && (
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Oldest: {formatDistanceToNow(new Date(queueStats.shipmentSyncQueue.oldestMessageAt), { addSuffix: true })}
+              </div>
+            )}
+            <Button
+              data-testid="button-purge-shipment-sync"
+              variant="outline"
+              size="sm"
+              onClick={() => setPurgeAction("shipment")}
+              disabled={!queueStats || queueStats.shipmentSyncQueue.size === 0}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Purge Queue
+            </Button>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">ShipStation tracking, fulfillments, backfill</p>
+              <Badge variant="outline" className="text-xs">Redis</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shopify-order-sync-queue" className="min-h-[280px]">
+        <Card data-testid="card-shopify-order-sync-queue">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-lg">Shopify Order Sync</CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">Missing orders awaiting import</span>
-                <Badge variant="outline" className="text-xs">Redis</Badge>
-              </CardDescription>
-            </div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              Shopify Order Sync
+            </CardTitle>
             <Badge
               data-testid={`badge-health-${shopifyOrderSyncHealth}`}
               variant={
                 shopifyOrderSyncHealth === "healthy" ? "default" :
                 shopifyOrderSyncHealth === "warning" ? "secondary" : "destructive"
               }
+              className={shopifyOrderSyncHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
             >
               {shopifyOrderSyncHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-              {shopifyOrderSyncHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+              {shopifyOrderSyncHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
               {shopifyOrderSyncHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
               {shopifyOrderSyncHealth}
             </Badge>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold" data-testid="text-shopify-order-sync-queue-size">
-                  {!hasQueueData ? "-" : queueStats?.shopifyOrderSyncQueue.size.toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">orders</span>
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-bold" data-testid="text-shopify-order-sync-queue-size">
+                {!hasQueueData ? "-" : queueStats?.shopifyOrderSyncQueue.size.toLocaleString()}
               </div>
-              {queueStats?.shopifyOrderSyncQueue.oldestMessageAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  Oldest: {formatDistanceToNow(new Date(queueStats.shopifyOrderSyncQueue.oldestMessageAt), { addSuffix: true })}
-                </div>
-              )}
-              <Button
-                data-testid="button-purge-shopify-order-sync"
-                variant="outline"
-                size="sm"
-                onClick={() => setPurgeAction("shopify-order-sync")}
-                disabled={!queueStats || queueStats.shopifyOrderSyncQueue.size === 0}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Purge Queue
-              </Button>
+              <p className="text-sm text-muted-foreground">orders</p>
+            </div>
+            {queueStats?.shopifyOrderSyncQueue.oldestMessageAt && (
+              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Oldest: {formatDistanceToNow(new Date(queueStats.shopifyOrderSyncQueue.oldestMessageAt), { addSuffix: true })}
+              </div>
+            )}
+            <Button
+              data-testid="button-purge-shopify-order-sync"
+              variant="outline"
+              size="sm"
+              onClick={() => setPurgeAction("shopify-order-sync")}
+              disabled={!queueStats || queueStats.shopifyOrderSyncQueue.size === 0}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Purge Queue
+            </Button>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Missing orders awaiting import</p>
+              <Badge variant="outline" className="text-xs">Redis</Badge>
             </div>
           </CardContent>
         </Card>
@@ -1319,44 +1323,39 @@ Please analyze this failure and help me understand:
           Warehouse Health
         </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-sessioned-today" className="hover-elevate min-h-[180px]">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-amber-500" />
-                  Sessioned Today
-                </CardTitle>
-                <CardDescription className="space-y-1">
-                  <span className="block">Orders entered wave picking</span>
-                  <Badge variant="outline" className="text-xs">SkuVault</Badge>
-                </CardDescription>
-              </div>
+          <Card data-testid="card-sessioned-today" className="hover-elevate">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                Sessioned Today
+              </CardTitle>
+              <Badge variant="default">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                info
+              </Badge>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold" data-testid="text-sessioned-today">
-                    {!hasQueueData ? "-" : (queueStats?.pipeline?.sessionedToday ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground">orders</span>
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-sessioned-today">
+                  {!hasQueueData ? "-" : (queueStats?.pipeline?.sessionedToday ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">orders</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Orders entered wave picking</p>
+                <Badge variant="outline" className="text-xs">SkuVault</Badge>
               </div>
             </CardContent>
           </Card>
 
           <Link href="/shipments?tab=packing_queue">
-            <Card data-testid="card-packing-queue" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Package className="h-5 w-5 text-blue-500" />
-                    Packing Queue
-                  </CardTitle>
-                  <CardDescription className="space-y-1">
-                    <span className="block">Sessioned but not shipped</span>
-                    <Badge variant="outline" className="text-xs">Database</Badge>
-                  </CardDescription>
-                </div>
+            <Card data-testid="card-packing-queue" className="hover-elevate active-elevate-2 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  Packing Queue
+                </CardTitle>
                 {(() => {
                   const queueHealth = (() => {
                     const count = queueStats?.pipeline?.inPackingQueue ?? 0;
@@ -1369,71 +1368,70 @@ Please analyze this failure and help me understand:
                     <Badge
                       data-testid={`badge-packing-queue-${queueHealth}`}
                       variant={queueHealth === "healthy" ? "default" : "secondary"}
+                      className={queueHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
                     >
                       {queueHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      {queueHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {queueHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
                       {queueHealth}
                     </Badge>
                   );
                 })()}
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold" data-testid="text-packing-queue">
-                      {!hasQueueData ? "-" : (queueStats?.pipeline?.inPackingQueue ?? 0).toLocaleString()}
-                    </span>
-                    <span className="text-muted-foreground">orders</span>
+              <CardContent className="space-y-4">
+                <div className="text-center py-2">
+                  <div className="text-4xl font-bold" data-testid="text-packing-queue">
+                    {!hasQueueData ? "-" : (queueStats?.pipeline?.inPackingQueue ?? 0).toLocaleString()}
                   </div>
-                  {queueStats?.pipeline?.oldestQueuedSessionAt && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      Oldest: {formatDistanceToNow(new Date(queueStats.pipeline.oldestQueuedSessionAt), { addSuffix: true })}
-                    </div>
-                  )}
+                  <p className="text-sm text-muted-foreground">orders</p>
+                </div>
+                {queueStats?.pipeline?.oldestQueuedSessionAt && (
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Oldest: {formatDistanceToNow(new Date(queueStats.pipeline.oldestQueuedSessionAt), { addSuffix: true })}
+                  </div>
+                )}
+                <Separator />
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Sessioned but not shipped</p>
+                  <Badge variant="outline" className="text-xs">Database</Badge>
                 </div>
               </CardContent>
             </Card>
           </Link>
 
-          <Card data-testid="card-shipped-today" className="hover-elevate min-h-[180px]">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-green-500" />
-                  Shipped Today
-                </CardTitle>
-                <CardDescription className="space-y-1">
-                  <span className="block">Orders with shipments today</span>
-                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
-                </CardDescription>
-              </div>
+          <Card data-testid="card-shipped-today" className="hover-elevate">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Shipped Today
+              </CardTitle>
+              <Badge variant="default">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                info
+              </Badge>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold" data-testid="text-shipped-today">
-                    {!hasQueueData ? "-" : (queueStats?.pipeline?.shippedToday ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground">orders</span>
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-shipped-today">
+                  {!hasQueueData ? "-" : (queueStats?.pipeline?.shippedToday ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">orders</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Orders with shipments today</p>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </div>
             </CardContent>
           </Card>
 
           <Link href="/stations?connection=offline">
-            <Card data-testid="card-offline-stations" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <WifiOff className="h-5 w-5 text-muted-foreground" />
-                    Offline Stations
-                  </CardTitle>
-                  <CardDescription className="space-y-1">
-                    <span className="block">Active stations not connected</span>
-                    <Badge variant="outline" className="text-xs">Desktop</Badge>
-                  </CardDescription>
-                </div>
+            <Card data-testid="card-offline-stations" className="hover-elevate active-elevate-2 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <WifiOff className="h-4 w-4 text-muted-foreground" />
+                  Offline Stations
+                </CardTitle>
                 {(() => {
                   const offlineCount = stationConnectionStats?.offline ?? 0;
                   const totalCount = stationConnectionStats?.total ?? 0;
@@ -1451,47 +1449,43 @@ Please analyze this failure and help me understand:
                         stationsHealth === "healthy" ? "default" :
                         stationsHealth === "warning" ? "secondary" : "destructive"
                       }
+                      className={stationsHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
                     >
                       {stationsHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      {stationsHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                      {stationsHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
                       {stationsHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
                       {stationsHealth}
                     </Badge>
                   );
                 })()}
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="text-center py-2">
+                  <div className="text-4xl font-bold" data-testid="text-offline-stations">
+                    {stationConnectionStats?.offline ?? 0}
+                  </div>
+                  <p className="text-sm text-muted-foreground">of {stationConnectionStats?.total ?? 0} stations</p>
+                </div>
+                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                  <Monitor className="h-3 w-3" />
+                  {stationConnectionStats?.connected ?? 0} online
+                </div>
+                <Separator />
                 <div className="space-y-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold" data-testid="text-offline-stations">
-                      {stationConnectionStats?.offline ?? 0}
-                    </span>
-                    <span className="text-muted-foreground">
-                      of {stationConnectionStats?.total ?? 0} stations
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Monitor className="h-4 w-4" />
-                    {stationConnectionStats?.connected ?? 0} online
-                  </div>
+                  <p className="text-xs text-muted-foreground">Active stations not connected</p>
+                  <Badge variant="outline" className="text-xs">Desktop</Badge>
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/print-queue">
-            <Card data-testid="card-stale-print-jobs" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    Stale Print Jobs
-                  </CardTitle>
-                  <CardDescription className="space-y-1">
-                    <span className="block">Jobs waiting too long</span>
-                    <Badge variant="outline" className="text-xs">Print Queue</Badge>
-                  </CardDescription>
-                </div>
+            <Card data-testid="card-stale-print-jobs" className="hover-elevate active-elevate-2 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  Stale Print Jobs
+                </CardTitle>
                 {(() => {
                   const staleHealth = queueStats?.stalePrintJobs?.healthStatus ?? 'healthy';
                   
@@ -1502,6 +1496,7 @@ Please analyze this failure and help me understand:
                         staleHealth === "healthy" ? "default" :
                         staleHealth === "warning" ? "secondary" : "destructive"
                       }
+                      className={staleHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
                     >
                       {staleHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                       {staleHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
@@ -1511,34 +1506,37 @@ Please analyze this failure and help me understand:
                   );
                 })()}
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold" data-testid="text-stale-print-jobs">
-                      {!hasQueueData ? "-" : (queueStats?.stalePrintJobs?.totalStale ?? 0)}
-                    </span>
-                    <span className="text-muted-foreground">stale jobs</span>
+              <CardContent className="space-y-4">
+                <div className="text-center py-2">
+                  <div className="text-4xl font-bold" data-testid="text-stale-print-jobs">
+                    {!hasQueueData ? "-" : (queueStats?.stalePrintJobs?.totalStale ?? 0)}
                   </div>
-                  {(queueStats?.stalePrintJobs?.totalStale ?? 0) > 0 && (
-                    <div className="flex items-center gap-3 text-sm">
-                      {(queueStats?.stalePrintJobs?.warningCount ?? 0) > 0 && (
-                        <span className="text-amber-600 dark:text-amber-400">
-                          {queueStats?.stalePrintJobs?.warningCount} warning
-                        </span>
-                      )}
-                      {(queueStats?.stalePrintJobs?.criticalCount ?? 0) > 0 && (
-                        <span className="text-red-600 dark:text-red-400">
-                          {queueStats?.stalePrintJobs?.criticalCount} critical
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {queueStats?.stalePrintJobs?.lastCheckedAt && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      Checked {formatDistanceToNow(new Date(queueStats.stalePrintJobs.lastCheckedAt), { addSuffix: true })}
-                    </div>
-                  )}
+                  <p className="text-sm text-muted-foreground">stale jobs</p>
+                </div>
+                {(queueStats?.stalePrintJobs?.totalStale ?? 0) > 0 && (
+                  <div className="flex items-center justify-center gap-3 text-xs">
+                    {(queueStats?.stalePrintJobs?.warningCount ?? 0) > 0 && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                        {queueStats?.stalePrintJobs?.warningCount} warning
+                      </Badge>
+                    )}
+                    {(queueStats?.stalePrintJobs?.criticalCount ?? 0) > 0 && (
+                      <Badge variant="destructive">
+                        {queueStats?.stalePrintJobs?.criticalCount} critical
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                {queueStats?.stalePrintJobs?.lastCheckedAt && (
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Checked {formatDistanceToNow(new Date(queueStats.stalePrintJobs.lastCheckedAt), { addSuffix: true })}
+                  </div>
+                )}
+                <Separator />
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Jobs waiting too long</p>
+                  <Badge variant="outline" className="text-xs">Print Queue</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -1554,18 +1552,12 @@ Please analyze this failure and help me understand:
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
         <Link href="/orders?hasShipment=false">
-          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+          <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Orders Missing Shipments
-                </CardTitle>
-                <CardDescription className="space-y-1">
-                  <span className="block">Fulfilled orders without shipment records</span>
-                  <Badge variant="outline" className="text-xs">Shopify ↔ ShipStation</Badge>
-                </CardDescription>
-              </div>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                Orders Missing Shipments
+              </CardTitle>
               {(() => {
                 const ordersMissingHealth = (() => {
                   if (!queueStats?.dataHealth?.ordersMissingShipments) return "healthy";
@@ -1584,196 +1576,244 @@ Please analyze this failure and help me understand:
                       ordersMissingHealth === "healthy" ? "default" :
                       ordersMissingHealth === "warning" ? "secondary" : "destructive"
                     }
+                    className={ordersMissingHealth === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" : ""}
                   >
                     {ordersMissingHealth === "healthy" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                    {ordersMissingHealth === "warning" && <AlertCircle className="h-3 w-3 mr-1" />}
+                    {ordersMissingHealth === "warning" && <AlertTriangle className="h-3 w-3 mr-1" />}
                     {ordersMissingHealth === "critical" && <AlertCircle className="h-3 w-3 mr-1" />}
                     {ordersMissingHealth}
                   </Badge>
                 );
               })()}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold" data-testid="text-orders-missing-shipments">
-                    {!hasQueueData ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground">orders</span>
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-orders-missing-shipments">
+                  {!hasQueueData ? "-" : (queueStats?.dataHealth?.ordersMissingShipments ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">orders</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Fulfilled orders without shipment records</p>
                 {queueStats?.dataHealth?.oldestOrderMissingShipmentAt && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
                     Oldest: {formatDistanceToNow(new Date(queueStats.dataHealth.oldestOrderMissingShipmentAt), { addSuffix: true })}
                   </div>
                 )}
+                <Badge variant="outline" className="text-xs">Shopify ↔ ShipStation</Badge>
               </div>
             </CardContent>
           </Card>
         </Link>
 
         <Link href="/shipments?withoutOrders=true">
-          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Truck className="h-5 w-5" />
+          <Card data-testid="card-shipments-without-orders" className="hover-elevate active-elevate-2 cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
                 Shipments Without Orders
               </CardTitle>
-              <CardDescription className="space-y-1">
-                <span className="block">Shipment records with no linked orders</span>
-                <Badge variant="outline" className="text-xs">ShipStation</Badge>
-              </CardDescription>
+              <Badge variant="default">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                info
+              </Badge>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-shipments-without-orders">
                   {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">shipments</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Shipment records with no linked orders</p>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </div>
             </CardContent>
           </Card>
         </Link>
 
         <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-warning">
-          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  No Tracking (24-48h)
-                </CardTitle>
-                <CardDescription className="space-y-1">
-                  <span className="block">Shipped 24-48 hours ago, no tracking yet</span>
-                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
-                </CardDescription>
-              </div>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                No Tracking (24-48h)
+              </CardTitle>
               <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 warning
               </Badge>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-bold" data-testid="text-shipments-without-status-warning">
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-shipments-without-status-warning">
                   {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">shipments</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Shipped 24-48 hours ago, no tracking yet</p>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </div>
             </CardContent>
           </Card>
         </Link>
 
         <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-critical">
-          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  No Tracking (48h+)
-                </CardTitle>
-                <CardDescription className="space-y-1">
-                  <span className="block">Shipped over 48 hours ago, still no tracking</span>
-                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
-                </CardDescription>
-              </div>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                No Tracking (48h+)
+              </CardTitle>
               <Badge variant="destructive">
                 <AlertCircle className="h-3 w-3 mr-1" />
                 critical
               </Badge>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-bold" data-testid="text-shipments-without-status-critical">
+            <CardContent className="space-y-4">
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" data-testid="text-shipments-without-status-critical">
                   {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0).toLocaleString()}
                 </div>
+                <p className="text-sm text-muted-foreground">shipments</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Shipped over 48 hours ago, still no tracking</p>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Card data-testid="card-shipment-sync-failures" className="min-h-[280px]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <XCircle className="h-5 w-5" />
+        <Card data-testid="card-shipment-sync-failures">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-muted-foreground" />
               Shipment Sync Failures
             </CardTitle>
-            <CardDescription className="space-y-1">
-              <span className="block">Failed shipment synchronization attempts</span>
-              <Badge variant="outline" className="text-xs">ShipStation</Badge>
-            </CardDescription>
+            {(() => {
+              const count = queueStats?.dataHealth?.shipmentSyncFailures ?? 0;
+              if (count === 0) {
+                return (
+                  <Badge variant="default">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    healthy
+                  </Badge>
+                );
+              }
+              return (
+                <Badge variant="destructive">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {count} failed
+                </Badge>
+              );
+            })()}
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold" data-testid="text-shipment-sync-failures">
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-bold" data-testid="text-shipment-sync-failures">
                 {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentSyncFailures ?? 0).toLocaleString()}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  data-testid="button-view-failures"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFailuresDialog(true)}
-                  disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
-                  className="flex-1"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  View
-                </Button>
-                <Button
-                  data-testid="button-purge-failures"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPurgeAction("failures")}
-                  disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">failures</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                data-testid="button-view-failures"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFailuresDialog(true)}
+                disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
+                className="flex-1"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                View
+              </Button>
+              <Button
+                data-testid="button-purge-failures"
+                variant="outline"
+                size="sm"
+                onClick={() => setPurgeAction("failures")}
+                disabled={!queueStats || (queueStats?.dataHealth?.shipmentSyncFailures ?? 0) === 0}
+                className="flex-1"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Failed shipment synchronization attempts</p>
+              <Badge variant="outline" className="text-xs">ShipStation</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-shopify-order-sync-failures" className="min-h-[280px]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
+        <Card data-testid="card-shopify-order-sync-failures">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               Shopify Order Sync Failures
             </CardTitle>
-            <CardDescription className="space-y-1">
-              <span className="block">Orders that failed to import</span>
-              <Badge variant="outline" className="text-xs">Shopify</Badge>
-            </CardDescription>
+            {(() => {
+              const count = queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0;
+              if (count === 0) {
+                return (
+                  <Badge variant="default">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    healthy
+                  </Badge>
+                );
+              }
+              return (
+                <Badge variant="destructive">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {count} failed
+                </Badge>
+              );
+            })()}
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold" data-testid="text-shopify-order-sync-failures">
+          <CardContent className="space-y-4">
+            <div className="text-center py-2">
+              <div className="text-4xl font-bold" data-testid="text-shopify-order-sync-failures">
                 {!hasQueueData ? "-" : (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0).toLocaleString()}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  data-testid="button-view-shopify-order-sync-failures"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowShopifyOrderSyncFailuresDialog(true)}
-                  disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
-                  className="flex-1"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  View
-                </Button>
-                <Button
-                  data-testid="button-purge-shopify-order-sync-failures"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPurgeAction("shopify-order-sync-failures")}
-                  disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">failures</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                data-testid="button-view-shopify-order-sync-failures"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowShopifyOrderSyncFailuresDialog(true)}
+                disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
+                className="flex-1"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                View
+              </Button>
+              <Button
+                data-testid="button-purge-shopify-order-sync-failures"
+                variant="outline"
+                size="sm"
+                onClick={() => setPurgeAction("shopify-order-sync-failures")}
+                disabled={!queueStats || (queueStats?.dataHealth?.shopifyOrderSyncFailures ?? 0) === 0}
+                className="flex-1"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Orders that failed to import</p>
+              <Badge variant="outline" className="text-xs">Shopify</Badge>
             </div>
           </CardContent>
         </Card>
