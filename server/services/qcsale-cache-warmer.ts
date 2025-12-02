@@ -477,6 +477,52 @@ export function getCacheWarmerMetrics(): CacheWarmerMetrics {
 }
 
 /**
+ * Batch check warm cache status for multiple order numbers
+ * Returns a map of orderNumber -> { isWarmed, warmedAt }
+ */
+export async function getWarmCacheStatusBatch(orderNumbers: string[]): Promise<Map<string, { isWarmed: boolean; warmedAt: number | null }>> {
+  const results = new Map<string, { isWarmed: boolean; warmedAt: number | null }>();
+  
+  if (!orderNumbers.length) {
+    return results;
+  }
+  
+  try {
+    const redis = getRedisClient();
+    
+    // Check all order numbers in parallel
+    await Promise.all(
+      orderNumbers.map(async (orderNumber) => {
+        const warmKey = getWarmCacheKey(orderNumber);
+        const cacheData = await redis.get(warmKey);
+        
+        if (cacheData) {
+          const parsed = typeof cacheData === 'string' ? JSON.parse(cacheData) : cacheData;
+          results.set(orderNumber, {
+            isWarmed: true,
+            warmedAt: parsed.warmedAt || parsed.cachedAt || null,
+          });
+        } else {
+          results.set(orderNumber, {
+            isWarmed: false,
+            warmedAt: null,
+          });
+        }
+      })
+    );
+    
+    return results;
+  } catch (err: any) {
+    error(`Failed to batch check warm cache status: ${err.message}`);
+    // Return all as not warmed on error
+    orderNumbers.forEach(orderNumber => {
+      results.set(orderNumber, { isWarmed: false, warmedAt: null });
+    });
+    return results;
+  }
+}
+
+/**
  * Called when a session transitions to 'closed' to immediately warm the cache
  * Hook this into the Firestore session sync worker
  */

@@ -23,7 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch } from "./services/qcsale-cache-warmer";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -4779,6 +4779,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Operations] Error fetching cache warmer status:", error);
       res.status(500).json({ error: "Failed to fetch cache warmer status" });
+    }
+  });
+
+  // Get batch warm cache status for multiple order numbers
+  // Used by frontend to show cache indicators on shipment cards
+  app.post("/api/operations/warm-cache-status", requireAuth, async (req, res) => {
+    try {
+      const { orderNumbers } = req.body;
+      
+      if (!Array.isArray(orderNumbers)) {
+        return res.status(400).json({ error: "orderNumbers must be an array" });
+      }
+      
+      if (orderNumbers.length > 100) {
+        return res.status(400).json({ error: "Maximum 100 order numbers per request" });
+      }
+      
+      const statusMap = await getWarmCacheStatusBatch(orderNumbers);
+      
+      // Convert Map to object for JSON response
+      const statuses: Record<string, { isWarmed: boolean; warmedAt: number | null }> = {};
+      statusMap.forEach((value, key) => {
+        statuses[key] = value;
+      });
+      
+      res.json({ statuses });
+    } catch (error: any) {
+      console.error("[Operations] Error fetching warm cache status:", error);
+      res.status(500).json({ error: "Failed to fetch warm cache status" });
     }
   });
 
