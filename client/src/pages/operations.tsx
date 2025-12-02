@@ -528,7 +528,11 @@ function UnifiedSyncButtons({
           setIsResyncLoading(true);
           try {
             await apiRequest('POST', '/api/operations/force-unified-resync');
-            // No success toast - status badge will update via WebSocket
+            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+            toast({
+              title: "7-Day Resync Started",
+              description: "Cursor reset to 7 days ago.",
+            });
           } catch (err) {
             console.error('Failed to force resync:', err);
             toast({
@@ -553,6 +557,7 @@ function UnifiedSyncButtons({
           setIsResync90Loading(true);
           try {
             await apiRequest('POST', '/api/operations/force-unified-resync-90');
+            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
             toast({
               title: "90-Day Resync Started",
               description: "Cursor reset to 90 days ago. This may take a while to complete.",
