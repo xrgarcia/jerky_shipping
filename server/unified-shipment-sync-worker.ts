@@ -15,10 +15,19 @@
  */
 
 import { db } from './db';
-import { syncCursors, shipments } from '@shared/schema';
-import { eq, sql, and, isNull, lt, or } from 'drizzle-orm';
+import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
+import { eq, sql, and, isNull, lt, or, count } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
-import { broadcastOrderUpdate } from './websocket';
+import { broadcastOrderUpdate, broadcastQueueStatus } from './websocket';
+import { 
+  getQueueLength, 
+  getShipmentSyncQueueLength, 
+  getShopifyOrderSyncQueueLength,
+  getOldestShopifyQueueMessage,
+  getOldestShipmentSyncQueueMessage,
+  getOldestShopifyOrderSyncQueueMessage
+} from './utils/queue';
+import { storage } from './storage';
 
 // Configuration
 const POLL_INTERVAL_MS = 60_000; // 60 seconds between polls
@@ -384,6 +393,8 @@ async function runPollLoop(): Promise<boolean> {
     console.error('[UnifiedSync] Poll error:', err);
   } finally {
     isPolling = false;
+    // Broadcast updated status via WebSocket after each poll
+    await broadcastWorkerStatus();
   }
   
   return needsImmediateFollowup;
@@ -542,6 +553,59 @@ export async function getWorkerStatus(): Promise<WorkerStatus> {
     lastCursorUpdate: cursor?.lastSyncedAt || null,
     credentialsConfigured: credentials.configured,
   };
+}
+
+/**
+ * Broadcast worker status via WebSocket
+ * Called after each poll cycle to update the Operations dashboard in real-time
+ */
+async function broadcastWorkerStatus(): Promise<void> {
+  try {
+    const status = await getWorkerStatus();
+    const stats = await getSyncStats();
+    
+    // Get current queue stats to include in broadcast
+    const shopifyQueueLength = await getQueueLength();
+    const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
+    const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
+    const oldestShopify = await getOldestShopifyQueueMessage();
+    const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
+    const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
+    const failureCount = await db.select({ count: count() })
+      .from(shipmentSyncFailures)
+      .then(rows => rows[0]?.count || 0);
+    const allBackfillJobs = await storage.getAllBackfillJobs();
+    const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
+    const dataHealth = await storage.getDataHealthMetrics();
+    const pipeline = await storage.getPipelineMetrics();
+    
+    broadcastQueueStatus({
+      shopifyQueue: shopifyQueueLength,
+      shipmentSyncQueue: shipmentSyncQueueLength,
+      shopifyOrderSyncQueue: shopifyOrderSyncQueueLength,
+      shipmentFailureCount: failureCount,
+      shopifyQueueOldestAt: oldestShopify?.enqueuedAt || null,
+      shipmentSyncQueueOldestAt: oldestShipmentSync?.enqueuedAt || null,
+      shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
+      backfillActiveJob: activeBackfillJob,
+      dataHealth,
+      pipeline,
+      unifiedSyncWorker: {
+        isRunning: status.isRunning,
+        isPolling: status.isPolling,
+        lastPollTime: status.lastPollTime?.toISOString() || null,
+        pollCount: status.pollCount,
+        errorCount: status.errorCount,
+        lastError: status.lastError,
+        cursorPosition: status.cursorPosition,
+        lastCursorUpdate: status.lastCursorUpdate?.toISOString() || null,
+        credentialsConfigured: status.credentialsConfigured,
+        syncStats: stats,
+      },
+    });
+  } catch (error) {
+    console.error('[UnifiedSync] Error broadcasting worker status:', error);
+  }
 }
 
 /**

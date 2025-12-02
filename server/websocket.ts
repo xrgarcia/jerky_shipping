@@ -697,6 +697,25 @@ export type QueueStatusData = {
     shippedToday: number;
     oldestQueuedSessionAt: string | null;
   };
+  unifiedSyncWorker?: {
+    isRunning: boolean;
+    isPolling: boolean;
+    lastPollTime: string | null;
+    pollCount: number;
+    errorCount: number;
+    lastError: string | null;
+    cursorPosition: string | null;
+    lastCursorUpdate: string | null;
+    credentialsConfigured: boolean;
+    syncStats?: {
+      totalShipments: number;
+      syncedLast5Minutes: number;
+      syncedLast1Hour: number;
+      neverSynced: number;
+      onHoldCount: number;
+      staleOnHoldCount: number;
+    };
+  };
   dataHealth: {
     ordersMissingShipments: number;
     oldestOrderMissingShipmentAt: string | null;
@@ -790,6 +809,25 @@ export function broadcastQueueStatus(data: {
     shippedToday: number;
     oldestQueuedSessionAt: string | null;
   };
+  unifiedSyncWorker?: {
+    isRunning: boolean;
+    isPolling: boolean;
+    lastPollTime: string | null;
+    pollCount: number;
+    errorCount: number;
+    lastError: string | null;
+    cursorPosition: string | null;
+    lastCursorUpdate: string | null;
+    credentialsConfigured: boolean;
+    syncStats?: {
+      totalShipments: number;
+      syncedLast5Minutes: number;
+      syncedLast1Hour: number;
+      neverSynced: number;
+      onHoldCount: number;
+      staleOnHoldCount: number;
+    };
+  };
 }): void {
   // Guard against wss being null and clear entire cache to prevent stale data after restart
   if (!wss) {
@@ -853,6 +891,8 @@ export function broadcastQueueStatus(data: {
     firestoreSessionSyncWorkerStats: data.firestoreSessionSyncWorkerStats ?? cachedState.firestoreSessionSyncWorkerStats,
     // Pipeline metrics - preserve from cache if not provided (prevents flashing)
     pipeline: data.pipeline ?? cachedState.pipeline,
+    // Unified shipment sync worker - preserve from cache if not provided
+    unifiedSyncWorker: data.unifiedSyncWorker ?? cachedState.unifiedSyncWorker,
     dataHealth: {
       ordersMissingShipments: data.dataHealth?.ordersMissingShipments ?? cachedState.dataHealth?.ordersMissingShipments ?? 0,
       oldestOrderMissingShipmentAt: data.dataHealth?.oldestOrderMissingShipmentAt ?? cachedState.dataHealth?.oldestOrderMissingShipmentAt ?? null,

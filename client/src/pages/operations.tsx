@@ -710,6 +710,10 @@ Please analyze this failure and help me understand:
               firestoreSessionSyncWorkerStats: message.data.firestoreSessionSyncWorkerStats !== undefined
                 ? message.data.firestoreSessionSyncWorkerStats
                 : (prev?.firestoreSessionSyncWorkerStats ?? initial?.firestoreSessionSyncWorkerStats),
+              // Unified shipment sync worker - use WebSocket data if defined
+              unifiedSyncWorker: message.data.unifiedSyncWorker !== undefined
+                ? message.data.unifiedSyncWorker
+                : (prev?.unifiedSyncWorker ?? initial?.unifiedSyncWorker),
             }));
           } else if (message.type === 'station_connection_change') {
             // Desktop client connected/disconnected - refetch stations data immediately
