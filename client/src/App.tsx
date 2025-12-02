@@ -57,14 +57,14 @@ function AppContent() {
   }
 
   if (isAuthenticated && location === "/login") {
-    return <Redirect to="/orders" />;
+    return <Redirect to="/shipments" />;
   }
 
   const router = (
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/">
-        <Redirect to="/orders" />
+        <Redirect to="/shipments" />
       </Route>
       <Route path="/orders" component={Orders} />
       <Route path="/orders/:id" component={OrderDetail} />
