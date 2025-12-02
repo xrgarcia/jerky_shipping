@@ -1162,8 +1162,8 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Queue</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>Order webhooks awaiting processing</span>
+              <CardDescription className="space-y-1">
+                <span className="block">Order webhooks awaiting processing</span>
                 <Badge variant="outline" className="text-xs">Redis</Badge>
               </CardDescription>
             </div>
@@ -1213,8 +1213,8 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Webhook Processing Queue</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>ShipStation tracking, fulfillments, backfill</span>
+              <CardDescription className="space-y-1">
+                <span className="block">ShipStation tracking, fulfillments, backfill</span>
                 <Badge variant="outline" className="text-xs">Redis</Badge>
               </CardDescription>
             </div>
@@ -1264,8 +1264,8 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Order Sync</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>Missing orders awaiting import</span>
+              <CardDescription className="space-y-1">
+                <span className="block">Missing orders awaiting import</span>
                 <Badge variant="outline" className="text-xs">Redis</Badge>
               </CardDescription>
             </div>
@@ -1326,8 +1326,8 @@ Please analyze this failure and help me understand:
                   <Zap className="h-5 w-5 text-amber-500" />
                   Sessioned Today
                 </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  <span>Orders entered wave picking</span>
+                <CardDescription className="space-y-1">
+                  <span className="block">Orders entered wave picking</span>
                   <Badge variant="outline" className="text-xs">SkuVault</Badge>
                 </CardDescription>
               </div>
@@ -1352,8 +1352,8 @@ Please analyze this failure and help me understand:
                     <Package className="h-5 w-5 text-blue-500" />
                     Packing Queue
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    <span>Sessioned but not shipped</span>
+                  <CardDescription className="space-y-1">
+                    <span className="block">Sessioned but not shipped</span>
                     <Badge variant="outline" className="text-xs">Database</Badge>
                   </CardDescription>
                 </div>
@@ -1403,8 +1403,8 @@ Please analyze this failure and help me understand:
                   <Truck className="h-5 w-5 text-green-500" />
                   Shipped Today
                 </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  <span>Orders with shipments today</span>
+                <CardDescription className="space-y-1">
+                  <span className="block">Orders with shipments today</span>
                   <Badge variant="outline" className="text-xs">ShipStation</Badge>
                 </CardDescription>
               </div>
@@ -1429,8 +1429,8 @@ Please analyze this failure and help me understand:
                     <WifiOff className="h-5 w-5 text-muted-foreground" />
                     Offline Stations
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    <span>Active stations not connected</span>
+                  <CardDescription className="space-y-1">
+                    <span className="block">Active stations not connected</span>
                     <Badge variant="outline" className="text-xs">Desktop</Badge>
                   </CardDescription>
                 </div>
@@ -1487,8 +1487,8 @@ Please analyze this failure and help me understand:
                     <AlertTriangle className="h-5 w-5 text-amber-500" />
                     Stale Print Jobs
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-2">
-                    <span>Jobs waiting too long</span>
+                  <CardDescription className="space-y-1">
+                    <span className="block">Jobs waiting too long</span>
                     <Badge variant="outline" className="text-xs">Print Queue</Badge>
                   </CardDescription>
                 </div>
@@ -1561,8 +1561,8 @@ Please analyze this failure and help me understand:
                   <ShoppingCart className="h-5 w-5" />
                   Orders Missing Shipments
                 </CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  <span>Fulfilled orders without shipment records</span>
+                <CardDescription className="space-y-1">
+                  <span className="block">Fulfilled orders without shipment records</span>
                   <Badge variant="outline" className="text-xs">Shopify ↔ ShipStation</Badge>
                 </CardDescription>
               </div>
@@ -1619,8 +1619,8 @@ Please analyze this failure and help me understand:
                 <Truck className="h-5 w-5" />
                 Shipments Without Orders
               </CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>Shipment records with no linked orders</span>
+              <CardDescription className="space-y-1">
+                <span className="block">Shipment records with no linked orders</span>
                 <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </CardDescription>
             </CardHeader>
@@ -1641,8 +1641,8 @@ Please analyze this failure and help me understand:
                 <AlertTriangle className="h-5 w-5" />
                 No Tracking (24-48h)
               </CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>Warning: Shipped 24-48 hours ago</span>
+              <CardDescription className="space-y-1">
+                <span className="block">Warning: Shipped 24-48 hours ago</span>
                 <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </CardDescription>
             </CardHeader>
@@ -1663,8 +1663,8 @@ Please analyze this failure and help me understand:
                 <AlertCircle className="h-5 w-5" />
                 No Tracking (48h+)
               </CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <span>Critical: Shipped over 48 hours ago</span>
+              <CardDescription className="space-y-1">
+                <span className="block">Critical: Shipped over 48 hours ago</span>
                 <Badge variant="outline" className="text-xs">ShipStation</Badge>
               </CardDescription>
             </CardHeader>
@@ -1684,8 +1684,8 @@ Please analyze this failure and help me understand:
               <XCircle className="h-5 w-5" />
               Shipment Sync Failures
             </CardTitle>
-            <CardDescription className="flex items-center gap-2">
-              <span>Failed shipment synchronization attempts</span>
+            <CardDescription className="space-y-1">
+              <span className="block">Failed shipment synchronization attempts</span>
               <Badge variant="outline" className="text-xs">ShipStation</Badge>
             </CardDescription>
           </CardHeader>
@@ -1728,8 +1728,8 @@ Please analyze this failure and help me understand:
               <ShoppingCart className="h-5 w-5" />
               Shopify Order Sync Failures
             </CardTitle>
-            <CardDescription className="flex items-center gap-2">
-              <span>Orders that failed to import</span>
+            <CardDescription className="space-y-1">
+              <span className="block">Orders that failed to import</span>
               <Badge variant="outline" className="text-xs">Shopify</Badge>
             </CardDescription>
           </CardHeader>
