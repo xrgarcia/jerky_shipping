@@ -73,6 +73,55 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling. Supported webhooks: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`. Note: ShipStation V2 does NOT support `fulfillment_created_v2` or `fulfillment_canceled_v2` events - on-hold status changes are handled by the Unified Shipment Sync Worker's cursor-based polling.
     - **CRITICAL API Parameter**: ShipStation V2 API uses `modified_at_start` and `modified_at_end` for date filtering (NOT `modified_date_start`). ShipStation silently ignores invalid parameters without error, making debugging difficult. Always verify parameters against official documentation.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning, featuring automatic authentication and Redis-backed token caching. Includes a discriminated union type system for product classification and optimized QC scan API with a cache-with-fallback pattern.
+
+### CRITICAL: Warehouse Session Lifecycle (SkuVault Sessions)
+This is the core warehouse workflow that governs order fulfillment. The system MUST understand this lifecycle deeply.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        SKUVAULT SESSION LIFECYCLE                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   SESSION STATUS    │  TRACKING   │  WAREHOUSE STATE       │  SYSTEM ACTION│
+│   ──────────────────┼─────────────┼────────────────────────┼───────────────│
+│   "new"             │  -          │  Ready to be picked    │  Pick queue   │
+│   "active"          │  -          │  Being picked now      │  In progress  │
+│   "inactive"        │  -          │  ⚠️ PAUSED/STUCK       │  FLAG IT!     │
+│   "closed"          │  NULL       │  ✅ READY TO PACK      │  WARM CACHE   │
+│   "closed"          │  Has value  │  Ready for carrier     │  INVALIDATE   │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  CACHE WARMING STRATEGY:                                                    │
+│  ────────────────────────                                                   │
+│  Target: sessionStatus='closed' AND trackingNumber IS NULL                  │
+│  These orders have been PICKED and are waiting at the packing station.      │
+│                                                                             │
+│  Warming Triggers:                                                          │
+│  • Session transitions to "closed" + no tracking → Warm cache immediately   │
+│  • Background poll every 30s catches any missed orders                      │
+│  • Uses extended TTL (10-15 min) vs standard 2-minute cache                 │
+│                                                                             │
+│  Invalidation Triggers:                                                     │
+│  • Label created (tracking number assigned) → Invalidate immediately        │
+│  • Order shipped → Remove from warm cache                                   │
+│                                                                             │
+│  Manual Refresh:                                                            │
+│  • Button on packing page for "closed + no tracking" orders only            │
+│  • Used when customer service makes order changes (rare but critical)       │
+│  • Forces fresh SkuVault API call and re-caches data                        │
+│                                                                             │
+│  Flagging for Attention:                                                    │
+│  • "inactive" sessions need supervisor attention (stuck mid-pick)           │
+│  • Surface in Operations Dashboard with warning indicator                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Session Status Definitions:**
+- **new**: Order has been sessioned and is in the pick queue, waiting to be picked
+- **active**: Order is currently being picked by a warehouse worker
+- **inactive**: Order was being picked but picker paused/abandoned it. REQUIRES ATTENTION.
+- **closed**: Order picking is complete. If no tracking number, it's ready to pack. If has tracking, it's ready for carrier pickup.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database.
