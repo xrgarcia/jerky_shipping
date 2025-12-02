@@ -492,9 +492,10 @@ function UnifiedSyncButtons({
 }) {
   const [isPollLoading, setIsPollLoading] = useState(false);
   const [isResyncLoading, setIsResyncLoading] = useState(false);
+  const [isResync90Loading, setIsResync90Loading] = useState(false);
 
   return (
-    <div className="flex gap-2 mt-2">
+    <div className="flex flex-wrap gap-2 mt-2">
       <Button
         size="sm"
         variant="outline"
@@ -543,7 +544,35 @@ function UnifiedSyncButtons({
         data-testid="button-force-unified-resync"
       >
         <RefreshCw className={cn("h-3 w-3 mr-1", isResyncLoading && "animate-spin")} />
-        {isResyncLoading ? "Resetting cursor..." : "Force Resync (7-day)"}
+        {isResyncLoading ? "Resetting..." : "Resync (7-day)"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          setIsResync90Loading(true);
+          try {
+            await apiRequest('POST', '/api/operations/force-unified-resync-90');
+            toast({
+              title: "90-Day Resync Started",
+              description: "Cursor reset to 90 days ago. This may take a while to complete.",
+            });
+          } catch (err) {
+            console.error('Failed to force 90-day resync:', err);
+            toast({
+              title: "Failed to force 90-day resync",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsResync90Loading(false);
+          }
+        }}
+        disabled={!credentialsConfigured || isResync90Loading}
+        data-testid="button-force-unified-resync-90"
+      >
+        <RefreshCw className={cn("h-3 w-3 mr-1", isResync90Loading && "animate-spin")} />
+        {isResync90Loading ? "Resetting..." : "Resync (90-day)"}
       </Button>
     </div>
   );

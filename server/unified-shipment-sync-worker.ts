@@ -814,3 +814,24 @@ export async function forceFullResync(): Promise<void> {
   // Trigger immediate poll
   triggerImmediatePoll();
 }
+
+/**
+ * Force a resync with custom lookback days
+ * WARNING: This will re-sync all shipments from the specified lookback period
+ */
+export async function forceResyncWithDays(days: number): Promise<void> {
+  console.log(`[UnifiedSync] Forcing resync with ${days}-day lookback`);
+  
+  const lookbackDate = new Date();
+  lookbackDate.setDate(lookbackDate.getDate() - days);
+  const cursorValue = lookbackDate.toISOString();
+  
+  await updateCursor(cursorValue, {
+    forcedResyncAt: new Date().toISOString(),
+    reason: `manual_trigger_${days}_days`,
+    lookbackDays: days,
+  });
+  
+  // Trigger immediate poll
+  triggerImmediatePoll();
+}

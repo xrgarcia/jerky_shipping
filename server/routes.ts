@@ -3733,6 +3733,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force 90-day resync (reset cursor to 90 days ago)
+  app.post("/api/operations/force-unified-resync-90", requireAuth, async (req, res) => {
+    try {
+      const { forceResyncWithDays } = await import("./unified-shipment-sync-worker");
+      await forceResyncWithDays(90);
+      res.json({ success: true, message: "Full resync initiated - cursor reset to 90-day lookback" });
+    } catch (error) {
+      console.error("Error forcing 90-day unified resync:", error);
+      res.status(500).json({ error: "Failed to force 90-day unified resync" });
+    }
+  });
+
   // Force full Firestore session resync (reset cursor and re-fetch all sessions)
   app.post("/api/operations/force-firestore-resync", requireAuth, async (req, res) => {
     try {
