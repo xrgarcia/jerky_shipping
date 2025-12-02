@@ -214,14 +214,10 @@ export default function OrderDetail() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'order_update') {
-            if (data.order.id === orderId) {
+            if (data.order?.id === orderId) {
+              // Silently refresh data - no toast notifications
               queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
               queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-              
-              toast({
-                title: "Shipment tracking updated",
-                description: `Tracking information updated for order #${data.order.orderNumber}`,
-              });
             }
           }
         } catch (error) {

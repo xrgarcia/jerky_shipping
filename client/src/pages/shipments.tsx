@@ -617,13 +617,8 @@ export default function Shipments() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'order_update' && data.order) {
+            // Silently refresh data - no toast notifications
             queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
-            if (isMounted) {
-              toast({
-                title: `Order ${data.order.orderNumber} updated`,
-                description: `Shipment tracking information updated for ${data.order.customerName}`,
-              });
-            }
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
