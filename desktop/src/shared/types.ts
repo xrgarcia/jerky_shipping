@@ -14,6 +14,7 @@ export interface Printer {
   isDefault: boolean;
   stationId: string | null;
   status: 'online' | 'offline' | 'error';
+  useRawMode: boolean; // Use raw/direct printing for industrial printers (SATO, Zebra, etc.)
   lastSeenAt: string | null;
   createdAt: string;
 }

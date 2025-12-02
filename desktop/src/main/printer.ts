@@ -12,6 +12,7 @@ interface SystemPrinter {
   systemName: string;
   isDefault: boolean;
   status: string;
+  suggestRawMode?: boolean; // Auto-detected suggestion for industrial printers
 }
 
 interface PdfViewerInfo {
@@ -19,6 +20,26 @@ interface PdfViewerInfo {
   viewer: string | null;
   path: string | null;
 }
+
+// Industrial printer brands that work best with raw/direct printing mode
+const INDUSTRIAL_PRINTER_PATTERNS = [
+  /sato/i,
+  /cl4nx/i,
+  /cl6nx/i,
+  /zebra.*industrial/i,
+  /zebra.*z[te]/i, // ZT410, ZT610, ZE500, etc.
+  /zebra.*105sl/i,
+  /zebra.*110xi/i,
+  /zebra.*170xi/i,
+  /zebra.*220xi/i,
+  /honeywell.*pm/i, // PM42, PM43, PM45
+  /honeywell.*px/i, // PX4i, PX6i
+  /datamax/i,
+  /tsc.*m[exb]/i, // ME240, MX240, MB240
+  /citizen.*cl-s/i,
+  /cab.*squix/i,
+  /cab.*a\+/i,
+];
 
 export class PrinterService {
   private tempDir: string;
@@ -28,6 +49,14 @@ export class PrinterService {
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'jerky-ship-connect');
     this.platform = process.platform;
+  }
+  
+  /**
+   * Check if a printer name suggests it's an industrial label printer
+   * that would benefit from raw/direct printing mode
+   */
+  isIndustrialPrinter(printerName: string): boolean {
+    return INDUSTRIAL_PRINTER_PATTERNS.some(pattern => pattern.test(printerName));
   }
   
   /**
@@ -209,11 +238,13 @@ export class PrinterService {
           status = 'busy';
         }
         
+        const name = printer.Name;
         printers.push({
-          name: printer.Name,
-          systemName: printer.Name,
+          name,
+          systemName: name,
           isDefault: printer.Default === true,
           status,
+          suggestRawMode: this.isIndustrialPrinter(name),
         });
       }
     } catch (error) {
@@ -236,6 +267,7 @@ export class PrinterService {
                 systemName: name,
                 isDefault,
                 status,
+                suggestRawMode: this.isIndustrialPrinter(name),
               });
             }
           }
@@ -248,7 +280,7 @@ export class PrinterService {
     return printers;
   }
   
-  async print(job: PrintJob, printerName: string): Promise<void> {
+  async print(job: PrintJob, printerName: string, useRawMode: boolean = false): Promise<void> {
     console.log('[Printer] ========================================');
     console.log('[Printer] PRINT JOB STARTING');
     console.log('[Printer] ========================================');
@@ -258,6 +290,7 @@ export class PrinterService {
     console.log(`[Printer] Has labelUrl: ${!!job.labelUrl}`);
     console.log(`[Printer] Platform: ${this.platform}`);
     console.log(`[Printer] Temp dir: ${this.tempDir}`);
+    console.log(`[Printer] Use Raw Mode: ${useRawMode}`);
     
     await fs.mkdir(this.tempDir, { recursive: true });
     
@@ -282,7 +315,7 @@ export class PrinterService {
       const fileExists = await fs.stat(labelPath).then(() => true).catch(() => false);
       console.log(`[Printer] File exists before print: ${fileExists}`);
       
-      await this.printFile(labelPath, printerName);
+      await this.printFile(labelPath, printerName, useRawMode);
       
       console.log('[Printer] ========================================');
       console.log(`[Printer] Job ${job.id} printed successfully`);
@@ -314,12 +347,131 @@ export class PrinterService {
     await fs.writeFile(destPath, Buffer.from(buffer));
   }
   
-  private async printFile(filePath: string, printerName: string): Promise<void> {
+  private async printFile(filePath: string, printerName: string, useRawMode: boolean = false): Promise<void> {
     if (this.platform === 'win32') {
+      if (useRawMode) {
+        console.log('[Printer] Using RAW MODE for Windows printing');
+        return this.printFileWindowsRaw(filePath, printerName);
+      }
       return this.printFileWindows(filePath, printerName);
     } else {
       return this.printFileMac(filePath, printerName);
     }
+  }
+  
+  /**
+   * Print using Windows raw/direct printing mode.
+   * This bypasses PDF viewers and sends the file directly to the Windows print spooler.
+   * Best for industrial printers like SATO, Zebra industrial, Honeywell, etc.
+   */
+  private async printFileWindowsRaw(filePath: string, printerName: string): Promise<void> {
+    console.log('[Printer] ====== WINDOWS RAW PRINT MODE ======');
+    console.log(`[Printer] Printer: ${printerName}`);
+    console.log(`[Printer] File: ${filePath}`);
+    
+    return new Promise((resolve, reject) => {
+      // Use PowerShell with .NET to send the PDF directly to the Windows print spooler
+      // This uses the Windows GDI printing which industrial printers handle well
+      const psCommand = `
+        $ErrorActionPreference = 'Stop'
+        $file = '${filePath.replace(/'/g, "''")}'
+        $printer = '${printerName.replace(/'/g, "''")}'
+        
+        Write-Host "[RAW] Starting raw print to: $printer"
+        Write-Host "[RAW] File: $file"
+        
+        # Verify file exists
+        if (!(Test-Path $file)) {
+          throw "File not found: $file"
+        }
+        
+        # First, set the printer as default temporarily
+        $currentDefault = (Get-CimInstance -ClassName Win32_Printer -Filter "Default=TRUE").Name
+        Write-Host "[RAW] Current default printer: $currentDefault"
+        
+        # Find and set our target printer as default
+        $targetPrinter = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$printer'"
+        if (!$targetPrinter) {
+          throw "Printer not found: $printer"
+        }
+        
+        Write-Host "[RAW] Setting $printer as default..."
+        Invoke-CimMethod -InputObject $targetPrinter -MethodName SetDefaultPrinter | Out-Null
+        
+        try {
+          # Use Start-Process with the print verb to send to default printer
+          Write-Host "[RAW] Sending print job..."
+          $proc = Start-Process -FilePath $file -Verb Print -PassThru -WindowStyle Hidden
+          
+          # Wait for the print dialog/process to initialize
+          Start-Sleep -Milliseconds 3000
+          
+          # Check if process started successfully
+          if ($proc.HasExited -and $proc.ExitCode -ne 0) {
+            throw "Print process failed with exit code: $($proc.ExitCode)"
+          }
+          
+          # Wait a bit more for print spooler to accept the job
+          Start-Sleep -Milliseconds 2000
+          
+          # If process is still running, give it time then close
+          if (!$proc.HasExited) {
+            Start-Sleep -Milliseconds 3000
+            if (!$proc.HasExited) {
+              Write-Host "[RAW] Closing print application..."
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+          
+          Write-Host "[RAW] Print job submitted successfully"
+        }
+        finally {
+          # Restore original default printer if different
+          if ($currentDefault -and $currentDefault -ne $printer) {
+            Write-Host "[RAW] Restoring default printer to: $currentDefault"
+            $origPrinter = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$currentDefault'"
+            if ($origPrinter) {
+              Invoke-CimMethod -InputObject $origPrinter -MethodName SetDefaultPrinter | Out-Null
+            }
+          }
+        }
+      `;
+      
+      const proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
+        shell: false,
+        windowsHide: true,
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+        console.log('[Printer/RAW]', data.toString().trim());
+      });
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+        console.error('[Printer/RAW Error]', data.toString().trim());
+      });
+      
+      proc.on('error', (error) => {
+        console.error('[Printer] Raw print spawn error:', error);
+        reject(error);
+      });
+      
+      proc.on('close', (code) => {
+        console.log(`[Printer] Raw print exited with code ${code}`);
+        if (code === 0) {
+          console.log('[Printer] ====== RAW PRINT SUCCESS ======');
+          resolve();
+        } else {
+          const errorMsg = `Raw print failed (code ${code}): ${stderr || stdout || 'Unknown error'}`;
+          console.log(`[Printer] ====== RAW PRINT FAILED: ${errorMsg} ======`);
+          reject(new Error(errorMsg));
+        }
+      });
+    });
   }
   
   private async printFileMac(filePath: string, printerName: string): Promise<void> {

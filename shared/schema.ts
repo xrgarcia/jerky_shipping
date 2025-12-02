@@ -774,6 +774,7 @@ export const printers = pgTable("printers", {
   capabilities: jsonb("capabilities"), // Supported paper sizes, dpi, etc.
   isDefault: boolean("is_default").notNull().default(false), // Default printer for this station
   status: text("status").notNull().default("offline"), // Printer status: "online", "offline", "busy", "error"
+  useRawMode: boolean("use_raw_mode").notNull().default(false), // Use raw/direct printing mode for industrial printers (SATO, Zebra industrial, etc.)
   lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

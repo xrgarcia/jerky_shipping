@@ -608,7 +608,9 @@ async function connectWebSocket(): Promise<void> {
     
     try {
       // ASYNC: Use the captured printer reference we got at the start
-      await printerService.print(job, printerSystemName);
+      // Pass useRawMode from printer settings for industrial printers
+      const useRawMode = printer?.useRawMode ?? false;
+      await printerService.print(job, printerSystemName, useRawMode);
       
       // AFTER AWAIT: Update local state first, then try to notify server (queues if fails)
       safeUpdateJob(job.id, 'completed');
@@ -694,7 +696,9 @@ async function connectWebSocket(): Promise<void> {
           
           try {
             // ASYNC: Use captured printer reference
-            await printerService.print(job, printerSystemName);
+            // Pass useRawMode from printer settings for industrial printers
+            const useRawMode = printer?.useRawMode ?? false;
+            await printerService.print(job, printerSystemName, useRawMode);
             
             // AFTER AWAIT: Update local state first, use retry queue for server
             safeUpdateJob(job.id, 'completed');
@@ -1184,7 +1188,9 @@ function setupIpcHandlers(): void {
     console.log(`[Main] Retry job ${jobId} marked as sent, printing to ${printerName}`);
     
     try {
-      await printerService.print(job, printerSystemName);
+      // Pass useRawMode from printer settings for industrial printers
+      const useRawMode = printer?.useRawMode ?? false;
+      await printerService.print(job, printerSystemName, useRawMode);
       
       safeUpdateJob(jobId, 'completed');
       trySendStatusUpdate(getCurrentWsClient(), jobId, 'completed');
