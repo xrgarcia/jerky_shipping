@@ -142,6 +142,19 @@ type QueueStats = {
     healthStatus: 'healthy' | 'warning' | 'critical';
     lastCheckedAt: string;
   };
+  unifiedSyncWorker?: {
+    status: 'running' | 'sleeping' | 'idle' | 'error';
+    cursor: string | null;
+    cursorAge: number | null;
+    cursorAgeLabel: string | null;
+    lastPollAt: string | null;
+    lastPollDuration: number | null;
+    pollIntervalSeconds: number;
+    shipmentsProcessedTotal: number;
+    shipmentsProcessedLastPoll: number;
+    workerStartedAt: string;
+    error: string | null;
+  };
 };
 
 type EnvironmentInfo = {
@@ -1770,6 +1783,88 @@ Please analyze this failure and help me understand:
                   : queueStats?.firestoreSessionSyncWorkerStatus === 'sleeping' 
                   ? 'Sleeping' 
                   : queueStats?.firestoreSessionSyncWorkerStatus === 'error'
+                  ? 'Error'
+                  : 'Unknown'}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium">Unified Shipment Sync Worker</p>
+                <p className="text-sm text-muted-foreground">
+                  {queueStats?.unifiedSyncWorker?.error 
+                    ? 'Error syncing shipments' 
+                    : `Cursor-based sync, ${queueStats?.unifiedSyncWorker?.pollIntervalSeconds || 30}s intervals`}
+                </p>
+                {queueStats?.unifiedSyncWorker && (
+                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
+                    {queueStats.unifiedSyncWorker.cursor && (
+                      <div>Cursor: {new Date(queueStats.unifiedSyncWorker.cursor).toLocaleString()} {queueStats.unifiedSyncWorker.cursorAgeLabel && `(${queueStats.unifiedSyncWorker.cursorAgeLabel} old)`}</div>
+                    )}
+                    <div>Last poll: {queueStats.unifiedSyncWorker.shipmentsProcessedLastPoll.toLocaleString()} shipments</div>
+                    <div>Total synced: {queueStats.unifiedSyncWorker.shipmentsProcessedTotal.toLocaleString()} shipments</div>
+                    {queueStats.unifiedSyncWorker.lastPollAt && (
+                      <div>Last sync: {formatDistanceToNow(new Date(queueStats.unifiedSyncWorker.lastPollAt), { addSuffix: true })} {queueStats.unifiedSyncWorker.lastPollDuration && `(${queueStats.unifiedSyncWorker.lastPollDuration}ms)`}</div>
+                    )}
+                    <div>Started: {formatDistanceToNow(new Date(queueStats.unifiedSyncWorker.workerStartedAt), { addSuffix: true })}</div>
+                    {queueStats.unifiedSyncWorker.error && (
+                      <div className="text-destructive">Error: {queueStats.unifiedSyncWorker.error}</div>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await apiRequest('/api/operations/trigger-unified-sync', { method: 'POST' });
+                      } catch (err) {
+                        console.error('Failed to trigger sync:', err);
+                      }
+                    }}
+                    data-testid="button-trigger-unified-sync"
+                  >
+                    <Zap className="h-3 w-3 mr-1" />
+                    Poll Now
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await apiRequest('/api/operations/force-unified-resync', { method: 'POST' });
+                      } catch (err) {
+                        console.error('Failed to force resync:', err);
+                      }
+                    }}
+                    data-testid="button-force-unified-resync"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Force Resync (7-day)
+                  </Button>
+                </div>
+              </div>
+              <Badge 
+                variant={
+                  queueStats?.unifiedSyncWorker?.status === 'running' 
+                    ? 'default' 
+                    : queueStats?.unifiedSyncWorker?.status === 'error'
+                    ? 'destructive'
+                    : 'secondary'
+                } 
+                data-testid={`badge-unified-sync-worker-${queueStats?.unifiedSyncWorker?.status || 'unknown'}`}
+              >
+                {queueStats?.unifiedSyncWorker?.status === 'running' && <Activity className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.status === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.status === 'idle' && <Clock className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.status === 'error' && <AlertCircle className="h-3 w-3 mr-1" />}
+                {queueStats?.unifiedSyncWorker?.status === 'running' 
+                  ? 'Running' 
+                  : queueStats?.unifiedSyncWorker?.status === 'sleeping' 
+                  ? 'Sleeping' 
+                  : queueStats?.unifiedSyncWorker?.status === 'idle'
+                  ? 'Idle'
+                  : queueStats?.unifiedSyncWorker?.status === 'error'
                   ? 'Error'
                   : 'Unknown'}
               </Badge>
