@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Accordion,
   AccordionContent,
@@ -253,6 +254,7 @@ type LabelError = {
 };
 
 export default function Packing() {
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -1123,8 +1125,8 @@ export default function Packing() {
         description: "Order data has been refreshed from SkuVault.",
       });
       // Re-validate the order to pick up fresh cache
-      if (currentShipment) {
-        validateOrderMutation.mutate(currentShipment);
+      if (currentShipment?.orderNumber) {
+        loadShipmentMutation.mutate(currentShipment.orderNumber);
       }
     },
     onError: (error: Error) => {

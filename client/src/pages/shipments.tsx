@@ -163,6 +163,87 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
     return <Badge variant="secondary" className="text-xs">{status}</Badge>;
   };
 
+  // Get the warehouse workflow step badge based on session and shipment status
+  const getWorkflowStepBadge = () => {
+    const sessionStatus = shipment.sessionStatus?.toLowerCase();
+    const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
+    const hasTracking = !!shipment.trackingNumber;
+    const status = shipment.status?.toLowerCase();
+    
+    // Order of priority for workflow steps:
+    // 1. Delivered - final state
+    if (status === 'delivered') {
+      return (
+        <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <CheckCircle className="h-3 w-3" />
+          Delivered
+        </Badge>
+      );
+    }
+    
+    // 2. On the Dock - has tracking, in transit
+    if (hasTracking && (status === 'in_transit' || status === 'shipped' || shipmentStatus === 'label_purchased')) {
+      return (
+        <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Truck className="h-3 w-3" />
+          On the Dock
+        </Badge>
+      );
+    }
+    
+    // 3. Picking Issues - inactive session (needs supervisor attention)
+    if (sessionStatus === 'inactive') {
+      return (
+        <Badge className="bg-orange-600 hover:bg-orange-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <AlertTriangle className="h-3 w-3" />
+          Picking Issues
+        </Badge>
+      );
+    }
+    
+    // 4. Packing Ready - closed session, no tracking yet
+    if (sessionStatus === 'closed' && !hasTracking) {
+      return (
+        <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Package className="h-3 w-3" />
+          Packing Ready
+        </Badge>
+      );
+    }
+    
+    // 5. Picking - active session
+    if (sessionStatus === 'active') {
+      return (
+        <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Play className="h-3 w-3" />
+          Picking
+        </Badge>
+      );
+    }
+    
+    // 6. Ready to Pick - new session
+    if (sessionStatus === 'new') {
+      return (
+        <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Timer className="h-3 w-3" />
+          Ready to Pick
+        </Badge>
+      );
+    }
+    
+    // 7. No session yet - awaiting session
+    if (!sessionStatus && shipmentStatus === 'pending') {
+      return (
+        <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Clock className="h-3 w-3" />
+          Awaiting Pick
+        </Badge>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <Card className="overflow-hidden" data-testid={`card-shipment-${shipment.id}`}>
       <CardHeader className="pb-4">
@@ -346,6 +427,11 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
             {/* Status Badge */}
             <div className="flex flex-col gap-1.5 lg:items-end">
               {getStatusBadge(shipment.status)}
+            </div>
+
+            {/* Workflow Step Badge */}
+            <div className="flex flex-col gap-1.5 lg:items-end">
+              {getWorkflowStepBadge()}
             </div>
 
             {/* Status & Special Handling Badges */}
