@@ -374,6 +374,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Desktop app downloads - fetches latest release from GitHub
+  app.get("/api/downloads/latest", async (req, res) => {
+    try {
+      const GITHUB_OWNER = "xrgarcia";
+      const GITHUB_REPO = "jerky_shipping";
+      
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+        {
+          headers: {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "JerkyShipConnect",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return res.status(404).json({ error: "No releases found" });
+        }
+        throw new Error(`GitHub API error: ${response.status}`);
+      }
+
+      const release = await response.json();
+      
+      // Extract version from tag (e.g., "v1.0.0" -> "1.0.0")
+      const version = release.tag_name.replace(/^v/, "");
+      const releaseDate = new Date(release.published_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+      });
+
+      // Map assets to download URLs
+      const assets: Record<string, string> = {};
+      for (const asset of release.assets || []) {
+        const name = asset.name.toLowerCase();
+        if (name.endsWith(".exe") && name.includes("setup")) {
+          assets.windowsInstaller = asset.browser_download_url;
+        } else if (name.endsWith(".exe") && !name.includes("setup")) {
+          assets.windowsPortable = asset.browser_download_url;
+        } else if (name.endsWith(".dmg")) {
+          assets.macDmg = asset.browser_download_url;
+        } else if (name.endsWith(".zip") && name.includes("mac")) {
+          assets.macZip = asset.browser_download_url;
+        }
+      }
+
+      res.json({
+        version,
+        releaseDate,
+        tagName: release.tag_name,
+        assets,
+        releaseUrl: release.html_url,
+      });
+    } catch (error: any) {
+      console.error("Error fetching GitHub release:", error);
+      res.status(500).json({ error: "Failed to fetch release info" });
+    }
+  });
+
   // User profile routes
   app.get("/api/user/profile", requireAuth, async (req, res) => {
     res.json({ user: (req as any).user });

@@ -2,15 +2,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Monitor, CheckCircle, AlertCircle } from "lucide-react";
+import { Download, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { SiApple } from "react-icons/si";
 import { FaWindows } from "react-icons/fa";
+import { useQuery } from "@tanstack/react-query";
 
-const APP_VERSION = "1.0.0";
-const RELEASE_DATE = "November 2024";
-const GITHUB_RELEASE_URL = "https://github.com/xrgarcia/jerky_shipping/releases/download/v1.0.0";
+interface ReleaseInfo {
+  version: string;
+  releaseDate: string;
+  tagName: string;
+  assets: {
+    windowsInstaller?: string;
+    windowsPortable?: string;
+    macDmg?: string;
+    macZip?: string;
+  };
+  releaseUrl: string;
+}
 
 export default function Downloads() {
+  const { data: release, isLoading, error } = useQuery<ReleaseInfo>({
+    queryKey: ["/api/downloads/latest"],
+  });
+
   const macRequirements = [
     "macOS 12 (Monterey) or later",
     "Apple Silicon (M1/M2/M3) or Intel processor",
@@ -58,117 +72,168 @@ export default function Downloads() {
                 Desktop printing client for warehouse stations
               </CardDescription>
             </div>
-            <Badge variant="secondary" data-testid="badge-version">
-              v{APP_VERSION}
-            </Badge>
+            {isLoading ? (
+              <Badge variant="secondary">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Loading...
+              </Badge>
+            ) : release ? (
+              <Badge variant="secondary" data-testid="badge-version">
+                v{release.version}
+              </Badge>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Tabs defaultValue="windows" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="windows" className="flex items-center gap-2" data-testid="tab-windows">
-                <FaWindows className="h-4 w-4" />
-                Windows
-              </TabsTrigger>
-              <TabsTrigger value="macos" className="flex items-center gap-2" data-testid="tab-macos">
-                <SiApple className="h-4 w-4" />
-                macOS
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="windows" className="space-y-4 mt-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg" 
-                  className="flex-1"
-                  data-testid="button-download-exe"
-                  asChild
-                >
-                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-Setup-${APP_VERSION}.exe`} download>
-                    <Download className="mr-2 h-5 w-5" />
-                    Download Installer (.exe)
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  className="flex-1"
-                  data-testid="button-download-portable"
-                  asChild
-                >
-                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}.exe`} download>
-                    <Download className="mr-2 h-5 w-5" />
-                    Portable Version
-                  </a>
-                </Button>
-              </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+              <p className="text-lg font-medium mb-2">Failed to load release info</p>
+              <p className="text-muted-foreground">
+                Please try again later or contact support.
+              </p>
+            </div>
+          ) : release ? (
+            <>
+              <Tabs defaultValue="windows" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="windows" className="flex items-center gap-2" data-testid="tab-windows">
+                    <FaWindows className="h-4 w-4" />
+                    Windows
+                  </TabsTrigger>
+                  <TabsTrigger value="macos" className="flex items-center gap-2" data-testid="tab-macos">
+                    <SiApple className="h-4 w-4" />
+                    macOS
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="windows" className="space-y-4 mt-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {release.assets.windowsInstaller ? (
+                      <Button 
+                        size="lg" 
+                        className="flex-1"
+                        data-testid="button-download-exe"
+                        asChild
+                      >
+                        <a href={release.assets.windowsInstaller}>
+                          <Download className="mr-2 h-5 w-5" />
+                          Download Installer (.exe)
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button size="lg" className="flex-1" disabled>
+                        <Download className="mr-2 h-5 w-5" />
+                        Installer Not Available
+                      </Button>
+                    )}
+                    {release.assets.windowsPortable ? (
+                      <Button 
+                        variant="outline" 
+                        size="lg"
+                        className="flex-1"
+                        data-testid="button-download-portable"
+                        asChild
+                      >
+                        <a href={release.assets.windowsPortable}>
+                          <Download className="mr-2 h-5 w-5" />
+                          Portable Version
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="lg" className="flex-1" disabled>
+                        <Download className="mr-2 h-5 w-5" />
+                        Portable Not Available
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm font-medium mb-2">System Requirements</p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {windowsRequirements.map((req, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="macos" className="space-y-4 mt-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    {release.assets.macDmg ? (
+                      <Button 
+                        size="lg" 
+                        className="flex-1"
+                        data-testid="button-download-dmg"
+                        asChild
+                      >
+                        <a href={release.assets.macDmg}>
+                          <Download className="mr-2 h-5 w-5" />
+                          Download for macOS (.dmg)
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button size="lg" className="flex-1" disabled>
+                        <Download className="mr-2 h-5 w-5" />
+                        DMG Not Available
+                      </Button>
+                    )}
+                    {release.assets.macZip ? (
+                      <Button 
+                        variant="outline" 
+                        size="lg"
+                        className="flex-1"
+                        data-testid="button-download-zip"
+                        asChild
+                      >
+                        <a href={release.assets.macZip}>
+                          <Download className="mr-2 h-5 w-5" />
+                          Download ZIP Archive
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="lg" className="flex-1" disabled>
+                        <Download className="mr-2 h-5 w-5" />
+                        ZIP Not Available
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm font-medium mb-2">System Requirements</p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {macRequirements.map((req, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </TabsContent>
+              </Tabs>
               
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm font-medium mb-2">System Requirements</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {windowsRequirements.map((req, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                      {req}
-                    </li>
-                  ))}
-                </ul>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span data-testid="text-build-status">
+                  v{release.version} is now available for download.
+                </span>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="macos" className="space-y-4 mt-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg" 
-                  className="flex-1"
-                  data-testid="button-download-dmg"
-                  asChild
-                >
-                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}-arm64.dmg`} download>
-                    <Download className="mr-2 h-5 w-5" />
-                    Download for macOS (.dmg)
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  className="flex-1"
-                  data-testid="button-download-zip"
-                  asChild
-                >
-                  <a href={`${GITHUB_RELEASE_URL}/Jerky-Ship-Connect-${APP_VERSION}-arm64-mac.zip`} download>
-                    <Download className="mr-2 h-5 w-5" />
-                    Download ZIP Archive
-                  </a>
-                </Button>
-              </div>
-              
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm font-medium mb-2">System Requirements</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {macRequirements.map((req, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                      {req}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </TabsContent>
-          </Tabs>
-          
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span data-testid="text-build-status">
-              v{APP_VERSION} is now available for download.
-            </span>
-          </div>
 
-          <div className="pt-4 border-t">
-            <p className="text-sm text-muted-foreground">
-              Released: {RELEASE_DATE}
-            </p>
-          </div>
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Released: {release.releaseDate}
+                </p>
+              </div>
+            </>
+          ) : null}
         </CardContent>
       </Card>
 
