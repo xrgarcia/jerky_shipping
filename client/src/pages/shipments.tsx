@@ -844,6 +844,11 @@ export default function Shipments() {
       .filter(s => s.sessionStatus?.toLowerCase() === 'closed' && !s.trackingNumber && s.orderNumber)
       .map(s => s.orderNumber as string);
   }, [shipments]);
+  
+  // Only fetch cache status when viewing packing-related tabs
+  const shouldFetchCacheStatus = 
+    (viewMode === 'lifecycle' && activeLifecycleTab === 'packing_ready') ||
+    (viewMode === 'workflow' && activeTab === 'packing_queue');
 
   // API returns { statuses: { [orderNumber]: { isWarmed: boolean; warmedAt: number | null } } }
   type CacheStatusResponse = {
@@ -851,6 +856,7 @@ export default function Shipments() {
   };
 
   // Batch fetch cache status for orders ready to pack
+  // Only runs when viewing packing-related tabs and there are orders to check
   const { data: cacheStatusData } = useQuery<CacheStatusResponse>({
     queryKey: ["/api/operations/warm-cache-status", orderNumbersReadyToPack],
     queryFn: async () => {
@@ -858,7 +864,7 @@ export default function Shipments() {
       const response = await apiRequest("POST", "/api/operations/warm-cache-status", { orderNumbers: orderNumbersReadyToPack });
       return response.json();
     },
-    enabled: orderNumbersReadyToPack.length > 0,
+    enabled: shouldFetchCacheStatus && orderNumbersReadyToPack.length > 0,
     staleTime: 30000, // 30 seconds - cache status doesn't change too frequently
   });
 
