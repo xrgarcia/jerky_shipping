@@ -6792,8 +6792,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update a printer
-  app.patch("/api/desktop/printers/:id", requireDesktopAuth, async (req, res) => {
+  // Update a printer (accessible by both web and desktop)
+  app.patch("/api/desktop/printers/:id", hybridAuth, async (req, res) => {
     try {
       const printer = await storage.updatePrinter(req.params.id, req.body);
       if (!printer) {
