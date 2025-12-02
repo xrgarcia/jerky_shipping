@@ -1162,7 +1162,10 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Queue</CardTitle>
-              <CardDescription>Order webhooks awaiting processing</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>Order webhooks awaiting processing</span>
+                <Badge variant="outline" className="text-xs">Redis</Badge>
+              </CardDescription>
             </div>
             <Badge
               data-testid={`badge-health-${shopifyHealth}`}
@@ -1210,7 +1213,10 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Webhook Processing Queue</CardTitle>
-              <CardDescription>Real-time ShipStation events: tracking, fulfillments, backfill, manual triggers</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>ShipStation tracking, fulfillments, backfill</span>
+                <Badge variant="outline" className="text-xs">Redis</Badge>
+              </CardDescription>
             </div>
             <Badge
               data-testid={`badge-health-${shipmentHealth}`}
@@ -1258,7 +1264,10 @@ Please analyze this failure and help me understand:
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-lg">Shopify Order Sync</CardTitle>
-              <CardDescription>Missing orders awaiting import</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>Missing orders awaiting import</span>
+                <Badge variant="outline" className="text-xs">Redis</Badge>
+              </CardDescription>
             </div>
             <Badge
               data-testid={`badge-health-${shopifyOrderSyncHealth}`}
@@ -1303,20 +1312,25 @@ Please analyze this failure and help me understand:
         </Card>
       </div>
 
-      {/* Pipeline Metrics - SkuVault Session Workflow */}
+      {/* Warehouse Health - Daily Operations */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold flex items-center gap-2">
           <Package className="h-5 w-5" />
-          Pipeline Metrics
+          Warehouse Health
         </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card data-testid="card-sessioned-today" className="hover-elevate min-h-[180px]">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <div>
-                <CardTitle className="text-lg">Sessioned Today</CardTitle>
-                <CardDescription>Orders entered wave picking</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-500" />
+                  Sessioned Today
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>Orders entered wave picking</span>
+                  <Badge variant="outline" className="text-xs">SkuVault</Badge>
+                </CardDescription>
               </div>
-              <Zap className="h-5 w-5 text-amber-500" />
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -1334,8 +1348,14 @@ Please analyze this failure and help me understand:
             <Card data-testid="card-packing-queue" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div>
-                  <CardTitle className="text-lg">Packing Queue</CardTitle>
-                  <CardDescription>Sessioned but not shipped</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="h-5 w-5 text-blue-500" />
+                    Packing Queue
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>Sessioned but not shipped</span>
+                    <Badge variant="outline" className="text-xs">Database</Badge>
+                  </CardDescription>
                 </div>
                 {(() => {
                   const queueHealth = (() => {
@@ -1379,10 +1399,15 @@ Please analyze this failure and help me understand:
           <Card data-testid="card-shipped-today" className="hover-elevate min-h-[180px]">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <div>
-                <CardTitle className="text-lg">Shipped Today</CardTitle>
-                <CardDescription>Orders with shipments today</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Truck className="h-5 w-5 text-green-500" />
+                  Shipped Today
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>Orders with shipments today</span>
+                  <Badge variant="outline" className="text-xs">ShipStation</Badge>
+                </CardDescription>
               </div>
-              <Truck className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -1400,8 +1425,14 @@ Please analyze this failure and help me understand:
             <Card data-testid="card-offline-stations" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div>
-                  <CardTitle className="text-lg">Offline Stations</CardTitle>
-                  <CardDescription>Active stations not connected</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <WifiOff className="h-5 w-5 text-muted-foreground" />
+                    Offline Stations
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>Active stations not connected</span>
+                    <Badge variant="outline" className="text-xs">Desktop</Badge>
+                  </CardDescription>
                 </div>
                 {(() => {
                   const offlineCount = stationConnectionStats?.offline ?? 0;
@@ -1452,8 +1483,14 @@ Please analyze this failure and help me understand:
             <Card data-testid="card-stale-print-jobs" className="hover-elevate active-elevate-2 cursor-pointer min-h-[180px]">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div>
-                  <CardTitle className="text-lg">Stale Print Jobs</CardTitle>
-                  <CardDescription>Jobs waiting too long</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Stale Print Jobs
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>Jobs waiting too long</span>
+                    <Badge variant="outline" className="text-xs">Print Queue</Badge>
+                  </CardDescription>
                 </div>
                 {(() => {
                   const staleHealth = queueStats?.stalePrintJobs?.healthStatus ?? 'healthy';
@@ -1509,14 +1546,25 @@ Please analyze this failure and help me understand:
         </div>
       </div>
 
-      {/* Data Health */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Shipping Data Health */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          Shipping Data Health
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
         <Link href="/orders?hasShipment=false">
           <Card data-testid="card-orders-missing-shipments" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
-                <CardTitle className="text-lg">Orders Missing Shipments</CardTitle>
-                <CardDescription>Orders without shipment records</CardDescription>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Orders Missing Shipments
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>Fulfilled orders without shipment records</span>
+                  <Badge variant="outline" className="text-xs">Shopify ↔ ShipStation</Badge>
+                </CardDescription>
               </div>
               {(() => {
                 const ordersMissingHealth = (() => {
@@ -1571,11 +1619,16 @@ Please analyze this failure and help me understand:
                 <Truck className="h-5 w-5" />
                 Shipments Without Orders
               </CardTitle>
-              <CardDescription>Shipment records with no linked orders</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>Shipment records with no linked orders</span>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
-                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
+              <div className="space-y-2">
+                <div className="text-3xl font-bold" data-testid="text-shipments-without-orders">
+                  {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutOrders ?? 0).toLocaleString()}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1585,14 +1638,19 @@ Please analyze this failure and help me understand:
           <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px] border-yellow-500/50">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
-                <AlertCircle className="h-5 w-5" />
+                <AlertTriangle className="h-5 w-5" />
                 No Tracking (24-48h)
               </CardTitle>
-              <CardDescription>Warning: Shipped 24-48 hours ago, no tracking yet</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>Warning: Shipped 24-48 hours ago</span>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-500" data-testid="text-shipments-without-status-warning">
-                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0).toLocaleString()}
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-500" data-testid="text-shipments-without-status-warning">
+                  {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0).toLocaleString()}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1605,11 +1663,16 @@ Please analyze this failure and help me understand:
                 <AlertCircle className="h-5 w-5" />
                 No Tracking (48h+)
               </CardTitle>
-              <CardDescription>Critical: Shipped over 48 hours ago, still no tracking</CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <span>Critical: Shipped over 48 hours ago</span>
+                <Badge variant="outline" className="text-xs">ShipStation</Badge>
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-600 dark:text-red-500" data-testid="text-shipments-without-status-critical">
-                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0).toLocaleString()}
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-red-600 dark:text-red-500" data-testid="text-shipments-without-status-critical">
+                  {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0).toLocaleString()}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1621,7 +1684,10 @@ Please analyze this failure and help me understand:
               <XCircle className="h-5 w-5" />
               Shipment Sync Failures
             </CardTitle>
-            <CardDescription>Failed shipment synchronization attempts</CardDescription>
+            <CardDescription className="flex items-center gap-2">
+              <span>Failed shipment synchronization attempts</span>
+              <Badge variant="outline" className="text-xs">ShipStation</Badge>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -1662,7 +1728,10 @@ Please analyze this failure and help me understand:
               <ShoppingCart className="h-5 w-5" />
               Shopify Order Sync Failures
             </CardTitle>
-            <CardDescription>Orders that failed to import from Shopify</CardDescription>
+            <CardDescription className="flex items-center gap-2">
+              <span>Orders that failed to import</span>
+              <Badge variant="outline" className="text-xs">Shopify</Badge>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -1696,6 +1765,7 @@ Please analyze this failure and help me understand:
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       <Card data-testid="card-worker-status">
