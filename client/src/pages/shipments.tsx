@@ -762,6 +762,9 @@ export default function Shipments() {
           if (data.type === 'order_update' && data.order) {
             // Silently refresh data - no toast notifications
             queryClient.invalidateQueries({ queryKey: ["/api/shipments"] });
+            // Also refresh tab counts so numbers match when clicking into tabs
+            queryClient.invalidateQueries({ queryKey: ["/api/shipments/tab-counts"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/shipments/lifecycle-counts"] });
           }
         } catch (error) {
           console.error('WebSocket message error:', error);
