@@ -36,6 +36,8 @@ const PAGE_SIZE = 100; // ShipStation max per page
 const CURSOR_ID = 'shipstation:modified_at';
 const LOOKBACK_HOURS = 168; // 7 days lookback for initial cursor
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
+const TRACKING_BACKFILL_BATCH_SIZE = 10; // Max shipments to backfill per poll cycle
+const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older than 2 days
 
 // Worker state
 let isPolling = false;
@@ -202,6 +204,117 @@ async function fetchShipmentPage(modifyDateStart: string, page: number): Promise
     totalPages: data.pages || 1,
     hasMore: page < (data.pages || 1),
   };
+}
+
+/**
+ * Backfill tracking numbers for shipped shipments that are missing tracking
+ * Only processes shipments older than TRACKING_BACKFILL_MIN_AGE_HOURS (2 days)
+ * This runs after the main poll cycle and processes a small batch to avoid rate limits
+ * 
+ * EXCLUDES:
+ * - shipment_status='label_purchased' (label printed but not picked up by carrier - expected to have no tracking)
+ * - shipment_status='on_hold' (shipments on hold don't have tracking yet)
+ * 
+ * Returns number of shipments updated
+ */
+async function backfillMissingTracking(): Promise<{ processed: number; updated: number; errors: number }> {
+  // Query shipments that:
+  // 1. Have status='shipped' but no tracking number
+  // 2. Are older than 2 days (to allow normal sync to work first)
+  // 3. Have a shipment_id we can look up
+  // 4. NOT label_purchased or on_hold (those legitimately don't have tracking yet)
+  const cutoffDate = new Date();
+  cutoffDate.setHours(cutoffDate.getHours() - TRACKING_BACKFILL_MIN_AGE_HOURS);
+  
+  const shipmentsToBackfill = await db
+    .select({
+      id: shipments.id,
+      shipmentId: shipments.shipmentId,
+      orderNumber: shipments.orderNumber,
+      createdAt: shipments.createdAt,
+      shipmentStatus: shipments.shipmentStatus,
+    })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.status, 'shipped'),
+        isNull(shipments.trackingNumber),
+        sql`${shipments.shipmentId} IS NOT NULL`,
+        lt(shipments.createdAt, cutoffDate),
+        sql`(${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('label_purchased', 'on_hold'))`
+      )
+    )
+    .orderBy(shipments.createdAt)
+    .limit(TRACKING_BACKFILL_BATCH_SIZE);
+  
+  if (shipmentsToBackfill.length === 0) {
+    return { processed: 0, updated: 0, errors: 0 };
+  }
+  
+  console.log(`[UnifiedSync] Backfilling tracking for ${shipmentsToBackfill.length} shipped shipments without tracking`);
+  
+  let processed = 0;
+  let updated = 0;
+  let errors = 0;
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  
+  if (!apiKey) {
+    console.error('[UnifiedSync] Cannot backfill tracking - SHIPSTATION_API_KEY not configured');
+    return { processed: 0, updated: 0, errors: 0 };
+  }
+  
+  for (const shipment of shipmentsToBackfill) {
+    processed++;
+    
+    try {
+      // Fetch the full shipment from ShipStation API to get current data
+      const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipment.shipmentId!)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.status === 429) {
+        console.log('[UnifiedSync] Hit rate limit during tracking backfill, stopping batch');
+        break;
+      }
+      
+      if (!response.ok) {
+        console.error(`[UnifiedSync] Failed to fetch shipment ${shipment.shipmentId}: ${response.status}`);
+        errors++;
+        continue;
+      }
+      
+      const shipmentData = await response.json();
+      
+      // Process through ETL service to update tracking and all related data
+      await shipStationShipmentETL.processShipment(shipmentData, null);
+      
+      // Check if we got a tracking number
+      const trackingNumber = shipmentData.tracking_number || 
+                            (shipmentData.labels?.[0]?.tracking_number) ||
+                            null;
+      
+      if (trackingNumber) {
+        updated++;
+        console.log(`[UnifiedSync] Backfilled tracking ${trackingNumber} for order ${shipment.orderNumber}`);
+      }
+      
+    } catch (err) {
+      console.error(`[UnifiedSync] Error backfilling shipment ${shipment.shipmentId}:`, err);
+      errors++;
+    }
+  }
+  
+  if (updated > 0 || errors > 0) {
+    console.log(`[UnifiedSync] Tracking backfill complete: ${processed} processed, ${updated} updated, ${errors} errors`);
+  }
+  
+  return { processed, updated, errors };
 }
 
 /**
@@ -389,6 +502,16 @@ async function runPollLoop(): Promise<boolean> {
     
     // Flag for immediate follow-up if more pages remain
     needsImmediateFollowup = result.hasMorePages;
+    
+    // Run tracking backfill ONLY when we're caught up (not during catch-up)
+    // This prevents using API quota during high-priority sync
+    if (!needsImmediateFollowup && !result.hitRateLimit) {
+      try {
+        await backfillMissingTracking();
+      } catch (backfillErr) {
+        console.error('[UnifiedSync] Tracking backfill error (non-fatal):', backfillErr);
+      }
+    }
     
     lastError = null;
   } catch (err: any) {

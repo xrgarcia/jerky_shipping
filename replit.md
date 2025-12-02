@@ -48,6 +48,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - **Immediate webhook triggers**: ShipStation webhooks wake idle worker for sub-minute freshness
     - **MAX_PAGES handling**: When 10 pages processed, schedules 1-second follow-up to continue
     - **Credential detection**: Gracefully detects missing SHIPSTATION_API_SECRET and surfaces in Operations dashboard
+    - **Tracking Backfill**: After each poll cycle (when not catching up), fetches 10 shipments with `status='shipped'` but no tracking that are older than 48 hours. Excludes shipments with `shipment_status='label_purchased'` or `on_hold` since those legitimately don't have tracking yet. Updates their data from ShipStation API.
     - API endpoints: `/api/operations/unified-sync-status`, `/api/operations/trigger-unified-sync`, `/api/operations/force-unified-resync`
 - **Webhook Environment Isolation**: Automatic orphaned webhook cleanup on startup.
 
