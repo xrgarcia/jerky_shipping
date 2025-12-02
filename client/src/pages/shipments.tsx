@@ -62,8 +62,11 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
   const shipmentIdOrUuid = shipment.shipmentId ?? shipment.id;
   const sessionInfo = parseCustomField2(shipment.customField2);
 
-  // Determine if this order is ready to pack (closed session, no tracking)
-  const isReadyToPack = shipment.sessionStatus?.toLowerCase() === 'closed' && !shipment.trackingNumber;
+  // Determine if this order is ready to pack (closed session, no tracking, pending status)
+  // Must match cache warmer criteria: sessionStatus='closed', no tracking, shipmentStatus='pending'
+  const isReadyToPack = shipment.sessionStatus?.toLowerCase() === 'closed' 
+    && !shipment.trackingNumber 
+    && shipment.shipmentStatus === 'pending';
   
   const getCacheStatusBadge = () => {
     if (!isReadyToPack) return null;
@@ -939,11 +942,14 @@ export default function Shipments() {
     enabled: shipmentIds.length > 0,
   });
 
-  // Get order numbers for orders ready to pack (closed session, no tracking)
-  // Only include shipments with valid order numbers
+  // Get order numbers for orders ready to pack (closed session, no tracking, pending status)
+  // Must match cache warmer criteria exactly for cache status to be in sync
   const orderNumbersReadyToPack = useMemo(() => {
     return shipments
-      .filter(s => s.sessionStatus?.toLowerCase() === 'closed' && !s.trackingNumber && s.orderNumber)
+      .filter(s => s.sessionStatus?.toLowerCase() === 'closed' 
+        && !s.trackingNumber 
+        && s.shipmentStatus === 'pending'
+        && s.orderNumber)
       .map(s => s.orderNumber as string);
   }, [shipments]);
   
