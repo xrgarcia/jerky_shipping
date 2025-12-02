@@ -1955,6 +1955,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Queuing webhook:", webhookData);
       await enqueueWebhook(webhookData);
 
+      // Trigger immediate poll from unified sync worker (webhook as hint)
+      try {
+        const { triggerImmediatePoll } = await import("./unified-shipment-sync-worker");
+        triggerImmediatePoll();
+      } catch (err) {
+        // Worker may not be running yet - log but don't fail the webhook
+        console.log("[webhook] Could not trigger immediate poll:", err);
+      }
+
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error processing ShipStation webhook:", error);
@@ -3356,6 +3365,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('[queue-stats] Error getting firestore worker status:', error.message);
       }
 
+      // Get unified shipment sync worker status and stats
+      let unifiedSyncWorker = undefined;
+      try {
+        const { getWorkerStatus, getSyncStats } = await import("./unified-shipment-sync-worker");
+        const status = await getWorkerStatus();
+        const stats = await getSyncStats();
+        unifiedSyncWorker = {
+          isRunning: status.isRunning,
+          isPolling: status.isPolling,
+          lastPollTime: status.lastPollTime?.toISOString() || null,
+          pollCount: status.pollCount,
+          errorCount: status.errorCount,
+          lastError: status.lastError,
+          cursorPosition: status.cursorPosition,
+          lastCursorUpdate: status.lastCursorUpdate?.toISOString() || null,
+          syncStats: stats,
+        };
+      } catch (error: any) {
+        console.error('[queue-stats] Error getting unified sync worker status:', error.message);
+      }
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -3385,6 +3415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stalePrintJobs,
         firestoreSessionSyncWorkerStatus,
         firestoreSessionSyncWorkerStats,
+        unifiedSyncWorker,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);
@@ -3610,6 +3641,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ error: "Failed to clear order data" });
+    }
+  });
+
+  // Trigger immediate unified sync poll
+  app.post("/api/operations/trigger-unified-sync", requireAuth, async (req, res) => {
+    try {
+      const { triggerImmediatePoll } = await import("./unified-shipment-sync-worker");
+      triggerImmediatePoll();
+      res.json({ success: true, message: "Immediate poll triggered" });
+    } catch (error) {
+      console.error("Error triggering unified sync:", error);
+      res.status(500).json({ error: "Failed to trigger unified sync" });
+    }
+  });
+
+  // Force full resync (reset cursor to lookback period)
+  app.post("/api/operations/force-unified-resync", requireAuth, async (req, res) => {
+    try {
+      const { forceFullResync } = await import("./unified-shipment-sync-worker");
+      await forceFullResync();
+      res.json({ success: true, message: "Full resync initiated - cursor reset to 7-day lookback" });
+    } catch (error) {
+      console.error("Error forcing unified resync:", error);
+      res.status(500).json({ error: "Failed to force unified resync" });
     }
   });
 
