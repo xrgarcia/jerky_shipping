@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -47,13 +47,42 @@ type WorkflowTab = 'in_progress' | 'packing_queue' | 'shipped' | 'all';
 type LifecycleTab = 'picking' | 'packing_ready' | 'shipped' | 'attention' | 'all';
 type ViewMode = 'workflow' | 'lifecycle';
 
-function ShipmentCard({ shipment, tags }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[] }) {
+interface CacheStatus {
+  orderNumber: string;
+  isWarmed: boolean;
+  warmedAt: string | null;
+}
+
+function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[]; cacheStatus?: CacheStatus }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   
   const shipmentIdOrUuid = shipment.shipmentId ?? shipment.id;
   const sessionInfo = parseCustomField2(shipment.customField2);
+
+  // Determine if this order is ready to pack (closed session, no tracking)
+  const isReadyToPack = shipment.sessionStatus?.toLowerCase() === 'closed' && !shipment.trackingNumber;
+  
+  const getCacheStatusBadge = () => {
+    if (!isReadyToPack) return null;
+    
+    if (cacheStatus?.isWarmed) {
+      return (
+        <Badge className="bg-green-600/20 text-green-700 dark:text-green-400 border border-green-500/30 text-xs gap-1" data-testid={`badge-cache-warmed-${shipment.orderNumber}`}>
+          <Zap className="h-3 w-3" />
+          Cache Ready
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400 text-xs gap-1" data-testid={`badge-cache-cold-${shipment.orderNumber}`}>
+        <Clock className="h-3 w-3" />
+        Warming...
+      </Badge>
+    );
+  };
 
   const { data: items, isLoading: isLoadingItems } = useQuery<ShipmentItem[]>({
     queryKey: ['/api/shipments', shipmentIdOrUuid, 'items'],
@@ -196,10 +225,11 @@ function ShipmentCard({ shipment, tags }: { shipment: ShipmentWithItemCount; tag
             {/* Session Info - Only show if has session data */}
             {(shipment.sessionId || shipment.pickedByUserName) && (
               <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
+                <div className="flex items-center gap-2 text-sm font-semibold flex-wrap">
                   <Boxes className="h-4 w-4 text-primary" />
                   <span>Session Info</span>
                   {getSessionStatusBadge(shipment.sessionStatus)}
+                  {getCacheStatusBadge()}
                 </div>
                 
                 {/* Picker Name */}
@@ -806,6 +836,48 @@ export default function Shipments() {
     enabled: shipmentIds.length > 0,
   });
 
+  // Get order numbers for orders ready to pack (closed session, no tracking)
+  // Only include shipments with valid order numbers
+  const orderNumbersReadyToPack = useMemo(() => {
+    return shipments
+      .filter(s => s.sessionStatus?.toLowerCase() === 'closed' && !s.trackingNumber && s.orderNumber)
+      .map(s => s.orderNumber as string);
+  }, [shipments]);
+
+  // API returns { statuses: { [orderNumber]: { isWarmed: boolean; warmedAt: number | null } } }
+  type CacheStatusResponse = {
+    statuses: Record<string, { isWarmed: boolean; warmedAt: number | null }>;
+  };
+
+  // Batch fetch cache status for orders ready to pack
+  const { data: cacheStatusData } = useQuery<CacheStatusResponse>({
+    queryKey: ["/api/operations/warm-cache-status", orderNumbersReadyToPack],
+    queryFn: async () => {
+      if (orderNumbersReadyToPack.length === 0) return { statuses: {} };
+      const response = await apiRequest("POST", "/api/operations/warm-cache-status", { orderNumbers: orderNumbersReadyToPack });
+      return response.json();
+    },
+    enabled: orderNumbersReadyToPack.length > 0,
+    staleTime: 30000, // 30 seconds - cache status doesn't change too frequently
+  });
+
+  // Create a map of order number -> cache status for easy lookup
+  const cacheStatusMap = useMemo(() => {
+    if (!cacheStatusData?.statuses || typeof cacheStatusData.statuses !== 'object') {
+      return new Map<string, CacheStatus>();
+    }
+    // API returns object with order numbers as keys
+    const entries = Object.entries(cacheStatusData.statuses).map(([orderNumber, data]) => [
+      orderNumber,
+      {
+        orderNumber,
+        isWarmed: data.isWarmed,
+        warmedAt: data.warmedAt ? new Date(data.warmedAt).toISOString() : null,
+      } as CacheStatus
+    ] as [string, CacheStatus]);
+    return new Map(entries);
+  }, [cacheStatusData]);
+
   const clearFilters = () => {
     setSearch("");
     setStatus("");
@@ -895,7 +967,11 @@ export default function Shipments() {
             <Button
               variant={viewMode === 'lifecycle' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setViewMode('lifecycle')}
+              onClick={() => {
+                setViewMode('lifecycle');
+                setActiveLifecycleTab('packing_ready');
+                setPage(1);
+              }}
               className="gap-2"
               data-testid="button-view-lifecycle"
             >
@@ -905,7 +981,11 @@ export default function Shipments() {
             <Button
               variant={viewMode === 'workflow' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setViewMode('workflow')}
+              onClick={() => {
+                setViewMode('workflow');
+                setActiveTab('in_progress');
+                setPage(1);
+              }}
               className="gap-2"
               data-testid="button-view-workflow"
             >
@@ -1406,6 +1486,7 @@ export default function Shipments() {
                   key={shipment.id} 
                   shipment={shipment} 
                   tags={batchTagsData?.[shipment.id]}
+                  cacheStatus={shipment.orderNumber ? cacheStatusMap.get(shipment.orderNumber) : undefined}
                 />
               ))}
             </div>
