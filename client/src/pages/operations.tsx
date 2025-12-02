@@ -480,6 +480,73 @@ function BackfillDeleteButton({ jobId }: { jobId: string }) {
   );
 }
 
+// Component with loading state for unified sync buttons
+function UnifiedSyncButtons({ 
+  credentialsConfigured, 
+  toast 
+}: { 
+  credentialsConfigured: boolean;
+  toast: ReturnType<typeof useToast>['toast'];
+}) {
+  const [isPollLoading, setIsPollLoading] = useState(false);
+  const [isResyncLoading, setIsResyncLoading] = useState(false);
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          setIsPollLoading(true);
+          try {
+            await apiRequest('POST', '/api/operations/trigger-unified-sync');
+            // No success toast - status badge will update via WebSocket
+          } catch (err) {
+            console.error('Failed to trigger sync:', err);
+            toast({
+              title: "Failed to trigger poll",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsPollLoading(false);
+          }
+        }}
+        disabled={!credentialsConfigured || isPollLoading}
+        data-testid="button-trigger-unified-sync"
+      >
+        <Zap className={cn("h-3 w-3 mr-1", isPollLoading && "animate-pulse")} />
+        {isPollLoading ? "Triggering..." : "Poll Now"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          setIsResyncLoading(true);
+          try {
+            await apiRequest('POST', '/api/operations/force-unified-resync');
+            // No success toast - status badge will update via WebSocket
+          } catch (err) {
+            console.error('Failed to force resync:', err);
+            toast({
+              title: "Failed to force resync",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsResyncLoading(false);
+          }
+        }}
+        disabled={!credentialsConfigured || isResyncLoading}
+        data-testid="button-force-unified-resync"
+      >
+        <RefreshCw className={cn("h-3 w-3 mr-1", isResyncLoading && "animate-spin")} />
+        {isResyncLoading ? "Resetting cursor..." : "Force Resync (7-day)"}
+      </Button>
+    </div>
+  );
+}
+
 export default function OperationsPage() {
   const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "shopify-order-sync" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
@@ -1720,40 +1787,10 @@ Please analyze this failure and help me understand:
                     )}
                   </div>
                 )}
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        await apiRequest('POST', '/api/operations/trigger-unified-sync');
-                      } catch (err) {
-                        console.error('Failed to trigger sync:', err);
-                      }
-                    }}
-                    disabled={!queueStats?.unifiedSyncWorker?.credentialsConfigured}
-                    data-testid="button-trigger-unified-sync"
-                  >
-                    <Zap className="h-3 w-3 mr-1" />
-                    Poll Now
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        await apiRequest('POST', '/api/operations/force-unified-resync');
-                      } catch (err) {
-                        console.error('Failed to force resync:', err);
-                      }
-                    }}
-                    disabled={!queueStats?.unifiedSyncWorker?.credentialsConfigured}
-                    data-testid="button-force-unified-resync"
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Force Resync (7-day)
-                  </Button>
-                </div>
+                <UnifiedSyncButtons 
+                  credentialsConfigured={queueStats?.unifiedSyncWorker?.credentialsConfigured ?? false}
+                  toast={toast}
+                />
               </div>
               <Badge 
                 variant={
