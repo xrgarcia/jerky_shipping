@@ -256,6 +256,7 @@ export default function Packing() {
   const [, setLocation] = useLocation();
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
+  const completeButtonRef = useRef<HTMLButtonElement>(null); // Ref for Complete Boxing button
   const progressRestoredRef = useRef(false); // Track if initial restoration has been done
 
   const [orderScan, setOrderScan] = useState("");
@@ -1675,6 +1676,7 @@ export default function Packing() {
       setOrderScan("");
       setSkuProgress(new Map());
       setLabelError(null);
+      setScanFeedback(null); // Clear last scanned item feedback
       progressRestoredRef.current = false;
       
       // Focus the order input after state resets
@@ -1803,6 +1805,18 @@ export default function Packing() {
   const totalScanned = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
   const successfulScans = packingLogs?.filter((log) => log.success && log.action === "product_scanned").length || 0;
   const failedScans = packingLogs?.filter((log) => !log.success && log.action === "product_scanned").length || 0;
+
+  // Auto-focus Complete Boxing button when all items are scanned
+  // This allows user to simply press Enter to print the label
+  useEffect(() => {
+    if (allItemsScanned && currentShipment && !hasPendingPrintJob && isPrinterReady) {
+      // Small delay to ensure DOM is ready after state updates
+      const timer = setTimeout(() => {
+        completeButtonRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [allItemsScanned, currentShipment, hasPendingPrintJob, isPrinterReady]);
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
@@ -2919,6 +2933,7 @@ export default function Packing() {
 
               {/* Complete Packing Button */}
               <Button
+                ref={completeButtonRef}
                 onClick={handleCompletePacking}
                 disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady}
                 className="w-full"
