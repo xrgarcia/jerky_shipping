@@ -1217,7 +1217,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Text search across tracking number, carrier, order fields
+    // Text search across tracking number, carrier, order fields, session ID
     if (search) {
       const searchLower = search.toLowerCase();
       conditions.push(
@@ -1226,7 +1226,8 @@ export class DatabaseStorage implements IStorage {
           ilike(shipments.carrierCode, `%${searchLower}%`),
           ilike(shipments.shipmentId, `%${searchLower}%`),
           ilike(shipments.orderNumber, `%${searchLower}%`),
-          ilike(shipments.shipToName, `%${searchLower}%`)
+          ilike(shipments.shipToName, `%${searchLower}%`),
+          ilike(shipments.sessionId, `%${searchLower}%`)
         )
       );
     }
