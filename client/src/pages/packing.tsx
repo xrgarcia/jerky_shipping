@@ -2583,6 +2583,11 @@ export default function Packing() {
                                 <div className="text-lg text-muted-foreground font-mono mt-1">
                                   {progress.sku}
                                 </div>
+                                {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
+                                  <div className="text-sm text-muted-foreground/70 font-mono flex items-center gap-1">
+                                    <span className="text-xs">Barcode:</span> {progress.skuvaultCode}
+                                  </div>
+                                )}
                                 <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                                   {progress.kitComponents.length} component{progress.kitComponents.length !== 1 ? 's' : ''} • Scan any component barcode
                                 </div>
@@ -2765,6 +2770,11 @@ export default function Packing() {
                             <div className="text-lg text-muted-foreground font-mono">
                               {progress.sku}
                             </div>
+                            {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
+                              <div className="text-sm text-muted-foreground/70 font-mono flex items-center gap-1">
+                                <span className="text-xs">Barcode:</span> {progress.skuvaultCode}
+                              </div>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-3 ml-4 flex-shrink-0">
