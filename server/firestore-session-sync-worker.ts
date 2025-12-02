@@ -12,6 +12,7 @@ const log = (message: string) => console.log(`[firestore-session-sync] ${message
 let workerStatus: 'sleeping' | 'running' | 'error' = 'sleeping';
 let lastSyncTimestamp: Date | null = null;
 let syncIntervalId: NodeJS.Timeout | null = null;
+let pollCount = 0; // Track polls for periodic broader sync
 
 // Worker statistics
 let workerStats = {
@@ -178,13 +179,27 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
 
 /**
  * Main sync function - polls Firestore and syncs to shipments table
+ * Every 10 polls (10 minutes), does a broader 1-hour lookback to catch
+ * sessions where session_status changed but updated_date didn't
  */
 export async function syncFirestoreSessions(): Promise<number> {
   try {
     workerStatus = 'running';
+    pollCount++;
 
-    // Determine sync window - default to 5 minutes ago if no previous sync
-    const sinceDatetime = lastSyncTimestamp || new Date(Date.now() - 5 * 60 * 1000);
+    // Every 10 polls, do a broader 1-hour lookback to catch missed updates
+    // This handles cases where Firestore's updated_date doesn't change when session_status changes
+    const isBroadSync = pollCount % 10 === 0;
+    
+    let sinceDatetime: Date;
+    if (isBroadSync) {
+      // Broad sync: look back 1 hour to catch any missed updates
+      sinceDatetime = new Date(Date.now() - 60 * 60 * 1000);
+      log(`[BROAD SYNC] Fetching sessions from last hour to catch missed updates`);
+    } else {
+      // Normal sync: use cursor (or 5 minutes ago if no cursor)
+      sinceDatetime = lastSyncTimestamp || new Date(Date.now() - 5 * 60 * 1000);
+    }
     
     log(`Fetching sessions updated since ${sinceDatetime.toISOString()}`);
 
@@ -217,7 +232,10 @@ export async function syncFirestoreSessions(): Promise<number> {
     }
 
     // Update last sync timestamp to the latest session update time
-    lastSyncTimestamp = latestUpdateDate;
+    // For broad syncs, don't reset cursor - keep it advancing normally
+    if (!isBroadSync) {
+      lastSyncTimestamp = latestUpdateDate;
+    }
 
     // Update stats
     workerStats.totalSynced += syncedCount;
