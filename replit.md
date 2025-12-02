@@ -18,7 +18,9 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Core Features**:
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and QC integration for packing.
     - **Packing Page**: Single-warehouse MVP with SkuVault QC validation, scan-first workflow, individual unit scanning, and audit trails, supporting kit/assembled products.
-    - **Shipment Management**: Unified shipments page with workflow tabs (In Progress, Packing Queue, Shipped, All) and inline session info.
+    - **Shipment Management**: Unified shipments page with dual-view mode:
+        - **Workflow View**: Business process tabs (In Progress, Packing Queue, Shipped, All) for traditional fulfillment stages.
+        - **Lifecycle View**: 6 warehouse flow tabs matching the actual process - All Shipments (default), Ready to Pick (new sessions), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
     - **Order Backfill System**: Fault-tolerant, task-based architecture for historical Shopify orders and ShipStation shipments, using Redis-queued processing and WebSocket updates.
     - **Reporting & Analytics**: Business analytics dashboard (Gross Sales, Net Sales) and PO Recommendations page querying a separate GCP PostgreSQL database.
     - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets.
