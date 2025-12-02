@@ -54,7 +54,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
     - **QCSale Cache Warmer Service**: Proactively pre-loads SkuVault QC Sale data for orders ready to be packed (sessionStatus='closed', trackingNumber IS NULL).
         - **Extended TTL**: 10-minute TTL for warmed entries vs 2-minute for regular cache to reduce API load.
         - **Background Polling**: 30-second polling interval catches any orders missed by session sync triggers.
-        - **Immediate Warming**: Hooks into Firestore session sync to warm cache immediately when sessions transition to 'closed' status.
+        - **Immediate Warming**: Hooks into Firestore session sync to warm cache immediately when sessions transition to 'closed' status. The sync worker uses a closed-session detection algorithm that compares DB non-closed sessions with current Firestore state to catch sessions that disappear from the active query (transitioned to closed). Uses `session.order_number` from Firestore as the authoritative source for order numbers.
         - **Cache Invalidation**: Automatic invalidation when labels are created (tracking number assigned).
         - **Manual Refresh**: Refresh button on packing page for customer service order changes (gated to sessionStatus='closed' AND no trackingNumber).
         - **Metrics Tracking**: GET /api/operations/cache-warmer-status provides ordersWarmed, cacheHits, cacheMisses, invalidations, manualRefreshes, apiCallsSaved.
