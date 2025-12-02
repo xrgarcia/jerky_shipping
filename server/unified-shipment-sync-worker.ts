@@ -126,22 +126,26 @@ async function syncShipment(shipmentData: any): Promise<string> {
   // Use existing ETL service - handles full upsert including items and tags
   const shipmentDbId = await shipStationShipmentETL.processShipment(shipmentData, null);
   
-  // Update sync tracking timestamps
-  await db
+  // Update sync tracking timestamps and fetch the order number from DB
+  const [updatedShipment] = await db
     .update(shipments)
     .set({
       lastShipstationSyncAt: now,
       shipstationModifiedAt: modifiedAt,
     })
-    .where(eq(shipments.id, shipmentDbId));
+    .where(eq(shipments.id, shipmentDbId))
+    .returning({ orderNumber: shipments.orderNumber });
   
   // Broadcast update via WebSocket with shipment_synced event type
-  broadcastOrderUpdate({
-    type: 'shipment_synced',
-    shipmentId: shipmentDbId,
-    orderNumber: shipmentData.order_number || null,
-    syncedAt: now.toISOString(),
-  }, 'shipment_synced');
+  // Use the order number from the database record (properly extracted by ETL)
+  const orderNumber = updatedShipment?.orderNumber || null;
+  if (orderNumber) {
+    broadcastOrderUpdate({
+      type: 'shipment_synced',
+      orderNumber,
+      syncedAt: now.toISOString(),
+    }, 'shipment_synced');
+  }
   
   return shipmentDbId;
 }
