@@ -115,11 +115,12 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     // Check if already synced with same session data (use firestoreDocumentId for change detection)
     if (shipment.sessionId === session.session_id.toString() && 
         shipment.firestoreDocumentId === session.document_id) {
-      // Check if the updated timestamp matches - skip if no changes
-      // Use pickEndedAt as a proxy for last update
+      // Check if the updated timestamp AND session status match - skip only if both unchanged
+      // CRITICAL: Always update when session_status differs to prevent stale lifecycle data
       const existingPickEnd = shipment.pickEndedAt?.toISOString();
       const newPickEnd = session.pick_end_datetime?.toISOString();
-      if (existingPickEnd === newPickEnd) {
+      const statusUnchanged = shipment.sessionStatus === session.session_status;
+      if (existingPickEnd === newPickEnd && statusUnchanged) {
         return false; // No changes
       }
     }
