@@ -100,7 +100,8 @@ type QueueStats = {
     oldestOrderMissingShipmentAt: string | null;
     shipmentsWithoutOrders: number;
     orphanedShipments: number;
-    shipmentsWithoutStatus: number;
+    shipmentsWithoutStatusWarning: number;
+    shipmentsWithoutStatusCritical: number;
     shipmentSyncFailures: number;
     shopifyOrderSyncFailures: number;
   };
@@ -1580,18 +1581,35 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking">
-          <Card data-testid="card-shipments-without-status" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
+        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-warning">
+          <Card data-testid="card-shipments-without-status-warning" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px] border-yellow-500/50">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
                 <AlertCircle className="h-5 w-5" />
-                Shipped Without Tracking
+                No Tracking (24-48h)
               </CardTitle>
-              <CardDescription>Shipped shipments missing tracking numbers</CardDescription>
+              <CardDescription>Warning: Shipped 24-48 hours ago, no tracking yet</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-shipments-without-status">
-                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatus ?? 0).toLocaleString()}
+              <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-500" data-testid="text-shipments-without-status-warning">
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusWarning ?? 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking-critical">
+          <Card data-testid="card-shipments-without-status-critical" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px] border-red-500/50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-red-600 dark:text-red-500">
+                <AlertCircle className="h-5 w-5" />
+                No Tracking (48h+)
+              </CardTitle>
+              <CardDescription>Critical: Shipped over 48 hours ago, still no tracking</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600 dark:text-red-500" data-testid="text-shipments-without-status-critical">
+                {!hasQueueData ? "-" : (queueStats?.dataHealth?.shipmentsWithoutStatusCritical ?? 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>

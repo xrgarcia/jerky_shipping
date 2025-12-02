@@ -2056,11 +2056,22 @@ export class DatabaseStorage implements IStorage {
         sql`${shipments.trackingNumber} IS NULL AND ${shipments.shipDate} IS NULL AND ${shipments.shipmentId} IS NULL`
       );
     
-    // Query 4: Shipped shipments without tracking numbers
-    // Exclude label_purchased (label printed but not picked up by carrier yet - expected to have no tracking)
-    // Exclude shipments created in the last 48 hours (give time for tracking to come through)
-    // Focus on shipments that claim to be shipped/in_transit/delivered but still have no tracking
-    const shipmentsWithoutStatusResult = await db
+    // Query 4a: Shipped shipments without tracking (WARNING: 24-48 hours old)
+    // These are aging but may still get tracking soon
+    const shipmentsWithoutStatusWarningResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        sql`${shipments.status} IN ('shipped', 'in_transit', 'delivered') 
+            AND ${shipments.trackingNumber} IS NULL
+            AND (${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('label_purchased', 'on_hold'))
+            AND ${shipments.createdAt} >= NOW() - INTERVAL '48 hours'
+            AND ${shipments.createdAt} < NOW() - INTERVAL '24 hours'`
+      );
+    
+    // Query 4b: Shipped shipments without tracking (CRITICAL: over 48 hours old)
+    // These have had plenty of time and likely have a real problem
+    const shipmentsWithoutStatusCriticalResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
@@ -2085,7 +2096,8 @@ export class DatabaseStorage implements IStorage {
       oldestOrderMissingShipmentAt: oldestOrderResult[0]?.createdAt ? new Date(oldestOrderResult[0].createdAt).toISOString() : null,
       shipmentsWithoutOrders: shipmentsWithoutOrdersResult[0]?.count || 0,
       orphanedShipments: orphanedShipmentsResult[0]?.count || 0,
-      shipmentsWithoutStatus: shipmentsWithoutStatusResult[0]?.count || 0,
+      shipmentsWithoutStatusWarning: shipmentsWithoutStatusWarningResult[0]?.count || 0,
+      shipmentsWithoutStatusCritical: shipmentsWithoutStatusCriticalResult[0]?.count || 0,
       shipmentSyncFailures: syncFailuresResult[0]?.count || 0,
       shopifyOrderSyncFailures: shopifyOrderSyncFailuresResult[0]?.count || 0,
     };
