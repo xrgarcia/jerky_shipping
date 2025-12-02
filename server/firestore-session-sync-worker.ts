@@ -10,9 +10,7 @@ const log = (message: string) => console.log(`[firestore-session-sync] ${message
 
 // Worker state
 let workerStatus: 'sleeping' | 'running' | 'error' = 'sleeping';
-let lastSyncTimestamp: Date | null = null;
 let syncIntervalId: NodeJS.Timeout | null = null;
-let pollCount = 0; // Track polls for periodic broader sync
 
 // Worker statistics
 let workerStats = {
@@ -32,7 +30,6 @@ export function getFirestoreSessionSyncWorkerStats() {
   return {
     ...workerStats,
     status: workerStatus,
-    lastSyncTimestamp: lastSyncTimestamp?.toISOString() || null,
   };
 }
 
@@ -178,63 +175,42 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
 }
 
 /**
- * Main sync function - polls Firestore and syncs to shipments table
- * Every 10 polls (10 minutes), does a broader 1-hour lookback to catch
- * sessions where session_status changed but updated_date didn't
+ * Main sync function - queries Firestore for ALL non-closed sessions
+ * and compares with our database. Updates only if fields have changed.
+ * 
+ * This is simpler and more reliable than cursor-based sync because:
+ * - Firestore is the source of truth for session status
+ * - We always catch status changes even if updated_date doesn't change
+ * - No cursor management or timestamp tracking needed
  */
 export async function syncFirestoreSessions(): Promise<number> {
   try {
     workerStatus = 'running';
-    pollCount++;
 
-    // Every 10 polls, do a broader 1-hour lookback to catch missed updates
-    // This handles cases where Firestore's updated_date doesn't change when session_status changes
-    const isBroadSync = pollCount % 10 === 0;
-    
-    let sinceDatetime: Date;
-    if (isBroadSync) {
-      // Broad sync: look back 1 hour to catch any missed updates
-      sinceDatetime = new Date(Date.now() - 60 * 60 * 1000);
-      log(`[BROAD SYNC] Fetching sessions from last hour to catch missed updates`);
-    } else {
-      // Normal sync: use cursor (or 5 minutes ago if no cursor)
-      sinceDatetime = lastSyncTimestamp || new Date(Date.now() - 5 * 60 * 1000);
-    }
-    
-    log(`Fetching sessions updated since ${sinceDatetime.toISOString()}`);
-
-    // Fetch recently updated sessions from Firestore
-    const sessions = await firestoreStorage.getSessionsUpdatedSince(sinceDatetime);
+    // Query Firestore for ALL non-closed sessions (new, active, inactive)
+    log('Fetching all non-closed sessions from Firestore...');
+    const sessions = await firestoreStorage.getNonClosedSessions();
     
     if (sessions.length === 0) {
-      log('No new sessions to sync');
+      log('No non-closed sessions found');
       workerStats.lastSyncAt = new Date();
       workerStatus = 'sleeping';
       return 0;
     }
 
-    log(`Found ${sessions.length} session(s) to sync`);
+    log(`Found ${sessions.length} non-closed session(s) to check`);
 
     let syncedCount = 0;
-    let latestUpdateDate = sinceDatetime;
+    let skippedCount = 0;
 
-    // Process each session
+    // Process each session - compare with DB and update if changed
     for (const session of sessions) {
       const synced = await syncSessionToShipment(session);
       if (synced) {
         syncedCount++;
+      } else {
+        skippedCount++;
       }
-      
-      // Track the latest update timestamp for next sync
-      if (session.updated_date > latestUpdateDate) {
-        latestUpdateDate = session.updated_date;
-      }
-    }
-
-    // Update last sync timestamp to the latest session update time
-    // For broad syncs, don't reset cursor - keep it advancing normally
-    if (!isBroadSync) {
-      lastSyncTimestamp = latestUpdateDate;
     }
 
     // Update stats
@@ -242,7 +218,7 @@ export async function syncFirestoreSessions(): Promise<number> {
     workerStats.lastSyncCount = syncedCount;
     workerStats.lastSyncAt = new Date();
 
-    log(`Synced ${syncedCount} of ${sessions.length} sessions`);
+    log(`Synced ${syncedCount} sessions, skipped ${skippedCount} unchanged`);
 
     workerStatus = 'sleeping';
     return syncedCount;
@@ -256,76 +232,19 @@ export async function syncFirestoreSessions(): Promise<number> {
 }
 
 /**
- * Initial sync - sync all sessions from the past year
- * Called on worker startup to catch up on all historical data
+ * Initial sync - sync all non-closed sessions on startup
+ * Uses the same logic as regular sync - no cursor needed
  */
 export async function initialSync(): Promise<number> {
   try {
-    // Start from 1 year ago to capture all historical sessions
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    
-    log(`Starting initial sync from ${oneYearAgo.toISOString()}...`);
+    log('Starting initial sync of non-closed sessions...');
     workerStatus = 'running';
 
-    // Use pagination to handle large result sets
-    let totalSynced = 0;
-    let latestUpdateDate = oneYearAgo;
-    let hasMore = true;
-    let pageCount = 0;
-    const BATCH_LIMIT = 500;
+    // Just use the regular sync - it fetches all non-closed sessions
+    const syncedCount = await syncFirestoreSessions();
 
-    while (hasMore) {
-      pageCount++;
-      log(`Fetching page ${pageCount} of sessions updated since ${latestUpdateDate.toISOString()}`);
-      
-      const sessions = await firestoreStorage.getSessionsUpdatedSince(latestUpdateDate, BATCH_LIMIT);
-      
-      if (sessions.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      log(`Page ${pageCount}: Found ${sessions.length} session(s)`);
-
-      // Track the cursor before processing
-      const previousCursor = latestUpdateDate.getTime();
-
-      for (const session of sessions) {
-        const synced = await syncSessionToShipment(session);
-        if (synced) {
-          totalSynced++;
-        }
-        
-        if (session.updated_date > latestUpdateDate) {
-          latestUpdateDate = session.updated_date;
-        }
-      }
-
-      // If we got fewer than the limit, we've reached the end
-      if (sessions.length < BATCH_LIMIT) {
-        hasMore = false;
-      } else if (latestUpdateDate.getTime() === previousCursor) {
-        // Safety: if cursor didn't advance (all 500 sessions have same timestamp),
-        // add 1ms to prevent infinite loop
-        latestUpdateDate = new Date(latestUpdateDate.getTime() + 1);
-        log(`Warning: Cursor didn't advance, adding 1ms buffer to prevent stuck pagination`);
-      }
-      
-      // Log progress every page
-      log(`Page ${pageCount} complete: ${totalSynced} total sessions synced so far`);
-    }
-
-    // Set the last sync timestamp to the latest update
-    lastSyncTimestamp = latestUpdateDate;
-
-    workerStats.totalSynced += totalSynced;
-    workerStats.lastSyncCount = totalSynced;
-    workerStats.lastSyncAt = new Date();
-
-    log(`Initial sync complete: ${totalSynced} sessions synced across ${pageCount} page(s)`);
-    workerStatus = 'sleeping';
-    return totalSynced;
+    log(`Initial sync complete: ${syncedCount} sessions synced`);
+    return syncedCount;
   } catch (error: any) {
     log(`Initial sync error: ${error.message}`);
     workerStats.errorsCount++;
@@ -381,18 +300,14 @@ export function stopFirestoreSessionSyncWorker(): void {
 
 /**
  * Force a full re-sync of all sessions from Firestore
- * Resets the sync cursor and triggers initialSync to re-fetch everything
- * Useful for correcting stale data when Firestore documents weren't re-fetched
+ * Simply re-runs the sync which queries all non-closed sessions
  */
 export async function forceFullResync(): Promise<{ success: boolean; message: string; syncedCount?: number }> {
   try {
-    log('Force re-sync requested - resetting sync cursor');
+    log('Force re-sync requested');
     
-    // Reset the sync timestamp to force re-fetch all sessions
-    lastSyncTimestamp = null;
-    
-    // Run initial sync which will fetch all sessions from past year
-    const syncedCount = await initialSync();
+    // Run sync which fetches all non-closed sessions
+    const syncedCount = await syncFirestoreSessions();
     
     return {
       success: true,
