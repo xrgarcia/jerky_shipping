@@ -125,8 +125,6 @@ app.use((req, res, next) => {
       shipmentSyncQueueOldestAt: oldestShipmentSync?.enqueuedAt || null,
       shopifyOrderSyncQueueOldestAt: oldestShopifyOrderSync?.enqueuedAt || null,
       backfillActiveJob: activeBackfillJob,
-      onHoldWorkerStatus: 'sleeping', // Worker hasn't started yet, default to sleeping
-      onHoldWorkerStats: undefined, // Worker hasn't started yet, will be populated after first run
       dataHealth,
       pipeline,
     });
@@ -198,10 +196,6 @@ app.use((req, res, next) => {
     const { workerCoordinator } = await import("./worker-coordinator");
     await workerCoordinator.clearAllLocks();
     log("Worker coordination locks cleared successfully");
-    
-    // Start on-hold shipments polling worker (supplements webhooks which don't fire for on_hold)
-    const { startOnHoldPollWorker } = await import("./onhold-poll-worker");
-    startOnHoldPollWorker(60000); // Poll for on_hold shipments every 1 minute
     
     // Start unified shipment sync worker (crash-safe cursor-based polling)
     const { startUnifiedShipmentSyncWorker } = await import("./unified-shipment-sync-worker");

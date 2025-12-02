@@ -3314,17 +3314,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending');
       const recentBackfillJobs = allBackfillJobs.slice(0, 5); // Last 5 jobs
 
-      // Get on-hold worker status and stats
-      let onHoldWorkerStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
-      let onHoldWorkerStats = undefined;
-      try {
-        const { getOnHoldWorkerStatus, getOnHoldWorkerStats } = await import("./onhold-poll-worker");
-        onHoldWorkerStatus = getOnHoldWorkerStatus();
-        onHoldWorkerStats = getOnHoldWorkerStats();
-      } catch (error) {
-        // Worker not initialized yet
-      }
-
       // Get print queue worker status, stats, and stale jobs metrics
       let printQueueWorkerStatus: 'sleeping' | 'running' = 'sleeping';
       let printQueueWorkerStats = undefined;
@@ -3409,8 +3398,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         dataHealth: dataHealthMetrics,
         pipeline: pipelineMetrics,
-        onHoldWorkerStatus,
-        onHoldWorkerStats,
         printQueueWorkerStatus,
         printQueueWorkerStats,
         stalePrintJobs,

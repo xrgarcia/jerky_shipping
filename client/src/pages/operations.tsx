@@ -110,21 +110,6 @@ type QueueStats = {
     shippedToday: number;
     oldestQueuedSessionAt: string | null;
   };
-  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
-  onHoldWorkerStats?: {
-    totalProcessedCount: number;
-    lastProcessedCount: number;
-    workerStartedAt: string;
-    lastCompletedAt: string | null;
-  };
-  reverseSyncProgress?: {
-    inProgress: boolean;
-    currentPage: number;
-    totalStaleAtStart: number;
-    checkedThisRun: number;
-    updatedThisRun: number;
-    startedAt: string | null;
-  };
   firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
   firestoreSessionSyncWorkerStats?: {
     totalSynced: number;
@@ -694,15 +679,6 @@ Please analyze this failure and help me understand:
               dataHealth: message.data.dataHealth ?? prev?.dataHealth ?? initial?.dataHealth,
               // Pipeline metrics - now included in WebSocket broadcasts
               pipeline: message.data.pipeline ?? prev?.pipeline ?? initial?.pipeline,
-              onHoldWorkerStatus: message.data.onHoldWorkerStatus ?? prev?.onHoldWorkerStatus ?? 'sleeping',
-              // Only update onHoldWorkerStats if defined, otherwise preserve previous value
-              onHoldWorkerStats: message.data.onHoldWorkerStats !== undefined 
-                ? message.data.onHoldWorkerStats 
-                : (prev?.onHoldWorkerStats ?? initial?.onHoldWorkerStats),
-              // Reverse sync progress - live status of on_hold reverse sync
-              reverseSyncProgress: message.data.reverseSyncProgress !== undefined
-                ? message.data.reverseSyncProgress
-                : prev?.reverseSyncProgress,
               // Firestore worker status - use WebSocket data if defined
               firestoreSessionSyncWorkerStatus: message.data.firestoreSessionSyncWorkerStatus 
                 ?? prev?.firestoreSessionSyncWorkerStatus 
@@ -1537,32 +1513,6 @@ Please analyze this failure and help me understand:
           </Card>
         </Link>
 
-        <Card data-testid="card-onhold-worker-last-run" className="min-h-[280px]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              On-Hold Worker - Last Run
-            </CardTitle>
-            <CardDescription>Time since last successful completion</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold" data-testid="text-onhold-worker-last-run">
-                {!hasQueueData || !queueStats?.onHoldWorkerStats?.lastCompletedAt 
-                  ? "Never" 
-                  : formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.lastCompletedAt), { addSuffix: true })}
-              </div>
-              {queueStats?.onHoldWorkerStats && (
-                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  <div>Last processed: {queueStats.onHoldWorkerStats.lastProcessedCount.toLocaleString()} orders</div>
-                  <div>Total processed: {queueStats.onHoldWorkerStats.totalProcessedCount.toLocaleString()} orders</div>
-                  <div>Running since: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.workerStartedAt), { addSuffix: true })}</div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
         <Link href="/shipments?tab=all&shippedWithoutTracking=true" data-testid="link-shipped-without-tracking">
           <Card data-testid="card-shipments-without-status" className="hover-elevate active-elevate-2 cursor-pointer min-h-[280px]">
             <CardHeader>
@@ -1691,63 +1641,6 @@ Please analyze this failure and help me understand:
               <Badge variant="default" data-testid="badge-shipment-worker">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Running
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="font-medium">On-Hold Poll Worker</p>
-                <p className="text-sm text-muted-foreground">
-                  {queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job' 
-                    ? 'Paused while backfill job is running' 
-                    : 'Polls ShipStation for on_hold shipments, 1 minute intervals'}
-                </p>
-                {queueStats?.onHoldWorkerStats && (
-                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
-                    <div>Last processed: {queueStats.onHoldWorkerStats.lastProcessedCount.toLocaleString()} orders</div>
-                    <div>Total processed: {queueStats.onHoldWorkerStats.totalProcessedCount.toLocaleString()} orders</div>
-                    <div>Started: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.workerStartedAt), { addSuffix: true })}</div>
-                    {queueStats.onHoldWorkerStats.lastCompletedAt && (
-                      <div>Last run: {formatDistanceToNow(new Date(queueStats.onHoldWorkerStats.lastCompletedAt), { addSuffix: true })}</div>
-                    )}
-                  </div>
-                )}
-                {queueStats?.reverseSyncProgress?.inProgress && (
-                  <div className="mt-2 p-2 border rounded bg-muted/30" data-testid="reverse-sync-progress">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      Reverse Sync In Progress
-                    </div>
-                    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
-                      <div>Page: {queueStats.reverseSyncProgress.currentPage} of ~{Math.ceil(queueStats.reverseSyncProgress.totalStaleAtStart / 50)}</div>
-                      <div>Checked: {queueStats.reverseSyncProgress.checkedThisRun.toLocaleString()} / {queueStats.reverseSyncProgress.totalStaleAtStart.toLocaleString()}</div>
-                      <div>Updated: {queueStats.reverseSyncProgress.updatedThisRun.toLocaleString()}</div>
-                      {queueStats.reverseSyncProgress.startedAt && (
-                        <div>Started: {formatDistanceToNow(new Date(queueStats.reverseSyncProgress.startedAt), { addSuffix: true })}</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <Badge 
-                variant={
-                  queueStats?.onHoldWorkerStatus === 'running' 
-                    ? 'default' 
-                    : queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job'
-                    ? 'outline'
-                    : 'secondary'
-                } 
-                data-testid={`badge-onhold-worker-${queueStats?.onHoldWorkerStatus || 'unknown'}`}
-              >
-                {queueStats?.onHoldWorkerStatus === 'running' && <Activity className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'sleeping' && <Clock className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job' && <Pause className="h-3 w-3 mr-1" />}
-                {queueStats?.onHoldWorkerStatus === 'running' 
-                  ? 'Running' 
-                  : queueStats?.onHoldWorkerStatus === 'sleeping' 
-                  ? 'Sleeping' 
-                  : queueStats?.onHoldWorkerStatus === 'awaiting_backfill_job'
-                  ? 'Awaiting Backfill'
-                  : 'Unknown'}
               </Badge>
             </div>
             <div className="flex items-center justify-between">

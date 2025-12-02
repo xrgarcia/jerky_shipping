@@ -40,17 +40,6 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
     - Worker dequeues from high priority first, then low, ensuring webhooks are processed promptly even during reverse sync cycles
     - Requeue function preserves FIFO ordering within each priority level using RPUSH with reverse
 - **Shopify → ShipStation Sync DISABLED**: Shopify webhooks do NOT trigger ShipStation API calls. ShipStation data comes exclusively from ShipStation webhooks. This prevents queue flooding when Shopify order volume is high.
-- **Forward Poll Freshness Filtering** (Dec 2025): The on-hold poll worker now checks if shipments were synced within the last 5 minutes before re-queuing them. This prevents queue flooding when all ~133 on_hold shipments get re-queued every 60 seconds.
-- **Reverse Sync RE-ENABLED** (Dec 2025): Using micro-batch strategy with guardrails:
-    - Only enqueues 10 shipments per cycle (not all 1,400+)
-    - Only enqueues if low-priority queue is empty (LLEN check)
-    - Uses 6-hour freshness window (only re-checks shipments not verified in 6 hours)
-    - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
-- **Parallel Reverse Sync Processing** (Dec 2025): The shipment sync worker processes reverse sync messages in parallel batches:
-    - Fires up to 40 concurrent API requests (matching ShipStation's rate limit per minute)
-    - Uses `Promise.allSettled` to handle individual failures without blocking the batch
-    - Waits for rate limit reset only when the batch exhausts the quota AND more messages remain
-    - Processes ~40 shipments per minute vs ~1/minute with sequential processing (40x speedup)
 - **Unified Shipment Sync Worker Details** (Dec 2025): Part of the Dual Shipment Sync Architecture (see above). Implementation details:
     - **Cursor-based sync**: Uses `sync_cursors` table to track last processed `modified_at` timestamp
     - **7-day lookback**: Initial cursor starts 168 hours in the past for comprehensive catch-up
@@ -65,16 +54,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics for all coordinator operations.
-- **On-Hold Shipment Sync Strategy**: ShipStation does not provide webhooks for hold status changes (V2 API only supports 4 webhook events: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`). The on-hold sync uses a bi-directional approach:
-    - **Forward Poll**: Queries ShipStation for `shipment_status=on_hold` to detect new holds and queue them for sync. Uses smart date floor based on most recent on_hold shipment to minimize API calls.
-    - **Reverse Sync**: Micro-batch approach - checks 10 on_hold shipments per cycle with 6-hour freshness window. Key behavior:
-        - Only enqueues to low-priority queue if queue is empty (prevents flooding)
-        - Queries shipments with `shipment_status=on_hold` in DB, ordered by creation date
-        - Uses 6-hour freshness window (skips shipments verified recently)
-        - Parallel API processing: fires up to 40 concurrent requests per batch
-        - Only updates DB if status ACTUALLY CHANGED (on_hold -> something else)
-        - Does NOT touch records still on_hold (no timestamp bumping)
-        - Full rotation through all on_hold shipments takes ~2.5 hours at 10/min
+- **On-Hold Shipment Handling**: ShipStation does not provide webhooks for hold status changes (V2 API only supports 4 events: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`). The Unified Shipment Sync Worker handles on-hold status changes via its cursor-based polling - any shipment that gets put on hold or released from hold will have its `modified_at` timestamp updated, which the worker will catch on its next poll cycle.
 - **Packing Completion Audit Logging**: The packing completion endpoint (`POST /api/packing/complete`) logs all actions to the `packing_logs` table:
     - `complete_order_start` - Initial request with shipment ID and station
     - `fetch_existing_labels` / `label_fetched_existing` - Label lookup from ShipStation
@@ -89,7 +69,7 @@ The UI/UX employs a warm earth-tone palette and large typography for optimal rea
 
 ## External Dependencies
 -   **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
--   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling. Supported webhooks: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`. Note: ShipStation V2 does NOT support `fulfillment_created_v2` or `fulfillment_canceled_v2` events - on-hold status changes must be tracked via the background poll worker.
+-   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling. Supported webhooks: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`. Note: ShipStation V2 does NOT support `fulfillment_created_v2` or `fulfillment_canceled_v2` events - on-hold status changes are handled by the Unified Shipment Sync Worker's cursor-based polling.
     - **CRITICAL API Parameter**: ShipStation V2 API uses `modified_at_start` and `modified_at_end` for date filtering (NOT `modified_date_start`). ShipStation silently ignores invalid parameters without error, making debugging difficult. Always verify parameters against official documentation.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning, featuring automatic authentication and Redis-backed token caching. Includes a discriminated union type system for product classification and optimized QC scan API with a cache-with-fallback pattern.
 -   **Upstash Redis**: Used for asynchronous webhook and backfill job processing queues.

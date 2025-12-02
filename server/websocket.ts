@@ -674,13 +674,6 @@ export type QueueStatusData = {
   shipmentSyncQueueOldestAt: number | null;
   shopifyOrderSyncQueueOldestAt: number | null;
   backfillActiveJob: any | null;
-  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
-  onHoldWorkerStats?: {
-    totalProcessedCount: number;
-    lastProcessedCount: number;
-    workerStartedAt: string;
-    lastCompletedAt: string | null;
-  };
   firestoreSessionSyncWorkerStatus?: 'sleeping' | 'running' | 'error';
   firestoreSessionSyncWorkerStats?: {
     totalSynced: number;
@@ -744,21 +737,6 @@ export function broadcastQueueStatus(data: {
   oldestShopifyOrderSync?: { enqueuedAt?: number | null };
   backfillActiveJob?: any | null;
   activeBackfillJob?: any | null;
-  onHoldWorkerStatus?: 'sleeping' | 'running' | 'awaiting_backfill_job';
-  onHoldWorkerStats?: {
-    totalProcessedCount: number;
-    lastProcessedCount: number;
-    workerStartedAt: string;
-    lastCompletedAt: string | null;
-  };
-  reverseSyncProgress?: {
-    inProgress: boolean;
-    currentPage: number;
-    totalStaleAtStart: number;
-    checkedThisRun: number;
-    updatedThisRun: number;
-    startedAt: string | null;
-  };
   printQueueWorkerStatus?: 'sleeping' | 'running';
   printQueueWorkerStats?: {
     totalProcessedCount: number;
@@ -836,24 +814,6 @@ export function broadcastQueueStatus(data: {
     return;
   }
 
-  // Get current on-hold worker status
-  let currentOnHoldStatus: 'sleeping' | 'running' | 'awaiting_backfill_job' = 'sleeping';
-  try {
-    const { getOnHoldWorkerStatus } = require('./onhold-poll-worker');
-    currentOnHoldStatus = getOnHoldWorkerStatus();
-  } catch (error) {
-    // Worker not initialized yet
-  }
-
-  // Get worker stats if available
-  let workerStats = undefined;
-  try {
-    const { getOnHoldWorkerStats } = require('./onhold-poll-worker');
-    workerStats = getOnHoldWorkerStats();
-  } catch (error) {
-    // Worker not initialized yet
-  }
-
   // Get cached state to merge with (prevents flashing when partial updates are sent)
   let cachedState: Partial<QueueStatusData> = {};
   if (!globalThis.__lastQueueStatus) {
@@ -884,8 +844,6 @@ export function broadcastQueueStatus(data: {
       : (data.activeBackfillJob !== undefined 
         ? data.activeBackfillJob 
         : cachedState.backfillActiveJob ?? null),
-    onHoldWorkerStatus: data.onHoldWorkerStatus ?? currentOnHoldStatus,
-    onHoldWorkerStats: data.onHoldWorkerStats ?? workerStats,
     // Firestore session sync worker - preserve from cache if not provided
     firestoreSessionSyncWorkerStatus: data.firestoreSessionSyncWorkerStatus ?? cachedState.firestoreSessionSyncWorkerStatus,
     firestoreSessionSyncWorkerStats: data.firestoreSessionSyncWorkerStats ?? cachedState.firestoreSessionSyncWorkerStats,
