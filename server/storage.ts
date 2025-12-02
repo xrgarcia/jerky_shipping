@@ -1196,13 +1196,10 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'on_dock':
-          // On Dock: Label purchased, in transit (IT status)
-          // shipment_status = 'label_purchased' AND status = 'IT'
+          // On Dock: Label purchased (waiting for carrier pickup)
+          // shipment_status = 'label_purchased' - tracking status doesn't matter
           conditions.push(
-            and(
-              eq(shipments.shipmentStatus, 'label_purchased'),
-              eq(shipments.status, 'IT')
-            )
+            eq(shipments.shipmentStatus, 'label_purchased')
           );
           break;
         case 'picking_issues':
@@ -1446,16 +1443,13 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // On Dock: Label purchased, in transit (IT status)
-    // shipment_status = 'label_purchased' AND status = 'IT'
+    // On Dock: Label purchased (waiting for carrier pickup)
+    // shipment_status = 'label_purchased' - tracking status doesn't matter
     const onDockResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
-        and(
-          eq(shipments.shipmentStatus, 'label_purchased'),
-          eq(shipments.status, 'IT')
-        )
+        eq(shipments.shipmentStatus, 'label_purchased')
       );
 
     // Picking Issues: Orders with inactive session status (stuck/paused)
