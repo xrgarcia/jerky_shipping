@@ -56,6 +56,7 @@ export interface IFirestoreStorage {
   getUniqueSessionStatuses(): Promise<string[]>;
   getSessionsUpdatedSince(sinceDate: Date, limit?: number): Promise<SkuVaultOrderSession[]>;
   getTodaysSessions(): Promise<SkuVaultOrderSession[]>;
+  getNonClosedSessions(): Promise<SkuVaultOrderSession[]>;
 }
 
 export class FirestoreStorage implements IFirestoreStorage {
@@ -280,6 +281,30 @@ export class FirestoreStorage implements IFirestoreStorage {
       .get();
 
     return snapshot.docs.map(doc => this.mapDocToSession(doc));
+  }
+
+  /**
+   * Get all non-closed sessions (new, active, inactive)
+   * Used by sync worker to reliably catch all status changes
+   * Firestore doesn't support != queries, so we query each status separately
+   */
+  async getNonClosedSessions(): Promise<SkuVaultOrderSession[]> {
+    const db = getFirestoreDb();
+    const nonClosedStatuses = ['new', 'active', 'inactive'];
+    const allSessions: SkuVaultOrderSession[] = [];
+
+    for (const status of nonClosedStatuses) {
+      const snapshot = await db.collection(this.collectionName)
+        .where('session_status', '==', status)
+        .get();
+      
+      for (const doc of snapshot.docs) {
+        allSessions.push(this.mapDocToSession(doc));
+      }
+    }
+
+    console.log(`[FirestoreStorage] Found ${allSessions.length} non-closed sessions (${nonClosedStatuses.join(', ')})`);
+    return allSessions;
   }
 }
 
