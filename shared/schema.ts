@@ -271,6 +271,8 @@ export const shipments = pgTable("shipments", {
   reverseSyncLastCheckedAt: timestamp("reverse_sync_last_checked_at"), // When reverse sync last verified status with ShipStation
   lastShipstationSyncAt: timestamp("last_shipstation_sync_at"), // When this shipment was last synced from ShipStation (for freshness filtering)
   shipstationModifiedAt: timestamp("shipstation_modified_at"), // ShipStation's modified_at timestamp (for cursor-based polling)
+  // Cache warmer tracking
+  cacheWarmedAt: timestamp("cache_warmed_at"), // When QCSale data was pre-warmed into cache (null = not warmed)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -300,6 +302,13 @@ export const shipments = pgTable("shipments", {
   lastShipstationSyncAtIdx: index("shipments_last_shipstation_sync_at_idx").on(table.lastShipstationSyncAt.desc().nullsLast()),
   // Index for shipmentStatus filtering (on_hold verification)
   shipmentStatusIdx: index("shipments_shipment_status_idx").on(table.shipmentStatus).where(sql`${table.shipmentStatus} IS NOT NULL`),
+  // CACHE WARMER INDEXES: Partial index for ready-to-pack orders (closed session, no tracking)
+  // This is the exact query the cache warmer uses to find orders to pre-warm
+  cacheWarmerReadyIdx: index("shipments_cache_warmer_ready_idx").on(table.updatedAt.desc()).where(sql`${table.sessionStatus} = 'closed' AND ${table.trackingNumber} IS NULL`),
+  // Index for lifecycle-filtered shipment queries (new/active/inactive/closed tabs on shipments page)
+  sessionStatusUpdatedAtIdx: index("shipments_session_status_updated_at_idx").on(table.sessionStatus, table.updatedAt.desc()),
+  // Index for cache warming tracking (when was this order's cache warmed)
+  cacheWarmedAtIdx: index("shipments_cache_warmed_at_idx").on(table.cacheWarmedAt.desc().nullsLast()).where(sql`${table.cacheWarmedAt} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -372,6 +381,8 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   // New sync tracking fields
   lastShipstationSyncAt: z.coerce.date().optional().or(z.null()),
   shipstationModifiedAt: z.coerce.date().optional().or(z.null()),
+  // Cache warmer tracking
+  cacheWarmedAt: z.coerce.date().optional().or(z.null()),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;

@@ -222,6 +222,16 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     // Track in warmed set (also with TTL to auto-cleanup)
     await redis.sadd(WARMED_SET_KEY, orderNumber);
     
+    // Update the shipment record with cache_warmed_at timestamp for visibility
+    try {
+      await db.update(shipments)
+        .set({ cacheWarmedAt: new Date() })
+        .where(eq(shipments.orderNumber, orderNumber));
+    } catch (dbErr: any) {
+      // Non-critical - don't fail warming if DB update fails
+      error(`Failed to update cacheWarmedAt for ${orderNumber}: ${dbErr.message}`);
+    }
+    
     log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries (${WARM_TTL_SECONDS}s TTL)`);
     
     if (force) {
@@ -256,6 +266,16 @@ export async function invalidateCacheForOrder(orderNumber: string): Promise<void
     // Also clear the regular QCSale cache key
     const regularKey = `skuvault:qcsale:${orderNumber}`;
     await redis.del(regularKey);
+    
+    // Clear the cacheWarmedAt timestamp in the database
+    try {
+      await db.update(shipments)
+        .set({ cacheWarmedAt: null })
+        .where(eq(shipments.orderNumber, orderNumber));
+    } catch (dbErr: any) {
+      // Non-critical - don't fail invalidation if DB update fails
+      error(`Failed to clear cacheWarmedAt for ${orderNumber}: ${dbErr.message}`);
+    }
     
     log(`Invalidated cache for order ${orderNumber}`);
     metrics.invalidations++;
