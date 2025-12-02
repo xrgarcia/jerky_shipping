@@ -30,9 +30,9 @@
 name: Build Desktop App
 
 on:
-  # Trigger on new releases - electron-builder auto-publishes to this release
+  # Trigger on published releases - electron-builder uploads installers to the release
   release:
-    types: [created]
+    types: [published]
   
   # Allow manual trigger from Actions tab (for testing builds)
   workflow_dispatch:
