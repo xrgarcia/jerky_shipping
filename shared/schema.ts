@@ -269,6 +269,8 @@ export const shipments = pgTable("shipments", {
   pickEndedAt: timestamp("pick_ended_at"), // When picking finished
   savedCustomField2: boolean("saved_custom_field_2"), // SkuVault custom field flag
   reverseSyncLastCheckedAt: timestamp("reverse_sync_last_checked_at"), // When reverse sync last verified status with ShipStation
+  lastShipstationSyncAt: timestamp("last_shipstation_sync_at"), // When this shipment was last synced from ShipStation (for freshness filtering)
+  shipstationModifiedAt: timestamp("shipstation_modified_at"), // ShipStation's modified_at timestamp (for cursor-based polling)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -294,6 +296,10 @@ export const shipments = pgTable("shipments", {
   // Composite index for packing queue queries (sessionStatus + trackingNumber filtering)
   // Covers: WHERE sessionId IS NOT NULL AND sessionStatus IN ('closed', 'picked') AND trackingNumber IS NULL
   packingQueueIdx: index("shipments_packing_queue_idx").on(table.sessionStatus, table.trackingNumber).where(sql`${table.sessionId} IS NOT NULL`),
+  // Index for freshness filtering in the new incremental poller
+  lastShipstationSyncAtIdx: index("shipments_last_shipstation_sync_at_idx").on(table.lastShipstationSyncAt.desc().nullsLast()),
+  // Index for shipmentStatus filtering (on_hold verification)
+  shipmentStatusIdx: index("shipments_shipment_status_idx").on(table.shipmentStatus).where(sql`${table.shipmentStatus} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -363,10 +369,31 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   pickStartedAt: z.coerce.date().optional().or(z.null()),
   pickEndedAt: z.coerce.date().optional().or(z.null()),
   savedCustomField2: z.boolean().nullish(),
+  // New sync tracking fields
+  lastShipstationSyncAt: z.coerce.date().optional().or(z.null()),
+  shipstationModifiedAt: z.coerce.date().optional().or(z.null()),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
 export type Shipment = typeof shipments.$inferSelect;
+
+// Sync cursors table for storing cursor positions for incremental polling
+export const syncCursors = pgTable("sync_cursors", {
+  id: varchar("id").primaryKey(), // e.g., 'shipstation:modified_at'
+  cursorValue: text("cursor_value").notNull(), // ISO timestamp or other cursor value
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  metadata: jsonb("metadata"), // Additional metadata (e.g., last page processed, total synced)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSyncCursorSchema = createInsertSchema(syncCursors).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSyncCursor = z.infer<typeof insertSyncCursorSchema>;
+export type SyncCursor = typeof syncCursors.$inferSelect;
 
 // Shipment items table for normalized shipment line items
 export const shipmentItems = pgTable("shipment_items", {
