@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, nativeImage, Menu } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { AuthService } from './auth';
 import { WebSocketClient } from './websocket';
 import { PrinterService } from './printer';
