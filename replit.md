@@ -51,10 +51,13 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 -   **ShipStation Integration**: V2 API for shipment tracking and fulfillment, with robust rate limit handling. Supported webhooks: `fulfillment_shipped_v2`, `fulfillment_rejected_v2`, `track`, `batch`. Uses `modified_at_start` and `modified_at_end` for date filtering.
 -   **SkuVault Integration**: Reverse-engineered web API for wave picking session data and Quality Control (QC) scanning, featuring automatic authentication, Redis-backed token caching, and a discriminated union type system.
     - **Warehouse Session Lifecycle**: Deep understanding of SkuVault session statuses (`new`, `active`, `inactive`, `closed`) to manage picking, packing, and flagging for attention. Session flow: new (pick queue) → active (picking) → inactive (stuck/paused, FLAG) → closed+no tracking (WARM CACHE) → closed+has tracking (INVALIDATE CACHE).
-    - **QCSale Cache Warmer Service**: Proactively pre-loads SkuVault QC Sale data for orders ready to be packed (sessionStatus='closed', trackingNumber IS NULL).
-        - **Extended TTL**: 10-minute TTL for warmed entries vs 2-minute for regular cache to reduce API load.
+    - **QCSale Cache Warmer Service**: Proactively pre-loads SkuVault QC Sale data AND shipment data for orders ready to be packed (sessionStatus='closed', trackingNumber IS NULL).
+        - **Extended TTL**: 48-hour TTL for warmed entries to maximize cache hits during work shifts.
         - **Background Polling**: 30-second polling interval catches any orders missed by session sync triggers.
         - **Immediate Warming**: Hooks into Firestore session sync to warm cache immediately when sessions transition to 'closed' status. The sync worker uses a closed-session detection algorithm that compares DB non-closed sessions with current Firestore state to catch sessions that disappear from the active query (transitioned to closed). Uses `session.order_number` from Firestore as the authoritative source for order numbers.
+        - **Shipment Data Caching**: Stores carrier, address, weight, dimensions, status, and sessionStatus alongside QCSale data to eliminate PostgreSQL queries during packing.
+        - **Legacy Cache Upgrade**: Automatically detects cache entries missing the 'shipment' key (legacy format) and upgrades them on-demand with shipment data. Uses `!('shipment' in parsed)` to distinguish legacy entries from new entries with `shipment: null`.
+        - **Cache Structure**: `{ saleId, orderNumber, lookupMap, qcSale, shipment: { carrier, address, weight, dimensions, status, tracking, sessionStatus, cacheWarmedAt } }`.
         - **Cache Invalidation**: Automatic invalidation when labels are created (tracking number assigned).
         - **Manual Refresh**: Refresh button on packing page for customer service order changes (gated to sessionStatus='closed' AND no trackingNumber).
         - **Metrics Tracking**: GET /api/operations/cache-warmer-status provides ordersWarmed, cacheHits, cacheMisses, invalidations, manualRefreshes, apiCallsSaved.
