@@ -328,6 +328,10 @@ export async function refreshCacheForOrder(orderNumber: string): Promise<boolean
 /**
  * Get warm cache data for an order
  * Returns null if not in warm cache
+ * 
+ * CACHE UPGRADE: If the cached entry is a legacy entry (missing 'shipment' key entirely),
+ * it will be automatically re-warmed to add the shipment field.
+ * Note: A cache entry with `shipment: null` is NOT legacy - it means no shipment exists in DB.
  */
 export async function getWarmCache(orderNumber: string): Promise<any | null> {
   try {
@@ -340,11 +344,37 @@ export async function getWarmCache(orderNumber: string): Promise<any | null> {
       return null;
     }
     
+    // Upstash Redis auto-parses JSON
+    const parsed = typeof cacheData === 'string' ? JSON.parse(cacheData) : cacheData;
+    
+    // CACHE UPGRADE: Check if this is a LEGACY entry (missing 'shipment' key entirely)
+    // New cache entries have `shipment: null` when no shipment exists - that's NOT legacy
+    // Legacy entries don't have the 'shipment' key at all
+    const isLegacyEntry = parsed.qcSale && !('shipment' in parsed);
+    
+    if (isLegacyEntry) {
+      log(`Legacy cache entry for ${orderNumber} missing shipment field - upgrading...`);
+      
+      // Re-warm with force=true to upgrade the entry
+      const upgraded = await warmCacheForOrder(orderNumber, true);
+      if (upgraded) {
+        // Fetch the upgraded cache data
+        const upgradedData = await redis.get(warmKey);
+        if (upgradedData) {
+          const upgradedParsed = typeof upgradedData === 'string' ? JSON.parse(upgradedData) : upgradedData;
+          log(`Cache entry for ${orderNumber} upgraded with shipment field`);
+          metrics.cacheHits++;
+          metrics.apiCallsSaved++;
+          return upgradedParsed;
+        }
+      }
+      // Fall through to return original data if upgrade failed
+      log(`Cache upgrade failed for ${orderNumber}, returning legacy data`);
+    }
+    
     metrics.cacheHits++;
     metrics.apiCallsSaved++;
     
-    // Upstash Redis auto-parses JSON
-    const parsed = typeof cacheData === 'string' ? JSON.parse(cacheData) : cacheData;
     return parsed;
   } catch (err: any) {
     error(`Failed to get warm cache for order ${orderNumber}: ${err.message}`);
