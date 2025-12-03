@@ -206,8 +206,9 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
 
     const webhooks = await listResponse.json();
     
-    // CLEANUP: Delete orphaned webhooks from other environments
-    // Since ShipStation uses same API key for all environments, we identify by name label + URL
+    // CLEANUP: Only delete orphaned webhooks for THIS environment
+    // IMPORTANT: Never delete webhooks from other environments (e.g., don't delete [PROD] when running in DEV)
+    // This prevents dev/prod from fighting over webhook registration when sharing the same API key
     const orphanedWebhooks = webhooks?.filter((webhook: any) => {
       // Check if webhook name contains an environment label
       const nameMatch = webhook.name?.match(/\[([A-Z]+)\]/);
@@ -219,15 +220,29 @@ export async function ensureShipStationWebhooksRegistered(webhookBaseUrl: string
         const currentUrlObj = new URL(baseUrl);
         const urlMatches = webhookUrlObj.host === currentUrlObj.host;
         
-        // Webhook is orphaned if:
-        // 1. It has an environment label AND it's different from ours, OR
-        // 2. It points to a different URL host, OR
-        // 3. It has NO environment label at all (old webhook from before labeling system)
-        //    AND points to our URL (needs to be replaced with labeled version)
-        const hasNoLabel = !webhookEnv;
-        const needsReplacement = hasNoLabel && urlMatches; // Old webhook pointing to current URL
+        // CRITICAL: Never touch webhooks from other environments!
+        // If webhook has a different env label (e.g., [PROD] when we're DEV), leave it alone
+        if (webhookEnv && webhookEnv !== envLabel) {
+          return false; // Not orphaned - belongs to another environment
+        }
         
-        return (webhookEnv && webhookEnv !== envLabel) || !urlMatches || needsReplacement;
+        // Only cleanup webhooks that:
+        // 1. Have OUR environment label but point to a different URL (stale from old deployment)
+        // 2. Have NO label and point to our URL (old webhook that needs to be replaced with labeled version)
+        const hasOurLabel = webhookEnv === envLabel;
+        const hasNoLabel = !webhookEnv;
+        
+        // Stale webhook from our environment pointing to wrong URL
+        if (hasOurLabel && !urlMatches) {
+          return true;
+        }
+        
+        // Old unlabeled webhook pointing to our URL - replace with labeled version
+        if (hasNoLabel && urlMatches) {
+          return true;
+        }
+        
+        return false;
       } catch (error: any) {
         console.warn(`Skipping webhook with malformed URL: ${webhook.url} (${error.message})`);
         return false;
