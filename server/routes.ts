@@ -3,8 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags } from "@shared/schema";
-import { eq, count, desc, or, and, sql } from "drizzle-orm";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents } from "@shared/schema";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
@@ -2874,6 +2874,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching packed shipments:", error);
       res.status(500).json({ error: "Failed to fetch packed shipments" });
+    }
+  });
+
+  // Shipment events report - browsable view of all shipment events with filtering
+  app.get("/api/reports/shipment-events", requireAuth, async (req, res) => {
+    try {
+      const { 
+        startDate, 
+        endDate, 
+        username, 
+        station, 
+        eventName, 
+        orderNumber,
+        sortBy = 'occurredAt',
+        sortOrder = 'desc',
+        page = '1',
+        limit = '50'
+      } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Parse YYYY-MM-DD strings as Central Time
+      const start = fromZonedTime(`${startDate} 00:00:00`, CST_TIMEZONE);
+      const end = fromZonedTime(`${endDate} 23:59:59.999`, CST_TIMEZONE);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(parseInt(limit as string) || 50, 500); // Cap at 500
+      const offset = (pageNum - 1) * limitNum;
+
+      // Build dynamic query conditions
+      const conditions = [
+        gte(shipmentEvents.occurredAt, start),
+        lte(shipmentEvents.occurredAt, end)
+      ];
+
+      if (username && typeof username === 'string' && username.trim()) {
+        conditions.push(ilike(shipmentEvents.username, `%${username.trim()}%`));
+      }
+      if (station && typeof station === 'string' && station.trim()) {
+        conditions.push(ilike(shipmentEvents.station, `%${station.trim()}%`));
+      }
+      if (eventName && typeof eventName === 'string' && eventName.trim()) {
+        conditions.push(ilike(shipmentEvents.eventName, `%${eventName.trim()}%`));
+      }
+      if (orderNumber && typeof orderNumber === 'string' && orderNumber.trim()) {
+        conditions.push(ilike(shipmentEvents.orderNumber, `%${orderNumber.trim()}%`));
+      }
+
+      // Determine sort column
+      const sortColumn = (() => {
+        switch (sortBy) {
+          case 'username': return shipmentEvents.username;
+          case 'station': return shipmentEvents.station;
+          case 'eventName': return shipmentEvents.eventName;
+          case 'orderNumber': return shipmentEvents.orderNumber;
+          default: return shipmentEvents.occurredAt;
+        }
+      })();
+
+      const orderDirection = sortOrder === 'asc' ? asc : desc;
+
+      // Count total matching records
+      const [countResult] = await db
+        .select({ count: count() })
+        .from(shipmentEvents)
+        .where(and(...conditions));
+
+      const totalCount = countResult?.count || 0;
+
+      // Fetch paginated results - select only needed columns
+      const events = await db
+        .select({
+          id: shipmentEvents.id,
+          orderNumber: shipmentEvents.orderNumber,
+          eventName: shipmentEvents.eventName,
+          username: shipmentEvents.username,
+          station: shipmentEvents.station,
+          occurredAt: shipmentEvents.occurredAt,
+        })
+        .from(shipmentEvents)
+        .where(and(...conditions))
+        .orderBy(orderDirection(sortColumn))
+        .limit(limitNum)
+        .offset(offset);
+
+      // Base date range conditions for filter dropdowns
+      const dateRangeConditions = [
+        gte(shipmentEvents.occurredAt, start),
+        lte(shipmentEvents.occurredAt, end)
+      ];
+
+      // Get distinct values for filter dropdowns (scoped to date range + active filters)
+      // Event names - scoped by username, station, and orderNumber filters
+      const eventNameConditions = [...dateRangeConditions];
+      if (username && typeof username === 'string' && username.trim()) {
+        eventNameConditions.push(ilike(shipmentEvents.username, `%${username.trim()}%`));
+      }
+      if (station && typeof station === 'string' && station.trim()) {
+        eventNameConditions.push(ilike(shipmentEvents.station, `%${station.trim()}%`));
+      }
+      if (orderNumber && typeof orderNumber === 'string' && orderNumber.trim()) {
+        eventNameConditions.push(ilike(shipmentEvents.orderNumber, `%${orderNumber.trim()}%`));
+      }
+      const distinctEventNames = await db
+        .selectDistinct({ eventName: shipmentEvents.eventName })
+        .from(shipmentEvents)
+        .where(and(...eventNameConditions));
+
+      // Stations - scoped by username, eventName, and orderNumber filters
+      const stationConditions = [...dateRangeConditions];
+      if (username && typeof username === 'string' && username.trim()) {
+        stationConditions.push(ilike(shipmentEvents.username, `%${username.trim()}%`));
+      }
+      if (eventName && typeof eventName === 'string' && eventName.trim()) {
+        stationConditions.push(ilike(shipmentEvents.eventName, `%${eventName.trim()}%`));
+      }
+      if (orderNumber && typeof orderNumber === 'string' && orderNumber.trim()) {
+        stationConditions.push(ilike(shipmentEvents.orderNumber, `%${orderNumber.trim()}%`));
+      }
+      const distinctStations = await db
+        .selectDistinct({ station: shipmentEvents.station })
+        .from(shipmentEvents)
+        .where(and(...stationConditions));
+
+      // Usernames - scoped by station, eventName, and orderNumber filters
+      const usernameConditions = [...dateRangeConditions];
+      if (station && typeof station === 'string' && station.trim()) {
+        usernameConditions.push(ilike(shipmentEvents.station, `%${station.trim()}%`));
+      }
+      if (eventName && typeof eventName === 'string' && eventName.trim()) {
+        usernameConditions.push(ilike(shipmentEvents.eventName, `%${eventName.trim()}%`));
+      }
+      if (orderNumber && typeof orderNumber === 'string' && orderNumber.trim()) {
+        usernameConditions.push(ilike(shipmentEvents.orderNumber, `%${orderNumber.trim()}%`));
+      }
+      const distinctUsernames = await db
+        .selectDistinct({ username: shipmentEvents.username })
+        .from(shipmentEvents)
+        .where(and(...usernameConditions));
+
+      res.json({
+        events: events.map(e => ({
+          id: e.id,
+          orderNumber: e.orderNumber,
+          eventName: e.eventName,
+          username: e.username,
+          station: e.station,
+          occurredAt: e.occurredAt.toISOString(),
+        })),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitNum),
+        },
+        filters: {
+          eventNames: distinctEventNames.map(e => e.eventName).filter(Boolean).sort(),
+          stations: distinctStations.map(s => s.station).filter(Boolean).sort(),
+          usernames: distinctUsernames.map(u => u.username).filter(Boolean).sort(),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching shipment events:", error);
+      res.status(500).json({ error: "Failed to fetch shipment events" });
     }
   });
 
