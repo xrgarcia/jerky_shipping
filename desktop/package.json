@@ -1,6 +1,6 @@
 {
   "name": "jerky-ship-connect",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Desktop printer management app for Jerky Ship warehouse",
   "main": "dist/main/main/index.js",
   "author": "Jerky Ship",
