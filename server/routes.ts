@@ -4883,13 +4883,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let totalComponentsScanned = 0;
           
           if (svItem.IsKit && svItem.KitProducts && svItem.KitProducts.length > 0) {
-            console.log(`[Packing Validation] DEBUG Kit ${svItem.Sku}: svItem.Quantity=${svItem.Quantity}, KitProducts.length=${svItem.KitProducts.length}`);
             kitComponents = svItem.KitProducts.map((component, compIndex) => {
-              // Calculate total quantity: component qty * kit qty ordered
-              // NOTE: SkuVault's component.Quantity is already the TOTAL needed (pre-multiplied by kit qty)
-              // So we should NOT multiply again by svItem.Quantity
+              // IMPORTANT: SkuVault's component.Quantity is already the TOTAL needed 
+              // (pre-multiplied by kit quantity ordered). Do NOT multiply by svItem.Quantity again.
+              // Example: Kit ordered x2 with 2 components each → component.Quantity = 2 (not 1)
               const componentTotalQty = component.Quantity || 1;
-              console.log(`[Packing Validation] DEBUG Component ${compIndex}: component.Sku=${component.Sku}, component.Quantity=${component.Quantity}, componentTotalQty=${componentTotalQty}`);
               totalComponentsExpected += componentTotalQty;
               
               // Check if this component has been scanned (from PassedItems)

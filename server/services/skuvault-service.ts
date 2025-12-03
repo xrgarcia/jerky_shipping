@@ -225,8 +225,12 @@ export type BarcodeLookup = BarcodeLookupResult | BarcodeLookupNotFound;
 /**
  * Redis-based QCSale cache for order validation
  * Stores QCSale data with a flattened barcode/SKU lookup map
- * Includes both regular items AND kit component items for comprehensive validation
  * Uses short TTL (2 minutes) to keep data fresh
+ * 
+ * IMPORTANT Kit handling:
+ * - Parent kit SKUs are NOT added to the lookup map (they're not scannable)
+ * - Only kit component barcodes/SKUs are added for scanning
+ * - component.Quantity is already the TOTAL needed (pre-multiplied by kit qty ordered)
  */
 class QCSaleCache {
   private readonly KEY_PREFIX = 'skuvault:qcsale:';

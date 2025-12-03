@@ -83,6 +83,11 @@ function getWarmCacheKey(orderNumber: string): string {
 /**
  * Build flattened barcode lookup map from QCSale data
  * This is the same structure used by the regular QCSaleCache
+ * 
+ * IMPORTANT Kit handling:
+ * - Parent kit SKUs are NOT added to the lookup map (they're not scannable)
+ * - Only kit component barcodes/SKUs are added
+ * - component.Quantity is already the TOTAL needed (pre-multiplied by kit qty ordered)
  */
 function buildLookupMap(qcSale: import('@shared/skuvault-types').QCSale): Record<string, any> {
   const saleId = qcSale.SaleId || '';
