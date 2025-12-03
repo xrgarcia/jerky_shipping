@@ -23,7 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan } from "./services/qcsale-cache-warmer";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -1372,6 +1372,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`[QC Pass] Attempting QC pass with SaleId: ${saleId}`);
           const result = await skuVaultService.passQCItem(qcData);
+          
+          // Update cache to keep it in sync with SkuVault after successful pass
+          if (result?.Success && parseResult.data.OrderNumber) {
+            updateCacheAfterScan({
+              orderNumber: parseResult.data.OrderNumber,
+              sku: parseResult.data.ScannedCode,
+              scannedCode: parseResult.data.ScannedCode,
+              quantity: parseResult.data.Quantity,
+              itemId: parseResult.data.IdItem,
+              userName: (req.user as any)?.displayName || (req.user as any)?.email || undefined,
+            }).catch(err => console.warn(`[QC Pass] Cache update failed (non-blocking):`, err.message));
+          }
+          
           res.json(result);
         } catch (error: any) {
           // Graceful degradation: Log but return success so packing continues
@@ -1455,6 +1468,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`[QC Kit Pass] Attempting kit QC pass with SaleId: ${saleId}, KitId: ${qcData.KitId}`);
           const result = await skuVaultService.passKitQCItem(qcData);
+          
+          // Update cache to keep it in sync with SkuVault after successful pass
+          if (result?.Success && parseResult.data.OrderNumber) {
+            updateCacheAfterScan({
+              orderNumber: parseResult.data.OrderNumber,
+              sku: parseResult.data.ScannedCode,
+              scannedCode: parseResult.data.ScannedCode,
+              quantity: parseResult.data.Quantity,
+              itemId: parseResult.data.IdItem,
+              kitId: parseResult.data.KitId,
+              userName: (req.user as any)?.displayName || (req.user as any)?.email || undefined,
+            }).catch(err => console.warn(`[QC Kit Pass] Cache update failed (non-blocking):`, err.message));
+          }
+          
           res.json(result);
         } catch (error: any) {
           // Graceful degradation: Log but return success so packing continues
@@ -5845,6 +5872,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (result.Success) {
         console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
+        
+        // Update cache to keep it in sync with SkuVault after successful pass
+        // This ensures scan progress persists across page reloads
+        updateCacheAfterScan({
+          orderNumber,
+          sku: String(sku),          // Component/item SKU
+          scannedCode: String(sku),  // What was scanned (same as SKU in this flow)
+          quantity: Number(quantity),
+          itemId: idItem,
+          kitId: kitId || undefined,
+          userName: userEmail,
+        }).catch(err => console.warn(`[Packing QC] Cache update failed (non-blocking):`, err.message));
         
         // Build response with kit info if applicable
         const response: any = { 

@@ -317,6 +317,84 @@ export async function refreshCacheForOrder(orderNumber: string): Promise<boolean
   return warmCacheForOrder(orderNumber, true);
 }
 
+/**
+ * Passed item data for cache update after a successful scan
+ */
+interface PassedItemUpdate {
+  orderNumber: string;
+  sku: string;
+  code?: string | null;       // Barcode
+  scannedCode?: string;       // What was actually scanned
+  quantity: number;
+  itemId?: string | null;     // SkuVault Item ID
+  kitId?: string | null;      // For kit components
+  userName?: string;          // Who scanned it
+}
+
+/**
+ * Update the cache after a successful SkuVault passQCItem/passKitQCItem call
+ * Adds the passed item to the cached PassedItems array so it persists across page reloads
+ * 
+ * This is critical for keeping cache, events, and SkuVault in sync:
+ * 1. SkuVault API call succeeds (item marked as passed in SkuVault)
+ * 2. Event logged (shipment_events table)
+ * 3. Cache updated (this function) - so reload shows correct progress
+ */
+export async function updateCacheAfterScan(passedItem: PassedItemUpdate): Promise<boolean> {
+  try {
+    const redis = getRedisClient();
+    const warmKey = getWarmCacheKey(passedItem.orderNumber);
+    
+    // Get current cached data
+    const cached = await redis.get(warmKey);
+    if (!cached) {
+      log(`No cache found for order ${passedItem.orderNumber} - cannot update after scan`);
+      return false;
+    }
+    
+    // Handle both string and object return types from Redis
+    const cacheData = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    
+    // Ensure qcSale and PassedItems exist
+    if (!cacheData.qcSale) {
+      log(`Cache for ${passedItem.orderNumber} has no qcSale data - cannot update`);
+      return false;
+    }
+    
+    // Initialize PassedItems array if it doesn't exist
+    if (!cacheData.qcSale.PassedItems) {
+      cacheData.qcSale.PassedItems = [];
+    }
+    
+    // Create the passed item entry matching SkuVault's PassedItem structure
+    const passedEntry = {
+      KitId: passedItem.kitId || null,
+      Code: passedItem.code || null,
+      ScannedCode: passedItem.scannedCode || passedItem.sku,
+      Sku: passedItem.sku,
+      Quantity: passedItem.quantity,
+      ItemId: passedItem.itemId || null,
+      UserName: passedItem.userName || null,
+      DateTimeUtc: new Date().toISOString(),
+    };
+    
+    // Add to PassedItems array
+    cacheData.qcSale.PassedItems.push(passedEntry);
+    
+    // Update the cachedAt timestamp
+    cacheData.cachedAt = Date.now();
+    
+    // Save back to Redis with same TTL
+    await redis.set(warmKey, JSON.stringify(cacheData), { ex: WARM_TTL_SECONDS });
+    
+    log(`Updated cache for ${passedItem.orderNumber}: added passed item ${passedItem.sku} (total passed: ${cacheData.qcSale.PassedItems.length})`);
+    return true;
+  } catch (err: any) {
+    error(`Failed to update cache after scan for ${passedItem.orderNumber}: ${err.message}`);
+    return false;
+  }
+}
+
 // Track in-flight legacy upgrades to prevent concurrent upgrades for the same order
 // Note: This is an in-memory guard for single-process deployments.
 // For multi-worker scenarios, use Redis SETNX-based locking.
