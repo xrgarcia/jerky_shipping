@@ -1,0 +1,49 @@
+Error: src/main/printer.ts(454,48): error TS1005: ',' expected.
+Error: src/main/printer.ts(454,60): error TS1443: Module declaration names may only use ' or " quoted strings.
+Error: src/main/printer.ts(454,71): error TS1005: ';' expected.
+Error: src/main/printer.ts(454,73): error TS1109: Expression expected.
+Error: src/main/printer.ts(456,35): error TS1005: ')' expected.
+Error: src/main/printer.ts(456,36): error TS1005: ';' expected.
+Error: src/main/printer.ts(456,38): error TS1005: ';' expected.
+Error: src/main/printer.ts(457,26): error TS1005: ';' expected.
+Error: src/main/printer.ts(459,15): error TS1127: Invalid character.
+Error: src/main/printer.ts(459,17): error TS1005: ';' expected.
+Error: src/main/printer.ts(459,30): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(459,35): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(459,40): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(459,49): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(459,52): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(459,72): error TS1005: ',' expected.
+Error: src/main/printer.ts(459,76): error TS1005: '(' expected.
+Error: src/main/printer.ts(459,81): error TS1005: ';' expected.
+Error: src/main/printer.ts(459,89): error TS1005: ';' expected.
+Error: src/main/printer.ts(460,15): error TS1127: Invalid character.
+Error: src/main/printer.ts(460,17): error TS1005: ';' expected.
+Error: src/main/printer.ts(460,23): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(460,27): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(460,31): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(462,26): error TS1005: ';' expected.
+Error: src/main/printer.ts(464,15): error TS1127: Invalid character.
+Error: src/main/printer.ts(464,17): error TS1005: ';' expected.
+Error: src/main/printer.ts(464,20): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(820,35): error TS1005: '{' expected.
+Error: src/main/printer.ts(820,43): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(821,36): error TS1005: ';' expected.
+Error: src/main/printer.ts(821,37): error TS1128: Declaration or statement expected.
+Error: src/main/printer.ts(823,9): error TS1127: Invalid character.
+Error: src/main/printer.ts(823,11): error TS1005: ';' expected.
+Error: src/main/printer.ts(823,20): error TS1005: ';' expected.
+Error: src/main/printer.ts(824,32): error TS1005: ';' expected.
+Error: src/main/printer.ts(825,32): error TS1005: ';' expected.
+Error: src/main/printer.ts(829,22): error TS1005: ';' expected.
+Error: src/main/printer.ts(830,11): error TS1127: Invalid character.
+Error: src/main/printer.ts(830,13): error TS1005: ';' expected.
+Error: src/main/printer.ts(830,19): error TS1435: Unknown keyword or identifier. Did you mean 'this'?
+Error: src/main/printer.ts(830,24): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(830,33): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(830,81): error TS1002: Unterminated string literal.
+Error: src/main/printer.ts(858,29): error TS1005: ';' expected.
+Error: src/main/printer.ts(858,40): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(858,54): error TS1434: Unexpected keyword or identifier.
+Error: src/main/printer.ts(880,1): error TS1160: Unterminated template literal.
+Error: Process completed with exit code 1.
