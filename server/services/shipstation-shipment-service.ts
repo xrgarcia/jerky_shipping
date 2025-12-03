@@ -5,7 +5,7 @@
 
 import type { IStorage } from '../storage';
 import type { InsertShipment, Order } from '@shared/schema';
-import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo } from '../utils/shipstation-api';
+import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo, extractPdfLabelUrl } from '../utils/shipstation-api';
 
 export class ShipStationShipmentService {
   constructor(private storage: IStorage) {}
@@ -230,7 +230,8 @@ export class ShipStationShipmentService {
         if (existingLabels.length > 0) {
           console.log(`[ShipmentService] Found ${existingLabels.length} existing label(s) in ShipStation`);
           const label = existingLabels[0];
-          labelUrl = label.label_download?.href || label.label_download || null;
+          // CRITICAL: Extract PDF format only - SumatraPDF requires PDF, not ZPL
+          labelUrl = extractPdfLabelUrl(label.label_download);
           
           if (labelUrl) {
             // Save label URL to database for next time
@@ -317,7 +318,8 @@ export class ShipStationShipmentService {
 
         console.log(`[ShipmentService] Creating label for existing shipment_id: ${cleanShipmentData.shipment_id}`);
         const labelData = await createShipStationLabel(cleanShipmentData);
-        labelUrl = labelData.label_download?.href || labelData.label_download || labelData.pdf_url || labelData.href || null;
+        // CRITICAL: Extract PDF format only - SumatraPDF requires PDF, not ZPL
+        labelUrl = extractPdfLabelUrl(labelData.label_download);
         
         // Extract tracking number from label response
         const trackingNumber = labelData.tracking_number || null;

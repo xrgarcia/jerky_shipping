@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
-import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber } from "./utils/shipstation-api";
+import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber, extractPdfLabelUrl } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
@@ -6030,8 +6030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[Packing] Found ${existingLabels.length} existing label(s) in ShipStation`);
             const label = existingLabels[0];
             
-            // Use PDF format for all printers (SumatraPDF handles printing)
-            labelUrl = label.label_download?.href || label.label_download || null;
+            // CRITICAL: Extract PDF format only - SumatraPDF requires PDF, not ZPL
+            // The old code used `?.href || label_download` which could return ZPL URLs
+            labelUrl = extractPdfLabelUrl(label.label_download);
             trackingNumber = label.tracking_number || trackingNumber;
             
             await logPackingAction('label_fetched_existing', true, {
@@ -6076,8 +6077,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
             
-            // Extract label URL from response - API returns label_download with pdf/png/zpl URLs
-            labelUrl = labelData.label_download?.href || labelData.label_download?.pdf || labelData.label_download || null;
+            // CRITICAL: Extract PDF format only - use same safe extraction as existing labels
+            // We request label_format: 'pdf' but still validate to be safe
+            labelUrl = extractPdfLabelUrl(labelData.label_download);
             trackingNumber = labelData.tracking_number || trackingNumber;
             
             await logPackingAction('label_created', !!labelUrl, {

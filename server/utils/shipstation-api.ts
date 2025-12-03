@@ -59,6 +59,83 @@ function extractRateLimitInfo(headers: Headers): RateLimitInfo {
 }
 
 /**
+ * Safely extract PDF URL from ShipStation label_download object
+ * 
+ * ShipStation returns label_download as an object with multiple formats:
+ * { pdf: "...url...", png: "...url...", zpl: "...url...", href: "...url..." }
+ * 
+ * CRITICAL: We MUST prefer PDF format for printing with SumatraPDF.
+ * The `href` property can point to ZPL if that was the most recent format created,
+ * which would cause printing failures with SumatraPDF (expects PDF input).
+ * 
+ * Detection strategy:
+ * - Explicit ZPL indicators: .zpl extension OR format=zpl query param
+ * - Everything else is assumed PDF-compatible (including ?format=PDF query params)
+ * 
+ * Priority order:
+ * 1. label_download.pdf - Explicit PDF URL (always PDF)
+ * 2. label_download.href - Accept unless it's explicitly ZPL
+ * 3. null - If no valid URL found
+ * 
+ * @param labelDownload - The label_download object from ShipStation API
+ * @returns PDF URL string or null if no PDF available
+ */
+export function extractPdfLabelUrl(labelDownload: any): string | null {
+  if (!labelDownload) {
+    return null;
+  }
+  
+  /**
+   * Check if a URL is explicitly ZPL format
+   * ZPL indicators: .zpl extension OR format=zpl query param
+   */
+  function isZplUrl(url: string): boolean {
+    const urlLower = url.toLowerCase();
+    // Check file extension
+    if (urlLower.includes('.zpl')) {
+      return true;
+    }
+    // Check query parameter (format=zpl)
+    try {
+      const urlObj = new URL(url);
+      const formatParam = urlObj.searchParams.get('format');
+      if (formatParam && formatParam.toLowerCase() === 'zpl') {
+        return true;
+      }
+    } catch {
+      // If URL parsing fails, fall through to extension check only
+    }
+    return false;
+  }
+  
+  // If label_download is a string, check if it's a valid non-ZPL URL
+  if (typeof labelDownload === 'string') {
+    if (isZplUrl(labelDownload)) {
+      console.warn(`[ShipStation] label_download is ZPL format, skipping: ...${labelDownload.slice(-50)}`);
+      return null;
+    }
+    return labelDownload;
+  }
+  
+  // Priority 1: Explicit PDF URL (most reliable)
+  if (labelDownload.pdf && typeof labelDownload.pdf === 'string') {
+    return labelDownload.pdf;
+  }
+  
+  // Priority 2: href URL - accept unless explicitly ZPL
+  if (labelDownload.href && typeof labelDownload.href === 'string') {
+    if (isZplUrl(labelDownload.href)) {
+      console.warn(`[ShipStation] label_download.href is ZPL format, skipping: ...${labelDownload.href.slice(-50)}`);
+      return null;
+    }
+    return labelDownload.href;
+  }
+  
+  // Never fall back to ZPL or the whole object
+  return null;
+}
+
+/**
  * Fetch shipments from ShipStation API using resource_url
  */
 export async function fetchShipStationResource(resourceUrl: string): Promise<any> {
