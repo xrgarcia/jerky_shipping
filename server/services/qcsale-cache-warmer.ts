@@ -48,6 +48,8 @@ interface CacheWarmerMetrics {
   invalidations: number;
   manualRefreshes: number;
   apiCallsSaved: number;
+  legacyUpgrades: number;
+  legacyUpgradeFailures: number;
   lastPollAt: Date | null;
   workerStatus: 'sleeping' | 'running' | 'error';
   lastError: string | null;
@@ -60,6 +62,8 @@ let metrics: CacheWarmerMetrics = {
   invalidations: 0,
   manualRefreshes: 0,
   apiCallsSaved: 0,
+  legacyUpgrades: 0,
+  legacyUpgradeFailures: 0,
   lastPollAt: null,
   workerStatus: 'sleeping',
   lastError: null,
@@ -225,24 +229,23 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         id: shipment.id,
         orderNumber: shipment.orderNumber,
         orderId: shipment.orderId,
-        carrier: shipment.carrier,
         carrierCode: shipment.carrierCode,
         serviceCode: shipment.serviceCode,
         shipmentStatus: shipment.shipmentStatus,
-        recipientName: shipment.recipientName,
-        recipientCompany: shipment.recipientCompany,
-        recipientStreet1: shipment.recipientStreet1,
-        recipientStreet2: shipment.recipientStreet2,
-        recipientCity: shipment.recipientCity,
-        recipientState: shipment.recipientState,
-        recipientPostalCode: shipment.recipientPostalCode,
-        recipientCountry: shipment.recipientCountry,
-        recipientPhone: shipment.recipientPhone,
-        weight: shipment.weight,
-        dimensions: shipment.dimensions,
+        // Recipient address (ship_to fields)
+        shipToName: shipment.shipToName,
+        shipToCompany: shipment.shipToCompany,
+        shipToAddressLine1: shipment.shipToAddressLine1,
+        shipToAddressLine2: shipment.shipToAddressLine2,
+        shipToCity: shipment.shipToCity,
+        shipToState: shipment.shipToState,
+        shipToPostalCode: shipment.shipToPostalCode,
+        shipToCountry: shipment.shipToCountry,
+        shipToPhone: shipment.shipToPhone,
+        totalWeight: shipment.totalWeight,
         shipDate: shipment.shipDate,
         trackingNumber: shipment.trackingNumber,
-        shipStationShipmentId: shipment.shipStationShipmentId,
+        shipmentId: shipment.shipmentId,
         sessionStatus: shipment.sessionStatus,
         cacheWarmedAt: shipment.cacheWarmedAt,
       } : null,
@@ -325,12 +328,62 @@ export async function refreshCacheForOrder(orderNumber: string): Promise<boolean
   return warmCacheForOrder(orderNumber, true);
 }
 
+// Track in-flight legacy upgrades to prevent concurrent upgrades for the same order
+// Note: This is an in-memory guard for single-process deployments.
+// For multi-worker scenarios, use Redis SETNX-based locking.
+const pendingUpgrades = new Set<string>();
+
+/**
+ * Background upgrade for legacy cache entries
+ * Fire-and-forget with concurrency guard and retry logic
+ */
+function upgradeLegacyCacheInBackground(orderNumber: string): void {
+  // Check if upgrade already in progress for this order
+  if (pendingUpgrades.has(orderNumber)) {
+    log(`Legacy upgrade already in progress for ${orderNumber}, skipping`);
+    return;
+  }
+  
+  // Mark as in-progress BEFORE starting async work
+  pendingUpgrades.add(orderNumber);
+  
+  // Fire-and-forget async upgrade
+  (async () => {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 1000;
+    
+    try {
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          log(`Legacy upgrade attempt ${attempt}/${MAX_RETRIES} for ${orderNumber}`);
+          const success = await warmCacheForOrder(orderNumber, true);
+          if (success) {
+            log(`Legacy cache upgraded successfully for ${orderNumber}`);
+            metrics.legacyUpgrades++;
+            return;
+          }
+        } catch (err: any) {
+          error(`Legacy upgrade attempt ${attempt} failed for ${orderNumber}: ${err.message}`);
+          if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          }
+        }
+      }
+      metrics.legacyUpgradeFailures++;
+      error(`Legacy upgrade exhausted all retries for ${orderNumber}`);
+    } finally {
+      // Always clean up the guard, even on unexpected errors
+      pendingUpgrades.delete(orderNumber);
+    }
+  })();
+}
+
 /**
  * Get warm cache data for an order
  * Returns null if not in warm cache
  * 
  * CACHE UPGRADE: If the cached entry is a legacy entry (missing 'shipment' key entirely),
- * it will be automatically re-warmed to add the shipment field.
+ * the upgrade is triggered in the background (non-blocking) and stale data is returned immediately.
  * Note: A cache entry with `shipment: null` is NOT legacy - it means no shipment exists in DB.
  */
 export async function getWarmCache(orderNumber: string): Promise<any | null> {
@@ -353,23 +406,10 @@ export async function getWarmCache(orderNumber: string): Promise<any | null> {
     const isLegacyEntry = parsed.qcSale && !('shipment' in parsed);
     
     if (isLegacyEntry) {
-      log(`Legacy cache entry for ${orderNumber} missing shipment field - upgrading...`);
-      
-      // Re-warm with force=true to upgrade the entry
-      const upgraded = await warmCacheForOrder(orderNumber, true);
-      if (upgraded) {
-        // Fetch the upgraded cache data
-        const upgradedData = await redis.get(warmKey);
-        if (upgradedData) {
-          const upgradedParsed = typeof upgradedData === 'string' ? JSON.parse(upgradedData) : upgradedData;
-          log(`Cache entry for ${orderNumber} upgraded with shipment field`);
-          metrics.cacheHits++;
-          metrics.apiCallsSaved++;
-          return upgradedParsed;
-        }
-      }
-      // Fall through to return original data if upgrade failed
-      log(`Cache upgrade failed for ${orderNumber}, returning legacy data`);
+      log(`Legacy cache entry for ${orderNumber} - triggering background upgrade`);
+      // NON-BLOCKING: Fire off upgrade in background, return stale data immediately
+      // This avoids the 6-second blocking call for SkuVault API
+      upgradeLegacyCacheInBackground(orderNumber);
     }
     
     metrics.cacheHits++;

@@ -313,7 +313,9 @@ class QCSaleCache {
         // Also check AlternateCodes for item and kit components
         if (item.AlternateCodes) {
           for (const altCode of item.AlternateCodes) {
-            if (altCode && !lookupMap[altCode.toUpperCase()]) {
+            // Defensive check: ensure altCode is a string before calling toUpperCase
+            // SkuVault can return null, undefined, or numeric values in the AlternateCodes array
+            if (altCode && typeof altCode === 'string' && !lookupMap[altCode.toUpperCase()]) {
               lookupMap[altCode.toUpperCase()] = {
                 found: true,
                 sku: item.Sku || '',
