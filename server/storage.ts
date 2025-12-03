@@ -2848,9 +2848,11 @@ export class DatabaseStorage implements IStorage {
     return result.length;
   }
 
-  async claimStationAtomically(session: InsertStationSession, clientId: string): Promise<{ session?: StationSession; error?: string; claimedBy?: string; expiresAt?: Date }> {
+  async claimStationAtomically(session: InsertStationSession, clientId: string, forceClaim: boolean = false): Promise<{ session?: StationSession; error?: string; claimedBy?: string; expiresAt?: Date }> {
     try {
       return await db.transaction(async (tx) => {
+        const now = new Date();
+        
         // Check if station is already claimed by someone else (SELECT FOR UPDATE for row-level lock)
         const existingSession = await tx
           .select()
@@ -2862,17 +2864,38 @@ export class DatabaseStorage implements IStorage {
           .for('update');
         
         if (existingSession.length > 0 && existingSession[0].desktopClientId !== clientId) {
-          // Get the user who claimed it
-          const claimingUser = await tx
-            .select()
-            .from(users)
-            .where(eq(users.id, existingSession[0].userId));
+          const existingSess = existingSession[0];
           
-          return {
-            error: 'Station is already claimed',
-            claimedBy: claimingUser[0]?.name || 'Another user',
-            expiresAt: existingSession[0].expiresAt,
-          };
+          // Check if the existing session has expired (expiresAt < now)
+          // If expired, auto-expire it and allow the claim to proceed
+          if (existingSess.expiresAt && existingSess.expiresAt < now) {
+            console.log(`[Station Claim] Auto-expiring stale session ${existingSess.id} (expired at ${existingSess.expiresAt.toISOString()})`);
+            await tx
+              .update(stationSessions)
+              .set({ status: 'expired', endedAt: now })
+              .where(eq(stationSessions.id, existingSess.id));
+            // Continue with claim - session was expired
+          } else if (forceClaim) {
+            // Force claim requested - end the existing session
+            console.log(`[Station Claim] Force claiming station, ending session ${existingSess.id}`);
+            await tx
+              .update(stationSessions)
+              .set({ status: 'ended', endedAt: now })
+              .where(eq(stationSessions.id, existingSess.id));
+            // Continue with claim
+          } else {
+            // Session is still active and not expired - block the claim
+            const claimingUser = await tx
+              .select()
+              .from(users)
+              .where(eq(users.id, existingSess.userId));
+            
+            return {
+              error: 'Station is already claimed',
+              claimedBy: claimingUser[0]?.name || claimingUser[0]?.email || 'Another user',
+              expiresAt: existingSess.expiresAt,
+            };
+          }
         }
 
         // If there's an existing session for this same client, end it

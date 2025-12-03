@@ -7339,9 +7339,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== Station Sessions ====================
 
   // Claim a station (start a session) - uses atomic transaction to prevent race conditions
+  // Supports forceClaim=true to override an existing session (reclaim)
   app.post("/api/desktop/sessions/claim", requireDesktopAuth, async (req, res) => {
     try {
-      const { stationId } = req.body;
+      const { stationId, forceClaim } = req.body;
       const user = (req as any).user;
       const client = (req as any).desktopClient;
 
@@ -7372,7 +7373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startedAt: now,
         expiresAt,
         createdAt: now,
-      }, client.id);
+      }, client.id, !!forceClaim);
 
       if (result.error) {
         if (result.claimedBy) {
