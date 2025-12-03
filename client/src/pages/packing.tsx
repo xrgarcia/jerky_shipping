@@ -2582,8 +2582,17 @@ export default function Packing() {
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="text-sm text-muted-foreground font-mono mt-1 select-all cursor-text" data-testid={`text-kit-sku-${progress.sku}`}>
-                                  {progress.sku} {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && <span className="text-muted-foreground/70">• {progress.skuvaultCode}</span>}
+                                <div className="text-sm text-muted-foreground mt-1" data-testid={`text-kit-sku-${progress.sku}`}>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs">SKU:</span>
+                                    <span className="font-mono select-all cursor-text" data-testid={`text-kit-sku-value-${progress.sku}`}>{progress.sku}</span>
+                                  </div>
+                                  {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs">Barcode:</span>
+                                      <span className="font-mono select-all cursor-text" data-testid={`text-kit-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                                   {progress.kitComponents.length} component{progress.kitComponents.length !== 1 ? 's' : ''} • Scan any component barcode
