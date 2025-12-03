@@ -763,17 +763,29 @@ async function connectWebSocket(): Promise<void> {
     
     // Update the printer in app state if it's our current station
     if (appState.station?.id === data.stationId && data.printer) {
-      // Update the printer in the printers array
-      const updatedPrinters = appState.printers.map(p => 
-        p.id === data.printer.id 
-          ? { ...p, ...data.printer, useRawMode: data.printer.useRawMode ?? p.useRawMode }
-          : p
-      );
+      // Update the printer in the printers array - only update specific fields to preserve types
+      const updatedPrinters = appState.printers.map(p => {
+        if (p.id === data.printer.id) {
+          return {
+            ...p,
+            name: data.printer.name,
+            systemName: data.printer.systemName,
+            useRawMode: data.printer.useRawMode ?? p.useRawMode,
+          };
+        }
+        return p;
+      });
       
       // Also update selectedPrinter if it's the one being updated
-      const updatedSelectedPrinter = appState.selectedPrinter?.id === data.printer.id
-        ? { ...appState.selectedPrinter, ...data.printer, useRawMode: data.printer.useRawMode ?? appState.selectedPrinter.useRawMode }
-        : appState.selectedPrinter;
+      let updatedSelectedPrinter = appState.selectedPrinter;
+      if (appState.selectedPrinter?.id === data.printer.id) {
+        updatedSelectedPrinter = {
+          ...appState.selectedPrinter,
+          name: data.printer.name,
+          systemName: data.printer.systemName,
+          useRawMode: data.printer.useRawMode ?? appState.selectedPrinter.useRawMode,
+        };
+      }
       
       updateState({
         printers: updatedPrinters,
