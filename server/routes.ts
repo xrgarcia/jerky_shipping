@@ -4468,40 +4468,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      // 1. Fetch shipment from ShipStation (via our database)
-      const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
+      // PERFORMANCE OPTIMIZATION: Check warm cache first for BOTH shipment and QCSale data
+      // The cache warmer service pre-loads both for orders with sessionStatus='closed' and no tracking
+      const warmCacheData = await getWarmCache(orderNumber);
       
-      if (shipmentResults.length === 0) {
-        return res.status(404).json({ 
-          error: "Order not found",
-          orderNumber 
-        });
-      }
-      
-      if (shipmentResults.length > 1) {
-        console.warn(`[Packing Validation] Multiple shipments for order ${orderNumber}, using most recent (ID: ${shipmentResults[0].id})`);
-      }
-      
-      const shipment = shipmentResults[0];
-      const shipmentItems = await storage.getShipmentItems(shipment.id);
-      
-      // 2. Fetch QC Sales data from SkuVault (check warm cache first!)
+      let shipment: any = null;
+      let shipmentItems: any[] = [];
       let qcSale: import('@shared/skuvault-types').QCSale | null = null;
       let saleId: string | null = null;
       const validationWarnings: string[] = [];
-      let cacheSource: 'warm_cache' | 'skuvault_api' = 'skuvault_api';
+      let cacheSource: 'warm_cache' | 'skuvault_api' | 'database' = 'database';
+      
+      // 1. Get shipment data (prefer warm cache, fallback to PostgreSQL)
+      if (warmCacheData?.shipment) {
+        console.log(`[Packing Validation] WARM CACHE HIT for shipment: ${orderNumber} (cached at ${new Date(warmCacheData.warmedAt).toISOString()})`);
+        shipment = warmCacheData.shipment;
+        cacheSource = 'warm_cache';
+      } else {
+        console.log(`[Packing Validation] Cache miss for shipment, fetching from PostgreSQL: ${orderNumber}`);
+        const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
+        
+        if (shipmentResults.length === 0) {
+          return res.status(404).json({ 
+            error: "Order not found",
+            orderNumber 
+          });
+        }
+        
+        if (shipmentResults.length > 1) {
+          console.warn(`[Packing Validation] Multiple shipments for order ${orderNumber}, using most recent (ID: ${shipmentResults[0].id})`);
+        }
+        
+        shipment = shipmentResults[0];
+      }
+      
+      // Always fetch shipment items from PostgreSQL (not cached, rarely needed for rendering)
+      shipmentItems = await storage.getShipmentItems(shipment.id);
       
       try {
-        // PERFORMANCE OPTIMIZATION: Check warm cache first (pre-warmed for ready-to-pack orders)
-        // The cache warmer service pre-loads QCSale data for orders with sessionStatus='closed' and no tracking
-        const warmCacheData = await getWarmCache(orderNumber);
+        // 2. Get QCSale data (prefer warm cache, fallback to SkuVault API)
         if (warmCacheData?.qcSale) {
-          console.log(`[Packing Validation] WARM CACHE HIT for order: ${orderNumber} (cached at ${new Date(warmCacheData.warmedAt).toISOString()})`);
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale: ${orderNumber}`);
           qcSale = warmCacheData.qcSale as import('@shared/skuvault-types').QCSale;
-          cacheSource = 'warm_cache';
+          if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else {
-          console.log(`[Packing Validation] Warm cache miss, fetching from SkuVault API for order: ${orderNumber}`);
+          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber}`);
           qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+          if (cacheSource === 'database') cacheSource = 'skuvault_api';
         }
         
         if (qcSale) {

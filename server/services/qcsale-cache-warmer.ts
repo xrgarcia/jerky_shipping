@@ -188,16 +188,22 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       }
     }
     
-    // Fetch QCSale data from SkuVault
+    // Fetch QCSale data from SkuVault AND shipment data from PostgreSQL in parallel
     log(`Warming cache for order ${orderNumber}${force ? ' (forced refresh)' : ''}...`);
-    const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+    
+    const [qcSale, shipmentResults] = await Promise.all([
+      skuVaultService.getQCSalesByOrderNumber(orderNumber),
+      db.select().from(shipments).where(eq(shipments.orderNumber, orderNumber)).limit(1),
+    ]);
     
     if (!qcSale) {
       log(`No QCSale data found for order ${orderNumber}`);
       return false;
     }
     
-    // Build cache data with lookup map
+    const shipment = shipmentResults[0] || null;
+    
+    // Build cache data with lookup map AND shipment data
     const lookupMap = buildLookupMap(qcSale);
     const cacheData = {
       saleId: qcSale.SaleId || '',
@@ -214,6 +220,32 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         PassedItems: qcSale.PassedItems,
         Items: qcSale.Items,
       },
+      // Store shipment data to eliminate PostgreSQL query during order load
+      shipment: shipment ? {
+        id: shipment.id,
+        orderNumber: shipment.orderNumber,
+        orderId: shipment.orderId,
+        carrier: shipment.carrier,
+        carrierCode: shipment.carrierCode,
+        serviceCode: shipment.serviceCode,
+        shipmentStatus: shipment.shipmentStatus,
+        recipientName: shipment.recipientName,
+        recipientCompany: shipment.recipientCompany,
+        recipientStreet1: shipment.recipientStreet1,
+        recipientStreet2: shipment.recipientStreet2,
+        recipientCity: shipment.recipientCity,
+        recipientState: shipment.recipientState,
+        recipientPostalCode: shipment.recipientPostalCode,
+        recipientCountry: shipment.recipientCountry,
+        recipientPhone: shipment.recipientPhone,
+        weight: shipment.weight,
+        dimensions: shipment.dimensions,
+        shipDate: shipment.shipDate,
+        trackingNumber: shipment.trackingNumber,
+        shipStationShipmentId: shipment.shipStationShipmentId,
+        sessionStatus: shipment.sessionStatus,
+        cacheWarmedAt: shipment.cacheWarmedAt,
+      } : null,
     };
     
     // Store with extended TTL
@@ -232,7 +264,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       error(`Failed to update cacheWarmedAt for ${orderNumber}: ${dbErr.message}`);
     }
     
-    log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries (${WARM_TTL_SECONDS}s TTL)`);
+    log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries + shipment data (${WARM_TTL_SECONDS}s TTL)`);
     
     if (force) {
       metrics.manualRefreshes++;
