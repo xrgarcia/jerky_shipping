@@ -811,6 +811,9 @@ export async function forceFullResync(): Promise<void> {
     reason: 'manual_trigger',
   });
   
+  // Immediately broadcast the updated cursor so UI reflects the change
+  await broadcastWorkerStatus();
+  
   // Trigger immediate poll
   triggerImmediatePoll();
 }
@@ -831,6 +834,9 @@ export async function forceResyncWithDays(days: number): Promise<void> {
     reason: `manual_trigger_${days}_days`,
     lookbackDays: days,
   });
+  
+  // Immediately broadcast the updated cursor so UI reflects the change
+  await broadcastWorkerStatus();
   
   // Trigger immediate poll
   triggerImmediatePoll();
