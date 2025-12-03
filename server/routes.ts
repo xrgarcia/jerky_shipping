@@ -5984,6 +5984,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Get printer for this station to determine label format
+      const stationPrinters = await storage.getPrintersByStation(webSession.stationId);
+      const selectedPrinter = stationPrinters.length > 0 ? stationPrinters[0] : null;
+      const useRawMode = selectedPrinter?.useRawMode ?? false;
+      const labelFormat: 'pdf' | 'zpl' = useRawMode ? 'zpl' : 'pdf';
+      
+      console.log(`[Packing] Station ${webSession.stationId} printer: ${selectedPrinter?.name || 'none'}, useRawMode: ${useRawMode}, labelFormat: ${labelFormat}`);
+      
       // Get shipment
       shipment = await storage.getShipment(shipmentId);
       
@@ -6010,6 +6018,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let trackingNumber = shipment.trackingNumber;
       let labelError: { code: string; message: string; shipStationError?: string; resolution: string } | null = null;
       
+      // For raw mode printers, check if existing labelUrl is a ZPL URL
+      // If not, we need to clear it and fetch a new ZPL label
+      if (useRawMode && labelUrl) {
+        // ZPL URLs typically contain 'zpl' in the path or end with .zpl
+        const isZplUrl = labelUrl.toLowerCase().includes('zpl');
+        if (!isZplUrl) {
+          console.log(`[Packing] Raw mode printer requires ZPL but stored label is PDF - will fetch ZPL format`);
+          labelUrl = null; // Clear to force ZPL fetch
+        }
+      }
+      
       if (!labelUrl && shipment.shipmentId) {
         console.log(`[Packing] Shipment ${shipment.orderNumber} has no label URL - fetching from ShipStation...`);
         
@@ -6023,11 +6042,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingLabels.length > 0) {
             console.log(`[Packing] Found ${existingLabels.length} existing label(s) in ShipStation`);
             const label = existingLabels[0];
-            labelUrl = label.label_download?.href || label.label_download || null;
+            
+            // For raw mode printers, we need ZPL format labels
+            // Check if the existing label has ZPL format available
+            if (useRawMode && label.label_download?.zpl) {
+              labelUrl = label.label_download.zpl;
+              console.log(`[Packing] Using existing ZPL format label for raw mode printer`);
+            } else if (useRawMode) {
+              // Existing label is PDF only, but we need ZPL - skip and create new one
+              console.log(`[Packing] Existing label is PDF but raw mode printer needs ZPL - will create new ZPL label`);
+              labelUrl = null; // Force creation of new label
+            } else {
+              // Non-raw mode, use PDF/href as normal
+              labelUrl = label.label_download?.href || label.label_download || null;
+            }
             trackingNumber = label.tracking_number || trackingNumber;
             
             await logPackingAction('label_fetched_existing', true, {
-              responseData: { labelsFound: existingLabels.length, labelUrl, trackingNumber }
+              responseData: { labelsFound: existingLabels.length, labelUrl, trackingNumber, useRawMode, hasZpl: !!label.label_download?.zpl }
             });
             
             if (labelUrl) {
@@ -6044,13 +6076,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Use POST /v2/labels/shipment/{shipment_id} - the correct endpoint for existing shipments
           // This attaches a label to the existing shipment without creating duplicates
           if (!labelUrl && shipment.shipmentId) {
-            console.log(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId}...`);
+            console.log(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId} (format: ${labelFormat})...`);
             
             await logPackingAction('label_create_attempt', true, {
-              requestData: { shipStationShipmentId: shipment.shipmentId, action: 'createLabelForExistingShipment' }
+              requestData: { shipStationShipmentId: shipment.shipmentId, action: 'createLabelForExistingShipment', labelFormat }
             });
             
-            const labelData = await createLabelForExistingShipment(shipment.shipmentId);
+            // Pass label_format based on printer's raw mode setting
+            // ZPL format is required for industrial thermal printers (SATO, Zebra, etc.)
+            const labelData = await createLabelForExistingShipment(shipment.shipmentId, { label_format: labelFormat });
             
             // Handle dry run mode - returns null when DRY_RUN is enabled
             if (labelData === null) {
@@ -6068,7 +6102,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Extract label URL from response - API returns label_download with pdf/png/zpl URLs
-            labelUrl = labelData.label_download?.href || labelData.label_download?.pdf || labelData.label_download || null;
+            // Use ZPL URL if we requested ZPL format, otherwise fall back to PDF/href
+            if (labelFormat === 'zpl' && labelData.label_download?.zpl) {
+              labelUrl = labelData.label_download.zpl;
+              console.log(`[Packing] Using ZPL format label URL for raw mode printer`);
+            } else {
+              labelUrl = labelData.label_download?.href || labelData.label_download?.pdf || labelData.label_download || null;
+            }
             trackingNumber = labelData.tracking_number || trackingNumber;
             
             await logPackingAction('label_created', !!labelUrl, {
@@ -6203,7 +6243,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           labelUrl: labelUrl, // Use the fetched/created label URL
           orderNumber: shipment.orderNumber,
           trackingNumber: trackingNumber || shipment.trackingNumber,
-          requestedBy: user.displayName || user.email || 'Unknown'
+          requestedBy: user.displayName || user.email || 'Unknown',
+          // Printer mode info for desktop app
+          useRawMode: useRawMode, // Whether to use raw/direct printing (for SATO, Zebra industrial, etc.)
+          labelFormat: labelFormat, // 'pdf' or 'zpl' - format of the label
+          printerName: selectedPrinter?.name || null, // Printer name for logging/display
         },
         status: "pending" // Start as pending, desktop client will pick it up
       });
