@@ -758,6 +758,31 @@ async function connectWebSocket(): Promise<void> {
     }
   });
   
+  wsClient.on('printer-update', (data: { stationId: string; printer: { id: string; name: string; systemName: string; status?: string; useRawMode?: boolean } }) => {
+    console.log(`[Main] Printer update for station ${data.stationId}:`, data.printer);
+    
+    // Update the printer in app state if it's our current station
+    if (appState.station?.id === data.stationId && data.printer) {
+      // Update the printer in the printers array
+      const updatedPrinters = appState.printers.map(p => 
+        p.id === data.printer.id 
+          ? { ...p, ...data.printer, useRawMode: data.printer.useRawMode ?? p.useRawMode }
+          : p
+      );
+      
+      // Also update selectedPrinter if it's the one being updated
+      const updatedSelectedPrinter = appState.selectedPrinter?.id === data.printer.id
+        ? { ...appState.selectedPrinter, ...data.printer, useRawMode: data.printer.useRawMode ?? appState.selectedPrinter.useRawMode }
+        : appState.selectedPrinter;
+      
+      updateState({
+        printers: updatedPrinters,
+        selectedPrinter: updatedSelectedPrinter,
+      });
+      console.log(`[Main] Updated printer ${data.printer.id} in app state, useRawMode=${data.printer.useRawMode}`);
+    }
+  });
+  
   wsClient.on('config-update', (configData: Record<string, unknown>) => {
     console.log('[Main] Received config update from server:', configData);
     mainWindow?.webContents.send('config-updated', configData);

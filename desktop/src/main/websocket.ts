@@ -465,6 +465,14 @@ export class WebSocketClient extends EventEmitter {
         this.restartHeartbeat();
         break;
         
+      case 'desktop:printer_update':
+        console.log(`[WebSocket] Printer update for station ${message.stationId}:`, message.printer);
+        this.emit('printer-update', {
+          stationId: message.stationId,
+          printer: message.printer as { id: string; name: string; systemName: string; status?: string; useRawMode?: boolean },
+        });
+        break;
+        
       default:
         console.log('[WebSocket] Unknown message type:', message.type);
     }

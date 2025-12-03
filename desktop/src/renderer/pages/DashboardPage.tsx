@@ -554,6 +554,15 @@ function DashboardPage({ state }: DashboardPageProps) {
                     }`} data-testid="text-selected-printer-name">
                       {state.selectedPrinter?.name || 'NOT SELECTED'}
                     </span>
+                    {state.selectedPrinter?.useRawMode && (
+                      <span 
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium"
+                        data-testid="badge-raw-mode"
+                        title="Industrial thermal printer mode - sends ZPL commands directly"
+                      >
+                        RAW
+                      </span>
+                    )}
                   </div>
                   {state.selectedPrinter && (
                     <span className={`text-xs ${
