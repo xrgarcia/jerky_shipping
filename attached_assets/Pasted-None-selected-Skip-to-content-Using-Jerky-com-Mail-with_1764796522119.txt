@@ -1,0 +1,42 @@
+None selected 
+
+Skip to content
+Using Jerky.com Mail with screen readers
+
+Conversations
+ 
+Program Policies
+Powered by Google
+Last account activity: 0 minutes ago
+Details
+index-C10jiQMV.js:40 [Dashboard] Clearing PDF viewer cache and rechecking...
+index-C10jiQMV.js:40 [Dashboard] PDF viewer check result: Object
+index-C10jiQMV.js:40 [Renderer] handleSelectPrinter starting for: SATO CL4NX Plus 305dpi SATO CL4NX Plus 305dpi
+index-C10jiQMV.js:40 [Renderer] Register result: Object
+index-C10jiQMV.js:40 [Renderer] List result: Object
+index-C10jiQMV.js:40 [Renderer] Printers from list: Array(1)
+index-C10jiQMV.js:40 [Renderer] Found registeredPrinter: Object
+index-C10jiQMV.js:40 [Renderer] Calling setDefault with id: 0f88b9cb-fe18-49db-a864-e7c3c35ba0f2
+index-C10jiQMV.js:40 [Renderer] setDefault result: Object
+index-C10jiQMV.js:40 [Renderer] handleSelectPrinter completed successfully
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "Found bundled SumatraPDF at: C:\\Program Files\\Jerky Ship Connect\\resources\\bin\\SumatraPDF.exe"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386582[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: {command: 'C:\\Program Files\\Jerky Ship Connect\\resources\\bin\\SumatraPDF.exe', args: Array(4), printer: 'SATO CL4NX Plus 305dpi', file: 'C:\\Users\\Jerky\\AppData\\Local\\Temp\\jerky-ship-connect\\label-ec30cc6c-0f7c-4f50-9250-fa084a79b3e0.pdf', fullCommand: '"C:\\Program Files\\Jerky Ship Connect\\resources\\bin…t\\label-ec30cc6c-0f7c-4f50-9250-fa084a79b3e0.pdf"'}jobId: undefinedlevel: "info"message: "Executing SumatraPDF"orderNumber: undefinedstage: "COMMAND_INVOKED"timestamp: 1764796386583[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: Starting SumatraPDF 3.5.2, GetCommandLineW():\r\n\"C:\\Program Files\\Jerky Ship Connect\\resources\\bin\\SumatraPDF.exe\" -print-to \"SATO CL4NX Plus 305dpi\" -silent C:\\Users\\Jerky\\AppData\\Local\\Temp\\jerky-ship-connect\\label-ec30cc6c-0f7c-4f50-9250-fa084a79b3e0.pdf"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386717[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: LoadSettings() took 21.81 ms"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386741[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: ParseTranslationsTxt: 17632 lines, nStrings: 372"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386744[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: PrintFile: file: 'C:\\Users\\Jerky\\AppData\\Local\\Temp\\jerky-ship-connect\\label-ec30cc6c-0f7c-4f50-9250-fa084a79b3e0.pdf', printer: 'SATO CL4NX Plus 305dpi'"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386745[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: cannot recognize version marker\r\ntrying to repair broken xref\r\nrepairing PDF document\r\nname is too long"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386746[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: undefinedlevel: "debug"message: "SumatraPDF stdout: no objects found\r\nno objects found\r\nError: Couldn't open file 'C:\\Users\\Jerky\\AppData\\Local\\Temp\\jerky-ship-connect\\label-ec30cc6c-0f7c-4f50-9250-fa084a79b3e0.pdf' for printing\r\nFinished printing, exitCode: 1\r\nExiting with exit code: 1"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386747[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: {exitCode: 1, stdout: 'Starting SumatraPDF 3.5.2, GetCommandLineW():\r\n"C:…rinting, exitCode: 1\r\nExiting with exit code: 1\r\n', stderr: ''}jobId: undefinedlevel: "debug"message: "SumatraPDF exited"orderNumber: undefinedstage: "DIAGNOSTIC"timestamp: 1764796386754[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: {success: true, printer: 'SATO CL4NX Plus 305dpi'}jobId: "ec30cc6c-0f7c-4f50-9250-fa084a79b3e0"level: "info"message: "Print job completed successfully"orderNumber: "JK3825-1203253-RG"stage: "RESULT"timestamp: 1764796393036[[Prototype]]: Object
+index-C10jiQMV.js:40 [Dashboard] Received printer log: Objectdetails: undefinedjobId: "ec30cc6c-0f7c-4f50-9250-fa084a79b3e0"level: "info"message: "Cleaned up temp file"orderNumber: "JK3825-1203253-RG"stage: "PRINTING"timestamp: 1764796393037[[Prototype]]: Object
+
+
+logs.txt
+Displaying logs.txt.
