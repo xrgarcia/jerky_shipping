@@ -27,7 +27,7 @@
 import { getRedisClient } from '../utils/queue';
 import { db } from '../db';
 import { shipments } from '@shared/schema';
-import { eq, and, isNull, isNotNull, ne, sql } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, ne, sql, inArray } from 'drizzle-orm';
 import { skuVaultService } from './skuvault-service';
 
 const log = (message: string) => console.log(`[QCSaleWarmer] ${message}`);
@@ -431,7 +431,7 @@ export async function lookupInWarmCache(orderNumber: string, barcodeOrSku: strin
 /**
  * Get shipments that are ready to pack (closed session, no tracking, pending status)
  * These are the orders we should pre-warm the cache for
- * Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
+ * Uses shipmentStatus IN ('pending', 'label_pending') to support both old and new status values
  * 
  * NOTE: We don't filter by cacheWarmedAt here because the DB and Redis can get out of sync
  * (e.g., Redis restart/eviction). Instead, we return all packable orders and let
@@ -448,8 +448,8 @@ export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POL
           eq(shipments.sessionStatus, 'closed'),
           // No tracking number (not yet labeled)
           isNull(shipments.trackingNumber),
-          // Pending status (not yet shipped)
-          eq(shipments.shipmentStatus, 'pending'),
+          // Pending status (not yet shipped) - support both old and new values
+          inArray(shipments.shipmentStatus, ['pending', 'label_pending']),
           // Has a session ID
           isNotNull(shipments.sessionId)
         )
