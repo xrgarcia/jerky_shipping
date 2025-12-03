@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Loader2, LogOut, RefreshCw, Plus, X, Wifi, WifiOff } from 'lucide-react';
+import { MapPin, Loader2, LogOut, RefreshCw, Plus, X, Wifi, WifiOff, UserCircle, AlertTriangle } from 'lucide-react';
 import type { AppState, Station } from '@shared/types';
 
 interface StationPageProps {
@@ -10,6 +10,7 @@ function StationPage({ state }: StationPageProps) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [reclaiming, setReclaiming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newStationName, setNewStationName] = useState('');
@@ -38,12 +39,16 @@ function StationPage({ state }: StationPageProps) {
     loadStations();
   }, []);
 
-  const handleClaim = async (stationId: string) => {
-    setClaiming(stationId);
+  const handleClaim = async (stationId: string, force: boolean = false) => {
+    if (force) {
+      setReclaiming(stationId);
+    } else {
+      setClaiming(stationId);
+    }
     setError(null);
 
     try {
-      const result = await window.electronAPI.station.claim(stationId);
+      const result = await window.electronAPI.station.claim(stationId, force);
       if (!result.success) {
         setError(result.error || 'Failed to claim station');
       }
@@ -51,7 +56,12 @@ function StationPage({ state }: StationPageProps) {
       setError(err instanceof Error ? err.message : 'Failed to claim station');
     } finally {
       setClaiming(null);
+      setReclaiming(null);
     }
+  };
+
+  const handleReclaim = (stationId: string) => {
+    handleClaim(stationId, true);
   };
 
   const handleLogout = async () => {
@@ -227,43 +237,101 @@ function StationPage({ state }: StationPageProps) {
           </div>
         ) : stations.length === 0 ? null : (
           <div className="space-y-3">
-            {stations.map((station) => (
-              <button
-                key={station.id}
-                onClick={() => handleClaim(station.id)}
-                disabled={claiming !== null || !station.isActive}
-                data-testid={`button-claim-station-${station.id}`}
-                className={`w-full p-4 rounded-xl border transition-all text-left ${
-                  station.isActive
-                    ? 'bg-[#242424] border-[#333] hover:bg-[#2a2a2a] hover:border-primary-500/50'
-                    : 'bg-[#1f1f1f] border-[#2a2a2a] opacity-50 cursor-not-allowed'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-white">{station.name}</h3>
-                      {!station.isActive && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-[#333] text-[#999]">
-                          Inactive
-                        </span>
+            {stations.map((station) => {
+              const isClaimed = !!station.claimedBy && !station.sessionExpired;
+              const isProcessing = claiming === station.id || reclaiming === station.id;
+              
+              return (
+                <div
+                  key={station.id}
+                  className={`w-full p-4 rounded-xl border transition-all text-left ${
+                    station.isActive
+                      ? isClaimed 
+                        ? 'bg-[#242424] border-orange-500/30'
+                        : 'bg-[#242424] border-[#333]'
+                      : 'bg-[#1f1f1f] border-[#2a2a2a] opacity-50'
+                  }`}
+                  data-testid={`station-card-${station.id}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-white">{station.name}</h3>
+                        {!station.isActive && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-[#333] text-[#999]">
+                            Inactive
+                          </span>
+                        )}
+                        {isClaimed && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 flex items-center gap-1">
+                            <UserCircle className="w-3 h-3" />
+                            In Use
+                          </span>
+                        )}
+                      </div>
+                      {station.locationHint && (
+                        <p className="text-sm text-[#999] mt-1 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {station.locationHint}
+                        </p>
+                      )}
+                      {isClaimed && (
+                        <p className="text-sm text-orange-400/80 mt-2 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Currently used by {station.claimedBy}
+                        </p>
                       )}
                     </div>
-                    {station.locationHint && (
-                      <p className="text-sm text-[#999] mt-1 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {station.locationHint}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      {isProcessing ? (
+                        <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+                      ) : isClaimed ? (
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Action buttons */}
+                  <div className="mt-3 flex gap-2">
+                    {isClaimed ? (
+                      <button
+                        onClick={() => handleReclaim(station.id)}
+                        disabled={isProcessing || !station.isActive}
+                        data-testid={`button-reclaim-station-${station.id}`}
+                        className="flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {reclaiming === station.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Reclaiming...
+                          </>
+                        ) : (
+                          'Take Over Station'
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleClaim(station.id)}
+                        disabled={isProcessing || !station.isActive}
+                        data-testid={`button-claim-station-${station.id}`}
+                        className="flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-white disabled:bg-[#333] disabled:text-[#666] disabled:cursor-not-allowed"
+                      >
+                        {claiming === station.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Claiming...
+                          </>
+                        ) : (
+                          'Select Station'
+                        )}
+                      </button>
                     )}
                   </div>
-                  {claiming === station.id ? (
-                    <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
-                  ) : (
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                  )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
