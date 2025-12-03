@@ -691,6 +691,10 @@ function DashboardPage({ state }: DashboardPageProps) {
                     const isBusy = printer.status === 'busy';
                     const isOffline = printer.status === 'offline' || (!isOnline && !isBusy);
                     
+                    // Check if this printer is already registered and get its actual useRawMode setting
+                    const registeredPrinter = state.printers.find(p => p.systemName === printer.systemName);
+                    const isIndustrial = registeredPrinter?.useRawMode === true;
+                    
                     return (
                       <button
                         key={printer.systemName}
@@ -744,10 +748,10 @@ function DashboardPage({ state }: DashboardPageProps) {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {printer.suggestRawMode && (
+                          {isIndustrial && (
                             <span 
                               className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400"
-                              title="Industrial printer detected - will use direct printing mode"
+                              title="Industrial thermal printer mode - sends ZPL commands directly"
                             >
                               Industrial
                             </span>
