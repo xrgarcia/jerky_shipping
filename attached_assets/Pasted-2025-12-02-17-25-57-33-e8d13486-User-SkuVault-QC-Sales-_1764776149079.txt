@@ -1,0 +1,155 @@
+2025-12-02 17:25:57.33
+e8d13486
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available
+2025-12-02 17:25:57.33
+e8d13486
+User
+[QCSaleWarmer] Failed to warm cache for order JK3825349466: Could not reach SkuVault: No authentication token available
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7201:20)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:6871:27)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6377:17)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:7422:5)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6377:17)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:7422:5)
+2025-12-02 17:25:57.33
+e8d13486
+User
+[QCSaleWarmer] Failed to warm cache for order JK3825349466: Could not reach SkuVault: No authentication token available
+2025-12-02 17:25:57.33
+e8d13486
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available
+2025-12-02 17:25:57.33
+e8d13486
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:6871:27)
+2025-12-02 17:25:57.33
+e8d13486
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7201:20)
+2025-12-02 17:25:57.34
+e8d13486
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7201:20)
+2025-12-02 17:25:57.34
+e8d13486
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:7422:5)
+2025-12-02 17:25:57.34
+e8d13486
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:6871:27)
+2025-12-02 17:25:57.34
+e8d13486
+User
+[QCSaleWarmer] Failed to warm cache for order JK3825349466: Could not reach SkuVault: No authentication token available
+2025-12-02 17:25:57.34
+e8d13486
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available
+2025-12-02 17:25:57.34
+e8d13486
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-02 17:25:57.34
+e8d13486
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6377:17)
+2025-12-03 08:22:04.43
+76649ca8
+User
+[Packing Validation] No shipment item found for SKU JCB-BAJ-42-17
+2025-12-03 09:02:33.86
+76649ca8
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6379:17)
+2025-12-03 09:02:33.86
+76649ca8
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6379:17)
+2025-12-03 09:02:33.86
+76649ca8
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:6873:27)
+2025-12-03 09:02:33.86
+76649ca8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-03 09:09:28.80
+76649ca8
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available
+2025-12-03 09:09:28.80
+76649ca8
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6379:17)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:7477:5)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async Promise.all (index 0)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7197:39)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7197:39)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:6873:27)
+2025-12-03 09:09:28.80
+76649ca8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-03 09:09:28.80
+76649ca8
+User
+[QCSaleWarmer] Failed to warm cache for order 111-6276873-6951446: Could not reach SkuVault: No authentication token available
+2025-12-03 09:09:28.80
+76649ca8
+User
+at async Promise.all (index 0)
+
+Collapse
+
+Wrap
+
+Colors
+

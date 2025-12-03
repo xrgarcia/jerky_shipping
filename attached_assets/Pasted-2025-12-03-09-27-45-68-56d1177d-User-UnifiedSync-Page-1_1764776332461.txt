@@ -1,0 +1,148 @@
+2025-12-03 09:27:45.68
+56d1177d
+User
+[UnifiedSync] Page 1: processed 7 shipments (0 errors so far)
+2025-12-03 09:27:45.72
+56d1177d
+User
+[UnifiedSync] Poll complete: 7 processed, 0 errors, 1 pages
+2025-12-03 09:27:45.72
+56d1177d
+User
+[UnifiedSync] Updated cursor to: 2025-12-03T15:27:11.390Z (with 30s safety overlap)
+2025-12-03 09:27:45.80
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:27:45.94
+76649ca8
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:27:11.390Z
+2025-12-03 09:27:48.06
+76649ca8
+User
+[UnifiedSync] Poll complete: 4 processed, 0 errors, 1 pages
+2025-12-03 09:27:48.06
+76649ca8
+User
+[UnifiedSync] Page 1: processed 4 shipments (0 errors so far)
+2025-12-03 09:27:48.15
+76649ca8
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:28:09.46
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:27:11.390Z
+2025-12-03 09:28:11.42
+56d1177d
+User
+[UnifiedSync] Poll complete: 4 processed, 0 errors, 1 pages
+2025-12-03 09:28:11.42
+56d1177d
+User
+[UnifiedSync] Page 1: processed 4 shipments (0 errors so far)
+2025-12-03 09:28:11.51
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:28:49.25
+76649ca8
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:27:11.390Z
+2025-12-03 09:28:51.87
+76649ca8
+User
+[UnifiedSync] Page 1: processed 5 shipments (0 errors so far)
+2025-12-03 09:28:51.92
+76649ca8
+User
+[UnifiedSync] Updated cursor to: 2025-12-03T15:28:04.653Z (with 30s safety overlap)
+2025-12-03 09:28:51.92
+76649ca8
+User
+[UnifiedSync] Poll complete: 5 processed, 0 errors, 1 pages
+2025-12-03 09:28:52.01
+76649ca8
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:29:02.93
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:29:38.86
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:28:04.653Z
+2025-12-03 09:30:03.97
+56d1177d
+User
+[UnifiedSync] Page 1: processed 2 shipments (0 errors so far)
+2025-12-03 09:30:04.02
+56d1177d
+User
+[UnifiedSync] Poll complete: 2 processed, 0 errors, 1 pages
+2025-12-03 09:30:04.02
+56d1177d
+User
+[UnifiedSync] Updated cursor to: 2025-12-03T15:29:25.743Z (with 30s safety overlap)
+2025-12-03 09:30:04.26
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:31:18.97
+56d1177d
+User
+[UnifiedSync] Page 1: processed 2 shipments (0 errors so far)
+2025-12-03 09:31:18.97
+56d1177d
+User
+[UnifiedSync] Poll complete: 2 processed, 0 errors, 1 pages
+2025-12-03 09:31:19.10
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2025-12-03 09:31:38.67
+56d1177d
+User
+[UnifiedSync] Immediate poll requested
+2025-12-03 09:31:38.67
+56d1177d
+User
+[UnifiedSync] Waking idle worker for immediate poll
+2025-12-03 09:31:38.71
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:29:25.743Z
+2025-12-03 09:32:38.95
+56d1177d
+User
+[UnifiedSync] More pages remain, scheduling immediate follow-up poll
+2025-12-03 09:32:39.99
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:31:06.410Z
+2025-12-03 09:32:43.78
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-12-03T15:31:06.410Z
+2025-12-03 09:33:54.05
+56d1177d
+User
+[UnifiedSync] Forcing full resync
+2025-12-03 09:33:54.09
+56d1177d
+User
+[UnifiedSync] Immediate poll requested
+2025-12-03 09:33:54.09
+56d1177d
+User
+[UnifiedSync] Waking idle worker for immediate poll
+2025-12-03 09:33:54.13
+56d1177d
+User
+[UnifiedSync] Starting poll from cursor: 2025-11-26T15:33:54.052Z
+2025-12-03 09:33:54.90
+56d1177d
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
