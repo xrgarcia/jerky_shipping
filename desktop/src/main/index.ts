@@ -877,10 +877,10 @@ function setupIpcHandlers(): void {
     }
   });
   
-  ipcMain.handle('station:claim', async (_event, stationId: string) => {
+  ipcMain.handle('station:claim', async (_event, stationId: string, forceClaim: boolean = false) => {
     try {
       if (!apiClient) throw new Error('Not authenticated');
-      const session = await apiClient.claimStation(stationId);
+      const session = await apiClient.claimStation(stationId, forceClaim);
       const station = await apiClient.getStation(stationId);
       
       // Clear previous printer state before loading new station's printers

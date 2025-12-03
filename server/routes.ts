@@ -6887,7 +6887,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const activeOnly = req.query.active === 'true';
       const stations = await storage.getAllStations(activeOnly);
-      res.json(stations);
+      
+      // Enrich stations with session info (who has claimed them)
+      const enrichedStations = await Promise.all(stations.map(async (station) => {
+        const activeSession = await storage.getActiveSessionByStation(station.id);
+        if (activeSession) {
+          // Check if session has expired
+          const now = new Date();
+          if (activeSession.expiresAt && activeSession.expiresAt < now) {
+            // Session has expired, mark it as available
+            return {
+              ...station,
+              claimedBy: null,
+              sessionExpiresAt: null,
+              sessionExpired: true,
+            };
+          }
+          
+          // Get the user who claimed it
+          const user = await storage.getUser(activeSession.userId);
+          return {
+            ...station,
+            claimedBy: user?.name || user?.email || 'Unknown user',
+            claimedByUserId: activeSession.userId,
+            sessionExpiresAt: activeSession.expiresAt,
+            sessionExpired: false,
+          };
+        }
+        return {
+          ...station,
+          claimedBy: null,
+          sessionExpiresAt: null,
+          sessionExpired: false,
+        };
+      }));
+      
+      res.json(enrichedStations);
     } catch (error: any) {
       console.error("[Desktop] Error fetching stations:", error);
       res.status(500).json({ error: error.message || "Failed to fetch stations" });

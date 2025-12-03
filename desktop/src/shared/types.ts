@@ -5,6 +5,11 @@ export interface Station {
   isActive: boolean;
   defaultPrinterId: string | null;
   createdAt: string;
+  // Session info (enriched by API)
+  claimedBy?: string | null;
+  claimedByUserId?: string | null;
+  sessionExpiresAt?: string | null;
+  sessionExpired?: boolean;
 }
 
 export interface Printer {

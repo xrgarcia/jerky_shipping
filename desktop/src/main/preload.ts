@@ -39,7 +39,8 @@ const api = {
   
   station: {
     list: () => ipcRenderer.invoke('station:list'),
-    claim: (stationId: string) => ipcRenderer.invoke('station:claim', stationId),
+    claim: (stationId: string, forceClaim: boolean = false) => 
+      ipcRenderer.invoke('station:claim', stationId, forceClaim),
     release: () => ipcRenderer.invoke('station:release'),
     create: (data: { name: string; locationHint?: string }) => 
       ipcRenderer.invoke('station:create', data),

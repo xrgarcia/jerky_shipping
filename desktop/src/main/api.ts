@@ -99,8 +99,8 @@ export class ApiClient {
     return this.request<Station>('GET', `/api/desktop/stations/${stationId}`);
   }
   
-  async claimStation(stationId: string): Promise<StationSession> {
-    return this.request<StationSession>('POST', `/api/desktop/sessions/claim`, { stationId });
+  async claimStation(stationId: string, forceClaim: boolean = false): Promise<StationSession> {
+    return this.request<StationSession>('POST', `/api/desktop/sessions/claim`, { stationId, forceClaim });
   }
   
   async getCurrentSession(): Promise<{ session: StationSession; station: Station } | null> {
