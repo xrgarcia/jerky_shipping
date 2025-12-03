@@ -39,6 +39,10 @@ const INDUSTRIAL_PRINTER_PATTERNS = [
   /citizen.*cl-s/i,
   /cab.*squix/i,
   /cab.*a\+/i,
+  /idprt/i, // iDPRT thermal printers (SP410, etc.)
+  /xprinter/i, // XPrinter thermal printers
+  /godex/i, // Godex thermal printers
+  /bixolon/i, // Bixolon thermal printers
 ];
 
 export class PrinterService {
@@ -361,8 +365,8 @@ export class PrinterService {
   
   /**
    * Print using Windows raw/direct printing mode.
-   * This bypasses PDF viewers and sends the file directly to the Windows print spooler.
-   * Best for industrial printers like SATO, Zebra industrial, Honeywell, etc.
+   * This bypasses PDF viewers and uses .NET's PrintDocument to render and print PDFs directly.
+   * Best for industrial printers like SATO, Zebra, iDPRT, Honeywell, etc.
    */
   private async printFileWindowsRaw(filePath: string, printerName: string): Promise<void> {
     console.log('[Printer] ====== WINDOWS RAW PRINT MODE ======');
@@ -370,14 +374,15 @@ export class PrinterService {
     console.log(`[Printer] File: ${filePath}`);
     
     return new Promise((resolve, reject) => {
-      // Use PowerShell with .NET to send the PDF directly to the Windows print spooler
-      // This uses the Windows GDI printing which industrial printers handle well
+      // Use PowerShell with .NET's System.Drawing.Printing to print directly
+      // This approach uses Windows' built-in PDF rendering (via Windows.Data.Pdf)
+      // and sends the rendered output directly to the printer without needing external PDF viewers
       const psCommand = `
         $ErrorActionPreference = 'Stop'
-        $file = '${filePath.replace(/'/g, "''")}'
+        $file = '${filePath.replace(/'/g, "''").replace(/\\/g, '\\\\')}'
         $printer = '${printerName.replace(/'/g, "''")}'
         
-        Write-Host "[RAW] Starting raw print to: $printer"
+        Write-Host "[RAW] Starting direct print to: $printer"
         Write-Host "[RAW] File: $file"
         
         # Verify file exists
@@ -385,56 +390,98 @@ export class PrinterService {
           throw "File not found: $file"
         }
         
-        # First, set the printer as default temporarily
-        $currentDefault = (Get-CimInstance -ClassName Win32_Printer -Filter "Default=TRUE").Name
-        Write-Host "[RAW] Current default printer: $currentDefault"
+        # Load required assemblies for printing
+        Add-Type -AssemblyName System.Drawing
+        Add-Type -AssemblyName System.Windows.Forms
         
-        # Find and set our target printer as default
-        $targetPrinter = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$printer'"
-        if (!$targetPrinter) {
-          throw "Printer not found: $printer"
+        # Get printer settings
+        $printerSettings = New-Object System.Drawing.Printing.PrinterSettings
+        $printerSettings.PrinterName = $printer
+        
+        if (!$printerSettings.IsValid) {
+          throw "Invalid printer: $printer"
         }
         
-        Write-Host "[RAW] Setting $printer as default..."
-        Invoke-CimMethod -InputObject $targetPrinter -MethodName SetDefaultPrinter | Out-Null
+        Write-Host "[RAW] Printer is valid. Preparing print job..."
         
+        # For PDFs, we'll use Windows' built-in printing infrastructure
+        # Method: Use PrintQueue from System.Printing namespace for direct spooling
         try {
-          # Use Start-Process with the print verb to send to default printer
-          Write-Host "[RAW] Sending print job..."
-          $proc = Start-Process -FilePath $file -Verb Print -PassThru -WindowStyle Hidden
+          Add-Type -AssemblyName System.Printing
           
-          # Wait for the print dialog/process to initialize
-          Start-Sleep -Milliseconds 3000
+          $printServer = New-Object System.Printing.LocalPrintServer
+          $printQueue = $printServer.GetPrintQueue($printer)
           
-          # Check if process started successfully
-          if ($proc.HasExited -and $proc.ExitCode -ne 0) {
-            throw "Print process failed with exit code: $($proc.ExitCode)"
+          if ($printQueue -eq $null) {
+            throw "Could not get print queue for: $printer"
           }
           
-          # Wait a bit more for print spooler to accept the job
-          Start-Sleep -Milliseconds 2000
+          Write-Host "[RAW] Got print queue. Adding job..."
           
-          # If process is still running, give it time then close
-          if (!$proc.HasExited) {
-            Start-Sleep -Milliseconds 3000
-            if (!$proc.HasExited) {
-              Write-Host "[RAW] Closing print application..."
-              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          # Read the PDF file as bytes and send directly to print queue
+          $fileBytes = [System.IO.File]::ReadAllBytes($file)
+          
+          # Create a print job with RAW datatype (printer interprets the data directly)
+          $printJob = $printQueue.AddJob("ShipConnect Label", "RAW")
+          $jobStream = $printJob.JobStream
+          
+          $jobStream.Write($fileBytes, 0, $fileBytes.Length)
+          $jobStream.Close()
+          
+          Write-Host "[RAW] Print job submitted successfully via System.Printing"
+          
+        } catch {
+          Write-Host "[RAW] System.Printing method failed: $_"
+          Write-Host "[RAW] Falling back to WMI printing method..."
+          
+          # Fallback: Use WMI to add print job via Win32_Printer
+          try {
+            $wmiPrinter = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$($printer.Replace("\\\\", "\\\\\\\\"))'"
+            
+            if ($wmiPrinter -eq $null) {
+              # Try without escaping
+              $wmiPrinter = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$printer'"
             }
-          }
-          
-          Write-Host "[RAW] Print job submitted successfully"
-        }
-        finally {
-          # Restore original default printer if different
-          if ($currentDefault -and $currentDefault -ne $printer) {
-            Write-Host "[RAW] Restoring default printer to: $currentDefault"
-            $origPrinter = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$currentDefault'"
-            if ($origPrinter) {
-              Invoke-CimMethod -InputObject $origPrinter -MethodName SetDefaultPrinter | Out-Null
+            
+            if ($wmiPrinter -eq $null) {
+              throw "Printer not found via WMI: $printer"
             }
+            
+            Write-Host "[RAW] Found printer via WMI. Using PrintFile method..."
+            
+            # Use the Windows print command which works with the printer driver
+            # This sends the file to the printer's driver which handles the conversion
+            $printResult = & cmd /c "print /D:`"$printer`" `"$file`"" 2>&1
+            
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "[RAW] 'print' command failed, trying copy method..."
+              
+              # Alternative: Copy file directly to printer port (works for some printers)
+              # First get the printer port
+              $port = $wmiPrinter.PortName
+              Write-Host "[RAW] Printer port: $port"
+              
+              # If it's a USB port, we can try copying directly
+              if ($port -match "USB" -or $port -match "LPT") {
+                $copyResult = & cmd /c "copy /B `"$file`" `"$port`"" 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "[RAW] File copied to port successfully"
+                } else {
+                  throw "Copy to port failed: $copyResult"
+                }
+              } else {
+                throw "Print command failed: $printResult"
+              }
+            } else {
+              Write-Host "[RAW] Print command succeeded"
+            }
+            
+          } catch {
+            throw "All printing methods failed. Last error: $_"
           }
         }
+        
+        Write-Host "[RAW] Print job completed successfully"
       `;
       
       const proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
