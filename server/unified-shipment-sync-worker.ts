@@ -38,6 +38,7 @@ const LOOKBACK_HOURS = 168; // 7 days lookback for initial cursor
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 const TRACKING_BACKFILL_BATCH_SIZE = 10; // Max shipments to backfill per poll cycle
 const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older than 2 days
+const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
 
 // Worker state
 let isPolling = false;
@@ -207,6 +208,91 @@ async function fetchShipmentPage(modifyDateStart: string, page: number): Promise
 }
 
 /**
+ * Fetch labels for a batch of shipments and attach tracking_number to each
+ * The /v2/shipments endpoint does NOT include tracking numbers - they come from /v2/labels
+ * This function makes one API call per shipment to fetch its labels
+ * 
+ * Modifies shipments in place by attaching tracking_number and labels
+ * Returns count of shipments that got tracking numbers
+ */
+async function fetchLabelsForShipments(shipmentsToEnrich: any[]): Promise<{
+  withTracking: number;
+  errors: number;
+  hitRateLimit: boolean;
+}> {
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  if (!apiKey) {
+    console.error('[UnifiedSync] Cannot fetch labels - SHIPSTATION_API_KEY not configured');
+    return { withTracking: 0, errors: shipmentsToEnrich.length, hitRateLimit: false };
+  }
+  
+  let withTracking = 0;
+  let errors = 0;
+  let hitRateLimit = false;
+  
+  for (const shipment of shipmentsToEnrich) {
+    const shipmentId = shipment.shipment_id;
+    if (!shipmentId) continue;
+    
+    let retryCount = 0;
+    
+    while (retryCount <= LABEL_FETCH_RETRY_MAX) {
+      try {
+        const labelUrl = `${SHIPSTATION_API_BASE}/v2/labels?shipment_id=${encodeURIComponent(shipmentId)}`;
+        
+        const response = await fetch(labelUrl, {
+          method: 'GET',
+          headers: {
+            'api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        // Handle 429 rate limit
+        if (response.status === 429) {
+          const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+          if (retryCount < LABEL_FETCH_RETRY_MAX) {
+            console.log(`[UnifiedSync] Rate limited (429) fetching labels for ${shipmentId}, waiting ${retryAfter}s...`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+            retryCount++;
+            continue;
+          } else {
+            console.log('[UnifiedSync] Hit rate limit during label fetch, stopping batch');
+            hitRateLimit = true;
+            return { withTracking, errors, hitRateLimit };
+          }
+        }
+        
+        if (response.ok) {
+          const labelData = await response.json();
+          const labels = labelData.labels || [];
+          if (labels.length > 0) {
+            // Attach tracking number and labels to shipment data
+            shipment.tracking_number = labels[0].tracking_number || null;
+            shipment.labels = labels;
+            if (shipment.tracking_number) {
+              withTracking++;
+            }
+          }
+        } else {
+          // Non-429 error
+          console.log(`[UnifiedSync] Failed to fetch labels for shipment ${shipmentId}: ${response.status}`);
+          errors++;
+        }
+        
+        break; // Success or non-retryable error
+      } catch (err: any) {
+        console.log(`[UnifiedSync] Error fetching labels for ${shipmentId}: ${err.message}`);
+        errors++;
+        break;
+      }
+    }
+  }
+  
+  return { withTracking, errors, hitRateLimit };
+}
+
+/**
  * Backfill tracking numbers for shipped shipments that are missing tracking
  * Only processes shipments older than TRACKING_BACKFILL_MIN_AGE_HOURS (2 days)
  * This runs after the main poll cycle and processes a small batch to avoid rate limits
@@ -267,10 +353,11 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
     processed++;
     
     try {
-      // Fetch the full shipment from ShipStation API to get current data
-      const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipment.shipmentId!)}`;
+      // FIXED: Fetch labels directly - the /v2/shipments/{id} endpoint does NOT include tracking numbers
+      // Tracking numbers ONLY come from the /v2/labels endpoint
+      const labelUrl = `${SHIPSTATION_API_BASE}/v2/labels?shipment_id=${encodeURIComponent(shipment.shipmentId!)}`;
       
-      const response = await fetch(url, {
+      const labelResponse = await fetch(labelUrl, {
         method: 'GET',
         headers: {
           'api-key': apiKey,
@@ -278,30 +365,35 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
         },
       });
       
-      if (response.status === 429) {
+      if (labelResponse.status === 429) {
         console.log('[UnifiedSync] Hit rate limit during tracking backfill, stopping batch');
         break;
       }
       
-      if (!response.ok) {
-        console.error(`[UnifiedSync] Failed to fetch shipment ${shipment.shipmentId}: ${response.status}`);
+      if (!labelResponse.ok) {
+        console.error(`[UnifiedSync] Failed to fetch labels for shipment ${shipment.shipmentId}: ${labelResponse.status}`);
         errors++;
         continue;
       }
       
-      const shipmentData = await response.json();
+      const labelData = await labelResponse.json();
+      const labels = labelData.labels || [];
       
-      // Process through ETL service to update tracking and all related data
-      await shipStationShipmentETL.processShipment(shipmentData, null);
-      
-      // Check if we got a tracking number
-      const trackingNumber = shipmentData.tracking_number || 
-                            (shipmentData.labels?.[0]?.tracking_number) ||
-                            null;
-      
-      if (trackingNumber) {
-        updated++;
-        console.log(`[UnifiedSync] Backfilled tracking ${trackingNumber} for order ${shipment.orderNumber}`);
+      if (labels.length > 0) {
+        const trackingNumber = labels[0].tracking_number || null;
+        
+        if (trackingNumber) {
+          // Update the shipment record directly with the tracking number
+          await db
+            .update(shipments)
+            .set({
+              trackingNumber: trackingNumber,
+            })
+            .where(eq(shipments.id, shipment.id));
+          
+          updated++;
+          console.log(`[UnifiedSync] Backfilled tracking ${trackingNumber} for order ${shipment.orderNumber}`);
+        }
       }
       
     } catch (err) {
@@ -363,7 +455,23 @@ async function pollCycle(): Promise<{
       const pageResult = await fetchShipmentPage(cursor.cursorValue, currentPage);
       pagesProcessed++;
       
-      // Process each shipment
+      // CRITICAL: Fetch labels for each shipment BEFORE processing
+      // The /v2/shipments endpoint does NOT include tracking numbers - they come from /v2/labels
+      if (pageResult.shipments.length > 0) {
+        const labelResult = await fetchLabelsForShipments(pageResult.shipments);
+        
+        if (labelResult.hitRateLimit) {
+          console.log(`[UnifiedSync] Hit rate limit during label fetch on page ${currentPage}`);
+          hitRateLimit = true;
+          // Still process what we have - some shipments may have tracking now
+        }
+        
+        if (labelResult.withTracking > 0) {
+          console.log(`[UnifiedSync] Page ${currentPage}: fetched labels, ${labelResult.withTracking}/${pageResult.shipments.length} have tracking`);
+        }
+      }
+      
+      // Process each shipment (now with labels/tracking attached)
       for (const shipment of pageResult.shipments) {
         try {
           await syncShipment(shipment);
