@@ -440,9 +440,14 @@ export async function lookupInWarmCache(orderNumber: string, barcodeOrSku: strin
 }
 
 /**
- * Get shipments that are ready to pack (closed session, no tracking, pending status)
+ * Get shipments that are ready to pack (closed/picked session, no tracking)
  * These are the orders we should pre-warm the cache for
- * Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
+ * 
+ * MATCHES packing_queue workflow tab criteria:
+ * - sessionId IS NOT NULL (has a picking session)
+ * - sessionStatus = 'closed' OR 'picked' (picking complete)
+ * - trackingNumber IS NULL (not yet shipped)
+ * - status != 'cancelled'
  * 
  * IMPORTANT: 
  * - Excludes orders that are already warmed (cacheWarmedAt is set) AND cache hasn't expired
@@ -459,14 +464,17 @@ export async function getReadyToPackShipments(limit: number = MAX_ORDERS_PER_POL
       .from(shipments)
       .where(
         and(
-          // Session is closed (picking complete)
-          eq(shipments.sessionStatus, 'closed'),
-          // No tracking number (not yet labeled)
-          isNull(shipments.trackingNumber),
-          // Pending status (not yet shipped)
-          eq(shipments.shipmentStatus, 'pending'),
-          // Has a session ID
+          // Has a session ID (was picked)
           isNotNull(shipments.sessionId),
+          // Session is closed or picked (picking complete)
+          or(
+            eq(shipments.sessionStatus, 'closed'),
+            eq(shipments.sessionStatus, 'picked')
+          ),
+          // No tracking number (not yet shipped)
+          isNull(shipments.trackingNumber),
+          // Not cancelled
+          ne(shipments.status, 'cancelled'),
           // Either: never warmed OR cache has expired (warmed more than TTL ago)
           or(
             isNull(shipments.cacheWarmedAt),
