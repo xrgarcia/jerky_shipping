@@ -89,34 +89,40 @@ function buildLookupMap(qcSale: import('@shared/skuvault-types').QCSale): Record
   const lookupMap: Record<string, any> = {};
   
   for (const item of qcSale.Items || []) {
-    const regularItemResult = {
-      found: true,
-      sku: item.Sku || '',
-      code: item.Code || null,
-      title: item.Title || null,
-      quantity: item.Quantity || 1,
-      itemId: item.Id || null,
-      saleId,
-      isKitComponent: false,
-    };
+    const isKit = item.KitProducts && item.KitProducts.length > 0;
     
-    // Add by Code (barcode)
-    if (item.Code) {
-      lookupMap[item.Code.toUpperCase()] = regularItemResult;
+    // For kit items, ONLY add component entries - the parent kit SKU itself is not scannable
+    // For regular items, add the item's Code/SKU/PartNumber entries
+    if (!isKit) {
+      const regularItemResult = {
+        found: true,
+        sku: item.Sku || '',
+        code: item.Code || null,
+        title: item.Title || null,
+        quantity: item.Quantity || 1,
+        itemId: item.Id || null,
+        saleId,
+        isKitComponent: false,
+      };
+      
+      // Add by Code (barcode)
+      if (item.Code) {
+        lookupMap[item.Code.toUpperCase()] = regularItemResult;
+      }
+      
+      // Add by SKU
+      if (item.Sku) {
+        lookupMap[item.Sku.toUpperCase()] = regularItemResult;
+      }
+      
+      // Add by PartNumber (UPC barcode)
+      if (item.PartNumber) {
+        lookupMap[item.PartNumber.toUpperCase()] = regularItemResult;
+      }
     }
     
-    // Add by SKU
-    if (item.Sku) {
-      lookupMap[item.Sku.toUpperCase()] = regularItemResult;
-    }
-    
-    // Add by PartNumber (UPC barcode)
-    if (item.PartNumber) {
-      lookupMap[item.PartNumber.toUpperCase()] = regularItemResult;
-    }
-    
-    // Add kit component items
-    if (item.KitProducts && item.KitProducts.length > 0) {
+    // Add kit component items (only for kits)
+    if (isKit && item.KitProducts) {
       for (const component of item.KitProducts) {
         const componentResult = {
           found: true,
