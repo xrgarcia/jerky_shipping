@@ -364,124 +364,125 @@ export class PrinterService {
   }
   
   /**
-   * Print using Windows raw/direct printing mode.
-   * This bypasses PDF viewers and uses .NET's PrintDocument to render and print PDFs directly.
-   * Best for industrial printers like SATO, Zebra, iDPRT, Honeywell, etc.
+   * Print using Windows industrial printer mode.
+   * 
+   * IMPORTANT: Industrial printers (SATO, Zebra, etc.) need their Windows driver
+   * to convert PDFs to their native language (SBPL, ZPL). Raw PDF bytes won't work!
+   * 
+   * This method uses SumatraPDF for reliable silent printing, with fallbacks.
+   * The driver handles the conversion from PDF → printer language automatically.
    */
   private async printFileWindowsRaw(filePath: string, printerName: string): Promise<void> {
-    console.log('[Printer] ====== WINDOWS RAW PRINT MODE ======');
+    console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
+    console.log('[Printer] ║         INDUSTRIAL PRINTER MODE                        ║');
+    console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
     console.log(`[Printer] Printer: ${printerName}`);
     console.log(`[Printer] File: ${filePath}`);
+    console.log(`[Printer] Timestamp: ${new Date().toISOString()}`);
+    console.log('[Printer] NOTE: Industrial printers need their driver to convert PDF');
+    console.log('[Printer]       to native language (SBPL/ZPL). Using driver-based printing.');
     
-    return new Promise((resolve, reject) => {
-      // Use PowerShell with .NET's System.Drawing.Printing to print directly
-      // This approach uses Windows' built-in PDF rendering (via Windows.Data.Pdf)
-      // and sends the rendered output directly to the printer without needing external PDF viewers
+    // First, log printer diagnostics via PowerShell
+    await this.logPrinterDiagnostics(printerName);
+    
+    // Use the same reliable printing path as regular mode
+    // The SATO/Zebra driver converts PDF → SBPL/ZPL automatically
+    const errors: string[] = [];
+    
+    // Approach 1: Use SumatraPDF if available (most reliable for label printers)
+    try {
+      console.log('[Printer] ══════ ATTEMPT 1: SumatraPDF ══════');
+      await this.printWithSumatra(filePath, printerName);
+      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
+      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (SumatraPDF)          ║');
+      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] SumatraPDF failed: ${msg}`);
+      errors.push(`SumatraPDF: ${msg}`);
+    }
+    
+    // Approach 2: Use Adobe Reader if available
+    try {
+      console.log('[Printer] ══════ ATTEMPT 2: Adobe Reader ══════');
+      await this.printWithAdobeReader(filePath, printerName);
+      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
+      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (Adobe)               ║');
+      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] Adobe Reader failed: ${msg}`);
+      errors.push(`Adobe Reader: ${msg}`);
+    }
+    
+    // Approach 3: Use Windows PrintTo shell verb
+    try {
+      console.log('[Printer] ══════ ATTEMPT 3: Windows Shell PrintTo ══════');
+      await this.printWithShellVerb(filePath, printerName);
+      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
+      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (Shell)               ║');
+      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
+      return;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`[Printer] Shell PrintTo failed: ${msg}`);
+      errors.push(`Shell PrintTo: ${msg}`);
+    }
+    
+    console.error('[Printer] ╔════════════════════════════════════════════════════════╗');
+    console.error('[Printer] ║         INDUSTRIAL PRINT FAILED - ALL METHODS          ║');
+    console.error('[Printer] ╚════════════════════════════════════════════════════════╝');
+    console.error('[Printer] Errors:', errors);
+    console.error('[Printer] SOLUTION: Install SumatraPDF from https://www.sumatrapdfreader.org/');
+    throw new Error(`Industrial print failed. Install SumatraPDF for reliable printing.\n\nErrors:\n${errors.join('\n')}`);
+  }
+  
+  /**
+   * Log detailed printer diagnostics via PowerShell
+   */
+  private async logPrinterDiagnostics(printerName: string): Promise<void> {
+    console.log('[Printer] ────── Printer Diagnostics ──────');
+    
+    return new Promise((resolve) => {
       const psCommand = `
-        $ErrorActionPreference = 'Stop'
-        $file = '${filePath.replace(/'/g, "''").replace(/\\/g, '\\\\')}'
         $printer = '${printerName.replace(/'/g, "''")}'
         
-        Write-Host "[RAW] Starting direct print to: $printer"
-        Write-Host "[RAW] File: $file"
+        Write-Host "[DIAG] Checking printer: $printer"
         
-        # Verify file exists
-        if (!(Test-Path $file)) {
-          throw "File not found: $file"
-        }
-        
-        # Load required assemblies for printing
+        # Check if printer is valid
         Add-Type -AssemblyName System.Drawing
-        Add-Type -AssemblyName System.Windows.Forms
+        $settings = New-Object System.Drawing.Printing.PrinterSettings
+        $settings.PrinterName = $printer
+        Write-Host "[DIAG] Printer Valid: $($settings.IsValid)"
         
-        # Get printer settings
-        $printerSettings = New-Object System.Drawing.Printing.PrinterSettings
-        $printerSettings.PrinterName = $printer
-        
-        if (!$printerSettings.IsValid) {
-          throw "Invalid printer: $printer"
-        }
-        
-        Write-Host "[RAW] Printer is valid. Preparing print job..."
-        
-        # For PDFs, we'll use Windows' built-in printing infrastructure
-        # Method: Use PrintQueue from System.Printing namespace for direct spooling
+        # Get WMI details
         try {
-          Add-Type -AssemblyName System.Printing
-          
-          $printServer = New-Object System.Printing.LocalPrintServer
-          $printQueue = $printServer.GetPrintQueue($printer)
-          
-          if ($printQueue -eq $null) {
-            throw "Could not get print queue for: $printer"
+          $wmi = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$($printer.Replace('\\', '\\\\'))'" -ErrorAction SilentlyContinue
+          if ($wmi) {
+            Write-Host "[DIAG] Status: $($wmi.Status)"
+            Write-Host "[DIAG] State: $($wmi.PrinterState)"
+            Write-Host "[DIAG] Port: $($wmi.PortName)"
+            Write-Host "[DIAG] Driver: $($wmi.DriverName)"
+            Write-Host "[DIAG] Offline: $($wmi.WorkOffline)"
+          } else {
+            Write-Host "[DIAG] WARNING: Could not get WMI info"
           }
-          
-          Write-Host "[RAW] Got print queue. Adding job..."
-          
-          # Read the PDF file as bytes and send directly to print queue
-          $fileBytes = [System.IO.File]::ReadAllBytes($file)
-          
-          # Create a print job with RAW datatype (printer interprets the data directly)
-          $printJob = $printQueue.AddJob("ShipConnect Label", "RAW")
-          $jobStream = $printJob.JobStream
-          
-          $jobStream.Write($fileBytes, 0, $fileBytes.Length)
-          $jobStream.Close()
-          
-          Write-Host "[RAW] Print job submitted successfully via System.Printing"
-          
         } catch {
-          Write-Host "[RAW] System.Printing method failed: $_"
-          Write-Host "[RAW] Falling back to WMI printing method..."
-          
-          # Fallback: Use WMI to add print job via Win32_Printer
-          try {
-            $wmiPrinter = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$($printer.Replace("\\\\", "\\\\\\\\"))'"
-            
-            if ($wmiPrinter -eq $null) {
-              # Try without escaping
-              $wmiPrinter = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$printer'"
-            }
-            
-            if ($wmiPrinter -eq $null) {
-              throw "Printer not found via WMI: $printer"
-            }
-            
-            Write-Host "[RAW] Found printer via WMI. Using PrintFile method..."
-            
-            # Use the Windows print command which works with the printer driver
-            # This sends the file to the printer's driver which handles the conversion
-            $printResult = & cmd /c "print /D:\`"$printer\`" \`"$file\`"" 2>&1
-            
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "[RAW] 'print' command failed, trying copy method..."
-              
-              # Alternative: Copy file directly to printer port (works for some printers)
-              # First get the printer port
-              $port = $wmiPrinter.PortName
-              Write-Host "[RAW] Printer port: $port"
-              
-              # If it's a USB port, we can try copying directly
-              if ($port -match "USB" -or $port -match "LPT") {
-                $copyResult = & cmd /c "copy /B \`"$file\`" \`"$port\`"" 2>&1
-                if ($LASTEXITCODE -eq 0) {
-                  Write-Host "[RAW] File copied to port successfully"
-                } else {
-                  throw "Copy to port failed: $copyResult"
-                }
-              } else {
-                throw "Print command failed: $printResult"
-              }
-            } else {
-              Write-Host "[RAW] Print command succeeded"
-            }
-            
-          } catch {
-            throw "All printing methods failed. Last error: $_"
-          }
+          Write-Host "[DIAG] WMI Error: $_"
         }
         
-        Write-Host "[RAW] Print job completed successfully"
+        # List available printers
+        Write-Host "[DIAG] Available printers:"
+        $printers = [System.Drawing.Printing.PrinterSettings]::InstalledPrinters
+        foreach ($p in $printers) {
+          if ($p -eq $printer) {
+            Write-Host "[DIAG]   * $p (SELECTED)"
+          } else {
+            Write-Host "[DIAG]   - $p"
+          }
+        }
       `;
       
       const proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
@@ -489,35 +490,27 @@ export class PrinterService {
         windowsHide: true,
       });
       
-      let stdout = '';
-      let stderr = '';
-      
       proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-        console.log('[Printer/RAW]', data.toString().trim());
+        const lines = data.toString().trim().split('\n');
+        for (const line of lines) {
+          if (line.trim()) console.log('[Printer]', line.trim());
+        }
       });
       
       proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-        console.error('[Printer/RAW Error]', data.toString().trim());
+        console.error('[Printer/DIAG Error]', data.toString().trim());
       });
       
-      proc.on('error', (error) => {
-        console.error('[Printer] Raw print spawn error:', error);
-        reject(error);
+      proc.on('close', () => {
+        console.log('[Printer] ────── End Diagnostics ──────');
+        resolve();
       });
       
-      proc.on('close', (code) => {
-        console.log(`[Printer] Raw print exited with code ${code}`);
-        if (code === 0) {
-          console.log('[Printer] ====== RAW PRINT SUCCESS ======');
-          resolve();
-        } else {
-          const errorMsg = `Raw print failed (code ${code}): ${stderr || stdout || 'Unknown error'}`;
-          console.log(`[Printer] ====== RAW PRINT FAILED: ${errorMsg} ======`);
-          reject(new Error(errorMsg));
-        }
-      });
+      // Don't wait forever for diagnostics
+      setTimeout(() => {
+        try { proc.kill(); } catch {}
+        resolve();
+      }, 5000);
     });
   }
   
