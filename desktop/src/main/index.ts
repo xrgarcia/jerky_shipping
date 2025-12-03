@@ -6,6 +6,7 @@ import { PrinterService } from './printer';
 import { ApiClient } from './api';
 import { AppState, PrintJob, ConnectionInfo } from '../shared/types';
 import { environments, config, getEnvironment, fetchRemoteConfig, runtimeConfig } from '../shared/config';
+import { printerLogger } from './logger';
 
 // Global error handlers to prevent crashes during server restarts
 process.on('uncaughtException', (error) => {
@@ -127,7 +128,11 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    printerLogger.setMainWindow(null);
   });
+  
+  // Set up the logger to send logs to the renderer
+  printerLogger.setMainWindow(mainWindow);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     shell.openExternal(url);

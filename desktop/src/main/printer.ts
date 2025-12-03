@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import type { PrintJob } from '../shared/types';
+import { printerLogger } from './logger';
 
 const execAsync = promisify(exec);
 
@@ -285,55 +286,71 @@ export class PrinterService {
   }
   
   async print(job: PrintJob, printerName: string, useRawMode: boolean = false): Promise<void> {
-    console.log('[Printer] ========================================');
-    console.log('[Printer] PRINT JOB STARTING');
-    console.log('[Printer] ========================================');
-    console.log(`[Printer] Job ID: ${job.id}`);
-    console.log(`[Printer] Printer: ${printerName}`);
-    console.log(`[Printer] Has labelData: ${!!job.labelData}`);
-    console.log(`[Printer] Has labelUrl: ${!!job.labelUrl}`);
-    console.log(`[Printer] Platform: ${this.platform}`);
-    console.log(`[Printer] Temp dir: ${this.tempDir}`);
-    console.log(`[Printer] Use Raw Mode: ${useRawMode}`);
+    // Log job received - this is the entry point
+    printerLogger.jobReceived(job.id, job.orderNumber, {
+      printer: printerName,
+      hasLabelData: !!job.labelData,
+      hasLabelUrl: !!job.labelUrl,
+      labelUrlPreview: job.labelUrl ? job.labelUrl.substring(0, 100) + '...' : null,
+      platform: this.platform,
+      useRawMode,
+      requestedBy: job.requestedBy,
+    });
     
     await fs.mkdir(this.tempDir, { recursive: true });
     
     const labelPath = path.join(this.tempDir, `label-${job.id}.pdf`);
-    console.log(`[Printer] Label file path: ${labelPath}`);
+    printerLogger.printing(job.id, job.orderNumber, `Temp file path: ${labelPath}`, { tempDir: this.tempDir });
     
     try {
       if (job.labelData) {
         const buffer = Buffer.from(job.labelData, 'base64');
         await fs.writeFile(labelPath, buffer);
-        console.log(`[Printer] Wrote ${buffer.length} bytes from base64 data`);
+        printerLogger.labelDownload(job.id, job.orderNumber, 'base64-data', 'success', {
+          source: 'base64',
+          bytes: buffer.length,
+        });
       } else if (job.labelUrl) {
-        console.log(`[Printer] Downloading from: ${job.labelUrl}`);
+        printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'starting');
         await this.downloadLabel(job.labelUrl, labelPath);
         const stats = await fs.stat(labelPath);
-        console.log(`[Printer] Downloaded ${stats.size} bytes`);
+        printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'success', {
+          bytes: stats.size,
+        });
       } else {
+        printerLogger.result(job.id, job.orderNumber, false, 'No label data or URL provided');
         throw new Error('No label data or URL provided');
       }
       
       // Verify file exists before printing
       const fileExists = await fs.stat(labelPath).then(() => true).catch(() => false);
-      console.log(`[Printer] File exists before print: ${fileExists}`);
+      if (!fileExists) {
+        printerLogger.result(job.id, job.orderNumber, false, 'Label file not found after download');
+        throw new Error('Label file not found after download');
+      }
+      
+      printerLogger.printing(job.id, job.orderNumber, `Starting print to: ${printerName}`, {
+        mode: useRawMode ? 'industrial' : 'consumer',
+        filePath: labelPath,
+      });
       
       await this.printFile(labelPath, printerName, useRawMode);
       
-      console.log('[Printer] ========================================');
-      console.log(`[Printer] Job ${job.id} printed successfully`);
-      console.log('[Printer] ========================================');
+      printerLogger.result(job.id, job.orderNumber, true, 'Print job completed successfully', {
+        printer: printerName,
+        mode: useRawMode ? 'industrial' : 'consumer',
+      });
     } catch (error) {
-      console.log('[Printer] ========================================');
-      console.log('[Printer] PRINT JOB FAILED');
-      console.log(`[Printer] Error: ${error instanceof Error ? error.message : String(error)}`);
-      console.log('[Printer] ========================================');
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      printerLogger.result(job.id, job.orderNumber, false, `Print job failed: ${errorMsg}`, {
+        error: errorMsg,
+        printer: printerName,
+      });
       throw error;
     } finally {
       try {
         await fs.unlink(labelPath);
-        console.log('[Printer] Cleaned up temp file');
+        printerLogger.printing(job.id, job.orderNumber, 'Cleaned up temp file');
       } catch {
         // Ignore cleanup errors
       }
@@ -627,37 +644,40 @@ export class PrinterService {
       'SumatraPDF.exe',
     ];
     
-    console.log('[Printer] ====== SUMATRA PDF SEARCH ======');
-    console.log('[Printer] Looking for SumatraPDF in the following locations:');
+    printerLogger.diagnostic('Searching for SumatraPDF...', { searchPaths: sumatraPaths });
     
     let foundPath: string | null = null;
     
     for (const sumatraPath of sumatraPaths) {
       if (!sumatraPath) continue;
-      console.log(`[Printer]   Checking: ${sumatraPath}`);
       try {
         await fs.access(sumatraPath);
         foundPath = sumatraPath;
-        console.log(`[Printer]   ✓ FOUND: ${sumatraPath}`);
+        printerLogger.diagnostic(`Found SumatraPDF at: ${sumatraPath}`);
         break;
       } catch {
-        console.log(`[Printer]   ✗ Not found`);
+        // Continue searching
       }
     }
     
     if (!foundPath) {
-      const errorMsg = 'SumatraPDF not found. Please install from https://www.sumatrapdfreader.org/download-free-pdf-viewer and install to Program Files.';
-      console.log(`[Printer] ${errorMsg}`);
+      const errorMsg = 'SumatraPDF not found. Please install from https://www.sumatrapdfreader.org/download-free-pdf-viewer';
+      printerLogger.diagnostic(errorMsg, { searchedPaths: sumatraPaths.length });
       throw new Error(errorMsg);
     }
     
     return new Promise((resolve, reject) => {
       const args = ['-print-to', printerName, '-silent', filePath];
       
-      console.log('[Printer] ====== EXECUTING SUMATRA ======');
-      console.log(`[Printer] Command: "${foundPath}" ${args.join(' ')}`);
-      console.log(`[Printer] Printer: ${printerName}`);
-      console.log(`[Printer] File: ${filePath}`);
+      // Log the exact command being executed - this is the key info the user wanted
+      // Note: We don't have jobId/orderNumber in this context, they're logged at the higher level
+      printerLogger.log('info', 'COMMAND_INVOKED', `Executing SumatraPDF`, {
+        command: foundPath,
+        args,
+        printer: printerName,
+        file: filePath,
+        fullCommand: `"${foundPath}" ${args.map(a => `"${a}"`).join(' ')}`,
+      });
       
       const proc = spawn(foundPath!, args, { shell: false, windowsHide: true });
       let stdout = '';
@@ -665,24 +685,22 @@ export class PrinterService {
       
       proc.stdout?.on('data', (data) => { 
         stdout += data.toString(); 
-        console.log('[Printer/Sumatra OUT]', data.toString().trim());
+        printerLogger.diagnostic(`SumatraPDF stdout: ${data.toString().trim()}`);
       });
       proc.stderr.on('data', (data) => { 
         stderr += data.toString(); 
-        console.log('[Printer/Sumatra ERR]', data.toString().trim());
+        printerLogger.diagnostic(`SumatraPDF stderr: ${data.toString().trim()}`);
       });
       proc.on('error', (error) => {
-        console.log('[Printer] Sumatra spawn error:', error.message);
+        printerLogger.diagnostic(`SumatraPDF spawn error: ${error.message}`);
         reject(error);
       });
       proc.on('close', (code) => {
-        console.log(`[Printer] Sumatra exited with code ${code}`);
+        printerLogger.diagnostic(`SumatraPDF exited`, { exitCode: code, stdout, stderr });
         if (code === 0) {
-          console.log('[Printer] ====== PRINT SUCCESS ======');
           resolve();
         } else {
           const errorMsg = `SumatraPDF exited with code ${code}: ${stderr || stdout || 'No output'}`;
-          console.log(`[Printer] ====== PRINT FAILED: ${errorMsg} ======`);
           reject(new Error(errorMsg));
         }
       });

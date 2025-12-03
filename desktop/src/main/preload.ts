@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo, RemoteConfig, PdfViewerInfo } from '../shared/types';
+import type { AppState, IpcChannel, IpcResponse, EnvironmentInfo, RemoteConfig, PdfViewerInfo, PrinterLogEntry } from '../shared/types';
 
 const api = {
   invoke: <T = unknown>(channel: IpcChannel, data?: unknown): Promise<IpcResponse<T>> => {
@@ -16,6 +16,12 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, config: Partial<RemoteConfig>) => callback(config);
     ipcRenderer.on('config-updated', handler);
     return () => ipcRenderer.removeListener('config-updated', handler);
+  },
+  
+  onPrinterLog: (callback: (entry: PrinterLogEntry) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, entry: PrinterLogEntry) => callback(entry);
+    ipcRenderer.on('printer:log', handler);
+    return () => ipcRenderer.removeListener('printer:log', handler);
   },
   
   getState: (): Promise<AppState> => {

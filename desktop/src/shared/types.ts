@@ -116,6 +116,20 @@ export interface PdfViewerInfo {
   path: string | null;
 }
 
+export type PrinterLogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+export type PrinterLogStage = 'JOB_RECEIVED' | 'LABEL_DOWNLOAD' | 'COMMAND_INVOKED' | 'PRINTING' | 'RESULT' | 'DIAGNOSTIC';
+
+export interface PrinterLogEntry {
+  timestamp: string;
+  level: PrinterLogLevel;
+  stage: PrinterLogStage;
+  message: string;
+  details?: Record<string, unknown>;
+  jobId?: string;
+  orderNumber?: string;
+}
+
 export type IpcChannel = 
   | 'auth:login'
   | 'auth:logout'
