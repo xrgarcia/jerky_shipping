@@ -262,8 +262,8 @@ export const shipments = pgTable("shipments", {
   saleId: text("sale_id"), // SkuVault sale ID for QC operations
   firestoreDocumentId: text("firestore_document_id"), // Firestore document ID for the session
   sessionStatus: text("session_status"), // Session status (e.g., "Picked", "Pending")
-  spotNumber: integer("spot_number"), // Physical bin/spot number in warehouse
-  pickedByUserId: integer("picked_by_user_id"), // SkuVault user ID who picked the order
+  spotNumber: text("spot_number"), // Physical bin/spot number in warehouse (stored as text for compatibility)
+  pickedByUserId: text("picked_by_user_id"), // SkuVault user ID who picked the order (stored as text for compatibility)
   pickedByUserName: text("picked_by_user_name"), // Name of picker
   pickStartedAt: timestamp("pick_started_at"), // When picking began
   pickEndedAt: timestamp("pick_ended_at"), // When picking finished
@@ -372,8 +372,8 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   saleId: z.string().nullish(),
   firestoreDocumentId: z.string().nullish(),
   sessionStatus: z.string().nullish(),
-  spotNumber: z.number().int().nullish(),
-  pickedByUserId: z.number().int().nullish(),
+  spotNumber: z.string().nullish(),
+  pickedByUserId: z.string().nullish(),
   pickedByUserName: z.string().nullish(),
   pickStartedAt: z.coerce.date().optional().or(z.null()),
   pickEndedAt: z.coerce.date().optional().or(z.null()),
