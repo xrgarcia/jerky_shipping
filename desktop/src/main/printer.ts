@@ -301,12 +301,17 @@ export class PrinterService {
     
     await fs.mkdir(this.tempDir, { recursive: true });
     
-    const labelPath = path.join(this.tempDir, `label-${job.id}.pdf`);
+    // Use unique filename with timestamp to prevent race conditions
+    const timestamp = Date.now();
+    const labelPath = path.join(this.tempDir, `label-${job.id}-${timestamp}.pdf`);
     printerLogger.printing(job.id, job.orderNumber, `Temp file path: ${labelPath}`, { tempDir: this.tempDir });
     
     try {
+      let expectedBytes = 0;
+      
       if (job.labelData) {
         const buffer = Buffer.from(job.labelData, 'base64');
+        expectedBytes = buffer.length;
         await fs.writeFile(labelPath, buffer);
         printerLogger.labelDownload(job.id, job.orderNumber, 'base64-data', 'success', {
           source: 'base64',
@@ -314,22 +319,38 @@ export class PrinterService {
         });
       } else if (job.labelUrl) {
         printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'starting');
-        await this.downloadLabel(job.labelUrl, labelPath);
-        const stats = await fs.stat(labelPath);
+        expectedBytes = await this.downloadLabel(job.labelUrl, labelPath);
         printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'success', {
-          bytes: stats.size,
+          bytes: expectedBytes,
         });
       } else {
         printerLogger.result(job.id, job.orderNumber, false, 'No label data or URL provided');
         throw new Error('No label data or URL provided');
       }
       
-      // Verify file exists before printing
-      const fileExists = await fs.stat(labelPath).then(() => true).catch(() => false);
-      if (!fileExists) {
+      // Verify file exists AND has correct size before printing
+      const stats = await fs.stat(labelPath).catch(() => null);
+      if (!stats) {
         printerLogger.result(job.id, job.orderNumber, false, 'Label file not found after download');
         throw new Error('Label file not found after download');
       }
+      
+      if (stats.size === 0) {
+        printerLogger.result(job.id, job.orderNumber, false, 'Label file is empty (0 bytes)');
+        throw new Error('Label file is empty (0 bytes)');
+      }
+      
+      if (stats.size < 100) {
+        printerLogger.result(job.id, job.orderNumber, false, `Label file too small: ${stats.size} bytes`);
+        throw new Error(`Label file too small: ${stats.size} bytes - likely corrupt or incomplete`);
+      }
+      
+      // Log file size verification
+      printerLogger.printing(job.id, job.orderNumber, `File verified: ${stats.size} bytes`, {
+        filePath: labelPath,
+        fileSize: stats.size,
+        expectedBytes,
+      });
       
       printerLogger.printing(job.id, job.orderNumber, `Starting print to: ${printerName}`, {
         filePath: labelPath,
@@ -357,7 +378,7 @@ export class PrinterService {
     }
   }
   
-  private async downloadLabel(url: string, destPath: string): Promise<void> {
+  private async downloadLabel(url: string, destPath: string): Promise<number> {
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -365,7 +386,9 @@ export class PrinterService {
     }
     
     const buffer = await response.arrayBuffer();
-    await fs.writeFile(destPath, Buffer.from(buffer));
+    const nodeBuffer = Buffer.from(buffer);
+    await fs.writeFile(destPath, nodeBuffer);
+    return nodeBuffer.length;
   }
   
   private async printFile(filePath: string, printerName: string): Promise<void> {
@@ -488,64 +511,13 @@ export class PrinterService {
     console.log('[Printer] ====== WINDOWS PRINT DISPATCH ======');
     console.log(`[Printer] Printer name: "${printerName}"`);
     console.log(`[Printer] File path: "${filePath}"`);
-    console.log(`[Printer] LOCALAPPDATA: ${process.env.LOCALAPPDATA}`);
-    console.log(`[Printer] APPDATA: ${process.env.APPDATA}`);
-    console.log(`[Printer] USERPROFILE: ${process.env.USERPROFILE}`);
     
-    // Try multiple approaches in order of reliability
-    const errors: string[] = [];
-    
-    // Approach 1: Use SumatraPDF if available (most reliable for label printers)
-    try {
-      console.log('[Printer] ====== ATTEMPT 1: SumatraPDF ======');
-      await this.printWithSumatra(filePath, printerName);
-      console.log('[Printer] SumatraPDF print succeeded!');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] SumatraPDF failed: ${msg}`);
-      errors.push(`SumatraPDF: ${msg}`);
-    }
-    
-    // Approach 2: Use Adobe Reader if available
-    try {
-      console.log('[Printer] ====== ATTEMPT 2: Adobe Reader ======');
-      await this.printWithAdobeReader(filePath, printerName);
-      console.log('[Printer] Adobe Reader print succeeded!');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] Adobe Reader failed: ${msg}`);
-      errors.push(`Adobe Reader: ${msg}`);
-    }
-    
-    // Approach 3: Use Windows PrintTo shell verb (requires default PDF handler)
-    try {
-      console.log('[Printer] ====== ATTEMPT 3: Shell PrintTo ======');
-      await this.printWithShellVerb(filePath, printerName);
-      console.log('[Printer] Shell PrintTo succeeded!');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] Shell PrintTo failed: ${msg}`);
-      errors.push(`Shell PrintTo: ${msg}`);
-    }
-    
-    // Approach 4: Use PowerShell's Out-Printer (text only, last resort)
-    try {
-      console.log('[Printer] ====== ATTEMPT 4: PowerShell ======');
-      await this.printWithPowerShell(filePath, printerName);
-      console.log('[Printer] PowerShell succeeded!');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] PowerShell failed: ${msg}`);
-      errors.push(`PowerShell: ${msg}`);
-    }
-    
-    console.log('[Printer] ====== ALL METHODS FAILED ======');
-    console.log('[Printer] Errors:', errors);
-    throw new Error(`All print methods failed:\n${errors.join('\n')}`);
+    // Unified printing: Use SumatraPDF exclusively
+    // All printers (industrial thermal and consumer) use the same SumatraPDF->driver conversion
+    // This eliminates false success reports from fallback methods that don't work with thermal printers
+    console.log('[Printer] Using SumatraPDF (unified print method)');
+    await this.printWithSumatra(filePath, printerName);
+    console.log('[Printer] SumatraPDF print succeeded!');
   }
   
   private async printWithSumatra(filePath: string, printerName: string): Promise<void> {
