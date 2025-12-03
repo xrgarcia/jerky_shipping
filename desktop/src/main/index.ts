@@ -1056,6 +1056,39 @@ function setupIpcHandlers(): void {
     }
   });
   
+  ipcMain.handle('printer:download-logs', async () => {
+    try {
+      console.log('[Main] printer:download-logs called');
+      const logFilePath = printerLogger.getLogFilePath();
+      
+      if (!logFilePath || !fs.existsSync(logFilePath)) {
+        return { success: false, error: 'No log file available' };
+      }
+      
+      // Use dialog to save file
+      const { dialog } = await import('electron');
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        title: 'Save Printer Logs',
+        defaultPath: path.basename(logFilePath),
+        filters: [{ name: 'Log Files', extensions: ['log'] }],
+      });
+      
+      if (result.canceled || !result.filePath) {
+        return { success: true }; // User cancelled, not an error
+      }
+      
+      // Copy log file to selected location
+      fs.copyFileSync(logFilePath, result.filePath);
+      console.log(`[Main] Logs saved to: ${result.filePath}`);
+      
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to download logs';
+      console.error('[Main] Failed to download logs:', message);
+      return { success: false, error: message };
+    }
+  });
+  
   ipcMain.handle('ws:connect', async () => {
     await connectWebSocket();
     return { success: true };

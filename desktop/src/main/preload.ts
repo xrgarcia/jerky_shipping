@@ -55,6 +55,8 @@ const api = {
       ipcRenderer.invoke('printer:detect-pdf-viewer'),
     clearPdfViewerCache: (): Promise<IpcResponse<void>> =>
       ipcRenderer.invoke('printer:clear-pdf-viewer-cache'),
+    downloadLogs: (): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('printer:download-logs'),
   },
   
   ws: {

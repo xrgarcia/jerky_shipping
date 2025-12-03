@@ -16,7 +16,8 @@ import {
   ChevronDown,
   RotateCcw,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import type { AppState, PrintJob, PdfViewerInfo, PrinterLogEntry } from '@shared/types';
 import logoImage from '../assets/logo.png';
@@ -64,6 +65,7 @@ function DashboardPage({ state }: DashboardPageProps) {
   // Printer logs state
   const [printerLogs, setPrinterLogs] = useState<PrinterLogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   
   // Use printersLoaded flag from main process to determine loading state
@@ -171,16 +173,18 @@ function DashboardPage({ state }: DashboardPageProps) {
   }, []);
 
   // Subscribe to printer logs from main process
+  // Logs are stored in chronological order (oldest first) for correct grouping
   useEffect(() => {
     const unsubscribe = window.electronAPI.onPrinterLog((entry: PrinterLogEntry) => {
       console.log('[Dashboard] Received printer log:', entry);
       setPrinterLogs(prev => {
-        const newLogs = [entry, ...prev].slice(0, 100); // Keep last 100 logs
+        // Append new logs and keep only last 100, maintaining chronological order
+        const newLogs = [...prev, entry].slice(-100);
         return newLogs;
       });
-      // Auto-scroll logs container
+      // Auto-scroll logs container to bottom (newest)
       if (logsContainerRef.current) {
-        logsContainerRef.current.scrollTop = 0;
+        logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
       }
     });
     
@@ -883,68 +887,171 @@ function DashboardPage({ state }: DashboardPageProps) {
             </div>
           </div>
           
-          {/* Printer Logs Panel */}
-          {showLogs && (
-            <div className="mb-4 rounded-lg bg-[#1a1a1a] border border-[#333] overflow-hidden">
-              <div className="px-3 py-2 border-b border-[#333] flex items-center justify-between">
-                <span className="text-xs font-medium text-white">Print Diagnostics</span>
-                <button
-                  onClick={() => setPrinterLogs([])}
-                  className="text-xs text-[#666] hover:text-white transition-colors"
-                  data-testid="button-clear-logs"
-                >
-                  Clear
-                </button>
-              </div>
-              <div 
-                ref={logsContainerRef}
-                className="max-h-48 overflow-y-auto p-2 space-y-1 font-mono text-xs"
-              >
-                {printerLogs.length === 0 ? (
-                  <div className="text-[#666] text-center py-4">
-                    No logs yet. Logs will appear when print jobs are processed.
-                  </div>
-                ) : (
-                  printerLogs.map((log, i) => (
-                    <div 
-                      key={`${log.timestamp}-${i}`}
-                      className={`px-2 py-1 rounded ${
-                        log.level === 'error' ? 'bg-red-500/10 text-red-400' :
-                        log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-400' :
-                        log.stage === 'JOB_RECEIVED' ? 'bg-blue-500/10 text-blue-400' :
-                        log.stage === 'RESULT' ? (log.details?.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400') :
-                        'bg-[#242424] text-[#999]'
-                      }`}
+          {/* Printer Logs Panel - Grouped by Job */}
+          {showLogs && (() => {
+            // Group logs by jobId/orderNumber
+            const groupedLogs = printerLogs.reduce((acc, log) => {
+              const key = log.jobId || log.orderNumber || 'unknown';
+              if (!acc[key]) {
+                acc[key] = { 
+                  logs: [], 
+                  orderNumber: log.orderNumber,
+                  jobId: log.jobId,
+                  hasError: false,
+                  hasSuccess: false
+                };
+              }
+              acc[key].logs.push(log);
+              if (log.level === 'error' || (log.stage === 'RESULT' && !log.details?.success)) {
+                acc[key].hasError = true;
+              }
+              if (log.stage === 'RESULT' && log.details?.success) {
+                acc[key].hasSuccess = true;
+              }
+              return acc;
+            }, {} as Record<string, { logs: PrinterLogEntry[], orderNumber?: string, jobId?: string, hasError: boolean, hasSuccess: boolean }>);
+
+            // Compute earliest timestamp for each group and sort job groups (newest jobs first)
+            const jobGroups = Object.entries(groupedLogs)
+              .map(([key, group]) => {
+                const earliestTime = Math.min(...group.logs.map(l => l.timestamp));
+                return { key, group, earliestTime };
+              })
+              .sort((a, b) => b.earliestTime - a.earliestTime);
+
+            return (
+              <div className="mb-4 rounded-lg bg-[#1a1a1a] border border-[#333] overflow-hidden">
+                <div className="px-3 py-2 border-b border-[#333] flex items-center justify-between">
+                  <span className="text-xs font-medium text-white">Print Diagnostics</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        setLogsError(null);
+                        try {
+                          const result = await window.electronAPI.printer.downloadLogs();
+                          if (!result.success && result.error) {
+                            setLogsError(result.error);
+                          }
+                        } catch (err) {
+                          setLogsError(err instanceof Error ? err.message : 'Download failed');
+                        }
+                      }}
+                      className="text-xs text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1"
+                      data-testid="button-download-logs"
                     >
-                      <div className="flex items-start gap-2">
-                        <span className="text-[#666] whitespace-nowrap">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span className={`px-1 rounded text-[10px] ${
-                          log.stage === 'JOB_RECEIVED' ? 'bg-blue-500/30' :
-                          log.stage === 'LABEL_DOWNLOAD' ? 'bg-purple-500/30' :
-                          log.stage === 'COMMAND_INVOKED' ? 'bg-yellow-500/30' :
-                          log.stage === 'RESULT' ? 'bg-green-500/30' :
-                          'bg-[#333]'
-                        }`}>
-                          {log.stage}
-                        </span>
-                        <span className="flex-1 break-all">{log.message}</span>
-                      </div>
-                      {log.orderNumber && (
-                        <div className="ml-16 text-[#666]">Order: {log.orderNumber}</div>
-                      )}
-                      {log.details && log.stage === 'COMMAND_INVOKED' && log.details.fullCommand && (
-                        <div className="ml-16 text-[10px] text-[#888] break-all mt-1">
-                          Command: {String(log.details.fullCommand)}
-                        </div>
-                      )}
-                    </div>
-                  ))
+                      <Download className="w-3 h-3" />
+                      Download
+                    </button>
+                    <button
+                      onClick={() => setPrinterLogs([])}
+                      className="text-xs text-[#666] hover:text-white transition-colors"
+                      data-testid="button-clear-logs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                {logsError && (
+                  <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between">
+                    <span className="text-xs text-red-400">{logsError}</span>
+                    <button onClick={() => setLogsError(null)} className="text-red-400/60 hover:text-red-400">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 )}
+                <div 
+                  ref={logsContainerRef}
+                  className="max-h-64 overflow-y-auto p-2 space-y-2 font-mono text-xs"
+                >
+                  {printerLogs.length === 0 ? (
+                    <div className="text-[#666] text-center py-4">
+                      No logs yet. Logs will appear when print jobs are processed.
+                    </div>
+                  ) : (
+                    jobGroups.map(({ key, group, earliestTime }) => (
+                      <div 
+                        key={key}
+                        className={`rounded border ${
+                          group.hasError ? 'border-red-500/30 bg-red-500/5' :
+                          group.hasSuccess ? 'border-green-500/30 bg-green-500/5' :
+                          'border-[#333] bg-[#242424]'
+                        }`}
+                      >
+                        <div className={`px-2 py-1.5 border-b flex items-center justify-between ${
+                          group.hasError ? 'border-red-500/20' :
+                          group.hasSuccess ? 'border-green-500/20' :
+                          'border-[#333]'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${
+                              group.hasError ? 'bg-red-500' :
+                              group.hasSuccess ? 'bg-green-500' :
+                              'bg-blue-500'
+                            }`} />
+                            <span className="text-white font-medium">
+                              {group.orderNumber || key}
+                            </span>
+                            <span className="text-[#666]">
+                              {new Date(earliestTime).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            group.hasError ? 'bg-red-500/20 text-red-400' :
+                            group.hasSuccess ? 'bg-green-500/20 text-green-400' :
+                            'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {group.logs.length} steps
+                          </span>
+                        </div>
+                        <div className="p-2 space-y-1">
+                          {[...group.logs]
+                            .sort((a, b) => a.timestamp - b.timestamp)
+                            .map((log, i) => (
+                            <div 
+                              key={`${log.timestamp}-${i}`}
+                              className={`px-2 py-1 rounded ${
+                                log.level === 'error' ? 'bg-red-500/10 text-red-400' :
+                                log.level === 'warn' ? 'bg-yellow-500/10 text-yellow-400' :
+                                log.stage === 'RESULT' ? (log.details?.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400') :
+                                'text-[#999]'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="text-[#555] whitespace-nowrap text-[10px]">
+                                  {new Date(log.timestamp).toLocaleTimeString()}
+                                </span>
+                                <span className={`px-1 rounded text-[10px] whitespace-nowrap ${
+                                  log.stage === 'JOB_RECEIVED' ? 'bg-blue-500/30 text-blue-300' :
+                                  log.stage === 'LABEL_DOWNLOAD' ? 'bg-purple-500/30 text-purple-300' :
+                                  log.stage === 'COMMAND_INVOKED' ? 'bg-yellow-500/30 text-yellow-300' :
+                                  log.stage === 'RESULT' ? 'bg-green-500/30 text-green-300' :
+                                  log.stage === 'DIAGNOSTIC' ? 'bg-cyan-500/30 text-cyan-300' :
+                                  'bg-[#333] text-[#888]'
+                                }`}>
+                                  {log.stage}
+                                </span>
+                                <span className="flex-1 break-all">{log.message}</span>
+                              </div>
+                              {log.details && log.stage === 'COMMAND_INVOKED' && log.details.fullCommand && (
+                                <div className="ml-20 text-[10px] text-[#666] break-all mt-1 bg-[#1a1a1a] p-1 rounded">
+                                  $ {String(log.details.fullCommand)}
+                                </div>
+                              )}
+                              {log.details && log.stage === 'RESULT' && log.details.output && (
+                                <div className="ml-20 text-[10px] text-[#666] break-all mt-1 bg-[#1a1a1a] p-1 rounded max-h-20 overflow-y-auto">
+                                  {String(log.details.output)}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           
           {/* Retry error display */}
           {error && (

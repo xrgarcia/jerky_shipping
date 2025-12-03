@@ -43,15 +43,20 @@ class PrinterLogger {
     return this.logBuffer.slice(-count);
   }
   
-  private formatTimestamp(): string {
-    return new Date().toISOString();
+  private getTimestamp(): number {
+    return Date.now();
   }
   
   private writeToFile(entry: PrinterLogEntry): void {
     if (!this.logFile) return;
     
     try {
-      const line = JSON.stringify(entry) + '\n';
+      // Include human-readable timestamp in file output
+      const fileEntry = {
+        ...entry,
+        isoTime: new Date(entry.timestamp).toISOString(),
+      };
+      const line = JSON.stringify(fileEntry) + '\n';
       fs.appendFileSync(this.logFile, line);
     } catch (error) {
       console.error('[Logger] Failed to write to log file:', error);
@@ -84,7 +89,7 @@ class PrinterLogger {
     orderNumber?: string
   ): void {
     const entry: PrinterLogEntry = {
-      timestamp: this.formatTimestamp(),
+      timestamp: this.getTimestamp(),
       level,
       stage,
       message,

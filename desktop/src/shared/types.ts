@@ -121,7 +121,7 @@ export type PrinterLogLevel = 'info' | 'warn' | 'error' | 'debug';
 export type PrinterLogStage = 'JOB_RECEIVED' | 'LABEL_DOWNLOAD' | 'COMMAND_INVOKED' | 'PRINTING' | 'RESULT' | 'DIAGNOSTIC';
 
 export interface PrinterLogEntry {
-  timestamp: string;
+  timestamp: number; // Unix timestamp in milliseconds for sorting
   level: PrinterLogLevel;
   stage: PrinterLogStage;
   message: string;
