@@ -43,28 +43,42 @@ function hashToken(token: string): string {
 }
 
 // Authenticate desktop client from Bearer token
+// Returns { clientId, userId } on success, null on failure
+// Logs detailed reason for failures to aid debugging connection issues
 async function authenticateDesktopClient(authHeader: string | undefined): Promise<{ clientId: string; userId: string } | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('[Desktop WS] Auth check: Missing or malformed Authorization header');
     return null;
   }
 
   const token = authHeader.substring(7);
+  if (!token || token.length < 10) {
+    console.log('[Desktop WS] Auth check: Token too short or empty');
+    return null;
+  }
+  
   const tokenHash = hashToken(token);
+  const tokenPrefix = token.substring(0, 8);
 
   try {
     const client = await storage.getDesktopClientByAccessToken(tokenHash);
     if (!client) {
+      console.log(`[Desktop WS] Auth check: No client found for token ${tokenPrefix}...`);
       return null;
     }
 
     // Check token expiry
-    if (new Date() > new Date(client.accessTokenExpiresAt)) {
+    const expiresAt = new Date(client.accessTokenExpiresAt);
+    const now = new Date();
+    if (now > expiresAt) {
+      const expiredAgo = Math.round((now.getTime() - expiresAt.getTime()) / 1000 / 60);
+      console.log(`[Desktop WS] Auth check: Token ${tokenPrefix}... expired ${expiredAgo} minutes ago for client ${client.id}`);
       return null;
     }
 
     return { clientId: client.id, userId: client.userId };
   } catch (error) {
-    console.error('[Desktop WS] Auth error:', error);
+    console.error('[Desktop WS] Auth check: Database error:', error);
     return null;
   }
 }
@@ -465,22 +479,32 @@ export function setupWebSocket(server: Server): void {
     // Auth: Bearer token in Authorization header
     // ========================================
     if (url.pathname === '/ws/desktop') {
+      const clientIp = request.socket.remoteAddress || 'unknown';
+      const clientIdHeader = request.headers['x-desktop-client-id'] || 'not-provided';
+      
       try {
         const authHeader = request.headers.authorization;
         const authResult = await authenticateDesktopClient(authHeader);
         
         if (!authResult) {
+          // Log auth failure with details for debugging connection issues
+          const hasAuthHeader = !!authHeader;
+          const hasBearerPrefix = authHeader?.startsWith('Bearer ') || false;
+          console.log(`[Desktop WS] Auth FAILED - IP: ${clientIp}, ClientId header: ${clientIdHeader}, ` +
+            `Has auth header: ${hasAuthHeader}, Has Bearer prefix: ${hasBearerPrefix}`);
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
 
+        console.log(`[Desktop WS] Auth SUCCESS - IP: ${clientIp}, ClientId: ${authResult.clientId}`);
+        
         wss?.handleUpgrade(request, socket, head, (ws) => {
           // Handle desktop connection separately - NOT emitting to main 'connection' event
           handleDesktopConnection(ws, authResult.clientId, authResult.userId);
         });
       } catch (error) {
-        console.error('[Desktop WS] Upgrade error:', error);
+        console.error(`[Desktop WS] Upgrade error - IP: ${clientIp}, ClientId header: ${clientIdHeader}:`, error);
         socket.destroy();
       }
       return;

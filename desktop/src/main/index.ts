@@ -146,8 +146,21 @@ function broadcastState(): void {
 }
 
 function updateState(updates: Partial<AppState>): void {
+  const previousSession = appState.session;
   appState = { ...appState, ...updates };
   broadcastState();
+  
+  // Reactive station subscription: if session was just set with a stationId,
+  // call subscribeToStation immediately. The WebSocket client handles queuing:
+  // - If already authenticated: sends subscription message immediately
+  // - If not yet authenticated: queues as pendingStationSubscription
+  // This ensures subscription happens regardless of session/auth timing.
+  if (updates.session?.stationId && 
+      updates.session.stationId !== previousSession?.stationId &&
+      wsClient) {
+    console.log(`[Main] Session updated with stationId ${updates.session.stationId}, subscribing to station`);
+    wsClient.subscribeToStation(updates.session.stationId);
+  }
 }
 
 // Safe job state update - directly mutates state synchronously
@@ -489,11 +502,23 @@ async function connectWebSocket(): Promise<void> {
   });
   
   wsClient.on('connected', () => {
-    if (appState.session?.stationId && wsClient) {
-      wsClient.subscribeToStation(appState.session.stationId);
-    }
+    // Note: 'connected' fires when socket opens, before server authentication completes
+    // Station subscription is now handled in 'authenticated' event for reliability
     // Flush any pending status updates that couldn't be sent during disconnect
     flushPendingStatusUpdates();
+  });
+  
+  // Handle successful authentication - this is the reliable point to subscribe to station
+  // The websocket.ts handleMessage also auto-resubscribes using subscribedStationId on reconnect,
+  // but this handles the case where session wasn't ready when first connecting
+  wsClient.on('authenticated', () => {
+    console.log('[Main] WebSocket authenticated, checking station subscription...');
+    if (appState.session?.stationId && wsClient) {
+      console.log(`[Main] Subscribing to station ${appState.session.stationId}`);
+      wsClient.subscribeToStation(appState.session.stationId);
+    } else {
+      console.log('[Main] No station in session, skipping subscription');
+    }
   });
   
   // Handle authentication failures - attempt silent token refresh first

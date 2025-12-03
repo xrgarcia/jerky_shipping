@@ -37,7 +37,13 @@ export class WebSocketClient extends EventEmitter {
     let status: ConnectionInfo['status'] = 'disconnected';
     
     if (this.ws?.readyState === WebSocket.OPEN) {
-      status = 'connected';
+      // Only show 'connected' after both socket open AND server authentication complete
+      // This prevents misleading UI when socket is open but auth hasn't finished
+      if (this.isAuthenticated) {
+        status = 'connected';
+      } else {
+        status = 'connecting'; // Socket open but waiting for auth
+      }
     } else if (this.ws?.readyState === WebSocket.CONNECTING) {
       status = 'connecting';
     } else if (this.reconnectTimer || (this.reconnectAttempt > 0 && !this.isIntentionalClose)) {
