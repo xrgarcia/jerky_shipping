@@ -425,13 +425,13 @@ export const shipmentItems = pgTable("shipment_items", {
   svCompleted: boolean("sv_completed"), // Whether item is complete in SkuVault
   svAuditStatus: text("sv_audit_status"), // SkuVault audit status
   svWarehouseLocation: text("sv_warehouse_location"), // Primary warehouse location
-  svWarehouseLocations: text("sv_warehouse_locations").array(), // All warehouse locations
+  svWarehouseLocations: jsonb("sv_warehouse_locations"), // All warehouse locations (stored as jsonb array)
   svStockStatus: text("sv_stock_status"), // Stock status from SkuVault
   svAvailableQuantity: integer("sv_available_quantity"), // Available quantity in SkuVault
   svNotFoundProduct: boolean("sv_not_found_product"), // Whether product wasn't found
   svIsSerialized: boolean("sv_is_serialized"), // Whether item is serialized
   svPartNumber: text("sv_part_number"), // SkuVault part number
-  svWeightPounds: numeric("sv_weight_pounds"), // Weight in pounds
+  svWeightPounds: text("sv_weight_pounds"), // Weight in pounds
   svCode: text("sv_code"), // SkuVault code
   svProductPictures: text("sv_product_pictures").array(), // Product picture URLs
   createdAt: timestamp("created_at").notNull().defaultNow(),
