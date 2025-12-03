@@ -303,30 +303,56 @@ export class PrinterService {
     
     // Use unique filename with timestamp to prevent race conditions
     const timestamp = Date.now();
-    const labelPath = path.join(this.tempDir, `label-${job.id}-${timestamp}.pdf`);
-    printerLogger.printing(job.id, job.orderNumber, `Temp file path: ${labelPath}`, { tempDir: this.tempDir });
+    let labelPath: string | null = null;
     
     try {
       let expectedBytes = 0;
+      let labelFormat: 'zpl' | 'pdf' = 'pdf';
       
       if (job.labelData) {
+        // Base64 data - assume PDF unless we can detect otherwise
         const buffer = Buffer.from(job.labelData, 'base64');
         expectedBytes = buffer.length;
+        
+        // Check if it starts with ZPL command (^XA)
+        const headerStr = buffer.toString('utf8', 0, Math.min(100, buffer.length));
+        if (headerStr.includes('^XA')) {
+          labelFormat = 'zpl';
+        }
+        
+        labelPath = path.join(this.tempDir, `label-${job.id}-${timestamp}.${labelFormat}`);
         await fs.writeFile(labelPath, buffer);
         printerLogger.labelDownload(job.id, job.orderNumber, 'base64-data', 'success', {
           source: 'base64',
           bytes: buffer.length,
+          format: labelFormat,
         });
       } else if (job.labelUrl) {
+        // First download to detect format, then set correct extension
+        const tempPath = path.join(this.tempDir, `label-${job.id}-${timestamp}.tmp`);
         printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'starting');
-        expectedBytes = await this.downloadLabel(job.labelUrl, labelPath);
+        
+        const result = await this.downloadLabel(job.labelUrl, tempPath);
+        expectedBytes = result.bytes;
+        labelFormat = result.format;
+        
+        // Rename to correct extension
+        labelPath = path.join(this.tempDir, `label-${job.id}-${timestamp}.${labelFormat}`);
+        await fs.rename(tempPath, labelPath);
+        
         printerLogger.labelDownload(job.id, job.orderNumber, job.labelUrl, 'success', {
           bytes: expectedBytes,
+          format: labelFormat,
         });
       } else {
         printerLogger.result(job.id, job.orderNumber, false, 'No label data or URL provided');
         throw new Error('No label data or URL provided');
       }
+      
+      printerLogger.printing(job.id, job.orderNumber, `Temp file path: ${labelPath}`, { 
+        tempDir: this.tempDir,
+        format: labelFormat,
+      });
       
       // Verify file exists AND has correct size before printing
       const stats = await fs.stat(labelPath).catch(() => null);
@@ -346,20 +372,28 @@ export class PrinterService {
       }
       
       // Log file size verification
-      printerLogger.printing(job.id, job.orderNumber, `File verified: ${stats.size} bytes`, {
+      printerLogger.printing(job.id, job.orderNumber, `File verified: ${stats.size} bytes (${labelFormat.toUpperCase()})`, {
         filePath: labelPath,
         fileSize: stats.size,
         expectedBytes,
+        format: labelFormat,
       });
       
-      printerLogger.printing(job.id, job.orderNumber, `Starting print to: ${printerName}`, {
+      printerLogger.printing(job.id, job.orderNumber, `Starting ${labelFormat.toUpperCase()} print to: ${printerName}`, {
         filePath: labelPath,
+        format: labelFormat,
       });
       
-      await this.printFile(labelPath, printerName);
+      // Route to appropriate print method based on format
+      if (labelFormat === 'zpl') {
+        await this.printZplFile(labelPath, printerName);
+      } else {
+        await this.printFile(labelPath, printerName);
+      }
       
-      printerLogger.result(job.id, job.orderNumber, true, 'Print job completed successfully', {
+      printerLogger.result(job.id, job.orderNumber, true, `${labelFormat.toUpperCase()} print job completed successfully`, {
         printer: printerName,
+        format: labelFormat,
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -369,26 +403,59 @@ export class PrinterService {
       });
       throw error;
     } finally {
-      try {
-        await fs.unlink(labelPath);
-        printerLogger.printing(job.id, job.orderNumber, 'Cleaned up temp file');
-      } catch {
-        // Ignore cleanup errors
+      if (labelPath) {
+        try {
+          await fs.unlink(labelPath);
+          printerLogger.printing(job.id, job.orderNumber, 'Cleaned up temp file');
+        } catch {
+          // Ignore cleanup errors
+        }
       }
     }
   }
   
-  private async downloadLabel(url: string, destPath: string): Promise<number> {
+  /**
+   * Detect label format from URL and content-type
+   * Returns 'zpl' for ZPL labels, 'pdf' for PDF labels
+   */
+  private detectLabelFormat(url: string, contentType: string | null): 'zpl' | 'pdf' {
+    // Check URL extension first
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('.zpl')) {
+      return 'zpl';
+    }
+    
+    // Check content-type header
+    if (contentType) {
+      const ctLower = contentType.toLowerCase();
+      if (ctLower.includes('zpl') || ctLower.includes('x-zpl')) {
+        return 'zpl';
+      }
+    }
+    
+    // Default to PDF
+    return 'pdf';
+  }
+  
+  private async downloadLabel(url: string, destPath: string): Promise<{ bytes: number; format: 'zpl' | 'pdf' }> {
     const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error(`Failed to download label: ${response.status}`);
     }
     
+    const contentType = response.headers.get('content-type');
+    const format = this.detectLabelFormat(url, contentType);
+    
+    printerLogger.diagnostic(`Label format detected: ${format}`, {
+      url: url.substring(0, 100),
+      contentType,
+    });
+    
     const buffer = await response.arrayBuffer();
     const nodeBuffer = Buffer.from(buffer);
     await fs.writeFile(destPath, nodeBuffer);
-    return nodeBuffer.length;
+    return { bytes: nodeBuffer.length, format };
   }
   
   private async printFile(filePath: string, printerName: string): Promise<void> {
@@ -397,6 +464,229 @@ export class PrinterService {
     } else {
       return this.printFileMac(filePath, printerName);
     }
+  }
+  
+  /**
+   * Print ZPL file directly to thermal printer using raw mode
+   * ZPL is already printer commands - send directly without conversion
+   */
+  private async printZplFile(filePath: string, printerName: string): Promise<void> {
+    if (this.platform === 'win32') {
+      return this.printZplWindows(filePath, printerName);
+    } else {
+      return this.printZplMac(filePath, printerName);
+    }
+  }
+  
+  /**
+   * Send ZPL to printer on Windows using raw print via winspool.Drv
+   * Uses RawPrinterHelper for all printer types (USB, network, etc.)
+   */
+  private async printZplWindows(filePath: string, printerName: string): Promise<void> {
+    console.log('[Printer] ====== WINDOWS ZPL RAW PRINT ======');
+    console.log(`[Printer] Printer: "${printerName}"`);
+    console.log(`[Printer] ZPL file: "${filePath}"`);
+    
+    // Read the ZPL content
+    const zplContent = await fs.readFile(filePath, 'utf8');
+    console.log(`[Printer] ZPL content size: ${zplContent.length} bytes`);
+    console.log(`[Printer] ZPL preview: ${zplContent.substring(0, 100)}...`);
+    
+    return new Promise((resolve, reject) => {
+      // PowerShell script to send raw data to printer using RawPrinterHelper
+      // This uses Windows Print Spooler API (winspool.Drv) for reliable raw printing
+      const psScript = `
+$ErrorActionPreference = 'Stop'
+$printerName = '${printerName.replace(/'/g, "''")}'
+$zplFile = '${filePath.replace(/\\/g, '\\\\').replace(/'/g, "''")}'
+
+try {
+    Write-Host "[ZPL] Reading ZPL file: $zplFile"
+    $zplContent = [System.IO.File]::ReadAllBytes($zplFile)
+    Write-Host "[ZPL] ZPL data size: $($zplContent.Length) bytes"
+    
+    # Verify printer exists
+    $printer = Get-WmiObject -Query "SELECT * FROM Win32_Printer WHERE Name = '$($printerName.Replace('\\', '\\\\'))'" -ErrorAction SilentlyContinue
+    if ($printer) {
+        Write-Host "[ZPL] Printer found: $($printer.Name)"
+        Write-Host "[ZPL] Printer port: $($printer.PortName)"
+        Write-Host "[ZPL] Printer driver: $($printer.DriverName)"
+    } else {
+        Write-Host "[ZPL] WARNING: Could not query printer details via WMI, proceeding anyway..."
+    }
+    
+    # Use RawPrinterHelper for ALL printer types (USB, network, virtual)
+    # This is the most reliable method and works with any Windows printer
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class RawPrinterHelper {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    public class DOCINFOA {
+        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+    }
+    
+    [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", CharSet = CharSet.Ansi, SetLastError = true)]
+    public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+    
+    [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+    
+    [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", CharSet = CharSet.Ansi, SetLastError = true)]
+    public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+    
+    [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+    
+    [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter", SetLastError = true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+    
+    [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter", SetLastError = true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+    
+    [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+    
+    public static string SendBytesToPrinter(string printerName, byte[] bytes) {
+        IntPtr hPrinter = IntPtr.Zero;
+        
+        if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) {
+            return "OpenPrinter failed: " + Marshal.GetLastWin32Error();
+        }
+        
+        try {
+            DOCINFOA di = new DOCINFOA();
+            di.pDocName = "ZPL Label";
+            di.pDataType = "RAW";
+            
+            if (!StartDocPrinter(hPrinter, 1, di)) {
+                return "StartDocPrinter failed: " + Marshal.GetLastWin32Error();
+            }
+            
+            try {
+                if (!StartPagePrinter(hPrinter)) {
+                    return "StartPagePrinter failed: " + Marshal.GetLastWin32Error();
+                }
+                
+                try {
+                    IntPtr pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
+                    try {
+                        Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
+                        int written;
+                        if (!WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out written)) {
+                            return "WritePrinter failed: " + Marshal.GetLastWin32Error();
+                        }
+                        if (written != bytes.Length) {
+                            return "WritePrinter incomplete: wrote " + written + " of " + bytes.Length + " bytes";
+                        }
+                    } finally {
+                        Marshal.FreeCoTaskMem(pUnmanagedBytes);
+                    }
+                } finally {
+                    EndPagePrinter(hPrinter);
+                }
+            } finally {
+                EndDocPrinter(hPrinter);
+            }
+        } finally {
+            ClosePrinter(hPrinter);
+        }
+        
+        return null; // Success
+    }
+}
+"@
+    
+    Write-Host "[ZPL] Sending via RawPrinterHelper (winspool.Drv)..."
+    $result = [RawPrinterHelper]::SendBytesToPrinter($printerName, $zplContent)
+    
+    if ($result -eq $null) {
+        Write-Host "[ZPL] SUCCESS: ZPL sent via RawPrinterHelper ($($zplContent.Length) bytes)"
+        exit 0
+    } else {
+        throw "RawPrinterHelper failed: $result"
+    }
+} catch {
+    Write-Host "[ZPL] ERROR: $_"
+    exit 1
+}
+`;
+      
+      const ps = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], {
+        windowsHide: true,
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      ps.stdout.on('data', (data) => {
+        const text = data.toString();
+        stdout += text;
+        console.log('[ZPL]', text.trim());
+      });
+      
+      ps.stderr.on('data', (data) => {
+        const text = data.toString();
+        stderr += text;
+        console.error('[ZPL Error]', text.trim());
+      });
+      
+      ps.on('close', (code) => {
+        if (code === 0) {
+          console.log('[Printer] ZPL raw print completed successfully');
+          resolve();
+        } else {
+          const errorMsg = `ZPL raw print failed with exit code ${code}: ${stderr || stdout}`;
+          console.error('[Printer]', errorMsg);
+          reject(new Error(errorMsg));
+        }
+      });
+      
+      ps.on('error', (error) => {
+        console.error('[Printer] Failed to start ZPL print process:', error);
+        reject(error);
+      });
+    });
+  }
+  
+  /**
+   * Send ZPL to printer on macOS using lp with raw mode
+   */
+  private async printZplMac(filePath: string, printerName: string): Promise<void> {
+    console.log('[Printer] ====== MAC ZPL RAW PRINT ======');
+    console.log(`[Printer] Printer: "${printerName}"`);
+    console.log(`[Printer] ZPL file: "${filePath}"`);
+    
+    // Use lp with -o raw option to send ZPL directly
+    return new Promise((resolve, reject) => {
+      const args = ['-d', printerName, '-o', 'raw', filePath];
+      console.log(`[Printer] Executing: lp ${args.join(' ')}`);
+      
+      const process = spawn('lp', args);
+      let stderr = '';
+      
+      process.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      process.on('close', (code) => {
+        if (code === 0) {
+          console.log('[Printer] ZPL raw print completed successfully');
+          resolve();
+        } else {
+          const errorMsg = `lp (raw) exited with code ${code}: ${stderr}`;
+          console.error('[Printer]', errorMsg);
+          reject(new Error(errorMsg));
+        }
+      });
+      
+      process.on('error', (error) => {
+        console.error('[Printer] Failed to start lp process:', error);
+        reject(error);
+      });
+    });
   }
   
   /**
