@@ -418,7 +418,7 @@ export const shipmentItems = pgTable("shipment_items", {
   externalOrderItemId: text("external_order_item_id"), // ShipStation's reference to Shopify line item
   imageUrl: text("image_url"), // Product image URL
   // SkuVault session item data (sv_ prefix indicates SkuVault source)
-  svProductId: integer("sv_product_id"), // SkuVault product ID
+  svProductId: text("sv_product_id"), // SkuVault product ID (stored as text for compatibility)
   expectedQuantity: integer("expected_quantity"), // Expected quantity from SkuVault session
   scannedQuantity: integer("scanned_quantity").default(0), // QC scan progress during packing
   svPicked: boolean("sv_picked"), // Whether item was picked in SkuVault
