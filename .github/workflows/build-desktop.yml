@@ -55,6 +55,18 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Sync version from release tag
+        if: github.event_name == 'release'
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
+          Write-Host "Setting version to: $version"
+          $packageJson = Get-Content package.json | ConvertFrom-Json
+          $packageJson.version = $version
+          $packageJson | ConvertTo-Json -Depth 100 | Set-Content package.json
+          Write-Host "Updated package.json version to: $($packageJson.version)"
+      
       - name: Install dependencies
         working-directory: desktop
         run: npm install
@@ -92,6 +104,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      
+      - name: Sync version from release tag
+        if: github.event_name == 'release'
+        working-directory: desktop
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          echo "Setting version to: $VERSION"
+          # Use node to update package.json properly
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Updated package.json version to:', pkg.version);
+          "
       
       - name: Install dependencies
         working-directory: desktop
