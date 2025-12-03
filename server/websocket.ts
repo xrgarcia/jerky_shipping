@@ -619,8 +619,8 @@ export function broadcastStationConnectionChange(stationId: string, isConnected:
   console.log(`[WS] Broadcast station ${stationId} connection change: ${isConnected ? 'online' : 'offline'}`);
 }
 
-// Broadcast printer updates to web clients (when desktop app registers/changes printer)
-export function broadcastStationPrinterUpdate(stationId: string, printer: { id: string; name: string; systemName: string; status?: string; isDefault?: boolean } | null): void {
+// Broadcast printer updates to web clients AND desktop clients (when printer config changes)
+export function broadcastStationPrinterUpdate(stationId: string, printer: { id: string; name: string; systemName: string; status?: string; isDefault?: boolean; useRawMode?: boolean } | null): void {
   if (!wss) {
     return;
   }
@@ -633,7 +633,25 @@ export function broadcastStationPrinterUpdate(stationId: string, printer: { id: 
 
   // Broadcast to operations and default rooms (stations page uses default)
   broadcastToRooms(['operations', 'default'], message);
-  console.log(`[WS] Broadcast station ${stationId} printer update: ${printer ? `${printer.name} (${printer.status || 'unknown'})` : 'none'}`);
+  
+  // Also broadcast to connected desktop clients for this station
+  // so they receive useRawMode updates in real-time
+  const desktopConnection = desktopStationConnections.get(stationId);
+  if (desktopConnection && desktopConnection.ws.readyState === WebSocket.OPEN) {
+    const desktopMessage = JSON.stringify({
+      type: 'desktop:printer_update',
+      stationId,
+      printer,
+    });
+    try {
+      desktopConnection.ws.send(desktopMessage);
+      console.log(`[Desktop WS] Sent printer update to station ${stationId}: useRawMode=${printer?.useRawMode}`);
+    } catch (error) {
+      console.error(`[Desktop WS] Error sending printer update to station ${stationId}:`, error);
+    }
+  }
+  
+  console.log(`[WS] Broadcast station ${stationId} printer update: ${printer ? `${printer.name} (${printer.status || 'unknown'}, rawMode=${printer.useRawMode})` : 'none'}`);
 }
 
 // Event types for more informative notifications

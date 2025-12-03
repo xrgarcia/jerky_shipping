@@ -7024,12 +7024,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updated = await storage.updatePrinter(existing.id, data);
         
         // Broadcast printer update if associated with a station
+        // Include useRawMode so desktop clients receive real-time updates
         if (updated && updated.stationId) {
           broadcastStationPrinterUpdate(updated.stationId, {
             id: updated.id,
             name: updated.name,
             systemName: updated.systemName,
             status: updated.status || 'offline',
+            useRawMode: updated.useRawMode || false,
           });
         }
         
@@ -7039,12 +7041,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const printer = await storage.createPrinter(data);
       
       // Broadcast printer update if associated with a station
+      // Include useRawMode so desktop clients receive real-time updates
       if (printer.stationId) {
         broadcastStationPrinterUpdate(printer.stationId, {
           id: printer.id,
           name: printer.name,
           systemName: printer.systemName,
           status: printer.status || 'offline',
+          useRawMode: printer.useRawMode || false,
         });
       }
       
@@ -7067,12 +7071,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Broadcast printer update if associated with a station
+      // Include useRawMode so desktop clients receive real-time updates
       if (printer.stationId) {
         broadcastStationPrinterUpdate(printer.stationId, {
           id: printer.id,
           name: printer.name,
           systemName: printer.systemName,
           status: printer.status || 'offline',
+          useRawMode: printer.useRawMode || false,
         });
       }
       
@@ -7115,12 +7121,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Broadcast the printer update to all clients watching this station
+      // Include useRawMode so desktop clients receive real-time updates
       broadcastStationPrinterUpdate(stationId, {
         id: printer.id,
         name: printer.name,
         systemName: printer.systemName,
         status: printer.status || 'offline',
         isDefault: true,
+        useRawMode: printer.useRawMode || false,
       });
       
       console.log(`[Desktop] Set default printer for station ${stationId}: ${printer.name} (${printer.id})`);
