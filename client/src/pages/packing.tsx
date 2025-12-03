@@ -2676,8 +2676,17 @@ export default function Packing() {
                                           )}
                                           <div className="flex-1 min-w-0">
                                             <div className="font-medium text-sm truncate">{comp.name}</div>
-                                            <div className="text-xs text-muted-foreground font-mono select-all cursor-text" data-testid={`text-comp-barcode-${comp.sku || comp.id}`}>
-                                              {comp.sku || 'N/A'} {comp.code && comp.code !== comp.sku && <span className="text-muted-foreground/70">• {comp.code}</span>}
+                                            <div className="text-xs text-muted-foreground" data-testid={`text-comp-barcode-${comp.sku || comp.id}`}>
+                                              <div className="flex items-center gap-1">
+                                                <span>SKU:</span>
+                                                <span className="font-mono select-all cursor-text" data-testid={`text-comp-sku-value-${comp.sku || comp.id}`}>{comp.sku || 'N/A'}</span>
+                                              </div>
+                                              {comp.code && comp.code !== comp.sku && (
+                                                <div className="flex items-center gap-1">
+                                                  <span>Barcode:</span>
+                                                  <span className="font-mono select-all cursor-text" data-testid={`text-comp-barcode-value-${comp.sku || comp.id}`}>{comp.code}</span>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -2764,8 +2773,17 @@ export default function Packing() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-sm text-muted-foreground font-mono select-all cursor-text" data-testid={`text-barcode-${progress.sku}`}>
-                              {progress.sku} {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && <span className="text-muted-foreground/70">• {progress.skuvaultCode}</span>}
+                            <div className="text-sm text-muted-foreground" data-testid={`text-barcode-${progress.sku}`}>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs">SKU:</span>
+                                <span className="font-mono select-all cursor-text" data-testid={`text-sku-value-${progress.sku}`}>{progress.sku}</span>
+                              </div>
+                              {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs">Barcode:</span>
+                                  <span className="font-mono select-all cursor-text" data-testid={`text-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           
