@@ -25,7 +25,9 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
     - **Reporting & Analytics**: Business analytics dashboard (Gross Sales, Net Sales) and PO Recommendations page querying a separate GCP PostgreSQL database.
     - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets.
     - **Print Queue System**: Automated shipping label printing with background worker, retry logic, and browser auto-print.
-    - **Desktop Printing System**: A three-tier architecture enabling native macOS printing with a dedicated Electron app for secure Google OAuth, WebSocket connectivity, station management, and remote configuration.
+    - **Desktop Printing System**: A three-tier architecture enabling native Windows printing with a dedicated Electron app for secure Google OAuth, WebSocket connectivity, station management, and remote configuration.
+        - **Unified SumatraPDF Printing**: All printers use a bundled SumatraPDF.exe (v3.5.2, GPL-3 licensed) for consistent label printing. This follows ShipStation Connect's proven approach. Production path: `process.resourcesPath/bin/SumatraPDF.exe`. Dev path: `binaries/win/SumatraPDF.exe`. Command: `-print-to [printer] -silent [pdf]`.
+        - **Temp File Management**: Labels are saved to `os.tmpdir()/jerky-ship-connect/label-{jobId}.pdf` with automatic cleanup after successful printing.
         - **WebSocket Connection Reliability**: Connection status shows 'connecting' until server authentication completes (not just socket open). Station subscription handles session/auth timing races via reactive subscription in updateState() and pendingStationSubscription queuing. Server logs detailed auth failure diagnostics for debugging.
     - **Web-based Stations Management**: CRUD interface at `/stations` with real-time connection status.
     - **Real-Time Updates**: WebSocket server provides live updates for orders, queues, and print status.

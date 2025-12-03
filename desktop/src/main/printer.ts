@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { app } from 'electron';
 import type { PrintJob } from '../shared/types';
 import { printerLogger } from './logger';
 
@@ -13,7 +14,6 @@ interface SystemPrinter {
   systemName: string;
   isDefault: boolean;
   status: string;
-  suggestRawMode?: boolean; // Auto-detected suggestion for industrial printers
 }
 
 interface PdfViewerInfo {
@@ -22,52 +22,44 @@ interface PdfViewerInfo {
   path: string | null;
 }
 
-// Industrial printer brands that work best with raw/direct printing mode
-const INDUSTRIAL_PRINTER_PATTERNS = [
-  /sato/i,
-  /cl4nx/i,
-  /cl6nx/i,
-  /zebra.*industrial/i,
-  /zebra.*z[te]/i, // ZT410, ZT610, ZE500, etc.
-  /zebra.*105sl/i,
-  /zebra.*110xi/i,
-  /zebra.*170xi/i,
-  /zebra.*220xi/i,
-  /honeywell.*pm/i, // PM42, PM43, PM45
-  /honeywell.*px/i, // PX4i, PX6i
-  /datamax/i,
-  /tsc.*m[exb]/i, // ME240, MX240, MB240
-  /citizen.*cl-s/i,
-  /cab.*squix/i,
-  /cab.*a\+/i,
-  /idprt/i, // iDPRT thermal printers (SP410, etc.)
-  /xprinter/i, // XPrinter thermal printers
-  /godex/i, // Godex thermal printers
-  /bixolon/i, // Bixolon thermal printers
-];
-
 export class PrinterService {
   private tempDir: string;
   private platform: NodeJS.Platform;
   private cachedPdfViewer: PdfViewerInfo | null = null;
+  private bundledSumatraPath: string | null = null;
   
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'jerky-ship-connect');
     this.platform = process.platform;
+    this.initBundledPaths();
   }
   
   /**
-   * Check if a printer name suggests it's an industrial label printer
-   * that would benefit from raw/direct printing mode
+   * Initialize paths to bundled executables.
+   * In production, these are in resources/bin/.
+   * In development, they're in binaries/win/.
    */
-  isIndustrialPrinter(printerName: string): boolean {
-    return INDUSTRIAL_PRINTER_PATTERNS.some(pattern => pattern.test(printerName));
+  private initBundledPaths(): void {
+    if (this.platform === 'win32') {
+      if (app.isPackaged) {
+        this.bundledSumatraPath = path.join(process.resourcesPath, 'bin', 'SumatraPDF.exe');
+      } else {
+        this.bundledSumatraPath = path.join(__dirname, '..', '..', '..', 'binaries', 'win', 'SumatraPDF.exe');
+      }
+      console.log(`[PrinterService] Bundled SumatraPDF path: ${this.bundledSumatraPath}`);
+    }
   }
   
   /**
    * Detect if a PDF viewer is installed on Windows.
    * Returns cached result after first detection.
    * macOS always returns installed since it uses lp command.
+   * 
+   * Priority:
+   * 1. Bundled SumatraPDF (always available in packaged app)
+   * 2. System-installed SumatraPDF
+   * 3. Adobe Reader
+   * 4. System default PDF handler
    */
   async detectPdfViewer(): Promise<PdfViewerInfo> {
     console.log('[PrinterService] detectPdfViewer called');
@@ -86,7 +78,20 @@ export class PrinterService {
     
     console.log('[PrinterService] Searching for PDF viewers on Windows...');
     
-    // Check SumatraPDF first (preferred for label printing)
+    // Check bundled SumatraPDF first (always preferred)
+    if (this.bundledSumatraPath) {
+      console.log(`[PrinterService] Checking bundled SumatraPDF at: ${this.bundledSumatraPath}`);
+      try {
+        await fs.access(this.bundledSumatraPath);
+        console.log(`[PrinterService] FOUND bundled SumatraPDF at: ${this.bundledSumatraPath}`);
+        this.cachedPdfViewer = { installed: true, viewer: 'SumatraPDF (bundled)', path: this.bundledSumatraPath };
+        return this.cachedPdfViewer;
+      } catch {
+        console.log('[PrinterService] Bundled SumatraPDF not found, checking system paths...');
+      }
+    }
+    
+    // Fallback: Check system-installed SumatraPDF
     const sumatraPaths = [
       'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
       'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
@@ -249,7 +254,6 @@ export class PrinterService {
           systemName: name,
           isDefault: printer.Default === true,
           status,
-          suggestRawMode: this.isIndustrialPrinter(name),
         });
       }
     } catch (error) {
@@ -272,7 +276,6 @@ export class PrinterService {
                 systemName: name,
                 isDefault,
                 status,
-                suggestRawMode: this.isIndustrialPrinter(name),
               });
             }
           }
@@ -285,7 +288,7 @@ export class PrinterService {
     return printers;
   }
   
-  async print(job: PrintJob, printerName: string, useRawMode: boolean = false): Promise<void> {
+  async print(job: PrintJob, printerName: string): Promise<void> {
     // Log job received - this is the entry point
     printerLogger.jobReceived(job.id, job.orderNumber, {
       printer: printerName,
@@ -293,7 +296,6 @@ export class PrinterService {
       hasLabelUrl: !!job.labelUrl,
       labelUrlPreview: job.labelUrl ? job.labelUrl.substring(0, 100) + '...' : null,
       platform: this.platform,
-      useRawMode,
       requestedBy: job.requestedBy,
     });
     
@@ -330,15 +332,13 @@ export class PrinterService {
       }
       
       printerLogger.printing(job.id, job.orderNumber, `Starting print to: ${printerName}`, {
-        mode: useRawMode ? 'industrial' : 'consumer',
         filePath: labelPath,
       });
       
-      await this.printFile(labelPath, printerName, useRawMode);
+      await this.printFile(labelPath, printerName);
       
       printerLogger.result(job.id, job.orderNumber, true, 'Print job completed successfully', {
         printer: printerName,
-        mode: useRawMode ? 'industrial' : 'consumer',
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -368,92 +368,12 @@ export class PrinterService {
     await fs.writeFile(destPath, Buffer.from(buffer));
   }
   
-  private async printFile(filePath: string, printerName: string, useRawMode: boolean = false): Promise<void> {
+  private async printFile(filePath: string, printerName: string): Promise<void> {
     if (this.platform === 'win32') {
-      if (useRawMode) {
-        console.log('[Printer] Using RAW MODE for Windows printing');
-        return this.printFileWindowsRaw(filePath, printerName);
-      }
       return this.printFileWindows(filePath, printerName);
     } else {
       return this.printFileMac(filePath, printerName);
     }
-  }
-  
-  /**
-   * Print using Windows industrial printer mode.
-   * 
-   * IMPORTANT: Industrial printers (SATO, Zebra, etc.) need their Windows driver
-   * to convert PDFs to their native language (SBPL, ZPL). Raw PDF bytes won't work!
-   * 
-   * This method uses SumatraPDF for reliable silent printing, with fallbacks.
-   * The driver handles the conversion from PDF → printer language automatically.
-   */
-  private async printFileWindowsRaw(filePath: string, printerName: string): Promise<void> {
-    console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
-    console.log('[Printer] ║         INDUSTRIAL PRINTER MODE                        ║');
-    console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
-    console.log(`[Printer] Printer: ${printerName}`);
-    console.log(`[Printer] File: ${filePath}`);
-    console.log(`[Printer] Timestamp: ${new Date().toISOString()}`);
-    console.log('[Printer] NOTE: Industrial printers need their driver to convert PDF');
-    console.log('[Printer]       to native language (SBPL/ZPL). Using driver-based printing.');
-    
-    // First, log printer diagnostics via PowerShell
-    await this.logPrinterDiagnostics(printerName);
-    
-    // Use the same reliable printing path as regular mode
-    // The SATO/Zebra driver converts PDF → SBPL/ZPL automatically
-    const errors: string[] = [];
-    
-    // Approach 1: Use SumatraPDF if available (most reliable for label printers)
-    try {
-      console.log('[Printer] ══════ ATTEMPT 1: SumatraPDF ══════');
-      await this.printWithSumatra(filePath, printerName);
-      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
-      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (SumatraPDF)          ║');
-      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] SumatraPDF failed: ${msg}`);
-      errors.push(`SumatraPDF: ${msg}`);
-    }
-    
-    // Approach 2: Use Adobe Reader if available
-    try {
-      console.log('[Printer] ══════ ATTEMPT 2: Adobe Reader ══════');
-      await this.printWithAdobeReader(filePath, printerName);
-      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
-      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (Adobe)               ║');
-      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] Adobe Reader failed: ${msg}`);
-      errors.push(`Adobe Reader: ${msg}`);
-    }
-    
-    // Approach 3: Use Windows PrintTo shell verb
-    try {
-      console.log('[Printer] ══════ ATTEMPT 3: Windows Shell PrintTo ══════');
-      await this.printWithShellVerb(filePath, printerName);
-      console.log('[Printer] ╔════════════════════════════════════════════════════════╗');
-      console.log('[Printer] ║         INDUSTRIAL PRINT SUCCESS (Shell)               ║');
-      console.log('[Printer] ╚════════════════════════════════════════════════════════╝');
-      return;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`[Printer] Shell PrintTo failed: ${msg}`);
-      errors.push(`Shell PrintTo: ${msg}`);
-    }
-    
-    console.error('[Printer] ╔════════════════════════════════════════════════════════╗');
-    console.error('[Printer] ║         INDUSTRIAL PRINT FAILED - ALL METHODS          ║');
-    console.error('[Printer] ╚════════════════════════════════════════════════════════╝');
-    console.error('[Printer] Errors:', errors);
-    console.error('[Printer] SOLUTION: Install SumatraPDF from https://www.sumatrapdfreader.org/');
-    throw new Error(`Industrial print failed. Install SumatraPDF for reliable printing.\n\nErrors:\n${errors.join('\n')}`);
   }
   
   /**
@@ -629,40 +549,54 @@ export class PrinterService {
   }
   
   private async printWithSumatra(filePath: string, printerName: string): Promise<void> {
-    // Search for SumatraPDF in common installation paths
-    const sumatraPaths = [
-      // Common installation locations
-      'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
-      'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
-      // Local user installations
-      `${process.env.LOCALAPPDATA}\\SumatraPDF\\SumatraPDF.exe`,
-      `${process.env.APPDATA}\\SumatraPDF\\SumatraPDF.exe`,
-      // Portable version in user's home folder
-      `${process.env.USERPROFILE}\\SumatraPDF\\SumatraPDF.exe`,
-      `${process.env.USERPROFILE}\\Downloads\\SumatraPDF.exe`,
-      // If in PATH
-      'SumatraPDF.exe',
-    ];
-    
-    printerLogger.diagnostic('Searching for SumatraPDF...', { searchPaths: sumatraPaths });
-    
     let foundPath: string | null = null;
     
-    for (const sumatraPath of sumatraPaths) {
-      if (!sumatraPath) continue;
+    // Check bundled SumatraPDF first (always preferred)
+    if (this.bundledSumatraPath) {
+      printerLogger.diagnostic(`Checking bundled SumatraPDF at: ${this.bundledSumatraPath}`);
       try {
-        await fs.access(sumatraPath);
-        foundPath = sumatraPath;
-        printerLogger.diagnostic(`Found SumatraPDF at: ${sumatraPath}`);
-        break;
+        await fs.access(this.bundledSumatraPath);
+        foundPath = this.bundledSumatraPath;
+        printerLogger.diagnostic(`Found bundled SumatraPDF at: ${this.bundledSumatraPath}`);
       } catch {
-        // Continue searching
+        printerLogger.diagnostic('Bundled SumatraPDF not found, checking system paths...');
+      }
+    }
+    
+    // Fallback: Search for SumatraPDF in common installation paths
+    if (!foundPath) {
+      const sumatraPaths = [
+        // Common installation locations
+        'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
+        'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
+        // Local user installations
+        `${process.env.LOCALAPPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+        `${process.env.APPDATA}\\SumatraPDF\\SumatraPDF.exe`,
+        // Portable version in user's home folder
+        `${process.env.USERPROFILE}\\SumatraPDF\\SumatraPDF.exe`,
+        `${process.env.USERPROFILE}\\Downloads\\SumatraPDF.exe`,
+        // If in PATH
+        'SumatraPDF.exe',
+      ];
+      
+      printerLogger.diagnostic('Searching for system SumatraPDF...', { searchPaths: sumatraPaths });
+      
+      for (const sumatraPath of sumatraPaths) {
+        if (!sumatraPath) continue;
+        try {
+          await fs.access(sumatraPath);
+          foundPath = sumatraPath;
+          printerLogger.diagnostic(`Found system SumatraPDF at: ${sumatraPath}`);
+          break;
+        } catch {
+          // Continue searching
+        }
       }
     }
     
     if (!foundPath) {
-      const errorMsg = 'SumatraPDF not found. Please install from https://www.sumatrapdfreader.org/download-free-pdf-viewer';
-      printerLogger.diagnostic(errorMsg, { searchedPaths: sumatraPaths.length });
+      const errorMsg = 'SumatraPDF not found. The bundled version is missing and no system installation was found.';
+      printerLogger.diagnostic(errorMsg);
       throw new Error(errorMsg);
     }
     

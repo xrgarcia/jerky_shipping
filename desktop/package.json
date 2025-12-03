@@ -1,6 +1,6 @@
 {
   "name": "jerky-ship-connect",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Desktop printer management app for Jerky Ship warehouse",
   "main": "dist/main/main/index.js",
   "author": "Jerky Ship",
@@ -83,6 +83,13 @@
     "files": [
       "dist/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "binaries/${os}",
+        "to": "bin",
+        "filter": ["**/*", "!README.md"]
+      }
     ],
     "publish": {
       "provider": "github",

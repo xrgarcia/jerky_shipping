@@ -554,15 +554,6 @@ function DashboardPage({ state }: DashboardPageProps) {
                     }`} data-testid="text-selected-printer-name">
                       {state.selectedPrinter?.name || 'NOT SELECTED'}
                     </span>
-                    {state.selectedPrinter?.useRawMode && (
-                      <span 
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium"
-                        data-testid="badge-raw-mode"
-                        title="Industrial thermal printer mode - sends ZPL commands directly"
-                      >
-                        RAW
-                      </span>
-                    )}
                   </div>
                   {state.selectedPrinter && (
                     <span className={`text-xs ${
@@ -690,10 +681,6 @@ function DashboardPage({ state }: DashboardPageProps) {
                     const isOnline = printer.status === 'online';
                     const isBusy = printer.status === 'busy';
                     const isOffline = printer.status === 'offline' || (!isOnline && !isBusy);
-                    
-                    // Check if this printer is already registered and get its actual useRawMode setting
-                    const registeredPrinter = state.printers.find(p => p.systemName === printer.systemName);
-                    const isIndustrial = registeredPrinter?.useRawMode === true;
                     
                     return (
                       <button

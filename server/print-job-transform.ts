@@ -1,11 +1,9 @@
 interface PrintJobPayload {
   orderNumber?: string;
   labelUrl?: string;
-  labelData?: string | null;  // Raw ZPL/EPL data for thermal printers
-  labelFormat?: 'pdf' | 'zpl';  // Label format: pdf (default) or zpl for raw mode
+  labelData?: string | null;
   trackingNumber?: string;
   requestedBy?: string;
-  useRawMode?: boolean;  // Whether to use raw/direct printing
   printerName?: string;  // Printer name for display
 }
 
@@ -16,9 +14,7 @@ export interface TransformedPrintJob {
   shipmentId: string | null;
   orderNumber: string;
   labelUrl: string | null;
-  labelData: string | null;  // Raw ZPL/EPL data for thermal printers
-  labelFormat: 'pdf' | 'zpl';  // Label format
-  useRawMode: boolean;  // Whether to use raw/direct printing
+  labelData: string | null;
   printerName: string | null;  // Printer name for display
   status: string;
   errorMessage: string | null;
@@ -38,8 +34,6 @@ export function transformPrintJobForDesktop(job: any): TransformedPrintJob {
     orderNumber: payload?.orderNumber || job.orderId || 'Unknown',
     labelUrl: payload?.labelUrl || null,
     labelData: payload?.labelData || null,
-    labelFormat: payload?.labelFormat || 'pdf',
-    useRawMode: payload?.useRawMode ?? false,
     printerName: payload?.printerName || null,
     status: job.status,
     errorMessage: job.errorMessage,

@@ -55,7 +55,6 @@ interface StationWithSession extends Station {
     name: string;
     systemName: string;
     status?: string;
-    useRawMode?: boolean;
   } | null;
 }
 
@@ -240,23 +239,6 @@ export default function Stations() {
     },
   });
 
-  const updatePrinterMutation = useMutation({
-    mutationFn: async ({ printerId, data }: { printerId: string; data: { useRawMode?: boolean } }) => {
-      const res = await apiRequest("PATCH", `/api/desktop/printers/${printerId}`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Printer settings updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update printer settings",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -536,35 +518,6 @@ export default function Stations() {
                       )}
                     </div>
                   </div>
-                  {station.printer && (
-                    <div className="flex items-center justify-between pl-8 pt-2 border-t border-dashed">
-                      <div className="space-y-0.5">
-                        <Label 
-                          htmlFor={`raw-mode-${station.id}`}
-                          className="text-xs font-medium cursor-pointer"
-                        >
-                          Industrial Print Mode
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Direct printing for SATO, Zebra, Honeywell
-                        </p>
-                      </div>
-                      <Switch
-                        id={`raw-mode-${station.id}`}
-                        checked={station.printer.useRawMode ?? false}
-                        disabled={updatePrinterMutation.isPending}
-                        onCheckedChange={(checked) => {
-                          if (station.printer) {
-                            updatePrinterMutation.mutate({
-                              printerId: station.printer.id,
-                              data: { useRawMode: checked },
-                            });
-                          }
-                        }}
-                        data-testid={`switch-raw-mode-${station.id}`}
-                      />
-                    </div>
-                  )}
                 </div>
                 
                 <div className="flex items-center justify-between pt-2 border-t">

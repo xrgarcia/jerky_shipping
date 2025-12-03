@@ -639,9 +639,7 @@ async function connectWebSocket(): Promise<void> {
     
     try {
       // ASYNC: Use the captured printer reference we got at the start
-      // Pass useRawMode from printer settings for industrial printers
-      const useRawMode = printer?.useRawMode ?? false;
-      await printerService.print(job, printerSystemName, useRawMode);
+      await printerService.print(job, printerSystemName);
       
       // AFTER AWAIT: Update local state first, then try to notify server (queues if fails)
       safeUpdateJob(job.id, 'completed');
@@ -727,9 +725,7 @@ async function connectWebSocket(): Promise<void> {
           
           try {
             // ASYNC: Use captured printer reference
-            // Pass useRawMode from printer settings for industrial printers
-            const useRawMode = printer?.useRawMode ?? false;
-            await printerService.print(job, printerSystemName, useRawMode);
+            await printerService.print(job, printerSystemName);
             
             // AFTER AWAIT: Update local state first, use retry queue for server
             safeUpdateJob(job.id, 'completed');
@@ -783,7 +779,7 @@ async function connectWebSocket(): Promise<void> {
     }
   });
   
-  wsClient.on('printer-update', (data: { stationId: string; printer: { id: string; name: string; systemName: string; status?: string; useRawMode?: boolean } }) => {
+  wsClient.on('printer-update', (data: { stationId: string; printer: { id: string; name: string; systemName: string; status?: string } }) => {
     console.log(`[Main] Printer update for station ${data.stationId}:`, data.printer);
     
     // Update the printer in app state if it's our current station
@@ -795,7 +791,6 @@ async function connectWebSocket(): Promise<void> {
             ...p,
             name: data.printer.name,
             systemName: data.printer.systemName,
-            useRawMode: data.printer.useRawMode ?? p.useRawMode,
           };
         }
         return p;
@@ -808,7 +803,6 @@ async function connectWebSocket(): Promise<void> {
           ...appState.selectedPrinter,
           name: data.printer.name,
           systemName: data.printer.systemName,
-          useRawMode: data.printer.useRawMode ?? appState.selectedPrinter.useRawMode,
         };
       }
       
@@ -816,7 +810,7 @@ async function connectWebSocket(): Promise<void> {
         printers: updatedPrinters,
         selectedPrinter: updatedSelectedPrinter,
       });
-      console.log(`[Main] Updated printer ${data.printer.id} in app state, useRawMode=${data.printer.useRawMode}`);
+      console.log(`[Main] Updated printer ${data.printer.id} in app state`);
     }
   });
   
@@ -1289,9 +1283,7 @@ function setupIpcHandlers(): void {
     console.log(`[Main] Retry job ${jobId} marked as sent, printing to ${printerName}`);
     
     try {
-      // Pass useRawMode from printer settings for industrial printers
-      const useRawMode = printer?.useRawMode ?? false;
-      await printerService.print(job, printerSystemName, useRawMode);
+      await printerService.print(job, printerSystemName);
       
       safeUpdateJob(jobId, 'completed');
       trySendStatusUpdate(getCurrentWsClient(), jobId, 'completed');

@@ -475,7 +475,7 @@ export class WebSocketClient extends EventEmitter {
         console.log(`[WebSocket] Printer update for station ${message.stationId}:`, message.printer);
         this.emit('printer-update', {
           stationId: message.stationId,
-          printer: message.printer as { id: string; name: string; systemName: string; status?: string; useRawMode?: boolean },
+          printer: message.printer as { id: string; name: string; systemName: string; status?: string },
         });
         break;
         
