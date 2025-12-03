@@ -451,7 +451,7 @@ export class PrinterService {
             
             # Use the Windows print command which works with the printer driver
             # This sends the file to the printer's driver which handles the conversion
-            $printResult = & cmd /c "print /D:`"$printer`" `"$file`"" 2>&1
+            $printResult = & cmd /c "print /D:\`"$printer\`" \`"$file\`"" 2>&1
             
             if ($LASTEXITCODE -ne 0) {
               Write-Host "[RAW] 'print' command failed, trying copy method..."
@@ -463,7 +463,7 @@ export class PrinterService {
               
               # If it's a USB port, we can try copying directly
               if ($port -match "USB" -or $port -match "LPT") {
-                $copyResult = & cmd /c "copy /B `"$file`" `"$port`"" 2>&1
+                $copyResult = & cmd /c "copy /B \`"$file\`" \`"$port\`"" 2>&1
                 if ($LASTEXITCODE -eq 0) {
                   Write-Host "[RAW] File copied to port successfully"
                 } else {
