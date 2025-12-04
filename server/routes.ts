@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents } from "@shared/schema";
-import { eq, count, desc, asc, or, and, sql, gte, lte, ilike } from "drizzle-orm";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
@@ -3958,11 +3958,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This backfills sessions that were missed because shipments didn't exist when sessions closed
   app.post("/api/operations/firestore-sessions/reimport", requireAuth, async (req, res) => {
     try {
-      // Find the oldest shipment date (ascending order to get the oldest)
+      // Find the oldest shipment by order_date (the actual order date, not DB insert time)
+      // Filter out null orderDate values to avoid NULLs sorting first in ascending order
       const oldestShipmentResult = await db
-        .select({ createdAt: shipments.createdAt })
+        .select({ orderDate: shipments.orderDate })
         .from(shipments)
-        .orderBy(asc(shipments.createdAt))
+        .where(isNotNull(shipments.orderDate))
+        .orderBy(asc(shipments.orderDate))
         .limit(1);
 
       if (oldestShipmentResult.length === 0) {
@@ -3972,7 +3974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const oldestDate = oldestShipmentResult[0].createdAt;
+      const oldestDate = oldestShipmentResult[0].orderDate;
       console.log(`[operations] Starting Firestore session reimport from ${oldestDate?.toISOString()}`);
 
       const { reimportAllSessions } = await import("./firestore-session-sync-worker");
