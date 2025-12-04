@@ -1711,21 +1711,30 @@ export default function Bagging() {
     mutationFn: async () => {
       // For bagging, we don't need to print again - just log the QC completion
       // The label was already printed when the order was scanned
+      // IMPORTANT: Capture state values BEFORE they get reset
       const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
-      await logShipmentEvent("bagging_qc_completed", {
+      const orderNumber = currentShipment?.orderNumber;
+      const shipmentId = currentShipment?.id;
+      const stationId = currentStation?.stationId;
+      const wasLabelPrintedOnLoad = labelPrintedOnLoad; // Capture before reset
+      
+      if (!orderNumber) {
+        throw new Error('No order number available');
+      }
+      
+      // Call backend to log both bagging_qc_completed and packing_complete events
+      const result = await apiRequest("POST", "/api/packing/bagging-complete", {
+        orderNumber,
+        shipmentId,
+        stationId,
         totalScans,
-        labelAlreadyPrinted: labelPrintedOnLoad,
+        labelPrintedOnLoad: wasLabelPrintedOnLoad,
       });
+      
+      console.log('[Bagging] Logged completion events:', result);
       return { success: true, printQueued: false }; // No new print job for bagging
     },
     onSuccess: () => {
-      // Log bagging completed event before resetting state
-      const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
-      logShipmentEvent("bagging_completed", {
-        totalScans,
-        labelPrintedOnLoad,
-      });
-      
       // BAGGING WORKFLOW: Return directly to order scan (no "Next Order" confirmation)
       setCompletionSuccess(null);
       setJustCreatedPrintJob(false);

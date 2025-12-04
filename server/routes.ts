@@ -6316,6 +6316,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete bagging order (QC verification complete - label was already printed on order scan)
+  // This is a lightweight endpoint that logs completion events to shipment_events
+  // It logs both bagging_qc_completed and packing_complete for analytics parity with boxing
+  app.post("/api/packing/bagging-complete", requireAuth, async (req, res) => {
+    const { shipmentId, orderNumber, totalScans, stationId, labelPrintedOnLoad } = req.body;
+    const user = req.user!;
+    
+    try {
+      // Validate required fields
+      if (!orderNumber) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Order number is required" 
+        });
+      }
+      
+      // Log bagging QC completed event (first event - QC verification done)
+      await storage.createShipmentEvent({
+        username: user.email,
+        station: "bagging",
+        eventName: "bagging_qc_completed",
+        orderNumber,
+        metadata: {
+          shipmentId,
+          stationId,
+          totalScans: totalScans || 0,
+          labelAlreadyPrinted: labelPrintedOnLoad || false,
+        },
+      });
+      
+      // Log bagging_completed event (second event - matches historical client-side event name)
+      await storage.createShipmentEvent({
+        username: user.email,
+        station: "bagging",
+        eventName: "bagging_completed",
+        orderNumber,
+        metadata: {
+          shipmentId,
+          stationId,
+          totalScans: totalScans || 0,
+          labelPrintedOnLoad: labelPrintedOnLoad || false,
+        },
+      });
+      
+      // Log packing_complete event (third event - unified completion event for cross-station analytics)
+      const event = await storage.createShipmentEvent({
+        username: user.email,
+        station: "bagging",
+        eventName: "packing_complete",
+        orderNumber,
+        metadata: {
+          shipmentId,
+          stationId,
+          totalScans: totalScans || 0,
+          labelPrintedOnLoad: labelPrintedOnLoad || false,
+          completedBy: user.displayName || user.email,
+          completedAt: new Date().toISOString(),
+        },
+      });
+      
+      console.log(`[Bagging] Logged bagging_qc_completed, bagging_completed, and packing_complete events for order ${orderNumber}`);
+      
+      res.json({ 
+        success: true, 
+        eventId: event.id,
+        message: "Bagging complete! QC verification finished."
+      });
+    } catch (error: any) {
+      console.error("[Bagging] Error completing bagging order:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to log bagging completion" 
+      });
+    }
+  });
+
   // Saved Views API endpoints
   // Get current user's saved views for a specific page
   app.get("/api/saved-views", requireAuth, async (req, res) => {
