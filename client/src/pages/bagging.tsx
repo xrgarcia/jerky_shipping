@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { setWorkstationId, getWorkstationId, getWorkstationName } from "@/lib/workstation-guard";
+import { setWorkstationId } from "@/lib/workstation-guard";
 import {
   Accordion,
   AccordionContent,
@@ -314,25 +314,10 @@ export default function Bagging() {
       return apiRequest('POST', '/api/packing/station-session', { stationId });
     },
     onSuccess: (_, { stationId, stationName }) => {
-      const storedWorkstationId = getWorkstationId();
-      
-      // If no workstation stored yet (first time on this computer), store the selected station
-      if (!storedWorkstationId) {
-        setWorkstationId(stationId, stationName);
-        setWorkstationMismatch(null);
-      } else if (storedWorkstationId === stationId) {
-        // Selected station matches this workstation - clear mismatch
-        setWorkstationMismatch(null);
-      } else {
-        // Selected station does NOT match this workstation - set mismatch
-        const storedName = getWorkstationName() || 'Unknown Station';
-        setWorkstationMismatch({
-          workstationId: storedWorkstationId,
-          workstationName: storedName,
-          userStationId: stationId,
-          userStationName: stationName,
-        });
-      }
+      // DISABLED: Workstation mismatch validation - always allow station selection
+      // Store the selected station in localStorage (for future reference)
+      setWorkstationId(stationId, stationName);
+      setWorkstationMismatch(null);
       
       queryClient.invalidateQueries({ queryKey: ['/api/packing/station-session'] });
       setShowStationModal(false);
@@ -348,31 +333,14 @@ export default function Bagging() {
   const isSessionExpired = currentStation ? new Date(currentStation.expiresAt) <= new Date() : true;
   const hasValidSession = !!currentStation && !isSessionExpired;
 
-  // Check for workstation mismatch when session loads
+  // DISABLED: Workstation mismatch validation on session load
+  // Just store the current station in localStorage without blocking
   useEffect(() => {
     if (!hasValidSession || !currentStation) return;
     
-    const storedWorkstationId = getWorkstationId();
-    
-    // If no workstation stored yet, this is first time - store it
-    if (!storedWorkstationId) {
-      setWorkstationId(currentStation.stationId, currentStation.stationName);
-      setWorkstationMismatch(null);
-      return;
-    }
-    
-    // Check if user's assigned station matches the workstation
-    if (storedWorkstationId !== currentStation.stationId) {
-      const storedName = getWorkstationName() || 'Unknown Station';
-      setWorkstationMismatch({
-        workstationId: storedWorkstationId,
-        workstationName: storedName,
-        userStationId: currentStation.stationId,
-        userStationName: currentStation.stationName,
-      });
-    } else {
-      setWorkstationMismatch(null);
-    }
+    // Store the current station (no mismatch validation)
+    setWorkstationId(currentStation.stationId, currentStation.stationName);
+    setWorkstationMismatch(null);
   }, [hasValidSession, currentStation?.stationId]);
 
   // Track real-time station connection status (updated via WebSocket)
