@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useInactivityTimeout } from "@/hooks/use-inactivity-timeout";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Orders from "@/pages/orders";
@@ -40,6 +41,14 @@ function AppContent() {
   const [location] = useLocation();
   const isPublicRoute = location === "/login";
   const isAuthenticated = !!userData?.user;
+
+  // Inactivity timeout - only active for authenticated users
+  const { WarningDialog } = useInactivityTimeout({
+    onLogout: () => {
+      queryClient.clear();
+    },
+    enabled: isAuthenticated,
+  });
 
   const sidebarStyle = {
     "--sidebar-width": "20rem",
@@ -102,22 +111,25 @@ function AppContent() {
   }
 
   return (
-    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden relative">
-          <header 
-            className="flex items-center justify-between px-4 border-b border-sidebar-border h-[72px]"
-            style={{ background: '#1a1a1a' }}
-          >
-            <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
-          </header>
-          <main className="flex-1 overflow-y-auto">
-            {router}
-          </main>
+    <>
+      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 overflow-hidden relative">
+            <header 
+              className="flex items-center justify-between px-4 border-b border-sidebar-border h-[72px]"
+              style={{ background: '#1a1a1a' }}
+            >
+              <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
+            </header>
+            <main className="flex-1 overflow-y-auto">
+              {router}
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+      <WarningDialog />
+    </>
   );
 }
 
