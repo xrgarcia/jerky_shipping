@@ -491,6 +491,7 @@ export const shipmentEvents = pgTable("shipment_events", {
   orderNumberIdx: index("shipment_events_order_number_idx").on(table.orderNumber).where(sql`${table.orderNumber} IS NOT NULL`),
   eventNameIdx: index("shipment_events_event_name_idx").on(table.eventName),
   usernameIdx: index("shipment_events_username_idx").on(table.username),
+  timingIdx: index("shipment_events_timing_idx").on(table.orderNumber, table.username, table.eventName, table.occurredAt),
 }));
 
 export const insertShipmentEventSchema = createInsertSchema(shipmentEvents).omit({
