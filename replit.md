@@ -22,6 +22,13 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
         - **Immediate Label Printing**: Label prints immediately when order is scanned (before QC), as the bagging machine advances the poly bag roll and prints in one motion.
         - **Direct Completion**: "Complete Packing" returns directly to order scan without "Next Order" confirmation dialog.
         - **Separate Station Tracking**: Uses "bagging" station type in audit logs for analytics differentiation.
+    - **Workstation Guard System**: Prevents workers from packing at the wrong physical workstation (which would print labels to wrong printer):
+        - **Browser localStorage Tracking**: When a user selects a station, the station ID is stored in localStorage with TTL expiring at midnight local time.
+        - **Mismatch Detection**: On page load, compares user's assigned station (from session) with the stored workstation ID. If different, shows blocking screen.
+        - **Bypass Prevention**: When mismatch detected, user cannot dismiss the station selection modal without selecting the correct station (matching the workstation) or logging out.
+        - **Station Selection Re-validation**: After selecting a station, the mutation re-validates against localStorage to ensure the selected station matches the physical workstation. If not, mismatch persists.
+        - **Clear User Guidance**: Blocking screen explains options: "Work at This Computer (Select X)" or "Go to the computer configured for Y" or "Log Out".
+        - **Implementation Files**: `client/src/lib/workstation-guard.ts` (localStorage utilities), `client/src/pages/packing.tsx`, `client/src/pages/bagging.tsx`.
     - **Shipment Management**: Unified shipments page with dual-view mode:
         - **Workflow View**: Business process tabs (In Progress, Packing Queue, Shipped, All) for traditional fulfillment stages.
         - **Lifecycle View**: 6 warehouse flow tabs matching the actual process - All Shipments (default), Ready to Pick (new sessions), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
