@@ -266,6 +266,9 @@ export default function Bagging() {
   
   // Bagging-specific: Track if label was printed on order load
   const [labelPrintedOnLoad, setLabelPrintedOnLoad] = useState(false);
+  
+  // Bagging-specific: Track if label print is in progress (prevents QC page flash)
+  const [isLabelPrinting, setIsLabelPrinting] = useState(false);
 
   const [orderScan, setOrderScan] = useState("");
   const [productScan, setProductScan] = useState("");
@@ -1120,12 +1123,16 @@ export default function Bagging() {
         return;
       }
 
-      setCurrentShipment(shipment);
+      // Reset state for new order
       setPackingComplete(false);
       setLabelError(null); // Clear any previous label errors when loading new order
       setCompletionSuccess(null); // Clear any previous success state
       progressRestoredRef.current = false; // Reset so restoration runs for new order
       setLabelPrintedOnLoad(false); // Reset label print tracking
+      setIsLabelPrinting(true); // Show loading state while printing label
+      
+      // Set shipment for display (error UI needs order info)
+      setCurrentShipment(shipment);
       
       // Log order loaded event
       logShipmentEvent("order_loaded", {
@@ -1152,17 +1159,23 @@ export default function Bagging() {
         if (printResult.success && printResult.printQueued) {
           console.log('[Bagging] Label print job queued successfully:', printResult.printJobId);
           setLabelPrintedOnLoad(true);
+          setIsLabelPrinting(false); // Label printed successfully, allow QC page
           logShipmentEvent("label_printed_on_load", {
             printJobId: printResult.printJobId,
             orderNumber: shipment.orderNumber,
             station: "bagging",
           }, shipment.orderNumber);
+          // Focus product input after successful label print
+          setTimeout(() => productInputRef.current?.focus(), 100);
         } else {
           console.warn('[Bagging] Label print queuing returned unexpected result:', printResult);
+          setIsLabelPrinting(false); // Allow QC page even if unexpected result
+          setTimeout(() => productInputRef.current?.focus(), 100);
         }
       } catch (printError: any) {
         console.error('[Bagging] Failed to print label on order load:', printError);
         setJustCreatedPrintJob(false);
+        setIsLabelPrinting(false); // Stop loading, show error on scan page
         
         // Extract error details if available
         let parsedError: LabelError | null = null;
@@ -1181,9 +1194,6 @@ export default function Bagging() {
           });
         }
       }
-      
-      // Focus product input after loading shipment
-      setTimeout(() => productInputRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
       // Order not found - clear and refocus for next scan
@@ -2202,11 +2212,26 @@ export default function Bagging() {
               </div>
             </CardContent>
           </Card>
-        ) : !currentShipment || labelError ? (
-          /* No Order Loaded OR Label Print Failed - Show Scan Order Input with any error */
+        ) : !currentShipment || labelError || isLabelPrinting ? (
+          /* No Order Loaded OR Label Print Failed OR Label Printing - Show Scan Order Input */
           <>
+            {/* Loading state while printing label */}
+            {isLabelPrinting && currentShipment && (
+              <Card className="mb-4">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Printing Label...</h3>
+                    <p className="text-muted-foreground">
+                      Order {currentShipment.orderNumber} for {currentShipment.shipToName || 'customer'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
             {/* Show order info if we have a shipment but label failed */}
-            {currentShipment && labelError && (
+            {currentShipment && labelError && !isLabelPrinting && (
               <div className="bg-muted/50 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -2347,7 +2372,7 @@ export default function Bagging() {
             })()}
 
             {/* Printer Status Warning - shown on scan page before scanning */}
-            {!isPrinterReady && !isLoadingStationStatus && !labelError && (
+            {!isPrinterReady && !isLoadingStationStatus && !labelError && !isLabelPrinting && (
               <div 
                 className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-2 mb-4"
                 data-testid="alert-printer-not-ready-scan"
@@ -2378,44 +2403,45 @@ export default function Bagging() {
               </div>
             )}
 
-            {/* Order Scan Card - Entire card is clickable to focus input */}
-            <Card 
-              className={`cursor-text hover-elevate transition-shadow ${hasCriticalPrintQueue || labelError || !isPrinterReady ? 'opacity-50' : ''}`}
-              onClick={() => !hasCriticalPrintQueue && !labelError && isPrinterReady && orderInputRef.current?.focus()}
-            >
-              <CardContent className="pt-6">
-                <form onSubmit={handleOrderScan} className="space-y-3">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Scan className="h-4 w-4" />
-                    Scan Order Barcode
-                  </label>
-                  <Input
-                    ref={orderInputRef}
-                    type="text"
-                    placeholder={
-                      labelError ? "Resolve error above first..." 
-                      : !isPrinterReady ? "Printer offline - cannot scan..." 
-                      : hasCriticalPrintQueue ? "Resolve print queue first..." 
-                      : "Scan order number..."
-                    }
-                    value={orderScan}
-                    onChange={(e) => setOrderScan(e.target.value)}
-                    disabled={loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue || !!labelError || !isPrinterReady}
-                    className="text-2xl h-16 text-center font-mono"
-                    data-testid="input-order-scan"
-                  />
-                  {loadShipmentMutation.isPending && (
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-sm">Loading order...</span>
-                    </div>
-                  )}
-                </form>
-              </CardContent>
-            </Card>
+            {/* Order Scan Card - Hidden while label is printing */}
+            {!isLabelPrinting && (
+              <Card 
+                className={`cursor-text hover-elevate transition-shadow ${hasCriticalPrintQueue || !isPrinterReady ? 'opacity-50' : ''}`}
+                onClick={() => !hasCriticalPrintQueue && isPrinterReady && orderInputRef.current?.focus()}
+              >
+                <CardContent className="pt-6">
+                  <form onSubmit={handleOrderScan} className="space-y-3">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Scan className="h-4 w-4" />
+                      Scan Order Barcode
+                    </label>
+                    <Input
+                      ref={orderInputRef}
+                      type="text"
+                      placeholder={
+                        !isPrinterReady ? "Printer offline - cannot scan..." 
+                        : hasCriticalPrintQueue ? "Resolve print queue first..." 
+                        : "Scan order number..."
+                      }
+                      value={orderScan}
+                      onChange={(e) => setOrderScan(e.target.value)}
+                      disabled={loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue || !isPrinterReady}
+                      className="text-2xl h-16 text-center font-mono"
+                      data-testid="input-order-scan"
+                    />
+                    {loadShipmentMutation.isPending && (
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Loading order...</span>
+                      </div>
+                    )}
+                  </form>
+                </CardContent>
+              </Card>
+            )}
             
             {/* Print Queue Status Indicator - Separate container below scan card */}
-            {!isLoadingStaleMetrics && printQueueJobCount > 0 && (
+            {!isLoadingStaleMetrics && !isLabelPrinting && printQueueJobCount > 0 && (
               <div 
                 className={`rounded-lg p-4 ${
                   hasCriticalPrintQueue 
@@ -3463,8 +3489,8 @@ export default function Bagging() {
           </>
         )}
 
-        {/* Events Timeline - Shows when order is loaded AND has events or logs */}
-        {currentShipment && ((packingLogs && packingLogs.length > 0) || (shipmentEvents && shipmentEvents.length > 0)) && (() => {
+        {/* Events Timeline - Hidden on bagging page per user request */}
+        {false && currentShipment && ((packingLogs && packingLogs.length > 0) || (shipmentEvents && shipmentEvents.length > 0)) && (() => {
           // Merge logs and events, sorted by timestamp (newest first)
           type TimelineEntry = {
             id: string;
