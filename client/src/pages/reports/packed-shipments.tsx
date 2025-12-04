@@ -385,25 +385,25 @@ export default function PackedShipmentsReport() {
                         {day.orders.map((order, idx) => (
                           <div
                             key={`${order.orderNumber}-${idx}`}
-                            className="flex items-center justify-between py-2 px-3 rounded hover:bg-muted/30"
+                            className="grid grid-cols-[1fr_100px_70px_140px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
                             data-testid={`order-row-${order.orderNumber}`}
                           >
                             <a
                               href={`/shipments?search=${order.orderNumber}`}
-                              className="font-mono text-sm text-primary hover:underline"
+                              className="font-mono text-sm text-primary hover:underline truncate"
                               data-testid={`link-order-${order.orderNumber}`}
                             >
                               {order.orderNumber}
                             </a>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>{extractUsername(order.packedBy)}</span>
-                              {order.packingSeconds !== null && (
-                                <span className="text-amber-600 font-medium">
-                                  {formatPackingTime(order.packingSeconds)}
-                                </span>
-                              )}
-                              <span>{formatDateTime(order.packedAt)}</span>
-                            </div>
+                            <span className="text-sm text-muted-foreground truncate text-right">
+                              {extractUsername(order.packedBy)}
+                            </span>
+                            <span className="text-sm text-amber-600 font-medium text-right">
+                              {order.packingSeconds !== null ? formatPackingTime(order.packingSeconds) : '-'}
+                            </span>
+                            <span className="text-sm text-muted-foreground text-right">
+                              {formatDateTime(order.packedAt)}
+                            </span>
                           </div>
                         ))}
                       </div>
