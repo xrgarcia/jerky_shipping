@@ -145,6 +145,14 @@ type PendingPrintJob = {
   createdAt: string;
 };
 
+// Warning when order is missing MOVE OVER tag (only when boxing allows loading anyway)
+type NotShippableWarning = {
+  code: string;
+  message: string;
+  explanation: string;
+  resolution: string;
+};
+
 type ShipmentWithItems = {
   id: string;
   shipmentId: string | null;
@@ -188,6 +196,8 @@ type ShipmentWithItems = {
   // Pre-calculated pending print jobs (immediate display on order load)
   pendingPrintJobs?: PendingPrintJob[];
   hasPendingPrintJobs?: boolean;
+  // Shippability warning (present when order loaded with allowNotShippable=true but missing MOVE OVER tag)
+  notShippable?: NotShippableWarning | null;
 };
 
 type PackingLog = {
@@ -1103,9 +1113,10 @@ export default function Packing() {
   }, [packingLogs, skuProgress.size]); // Re-run when logs load or when skuProgress is initialized
 
   // Load shipment by order number (includes items from backend + SkuVault validation)
+  // Boxing uses allowNotShippable=true to load orders for QC even if not yet shippable
   const loadShipmentMutation = useMutation({
     mutationFn: async (orderNumber: string) => {
-      const response = await apiRequest("GET", `/api/packing/validate-order/${encodeURIComponent(orderNumber)}`);
+      const response = await apiRequest("GET", `/api/packing/validate-order/${encodeURIComponent(orderNumber)}?allowNotShippable=true`);
       return (await response.json()) as ShipmentWithItems;
     },
     onSuccess: (shipment) => {
@@ -3100,6 +3111,29 @@ export default function Packing() {
                 </div>
               )}
 
+              {/* Not Shippable Warning - Order loaded but cannot print label */}
+              {currentShipment?.notShippable && (
+                <div 
+                  className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-2"
+                  data-testid="alert-not-shippable"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-amber-800 dark:text-amber-200">
+                        {currentShipment.notShippable.message}
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        {currentShipment.notShippable.explanation}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">
+                        {currentShipment.notShippable.resolution}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Printer Not Ready Warning */}
               {!isPrinterReady && !isLoadingStationStatus && (
                 <div 
@@ -3136,7 +3170,7 @@ export default function Packing() {
               <Button
                 ref={completeButtonRef}
                 onClick={handleCompletePacking}
-                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady}
+                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady || !!currentShipment?.notShippable}
                 className="w-full focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] transition-all"
                 size="lg"
                 data-testid="button-complete-packing"
@@ -3145,6 +3179,11 @@ export default function Packing() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Completing...
+                  </>
+                ) : currentShipment?.notShippable ? (
+                  <>
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Not Shippable
                   </>
                 ) : !isPrinterReady ? (
                   <>
