@@ -17,7 +17,11 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Data Storage**: PostgreSQL (Neon serverless) with Drizzle Kit for migrations.
 - **Core Features**:
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and QC integration for packing.
-    - **Packing Page**: Single-warehouse MVP with SkuVault QC validation, scan-first workflow, individual unit scanning, and audit trails, supporting kit/assembled products.
+    - **Packing Page (Boxing)**: Single-warehouse MVP with SkuVault QC validation, scan-first workflow, individual unit scanning, and audit trails, supporting kit/assembled products.
+    - **Bagging Page**: Poly-bagging workflow variant of the packing page. Key differences from boxing:
+        - **Immediate Label Printing**: Label prints immediately when order is scanned (before QC), as the bagging machine advances the poly bag roll and prints in one motion.
+        - **Direct Completion**: "Complete Packing" returns directly to order scan without "Next Order" confirmation dialog.
+        - **Separate Station Tracking**: Uses "bagging" station type in audit logs for analytics differentiation.
     - **Shipment Management**: Unified shipments page with dual-view mode:
         - **Workflow View**: Business process tabs (In Progress, Packing Queue, Shipped, All) for traditional fulfillment stages.
         - **Lifecycle View**: 6 warehouse flow tabs matching the actual process - All Shipments (default), Ready to Pick (new sessions), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
