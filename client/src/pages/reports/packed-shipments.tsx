@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers } from "lucide-react";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import {
@@ -13,6 +13,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { SessionDetailDialog } from "@/components/session-detail-dialog";
 
 const CST_TIMEZONE = 'America/Chicago';
 
@@ -21,6 +22,7 @@ interface PackedOrder {
   packedAt: string;
   packedBy: string;
   packingSeconds: number | null;
+  sessionId: string | null;
 }
 
 interface DailySummary {
@@ -67,6 +69,7 @@ export default function PackedShipmentsReport() {
   const [startDate, setStartDate] = useState(sevenDaysAgo);
   const [endDate, setEndDate] = useState(today);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useQuery<PackedShipmentsResponse>({
     queryKey: ['/api/reports/packed-shipments', startDate, endDate],
@@ -385,7 +388,7 @@ export default function PackedShipmentsReport() {
                         {day.orders.map((order, idx) => (
                           <div
                             key={`${order.orderNumber}-${idx}`}
-                            className="grid grid-cols-[1fr_100px_70px_140px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
+                            className="grid grid-cols-[1fr_90px_100px_70px_140px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
                             data-testid={`order-row-${order.orderNumber}`}
                           >
                             <a
@@ -395,6 +398,18 @@ export default function PackedShipmentsReport() {
                             >
                               {order.orderNumber}
                             </a>
+                            {order.sessionId ? (
+                              <button
+                                onClick={() => setSelectedSessionId(order.sessionId)}
+                                className="text-xs font-mono text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-200 flex items-center gap-1"
+                                data-testid={`button-session-${order.sessionId}`}
+                              >
+                                <Layers className="h-3 w-3" />
+                                {order.sessionId}
+                              </button>
+                            ) : (
+                              <span className="text-sm text-muted-foreground text-center">—</span>
+                            )}
                             <span className="text-sm text-muted-foreground truncate text-right">
                               {extractUsername(order.packedBy)}
                             </span>
@@ -421,6 +436,12 @@ export default function PackedShipmentsReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Session Detail Modal */}
+      <SessionDetailDialog
+        picklistId={selectedSessionId}
+        onClose={() => setSelectedSessionId(null)}
+      />
     </div>
   );
 }

@@ -241,6 +241,7 @@ export interface IStorage {
     scanTime: Date;
     completeTime: Date;
     packingSeconds: number;
+    sessionId: string | null;
   }[]>;
   deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void>;
   
@@ -2143,10 +2144,12 @@ export class DatabaseStorage implements IStorage {
     scanTime: Date;
     completeTime: Date;
     packingSeconds: number;
+    sessionId: string | null;
   }[]> {
     // For each packing_completed event, find the most recent order_scanned before it
     // This gives us accurate timing even when orders are scanned multiple times
     // Note: We match by order_number only (not username) since different users may scan vs complete
+    // Also join to shipments table to get session_id for linking to session modal
     const result = await db.execute(sql`
       WITH complete_events AS (
         SELECT id, order_number, username, occurred_at as complete_time
@@ -2173,16 +2176,18 @@ export class DatabaseStorage implements IStorage {
           ) as scan_time
         FROM complete_events c
       )
-      SELECT 
-        event_id,
-        order_number,
-        username,
-        scan_time,
-        complete_time,
-        EXTRACT(EPOCH FROM (complete_time - scan_time)) as packing_seconds
-      FROM scan_with_timing
-      WHERE scan_time IS NOT NULL
-      ORDER BY complete_time DESC
+      SELECT DISTINCT ON (swt.event_id)
+        swt.event_id,
+        swt.order_number,
+        swt.username,
+        swt.scan_time,
+        swt.complete_time,
+        EXTRACT(EPOCH FROM (swt.complete_time - swt.scan_time)) as packing_seconds,
+        sh.session_id
+      FROM scan_with_timing swt
+      LEFT JOIN shipments sh ON sh.order_number = swt.order_number
+      WHERE swt.scan_time IS NOT NULL
+      ORDER BY swt.event_id, sh.session_id DESC NULLS LAST
     `);
     
     return (result.rows as any[]).map(row => ({
@@ -2192,6 +2197,7 @@ export class DatabaseStorage implements IStorage {
       scanTime: new Date(row.scan_time),
       completeTime: new Date(row.complete_time),
       packingSeconds: parseFloat(row.packing_seconds) || 0,
+      sessionId: row.session_id || null,
     }));
   }
 

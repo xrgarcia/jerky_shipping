@@ -2831,11 +2831,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getPackingTimingData(start, end),
       ]);
       
-      // Build timing lookup map: key = eventId (unique per packing_completed event)
+      // Build timing and sessionId lookup maps: key = eventId (unique per packing_completed event)
       // This prevents collisions when multiple events have identical timestamps
       const timingMap = new Map<string, number>();
+      const sessionIdMap = new Map<string, string | null>();
       for (const t of timingData) {
         timingMap.set(t.eventId, t.packingSeconds);
+        sessionIdMap.set(t.eventId, t.sessionId);
       }
       
       // First, group events by order number to deduplicate
@@ -2846,13 +2848,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         packedBy: string;
         eventCount: number;
         packingSeconds: number | null;
+        sessionId: string | null;
       }> = {};
       
       for (const event of packingEvents) {
         const existing = orderMap[event.orderNumber!];
         if (!existing || event.occurredAt > existing.packedAt) {
-          // Look up timing using the event's unique id
+          // Look up timing and sessionId using the event's unique id
           const packingSeconds = timingMap.get(event.id) ?? null;
+          const sessionId = sessionIdMap.get(event.id) ?? null;
           
           orderMap[event.orderNumber] = {
             orderNumber: event.orderNumber,
@@ -2860,6 +2864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             packedBy: event.username,
             eventCount: existing ? existing.eventCount + 1 : 1,
             packingSeconds,
+            sessionId,
           };
         } else {
           existing.eventCount++;
@@ -2928,6 +2933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 packedAt: o.packedAt,
                 packedBy: o.packedBy,
                 packingSeconds: o.packingSeconds,
+                sessionId: o.sessionId,
               })),
           };
         })
