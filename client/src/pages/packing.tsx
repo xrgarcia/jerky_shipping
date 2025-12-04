@@ -1722,14 +1722,27 @@ export default function Packing() {
   };
 
   // Complete packing and queue print job
+  // When order is notShippable, we pass skipLabel=true for QC-only completion
   const completePackingMutation = useMutation({
     mutationFn: async () => {
-      // Set optimistic state immediately so button shows pending state right away
-      setJustCreatedPrintJob(true);
+      const isQcOnly = !!currentShipment?.notShippable;
+      
+      // Only set optimistic print job state if we're actually printing
+      if (!isQcOnly) {
+        setJustCreatedPrintJob(true);
+      }
+      
       const response = await apiRequest("POST", "/api/packing/complete", {
         shipmentId: currentShipment!.id,
+        skipLabel: isQcOnly, // Skip label printing for non-shippable orders
       });
-      return (await response.json()) as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
+      return (await response.json()) as { 
+        success: boolean; 
+        printQueued: boolean; 
+        qcOnly?: boolean;
+        printJobId?: string; 
+        message?: string 
+      };
     },
     onSuccess: (result) => {
       // Log packing completed event before resetting state
@@ -1737,7 +1750,17 @@ export default function Packing() {
       logShipmentEvent("packing_completed", {
         totalScans,
         printQueued: result.printQueued,
+        qcOnly: result.qcOnly || false,
       });
+      
+      // Show QC-only toast for non-shippable orders
+      if (result.qcOnly) {
+        toast({
+          title: "QC Complete",
+          description: "Quality check recorded. Label not printed - order is not yet shippable.",
+          variant: "default",
+        });
+      }
       
       // Auto-reset to order scan state - ready for next order
       setCompletionSuccess(null);
@@ -3167,10 +3190,16 @@ export default function Packing() {
               )}
 
               {/* Complete Packing Button */}
+              {/* For notShippable orders: enable button for QC-only completion (no label print) */}
+              {/* For shippable orders: require printer ready before enabling */}
               <Button
                 ref={completeButtonRef}
                 onClick={handleCompletePacking}
-                disabled={!allItemsScanned || completePackingMutation.isPending || hasPendingPrintJob || !isPrinterReady || !!currentShipment?.notShippable}
+                disabled={
+                  !allItemsScanned || 
+                  completePackingMutation.isPending || 
+                  (currentShipment?.notShippable ? false : (hasPendingPrintJob || !isPrinterReady))
+                }
                 className="w-full focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] transition-all"
                 size="lg"
                 data-testid="button-complete-packing"
@@ -3180,12 +3209,12 @@ export default function Packing() {
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Completing...
                   </>
-                ) : currentShipment?.notShippable ? (
+                ) : currentShipment?.notShippable && allItemsScanned ? (
                   <>
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Not Shippable
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Complete Packing
                   </>
-                ) : !isPrinterReady ? (
+                ) : !isPrinterReady && !currentShipment?.notShippable ? (
                   <>
                     <WifiOff className="h-4 w-4 mr-2" />
                     Printer Not Ready

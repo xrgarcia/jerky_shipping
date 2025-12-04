@@ -6064,10 +6064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Complete order packing
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
-    const { shipmentId } = req.body;
+    const { shipmentId, skipLabel } = req.body;
     const user = req.user!;
     let orderNumber = 'unknown';
     let shipment: Awaited<ReturnType<typeof storage.getShipment>> | null = null;
+    let isNotShippable = false; // Track if order is missing MOVE OVER tag
     
     // Helper to log packing actions with request/response data
     async function logPackingAction(
@@ -6139,10 +6140,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       orderNumber = shipment.orderNumber;
       
+      // Check if order is shippable (has MOVE OVER tag)
+      const shipmentTags = await storage.getShipmentTags(shipment.id);
+      const hasMoveOverTag = shipmentTags.some((tag: { name: string }) => tag.name === 'MOVE OVER');
+      isNotShippable = !hasMoveOverTag;
+      
+      // Validate skipLabel is only allowed when order is not shippable
+      if (skipLabel && !isNotShippable) {
+        console.warn(`[Packing] Rejected skipLabel=true for shippable order ${orderNumber}`);
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_SKIP_LABEL',
+            message: 'Cannot skip label for shippable orders',
+            resolution: 'This order is ready to ship and requires a label. Complete normally.'
+          }
+        });
+      }
+      
       // Log the packing completion attempt
       await logPackingAction('complete_order_start', true, {
-        requestData: { shipmentId, stationId: webSession.stationId, hasLabelUrl: !!shipment.labelUrl, hasOrderId: !!shipment.orderId }
+        requestData: { 
+          shipmentId, 
+          stationId: webSession.stationId, 
+          hasLabelUrl: !!shipment.labelUrl, 
+          hasOrderId: !!shipment.orderId,
+          skipLabel: !!skipLabel,
+          isNotShippable
+        }
       });
+      
+      // If skipLabel is true (QC-only completion for non-shippable orders), skip label handling entirely
+      if (skipLabel && isNotShippable) {
+        console.log(`[Packing] Completing QC-only (no label) for non-shippable order ${orderNumber}`);
+        
+        // Log the QC-only completion
+        await logPackingAction('boxing_completed_without_label', true, {
+          responseData: { 
+            reason: 'Order missing MOVE OVER tag',
+            qcOnly: true,
+            stationId: webSession.stationId
+          }
+        });
+        
+        return res.json({
+          success: true,
+          printQueued: false,
+          qcOnly: true,
+          message: "QC complete! Label not printed - order is not yet shippable (missing MOVE OVER tag).",
+          orderNumber: shipment.orderNumber
+        });
+      }
       
       // If no label URL, try to fetch or create one from ShipStation
       let labelUrl = shipment.labelUrl;
