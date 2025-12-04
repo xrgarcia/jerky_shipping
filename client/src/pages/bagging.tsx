@@ -1198,6 +1198,10 @@ export default function Bagging() {
     onError: (error: any) => {
       console.error('[Bagging] Order load failed:', error);
       
+      // Always clear previous order on any error
+      setCurrentShipment(null);
+      setOrderScan("");
+      
       // Check if this is a NOT_SHIPPABLE error (or other structured error)
       if (error.data?.error?.code === 'NOT_SHIPPABLE') {
         const notShippableError = error.data.error;
@@ -1207,13 +1211,9 @@ export default function Bagging() {
           shipStationError: notShippableError.explanation,
           resolution: notShippableError.resolution,
         });
-        // Keep orderScan so user can see what they scanned
-        setTimeout(() => orderInputRef.current?.focus(), 100);
-      } else {
-        // Generic error - clear and refocus for next scan
-        setOrderScan("");
-        setTimeout(() => orderInputRef.current?.focus(), 100);
       }
+      // Focus on scan input for next order
+      setTimeout(() => orderInputRef.current?.focus(), 100);
     },
   });
 
