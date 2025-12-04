@@ -338,6 +338,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
     try {
       const sessionToken = req.cookies[SESSION_COOKIE_NAME];
+      const user = req.user!;
+      
+      // Clear user's station assignment before logging out
+      await storage.deleteWebPackingSession(user.id);
+      
       await storage.deleteSession(sessionToken);
       res.clearCookie(SESSION_COOKIE_NAME);
       res.json({ success: true });
@@ -6317,8 +6322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Complete bagging order (QC verification complete - label was already printed on order scan)
-  // This is a lightweight endpoint that logs completion events to shipment_events
-  // It logs both bagging_qc_completed and packing_complete for analytics parity with boxing
+  // Logs a single 'packing_completed' event matching boxing station for unified metrics
   app.post("/api/packing/bagging-complete", requireAuth, async (req, res) => {
     const { shipmentId, orderNumber, totalScans, stationId, labelPrintedOnLoad } = req.body;
     const user = req.user!;
@@ -6332,51 +6336,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Log bagging QC completed event (first event - QC verification done)
-      await storage.createShipmentEvent({
-        username: user.email,
-        station: "bagging",
-        eventName: "bagging_qc_completed",
-        orderNumber,
-        metadata: {
-          shipmentId,
-          stationId,
-          totalScans: totalScans || 0,
-          labelAlreadyPrinted: labelPrintedOnLoad || false,
-        },
-      });
-      
-      // Log bagging_completed event (second event - matches historical client-side event name)
-      await storage.createShipmentEvent({
-        username: user.email,
-        station: "bagging",
-        eventName: "bagging_completed",
-        orderNumber,
-        metadata: {
-          shipmentId,
-          stationId,
-          totalScans: totalScans || 0,
-          labelPrintedOnLoad: labelPrintedOnLoad || false,
-        },
-      });
-      
-      // Log packing_complete event (third event - unified completion event for cross-station analytics)
+      // Log single packing_completed event (matches boxing station for unified metrics)
+      // Use station: "bagging" to differentiate from boxing in analytics
       const event = await storage.createShipmentEvent({
         username: user.email,
         station: "bagging",
-        eventName: "packing_complete",
+        eventName: "packing_completed",
         orderNumber,
         metadata: {
           shipmentId,
           stationId,
           totalScans: totalScans || 0,
           labelPrintedOnLoad: labelPrintedOnLoad || false,
-          completedBy: user.displayName || user.email,
-          completedAt: new Date().toISOString(),
         },
       });
       
-      console.log(`[Bagging] Logged bagging_qc_completed, bagging_completed, and packing_complete events for order ${orderNumber}`);
+      console.log(`[Bagging] Logged packing_completed event for order ${orderNumber}`);
       
       res.json({ 
         success: true, 
