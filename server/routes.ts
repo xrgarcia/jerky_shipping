@@ -2825,8 +2825,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid date format" });
       }
 
-      // Get all packing_completed events in the date range
-      const packingEvents = await storage.getPackingCompletedEvents(start, end);
+      // Get all packing_completed events and timing data in parallel
+      const [packingEvents, timingData] = await Promise.all([
+        storage.getPackingCompletedEvents(start, end),
+        storage.getPackingTimingData(start, end),
+      ]);
+      
+      // Build timing lookup map: key = eventId (unique per packing_completed event)
+      // This prevents collisions when multiple events have identical timestamps
+      const timingMap = new Map<string, number>();
+      for (const t of timingData) {
+        timingMap.set(t.eventId, t.packingSeconds);
+      }
       
       // First, group events by order number to deduplicate
       // Keep the most recent packing event for each order
@@ -2835,16 +2845,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         packedAt: Date;
         packedBy: string;
         eventCount: number;
+        packingSeconds: number | null;
       }> = {};
       
       for (const event of packingEvents) {
-        const existing = orderMap[event.orderNumber];
+        const existing = orderMap[event.orderNumber!];
         if (!existing || event.occurredAt > existing.packedAt) {
+          // Look up timing using the event's unique id
+          const packingSeconds = timingMap.get(event.id) ?? null;
+          
           orderMap[event.orderNumber] = {
             orderNumber: event.orderNumber,
             packedAt: event.occurredAt,
             packedBy: event.username,
             eventCount: existing ? existing.eventCount + 1 : 1,
+            packingSeconds,
           };
         } else {
           existing.eventCount++;
@@ -2853,9 +2868,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const uniqueOrders = Object.values(orderMap);
       
+      // Calculate overall timing statistics
+      const ordersWithTiming = uniqueOrders.filter(o => o.packingSeconds !== null);
+      const totalPackingSeconds = ordersWithTiming.reduce((sum, o) => sum + (o.packingSeconds || 0), 0);
+      const overallAvgPackingSeconds = ordersWithTiming.length > 0 
+        ? totalPackingSeconds / ordersWithTiming.length 
+        : null;
+      
       // Group unique orders by date (in Central Time)
       const byDate: Record<string, typeof uniqueOrders> = {};
-      const byUser: Record<string, number> = {};
+      const byUser: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
       
       for (const order of uniqueOrders) {
         // Format date as YYYY-MM-DD in Central Time
@@ -2866,8 +2888,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         byDate[dateKey].push(order);
         
-        // Count unique orders by user
-        byUser[order.packedBy] = (byUser[order.packedBy] || 0) + 1;
+        // Aggregate user timing stats
+        if (!byUser[order.packedBy]) {
+          byUser[order.packedBy] = { count: 0, totalSeconds: 0, ordersWithTiming: 0 };
+        }
+        byUser[order.packedBy].count++;
+        if (order.packingSeconds !== null) {
+          byUser[order.packedBy].totalSeconds += order.packingSeconds;
+          byUser[order.packedBy].ordersWithTiming++;
+        }
       }
       
       // Convert to array sorted by date descending
@@ -2879,9 +2908,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userBreakdown[order.packedBy] = (userBreakdown[order.packedBy] || 0) + 1;
           }
           
+          // Calculate average packing time for this day
+          const dayOrdersWithTiming = orders.filter(o => o.packingSeconds !== null);
+          const dayTotalSeconds = dayOrdersWithTiming.reduce((sum, o) => sum + (o.packingSeconds || 0), 0);
+          const avgPackingSeconds = dayOrdersWithTiming.length > 0 
+            ? dayTotalSeconds / dayOrdersWithTiming.length 
+            : null;
+          
           return {
             date,
             count: orders.length,
+            avgPackingSeconds,
+            ordersWithTiming: dayOrdersWithTiming.length,
             userBreakdown,
             orders: orders
               .sort((a, b) => b.packedAt.getTime() - a.packedAt.getTime())
@@ -2889,6 +2927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 orderNumber: o.orderNumber,
                 packedAt: o.packedAt,
                 packedBy: o.packedBy,
+                packingSeconds: o.packingSeconds,
               })),
           };
         })
@@ -2898,8 +2937,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         totalPacked: uniqueOrders.length,
+        // Overall timing metrics
+        overallAvgPackingSeconds,
+        ordersWithTiming: ordersWithTiming.length,
+        // Per-user summary with timing
         userSummary: Object.entries(byUser)
-          .map(([username, count]) => ({ username, count }))
+          .map(([username, stats]) => ({ 
+            username, 
+            count: stats.count,
+            avgPackingSeconds: stats.ordersWithTiming > 0 
+              ? stats.totalSeconds / stats.ordersWithTiming 
+              : null,
+            ordersWithTiming: stats.ordersWithTiming,
+          }))
           .sort((a, b) => b.count - a.count),
         dailySummary,
       });

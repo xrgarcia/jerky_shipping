@@ -36,6 +36,12 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
         - **Lifecycle View**: 6 warehouse flow tabs matching the actual process - All Shipments (default), Ready to Pick (new sessions), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
     - **Order Backfill System**: Fault-tolerant, task-based architecture for historical Shopify orders and ShipStation shipments, using Redis-queued processing and WebSocket updates.
     - **Reporting & Analytics**: Business analytics dashboard (Gross Sales, Net Sales) and PO Recommendations page querying a separate GCP PostgreSQL database.
+        - **Packed Shipments Report**: Shows shipments by date they were packed with comprehensive timing analytics:
+            - **Overall Timing**: Average packing time for the entire date range (scan-to-complete)
+            - **Per-User Timing**: Average packing time per packer in the leaderboard
+            - **Per-Day Timing**: Average packing time per day in daily breakdown
+            - **Per-Order Timing**: Individual packing time for each order in details
+            - **Implementation**: Uses composite index `shipment_events_timing_idx` on (order_number, event_name, occurred_at DESC) for efficient queries. The `getPackingTimingData()` method uses raw SQL to find the most recent `order_scanned` event before each `packing_completed` event, matching by order number only (not username) to support multi-user workflows where different people scan vs complete.
     - **Operations Dashboard**: Real-time queue monitoring, worker status, backfill job status, and data health metrics via WebSockets.
     - **Print Queue System**: Automated shipping label printing with background worker, retry logic, and browser auto-print.
     - **Desktop Printing System**: A three-tier architecture enabling native Windows printing with a dedicated Electron app for secure Google OAuth, WebSocket connectivity, station management, and remote configuration.

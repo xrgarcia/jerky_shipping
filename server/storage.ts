@@ -234,6 +234,14 @@ export interface IStorage {
   getShipmentEventsByUser(username: string, limit?: number): Promise<ShipmentEvent[]>;
   getShipmentEventsByDateRange(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
   getPackingCompletedEvents(startDate: Date, endDate: Date): Promise<ShipmentEvent[]>;
+  getPackingTimingData(startDate: Date, endDate: Date): Promise<{
+    eventId: string;
+    orderNumber: string;
+    username: string;
+    scanTime: Date;
+    completeTime: Date;
+    packingSeconds: number;
+  }[]>;
   deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void>;
   
   // Shipment Sync Failures
@@ -2126,6 +2134,65 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(shipmentEvents.occurredAt));
+  }
+
+  async getPackingTimingData(startDate: Date, endDate: Date): Promise<{
+    eventId: string;
+    orderNumber: string;
+    username: string;
+    scanTime: Date;
+    completeTime: Date;
+    packingSeconds: number;
+  }[]> {
+    // For each packing_completed event, find the most recent order_scanned before it
+    // This gives us accurate timing even when orders are scanned multiple times
+    // Note: We match by order_number only (not username) since different users may scan vs complete
+    const result = await db.execute(sql`
+      WITH complete_events AS (
+        SELECT id, order_number, username, occurred_at as complete_time
+        FROM shipment_events
+        WHERE event_name = 'packing_completed'
+          AND occurred_at >= ${startDate}
+          AND occurred_at <= ${endDate}
+          AND order_number IS NOT NULL
+      ),
+      scan_with_timing AS (
+        SELECT 
+          c.id as event_id,
+          c.order_number,
+          c.username,
+          c.complete_time,
+          (
+            SELECT occurred_at 
+            FROM shipment_events s
+            WHERE s.event_name = 'order_scanned'
+              AND s.order_number = c.order_number
+              AND s.occurred_at <= c.complete_time
+            ORDER BY s.occurred_at DESC
+            LIMIT 1
+          ) as scan_time
+        FROM complete_events c
+      )
+      SELECT 
+        event_id,
+        order_number,
+        username,
+        scan_time,
+        complete_time,
+        EXTRACT(EPOCH FROM (complete_time - scan_time)) as packing_seconds
+      FROM scan_with_timing
+      WHERE scan_time IS NOT NULL
+      ORDER BY complete_time DESC
+    `);
+    
+    return (result.rows as any[]).map(row => ({
+      eventId: row.event_id,
+      orderNumber: row.order_number,
+      username: row.username,
+      scanTime: new Date(row.scan_time),
+      completeTime: new Date(row.complete_time),
+      packingSeconds: parseFloat(row.packing_seconds) || 0,
+    }));
   }
 
   async deleteShipmentEventsByOrderNumber(orderNumber: string): Promise<void> {

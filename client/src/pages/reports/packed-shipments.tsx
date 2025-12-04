@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import {
@@ -20,11 +20,14 @@ interface PackedOrder {
   orderNumber: string;
   packedAt: string;
   packedBy: string;
+  packingSeconds: number | null;
 }
 
 interface DailySummary {
   date: string;
   count: number;
+  avgPackingSeconds: number | null;
+  ordersWithTiming: number;
   userBreakdown: Record<string, number>;
   orders: PackedOrder[];
 }
@@ -32,15 +35,28 @@ interface DailySummary {
 interface UserSummary {
   username: string;
   count: number;
+  avgPackingSeconds: number | null;
+  ordersWithTiming: number;
 }
 
 interface PackedShipmentsResponse {
   startDate: string;
   endDate: string;
   totalPacked: number;
+  overallAvgPackingSeconds: number | null;
+  ordersWithTiming: number;
   userSummary: UserSummary[];
   dailySummary: DailySummary[];
 }
+
+// Helper function to format seconds as human-readable time
+const formatPackingTime = (seconds: number | null): string => {
+  if (seconds === null) return '-';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+};
 
 export default function PackedShipmentsReport() {
   // Get today and 7 days ago in Central Time
@@ -200,7 +216,7 @@ export default function PackedShipmentsReport() {
 
         {/* Summary Cards */}
         {data && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="border-green-500/30 bg-green-500/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -215,6 +231,28 @@ export default function PackedShipmentsReport() {
                 <div className="text-4xl font-bold text-green-600" data-testid="text-total-packed">
                   {data.totalPacked}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                  Avg Pack Time
+                </CardTitle>
+                <CardDescription>
+                  Scan to complete
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-amber-600" data-testid="text-avg-time">
+                  {formatPackingTime(data.overallAvgPackingSeconds)}
+                </div>
+                {data.ordersWithTiming > 0 && data.ordersWithTiming < data.totalPacked && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Based on {data.ordersWithTiming} of {data.totalPacked} orders
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -263,7 +301,7 @@ export default function PackedShipmentsReport() {
                 Packer Leaderboard
               </CardTitle>
               <CardDescription>
-                Orders packed by user in the selected date range
+                Orders packed by user in the selected date range (with average pack time)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -276,6 +314,12 @@ export default function PackedShipmentsReport() {
                   >
                     <span className="font-medium">{extractUsername(user.username)}</span>
                     <Badge variant="secondary">{user.count}</Badge>
+                    {user.avgPackingSeconds !== null && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {formatPackingTime(user.avgPackingSeconds)}
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </div>
@@ -318,6 +362,12 @@ export default function PackedShipmentsReport() {
                           <ChevronRight className="h-5 w-5" />
                         )}
                         <span className="font-semibold text-lg">{formatDisplayDate(day.date)}</span>
+                        {day.avgPackingSeconds !== null && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300">
+                            <Clock className="h-3 w-3 mr-1" />
+                            avg {formatPackingTime(day.avgPackingSeconds)}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex gap-2">
@@ -347,6 +397,11 @@ export default function PackedShipmentsReport() {
                             </a>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span>{extractUsername(order.packedBy)}</span>
+                              {order.packingSeconds !== null && (
+                                <span className="text-amber-600 font-medium">
+                                  {formatPackingTime(order.packingSeconds)}
+                                </span>
+                              )}
                               <span>{formatDateTime(order.packedAt)}</span>
                             </div>
                           </div>
