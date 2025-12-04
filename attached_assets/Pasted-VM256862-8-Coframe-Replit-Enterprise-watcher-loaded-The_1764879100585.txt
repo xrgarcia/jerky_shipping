@@ -1,0 +1,151 @@
+VM256862:8 [Coframe] Replit Enterprise watcher loaded
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+jerkyshippping:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+jerkyshippping:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+jerkyshippping:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+b386452d46b89b14.js:2 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+b386452d46b89b14.js:2 Download the Apollo DevTools for a better development experience: https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm
+b386452d46b89b14.js:2 [LaunchDarkly] LaunchDarkly client initialized
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+ed1e693c96a75807.js:2 Unrecognized feature: 'ambient-light-sensor'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'battery'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'execution-while-not-rendered'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'execution-while-out-of-viewport'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'layout-animations'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'legacy-image-formats'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'navigation-override'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'oversized-images'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'publickey-credentials'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'speaker-selection'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'unoptimized-images'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'unsized-media'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Unrecognized feature: 'pointer-lock'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Allow attribute will take precedence over 'allowfullscreen'.
+z @ ed1e693c96a75807.js:2
+ed1e693c96a75807.js:2 Allow attribute will take precedence over 'allowpaymentrequest'.
+z @ ed1e693c96a75807.js:2
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'battery'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'layout-animations'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'legacy-image-formats'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'navigation-override'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'oversized-images'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'publickey-credentials'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'speaker-selection'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'unoptimized-images'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Unrecognized feature: 'unsized-media'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Arbi%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+injected.js:37 [Bagging] WebSocket connected for station status
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+injected.js:37 [Bagging] Order load failed: ApiError: 422: {"error":{"code":"NOT_SHIPPABLE","message":"This order is not shippable","explanation":"The order does not have the \"MOVE OVER\" tag. This means the order may still be in picking, or it hasn't been released from SkuVault yet.","resolution":"Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship."},"orderNumber":"TEST-1204254-RG","shipmentId":"02bf6c28-5803-4692-91f7-f4d00d62adae"}
+    at throwIfResNotOk (queryClient.ts:27:11)
+    at async apiRequest (queryClient.ts:43:3)
+    at async Object.mutationFn (bagging.tsx:1115:24)
+(anonymous) @ injected.js:37
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+injected.js:37 [Bagging] Order load failed: ApiError: 422: {"error":{"code":"NOT_SHIPPABLE","message":"This order is not shippable","explanation":"The order does not have the \"MOVE OVER\" tag. This means the order may still be in picking, or it hasn't been released from SkuVault yet.","resolution":"Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship."},"orderNumber":"TEST-1204254-RG","shipmentId":"02bf6c28-5803-4692-91f7-f4d00d62adae"}
+    at throwIfResNotOk (queryClient.ts:27:11)
+    at async apiRequest (queryClient.ts:43:3)
+    at async Object.mutationFn (bagging.tsx:1115:24)
+(anonymous) @ injected.js:37
+injected.js:37 WebSocket connected
+injected.js:37 WebSocket disconnected 1005 
+injected.js:37 WebSocket connected
+injected.js:37 WebSocket disconnected 1005 
+injected.js:37 WebSocket connected (Operations)
+injected.js:37 WebSocket disconnected 1005 
+injected.js:37 [Packing] WebSocket connected for station status
+packing.tsx:526 WebSocket connection to 'wss://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/ws' failed: WebSocket is closed before the connection is established.
+(anonymous) @ packing.tsx:526
+injected.js:37 [Bagging] WebSocket connected for station status
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+injected.js:37 [Bagging] Order load failed: ApiError: 422: {"error":{"code":"NOT_SHIPPABLE","message":"This order is not shippable","explanation":"The order does not have the \"MOVE OVER\" tag. This means the order may still be in picking, or it hasn't been released from SkuVault yet.","resolution":"Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship."},"orderNumber":"TEST-1204254-RG","shipmentId":"02bf6c28-5803-4692-91f7-f4d00d62adae"}
+    at throwIfResNotOk (queryClient.ts:27:11)
+    at async apiRequest (queryClient.ts:43:3)
+    at async Object.mutationFn (bagging.tsx:1115:24)
+(anonymous) @ injected.js:37
+injected.js:37 [Packing] WebSocket connected for station status
+1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/api/packing/validate-order/TEST-1204254-RG:1  Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)
+injected.js:37 [Packing] Order load failed: 422: {"error":{"code":"NOT_SHIPPABLE","message":"This order is not shippable","explanation":"The order does not have the \"MOVE OVER\" tag. This means the order may still be in picking, or it hasn't been released from SkuVault yet.","resolution":"Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship."},"orderNumber":"TEST-1204254-RG","shipmentId":"02bf6c28-5803-4692-91f7-f4d00d62adae"}
+(anonymous) @ injected.js:37

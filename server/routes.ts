@@ -4750,9 +4750,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Validate order for packing - cross-validates ShipStation and SkuVault data
+  // Query params:
+  //   - allowNotShippable: If "true", returns shipment with notShippable warning instead of 422 error
+  //     This is used by boxing page which can load orders for QC even if not yet shippable
   app.get("/api/packing/validate-order/:orderNumber", requireAuth, async (req, res) => {
     try {
       const { orderNumber } = req.params;
+      const allowNotShippable = req.query.allowNotShippable === 'true';
       const user = req.user;
       
       if (!user) {
@@ -4769,6 +4773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let saleId: string | null = null;
       const validationWarnings: string[] = [];
       let cacheSource: 'warm_cache' | 'skuvault_api' | 'database' = 'database';
+      
+      // Track shippability for response (used when allowNotShippable=true)
+      let notShippable: { code: string; message: string; explanation: string; resolution: string } | null = null;
       
       // 1. Get shipment data (prefer warm cache, fallback to PostgreSQL)
       if (warmCacheData?.shipment) {
@@ -4800,16 +4807,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!hasMoveOverTag) {
         console.log(`[Packing Validation] Order ${orderNumber} is not shippable - missing MOVE OVER tag`);
-        return res.status(422).json({
-          error: {
-            code: 'NOT_SHIPPABLE',
-            message: 'This order is not shippable',
-            explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
-            resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
-          },
-          orderNumber,
-          shipmentId: shipment.id
-        });
+        
+        const notShippableError = {
+          code: 'NOT_SHIPPABLE',
+          message: 'This order is not shippable',
+          explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
+          resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
+        };
+        
+        // If allowNotShippable is true (boxing page), continue loading but include warning
+        // Otherwise (bagging page), return 422 error to block the scan
+        if (allowNotShippable) {
+          notShippable = notShippableError;
+          console.log(`[Packing Validation] allowNotShippable=true, continuing with warning for order ${orderNumber}`);
+        } else {
+          return res.status(422).json({
+            error: notShippableError,
+            orderNumber,
+            shipmentId: shipment.id
+          });
+        }
       }
       
       // Always fetch shipment items from PostgreSQL (not cached, rarely needed for rendering)
@@ -5088,6 +5105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemsSource: qcSale?.Items?.length ? 'skuvault' : 'shipstation', // Tell frontend which source was used
         cacheSource, // Whether data came from warm cache or direct API call
         sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
+        notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
