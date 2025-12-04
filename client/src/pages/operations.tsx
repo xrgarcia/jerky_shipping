@@ -583,6 +583,57 @@ function UnifiedSyncButtons({
   );
 }
 
+function FirestoreSyncButtons({ 
+  toast 
+}: { 
+  toast: ReturnType<typeof useToast>['toast'];
+}) {
+  const [isReimportLoading, setIsReimportLoading] = useState(false);
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          setIsReimportLoading(true);
+          try {
+            const response = await apiRequest('POST', '/api/operations/firestore-sessions/reimport');
+            const result = await response.json();
+            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+            if (result.success) {
+              toast({
+                title: "Re-import Complete",
+                description: `Synced ${result.totalSynced} sessions from ${result.pagesProcessed} pages (starting ${new Date(result.startDate).toLocaleDateString()})`,
+              });
+            } else {
+              toast({
+                title: "Re-import Failed",
+                description: result.message,
+                variant: "destructive",
+              });
+            }
+          } catch (err) {
+            console.error('Failed to reimport sessions:', err);
+            toast({
+              title: "Failed to reimport sessions",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsReimportLoading(false);
+          }
+        }}
+        disabled={isReimportLoading}
+        data-testid="button-firestore-reimport"
+      >
+        <RefreshCw className={cn("h-3 w-3 mr-1", isReimportLoading && "animate-spin")} />
+        {isReimportLoading ? "Re-importing..." : "Re-import All"}
+      </Button>
+    </div>
+  );
+}
+
 export default function OperationsPage() {
   const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "shopify-order-sync" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
@@ -1934,6 +1985,7 @@ Please analyze this failure and help me understand:
                     )}
                   </div>
                 )}
+                <FirestoreSyncButtons toast={toast} />
               </div>
               <Badge 
                 variant={

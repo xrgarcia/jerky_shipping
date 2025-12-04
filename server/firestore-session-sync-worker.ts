@@ -438,3 +438,102 @@ export async function getSessionedShipmentCount(): Promise<number> {
   // Filter to only those with sessionId
   return result.filter(s => s.sessionId !== null).length;
 }
+
+/**
+ * Re-import ALL sessions (including closed) from a given start date.
+ * Paginates through sessions 500 at a time to avoid memory issues.
+ * This is used to backfill sessions that were missed because their
+ * shipment didn't exist when the session closed.
+ */
+export async function reimportAllSessions(
+  startDate: Date
+): Promise<{ success: boolean; message: string; totalSynced: number; pagesProcessed: number }> {
+  const BATCH_SIZE = 500;
+  let totalSynced = 0;
+  let pagesProcessed = 0;
+  let currentStartDate = startDate;
+  let hasMore = true;
+
+  try {
+    log(`Starting reimport of ALL sessions from ${startDate.toISOString()}`);
+    workerStatus = 'running';
+
+    while (hasMore) {
+      pagesProcessed++;
+      log(`Fetching page ${pagesProcessed} of sessions since ${currentStartDate.toISOString()}...`);
+
+      const sessions = await firestoreStorage.getSessionsUpdatedSince(currentStartDate, BATCH_SIZE);
+      
+      if (sessions.length === 0) {
+        log(`No more sessions found, reimport complete`);
+        hasMore = false;
+        workerStatus = 'sleeping';
+        break;
+      }
+
+      log(`Processing ${sessions.length} sessions from page ${pagesProcessed}...`);
+
+      let pageSynced = 0;
+      for (const session of sessions) {
+        const synced = await syncSessionToShipment(session);
+        if (synced) {
+          pageSynced++;
+          totalSynced++;
+        }
+      }
+
+      log(`Page ${pagesProcessed}: synced ${pageSynced} of ${sessions.length} sessions`);
+
+      // Update running stats so UI can see progress
+      workerStats.totalSynced += pageSynced;
+      workerStats.lastSyncCount = pageSynced;
+      workerStats.lastSyncAt = new Date();
+
+      // If we got fewer than BATCH_SIZE, we've reached the end
+      if (sessions.length < BATCH_SIZE) {
+        log(`Last page had ${sessions.length} sessions (less than ${BATCH_SIZE}), reimport complete`);
+        hasMore = false;
+      } else {
+        // Move cursor to the last session's updated_date for next page
+        const lastSession = sessions[sessions.length - 1];
+        // Ensure updated_date is a valid Date object before calling getTime()
+        const lastUpdatedDate = lastSession.updated_date instanceof Date 
+          ? lastSession.updated_date 
+          : new Date(lastSession.updated_date);
+        
+        if (lastUpdatedDate && !isNaN(lastUpdatedDate.getTime())) {
+          // Add 1ms to avoid re-fetching the same session
+          currentStartDate = new Date(lastUpdatedDate.getTime() + 1);
+        } else {
+          // Fallback: if no valid updated_date, stop to avoid infinite loop
+          log(`Warning: Last session has no valid updated_date, stopping pagination`);
+          hasMore = false;
+        }
+      }
+    }
+
+    workerStatus = 'sleeping';
+    const message = `Reimport complete: ${totalSynced} sessions synced across ${pagesProcessed} pages`;
+    log(message);
+
+    return {
+      success: true,
+      message,
+      totalSynced,
+      pagesProcessed,
+    };
+  } catch (error: any) {
+    const errorMsg = `Reimport error on page ${pagesProcessed}: ${error.message}`;
+    log(errorMsg);
+    workerStats.errorsCount++;
+    workerStats.lastError = error.message;
+    workerStatus = 'error';
+
+    return {
+      success: false,
+      message: errorMsg,
+      totalSynced,
+      pagesProcessed,
+    };
+  }
+}

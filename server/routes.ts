@@ -3954,6 +3954,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Re-import ALL sessions (including closed) from oldest shipment date
+  // This backfills sessions that were missed because shipments didn't exist when sessions closed
+  app.post("/api/operations/firestore-sessions/reimport", requireAuth, async (req, res) => {
+    try {
+      // Find the oldest shipment date (ascending order to get the oldest)
+      const oldestShipmentResult = await db
+        .select({ createdAt: shipments.createdAt })
+        .from(shipments)
+        .orderBy(asc(shipments.createdAt))
+        .limit(1);
+
+      if (oldestShipmentResult.length === 0) {
+        return res.json({ 
+          success: false, 
+          message: "No shipments found in database" 
+        });
+      }
+
+      const oldestDate = oldestShipmentResult[0].createdAt;
+      console.log(`[operations] Starting Firestore session reimport from ${oldestDate?.toISOString()}`);
+
+      const { reimportAllSessions } = await import("./firestore-session-sync-worker");
+      const result = await reimportAllSessions(oldestDate!);
+      
+      res.json({
+        ...result,
+        startDate: oldestDate?.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Error reimporting Firestore sessions:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to reimport Firestore sessions: ${error.message}` 
+      });
+    }
+  });
+
   // List all registered Shopify webhooks (diagnostic endpoint)
   app.get("/api/operations/list-shopify-webhooks", requireAuth, async (req, res) => {
     try {
