@@ -4793,6 +4793,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipment = shipmentResults[0];
       }
       
+      // SHIPPABILITY CHECK: Verify order has "MOVE OVER" tag before allowing packing
+      // The MOVE OVER tag indicates the order has completed picking in SkuVault and is ready to ship
+      const shipmentTags = await storage.getShipmentTags(shipment.id);
+      const hasMoveOverTag = shipmentTags.some((tag: { name: string }) => tag.name === 'MOVE OVER');
+      
+      if (!hasMoveOverTag) {
+        console.log(`[Packing Validation] Order ${orderNumber} is not shippable - missing MOVE OVER tag`);
+        return res.status(422).json({
+          error: {
+            code: 'NOT_SHIPPABLE',
+            message: 'This order is not shippable',
+            explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
+            resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
+          },
+          orderNumber,
+          shipmentId: shipment.id
+        });
+      }
+      
       // Always fetch shipment items from PostgreSQL (not cached, rarely needed for rendering)
       shipmentItems = await storage.getShipmentItems(shipment.id);
       

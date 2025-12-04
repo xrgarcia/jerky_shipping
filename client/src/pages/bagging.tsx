@@ -1195,11 +1195,25 @@ export default function Bagging() {
         }
       }
     },
-    onError: (error: Error) => {
-      // Order not found - clear and refocus for next scan
-      console.error('[Bagging] Order load failed:', error.message);
-      setOrderScan("");
-      setTimeout(() => orderInputRef.current?.focus(), 100);
+    onError: (error: any) => {
+      console.error('[Bagging] Order load failed:', error);
+      
+      // Check if this is a NOT_SHIPPABLE error (or other structured error)
+      if (error.data?.error?.code === 'NOT_SHIPPABLE') {
+        const notShippableError = error.data.error;
+        setLabelError({
+          code: notShippableError.code,
+          message: notShippableError.message,
+          shipStationError: notShippableError.explanation,
+          resolution: notShippableError.resolution,
+        });
+        // Keep orderScan so user can see what they scanned
+        setTimeout(() => orderInputRef.current?.focus(), 100);
+      } else {
+        // Generic error - clear and refocus for next scan
+        setOrderScan("");
+        setTimeout(() => orderInputRef.current?.focus(), 100);
+      }
     },
   });
 
@@ -2255,7 +2269,7 @@ export default function Bagging() {
 
             {/* Label Error Display - shown on scan page, blocking QC */}
             {labelError && (() => {
-              const nonRetriableCodes = ['SHIPMENT_ON_HOLD', 'ADDRESS_VALIDATION_FAILED', 'CARRIER_ERROR'];
+              const nonRetriableCodes = ['SHIPMENT_ON_HOLD', 'ADDRESS_VALIDATION_FAILED', 'CARRIER_ERROR', 'NOT_SHIPPABLE'];
               const canRetry = !nonRetriableCodes.includes(labelError.code);
               
               return (
@@ -2267,14 +2281,27 @@ export default function Bagging() {
                     <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 space-y-2">
                       <h4 className="font-semibold text-red-800 dark:text-red-200 text-lg">
-                        {labelError.code === 'SHIPMENT_ON_HOLD' 
-                          ? 'Shipment On Hold - Cannot Print Label'
-                          : labelError.code === 'ADDRESS_VALIDATION_FAILED'
-                            ? 'Address Error - Cannot Create Label'
-                            : labelError.code === 'CARRIER_ERROR'
-                              ? 'Carrier Issue - Cannot Create Label'
-                              : 'Label Print Failed'}
+                        {labelError.code === 'NOT_SHIPPABLE'
+                          ? 'Order Not Shippable'
+                          : labelError.code === 'SHIPMENT_ON_HOLD' 
+                            ? 'Shipment On Hold - Cannot Print Label'
+                            : labelError.code === 'ADDRESS_VALIDATION_FAILED'
+                              ? 'Address Error - Cannot Create Label'
+                              : labelError.code === 'CARRIER_ERROR'
+                                ? 'Carrier Issue - Cannot Create Label'
+                                : 'Label Print Failed'}
                       </h4>
+                      
+                      {labelError.code === 'NOT_SHIPPABLE' && (
+                        <div className="bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded p-3 space-y-2">
+                          <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                            This order is missing the "MOVE OVER" tag.
+                          </p>
+                          <p className="text-sm text-amber-700 dark:text-amber-300">
+                            {labelError.shipStationError || 'The order may still be in picking, or it hasn\'t been released from SkuVault yet.'}
+                          </p>
+                        </div>
+                      )}
                       
                       {labelError.code === 'SHIPMENT_ON_HOLD' && (
                         <div className="bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded p-3 space-y-2">
@@ -2311,7 +2338,7 @@ export default function Bagging() {
                         </div>
                       )}
                       
-                      {labelError.shipStationError && labelError.code !== 'SHIPMENT_ON_HOLD' && (
+                      {labelError.shipStationError && labelError.code !== 'SHIPMENT_ON_HOLD' && labelError.code !== 'NOT_SHIPPABLE' && (
                         <div className="bg-red-100 dark:bg-red-900 rounded p-2">
                           <p className="text-xs text-red-600 dark:text-red-400 font-mono break-all">
                             {labelError.shipStationError}
