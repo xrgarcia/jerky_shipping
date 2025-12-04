@@ -19,6 +19,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   PackageCheck,
@@ -44,6 +45,7 @@ import {
   Wifi,
   WifiOff,
   RotateCcw,
+  LogOut,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -1829,10 +1831,18 @@ export default function Packing() {
           setShowStationModal(false);
         }
       }}>
-        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => {
-          // Prevent closing by clicking outside if no session
-          if (!hasValidSession) e.preventDefault();
-        }}>
+        <DialogContent 
+          className="sm:max-w-md" 
+          onInteractOutside={(e) => {
+            // Prevent closing by clicking outside if no session
+            if (!hasValidSession) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            // Prevent closing with Escape if no session
+            if (!hasValidSession) e.preventDefault();
+          }}
+          hideCloseButton={!hasValidSession}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
@@ -1842,6 +1852,17 @@ export default function Packing() {
               Choose which station you're working at today. This selection resets at midnight.
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Required station message */}
+          {!hasValidSession && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                You must select a station to fulfill orders. A station is required to print shipping labels.
+              </p>
+            </div>
+          )}
+          
           <div className="grid gap-2 py-4">
             {isLoadingStations ? (
               <div className="flex items-center justify-center py-8">
@@ -1874,6 +1895,21 @@ export default function Packing() {
               ))
             )}
           </div>
+          
+          {/* Exit button - only show when no valid session */}
+          {!hasValidSession && (
+            <DialogFooter>
+              <Button
+                variant="destructive"
+                onClick={() => setLocation("/shipments")}
+                className="w-full"
+                data-testid="button-exit-station-selection"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Exit
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
