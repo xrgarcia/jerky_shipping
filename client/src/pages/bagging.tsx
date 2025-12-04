@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { setWorkstationId, getWorkstationId, getWorkstationName } from "@/lib/workstation-guard";
 import {
   Accordion,
   AccordionContent,
@@ -296,12 +297,40 @@ export default function Bagging() {
     enabled: showStationModal,
   });
 
+  // State for workstation mismatch blocking
+  const [workstationMismatch, setWorkstationMismatch] = useState<{
+    workstationId: string;
+    workstationName: string;
+    userStationId: string;
+    userStationName: string;
+  } | null>(null);
+
   // Mutation to set station session
   const setStationMutation = useMutation({
-    mutationFn: async (stationId: string) => {
+    mutationFn: async ({ stationId, stationName }: { stationId: string; stationName: string }) => {
       return apiRequest('POST', '/api/packing/station-session', { stationId });
     },
-    onSuccess: () => {
+    onSuccess: (_, { stationId, stationName }) => {
+      const storedWorkstationId = getWorkstationId();
+      
+      // If no workstation stored yet (first time on this computer), store the selected station
+      if (!storedWorkstationId) {
+        setWorkstationId(stationId, stationName);
+        setWorkstationMismatch(null);
+      } else if (storedWorkstationId === stationId) {
+        // Selected station matches this workstation - clear mismatch
+        setWorkstationMismatch(null);
+      } else {
+        // Selected station does NOT match this workstation - set mismatch
+        const storedName = getWorkstationName() || 'Unknown Station';
+        setWorkstationMismatch({
+          workstationId: storedWorkstationId,
+          workstationName: storedName,
+          userStationId: stationId,
+          userStationName: stationName,
+        });
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['/api/packing/station-session'] });
       setShowStationModal(false);
     },
@@ -315,6 +344,33 @@ export default function Bagging() {
   const currentStation = stationSessionData?.session;
   const isSessionExpired = currentStation ? new Date(currentStation.expiresAt) <= new Date() : true;
   const hasValidSession = !!currentStation && !isSessionExpired;
+
+  // Check for workstation mismatch when session loads
+  useEffect(() => {
+    if (!hasValidSession || !currentStation) return;
+    
+    const storedWorkstationId = getWorkstationId();
+    
+    // If no workstation stored yet, this is first time - store it
+    if (!storedWorkstationId) {
+      setWorkstationId(currentStation.stationId, currentStation.stationName);
+      setWorkstationMismatch(null);
+      return;
+    }
+    
+    // Check if user's assigned station matches the workstation
+    if (storedWorkstationId !== currentStation.stationId) {
+      const storedName = getWorkstationName() || 'Unknown Station';
+      setWorkstationMismatch({
+        workstationId: storedWorkstationId,
+        workstationName: storedName,
+        userStationId: currentStation.stationId,
+        userStationName: currentStation.stationName,
+      });
+    } else {
+      setWorkstationMismatch(null);
+    }
+  }, [hasValidSession, currentStation?.stationId]);
 
   // Track real-time station connection status (updated via WebSocket)
   const [stationConnected, setStationConnected] = useState<boolean | null>(null);
@@ -1883,14 +1939,14 @@ export default function Bagging() {
         <DialogContent 
           className="sm:max-w-md" 
           onInteractOutside={(e) => {
-            // Prevent closing by clicking outside if no session
-            if (!hasValidSession) e.preventDefault();
+            // Prevent closing by clicking outside if no session or mismatch
+            if (!hasValidSession || workstationMismatch) e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
-            // Prevent closing with Escape if no session
-            if (!hasValidSession) e.preventDefault();
+            // Prevent closing with Escape if no session or mismatch
+            if (!hasValidSession || workstationMismatch) e.preventDefault();
           }}
-          hideCloseButton={!hasValidSession}
+          hideCloseButton={!hasValidSession || !!workstationMismatch}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1927,7 +1983,7 @@ export default function Bagging() {
                   key={station.id}
                   variant={currentStation?.stationId === station.id ? "default" : "outline"}
                   className="w-full justify-start h-auto py-4 px-4"
-                  onClick={() => setStationMutation.mutate(station.id)}
+                  onClick={() => setStationMutation.mutate({ stationId: station.id, stationName: station.name })}
                   disabled={setStationMutation.isPending}
                   data-testid={`button-select-station-${station.id}`}
                 >
@@ -1962,7 +2018,87 @@ export default function Bagging() {
         </DialogContent>
       </Dialog>
 
-      {/* Page Header with Station Indicator */}
+      {/* Workstation Mismatch Blocking Screen */}
+      {workstationMismatch && (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+          <Card className="max-w-lg w-full">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              </div>
+              <CardTitle className="text-xl">Wrong Workstation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center text-muted-foreground">
+                <p className="mb-4">
+                  This computer is configured for <span className="font-semibold text-foreground">{workstationMismatch.workstationName}</span>, 
+                  but you're assigned to <span className="font-semibold text-foreground">{workstationMismatch.userStationName}</span>.
+                </p>
+                <p className="text-sm">
+                  Labels would print to the wrong printer if you continue here.
+                </p>
+              </div>
+              
+              <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+                <p className="text-sm font-medium text-center">Choose one option:</p>
+                
+                <Button
+                  className="w-full"
+                  onClick={() => setShowStationModal(true)}
+                  data-testid="button-change-station-mismatch"
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Work at This Computer (Select {workstationMismatch.workstationName})
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  You'll need to select {workstationMismatch.workstationName} as your station
+                </p>
+                
+                <div className="flex items-center gap-2 py-2">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">or</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                
+                <p className="text-xs text-muted-foreground text-center">
+                  Go to the computer configured for {workstationMismatch.userStationName}
+                </p>
+              </div>
+              
+              <div className="space-y-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      await apiRequest('POST', '/api/auth/logout');
+                      window.location.href = '/';
+                    } catch (e) {
+                      console.error('Logout failed:', e);
+                    }
+                  }}
+                  data-testid="button-logout-mismatch"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out (Let Someone Else Use This Computer)
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground"
+                  onClick={() => setLocation("/shipments")}
+                  data-testid="button-exit-mismatch"
+                >
+                  Go Back to Shipments
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Page Header with Station Indicator - only show if no mismatch */}
+      {!workstationMismatch && (<>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <PackageCheck className="h-7 w-7 text-primary" />
@@ -3471,6 +3607,7 @@ export default function Bagging() {
           );
         })()}
       </div>
+      </>)}
 
       {/* Session Detail Modal */}
       <SessionDetailDialog 
