@@ -20,6 +20,8 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
     - **Packing Page (Boxing)**: Single-warehouse MVP with SkuVault QC validation, scan-first workflow, individual unit scanning, and audit trails, supporting kit/assembled products.
     - **Bagging Page**: Poly-bagging workflow variant of the packing page. Key differences from boxing:
         - **Immediate Label Printing**: Label prints immediately when order is scanned (before QC), as the bagging machine advances the poly bag roll and prints in one motion.
+        - **Error Handling on Scan Page**: If label printing fails (SHIPMENT_ON_HOLD, ADDRESS_VALIDATION_FAILED, CARRIER_ERROR, RATE_LIMIT_EXCEEDED), the error is displayed on the scan page - NOT the QC page. Workers cannot bag an order without a printed label. Error UI shows order context, error type, resolution steps, and retry/dismiss buttons.
+        - **Printer Pre-check**: Scan input is disabled when station is offline, no printer configured, or printer offline. Warning banners explain the issue and block scanning until resolved.
         - **Direct Completion**: "Complete Packing" returns directly to order scan without "Next Order" confirmation dialog.
         - **Separate Station Tracking**: Uses "bagging" station type in audit logs for analytics differentiation.
     - **Workstation Guard System**: Prevents workers from packing at the wrong physical workstation (which would print labels to wrong printer):
