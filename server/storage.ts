@@ -1150,17 +1150,29 @@ export class DatabaseStorage implements IStorage {
           break;
         case 'in_progress':
           // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
-          // This combines: new sessions, active sessions, and closed sessions without tracking
+          // Must match EXACTLY the sum of lifecycle tabs:
+          // - Ready to Pick: sessionStatus='new', no tracking
+          // - Picking: sessionStatus='active', no tracking
+          // - Packing Ready: sessionStatus='closed', no tracking, shipmentStatus='pending', not cancelled
           conditions.push(
-            and(
-              isNotNull(shipments.sessionId),
-              or(
+            or(
+              // Ready to Pick
+              and(
                 eq(shipments.sessionStatus, 'new'),
-                eq(shipments.sessionStatus, 'active'),
-                eq(shipments.sessionStatus, 'closed')
+                isNull(shipments.trackingNumber)
               ),
-              isNull(shipments.trackingNumber),
-              ne(shipments.status, 'cancelled')
+              // Picking
+              and(
+                eq(shipments.sessionStatus, 'active'),
+                isNull(shipments.trackingNumber)
+              ),
+              // Packing Ready (requires pending shipment status)
+              and(
+                eq(shipments.sessionStatus, 'closed'),
+                isNull(shipments.trackingNumber),
+                eq(shipments.shipmentStatus, 'pending'),
+                ne(shipments.status, 'cancelled')
+              )
             )
           );
           break;
@@ -1376,20 +1388,29 @@ export class DatabaseStorage implements IStorage {
       );
 
     // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
-    // This combines: new sessions, active sessions, and closed sessions without tracking
+    // Must match EXACTLY the sum of lifecycle tabs
     const inProgressResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
-        and(
-          isNotNull(shipments.sessionId),
-          or(
+        or(
+          // Ready to Pick: sessionStatus='new', no tracking
+          and(
             eq(shipments.sessionStatus, 'new'),
-            eq(shipments.sessionStatus, 'active'),
-            eq(shipments.sessionStatus, 'closed')
+            isNull(shipments.trackingNumber)
           ),
-          isNull(shipments.trackingNumber),
-          ne(shipments.status, 'cancelled')
+          // Picking: sessionStatus='active', no tracking
+          and(
+            eq(shipments.sessionStatus, 'active'),
+            isNull(shipments.trackingNumber)
+          ),
+          // Packing Ready: sessionStatus='closed', no tracking, shipmentStatus='pending', not cancelled
+          and(
+            eq(shipments.sessionStatus, 'closed'),
+            isNull(shipments.trackingNumber),
+            eq(shipments.shipmentStatus, 'pending'),
+            ne(shipments.status, 'cancelled')
+          )
         )
       );
 
