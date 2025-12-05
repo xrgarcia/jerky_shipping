@@ -29,6 +29,7 @@ interface ShipmentsResponse {
 }
 
 interface TabCounts {
+  readyToFulfill: number;
   inProgress: number;
   packingQueue: number;
   shipped: number;
@@ -44,7 +45,7 @@ interface LifecycleTabCounts {
   pickingIssues: number;
 }
 
-type WorkflowTab = 'in_progress' | 'packing_queue' | 'shipped' | 'all';
+type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'packing_queue' | 'shipped' | 'all';
 type LifecycleTab = 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
@@ -859,7 +860,7 @@ export default function Shipments() {
     queryKey: ["/api/shipments/tab-counts"],
   });
 
-  const tabCounts = tabCountsData || { inProgress: 0, packingQueue: 0, shipped: 0, all: 0 };
+  const tabCounts = tabCountsData || { readyToFulfill: 0, inProgress: 0, packingQueue: 0, shipped: 0, all: 0 };
 
   // Fetch lifecycle tab counts
   const { data: lifecycleCountsData } = useQuery<LifecycleTabCounts>({
@@ -1039,6 +1040,8 @@ export default function Shipments() {
   const getTabDescription = () => {
     if (viewMode === 'workflow') {
       switch (activeTab) {
+        case 'ready_to_fulfill':
+          return 'Orders on hold with MOVE OVER tag - ready for warehouse to start processing';
         case 'in_progress':
           return 'Orders currently being picked (New or Active sessions)';
         case 'packing_queue':
@@ -1190,7 +1193,18 @@ export default function Shipments() {
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+              <TabsTrigger 
+                value="ready_to_fulfill" 
+                className="flex flex-col gap-1 py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                data-testid="tab-ready-to-fulfill"
+              >
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4" />
+                  <span className="font-semibold">Ready to Fulfill</span>
+                </div>
+                <span className="text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
+              </TabsTrigger>
               <TabsTrigger 
                 value="in_progress" 
                 className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"

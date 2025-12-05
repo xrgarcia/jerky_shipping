@@ -1,4 +1,4 @@
-import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count } from "drizzle-orm";
+import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count, exists } from "drizzle-orm";
 import { db } from "./db";
 import {
   type User,
@@ -96,7 +96,7 @@ export interface OrderFilters {
 
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
-  workflowTab?: 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
+  workflowTab?: 'ready_to_fulfill' | 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
   lifecycleTab?: 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues'; // Warehouse lifecycle tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
@@ -168,7 +168,7 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
-  getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }>;
+  getShipmentTabCounts(): Promise<{ readyToFulfill: number; inProgress: number; packingQueue: number; shipped: number; all: number }>;
   getLifecycleTabCounts(): Promise<{ all: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
@@ -1129,6 +1129,25 @@ export class DatabaseStorage implements IStorage {
     // Workflow tab filter - applies different filters based on selected tab
     if (workflowTab) {
       switch (workflowTab) {
+        case 'ready_to_fulfill':
+          // Ready to Fulfill: On-hold shipments with "MOVE OVER" tag - ready for warehouse to start processing
+          // Uses exists() helper with correlated subquery
+          conditions.push(
+            and(
+              eq(shipments.shipmentStatus, 'on_hold'),
+              exists(
+                db.select({ one: sql`1` })
+                  .from(shipmentTags)
+                  .where(
+                    and(
+                      eq(shipmentTags.shipmentId, shipments.id),
+                      eq(shipmentTags.name, 'MOVE OVER')
+                    )
+                  )
+              )
+            )
+          );
+          break;
         case 'in_progress':
           // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
           conditions.push(
@@ -1346,7 +1365,27 @@ export class DatabaseStorage implements IStorage {
     return { shipments: result, total };
   }
 
-  async getShipmentTabCounts(): Promise<{ inProgress: number; packingQueue: number; shipped: number; all: number }> {
+  async getShipmentTabCounts(): Promise<{ readyToFulfill: number; inProgress: number; packingQueue: number; shipped: number; all: number }> {
+    // Ready to Fulfill: On-hold shipments with "MOVE OVER" tag - ready for warehouse to start processing
+    const readyToFulfillResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'on_hold'),
+          exists(
+            db.select({ one: sql`1` })
+              .from(shipmentTags)
+              .where(
+                and(
+                  eq(shipmentTags.shipmentId, shipments.id),
+                  eq(shipmentTags.name, 'MOVE OVER')
+                )
+              )
+          )
+        )
+      );
+
     // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
     const inProgressResult = await db
       .select({ count: count() })
@@ -1390,6 +1429,7 @@ export class DatabaseStorage implements IStorage {
       .from(shipments);
 
     return {
+      readyToFulfill: Number(readyToFulfillResult[0]?.count) || 0,
       inProgress: Number(inProgressResult[0]?.count) || 0,
       packingQueue: Number(packingQueueResult[0]?.count) || 0,
       shipped: Number(shippedResult[0]?.count) || 0,
