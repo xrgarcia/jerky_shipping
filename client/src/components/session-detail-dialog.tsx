@@ -10,8 +10,22 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Package, User, ListChecks, MapPin, Loader2 } from "lucide-react";
+import { Package, User, ListChecks, MapPin, Loader2, Clock } from "lucide-react";
 import { SessionState, parseSessionState } from "@shared/skuvault-types";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+const formatTimestamp = (timestamp: string | null | undefined): string => {
+  if (!timestamp) return "—";
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "—";
+    const centralTime = toZonedTime(date, 'America/Chicago');
+    return format(centralTime, "MMM d, yyyy h:mm a");
+  } catch {
+    return "—";
+  }
+};
 
 const getStatusColor = (status: SessionState | null): string => {
   switch (status) {
@@ -150,6 +164,54 @@ export function SessionDetailDialog({ picklistId, onClose }: SessionDetailDialog
                       )}
                     </div>
                   </div>
+
+                  {/* Timestamps section */}
+                  {(sessionDetails.picklist.pickStartTime || sessionDetails.picklist.pickEndTime || sessionDetails.picklist.createdAt || sessionDetails.picklist.updatedAt) && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3">Timeline</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {sessionDetails.picklist.pickStartTime && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">Pick Started</div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{formatTimestamp(sessionDetails.picklist.pickStartTime)}</span>
+                              </div>
+                            </div>
+                          )}
+                          {sessionDetails.picklist.pickEndTime && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">Pick Completed</div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{formatTimestamp(sessionDetails.picklist.pickEndTime)}</span>
+                              </div>
+                            </div>
+                          )}
+                          {sessionDetails.picklist.createdAt && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">Session Created</div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{formatTimestamp(sessionDetails.picklist.createdAt)}</span>
+                              </div>
+                            </div>
+                          )}
+                          {sessionDetails.picklist.updatedAt && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">Last Updated</div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{formatTimestamp(sessionDetails.picklist.updatedAt)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <Separator />
 

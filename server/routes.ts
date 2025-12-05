@@ -1215,11 +1215,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           picklist: {
             picklistId: firstSession.session_picklist_id || picklistId,
             sessionId: firstSession.session_id,
+            // Use 'state' field for frontend compatibility with parseSessionState()
+            state: firstSession.session_status,
             status: firstSession.session_status,
             pickerName: firstSession.picked_by_user_name,
             pickerId: firstSession.picked_by_user_id,
+            // Timestamps
             pickStartTime: firstSession.pick_start_datetime,
             pickEndTime: firstSession.pick_end_datetime,
+            createdAt: firstSession.create_date,
+            updatedAt: firstSession.updated_date,
             // Summary counts
             orderCount,
             skuCount: allSkus.size,
