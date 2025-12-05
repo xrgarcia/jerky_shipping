@@ -1231,12 +1231,12 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'on_dock':
-          // On Dock: Label purchased AND in transit (waiting for carrier pickup)
-          // shipment_status = 'label_purchased' AND fulfillment_status = 'IT' (In Transit)
+          // On Dock: Label purchased AND accepted (truly waiting for carrier pickup)
+          // shipment_status = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting item)
           conditions.push(
             and(
               eq(shipments.shipmentStatus, 'label_purchased'),
-              eq(shipments.status, 'IT')
+              eq(shipments.status, 'AC')
             )
           );
           break;
@@ -1502,15 +1502,15 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // On Dock: Label purchased AND in transit (waiting for carrier pickup)
-    // shipment_status = 'label_purchased' AND fulfillment_status = 'IT' (In Transit)
+    // On Dock: Label purchased AND accepted (truly waiting for carrier pickup)
+    // shipment_status = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting item)
     const onDockResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(
         and(
           eq(shipments.shipmentStatus, 'label_purchased'),
-          eq(shipments.status, 'IT')
+          eq(shipments.status, 'AC')
         )
       );
 
