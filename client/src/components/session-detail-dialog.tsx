@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Package, User, ListChecks, MapPin, Loader2, Clock } from "lucide-react";
+import { Package, User, ListChecks, MapPin, Loader2, Clock, Timer } from "lucide-react";
 import { SessionState, parseSessionState } from "@shared/skuvault-types";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -24,6 +24,29 @@ const formatTimestamp = (timestamp: string | null | undefined): string => {
     return format(centralTime, "MMM d, yyyy h:mm a");
   } catch {
     return "—";
+  }
+};
+
+const formatDuration = (startTime: string | null | undefined, endTime: string | null | undefined): string | null => {
+  if (!startTime || !endTime) return null;
+  try {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+    
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return null;
+    
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  } catch {
+    return null;
   }
 };
 
@@ -190,6 +213,15 @@ export function SessionDetailDialog({ picklistId, onClose }: SessionDetailDialog
                               </div>
                             </div>
                           )}
+                          {formatDuration(sessionDetails.picklist.pickStartTime, sessionDetails.picklist.pickEndTime) && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">Total Pick Time</div>
+                              <div className="flex items-center gap-2">
+                                <Timer className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm font-medium">{formatDuration(sessionDetails.picklist.pickStartTime, sessionDetails.picklist.pickEndTime)}</span>
+                              </div>
+                            </div>
+                          )}
                           {sessionDetails.picklist.createdAt && (
                             <div className="space-y-1">
                               <div className="text-xs text-muted-foreground">Session Created</div>
@@ -222,16 +254,24 @@ export function SessionDetailDialog({ picklistId, onClose }: SessionDetailDialog
                         {sessionDetails.picklist.orders.map((order: any, index: number) => (
                           <Card key={order.id || index} data-testid={`card-order-${order.id}`}>
                             <CardHeader className="pb-3">
-                              <CardTitle className="text-base flex items-center justify-between">
+                              <CardTitle className="text-base flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2">
                                   <ListChecks className="h-4 w-4" />
                                   <span>Order: {order.id}</span>
                                 </div>
-                                {order.spot_number && (
-                                  <Badge variant="secondary" data-testid={`badge-spot-${order.spot_number}`}>
-                                    Spot #{order.spot_number}
-                                  </Badge>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {formatDuration(order.pickStartTime, order.pickEndTime) && (
+                                    <Badge variant="outline" className="flex items-center gap-1" data-testid={`badge-picktime-${order.id}`}>
+                                      <Timer className="h-3 w-3" />
+                                      {formatDuration(order.pickStartTime, order.pickEndTime)}
+                                    </Badge>
+                                  )}
+                                  {order.spot_number && (
+                                    <Badge variant="secondary" data-testid={`badge-spot-${order.spot_number}`}>
+                                      Spot #{order.spot_number}
+                                    </Badge>
+                                  )}
+                                </div>
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
