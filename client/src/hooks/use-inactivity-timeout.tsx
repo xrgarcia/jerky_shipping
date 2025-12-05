@@ -44,21 +44,32 @@ export function useInactivityTimeout({ onLogout, enabled = true }: UseInactivity
   }, []);
 
   const handleLogout = useCallback(async () => {
+    // Prevent multiple logout calls
+    if (isLoggingOutRef.current) {
+      console.log('[InactivityTimeout] Logout already in progress, skipping');
+      return;
+    }
+    
+    console.log('[InactivityTimeout] handleLogout called - starting logout process');
     isLoggingOutRef.current = true; // Prevent stayLoggedIn from being called
     clearAllTimers();
     setShowWarning(false);
     
+    console.log('[InactivityTimeout] Calling /api/auth/logout');
     try {
-      await fetch('/api/auth/logout', { 
+      const response = await fetch('/api/auth/logout', { 
         method: 'POST',
         credentials: 'include'
       });
+      console.log('[InactivityTimeout] Logout API response:', response.status);
     } catch (error) {
       console.error('[InactivityTimeout] Logout request failed:', error);
     }
     
+    console.log('[InactivityTimeout] Calling onLogout callback');
     onLogout();
     
+    console.log('[InactivityTimeout] Redirecting to /login');
     // Use window.location for redirect to ensure full page reload
     window.location.href = '/login';
   }, [clearAllTimers, onLogout]);
@@ -66,25 +77,38 @@ export function useInactivityTimeout({ onLogout, enabled = true }: UseInactivity
   const startTimers = useCallback(() => {
     clearAllTimers();
     
+    console.log('[InactivityTimeout] Starting timers - warning in', (INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS) / 1000, 'seconds');
+    
     // Set timer to show warning (9 minutes after last activity)
     warningTimerRef.current = setTimeout(() => {
+      console.log('[InactivityTimeout] Warning timer fired - showing dialog');
       setShowWarning(true);
       setSecondsRemaining(60);
       
       // Start countdown
       countdownRef.current = setInterval(() => {
         setSecondsRemaining(prev => {
-          if (prev <= 1) {
+          const newValue = prev - 1;
+          console.log('[InactivityTimeout] Countdown:', newValue);
+          if (newValue <= 0) {
+            // Clear the interval BEFORE calling handleLogout to prevent race conditions
+            if (countdownRef.current) {
+              clearInterval(countdownRef.current);
+              countdownRef.current = null;
+            }
+            console.log('[InactivityTimeout] Countdown reached 0 - triggering logout');
             handleLogout();
             return 0;
           }
-          return prev - 1;
+          return newValue;
         });
       }, 1000);
     }, INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS);
 
-    // Set timer for auto-logout (10 minutes after last activity)
+    // Backup timer for auto-logout (10 minutes after last activity)
+    // This is a fallback in case the countdown doesn't trigger
     logoutTimerRef.current = setTimeout(() => {
+      console.log('[InactivityTimeout] Backup logout timer fired');
       handleLogout();
     }, INACTIVITY_TIMEOUT_MS);
   }, [clearAllTimers, handleLogout]);
