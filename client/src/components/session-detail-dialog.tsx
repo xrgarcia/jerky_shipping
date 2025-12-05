@@ -114,12 +114,15 @@ export function SessionDetailDialog({ picklistId, onClose }: SessionDetailDialog
                           {formatStatus(parseSessionState(sessionDetails.picklist.state))}
                         </Badge>
                       </div>
-                      {sessionDetails.picklist.assigned && (
+                      {/* Show picker info - prefer pickerName (Firestore) over assigned (SkuVault API) */}
+                      {(sessionDetails.picklist.pickerName || sessionDetails.picklist.assigned) && (
                         <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Assigned To</div>
+                          <div className="text-xs text-muted-foreground">Picked By</div>
                           <div className="flex items-center gap-2">
                             <User className="h-3 w-3" />
-                            <span className="text-sm font-medium">{sessionDetails.picklist.assigned.name}</span>
+                            <span className="text-sm font-medium">
+                              {sessionDetails.picklist.pickerName || sessionDetails.picklist.assigned?.name || 'Unknown'}
+                            </span>
                           </div>
                         </div>
                       )}

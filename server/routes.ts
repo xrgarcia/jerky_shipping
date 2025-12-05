@@ -1162,28 +1162,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Transform Firestore data to match the expected response format
         // Group all orders from the sessions
         const orders = firestoreSessions.map(session => ({
+          id: session.order_number, // Use order_number as id for frontend compatibility
           orderNumber: session.order_number,
           saleId: session.sale_id,
           shipmentId: session.shipment_id,
-          spot: session.spot_number,
+          spot_number: session.spot_number,
           status: session.session_status,
           pickerName: session.picked_by_user_name,
           pickStartTime: session.pick_start_datetime,
           pickEndTime: session.pick_end_datetime,
-          items: session.order_items.map(item => ({
-            sku: item.sku,
-            description: item.description,
-            quantity: item.quantity,
-            location: item.location,
-            locations: item.locations,
-            picked: item.picked,
-            completed: item.completed,
-            imageUrl: skuImageMap.get(item.sku) || (item.product_pictures?.[0] || null),
-          })),
+          items: session.order_items.map(item => {
+            // Ensure quantity is a number
+            const qty = typeof item.quantity === 'number' ? item.quantity : 
+                        typeof item.quantity === 'string' ? parseInt(item.quantity, 10) || 0 : 0;
+            // Handle picked - could be boolean or number
+            const pickedVal = typeof item.picked === 'boolean' ? (item.picked ? qty : 0) :
+                              typeof item.picked === 'number' ? item.picked : 0;
+            return {
+              sku: item.sku,
+              description: item.description,
+              quantity: qty,
+              location: item.location,
+              locations: item.locations,
+              picked: pickedVal,
+              completed: item.completed,
+              imageUrl: skuImageMap.get(item.sku) || (item.product_pictures?.[0] || null),
+            };
+          }),
         }));
         
         // Use the first session for picklist-level info
         const firstSession = firestoreSessions[0];
+        
+        // Calculate summary counts from orders (quantities already coerced to numbers above)
+        const orderCount = orders.length;
+        const allSkus = new Set<string>();
+        let totalQuantity = 0;
+        let pickedQuantity = 0;
+        
+        for (const order of orders) {
+          for (const item of order.items) {
+            if (item.sku) {
+              allSkus.add(item.sku);
+            }
+            totalQuantity += item.quantity;
+            pickedQuantity += item.picked;
+          }
+        }
+        
         return res.json({
           source: 'firestore',
           picklist: {
@@ -1194,6 +1220,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pickerId: firstSession.picked_by_user_id,
             pickStartTime: firstSession.pick_start_datetime,
             pickEndTime: firstSession.pick_end_datetime,
+            // Summary counts
+            orderCount,
+            skuCount: allSkus.size,
+            totalQuantity,
+            pickedQuantity,
             orders,
           },
         });
