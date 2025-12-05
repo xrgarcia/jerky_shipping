@@ -948,8 +948,7 @@ export default function Shipments() {
   
   // Only fetch cache status when viewing packing-related tabs
   const shouldFetchCacheStatus = 
-    (viewMode === 'lifecycle' && activeLifecycleTab === 'packing_ready') ||
-    (viewMode === 'workflow' && activeTab === 'packing_queue');
+    (viewMode === 'lifecycle' && activeLifecycleTab === 'packing_ready');
 
   // API returns { statuses: { [orderNumber]: { isWarmed: boolean; warmedAt: number | null } } }
   type CacheStatusResponse = {
@@ -1039,7 +1038,7 @@ export default function Shipments() {
         case 'in_progress':
           return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
         case 'shipped':
-          return 'Orders that have been shipped';
+          return 'Orders with labels purchased and in transit to customer';
         case 'all':
           return 'All shipments regardless of status';
       }
@@ -1214,8 +1213,8 @@ export default function Shipments() {
                 data-testid="tab-shipped"
               >
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-semibold">Shipped</span>
+                  <Truck className="h-4 w-4" />
+                  <span className="font-semibold">On the Way</span>
                 </div>
                 <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
               </TabsTrigger>
@@ -1560,11 +1559,9 @@ export default function Shipments() {
                     ? "No picking issues - all sessions are progressing normally"
                     : "Shipments will appear here when orders are fulfilled"
                   : activeTab === 'in_progress'
-                  ? "No orders are currently being picked"
-                  : activeTab === 'packing_queue'
-                  ? "No orders are ready for packing"
+                  ? "No orders are currently in progress"
                   : activeTab === 'shipped'
-                  ? "No shipped orders match your criteria"
+                  ? "No orders are on the way to customers"
                   : "Shipments will appear here when orders are fulfilled through ShipStation"}
               </p>
             </CardContent>

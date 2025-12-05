@@ -1177,8 +1177,14 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'shipped':
-          // Shipped: Orders that have been shipped (has tracking number)
-          conditions.push(isNotNull(shipments.trackingNumber));
+          // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
+          // shipment_status = 'label_purchased' AND fulfillment_status = 'IT' (In Transit)
+          conditions.push(
+            and(
+              eq(shipments.shipmentStatus, 'label_purchased'),
+              eq(shipments.status, 'IT')
+            )
+          );
           break;
         case 'all':
           // All: No additional filter, shows everything
@@ -1414,11 +1420,16 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Shipped: Orders that have been shipped (has tracking number)
+    // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
     const shippedResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(isNotNull(shipments.trackingNumber));
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'label_purchased'),
+          eq(shipments.status, 'IT')
+        )
+      );
 
     // All: Total count
     const allResult = await db
