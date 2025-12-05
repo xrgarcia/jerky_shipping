@@ -99,16 +99,12 @@ export default function ShipmentDetails() {
       };
     }
 
-    if (hasTracking && (status === 'in_transit' || status === 'shipped' || shipmentStatus === 'label_purchased')) {
-      const matchedCriteria = [];
-      const matchedFields = ['trackingNumber'];
-      if (status === 'in_transit') { matchedCriteria.push(`status = 'in_transit'`); matchedFields.push('status'); }
-      if (status === 'shipped') { matchedCriteria.push(`status = 'shipped'`); matchedFields.push('status'); }
-      if (shipmentStatus === 'label_purchased') { matchedCriteria.push(`shipmentStatus = 'label_purchased'`); matchedFields.push('shipmentStatus'); }
+    // On the Dock: Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
+    if (shipmentStatus === 'label_purchased' && status === 'ac') {
       return {
         step: 'On the Dock',
-        reason: `trackingNumber = '${shipment.trackingNumber?.substring(0, 15)}...' AND (${matchedCriteria.join(' OR ')})`,
-        matchedFields,
+        reason: `shipmentStatus = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting pickup)`,
+        matchedFields: ['shipmentStatus', 'status'],
         badge: <Badge className="bg-blue-600 text-white">On the Dock</Badge>
       };
     }
@@ -160,7 +156,7 @@ export default function ShipmentDetails() {
   const workflowCriteria = [
     { step: 'Delivered', criteria: "status = 'delivered'", colorClass: 'bg-green-600', order: 1 },
     { step: 'On Hold', criteria: "shipmentStatus = 'on_hold' (checked FIRST, before tracking)", colorClass: 'bg-amber-600', order: 2 },
-    { step: 'On the Dock', criteria: "trackingNumber exists AND (status IN ['in_transit', 'shipped'] OR shipmentStatus = 'label_purchased')", colorClass: 'bg-blue-600', order: 3 },
+    { step: 'On the Dock', criteria: "shipmentStatus = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting pickup)", colorClass: 'bg-blue-600', order: 3 },
     { step: 'Picking Issues', criteria: "sessionStatus = 'inactive'", colorClass: 'bg-orange-600', order: 4 },
     { step: 'Packing Ready', criteria: "sessionStatus = 'closed' AND no trackingNumber", colorClass: 'bg-purple-600', order: 5 },
     { step: 'Picking', criteria: "sessionStatus = 'active'", colorClass: 'bg-cyan-600', order: 6 },
@@ -270,13 +266,13 @@ export default function ShipmentDetails() {
         </CardHeader>
       </Card>
 
-      {/* Workflow Status Debug Card */}
+      {/* Workflow Status Card */}
       <Card className="border-2 border-dashed border-muted-foreground/30">
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5" />
-              Workflow Status Debug
+              Workflow Status
             </CardTitle>
             {(() => {
               const workflow = getWorkflowStepBadge(shipment);
@@ -361,7 +357,7 @@ export default function ShipmentDetails() {
                     variant="outline"
                     size="sm"
                     onClick={() => window.open(shipment.labelUrl!, '_blank')}
-                    data-testid="button-debug-view-label"
+                    data-testid="button-view-label"
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     View Label
