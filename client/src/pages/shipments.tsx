@@ -456,11 +456,6 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
                   Orphaned
                 </Badge>
               )}
-              {shipment.shipmentStatus === 'on_hold' && (
-                <Badge variant="outline" className="border-yellow-500 text-yellow-700 dark:text-yellow-400 text-xs font-semibold" data-testid="badge-on-hold">
-                  ON HOLD
-                </Badge>
-              )}
               {shipment.shipmentStatus === 'pending' && !shipment.trackingNumber && (
                 <Badge variant="outline" className="border-gray-500 text-gray-700 dark:text-gray-400 text-xs" data-testid="badge-pending">
                   Awaiting Label
