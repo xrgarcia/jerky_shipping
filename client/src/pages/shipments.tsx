@@ -31,7 +31,6 @@ interface ShipmentsResponse {
 interface TabCounts {
   readyToFulfill: number;
   inProgress: number;
-  packingQueue: number;
   shipped: number;
   all: number;
 }
@@ -45,7 +44,7 @@ interface LifecycleTabCounts {
   pickingIssues: number;
 }
 
-type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'packing_queue' | 'shipped' | 'all';
+type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
 type LifecycleTab = 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
@@ -855,7 +854,7 @@ export default function Shipments() {
     queryKey: ["/api/shipments/tab-counts"],
   });
 
-  const tabCounts = tabCountsData || { readyToFulfill: 0, inProgress: 0, packingQueue: 0, shipped: 0, all: 0 };
+  const tabCounts = tabCountsData || { readyToFulfill: 0, inProgress: 0, shipped: 0, all: 0 };
 
   // Fetch lifecycle tab counts
   const { data: lifecycleCountsData } = useQuery<LifecycleTabCounts>({
@@ -1038,9 +1037,7 @@ export default function Shipments() {
         case 'ready_to_fulfill':
           return 'Orders on hold with MOVE OVER tag - ready for warehouse to start processing';
         case 'in_progress':
-          return 'Orders currently being picked (New or Active sessions)';
-        case 'packing_queue':
-          return 'Orders ready to pack (all items picked, awaiting shipment)';
+          return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
         case 'shipped':
           return 'Orders that have been shipped';
         case 'all':
@@ -1188,7 +1185,7 @@ export default function Shipments() {
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
               <TabsTrigger 
                 value="ready_to_fulfill" 
                 className="flex flex-col gap-1 py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -1212,17 +1209,6 @@ export default function Shipments() {
                 <span className="text-xs opacity-80">{tabCounts.inProgress} orders</span>
               </TabsTrigger>
               <TabsTrigger 
-                value="packing_queue" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                data-testid="tab-packing-queue"
-              >
-                <div className="flex items-center gap-2">
-                  <PackageOpen className="h-4 w-4" />
-                  <span className="font-semibold">Packing Queue</span>
-                </div>
-                <span className="text-xs opacity-80">{tabCounts.packingQueue} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
                 value="shipped" 
                 className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 data-testid="tab-shipped"
@@ -1239,7 +1225,7 @@ export default function Shipments() {
                 data-testid="tab-all"
               >
                 <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
+                  <Boxes className="h-4 w-4" />
                   <span className="font-semibold">All</span>
                 </div>
                 <span className="text-xs opacity-80">{tabCounts.all} total</span>

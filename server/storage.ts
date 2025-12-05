@@ -1149,26 +1149,15 @@ export class DatabaseStorage implements IStorage {
           );
           break;
         case 'in_progress':
-          // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
+          // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
+          // This combines: new sessions, active sessions, and closed sessions without tracking
           conditions.push(
             and(
               isNotNull(shipments.sessionId),
               or(
                 eq(shipments.sessionStatus, 'new'),
-                eq(shipments.sessionStatus, 'active')
-              ),
-              isNull(shipments.trackingNumber)
-            )
-          );
-          break;
-        case 'packing_queue':
-          // Packing Queue: Orders ready to pack (picked/closed session status, no tracking number yet, not cancelled)
-          conditions.push(
-            and(
-              isNotNull(shipments.sessionId),
-              or(
-                eq(shipments.sessionStatus, 'closed'),
-                eq(shipments.sessionStatus, 'picked')
+                eq(shipments.sessionStatus, 'active'),
+                eq(shipments.sessionStatus, 'closed')
               ),
               isNull(shipments.trackingNumber),
               ne(shipments.status, 'cancelled')
@@ -1365,7 +1354,7 @@ export class DatabaseStorage implements IStorage {
     return { shipments: result, total };
   }
 
-  async getShipmentTabCounts(): Promise<{ readyToFulfill: number; inProgress: number; packingQueue: number; shipped: number; all: number }> {
+  async getShipmentTabCounts(): Promise<{ readyToFulfill: number; inProgress: number; shipped: number; all: number }> {
     // Ready to Fulfill: On-hold shipments with "MOVE OVER" tag - ready for warehouse to start processing
     const readyToFulfillResult = await db
       .select({ count: count() })
@@ -1386,7 +1375,8 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // In Progress: Orders currently being picked (new or active sessions, not yet shipped)
+    // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
+    // This combines: new sessions, active sessions, and closed sessions without tracking
     const inProgressResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1395,22 +1385,8 @@ export class DatabaseStorage implements IStorage {
           isNotNull(shipments.sessionId),
           or(
             eq(shipments.sessionStatus, 'new'),
-            eq(shipments.sessionStatus, 'active')
-          ),
-          isNull(shipments.trackingNumber)
-        )
-      );
-
-    // Packing Queue: Orders ready to pack (picked/closed session, no tracking number, not cancelled)
-    const packingQueueResult = await db
-      .select({ count: count() })
-      .from(shipments)
-      .where(
-        and(
-          isNotNull(shipments.sessionId),
-          or(
-            eq(shipments.sessionStatus, 'closed'),
-            eq(shipments.sessionStatus, 'picked')
+            eq(shipments.sessionStatus, 'active'),
+            eq(shipments.sessionStatus, 'closed')
           ),
           isNull(shipments.trackingNumber),
           ne(shipments.status, 'cancelled')
@@ -1431,7 +1407,6 @@ export class DatabaseStorage implements IStorage {
     return {
       readyToFulfill: Number(readyToFulfillResult[0]?.count) || 0,
       inProgress: Number(inProgressResult[0]?.count) || 0,
-      packingQueue: Number(packingQueueResult[0]?.count) || 0,
       shipped: Number(shippedResult[0]?.count) || 0,
       all: Number(allResult[0]?.count) || 0,
     };
