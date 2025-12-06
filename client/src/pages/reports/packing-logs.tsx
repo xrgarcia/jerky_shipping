@@ -141,6 +141,57 @@ ${jsonResponse}
 Please provide a clear, actionable analysis.`;
 };
 
+const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): string => {
+  const successCount = logs.filter(l => l.success).length;
+  const failureCount = logs.filter(l => !l.success).length;
+  
+  const logEntries = logs.map((log, index) => {
+    const timestamp = formatDateTime(log.createdAt);
+    const jsonResponse = log.skuVaultRawResponse 
+      ? JSON.stringify(log.skuVaultRawResponse, null, 2)
+      : 'No data';
+    
+    return `### Entry ${index + 1}
+- **Timestamp:** ${timestamp}
+- **User:** ${extractUsername(log.username)}
+- **Action:** ${formatActionLabel(log.action)}
+- **Success:** ${log.success ? 'Yes' : 'No'}
+- **SKU:** ${log.productSku || 'N/A'}
+- **Scanned Barcode:** ${log.scannedCode || 'N/A'}
+- **SkuVault Product ID:** ${log.skuVaultProductId || 'N/A'}
+- **Error:** ${log.errorMessage || 'None'}
+- **SkuVault Response:** \`${jsonResponse === 'No data' ? jsonResponse : 'See below'}\`
+${jsonResponse !== 'No data' ? `\`\`\`json\n${jsonResponse}\n\`\`\`` : ''}`;
+  }).join('\n\n');
+
+  return `You are analyzing packing logs from a warehouse fulfillment system. Please review all log entries for this order and provide a comprehensive analysis.
+
+## Context
+These logs are from a warehouse packing station where workers scan orders and products for quality control (QC) validation against SkuVault inventory system.
+
+## Order Summary
+
+**Order Number:** ${orderNumber}
+**Total Log Entries:** ${logs.length}
+**Successful Actions:** ${successCount}
+**Failed Actions:** ${failureCount}
+
+## All Log Entries (Chronological)
+
+${logEntries}
+
+## Questions to Answer
+
+1. **Timeline Analysis:** What is the sequence of events that occurred during packing?
+2. **Failure Patterns:** Are there any patterns in the failures? (e.g., same user, same SKU, same error type)
+3. **Root Cause:** If there are failures, what is the likely root cause?
+4. **User Behavior:** Did any workers scan the wrong items or make procedural errors?
+5. **System Issues:** Are there any red flags suggesting system configuration problems?
+6. **Recommendations:** What steps should the warehouse team take to prevent similar issues?
+
+Please provide a clear, actionable analysis with specific recommendations.`;
+};
+
 function LogDetailsModal({ 
   log, 
   orderNumber, 
@@ -359,6 +410,51 @@ export default function PackingLogsReport() {
     setOrderNumber('');
   };
 
+  const handleCopyAllForAI = async (logs: PackingLog[], orderNum: string) => {
+    const prompt = generateAllLogsAIPrompt(logs, orderNum);
+    
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(prompt);
+        toast({
+          title: "Copied to clipboard",
+          description: `AI analysis prompt for all ${logs.length} logs copied. Paste it into ChatGPT or Claude.`,
+        });
+        return;
+      } catch (error) {
+        console.warn('Clipboard API failed, falling back to textarea method:', error);
+      }
+    }
+    
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = prompt;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        toast({
+          title: "Copied to clipboard",
+          description: `AI analysis prompt for all ${logs.length} logs copied. Paste it into ChatGPT or Claude.`,
+        });
+      } else {
+        throw new Error('execCommand copy failed');
+      }
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Your browser doesn't support clipboard access. Please manually select and copy the text.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -445,13 +541,23 @@ export default function PackingLogsReport() {
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl">
-                      Log Entries
-                    </CardTitle>
-                    <CardDescription>
-                      Chronological list of packing actions for this order. Click "View" to see full details.
-                    </CardDescription>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-xl">
+                        Log Entries
+                      </CardTitle>
+                      <CardDescription>
+                        Chronological list of packing actions for this order. Click "View" to see full details.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleCopyAllForAI(data.logs, data.orderNumber)}
+                      data-testid="button-copy-all-ai"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Copy All for AI Analysis
+                    </Button>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border overflow-x-auto">
