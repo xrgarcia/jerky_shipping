@@ -753,7 +753,7 @@ export default function Bagging() {
       timestamp: Date.now(),
     });
 
-    // Audio feedback
+    // Audio feedback - only play sound for final results (success/error), not intermediate "info" states
     if (type === "success") {
       playSuccessBeep();
       vibrate(100); // Short vibration
@@ -761,7 +761,7 @@ export default function Bagging() {
       playErrorBeep();
       vibrate([100, 50, 100]); // Double vibration pattern
     } else {
-      playSuccessBeep();
+      // "info" type - no beep, just brief vibration for tactile feedback
       vibrate(50); // Brief vibration
     }
   };
