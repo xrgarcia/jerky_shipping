@@ -1135,7 +1135,7 @@ export default function Shipments() {
               Lifecycle View
             </Button>
             <Button
-              variant={viewMode === 'workflow' ? 'default' : 'outline'}
+              variant={viewMode === 'workflow' && activeTab !== 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => {
                 setViewMode('workflow');
