@@ -6518,11 +6518,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const event = await storage.createShipmentEvent({
         username: user.email,
         station: "bagging",
+        stationId: stationId || null, // Specific workstation ID for reporting
         eventName: "packing_completed",
         orderNumber,
         metadata: {
           shipmentId,
-          stationId,
           totalScans: totalScans || 0,
           labelPrintedOnLoad: labelPrintedOnLoad || false,
         },

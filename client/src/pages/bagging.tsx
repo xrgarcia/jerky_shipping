@@ -1742,6 +1742,7 @@ export default function Bagging() {
     try {
       await apiRequest("POST", "/api/shipment-events", {
         station: "bagging", // Bagging station for audit trail
+        stationId: currentStation?.stationId || null, // Specific workstation ID
         eventName,
         orderNumber: orderNumber || currentShipment?.orderNumber || null,
         metadata,

@@ -1679,6 +1679,7 @@ export default function Packing() {
     try {
       await apiRequest("POST", "/api/shipment-events", {
         station: "packing",
+        stationId: currentStation?.stationId || null, // Specific workstation ID
         eventName,
         orderNumber: orderNumber || currentShipment?.orderNumber || null,
         metadata,
