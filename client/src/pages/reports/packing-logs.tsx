@@ -14,12 +14,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ClipboardList, RefreshCw, Loader2, Search, ChevronDown, ChevronRight, CheckCircle, XCircle, Package, Scan, FileCheck } from "lucide-react";
-import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { ClipboardList, RefreshCw, Loader2, Search, CheckCircle, XCircle, Package, Scan, FileCheck, Eye, Copy, Sparkles } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
+import { useToast } from "@/hooks/use-toast";
 
 const CST_TIMEZONE = 'America/Chicago';
 
@@ -97,45 +103,235 @@ const formatActionLabel = (action: string) => {
   return action.replace(/_/g, ' ').toUpperCase();
 };
 
-function JsonViewer({ data, label }: { data: unknown; label: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+const generateAIPrompt = (log: PackingLog, orderNumber: string): string => {
+  const timestamp = formatDateTime(log.createdAt);
+  const jsonResponse = log.skuVaultRawResponse 
+    ? JSON.stringify(log.skuVaultRawResponse, null, 2)
+    : 'No SkuVault response data';
   
-  if (data === null || data === undefined) {
-    return <span className="text-muted-foreground">-</span>;
-  }
+  return `You are diagnosing a packing log anomaly in a warehouse fulfillment system. Please analyze the following log entry and help identify potential issues or explain what happened.
+
+## Context
+This log is from a warehouse packing station where workers scan orders and products for quality control (QC) validation against SkuVault inventory system.
+
+## Log Entry Details
+
+**Order Number:** ${orderNumber}
+**Log ID:** ${log.id}
+**Timestamp (CST):** ${timestamp}
+**User:** ${extractUsername(log.username)}
+**Action Type:** ${formatActionLabel(log.action)}
+**Success:** ${log.success ? 'Yes' : 'No'}
+**Product SKU:** ${log.productSku || 'N/A'}
+**Scanned Barcode:** ${log.scannedCode || 'N/A'}
+**SkuVault Product ID:** ${log.skuVaultProductId || 'N/A'}
+**Error Message:** ${log.errorMessage || 'None'}
+
+## SkuVault Raw Response
+\`\`\`json
+${jsonResponse}
+\`\`\`
+
+## Questions to Answer
+1. What does this log entry indicate happened during packing?
+2. If this is a failure, what is the likely root cause?
+3. What steps should the warehouse team take to resolve this issue?
+4. Are there any patterns or red flags in the SkuVault response that suggest configuration issues?
+
+Please provide a clear, actionable analysis.`;
+};
+
+function LogDetailsModal({ 
+  log, 
+  orderNumber, 
+  isOpen, 
+  onClose 
+}: { 
+  log: PackingLog | null; 
+  orderNumber: string;
+  isOpen: boolean; 
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
   
-  const jsonString = JSON.stringify(data, null, 2);
-  const isComplex = typeof data === 'object' && Object.keys(data as object).length > 2;
+  if (!log) return null;
   
-  if (!isComplex) {
-    return (
-      <pre className="text-xs bg-muted p-2 rounded-md overflow-x-auto max-w-md">
-        {jsonString}
-      </pre>
-    );
-  }
+  const actionStyle = getActionBadgeVariant(log.action, log.success);
+  const jsonString = log.skuVaultRawResponse 
+    ? JSON.stringify(log.skuVaultRawResponse, null, 2) 
+    : null;
+  
+  const handleCopyForAI = async () => {
+    const prompt = generateAIPrompt(log, orderNumber);
+    
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(prompt);
+        toast({
+          title: "Copied to clipboard",
+          description: "AI analysis prompt copied. Paste it into ChatGPT or Claude to analyze.",
+        });
+        return;
+      } catch (error) {
+        console.warn('Clipboard API failed, falling back to textarea method:', error);
+      }
+    }
+    
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = prompt;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        toast({
+          title: "Copied to clipboard",
+          description: "AI analysis prompt copied. Paste it into ChatGPT or Claude to analyze.",
+        });
+      } else {
+        throw new Error('execCommand copy failed');
+      }
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Your browser doesn't support clipboard access. Please manually select and copy the text.",
+        variant: "destructive",
+      });
+    }
+  };
   
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700" data-testid={`button-expand-json-${label}`}>
-        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        {isOpen ? "Hide JSON" : "View JSON"}
-        <Badge variant="outline" className="ml-2 text-xs">
-          {Object.keys(data as object).length} fields
-        </Badge>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2">
-        <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto max-w-full whitespace-pre-wrap break-words">
-          {jsonString}
-        </pre>
-      </CollapsibleContent>
-    </Collapsible>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <Eye className="h-5 w-5 text-blue-500" />
+            Log Entry Details
+          </DialogTitle>
+          <DialogDescription>
+            Full details for packing log on order {orderNumber}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <Badge variant={actionStyle.variant} className={`${actionStyle.className} text-sm py-1 px-3`}>
+                  {getActionIcon(log.action)}
+                  {formatActionLabel(log.action)}
+                </Badge>
+                {log.success ? (
+                  <Badge variant="outline" className="border-green-500 text-green-600">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Success
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Failed
+                  </Badge>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {formatDateTime(log.createdAt)} CST
+              </span>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">User</Label>
+                <p className="font-medium">{extractUsername(log.username)}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Log ID</Label>
+                <p className="font-mono text-sm text-muted-foreground">{log.id}</p>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Product SKU</Label>
+                <p className="font-mono">{log.productSku || <span className="text-muted-foreground">-</span>}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Scanned Barcode</Label>
+                <p className="font-mono">{log.scannedCode || <span className="text-muted-foreground">-</span>}</p>
+              </div>
+            </div>
+            
+            {log.skuVaultProductId && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">SkuVault Product ID</Label>
+                <p className="font-mono">{log.skuVaultProductId}</p>
+              </div>
+            )}
+            
+            {log.errorMessage && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <XCircle className="h-3 w-3 text-red-500" />
+                    Error Message
+                  </Label>
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-md p-3">
+                    <p className="text-red-600 dark:text-red-400">{log.errorMessage}</p>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {jsonString && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">SkuVault Raw Response</Label>
+                  <div className="bg-muted rounded-md p-3 max-h-64 overflow-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap break-words">
+                      {jsonString}
+                    </pre>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </ScrollArea>
+        
+        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCopyForAI}
+            className="gap-2"
+            data-testid="button-copy-ai"
+          >
+            <Sparkles className="h-4 w-4" />
+            Copy for AI Analysis
+          </Button>
+          <Button variant="secondary" onClick={onClose} data-testid="button-close-modal">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 export default function PackingLogsReport() {
+  const { toast } = useToast();
   const [searchOrderNumber, setSearchOrderNumber] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
+  const [selectedLog, setSelectedLog] = useState<PackingLog | null>(null);
 
   const { data, isLoading, refetch, isRefetching, isFetched } = useQuery<PackingLogsResponse>({
     queryKey: ['/api/reports/packing-logs', orderNumber],
@@ -254,7 +450,7 @@ export default function PackingLogsReport() {
                       Log Entries
                     </CardTitle>
                     <CardDescription>
-                      Chronological list of packing actions for this order
+                      Chronological list of packing actions for this order. Click "View" to see full details.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -263,13 +459,12 @@ export default function PackingLogsReport() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[180px]">Timestamp</TableHead>
-                            <TableHead className="w-[120px]">User</TableHead>
+                            <TableHead className="w-[100px]">User</TableHead>
                             <TableHead className="w-[140px]">Action</TableHead>
                             <TableHead className="w-[140px]">SKU</TableHead>
-                            <TableHead className="w-[160px]">Scanned Code</TableHead>
                             <TableHead className="w-[80px]">Status</TableHead>
-                            <TableHead>Error / Details</TableHead>
-                            <TableHead>SkuVault Response</TableHead>
+                            <TableHead>Error / Notes</TableHead>
+                            <TableHead className="w-[80px] text-right">Details</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -294,9 +489,6 @@ export default function PackingLogsReport() {
                                 <TableCell className="font-mono text-sm">
                                   {log.productSku || '-'}
                                 </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                  {log.scannedCode || '-'}
-                                </TableCell>
                                 <TableCell>
                                   {log.success ? (
                                     <Badge variant="outline" className="border-green-500 text-green-600">
@@ -310,7 +502,7 @@ export default function PackingLogsReport() {
                                     </Badge>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm max-w-[200px] truncate">
                                   {log.errorMessage ? (
                                     <span className="text-red-600">{log.errorMessage}</span>
                                   ) : (
@@ -321,8 +513,16 @@ export default function PackingLogsReport() {
                                     )
                                   )}
                                 </TableCell>
-                                <TableCell>
-                                  <JsonViewer data={log.skuVaultRawResponse} label={log.id} />
+                                <TableCell className="text-right">
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost"
+                                    onClick={() => setSelectedLog(log)}
+                                    data-testid={`button-view-${index}`}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
                                 </TableCell>
                               </TableRow>
                             );
@@ -359,6 +559,13 @@ export default function PackingLogsReport() {
           </Card>
         )}
       </div>
+      
+      <LogDetailsModal
+        log={selectedLog}
+        orderNumber={data?.orderNumber || orderNumber}
+        isOpen={!!selectedLog}
+        onClose={() => setSelectedLog(null)}
+      />
     </div>
   );
 }
