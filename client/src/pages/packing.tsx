@@ -3043,6 +3043,15 @@ export default function Packing() {
                           <CheckCircle2 className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
                           <p className="font-semibold text-lg">All items scanned!</p>
                           <p className="text-sm text-muted-foreground">Review completed items below</p>
+                          {isGift && (
+                            <Badge 
+                              className="bg-pink-600 hover:bg-pink-600 text-white text-lg px-4 py-2 mt-4"
+                              data-testid="badge-gift-reminder"
+                            >
+                              <Gift className="h-5 w-5 mr-2" />
+                              Add $5 Gift Card
+                            </Badge>
+                          )}
                         </div>
                       )}
                       
