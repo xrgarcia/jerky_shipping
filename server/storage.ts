@@ -359,6 +359,15 @@ export interface IStorage {
   getJobsByOrder(orderId: string): Promise<PrintJob[]>;
   getJobsByShipment(shipmentId: string): Promise<PrintJob[]>;
   getAllDesktopPrintJobs(limit?: number): Promise<PrintJob[]>;
+  queryPrintJobs(options: {
+    userId?: string;
+    status?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }): Promise<{ jobs: PrintJob[]; total: number; page: number; limit: number; totalPages: number }>;
   markJobPickedUp(id: string): Promise<PrintJob | undefined>;
   markJobSent(id: string): Promise<PrintJob | undefined>;
   markJobCompleted(id: string): Promise<PrintJob | undefined>;
@@ -3115,6 +3124,79 @@ export class DatabaseStorage implements IStorage {
       .from(printJobs)
       .orderBy(desc(printJobs.createdAt))
       .limit(limit);
+  }
+
+  async queryPrintJobs(options: {
+    userId?: string;
+    status?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }): Promise<{ jobs: PrintJob[]; total: number; page: number; limit: number; totalPages: number }> {
+    const { 
+      userId, 
+      status, 
+      search, 
+      sortBy = 'createdAt', 
+      sortOrder = 'desc', 
+      page = 1, 
+      limit = 10 
+    } = options;
+
+    const conditions: any[] = [];
+
+    if (userId) {
+      conditions.push(eq(printJobs.requestedBy, userId));
+    }
+
+    if (status && status !== 'all') {
+      conditions.push(eq(printJobs.status, status));
+    }
+
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(sql`(${printJobs.payload}->>'orderNumber')::text`, searchPattern),
+          ilike(sql`(${printJobs.payload}->>'trackingNumber')::text`, searchPattern)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const totalResult = await db
+      .select({ count: count() })
+      .from(printJobs)
+      .where(whereClause);
+    const total = totalResult[0]?.count || 0;
+
+    const sortColumn = sortBy === 'createdAt' ? printJobs.createdAt
+      : sortBy === 'status' ? printJobs.status
+      : sortBy === 'completedAt' ? printJobs.completedAt
+      : printJobs.createdAt;
+
+    const orderByClause = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    const offset = (page - 1) * limit;
+
+    const jobs = await db
+      .select()
+      .from(printJobs)
+      .where(whereClause)
+      .orderBy(orderByClause)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      jobs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async markJobPickedUp(id: string): Promise<PrintJob | undefined> {
