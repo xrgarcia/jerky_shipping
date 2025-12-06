@@ -45,7 +45,7 @@ interface LifecycleTabCounts {
 }
 
 type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type LifecycleTab = 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -603,7 +603,7 @@ export default function Shipments() {
   // View mode and tab state
   const [viewMode, setViewMode] = useState<ViewMode>('lifecycle');
   const [activeTab, setActiveTab] = useState<WorkflowTab>('in_progress');
-  const [activeLifecycleTab, setActiveLifecycleTab] = useState<LifecycleTab>('all');
+  const [activeLifecycleTab, setActiveLifecycleTab] = useState<LifecycleTab>('ready_to_pick');
 
   // Filter states
   const [search, setSearch] = useState("");
@@ -623,6 +623,11 @@ export default function Shipments() {
   const [sortBy, setSortBy] = useState("orderDate");
   const [sortOrder, setSortOrder] = useState("desc");
 
+  // Valid values for URL hydration
+  const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
+  const validLifecycleTabs: LifecycleTab[] = ['ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+  const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
+
   // Initialize state from URL params (runs when URL changes, including browser navigation)
   useEffect(() => {
     const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
@@ -634,8 +639,40 @@ export default function Shipments() {
     
     const params = new URLSearchParams(currentSearch);
     
-    // Always reset to defaults, then apply URL params
-    setActiveTab((params.get('tab') as WorkflowTab) || 'in_progress');
+    // Hydrate viewMode from URL (default to lifecycle)
+    const urlViewMode = params.get('viewMode') as ViewMode | null;
+    const urlTab = params.get('tab') as WorkflowTab | null;
+    
+    // Determine view mode: if tab=all, force workflow mode; otherwise use URL viewMode or default to lifecycle
+    let hydratedViewMode: ViewMode;
+    let hydratedTab: WorkflowTab;
+    
+    if (urlTab === 'all') {
+      // "All" view is always workflow mode with tab=all
+      hydratedViewMode = 'workflow';
+      hydratedTab = 'all';
+    } else if (urlViewMode && validViewModes.includes(urlViewMode)) {
+      hydratedViewMode = urlViewMode;
+      // Only set tab for workflow mode, ignore for lifecycle
+      hydratedTab = hydratedViewMode === 'workflow' && urlTab && validWorkflowTabs.includes(urlTab) 
+        ? urlTab 
+        : 'in_progress';
+    } else {
+      // Default to lifecycle mode
+      hydratedViewMode = 'lifecycle';
+      hydratedTab = 'in_progress'; // Default workflow tab when switching to workflow later
+    }
+    
+    setViewMode(hydratedViewMode);
+    setActiveTab(hydratedTab);
+    
+    // Hydrate lifecycleTab with validation (map legacy 'all' to 'ready_to_pick')
+    const urlLifecycleTab = params.get('lifecycleTab');
+    const hydratedLifecycleTab = urlLifecycleTab && validLifecycleTabs.includes(urlLifecycleTab as LifecycleTab) 
+      ? urlLifecycleTab as LifecycleTab 
+      : 'ready_to_pick';
+    setActiveLifecycleTab(hydratedLifecycleTab);
+    
     setSearch(params.get('search') || '');
     setStatus(params.get('status') || ''); // Single status value
     setStatusDescription(params.get('statusDescription') || '');
@@ -678,7 +715,18 @@ export default function Shipments() {
     
     const params = new URLSearchParams();
     
-    if (activeTab !== 'in_progress') params.set('tab', activeTab);
+    // Include viewMode only when not lifecycle (the default)
+    if (viewMode !== 'lifecycle') params.set('viewMode', viewMode);
+    
+    // Include tab only for workflow mode (lifecycle mode ignores workflow tabs)
+    if (viewMode === 'workflow' && activeTab !== 'in_progress') {
+      params.set('tab', activeTab);
+    }
+    
+    // Include lifecycleTab only for lifecycle mode
+    if (viewMode === 'lifecycle' && activeLifecycleTab !== 'ready_to_pick') {
+      params.set('lifecycleTab', activeLifecycleTab);
+    }
     if (search) params.set('search', search);
     if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
@@ -705,7 +753,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [activeTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -1044,8 +1092,6 @@ export default function Shipments() {
       }
     } else {
       switch (activeLifecycleTab) {
-        case 'all':
-          return 'All shipments regardless of lifecycle stage';
         case 'ready_to_pick':
           return 'Orders ready to be picked - session created, waiting to start';
         case 'picking':
@@ -1078,7 +1124,8 @@ export default function Shipments() {
               size="sm"
               onClick={() => {
                 setViewMode('lifecycle');
-                setActiveLifecycleTab('all');
+                setActiveLifecycleTab('ready_to_pick');
+                setActiveTab('in_progress'); // Reset workflow tab to prevent stale state
                 setPage(1);
               }}
               className="gap-2"
@@ -1093,6 +1140,7 @@ export default function Shipments() {
               onClick={() => {
                 setViewMode('workflow');
                 setActiveTab('in_progress');
+                setActiveLifecycleTab('ready_to_pick'); // Reset lifecycle tab to prevent stale state
                 setPage(1);
               }}
               className="gap-2"
@@ -1101,29 +1149,35 @@ export default function Shipments() {
               <Boxes className="h-4 w-4" />
               Workflow View
             </Button>
+            <Button
+              variant={activeTab === 'all' && viewMode === 'workflow' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setViewMode('workflow');
+                setActiveTab('all');
+                setActiveLifecycleTab('ready_to_pick'); // Reset lifecycle tab to prevent stale state
+                setPage(1);
+              }}
+              className="gap-2"
+              data-testid="button-view-all"
+            >
+              <Package className="h-4 w-4" />
+              All
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground hidden md:block">
-            {viewMode === 'lifecycle' 
-              ? 'Track orders through warehouse lifecycle stages' 
-              : 'Traditional fulfillment workflow view'}
+            {activeTab === 'all' && viewMode === 'workflow'
+              ? 'All shipments regardless of status'
+              : viewMode === 'lifecycle' 
+                ? 'Track orders through warehouse lifecycle stages' 
+                : 'Traditional fulfillment workflow view'}
           </p>
         </div>
 
         {/* Lifecycle Tabs */}
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-6 h-auto p-1">
-              <TabsTrigger 
-                value="all" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                data-testid="tab-lifecycle-all"
-              >
-                <div className="flex items-center gap-2">
-                  <Boxes className="h-4 w-4" />
-                  <span className="font-semibold">All Shipments</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.all} total</span>
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
               <TabsTrigger 
                 value="ready_to_pick" 
                 className="flex flex-col gap-1 py-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -1181,10 +1235,13 @@ export default function Shipments() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+        ) : activeTab === 'all' ? (
+          /* All View - no tabs, just show all shipments */
+          null
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-3 h-auto p-1">
               <TabsTrigger 
                 value="ready_to_fulfill" 
                 className="flex flex-col gap-1 py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -1217,17 +1274,6 @@ export default function Shipments() {
                   <span className="font-semibold">On the Way</span>
                 </div>
                 <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="all" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                data-testid="tab-all"
-              >
-                <div className="flex items-center gap-2">
-                  <Boxes className="h-4 w-4" />
-                  <span className="font-semibold">All</span>
-                </div>
-                <span className="text-xs opacity-80">{tabCounts.all} total</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1545,9 +1591,7 @@ export default function Shipments() {
                 {activeFiltersCount > 0
                   ? "Try adjusting your filters or clearing them to see more results"
                   : viewMode === 'lifecycle'
-                  ? activeLifecycleTab === 'all'
-                    ? "Shipments will appear here when orders are fulfilled"
-                    : activeLifecycleTab === 'ready_to_pick'
+                  ? activeLifecycleTab === 'ready_to_pick'
                     ? "No orders are waiting to be picked"
                     : activeLifecycleTab === 'picking'
                     ? "No orders are currently being picked"
@@ -1562,6 +1606,8 @@ export default function Shipments() {
                   ? "No orders are currently in progress"
                   : activeTab === 'shipped'
                   ? "No orders are on the way to customers"
+                  : activeTab === 'all'
+                  ? "Shipments will appear here when orders are fulfilled through ShipStation"
                   : "Shipments will appear here when orders are fulfilled through ShipStation"}
               </p>
             </CardContent>

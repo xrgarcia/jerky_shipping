@@ -31,9 +31,11 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
         - **Station Selection Re-validation**: After selecting a station, the mutation re-validates against localStorage to ensure the selected station matches the physical workstation. If not, mismatch persists.
         - **Clear User Guidance**: Blocking screen explains options: "Work at This Computer (Select X)" or "Go to the computer configured for Y" or "Log Out".
         - **Implementation Files**: `client/src/lib/workstation-guard.ts` (localStorage utilities), `client/src/pages/packing.tsx`, `client/src/pages/bagging.tsx`.
-    - **Shipment Management**: Unified shipments page with dual-view mode:
-        - **Workflow View**: Business process tabs (In Progress, Packing Queue, Shipped, All) for traditional fulfillment stages.
-        - **Lifecycle View**: 6 warehouse flow tabs matching the actual process - All Shipments (default), Ready to Pick (new sessions), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
+    - **Shipment Management**: Unified shipments page with three top-level navigation modes:
+        - **Lifecycle View** (default): 5 warehouse lifecycle tabs - Ready to Pick (new sessions, default), Picking (active sessions), Packing Ready (closed + no tracking, cache is warmed), On the Dock (closed + tracking + in-transit), Picking Issues (inactive sessions flagged for supervisor attention).
+        - **Workflow View**: 3 business process tabs - Ready to Fulfill, In Progress, Shipped.
+        - **All**: Shows all shipments regardless of status (uses workflow mode with tab=all internally).
+        - **URL State Management**: URL parameters persist viewMode, tab (workflow only), and lifecycleTab (lifecycle only). Deep links are validated and corrected on load. Browser refresh preserves the current view.
     - **Order Backfill System**: Fault-tolerant, task-based architecture for historical Shopify orders and ShipStation shipments, using Redis-queued processing and WebSocket updates.
     - **Reporting & Analytics**: Business analytics dashboard (Gross Sales, Net Sales) and PO Recommendations page querying a separate GCP PostgreSQL database.
         - **Packed Shipments Report**: Shows shipments by date they were packed with comprehensive timing analytics:
