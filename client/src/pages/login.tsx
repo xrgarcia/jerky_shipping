@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
 import { Loader2, AlertCircle } from "lucide-react";
+import jerkyLogo from "@assets/image_1764264961124.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -72,13 +73,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary text-primary-foreground p-3 rounded-full">
-              <SiGoogle className="h-8 w-8" />
-            </div>
-          </div>
+      <Card className="w-full max-w-md overflow-hidden">
+        <div className="bg-black dark:bg-black py-6 px-4 flex justify-center">
+          <img 
+            src={jerkyLogo} 
+            alt="Jerky.com" 
+            className="h-10 object-contain"
+            data-testid="img-login-logo"
+          />
+        </div>
+        <CardHeader className="space-y-1 text-center pt-6">
           <CardTitle className="text-3xl font-serif">ship.jerky.com</CardTitle>
           <CardDescription className="text-base">
             Sign in with your Jerky.com Google account
