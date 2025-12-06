@@ -128,7 +128,7 @@ function AppContent() {
           </div>
         </div>
       </SidebarProvider>
-      <WarningDialog />
+      {WarningDialog}
     </>
   );
 }

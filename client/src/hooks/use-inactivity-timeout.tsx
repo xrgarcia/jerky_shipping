@@ -199,8 +199,8 @@ export function useInactivityTimeout({ onLogout, enabled = true }: UseInactivity
     };
   }, [enabled]); // ONLY enabled - no other deps
 
-  // Warning dialog component
-  const WarningDialog = () => (
+  // Warning dialog as stable JSX (not a component function that gets recreated)
+  const warningDialogElement = (
     <AlertDialog 
       open={showWarning} 
       onOpenChange={(open) => {
@@ -245,7 +245,7 @@ export function useInactivityTimeout({ onLogout, enabled = true }: UseInactivity
     secondsRemaining,
     stayLoggedIn: functionsRef.current.stayLoggedIn,
     handleLogout: functionsRef.current.handleLogout,
-    WarningDialog,
+    WarningDialog: warningDialogElement,
     resetActivity: functionsRef.current.startTimers
   };
 }
