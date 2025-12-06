@@ -4483,15 +4483,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/print-queue", requireAuth, async (req, res) => {
     try {
-      // Get all desktop print jobs (includes history)
-      const desktopJobs = await storage.getAllDesktopPrintJobs(100);
+      const {
+        myJobs,
+        status,
+        search,
+        sortBy,
+        sortOrder,
+        page,
+        limit,
+      } = req.query;
+
+      const options = {
+        userId: myJobs === 'true' ? req.user!.id : undefined,
+        status: status as string | undefined,
+        search: search as string | undefined,
+        sortBy: sortBy as string | undefined,
+        sortOrder: (sortOrder as 'asc' | 'desc') || 'desc',
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 10,
+      };
+
+      const result = await storage.queryPrintJobs(options);
       
       // Get stations for display names
       const stations = await storage.getAllStations();
       const stationMap = new Map(stations.map(s => [s.id, s.name]));
+
+      // Get users for requestedBy display names
+      const userIds = [...new Set(result.jobs.map(j => j.requestedBy).filter(Boolean))];
+      const usersData: Map<string, { name: string; email: string }> = new Map();
+      for (const userId of userIds) {
+        const user = await storage.getUser(userId as string);
+        if (user) {
+          usersData.set(userId as string, { 
+            name: user.name || user.email.split('@')[0], 
+            email: user.email 
+          });
+        }
+      }
       
       // Transform jobs to include station name and order number from payload
-      const jobs = desktopJobs.map(job => ({
+      const jobs = result.jobs.map(job => ({
         id: job.id,
         orderId: job.orderId,
         orderNumber: (job.payload as any)?.orderNumber || job.orderId,
@@ -4509,9 +4541,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentAt: job.sentAt,
         printedAt: job.completedAt,
         createdAt: job.createdAt,
+        requestedBy: job.requestedBy,
+        requestedByName: job.requestedBy ? usersData.get(job.requestedBy)?.name || 'Unknown' : null,
+        requestedByEmail: job.requestedBy ? usersData.get(job.requestedBy)?.email || null : null,
       }));
       
-      res.json({ jobs });
+      res.json({ 
+        jobs,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      });
     } catch (error) {
       console.error("Error fetching print queue:", error);
       res.status(500).json({ error: "Failed to fetch print queue" });
