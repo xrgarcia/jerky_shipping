@@ -51,8 +51,9 @@ import {
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
 // Import sound files
-import successSoundUrl from "@assets/smb_powerup_1765055020444.wav";
-import errorSoundUrl from "@assets/20251206_144623_1765054040309.mp3";
+import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3"; // QC scan success (coin)
+import errorSoundUrl from "@assets/20251206_144623_1765054040309.mp3"; // QC scan error
+import completionSoundUrl from "@assets/smb_powerup_1765055020444.wav"; // Complete packing (powerup)
 
 // Station session types
 type StationSession = {
@@ -668,6 +669,7 @@ export default function Packing() {
   const audioResumedRef = useRef(false);
   const successSoundRef = useRef<HTMLAudioElement | null>(null);
   const errorSoundRef = useRef<HTMLAudioElement | null>(null);
+  const completionSoundRef = useRef<HTMLAudioElement | null>(null);
 
   // Preload sounds on mount
   useEffect(() => {
@@ -680,6 +682,11 @@ export default function Packing() {
     errorAudio.preload = "auto";
     errorAudio.volume = 0.7; // 70% volume for error (more attention-grabbing)
     errorSoundRef.current = errorAudio;
+
+    const completionAudio = new Audio(completionSoundUrl);
+    completionAudio.preload = "auto";
+    completionAudio.volume = 0.6; // 60% volume for completion
+    completionSoundRef.current = completionAudio;
   }, []);
 
   const getAudioContext = async () => {
@@ -761,6 +768,20 @@ export default function Packing() {
       }
     } catch (error) {
       console.warn("Error sound error:", error);
+    }
+  };
+
+  // Play completion sound using preloaded WAV (for Complete Packing button)
+  const playCompletionSound = () => {
+    try {
+      if (completionSoundRef.current) {
+        completionSoundRef.current.currentTime = 0; // Reset to start
+        completionSoundRef.current.play().catch(err => {
+          console.warn("Completion sound playback failed:", err);
+        });
+      }
+    } catch (error) {
+      console.warn("Completion sound error:", error);
     }
   };
 
@@ -1758,6 +1779,9 @@ export default function Packing() {
       };
     },
     onSuccess: (result) => {
+      // Play completion sound
+      playCompletionSound();
+      
       // Log packing completed event before resetting state
       const totalScans = Array.from(skuProgress.values()).reduce((sum, p) => sum + p.scanned, 0);
       logShipmentEvent("packing_completed", {
