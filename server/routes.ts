@@ -6493,7 +6493,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           requestedBy: user.displayName || user.email || 'Unknown',
           printerName: selectedPrinter?.name || null, // Printer name for logging/display
         },
-        status: "pending" // Start as pending, desktop client will pick it up
+        status: "pending", // Start as pending, desktop client will pick it up
+        requestedBy: user.id, // Track who created this print job
       });
       
       // Send job to desktop client via WebSocket
@@ -7797,7 +7798,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/desktop/print-jobs", requireAuth, async (req, res) => {
     try {
       const data = insertPrintJobSchema.parse(req.body);
-      const job = await storage.createPrintJob(data);
+      const job = await storage.createPrintJob({
+        ...data,
+        requestedBy: req.user!.id, // Track who created this print job
+      });
       
       // TODO: Notify desktop clients via WebSocket
       
