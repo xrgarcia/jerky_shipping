@@ -12,16 +12,31 @@ class ApiError extends Error {
   }
 }
 
+let isRedirectingToLogin = false;
+
+function redirectToLogin() {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  
+  if (window.location.pathname !== '/login') {
+    console.log('[QueryClient] 401 detected - redirecting to login');
+    window.location.href = '/login';
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    if (res.status === 401) {
+      redirectToLogin();
+      throw new ApiError(401, 'Session expired', null);
+    }
+    
     const text = (await res.text()) || res.statusText;
     
-    // Try to parse as JSON to extract structured error data
     let data: any = null;
     try {
       data = JSON.parse(text);
     } catch {
-      // Not JSON, data stays null
     }
     
     throw new ApiError(res.status, `${res.status}: ${text}`, data);
@@ -44,7 +59,7 @@ export async function apiRequest(
   return res;
 }
 
-type UnauthorizedBehavior = "returnNull" | "throw";
+type UnauthorizedBehavior = "returnNull" | "throw" | "redirect";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
@@ -54,8 +69,12 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      redirectToLogin();
+      throw new ApiError(401, 'Session expired', null);
     }
 
     await throwIfResNotOk(res);
@@ -65,7 +84,7 @@ export const getQueryFn: <T>(options: {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "redirect" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,
