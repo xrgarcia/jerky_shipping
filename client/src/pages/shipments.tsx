@@ -1177,63 +1177,65 @@ export default function Shipments() {
         {/* Lifecycle Tabs */}
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
-              <TabsTrigger 
-                value="ready_to_pick" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                data-testid="tab-lifecycle-ready-to-pick"
-              >
-                <div className="flex items-center gap-2">
-                  <Timer className="h-4 w-4" />
-                  <span className="font-semibold">Ready to Pick</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.readyToPick} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="picking" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                data-testid="tab-lifecycle-picking"
-              >
-                <div className="flex items-center gap-2">
-                  <Play className="h-4 w-4" />
-                  <span className="font-semibold">Picking</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.picking} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="packing_ready" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-green-600 data-[state=active]:text-white"
-                data-testid="tab-lifecycle-packing-ready"
-              >
-                <div className="flex items-center gap-2">
-                  <PackageOpen className="h-4 w-4" />
-                  <span className="font-semibold">Packing Ready</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.packingReady} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="on_dock" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
-                data-testid="tab-lifecycle-on-dock"
-              >
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  <span className="font-semibold">On the Dock</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.onDock} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="picking_issues" 
-                className={`flex flex-col gap-1 py-3 data-[state=active]:bg-amber-600 data-[state=active]:text-white ${lifecycleCounts.pickingIssues > 0 ? 'border-2 border-amber-500' : ''}`}
-                data-testid="tab-lifecycle-picking-issues"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="font-semibold">Picking Issues</span>
-                </div>
-                <span className="text-xs opacity-80">{lifecycleCounts.pickingIssues} orders</span>
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto scrollbar-thin">
+              <TabsList className="grid grid-cols-5 w-max sm:w-full h-auto p-1 gap-1">
+                <TabsTrigger 
+                  value="ready_to_pick" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[90px] sm:min-w-0 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-ready-to-pick"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Timer className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Pick</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToPick} orders</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="picking" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[70px] sm:min-w-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  data-testid="tab-lifecycle-picking"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Play className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Picking</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.picking} orders</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="packing_ready" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-green-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-packing-ready"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <PackageOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Packing Ready</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.packingReady} orders</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="on_dock" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[85px] sm:min-w-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-on-dock"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Truck className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">On the Dock</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.onDock} orders</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="picking_issues" 
+                  className={`flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-amber-600 data-[state=active]:text-white ${lifecycleCounts.pickingIssues > 0 ? 'border-2 border-amber-500' : ''}`}
+                  data-testid="tab-lifecycle-picking-issues"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Picking Issues</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.pickingIssues} orders</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </Tabs>
         ) : activeTab === 'all' ? (
           /* All View - no tabs, just show all shipments */
@@ -1241,39 +1243,39 @@ export default function Shipments() {
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
               <TabsTrigger 
                 value="ready_to_fulfill" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
                 data-testid="tab-ready-to-fulfill"
               >
-                <div className="flex items-center gap-2">
-                  <Timer className="h-4 w-4" />
-                  <span className="font-semibold">Ready to Fulfill</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Timer className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
                 </div>
-                <span className="text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
+                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="in_progress" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 data-testid="tab-in-progress"
               >
-                <div className="flex items-center gap-2">
-                  <Play className="h-4 w-4" />
-                  <span className="font-semibold">In Progress</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Play className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">In Progress</span>
                 </div>
-                <span className="text-xs opacity-80">{tabCounts.inProgress} orders</span>
+                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.inProgress} orders</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="shipped" 
-                className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 data-testid="tab-shipped"
               >
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  <span className="font-semibold">On the Way</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Truck className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">On the Way</span>
                 </div>
-                <span className="text-xs opacity-80">{tabCounts.shipped} orders</span>
+                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.shipped} orders</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
