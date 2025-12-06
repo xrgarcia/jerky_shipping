@@ -1207,6 +1207,9 @@ export default function Bagging() {
           console.log('[Bagging] Label print job queued successfully:', printResult.printJobId);
           setLabelPrintedOnLoad(true);
           setIsLabelPrinting(false); // Label printed successfully, allow QC page
+          // Clear optimistic print job flag - the label has been queued, so we don't need to block UI anymore
+          // This allows the Complete Packing button to receive focus when all items are scanned
+          setJustCreatedPrintJob(false);
           logShipmentEvent("label_printed_on_load", {
             printJobId: printResult.printJobId,
             orderNumber: shipment.orderNumber,
@@ -1217,6 +1220,7 @@ export default function Bagging() {
         } else {
           console.warn('[Bagging] Label print queuing returned unexpected result:', printResult);
           setIsLabelPrinting(false); // Allow QC page even if unexpected result
+          setJustCreatedPrintJob(false); // Also clear on unexpected result to avoid stuck state
           setTimeout(() => productInputRef.current?.focus(), 100);
         }
       } catch (printError: any) {
@@ -1991,16 +1995,22 @@ export default function Bagging() {
   const failedScans = packingLogs?.filter((log) => !log.success && log.action === "product_scanned").length || 0;
 
   // Auto-focus Complete Packing button when all items are scanned
-  // This allows user to simply press Enter to print the label
+  // In bagging workflow, the label is printed when order is scanned (not when completing)
+  // So we don't need to wait for printer to be ready - just check that there's no pending print job
   useEffect(() => {
-    if (allItemsScanned && currentShipment && !hasPendingPrintJob && isPrinterReady) {
+    // In bagging, labelPrintedOnLoad means the label was already printed when the order was scanned
+    // So we can focus the Complete button even if printer goes offline later
+    const canFocusComplete = allItemsScanned && currentShipment && !hasPendingPrintJob && 
+      (labelPrintedOnLoad || isPrinterReady);
+    
+    if (canFocusComplete) {
       // Small delay to ensure DOM is ready after state updates
       const timer = setTimeout(() => {
         completeButtonRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [allItemsScanned, currentShipment, hasPendingPrintJob, isPrinterReady]);
+  }, [allItemsScanned, currentShipment, hasPendingPrintJob, labelPrintedOnLoad, isPrinterReady]);
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
