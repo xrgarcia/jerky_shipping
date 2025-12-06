@@ -97,22 +97,26 @@ export default function PackedShipmentsReport() {
   }, [stationsData?.stations]);
 
   const getStationDisplay = (stationId: string | null, stationType: string | null): string => {
-    if (!stationId) {
-      // Fall back to stationType if no stationId
-      if (stationType) {
-        return stationType.charAt(0).toUpperCase() + stationType.slice(1);
+    // Try to get station name from lookup first
+    if (stationId) {
+      const station = stationMap.get(stationId);
+      if (station) {
+        return station.name;
       }
-      return '—';
     }
-    const station = stationMap.get(stationId);
-    if (station) {
-      return station.name;
+    // Fall back to stationType, mapping "packing" → "Boxing" and "bagging" → "Bagging"
+    if (stationType === 'packing') {
+      return 'Boxing';
     }
-    // Show stationType as fallback if station not found
+    if (stationType === 'bagging') {
+      return 'Bagging';
+    }
+    // Handle unknown station types by capitalizing them (future-proofing)
     if (stationType) {
       return stationType.charAt(0).toUpperCase() + stationType.slice(1);
     }
-    return '—';
+    // Default fallback when no station info available is Boxing (the more common workflow)
+    return 'Boxing';
   };
 
   const { data, isLoading, refetch, isRefetching } = useQuery<PackedShipmentsResponse>({
