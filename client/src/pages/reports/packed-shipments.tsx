@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,12 +85,16 @@ export default function PackedShipmentsReport() {
   });
 
   // Create station lookup map (keyed by station id to match stationId in events)
-  const stationMap = new Map<string, Station>();
-  if (stationsData?.stations) {
-    for (const station of stationsData.stations) {
-      stationMap.set(station.id, station);
+  // Memoized to prevent recreation on every render
+  const stationMap = useMemo(() => {
+    const map = new Map<string, Station>();
+    if (stationsData?.stations) {
+      for (const station of stationsData.stations) {
+        map.set(station.id, station);
+      }
     }
-  }
+    return map;
+  }, [stationsData?.stations]);
 
   const getStationDisplay = (stationId: string | null, stationType: string | null): string => {
     if (!stationId) {
