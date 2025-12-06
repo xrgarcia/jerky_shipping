@@ -482,6 +482,7 @@ export const shipmentEvents = pgTable("shipment_events", {
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
   username: text("username").notNull(), // Email of logged-in user
   station: text("station").notNull(), // e.g., "packing", "shipping", "receiving"
+  stationId: text("station_id"), // UUID of the specific workstation (e.g., "Station 1", "Bagging 2")
   eventName: text("event_name").notNull(), // e.g., "order_scanned", "product_scan_success"
   orderNumber: text("order_number"), // Links to shipments.order_number
   metadata: jsonb("metadata"), // Flexible JSON data for event-specific details
@@ -491,6 +492,7 @@ export const shipmentEvents = pgTable("shipment_events", {
   orderNumberIdx: index("shipment_events_order_number_idx").on(table.orderNumber).where(sql`${table.orderNumber} IS NOT NULL`),
   eventNameIdx: index("shipment_events_event_name_idx").on(table.eventName),
   usernameIdx: index("shipment_events_username_idx").on(table.username),
+  stationIdIdx: index("shipment_events_station_id_idx").on(table.stationId).where(sql`${table.stationId} IS NOT NULL`),
   timingIdx: index("shipment_events_timing_idx").on(table.orderNumber, table.username, table.eventName, table.occurredAt),
 }));
 
