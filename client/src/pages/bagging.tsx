@@ -50,6 +50,9 @@ import {
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
+// Import success sound MP3
+import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3";
+
 // Station session types
 type StationSession = {
   id: string;
@@ -658,6 +661,15 @@ export default function Bagging() {
   // Audio feedback - Reuse single AudioContext to avoid browser limits
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioResumedRef = useRef(false);
+  const successSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Preload success sound on mount
+  useEffect(() => {
+    const audio = new Audio(successSoundUrl);
+    audio.preload = "auto";
+    audio.volume = 0.5; // 50% volume
+    successSoundRef.current = audio;
+  }, []);
 
   const getAudioContext = async () => {
     if (!audioContextRef.current) {
@@ -713,7 +725,20 @@ export default function Bagging() {
     }
   };
 
-  const playSuccessBeep = () => playBeep(800, 0.15); // High-pitched, short
+  // Play success sound using preloaded MP3
+  const playSuccessBeep = () => {
+    try {
+      if (successSoundRef.current) {
+        successSoundRef.current.currentTime = 0; // Reset to start
+        successSoundRef.current.play().catch(err => {
+          console.warn("Success sound playback failed:", err);
+        });
+      }
+    } catch (error) {
+      console.warn("Success sound error:", error);
+    }
+  };
+  
   const playErrorBeep = () => playBeep(200, 0.3); // Low-pitched, longer
 
   // Haptic feedback - Trigger vibration
