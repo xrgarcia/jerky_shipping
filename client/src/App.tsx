@@ -22,6 +22,7 @@ import ShopifySalesReport from "@/pages/reports/shopify-sales";
 import BrokenShipmentsReport from "@/pages/reports/broken-shipments";
 import PackedShipmentsReport from "@/pages/reports/packed-shipments";
 import ShipmentEventsReport from "@/pages/reports/shipment-events";
+import PackingLogsReport from "@/pages/reports/packing-logs";
 import Sessions from "@/pages/sessions";
 import Operations from "@/pages/operations";
 import PORecommendations from "@/pages/po-recommendations";
@@ -92,6 +93,7 @@ function AppContent() {
       <Route path="/reports/broken-shipments" component={BrokenShipmentsReport} />
       <Route path="/reports/packed-shipments" component={PackedShipmentsReport} />
       <Route path="/reports/shipment-events" component={ShipmentEventsReport} />
+      <Route path="/reports/packing-logs" component={PackingLogsReport} />
       <Route path="/reports">
         <Redirect to="/reports/shopify-sales" />
       </Route>

@@ -3039,6 +3039,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Packing logs report - search and view packing logs by order number
+  app.get("/api/reports/packing-logs", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.query;
+      
+      if (!orderNumber || typeof orderNumber !== 'string') {
+        return res.status(400).json({ error: "orderNumber query parameter is required" });
+      }
+
+      // Normalize order number (strip JK prefix if present for consistency)
+      const normalizedOrderNumber = orderNumber.trim();
+      
+      // Get packing logs with username joined
+      const logs = await storage.getPackingLogsByOrderNumber(normalizedOrderNumber);
+      
+      res.json({
+        orderNumber: normalizedOrderNumber,
+        totalLogs: logs.length,
+        logs: logs.map(log => ({
+          id: log.id,
+          createdAt: log.createdAt,
+          username: log.username,
+          action: log.action,
+          productSku: log.productSku,
+          scannedCode: log.scannedCode,
+          skuVaultProductId: log.skuVaultProductId,
+          success: log.success,
+          errorMessage: log.errorMessage,
+          skuVaultRawResponse: log.skuVaultRawResponse, // Include full JSON for formatted display
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching packing logs:", error);
+      res.status(500).json({ error: "Failed to fetch packing logs" });
+    }
+  });
+
   // Shipment events report - browsable view of all shipment events with filtering
   app.get("/api/reports/shipment-events", requireAuth, async (req, res) => {
     try {

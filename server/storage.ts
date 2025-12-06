@@ -227,6 +227,7 @@ export interface IStorage {
   createPackingLog(log: InsertPackingLog): Promise<PackingLog>;
   getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]>;
   getPackingLogsByUser(userId: string, limit?: number): Promise<PackingLog[]>;
+  getPackingLogsByOrderNumber(orderNumber: string): Promise<(PackingLog & { username: string })[]>;
   deletePackingLogsByShipment(shipmentId: string): Promise<void>;
   
   // Shipment Events
@@ -2147,6 +2148,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(packingLogs.userId, userId))
       .orderBy(desc(packingLogs.createdAt))
       .limit(limit);
+  }
+
+  async getPackingLogsByOrderNumber(orderNumber: string): Promise<(PackingLog & { username: string })[]> {
+    const result = await db
+      .select({
+        id: packingLogs.id,
+        userId: packingLogs.userId,
+        shipmentId: packingLogs.shipmentId,
+        orderNumber: packingLogs.orderNumber,
+        action: packingLogs.action,
+        productSku: packingLogs.productSku,
+        scannedCode: packingLogs.scannedCode,
+        skuVaultProductId: packingLogs.skuVaultProductId,
+        success: packingLogs.success,
+        errorMessage: packingLogs.errorMessage,
+        skuVaultRawResponse: packingLogs.skuVaultRawResponse,
+        createdAt: packingLogs.createdAt,
+        username: users.email, // Join to get email as username
+      })
+      .from(packingLogs)
+      .leftJoin(users, eq(packingLogs.userId, users.id))
+      .where(eq(packingLogs.orderNumber, orderNumber))
+      .orderBy(packingLogs.createdAt); // Chronological order for tracking workflow
+    
+    return result.map(row => ({
+      ...row,
+      username: row.username || 'Unknown User',
+    }));
   }
 
   async deletePackingLogsByShipment(shipmentId: string): Promise<void> {
