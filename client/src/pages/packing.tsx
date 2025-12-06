@@ -50,8 +50,9 @@ import {
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
-// Import success sound MP3
+// Import sound MP3 files
 import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3";
+import errorSoundUrl from "@assets/20251206_144623_1765054040309.mp3";
 
 // Station session types
 type StationSession = {
@@ -666,13 +667,19 @@ export default function Packing() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioResumedRef = useRef(false);
   const successSoundRef = useRef<HTMLAudioElement | null>(null);
+  const errorSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  // Preload success sound on mount
+  // Preload sounds on mount
   useEffect(() => {
-    const audio = new Audio(successSoundUrl);
-    audio.preload = "auto";
-    audio.volume = 0.5; // 50% volume
-    successSoundRef.current = audio;
+    const successAudio = new Audio(successSoundUrl);
+    successAudio.preload = "auto";
+    successAudio.volume = 0.5; // 50% volume
+    successSoundRef.current = successAudio;
+
+    const errorAudio = new Audio(errorSoundUrl);
+    errorAudio.preload = "auto";
+    errorAudio.volume = 0.7; // 70% volume for error (more attention-grabbing)
+    errorSoundRef.current = errorAudio;
   }, []);
 
   const getAudioContext = async () => {
@@ -743,7 +750,19 @@ export default function Packing() {
     }
   };
   
-  const playErrorBeep = () => playBeep(200, 0.3); // Low-pitched, longer
+  // Play error sound using preloaded MP3
+  const playErrorBeep = () => {
+    try {
+      if (errorSoundRef.current) {
+        errorSoundRef.current.currentTime = 0; // Reset to start
+        errorSoundRef.current.play().catch(err => {
+          console.warn("Error sound playback failed:", err);
+        });
+      }
+    } catch (error) {
+      console.warn("Error sound error:", error);
+    }
+  };
 
   // Haptic feedback - Trigger vibration
   const vibrate = (pattern: number | number[]) => {
