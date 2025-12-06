@@ -1136,6 +1136,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (firestoreSessions.length > 0) {
         console.log(`Found ${firestoreSessions.length} session(s) in Firestore for picklist ${picklistId}`);
         
+        // Fetch shipments from PostgreSQL to get accurate timestamps
+        // PostgreSQL has the correct synced timestamps, Firestore may have stale/incorrect ones
+        const pgShipments = await storage.getShipmentsBySessionId(picklistId);
+        const shipmentTimestampMap = new Map<string, { 
+          pickStartedAt: Date | null; 
+          pickEndedAt: Date | null;
+          createdAt: Date | null;
+          updatedAt: Date | null;
+        }>();
+        for (const ship of pgShipments) {
+          if (ship.orderNumber) {
+            shipmentTimestampMap.set(ship.orderNumber, {
+              pickStartedAt: ship.pickStartedAt,
+              pickEndedAt: ship.pickEndedAt,
+              createdAt: ship.createdAt,
+              updatedAt: ship.updatedAt,
+            });
+          }
+        }
+        console.log(`Found ${pgShipments.length} shipments in PostgreSQL for session ${picklistId}, mapped ${shipmentTimestampMap.size} order timestamps`);
+        
         // Extract all unique SKUs from the Firestore sessions
         const skus = new Set<string>();
         for (const session of firestoreSessions) {
@@ -1160,39 +1181,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Transform Firestore data to match the expected response format
-        // Group all orders from the sessions
-        const orders = firestoreSessions.map(session => ({
-          id: session.order_number, // Use order_number as id for frontend compatibility
-          orderNumber: session.order_number,
-          saleId: session.sale_id,
-          shipmentId: session.shipment_id,
-          spot_number: session.spot_number,
-          status: session.session_status,
-          pickerName: session.picked_by_user_name,
-          pickStartTime: session.pick_start_datetime,
-          pickEndTime: session.pick_end_datetime,
-          items: session.order_items.map(item => {
-            // Ensure quantity is a number
-            const qty = typeof item.quantity === 'number' ? item.quantity : 
-                        typeof item.quantity === 'string' ? parseInt(item.quantity, 10) || 0 : 0;
-            // Handle picked - could be boolean or number
-            const pickedVal = typeof item.picked === 'boolean' ? (item.picked ? qty : 0) :
-                              typeof item.picked === 'number' ? item.picked : 0;
-            return {
-              sku: item.sku,
-              description: item.description,
-              quantity: qty,
-              location: item.location,
-              locations: item.locations,
-              picked: pickedVal,
-              completed: item.completed,
-              imageUrl: skuImageMap.get(item.sku) || (item.product_pictures?.[0] || null),
-            };
-          }),
-        }));
+        // Use PostgreSQL timestamps instead of Firestore timestamps (Firestore can have stale data)
+        const orders = firestoreSessions.map(session => {
+          const pgTimestamps = shipmentTimestampMap.get(session.order_number);
+          return {
+            id: session.order_number, // Use order_number as id for frontend compatibility
+            orderNumber: session.order_number,
+            saleId: session.sale_id,
+            shipmentId: session.shipment_id,
+            spot_number: session.spot_number,
+            status: session.session_status,
+            pickerName: session.picked_by_user_name,
+            // Use PostgreSQL timestamps if available, otherwise fall back to Firestore
+            pickStartTime: pgTimestamps?.pickStartedAt || session.pick_start_datetime,
+            pickEndTime: pgTimestamps?.pickEndedAt || session.pick_end_datetime,
+            items: session.order_items.map(item => {
+              // Ensure quantity is a number
+              const qty = typeof item.quantity === 'number' ? item.quantity : 
+                          typeof item.quantity === 'string' ? parseInt(item.quantity, 10) || 0 : 0;
+              // Handle picked - could be boolean or number
+              const pickedVal = typeof item.picked === 'boolean' ? (item.picked ? qty : 0) :
+                                typeof item.picked === 'number' ? item.picked : 0;
+              return {
+                sku: item.sku,
+                description: item.description,
+                quantity: qty,
+                location: item.location,
+                locations: item.locations,
+                picked: pickedVal,
+                completed: item.completed,
+                imageUrl: skuImageMap.get(item.sku) || (item.product_pictures?.[0] || null),
+              };
+            }),
+          };
+        });
         
         // Use the first session for picklist-level info
         const firstSession = firestoreSessions[0];
+        const firstPgTimestamps = shipmentTimestampMap.get(firstSession.order_number);
         
         // Calculate summary counts from orders (quantities already coerced to numbers above)
         const orderCount = orders.length;
@@ -1220,11 +1246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: firstSession.session_status,
             pickerName: firstSession.picked_by_user_name,
             pickerId: firstSession.picked_by_user_id,
-            // Timestamps
-            pickStartTime: firstSession.pick_start_datetime,
-            pickEndTime: firstSession.pick_end_datetime,
-            createdAt: firstSession.create_date,
-            updatedAt: firstSession.updated_date,
+            // Use PostgreSQL timestamps if available, otherwise fall back to Firestore
+            pickStartTime: firstPgTimestamps?.pickStartedAt || firstSession.pick_start_datetime,
+            pickEndTime: firstPgTimestamps?.pickEndedAt || firstSession.pick_end_datetime,
+            createdAt: firstPgTimestamps?.createdAt || firstSession.create_date,
+            updatedAt: firstPgTimestamps?.updatedAt || firstSession.updated_date,
             // Summary counts
             orderCount,
             skuCount: allSkus.size,
