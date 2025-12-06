@@ -23,6 +23,14 @@ interface PackedOrder {
   packedBy: string;
   packingSeconds: number | null;
   sessionId: string | null;
+  stationId: string | null;
+  stationType: string | null;
+}
+
+interface Station {
+  id: string;
+  name: string;
+  locationHint: string | null;
 }
 
 interface DailySummary {
@@ -70,6 +78,38 @@ export default function PackedShipmentsReport() {
   const [endDate, setEndDate] = useState(today);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+  // Query stations for name lookup
+  const { data: stationsData } = useQuery<{ stations: Station[] }>({
+    queryKey: ["/api/stations"],
+  });
+
+  // Create station lookup map (keyed by station id to match stationId in events)
+  const stationMap = new Map<string, Station>();
+  if (stationsData?.stations) {
+    for (const station of stationsData.stations) {
+      stationMap.set(station.id, station);
+    }
+  }
+
+  const getStationDisplay = (stationId: string | null, stationType: string | null): string => {
+    if (!stationId) {
+      // Fall back to stationType if no stationId
+      if (stationType) {
+        return stationType.charAt(0).toUpperCase() + stationType.slice(1);
+      }
+      return '—';
+    }
+    const station = stationMap.get(stationId);
+    if (station) {
+      return station.name;
+    }
+    // Show stationType as fallback if station not found
+    if (stationType) {
+      return stationType.charAt(0).toUpperCase() + stationType.slice(1);
+    }
+    return '—';
+  };
 
   const { data, isLoading, refetch, isRefetching } = useQuery<PackedShipmentsResponse>({
     queryKey: ['/api/reports/packed-shipments', startDate, endDate],
@@ -388,7 +428,7 @@ export default function PackedShipmentsReport() {
                         {day.orders.map((order, idx) => (
                           <div
                             key={`${order.orderNumber}-${idx}`}
-                            className="grid grid-cols-[1fr_90px_100px_70px_140px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
+                            className="grid grid-cols-[1fr_90px_80px_100px_70px_100px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
                             data-testid={`order-row-${order.orderNumber}`}
                           >
                             <a
@@ -410,6 +450,9 @@ export default function PackedShipmentsReport() {
                             ) : (
                               <span className="text-sm text-muted-foreground text-center">—</span>
                             )}
+                            <span className="text-sm text-muted-foreground truncate text-center" data-testid={`station-${order.orderNumber}`}>
+                              {getStationDisplay(order.stationId, order.stationType)}
+                            </span>
                             <span className="text-sm text-muted-foreground truncate text-right">
                               {extractUsername(order.packedBy)}
                             </span>
