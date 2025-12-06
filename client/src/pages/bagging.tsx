@@ -532,7 +532,7 @@ export default function Bagging() {
   
   // Pending print jobs - use pre-calculated data from validate-order response for immediate display
   // The query is kept as a fallback for WebSocket updates after initial load
-  const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
+  const { data: pendingPrintJobsData, isLoading: isPendingJobsLoading, isError: isPendingJobsError } = useQuery<{ pendingJobs: PendingPrintJob[] }>({
     queryKey: ['/api/print-jobs/shipment', currentShipment?.id],
     enabled: !!currentShipment?.id,
     refetchInterval: 15000, // Relaxed polling - WebSocket handles real-time updates
@@ -588,6 +588,20 @@ export default function Bagging() {
   useEffect(() => {
     setJustCreatedPrintJob(false);
   }, [currentShipment?.id]);
+
+  // Auto-clear justCreatedPrintJob when API confirms no pending jobs exist
+  // This handles the case where a print job is completed/deleted but the WebSocket notification was missed
+  useEffect(() => {
+    // Only run this check when:
+    // 1. We have a shipment loaded
+    // 2. We think there's a pending job (justCreatedPrintJob is true)
+    // 3. The API has finished loading (not in loading/error state - don't clear on errors as job might still exist)
+    // 4. The API confirms no pending jobs exist
+    if (currentShipment?.id && justCreatedPrintJob && !isPendingJobsLoading && !isPendingJobsError && pendingPrintJobs.length === 0) {
+      console.log('[Bagging] API confirms no pending print jobs - clearing justCreatedPrintJob flag');
+      setJustCreatedPrintJob(false);
+    }
+  }, [currentShipment?.id, justCreatedPrintJob, isPendingJobsLoading, isPendingJobsError, pendingPrintJobs.length]);
 
   // Check if shipment is a gift (either has Gift tag OR isGift boolean)
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
