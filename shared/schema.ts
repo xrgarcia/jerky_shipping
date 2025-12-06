@@ -876,6 +876,7 @@ export const printJobs = pgTable("print_jobs", {
   attempts: integer("attempts").notNull().default(0),
   maxAttempts: integer("max_attempts").notNull().default(3),
   errorMessage: text("error_message"),
+  requestedBy: varchar("requested_by").references(() => users.id), // User who created the print job
   sentAt: timestamp("sent_at"), // When job was sent to desktop client
   completedAt: timestamp("completed_at"), // When printing finished
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -886,6 +887,7 @@ export const printJobs = pgTable("print_jobs", {
   orderIdIdx: index("print_jobs_order_id_idx").on(table.orderId),
   shipmentIdIdx: index("print_jobs_shipment_id_idx").on(table.shipmentId),
   statusIdx: index("print_jobs_status_idx").on(table.status),
+  requestedByIdx: index("print_jobs_requested_by_idx").on(table.requestedBy),
   // Composite index for fetching pending jobs by station, ordered by priority
   pendingJobsIdx: index("print_jobs_pending_idx")
     .on(table.stationId, table.priority.desc(), table.createdAt)
