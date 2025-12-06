@@ -115,8 +115,8 @@ export default function PackedShipmentsReport() {
     if (stationType) {
       return stationType.charAt(0).toUpperCase() + stationType.slice(1);
     }
-    // Default fallback when no station info available is Boxing (the more common workflow)
-    return 'Boxing';
+    // Default fallback when no station info available
+    return 'Unknown';
   };
 
   const { data, isLoading, refetch, isRefetching } = useQuery<PackedShipmentsResponse>({
