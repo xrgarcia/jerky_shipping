@@ -115,7 +115,7 @@ export default function Login() {
           <Button
             onClick={handleGoogleSignIn}
             data-testid="button-google-signin"
-            className="w-full h-12 text-base font-semibold gap-2"
+            className="w-full h-12 text-base font-semibold gap-2 bg-black dark:bg-black text-white dark:text-white border-black dark:border-black"
           >
             <SiGoogle className="h-5 w-5" />
             Sign in with Google
