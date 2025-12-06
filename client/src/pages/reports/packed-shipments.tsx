@@ -69,12 +69,14 @@ const formatPackingTime = (seconds: number | null): string => {
 };
 
 export default function PackedShipmentsReport() {
-  // Get today and 7 days ago in Central Time
+  // Get dates in Central Time
   const cstNow = toZonedTime(new Date(), CST_TIMEZONE);
   const today = formatInTimeZone(cstNow, CST_TIMEZONE, 'yyyy-MM-dd');
+  const yesterday = formatInTimeZone(subDays(cstNow, 1), CST_TIMEZONE, 'yyyy-MM-dd');
   const sevenDaysAgo = formatInTimeZone(subDays(cstNow, 7), CST_TIMEZONE, 'yyyy-MM-dd');
   
-  const [startDate, setStartDate] = useState(sevenDaysAgo);
+  // Default to "today" only for quick daily review
+  const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -200,6 +202,9 @@ export default function PackedShipmentsReport() {
               <Calendar className="h-5 w-5" />
               Date Range
             </CardTitle>
+            <CardDescription>
+              All times in Central Time (CT)
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap items-end gap-4">
@@ -225,7 +230,7 @@ export default function PackedShipmentsReport() {
                   data-testid="input-end-date"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -236,6 +241,17 @@ export default function PackedShipmentsReport() {
                   data-testid="button-today"
                 >
                   Today
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setStartDate(yesterday);
+                    setEndDate(yesterday);
+                  }}
+                  data-testid="button-yesterday"
+                >
+                  Yesterday
                 </Button>
                 <Button
                   variant="secondary"
