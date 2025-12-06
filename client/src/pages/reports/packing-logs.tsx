@@ -463,7 +463,6 @@ export default function PackingLogsReport() {
                             <TableHead className="w-[140px]">Action</TableHead>
                             <TableHead className="w-[140px]">SKU</TableHead>
                             <TableHead className="w-[80px]">Status</TableHead>
-                            <TableHead>Error / Notes</TableHead>
                             <TableHead className="w-[80px] text-right">Details</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -500,17 +499,6 @@ export default function PackingLogsReport() {
                                       <XCircle className="h-3 w-3 mr-1" />
                                       Fail
                                     </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm max-w-[200px] truncate">
-                                  {log.errorMessage ? (
-                                    <span className="text-red-600">{log.errorMessage}</span>
-                                  ) : (
-                                    log.skuVaultProductId ? (
-                                      <span className="text-muted-foreground">ID: {log.skuVaultProductId}</span>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
