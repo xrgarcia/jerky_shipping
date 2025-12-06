@@ -2192,14 +2192,17 @@ export class DatabaseStorage implements IStorage {
     completeTime: Date;
     packingSeconds: number;
     sessionId: string | null;
+    stationId: string | null;
+    stationType: string | null;
   }[]> {
     // For each packing_completed event, find the most recent order_scanned before it
     // This gives us accurate timing even when orders are scanned multiple times
     // Note: We match by order_number only (not username) since different users may scan vs complete
     // Also join to shipments table to get session_id for linking to session modal
+    // Also include station_id and station (type) from the packing_completed event for reporting
     const result = await db.execute(sql`
       WITH complete_events AS (
-        SELECT id, order_number, username, occurred_at as complete_time
+        SELECT id, order_number, username, occurred_at as complete_time, station_id, station
         FROM shipment_events
         WHERE event_name = 'packing_completed'
           AND occurred_at >= ${startDate}
@@ -2212,6 +2215,8 @@ export class DatabaseStorage implements IStorage {
           c.order_number,
           c.username,
           c.complete_time,
+          c.station_id,
+          c.station,
           (
             SELECT occurred_at 
             FROM shipment_events s
@@ -2229,6 +2234,8 @@ export class DatabaseStorage implements IStorage {
         swt.username,
         swt.scan_time,
         swt.complete_time,
+        swt.station_id,
+        swt.station,
         EXTRACT(EPOCH FROM (swt.complete_time - swt.scan_time)) as packing_seconds,
         sh.session_id
       FROM scan_with_timing swt
@@ -2245,6 +2252,8 @@ export class DatabaseStorage implements IStorage {
       completeTime: new Date(row.complete_time),
       packingSeconds: parseFloat(row.packing_seconds) || 0,
       sessionId: row.session_id || null,
+      stationId: row.station_id || null,
+      stationType: row.station || null,
     }));
   }
 
