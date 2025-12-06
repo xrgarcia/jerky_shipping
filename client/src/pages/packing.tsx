@@ -50,8 +50,8 @@ import {
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
-// Import sound MP3 files
-import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3";
+// Import sound files
+import successSoundUrl from "@assets/smb_powerup_1765055020444.wav";
 import errorSoundUrl from "@assets/20251206_144623_1765054040309.mp3";
 
 // Station session types
