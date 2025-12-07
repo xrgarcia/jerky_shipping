@@ -262,21 +262,22 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all hover-elevate active-elevate-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all hover-elevate active-elevate-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground`}
+                style={user?.profileBackgroundColor ? { backgroundColor: user.profileBackgroundColor } : undefined}
                 data-testid="button-user-menu"
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className={`h-8 w-8 ${user?.profileBackgroundColor ? "border border-white/20" : ""}`}>
                   <AvatarImage src={user?.avatarUrl || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback className={user?.profileBackgroundColor ? "bg-white/20 text-white" : "bg-primary text-primary-foreground"}>
                     {user?.email?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col items-start text-sm flex-1 min-w-0">
+                <div className={`flex flex-col items-start text-sm flex-1 min-w-0 ${user?.profileBackgroundColor ? "text-white" : ""}`}>
                   <span className="font-semibold truncate max-w-32">
                     {user?.handle ? `@${user.handle}` : user?.email}
                   </span>
                 </div>
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className={`h-4 w-4 ${user?.profileBackgroundColor ? "text-white" : ""}`} />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"

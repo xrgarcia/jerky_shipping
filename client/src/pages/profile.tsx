@@ -11,6 +11,7 @@ import { User as UserIcon, Upload, Sparkles, Check } from "lucide-react";
 import type { User } from "@shared/schema";
 
 const PRESET_COLORS = [
+  { name: "Default", value: "" },
   { name: "Slate", value: "#475569" },
   { name: "Stone", value: "#57534e" },
   { name: "Red", value: "#dc2626" },
@@ -32,7 +33,7 @@ const PRESET_COLORS = [
   { name: "Rose", value: "#e11d48" },
 ];
 
-const DEFAULT_COLOR = "#475569";
+const DEFAULT_COLOR = "";
 
 function isValidHexColor(color: string): boolean {
   return /^#[0-9A-Fa-f]{6}$/.test(color);
@@ -177,7 +178,7 @@ export default function Profile() {
       updates.handle = handle || null;
     }
     if (backgroundColor !== (user?.profileBackgroundColor || DEFAULT_COLOR)) {
-      updates.profileBackgroundColor = backgroundColor;
+      updates.profileBackgroundColor = backgroundColor || null;
     }
     if (skuvaultUsername !== (user?.skuvaultUsername || "")) {
       updates.skuvaultUsername = skuvaultUsername || null;
@@ -201,21 +202,21 @@ export default function Profile() {
         </CardHeader>
         <CardContent>
           <div 
-            className="rounded-lg p-6 flex items-center gap-4"
-            style={{ backgroundColor }}
+            className={`rounded-lg p-6 flex items-center gap-4 ${!backgroundColor ? "bg-sidebar border border-sidebar-border" : ""}`}
+            style={backgroundColor ? { backgroundColor } : undefined}
             data-testid="profile-header-preview"
           >
-            <Avatar className="h-16 w-16 border-2 border-white/20">
+            <Avatar className={`h-16 w-16 border-2 ${backgroundColor ? "border-white/20" : "border-border"}`}>
               <AvatarImage src={user?.avatarUrl || undefined} />
-              <AvatarFallback className="bg-white/20 text-white text-xl">
+              <AvatarFallback className={backgroundColor ? "bg-white/20 text-white text-xl" : "bg-primary text-primary-foreground text-xl"}>
                 {user?.email?.[0]?.toUpperCase() || <UserIcon className="h-8 w-8" />}
               </AvatarFallback>
             </Avatar>
-            <div className="text-white">
+            <div className={backgroundColor ? "text-white" : "text-sidebar-foreground"}>
               <p className="text-lg font-semibold" data-testid="text-preview-handle">
                 {displayHandle ? `@${displayHandle}` : "@yourhandle"}
               </p>
-              <p className="text-sm text-white/70">{user?.email || "email@example.com"}</p>
+              <p className={`text-sm ${backgroundColor ? "text-white/70" : "text-muted-foreground"}`}>{user?.email || "email@example.com"}</p>
             </div>
           </div>
         </CardContent>
@@ -229,19 +230,21 @@ export default function Profile() {
           <p className="text-sm text-muted-foreground">
             Choose a background color for your profile header section
           </p>
-          <div className="grid grid-cols-6 gap-2 sm:grid-cols-9" data-testid="color-picker-grid">
+          <div className="grid grid-cols-6 gap-2 sm:grid-cols-10" data-testid="color-picker-grid">
             {PRESET_COLORS.map((color) => (
               <button
-                key={color.value}
+                key={color.name}
                 type="button"
                 onClick={() => handleColorSelect(color.value)}
-                className="relative h-8 w-8 rounded-md transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                style={{ backgroundColor: color.value }}
+                className={`relative h-8 w-8 rounded-md transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                  color.value === "" ? "border-2 border-dashed border-muted-foreground bg-card" : ""
+                }`}
+                style={color.value ? { backgroundColor: color.value } : undefined}
                 title={color.name}
                 data-testid={`button-color-${color.name.toLowerCase()}`}
               >
                 {backgroundColor === color.value && (
-                  <Check className="absolute inset-0 m-auto h-4 w-4 text-white" />
+                  <Check className={`absolute inset-0 m-auto h-4 w-4 ${color.value === "" ? "text-muted-foreground" : "text-white"}`} />
                 )}
               </button>
             ))}
@@ -253,7 +256,7 @@ export default function Profile() {
             <Input
               id="custom-color"
               type="color"
-              value={backgroundColor}
+              value={backgroundColor || "#475569"}
               onChange={(e) => handleColorSelect(e.target.value)}
               className="h-9 w-16 p-1 cursor-pointer"
               data-testid="input-custom-color"
