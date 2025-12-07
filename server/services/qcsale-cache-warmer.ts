@@ -708,6 +708,7 @@ export interface ShipmentContext {
   trackingNumber: string | null;
   shipmentStatus: string | null;
   sessionId: string | null;
+  sessionStatus: string | null;
   cacheWarmedAt: Date | null;
 }
 
@@ -716,12 +717,13 @@ export interface ShipmentContext {
  * Packing ready = closed session + no tracking + pending/label_pending status + has session ID
  */
 export function isPackingReady(shipment: ShipmentContext): boolean {
-  const validStatuses = ['pending', 'label_pending'];
+  const validShipmentStatuses = ['pending', 'label_pending'];
   return (
     !shipment.trackingNumber &&
     shipment.sessionId !== null &&
+    shipment.sessionStatus === 'closed' &&
     shipment.shipmentStatus !== null &&
-    validStatuses.includes(shipment.shipmentStatus)
+    validShipmentStatuses.includes(shipment.shipmentStatus)
   );
 }
 
