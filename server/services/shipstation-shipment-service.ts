@@ -325,13 +325,17 @@ export class ShipStationShipmentService {
         const trackingNumber = labelData.tracking_number || null;
 
         if (labelUrl) {
-          // Update both labelUrl and tracking number if available
-          const updateData: any = { labelUrl };
+          // Update labelUrl, tracking number, and shipmentStatus when label is created
+          const updateData: any = { 
+            labelUrl,
+            shipmentStatus: 'label_created', // Update status when label is created
+          };
           if (trackingNumber) {
             updateData.trackingNumber = trackingNumber;
             console.log(`[ShipmentService] Saved tracking number: ${trackingNumber}`);
           }
           await this.storage.updateShipment(shipment.id, updateData);
+          console.log(`[ShipmentService] Updated shipmentStatus to label_created`);
         }
       }
 

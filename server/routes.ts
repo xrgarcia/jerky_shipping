@@ -6428,9 +6428,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (labelUrl) {
               await storage.updateShipment(shipment.id, { 
                 labelUrl, 
-                trackingNumber: trackingNumber || undefined 
+                trackingNumber: trackingNumber || undefined,
+                shipmentStatus: 'label_created', // Update status when label is created
               });
-              console.log(`[Packing] Created and saved new label: ${labelUrl}`);
+              console.log(`[Packing] Created and saved new label: ${labelUrl}, updated shipmentStatus to label_created`);
               
               // CACHE INVALIDATION: Label created means order is complete, invalidate warm cache
               // This prevents stale data from being served for completed orders
