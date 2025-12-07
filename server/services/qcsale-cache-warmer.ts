@@ -782,18 +782,68 @@ export interface ShipmentContext {
 }
 
 /**
+ * Valid shipment statuses for packing-ready determination
+ * Exported for reuse in other modules
+ */
+export const PACKING_READY_STATUSES = ['pending', 'label_pending'];
+
+/**
  * Check if a shipment is packing-ready based on full criteria
  * Packing ready = closed session + no tracking + pending/label_pending status + has session ID
+ * 
+ * Returns { ready: boolean, reason?: string } for diagnostic logging
+ */
+export function isPackingReadyWithReason(shipment: ShipmentContext): { ready: boolean; reason?: string } {
+  if (shipment.trackingNumber) {
+    return { ready: false, reason: 'has trackingNumber' };
+  }
+  if (shipment.sessionId === null) {
+    return { ready: false, reason: 'sessionId is null' };
+  }
+  if (shipment.sessionStatus !== 'closed') {
+    return { ready: false, reason: `sessionStatus is '${shipment.sessionStatus}' (expected 'closed')` };
+  }
+  if (shipment.shipmentStatus === null) {
+    return { ready: false, reason: 'shipmentStatus is null' };
+  }
+  if (!PACKING_READY_STATUSES.includes(shipment.shipmentStatus)) {
+    return { ready: false, reason: `shipmentStatus '${shipment.shipmentStatus}' not in [${PACKING_READY_STATUSES.join(', ')}]` };
+  }
+  return { ready: true };
+}
+
+/**
+ * Check if a shipment is packing-ready (simple boolean version)
+ * Use isPackingReadyWithReason() when you need diagnostic info
  */
 export function isPackingReady(shipment: ShipmentContext): boolean {
-  const validShipmentStatuses = ['pending', 'label_pending'];
-  return (
-    !shipment.trackingNumber &&
-    shipment.sessionId !== null &&
-    shipment.sessionStatus === 'closed' &&
-    shipment.shipmentStatus !== null &&
-    validShipmentStatuses.includes(shipment.shipmentStatus)
-  );
+  return isPackingReadyWithReason(shipment).ready;
+}
+
+/**
+ * Build a ShipmentContext from shipment data
+ * Centralizes context construction to prevent missing fields
+ * 
+ * @param shipment - Object with shipment fields (from DB query or full shipment)
+ * @param sessionStatusOverride - Optional override for sessionStatus (e.g., from Firestore session)
+ */
+export function buildShipmentContext(
+  shipment: {
+    trackingNumber?: string | null;
+    shipmentStatus?: string | null;
+    sessionId?: string | null;
+    sessionStatus?: string | null;
+    cacheWarmedAt?: Date | null;
+  },
+  sessionStatusOverride?: string | null
+): ShipmentContext {
+  return {
+    trackingNumber: shipment.trackingNumber ?? null,
+    shipmentStatus: shipment.shipmentStatus ?? null,
+    sessionId: shipment.sessionId ?? null,
+    sessionStatus: sessionStatusOverride ?? shipment.sessionStatus ?? null,
+    cacheWarmedAt: shipment.cacheWarmedAt ?? null,
+  };
 }
 
 /**
@@ -808,9 +858,10 @@ export async function onSessionClosed(orderNumber: string, shipment: ShipmentCon
     return;
   }
   
-  // Check if order is packing-ready
-  if (!isPackingReady(shipment)) {
-    log(`Order ${orderNumber} is not packing-ready (status: ${shipment.shipmentStatus}), skipping cache warming`);
+  // Check if order is packing-ready with detailed reason
+  const packingCheck = isPackingReadyWithReason(shipment);
+  if (!packingCheck.ready) {
+    log(`Order ${orderNumber} is not packing-ready: ${packingCheck.reason}`);
     return;
   }
   
