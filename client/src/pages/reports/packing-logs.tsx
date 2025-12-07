@@ -145,6 +145,68 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
   const successCount = logs.filter(l => l.success).length;
   const failureCount = logs.filter(l => !l.success).length;
   
+  // Generate action type summary
+  const actionCounts: Record<string, number> = {};
+  logs.forEach(log => {
+    const action = formatActionLabel(log.action);
+    actionCounts[action] = (actionCounts[action] || 0) + 1;
+  });
+  const actionSummary = Object.entries(actionCounts)
+    .map(([action, count]) => `${count}× ${action}`)
+    .join(', ');
+  
+  // Detect patterns
+  const patterns: string[] = [];
+  
+  // Check for duplicate order completions
+  const completeOrderCount = logs.filter(l => l.action === 'complete_order' || l.action === 'complete_order_success').length;
+  if (completeOrderCount > 1) {
+    patterns.push(`Order was completed ${completeOrderCount} times (possible reprints or retries)`);
+  }
+  
+  // Check for repeated failed barcodes
+  const failedBarcodes = logs.filter(l => !l.success && l.scannedCode).map(l => l.scannedCode);
+  const barcodeCounts: Record<string, number> = {};
+  failedBarcodes.forEach(code => {
+    if (code) barcodeCounts[code] = (barcodeCounts[code] || 0) + 1;
+  });
+  Object.entries(barcodeCounts).forEach(([code, count]) => {
+    if (count > 1) {
+      patterns.push(`Same invalid barcode "${code}" scanned ${count} times`);
+    }
+  });
+  
+  // Check for same user on all failures
+  const failedLogs = logs.filter(l => !l.success);
+  if (failedLogs.length > 1) {
+    const failedUsers = Array.from(new Set(failedLogs.map(l => extractUsername(l.username))));
+    if (failedUsers.length === 1) {
+      patterns.push(`All ${failedLogs.length} failures by same user: ${failedUsers[0]}`);
+    }
+  }
+  
+  // Calculate timing gaps
+  const timingGaps: string[] = [];
+  for (let i = 1; i < logs.length; i++) {
+    const prevTime = new Date(logs[i - 1].createdAt).getTime();
+    const currTime = new Date(logs[i].createdAt).getTime();
+    const gapMinutes = (currTime - prevTime) / 60000;
+    if (gapMinutes >= 5) {
+      timingGaps.push(`${Math.round(gapMinutes)} min gap between Entry ${i} and Entry ${i + 1}`);
+    }
+  }
+  
+  // Calculate total duration
+  let durationStr = '';
+  if (logs.length >= 2) {
+    const firstTime = new Date(logs[0].createdAt).getTime();
+    const lastTime = new Date(logs[logs.length - 1].createdAt).getTime();
+    const totalMinutes = Math.round((lastTime - firstTime) / 60000);
+    durationStr = totalMinutes >= 60 
+      ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+      : `${totalMinutes} minutes`;
+  }
+  
   const logEntries = logs.map((log, index) => {
     const timestamp = formatDateTime(log.createdAt);
     const jsonResponse = log.skuVaultRawResponse 
@@ -164,6 +226,14 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
 ${jsonResponse !== 'No data' ? `\`\`\`json\n${jsonResponse}\n\`\`\`` : ''}`;
   }).join('\n\n');
 
+  const patternsSection = patterns.length > 0 
+    ? `\n## Detected Patterns\n${patterns.map(p => `- ${p}`).join('\n')}\n` 
+    : '';
+  
+  const timingSection = timingGaps.length > 0
+    ? `\n## Significant Timing Gaps\n${timingGaps.map(t => `- ${t}`).join('\n')}\n`
+    : '';
+
   return `You are analyzing packing logs from a warehouse fulfillment system. Please review all log entries for this order and provide a comprehensive analysis.
 
 ## Context
@@ -175,7 +245,11 @@ These logs are from a warehouse packing station where workers scan orders and pr
 **Total Log Entries:** ${logs.length}
 **Successful Actions:** ${successCount}
 **Failed Actions:** ${failureCount}
+${durationStr ? `**Total Duration:** ${durationStr}` : ''}
 
+## Action Breakdown
+${actionSummary}
+${patternsSection}${timingSection}
 ## All Log Entries (Chronological)
 
 ${logEntries}
