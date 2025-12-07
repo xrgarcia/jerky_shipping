@@ -1,0 +1,420 @@
+You are analyzing packing logs from a warehouse fulfillment system. Please review all log entries for this order and provide a comprehensive analysis.
+
+## Context
+These logs are from a warehouse packing station where workers scan orders and products for quality control (QC) validation against SkuVault inventory system.
+
+## Order Summary
+
+**Order Number:** TEST-1205256-RG
+**Total Log Entries:** 17
+**Successful Actions:** 15
+**Failed Actions:** 2
+
+## All Log Entries (Chronological)
+
+### Entry 1
+- **Timestamp:** Dec 6, 2025 3:06:31 PM
+- **User:** ray
+- **Action:** PRODUCT SCANNED
+- **Success:** No
+- **SKU:** N/A
+- **Scanned Barcode:** asdfasdf
+- **SkuVault Product ID:** N/A
+- **Error:** 404: {"valid":false,"error":"Product not found in order","scannedValue":"asdfasdf","orderNumber":"TEST-1205256-RG"}
+- **SkuVault Response:** `No data`
+
+
+### Entry 2
+- **Timestamp:** Dec 6, 2025 3:06:40 PM
+- **User:** ray
+- **Action:** PRODUCT SCANNED
+- **Success:** Yes
+- **SKU:** JCB-BEJ-30-16
+- **Scanned Barcode:** 811007026951
+- **SkuVault Product ID:** 2545
+- **Error:** None
+- **SkuVault Response:** `No data`
+
+
+### Entry 3
+- **Timestamp:** Dec 6, 2025 3:12:27 PM
+- **User:** ray
+- **Action:** PRODUCT SCANNED
+- **Success:** No
+- **SKU:** N/A
+- **Scanned Barcode:** asdfasdf
+- **SkuVault Product ID:** N/A
+- **Error:** 404: {"valid":false,"error":"Product not found in order","scannedValue":"asdfasdf","orderNumber":"TEST-1205256-RG"}
+- **SkuVault Response:** `No data`
+
+
+### Entry 4
+- **Timestamp:** Dec 6, 2025 3:12:34 PM
+- **User:** ray
+- **Action:** PRODUCT SCANNED
+- **Success:** Yes
+- **SKU:** JCB1042-K
+- **Scanned Barcode:** 811007024926
+- **SkuVault Product ID:** 2698
+- **Error:** None
+- **SkuVault Response:** `No data`
+
+
+### Entry 5
+- **Timestamp:** Dec 6, 2025 3:12:38 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "hasOrderId": false,
+    "shipmentId": "16c87e4d-b925-4e3f-a373-ad875878fce4",
+    "hasLabelUrl": false,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 6
+- **Timestamp:** Dec 6, 2025 3:12:38 PM
+- **User:** ray
+- **Action:** FETCH EXISTING LABELS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "shipStationShipmentId": "se-931581716"
+  }
+}
+```
+
+### Entry 7
+- **Timestamp:** Dec 6, 2025 3:12:38 PM
+- **User:** ray
+- **Action:** LABEL CREATE ATTEMPT
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "action": "createLabelForExistingShipment",
+    "shipStationShipmentId": "se-931581716"
+  }
+}
+```
+
+### Entry 8
+- **Timestamp:** Dec 6, 2025 3:12:39 PM
+- **User:** ray
+- **Action:** LABEL CREATED
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "rawResponse": {
+      "status": "completed",
+      "voided": false,
+      "ship_to": {
+        "name": "TESTY TESTY",
+        "email": null,
+        "phone": null,
+        "geolocation": [],
+        "postal_code": "73108-2017",
+        "company_name": null,
+        "country_code": "US",
+        "instructions": null,
+        "address_line1": "4132 WILL ROGERS PKWY STE 1000",
+        "address_line2": "",
+        "address_line3": null,
+        "city_locality": "OKLAHOMA CITY",
+        "state_province": "OK",
+        "address_residential_indicator": "unknown"
+      },
+      "batch_id": "",
+      "label_id": "se-599718264",
+      "packages": [],
+      "ship_date": "2025-12-06T08:00:00Z",
+      "trackable": true,
+      "voided_at": null,
+      "carrier_id": "se-118080",
+      "created_at": "2025-12-06T21:12:38.6822011Z",
+      "rma_number": null,
+      "shipment_id": "se-931581716",
+      "carrier_code": "usps",
+      "charge_event": "carrier_default",
+      "confirmation": "none",
+      "label_format": "pdf",
+      "label_layout": "4x6",
+      "package_code": "package",
+      "rate_details": [],
+      "service_code": "usps_ground_advantage",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650206217132607549",
+      "form_download": null,
+      "shipment_cost": {
+        "amount": 6.34,
+        "currency": "usd"
+      },
+      "carrier_weight": null,
+      "display_scheme": "label",
+      "insurance_cost": {
+        "amount": 0,
+        "currency": "usd"
+      },
+      "label_download": {
+        "pdf": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+        "png": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.png",
+        "zpl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.zpl",
+        "href": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf"
+      },
+      "label_image_id": null,
+      "insurance_claim": null,
+      "is_return_label": false,
+      "tracking_number": "9434650206217132607549",
+      "tracking_status": "in_transit",
+      "is_international": false,
+      "qr_code_download": null,
+      "shipping_rule_id": null,
+      "external_order_id": null,
+      "paperless_download": null,
+      "external_shipment_id": "TEST-1205256-RG",
+      "alternative_identifiers": [],
+      "requested_comparison_amount": {
+        "amount": 0,
+        "currency": "usd"
+      }
+    },
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+### Entry 9
+- **Timestamp:** Dec 6, 2025 3:12:40 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "printJobId": "24aa9985-0765-4bdc-b67d-2add18d9cfd3",
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+### Entry 10
+- **Timestamp:** Dec 6, 2025 3:24:06 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "hasOrderId": false,
+    "shipmentId": "16c87e4d-b925-4e3f-a373-ad875878fce4",
+    "hasLabelUrl": true,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 11
+- **Timestamp:** Dec 6, 2025 3:24:06 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "printJobId": "80210ce4-8184-4c75-9ccc-bbaeabd65d5e",
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+### Entry 12
+- **Timestamp:** Dec 6, 2025 3:25:07 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "hasOrderId": false,
+    "shipmentId": "16c87e4d-b925-4e3f-a373-ad875878fce4",
+    "hasLabelUrl": true,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 13
+- **Timestamp:** Dec 6, 2025 3:25:07 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "printJobId": "d2c2c7f1-442a-4241-bf93-157fef43ae55",
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+### Entry 14
+- **Timestamp:** Dec 6, 2025 3:32:36 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "hasOrderId": false,
+    "shipmentId": "16c87e4d-b925-4e3f-a373-ad875878fce4",
+    "hasLabelUrl": true,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 15
+- **Timestamp:** Dec 6, 2025 3:32:36 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "printJobId": "b9c1c8b8-6029-4e2f-880e-a062a227c0b0",
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+### Entry 16
+- **Timestamp:** Dec 6, 2025 3:32:59 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "hasOrderId": false,
+    "shipmentId": "16c87e4d-b925-4e3f-a373-ad875878fce4",
+    "hasLabelUrl": true,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 17
+- **Timestamp:** Dec 6, 2025 3:32:59 PM
+- **User:** ray
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/ocbMTINM_kGMLVpgOH_Tvg/label-599718264.pdf",
+    "stationId": "9558a864-20cc-4a84-85e3-3759a73013f5",
+    "printJobId": "83305894-1e71-4032-8202-335fdabaf6f6",
+    "trackingNumber": "9434650206217132607549"
+  }
+}
+```
+
+## Questions to Answer
+
+1. **Timeline Analysis:** What is the sequence of events that occurred during packing?
+2. **Failure Patterns:** Are there any patterns in the failures? (e.g., same user, same SKU, same error type)
+3. **Root Cause:** If there are failures, what is the likely root cause?
+4. **User Behavior:** Did any workers scan the wrong items or make procedural errors?
+5. **System Issues:** Are there any red flags suggesting system configuration problems?
+6. **Recommendations:** What steps should the warehouse team take to prevent similar issues?
+
+Please provide a clear, actionable analysis with specific recommendations.
