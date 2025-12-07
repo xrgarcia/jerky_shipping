@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers } from "lucide-react";
+import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import {
@@ -80,6 +81,23 @@ export default function PackedShipmentsReport() {
   const [endDate, setEndDate] = useState(today);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const copyOrderNumber = async (orderNumber: string) => {
+    try {
+      await navigator.clipboard.writeText(orderNumber);
+      toast({
+        title: "Copied",
+        description: `${orderNumber} copied to clipboard`,
+      });
+    } catch {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Query stations for name lookup
   const { data: stationsData } = useQuery<{ stations: Station[] }>({
@@ -452,16 +470,27 @@ export default function PackedShipmentsReport() {
                         {day.orders.map((order, idx) => (
                           <div
                             key={`${order.orderNumber}-${idx}`}
-                            className="grid grid-cols-[1fr_90px_80px_100px_70px_100px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
+                            className="grid grid-cols-[1fr_90px_1fr_100px_70px_100px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
                             data-testid={`order-row-${order.orderNumber}`}
                           >
-                            <a
-                              href={`/shipments?search=${order.orderNumber}`}
-                              className="font-mono text-sm text-primary hover:underline truncate"
-                              data-testid={`link-order-${order.orderNumber}`}
-                            >
-                              {order.orderNumber}
-                            </a>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <a
+                                href={`/shipments?search=${order.orderNumber}`}
+                                className="font-mono text-sm text-primary hover:underline truncate"
+                                data-testid={`link-order-${order.orderNumber}`}
+                              >
+                                {order.orderNumber}
+                              </a>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="flex-shrink-0"
+                                onClick={() => copyOrderNumber(order.orderNumber)}
+                                data-testid={`button-copy-${order.orderNumber}`}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
                             {order.sessionId ? (
                               <button
                                 onClick={() => setSelectedSessionId(order.sessionId)}
