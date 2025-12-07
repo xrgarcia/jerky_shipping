@@ -10,6 +10,8 @@ export const users = pgTable("users", {
   name: text("name"),
   handle: text("handle").unique(),
   avatarUrl: text("avatar_url"),
+  profileBackgroundColor: text("profile_background_color"), // Custom background color for profile header (hex format)
+  skuvaultUsername: text("skuvault_username"), // SkuVault username for matching activity
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

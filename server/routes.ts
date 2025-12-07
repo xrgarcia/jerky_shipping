@@ -450,6 +450,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = z.object({
         handle: z.string().optional(),
         avatarUrl: z.string().optional(),
+        profileBackgroundColor: z.string().nullable().optional(),
+        skuvaultUsername: z.string().nullable().optional(),
       }).parse(req.body);
 
       const updatedUser = await storage.updateUser(user.id, updates);
