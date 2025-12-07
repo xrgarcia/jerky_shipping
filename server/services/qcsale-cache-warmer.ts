@@ -26,7 +26,7 @@
 
 import { getRedisClient } from '../utils/queue';
 import { db } from '../db';
-import { shipments } from '@shared/schema';
+import { shipments, shipmentTags, type Shipment } from '@shared/schema';
 import { eq, and, isNull, isNotNull, ne, sql, inArray } from 'drizzle-orm';
 import { skuVaultService } from './skuvault-service';
 
@@ -179,6 +179,72 @@ function buildLookupMap(qcSale: import('@shared/skuvault-types').QCSale): Record
 }
 
 /**
+ * Get the single shippable shipment for an order.
+ * A shipment is shippable if:
+ * - Has "MOVE OVER" tag
+ * - shipmentStatus is NOT 'on_hold'
+ * 
+ * Returns the shipment if exactly 1 is shippable, null otherwise.
+ * Logs the reason when returning null (0 shippable or multiple shippable).
+ */
+async function getShippableShipment(orderNumber: string): Promise<Shipment | null> {
+  try {
+    // Fetch ALL shipments for this order
+    const allShipments = await db
+      .select()
+      .from(shipments)
+      .where(eq(shipments.orderNumber, orderNumber));
+    
+    if (allShipments.length === 0) {
+      log(`No shipments found for order ${orderNumber}`);
+      return null;
+    }
+    
+    // If only one shipment, still need to check if it's shippable
+    const shipmentIds = allShipments.map(s => s.id);
+    
+    // Batch fetch tags for all shipments
+    const tagsResult = await db
+      .select()
+      .from(shipmentTags)
+      .where(inArray(shipmentTags.shipmentId, shipmentIds));
+    
+    // Build map of shipmentId -> has MOVE OVER tag
+    const hasMoveOverTag = new Map<string, boolean>();
+    for (const tag of tagsResult) {
+      if (tag.name === 'MOVE OVER') {
+        hasMoveOverTag.set(tag.shipmentId, true);
+      }
+    }
+    
+    // Filter to shippable shipments:
+    // - Has "MOVE OVER" tag
+    // - shipmentStatus is NOT 'on_hold'
+    const shippableShipments = allShipments.filter(shipment => {
+      const hasTag = hasMoveOverTag.get(shipment.id) === true;
+      const notOnHold = shipment.shipmentStatus !== 'on_hold';
+      return hasTag && notOnHold;
+    });
+    
+    if (shippableShipments.length === 0) {
+      log(`No shippable shipments for order ${orderNumber} (${allShipments.length} total, none with MOVE OVER tag and not on_hold)`);
+      return null;
+    }
+    
+    if (shippableShipments.length > 1) {
+      log(`Multiple shippable shipments for order ${orderNumber} (${shippableShipments.length} found), skipping cache warming`);
+      return null;
+    }
+    
+    // Exactly 1 shippable shipment
+    return shippableShipments[0];
+  } catch (err: any) {
+    error(`Failed to get shippable shipment for order ${orderNumber}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Warm the cache for a single order by fetching QCSale data from SkuVault
  * Uses extended TTL for pre-warmed entries
  */
@@ -198,20 +264,23 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       }
     }
     
-    // Fetch QCSale data from SkuVault AND shipment data from PostgreSQL in parallel
-    log(`Warming cache for order ${orderNumber}${force ? ' (forced refresh)' : ''}...`);
+    // First, find the single shippable shipment (has MOVE OVER tag, not on_hold)
+    const shipment = await getShippableShipment(orderNumber);
     
-    const [qcSale, shipmentResults] = await Promise.all([
-      skuVaultService.getQCSalesByOrderNumber(orderNumber),
-      db.select().from(shipments).where(eq(shipments.orderNumber, orderNumber)).limit(1),
-    ]);
+    if (!shipment) {
+      // getShippableShipment already logs the reason (0 found, or multiple found)
+      return false;
+    }
+    
+    // Now fetch QCSale data from SkuVault
+    log(`Warming cache for order ${orderNumber} (shipment ${shipment.id})${force ? ' (forced refresh)' : ''}...`);
+    
+    const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
     
     if (!qcSale) {
       log(`No QCSale data found for order ${orderNumber}`);
       return false;
     }
-    
-    const shipment = shipmentResults[0] || null;
     
     // Build cache data with lookup map AND shipment data
     const lookupMap = buildLookupMap(qcSale);
@@ -260,14 +329,14 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     // Store with extended TTL
     await redis.set(warmKey, JSON.stringify(cacheData), { ex: WARM_TTL_SECONDS });
     
-    // Update the shipment record with cache_warmed_at timestamp for visibility
+    // Update the specific shipment record with cache_warmed_at timestamp for visibility
     try {
       await db.update(shipments)
         .set({ cacheWarmedAt: new Date() })
-        .where(eq(shipments.orderNumber, orderNumber));
+        .where(eq(shipments.id, shipment.id));
     } catch (dbErr: any) {
       // Non-critical - don't fail warming if DB update fails
-      error(`Failed to update cacheWarmedAt for ${orderNumber}: ${dbErr.message}`);
+      error(`Failed to update cacheWarmedAt for shipment ${shipment.id}: ${dbErr.message}`);
     }
     
     log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries + shipment data (${WARM_TTL_SECONDS}s TTL)`);
