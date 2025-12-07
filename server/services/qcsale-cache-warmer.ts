@@ -702,17 +702,55 @@ export async function getWarmCacheStatusBatch(orderNumbers: string[]): Promise<M
 }
 
 /**
+ * Shipment context passed to onSessionClosed for packing-ready determination
+ */
+export interface ShipmentContext {
+  trackingNumber: string | null;
+  shipmentStatus: string | null;
+  sessionId: string | null;
+  cacheWarmedAt: Date | null;
+}
+
+/**
+ * Check if a shipment is packing-ready based on full criteria
+ * Packing ready = closed session + no tracking + pending/label_pending status + has session ID
+ */
+export function isPackingReady(shipment: ShipmentContext): boolean {
+  const validStatuses = ['pending', 'label_pending'];
+  return (
+    !shipment.trackingNumber &&
+    shipment.sessionId !== null &&
+    shipment.shipmentStatus !== null &&
+    validStatuses.includes(shipment.shipmentStatus)
+  );
+}
+
+/**
  * Called when a session transitions to 'closed' to immediately warm the cache
+ * Now checks full packing-ready criteria before warming
  * Hook this into the Firestore session sync worker
  */
-export async function onSessionClosed(orderNumber: string, hasTrackingNumber: boolean): Promise<void> {
-  if (hasTrackingNumber) {
-    // Already has tracking, invalidate instead
+export async function onSessionClosed(orderNumber: string, shipment: ShipmentContext): Promise<void> {
+  // If already has tracking, invalidate cache (order was shipped)
+  if (shipment.trackingNumber) {
     await invalidateCacheForOrder(orderNumber);
-  } else {
-    // Ready to pack, warm the cache
-    await warmCacheForOrder(orderNumber);
+    return;
   }
+  
+  // Check if order is packing-ready
+  if (!isPackingReady(shipment)) {
+    log(`Order ${orderNumber} is not packing-ready (status: ${shipment.shipmentStatus}), skipping cache warming`);
+    return;
+  }
+  
+  // Check if already warmed (avoid redundant warming)
+  if (shipment.cacheWarmedAt) {
+    log(`Order ${orderNumber} already has cacheWarmedAt set, skipping`);
+    return;
+  }
+  
+  // Ready to pack, warm the cache
+  await warmCacheForOrder(orderNumber);
 }
 
 /**

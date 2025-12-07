@@ -4,7 +4,7 @@ import { shipments, shipmentItems } from '@shared/schema';
 import { eq, and, isNull, inArray, isNotNull } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
-import { onSessionClosed } from './services/qcsale-cache-warmer';
+import { onSessionClosed, isPackingReady, type ShipmentContext } from './services/qcsale-cache-warmer';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
 
@@ -160,10 +160,16 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     // See replit.md "Warehouse Session Lifecycle" for critical system knowledge
     // Normalize to lowercase - Firestore stores "Closed" with capital C
     if (session.session_status?.toLowerCase() === 'closed') {
-      const hasTrackingNumber = !!shipment.trackingNumber;
-      log(`Session ${session.session_id} is closed, triggering cache ${hasTrackingNumber ? 'invalidation' : 'warming'} for order ${session.order_number}`);
+      const shipmentContext: ShipmentContext = {
+        trackingNumber: shipment.trackingNumber,
+        shipmentStatus: shipment.shipmentStatus,
+        sessionId: shipment.sessionId || session.session_id.toString(),
+        cacheWarmedAt: shipment.cacheWarmedAt,
+      };
+      const action = shipment.trackingNumber ? 'invalidation' : (isPackingReady(shipmentContext) ? 'warming' : 'skip (not packing-ready)');
+      log(`Session ${session.session_id} is closed, triggering cache ${action} for order ${session.order_number}`);
       // Fire and forget - don't block session sync on cache warming
-      onSessionClosed(session.order_number, hasTrackingNumber).catch(err => {
+      onSessionClosed(session.order_number, shipmentContext).catch(err => {
         log(`Cache warming error for order ${session.order_number}: ${err.message}`);
       });
     }
@@ -196,6 +202,8 @@ async function detectClosedSessionTransitions(
       sessionId: shipments.sessionId,
       sessionStatus: shipments.sessionStatus,
       trackingNumber: shipments.trackingNumber,
+      shipmentStatus: shipments.shipmentStatus,
+      cacheWarmedAt: shipments.cacheWarmedAt,
     })
     .from(shipments)
     .where(
@@ -248,9 +256,15 @@ async function detectClosedSessionTransitions(
 
       // Trigger cache warming (only if we have a valid order number)
       if (orderNumber) {
-        const hasTrackingNumber = !!shipment.trackingNumber;
-        log(`Triggering cache ${hasTrackingNumber ? 'invalidation' : 'warming'} for closed session ${session.session_id}`);
-        onSessionClosed(orderNumber, hasTrackingNumber).catch(err => {
+        const shipmentContext: ShipmentContext = {
+          trackingNumber: shipment.trackingNumber,
+          shipmentStatus: shipment.shipmentStatus,
+          sessionId: shipment.sessionId,
+          cacheWarmedAt: shipment.cacheWarmedAt,
+        };
+        const action = shipment.trackingNumber ? 'invalidation' : (isPackingReady(shipmentContext) ? 'warming' : 'skip (not packing-ready)');
+        log(`Triggering cache ${action} for closed session ${session.session_id}`);
+        onSessionClosed(orderNumber, shipmentContext).catch(err => {
           log(`Cache warming error for order ${orderNumber}: ${err.message}`);
         });
       } else {
@@ -266,6 +280,64 @@ async function detectClosedSessionTransitions(
   }
 
   return closedCount;
+}
+
+/**
+ * Ensure closed sessions that are packing-ready have been warmed
+ * This catches the gap where a session was already closed in DB but 
+ * the warming failed or was skipped (e.g., worker restart)
+ */
+async function ensureClosedSessionsWarmed(): Promise<number> {
+  // Find packing-ready shipments (closed, no tracking, pending status) that haven't been warmed
+  const packingReadyStatuses = ['pending', 'label_pending'];
+  const unwarmedShipments = await db
+    .select({
+      id: shipments.id,
+      orderNumber: shipments.orderNumber,
+      sessionId: shipments.sessionId,
+      trackingNumber: shipments.trackingNumber,
+      shipmentStatus: shipments.shipmentStatus,
+      cacheWarmedAt: shipments.cacheWarmedAt,
+    })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.sessionStatus, 'closed'),
+        isNull(shipments.trackingNumber),
+        inArray(shipments.shipmentStatus, packingReadyStatuses),
+        isNotNull(shipments.sessionId),
+        isNull(shipments.cacheWarmedAt)
+      )
+    )
+    .limit(50); // Process up to 50 per cycle to avoid overloading
+
+  if (unwarmedShipments.length === 0) {
+    return 0;
+  }
+
+  log(`Found ${unwarmedShipments.length} packing-ready shipments without cache, warming...`);
+  
+  let warmedCount = 0;
+  for (const shipment of unwarmedShipments) {
+    if (!shipment.orderNumber) continue;
+    
+    const shipmentContext: ShipmentContext = {
+      trackingNumber: shipment.trackingNumber,
+      shipmentStatus: shipment.shipmentStatus,
+      sessionId: shipment.sessionId,
+      cacheWarmedAt: shipment.cacheWarmedAt,
+    };
+    
+    try {
+      await onSessionClosed(shipment.orderNumber, shipmentContext);
+      warmedCount++;
+    } catch (err: any) {
+      log(`Failed to warm cache for ${shipment.orderNumber}: ${err.message}`);
+    }
+  }
+  
+  log(`Warmed cache for ${warmedCount}/${unwarmedShipments.length} packing-ready shipments`);
+  return warmedCount;
 }
 
 /**
@@ -311,12 +383,16 @@ export async function syncFirestoreSessions(): Promise<number> {
     const closedCount = await detectClosedSessionTransitions(nonClosedSessionIds);
     syncedCount += closedCount;
 
+    // CACHE WARMING SAFETY NET: Ensure any packing-ready shipments with missing
+    // cacheWarmedAt get warmed (catches failed warmings, worker restarts, etc.)
+    const ensuredCount = await ensureClosedSessionsWarmed();
+
     // Update stats
     workerStats.totalSynced += syncedCount;
     workerStats.lastSyncCount = syncedCount;
     workerStats.lastSyncAt = new Date();
 
-    log(`Synced ${syncedCount} sessions (${closedCount} closed), skipped ${skippedCount} unchanged`);
+    log(`Synced ${syncedCount} sessions (${closedCount} closed, ${ensuredCount} cache-warmed), skipped ${skippedCount} unchanged`);
 
     workerStatus = 'sleeping';
     return syncedCount;
