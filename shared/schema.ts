@@ -628,17 +628,21 @@ export type PrintQueue = typeof printQueue.$inferSelect;
 // Shipment sync failures table for dead letter queue
 export const shipmentSyncFailures = pgTable("shipment_sync_failures", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipstationShipmentId: text("shipstation_shipment_id").notNull(), // ShipStation shipment ID for deduplication
+  modifiedAt: text("modified_at").notNull(), // Shipment modified_at timestamp (ISO string) for cursor tracking
   orderNumber: text("order_number").notNull(),
-  reason: text("reason").notNull(), // 'backfill' | 'webhook' | 'manual'
+  reason: text("reason").notNull(), // 'unified_sync' | 'backfill' | 'webhook' | 'manual'
   errorMessage: text("error_message").notNull(),
-  requestData: jsonb("request_data"), // Original request details
+  requestData: jsonb("request_data"), // Original shipment data from ShipStation
   responseData: jsonb("response_data"), // API response if available
-  retryCount: integer("retry_count").notNull().default(0),
+  retryCount: integer("retry_count").notNull().default(0), // Number of times we tried before dead-lettering
   failedAt: timestamp("failed_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   orderNumberIdx: index("shipment_sync_failures_order_number_idx").on(table.orderNumber),
   failedAtIdx: index("shipment_sync_failures_failed_at_idx").on(table.failedAt),
+  // Unique index on shipment ID + modified_at for deduplication
+  shipmentModifiedIdx: uniqueIndex("shipment_sync_failures_shipment_modified_idx").on(table.shipstationShipmentId, table.modifiedAt),
 }));
 
 export const insertShipmentSyncFailureSchema = createInsertSchema(shipmentSyncFailures).omit({
