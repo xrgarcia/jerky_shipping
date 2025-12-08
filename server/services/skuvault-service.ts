@@ -1460,9 +1460,17 @@ export class SkuVaultService {
     await this.ensureAuthenticated();
 
     try {
+      // SkuVault QC Sale naming convention for multi-shipment orders:
+      // - First shipment: Just the order number (e.g., "TEST-1206254-RG")
+      // - Split shipments: Order number + shipment ID suffix (e.g., "TEST-1206254-RG-933001024")
+      // 
+      // Strategy: Search by order number first, if no results and shipmentId provided,
+      // retry with composite search term (orderNumber-shipmentIdSuffix)
+      
       // QC Sales endpoint is only available on app.skuvault.com, not lmdb.skuvault.com
-      const url = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(orderNumber)}`;
-      console.log(`[SkuVault QC Sales] Looking up order:`, orderNumber);
+      let searchTerm = orderNumber;
+      const url = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(searchTerm)}`;
+      console.log(`[SkuVault QC Sales] Looking up order:`, searchTerm, shipmentId ? `(shipmentId: ${shipmentId})` : '');
       
       // Apply rate limiting
       await this.applyRateLimit();
@@ -1523,28 +1531,93 @@ export class SkuVaultService {
       }
       
       // Extract the QC sales from the array
-      const qcSales = validatedResponse.Data?.QcSales;
-      if (!qcSales || qcSales.length === 0) {
-        console.log(`[SkuVault QC Sales] No QC sale found for order:`, orderNumber);
-        return null;
+      let qcSales = validatedResponse.Data?.QcSales ?? [];
+      
+      // Extract the numeric part from shipmentId for matching (e.g., "se-933001024" -> "933001024")
+      const shipmentIdSuffix = shipmentId ? shipmentId.replace(/^se-/, '') : null;
+      
+      // STRATEGY: SkuVault QC Sale naming for multi-shipment orders:
+      // - First/original shipment: Just order number (e.g., "TEST-1206254-RG")
+      // - Split shipments: Order number + shipment ID (e.g., "TEST-1206254-RG-933001024")
+      //
+      // If we have a shipmentId and found results, check if any match.
+      // If no match found, search again with composite search term.
+      
+      let qcSale: import('@shared/skuvault-types').QCSale | undefined;
+      
+      if (qcSales.length > 0) {
+        if (shipmentIdSuffix) {
+          // Look for a QC Sale that ends with the shipment ID suffix
+          qcSale = qcSales.find(sale => sale.SaleId && sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+          
+          if (qcSale) {
+            console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment suffix ${shipmentIdSuffix} in initial results`);
+          } else {
+            console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} in ${qcSales.length} results, trying composite search...`);
+          }
+        } else {
+          // No shipmentId specified, use first result
+          qcSale = qcSales[0];
+        }
       }
       
-      // If shipmentId is provided and there are multiple QC Sales, find the one matching the shipment
-      // SaleId format: "1-352444-5-13038-480797-TEST-1206254-RG-933001024" where 933001024 is ShipStation shipment ID
-      let qcSale = qcSales[0]; // Default to first match
-      
-      if (shipmentId && qcSales.length > 1) {
-        // Extract the numeric part from shipmentId (e.g., "se-933001024" -> "933001024")
-        const shipmentIdSuffix = shipmentId.replace(/^se-/, '');
-        console.log(`[SkuVault QC Sales] Multiple QC Sales (${qcSales.length}) found, filtering by shipmentId suffix: ${shipmentIdSuffix}`);
+      // If no matching QC Sale found and we have a shipmentId, try searching with composite term
+      // This handles split shipments that use "{orderNumber}-{shipmentId}" naming
+      if (!qcSale && shipmentIdSuffix) {
+        const compositeSearchTerm = `${orderNumber}-${shipmentIdSuffix}`;
+        console.log(`[SkuVault QC Sales] Retrying with composite search term: ${compositeSearchTerm}`);
         
-        const matchingQcSale = qcSales.find(sale => sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
-        if (matchingQcSale) {
-          qcSale = matchingQcSale;
-          console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment ${shipmentId}`);
-        } else {
-          console.warn(`[SkuVault QC Sales] No QC Sale matching shipmentId ${shipmentId}, using first result`);
+        await this.applyRateLimit();
+        const compositeUrl = `https://app.skuvault.com/sales/QualityControl/getQCSales?SearchTerm=${encodeURIComponent(compositeSearchTerm)}`;
+        const compositeHeaders = await this.getApiHeaders();
+        const compositeResponse = await this.client.request({
+          method: 'GET',
+          url: compositeUrl,
+          headers: compositeHeaders,
+          transformResponse: [],
+        });
+        
+        let compositeRawData = compositeResponse.data as string;
+        console.log(`[SkuVault QC Sales] Composite search response (first 200 chars):`, compositeRawData.substring(0, 200));
+        
+        // Handle HTML response (session expired)
+        if (compositeRawData.trim().startsWith('<!doctype') || compositeRawData.trim().startsWith('<html')) {
+          console.log('[SkuVault QC Sales] Composite search got HTML, re-authenticating...');
+          await this.tokenCache.clear();
+          this.isAuthenticated = false;
+          await this.ensureAuthenticated();
+          
+          const retryHeaders = await this.getApiHeaders();
+          const retryResponse = await this.client.request({
+            method: 'GET',
+            url: compositeUrl,
+            headers: retryHeaders,
+            transformResponse: [],
+          });
+          compositeRawData = retryResponse.data as string;
         }
+        
+        // Strip anti-XSSI prefix
+        if (compositeRawData.startsWith(")]}',")) {
+          compositeRawData = compositeRawData.substring(6);
+        }
+        
+        const compositeParsedData = JSON.parse(compositeRawData);
+        const { qcSalesResponseSchema: compositeSchema } = await import('@shared/skuvault-types');
+        const compositeValidated = compositeSchema.parse(compositeParsedData);
+        
+        const compositeQcSales = compositeValidated.Data?.QcSales ?? [];
+        if (compositeQcSales.length > 0) {
+          qcSale = compositeQcSales[0];
+          console.log(`[SkuVault QC Sales] Found QC Sale using composite search term`);
+        } else {
+          console.log(`[SkuVault QC Sales] No QC Sale found with composite search term either`);
+        }
+      }
+      
+      if (!qcSale) {
+        console.log(`[SkuVault QC Sales] No QC sale found for order:`, orderNumber, shipmentIdSuffix ? `(shipment suffix: ${shipmentIdSuffix})` : '');
+        return null;
       }
       
       console.log(`[SkuVault QC Sales] Found QC sale:`, {
@@ -1606,7 +1679,7 @@ export class SkuVaultService {
             const shipmentIdSuffix = shipmentId.replace(/^se-/, '');
             console.log(`[SkuVault QC Sales] Multiple QC Sales (${qcSales.length}) found in 404, filtering by shipmentId suffix: ${shipmentIdSuffix}`);
             
-            const matchingQcSale = qcSales.find(sale => sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+            const matchingQcSale = qcSales.find(sale => sale.SaleId && sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
             if (matchingQcSale) {
               qcSale = matchingQcSale;
               console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment ${shipmentId} in 404 response`);
