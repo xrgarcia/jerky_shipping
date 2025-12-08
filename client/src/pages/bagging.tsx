@@ -3562,22 +3562,23 @@ export default function Bagging() {
                                     <span className="text-xs">SKU:</span>
                                     <span className="font-mono select-all cursor-text" data-testid={`text-kit-sku-value-${progress.sku}`}>{progress.sku}</span>
                                   </div>
-                                  {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs">Barcode:</span>
-                                      <span className="font-mono select-all cursor-text" data-testid={`text-kit-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-5 w-5 p-0"
-                                        onClick={() => copyToClipboard(progress.skuvaultCode!)}
-                                        data-testid={`button-copy-kit-barcode-${progress.sku}`}
-                                      >
-                                        <Copy className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  )}
+                                  {/* Always show code with copy button - use barcode if available, otherwise SKU */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs">Code:</span>
+                                    <span className="font-mono select-all cursor-text" data-testid={`text-kit-barcode-value-${progress.sku}`}>
+                                      {progress.skuvaultCode || progress.sku}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-5 w-5 p-0"
+                                      onClick={() => copyToClipboard(progress.skuvaultCode || progress.sku)}
+                                      data-testid={`button-copy-kit-barcode-${progress.sku}`}
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </div>
                                 <div className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                                   {progress.kitComponents.length} component{progress.kitComponents.length !== 1 ? 's' : ''} • Scan any component barcode
@@ -3675,22 +3676,23 @@ export default function Bagging() {
                                                 <span>SKU:</span>
                                                 <span className="font-mono select-all cursor-text" data-testid={`text-comp-sku-value-${comp.sku || comp.id}`}>{comp.sku || 'N/A'}</span>
                                               </div>
-                                              {comp.code && comp.code !== comp.sku && (
-                                                <div className="flex items-center gap-1">
-                                                  <span>Barcode:</span>
-                                                  <span className="font-mono select-all cursor-text" data-testid={`text-comp-barcode-value-${comp.sku || comp.id}`}>{comp.code}</span>
-                                                  <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-4 w-4 p-0"
-                                                    onClick={() => copyToClipboard(comp.code!)}
-                                                    data-testid={`button-copy-comp-barcode-${comp.sku || comp.id}`}
-                                                  >
-                                                    <Copy className="h-2.5 w-2.5" />
-                                                  </Button>
-                                                </div>
-                                              )}
+                                              {/* Always show code with copy button - use barcode if available, otherwise SKU */}
+                                              <div className="flex items-center gap-1">
+                                                <span>Code:</span>
+                                                <span className="font-mono select-all cursor-text" data-testid={`text-comp-barcode-value-${comp.sku || comp.id}`}>
+                                                  {comp.code || comp.sku || 'N/A'}
+                                                </span>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-4 w-4 p-0"
+                                                  onClick={() => copyToClipboard(comp.code || comp.sku || '')}
+                                                  data-testid={`button-copy-comp-barcode-${comp.sku || comp.id}`}
+                                                >
+                                                  <Copy className="h-2.5 w-2.5" />
+                                                </Button>
+                                              </div>
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -3782,22 +3784,23 @@ export default function Bagging() {
                                 <span className="text-xs">SKU:</span>
                                 <span className="font-mono select-all cursor-text" data-testid={`text-sku-value-${progress.sku}`}>{progress.sku}</span>
                               </div>
-                              {progress.skuvaultCode && progress.skuvaultCode !== progress.sku && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs">Barcode:</span>
-                                  <span className="font-mono select-all cursor-text" data-testid={`text-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 p-0"
-                                    onClick={() => copyToClipboard(progress.skuvaultCode!)}
-                                    data-testid={`button-copy-barcode-${progress.sku}`}
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              )}
+                              {/* Always show code with copy button - use barcode if available, otherwise SKU */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs">Code:</span>
+                                <span className="font-mono select-all cursor-text" data-testid={`text-barcode-value-${progress.sku}`}>
+                                  {progress.skuvaultCode || progress.sku}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => copyToClipboard(progress.skuvaultCode || progress.sku)}
+                                  data-testid={`button-copy-barcode-${progress.sku}`}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                           
