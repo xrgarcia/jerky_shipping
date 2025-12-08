@@ -4973,20 +4973,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (shippableShipments.length > 1) {
           // MULTIPLE SHIPPABLE SHIPMENTS - Return early with selection options
           console.log(`[Packing Validation] Multiple shippable shipments (${shippableShipments.length}) - returning selection options`);
+          
+          // Fetch items for each shipment so warehouse can distinguish them
+          const shipmentsWithItems = await Promise.all(
+            shippableShipments.map(async (s: any) => {
+              const items = await storage.getShipmentItems(s.id);
+              return {
+                id: s.id,
+                shipmentId: s.shipmentId,
+                carrierCode: s.carrierCode,
+                serviceCode: s.serviceCode,
+                shipmentStatus: s.shipmentStatus,
+                shipToName: s.shipToName,
+                shipToCity: s.shipToCity,
+                shipToState: s.shipToState,
+                trackingNumber: s.trackingNumber,
+                items: items.map(item => ({
+                  sku: item.sku,
+                  name: item.name,
+                  quantity: item.quantity,
+                })),
+              };
+            })
+          );
+          
           return res.json({
             requiresShipmentSelection: true,
             orderNumber,
-            shippableShipments: shippableShipments.map((s: any) => ({
-              id: s.id,
-              shipmentId: s.shipmentId,
-              carrierCode: s.carrierCode,
-              serviceCode: s.serviceCode,
-              shipmentStatus: s.shipmentStatus,
-              shipToName: s.shipToName,
-              shipToCity: s.shipToCity,
-              shipToState: s.shipToState,
-              trackingNumber: s.trackingNumber,
-            })),
+            shippableShipments: shipmentsWithItems,
             shippableCount: shippableShipments.length,
             cacheSource,
           });
@@ -5039,20 +5053,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (shippableShipments.length > 1) {
           // MULTIPLE SHIPPABLE SHIPMENTS - Return early with selection options
           console.log(`[Packing Validation] Multiple shippable shipments (${shippableShipments.length}) - returning selection options`);
+          
+          // Fetch items for each shipment so warehouse can distinguish them
+          const shipmentsWithItems = await Promise.all(
+            shippableShipments.map(async (s: any) => {
+              const items = await storage.getShipmentItems(s.id);
+              return {
+                id: s.id,
+                shipmentId: s.shipmentId,
+                carrierCode: s.carrierCode,
+                serviceCode: s.serviceCode,
+                shipmentStatus: s.shipmentStatus,
+                shipToName: s.shipToName,
+                shipToCity: s.shipToCity,
+                shipToState: s.shipToState,
+                trackingNumber: s.trackingNumber,
+                items: items.map(item => ({
+                  sku: item.sku,
+                  name: item.name,
+                  quantity: item.quantity,
+                })),
+              };
+            })
+          );
+          
           return res.json({
             requiresShipmentSelection: true,
             orderNumber,
-            shippableShipments: shippableShipments.map((s: any) => ({
-              id: s.id,
-              shipmentId: s.shipmentId,
-              carrierCode: s.carrierCode,
-              serviceCode: s.serviceCode,
-              shipmentStatus: s.shipmentStatus,
-              shipToName: s.shipToName,
-              shipToCity: s.shipToCity,
-              shipToState: s.shipToState,
-              trackingNumber: s.trackingNumber,
-            })),
+            shippableShipments: shipmentsWithItems,
             shippableCount: shippableShipments.length,
             cacheSource,
           });
