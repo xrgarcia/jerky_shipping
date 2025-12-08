@@ -1453,9 +1453,10 @@ export class SkuVaultService {
    * - Items that failed QC
    * 
    * @param orderNumber - ShipStation order number to search for
+   * @param shipmentId - Optional ShipStation shipment ID (e.g., "se-933001024") to filter by when order has multiple shipments
    * @returns QCSale if found, null if not found or error
    */
-  async getQCSalesByOrderNumber(orderNumber: string): Promise<import('@shared/skuvault-types').QCSale | null> {
+  async getQCSalesByOrderNumber(orderNumber: string, shipmentId?: string): Promise<import('@shared/skuvault-types').QCSale | null> {
     await this.ensureAuthenticated();
 
     try {
@@ -1521,14 +1522,31 @@ export class SkuVaultService {
         );
       }
       
-      // Extract the first QC sale from the array
+      // Extract the QC sales from the array
       const qcSales = validatedResponse.Data?.QcSales;
       if (!qcSales || qcSales.length === 0) {
         console.log(`[SkuVault QC Sales] No QC sale found for order:`, orderNumber);
         return null;
       }
       
-      const qcSale = qcSales[0]; // Take first match
+      // If shipmentId is provided and there are multiple QC Sales, find the one matching the shipment
+      // SaleId format: "1-352444-5-13038-480797-TEST-1206254-RG-933001024" where 933001024 is ShipStation shipment ID
+      let qcSale = qcSales[0]; // Default to first match
+      
+      if (shipmentId && qcSales.length > 1) {
+        // Extract the numeric part from shipmentId (e.g., "se-933001024" -> "933001024")
+        const shipmentIdSuffix = shipmentId.replace(/^se-/, '');
+        console.log(`[SkuVault QC Sales] Multiple QC Sales (${qcSales.length}) found, filtering by shipmentId suffix: ${shipmentIdSuffix}`);
+        
+        const matchingQcSale = qcSales.find(sale => sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+        if (matchingQcSale) {
+          qcSale = matchingQcSale;
+          console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment ${shipmentId}`);
+        } else {
+          console.warn(`[SkuVault QC Sales] No QC Sale matching shipmentId ${shipmentId}, using first result`);
+        }
+      }
+      
       console.log(`[SkuVault QC Sales] Found QC sale:`, {
         SaleId: qcSale.SaleId,
         OrderId: qcSale.OrderId,
@@ -1574,14 +1592,29 @@ export class SkuVaultService {
             return null;
           }
           
-          // Extract the first QC sale from the array
+          // Extract the QC sales from the array
           const qcSales = validatedResponse.Data?.QcSales;
           if (!qcSales || qcSales.length === 0) {
             console.log(`[SkuVault QC Sales] No QC sale found in 404 response for order:`, orderNumber);
             return null;
           }
           
-          const qcSale = qcSales[0]; // Take first match
+          // Apply same shipmentId filtering logic as main path
+          let qcSale = qcSales[0]; // Default to first match
+          
+          if (shipmentId && qcSales.length > 1) {
+            const shipmentIdSuffix = shipmentId.replace(/^se-/, '');
+            console.log(`[SkuVault QC Sales] Multiple QC Sales (${qcSales.length}) found in 404, filtering by shipmentId suffix: ${shipmentIdSuffix}`);
+            
+            const matchingQcSale = qcSales.find(sale => sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+            if (matchingQcSale) {
+              qcSale = matchingQcSale;
+              console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment ${shipmentId} in 404 response`);
+            } else {
+              console.warn(`[SkuVault QC Sales] No QC Sale matching shipmentId ${shipmentId} in 404 response, using first result`);
+            }
+          }
+          
           console.log(`[SkuVault QC Sales] Successfully parsed QC sale from 404 response:`, {
             SaleId: qcSale.SaleId,
             OrderId: qcSale.OrderId,

@@ -5176,13 +5176,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // 2. Get QCSale data (prefer warm cache, fallback to SkuVault API)
+        // For multi-shipment orders, we need to pass the shipmentId to get the correct QCSale
+        const shipmentIdForQC = (shipment as any).shipment_id || (shipment as any).shipmentId;
+        
         if (warmCacheData?.qcSale) {
           console.log(`[Packing Validation] WARM CACHE HIT for QCSale: ${orderNumber}`);
           qcSale = warmCacheData.qcSale as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else {
-          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber}`);
-          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber} (shipmentId: ${shipmentIdForQC || 'none'})`);
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipmentIdForQC);
           if (cacheSource === 'database') cacheSource = 'skuvault_api';
         }
         
