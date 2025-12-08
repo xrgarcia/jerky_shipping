@@ -290,51 +290,94 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       return false;
     }
     
-    // Now fetch QCSale data from SkuVault
+    // Now fetch QCSale data from SkuVault for EACH shippable shipment
+    // Multi-shipment orders have separate QC Sales per shipment in SkuVault
     const shipmentCount = shipmentsResult.shippableShipments.length;
     log(`Warming cache for order ${orderNumber} (${shipmentCount} shippable shipment${shipmentCount > 1 ? 's' : ''})${force ? ' (forced refresh)' : ''}...`);
     
-    const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+    // Build maps for each shipment's QC Sale data
+    const qcSalesByShipment: Record<string, any> = {};
+    const lookupMapsByShipment: Record<string, Record<string, any>> = {};
     
-    if (!qcSale) {
-      log(`No QCSale data found for order ${orderNumber}`);
-      return false;
+    // Default QC Sale (backward compat) - will be set to first successful fetch
+    let defaultQcSale: any = null;
+    let defaultLookupMap: Record<string, any> = {};
+    
+    // Fetch QC Sale for each shippable shipment
+    for (const shipment of shipmentsResult.shippableShipments) {
+      try {
+        // Pass shipment ID to get the correct QC Sale for this specific shipment
+        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipment.id);
+        
+        if (qcSale) {
+          const lookupMap = buildLookupMap(qcSale);
+          
+          // Store by shipment ID
+          qcSalesByShipment[shipment.id] = {
+            SaleId: qcSale.SaleId,
+            OrderId: qcSale.OrderId,
+            Status: qcSale.Status,
+            TotalItems: qcSale.TotalItems,
+            PassedItems: qcSale.PassedItems,
+            Items: qcSale.Items,
+          };
+          lookupMapsByShipment[shipment.id] = lookupMap;
+          
+          // Set default to first successful fetch (for backward compat)
+          if (!defaultQcSale) {
+            defaultQcSale = qcSale;
+            defaultLookupMap = lookupMap;
+          }
+          
+          log(`  Fetched QC Sale for shipment ${shipment.id} (${Object.keys(lookupMap).length} barcode entries)`);
+        } else {
+          log(`  No QC Sale found for shipment ${shipment.id}`);
+        }
+      } catch (err: any) {
+        error(`  Failed to fetch QC Sale for shipment ${shipment.id}: ${err.message}`);
+      }
     }
     
-    // Build cache data with lookup map AND shipment data
-    const lookupMap = buildLookupMap(qcSale);
+    // If no QC Sales found for any shipment, don't cache
+    if (!defaultQcSale) {
+      log(`No QCSale data found for any shipment of order ${orderNumber}`);
+      return false;
+    }
     
     // Serialize all shippable shipments for cache
     const shippableShipmentsData = shipmentsResult.shippableShipments.map(serializeShipmentForCache);
     
     // For backward compatibility, keep 'shipment' as the default (first/only shippable)
-    // Add new fields for multiple shipment support
     const defaultShipment = shipmentsResult.shippableShipments.length > 0 
       ? shipmentsResult.shippableShipments[0] 
       : null;
     
     const cacheData = {
-      saleId: qcSale.SaleId || '',
+      saleId: defaultQcSale.SaleId || '',
       orderNumber,
       cachedAt: Date.now(),
       warmedAt: Date.now(),
-      lookupMap,
-      // Store full QCSale for validation endpoint
+      // BACKWARD COMPAT: Default lookup map (first shipment)
+      lookupMap: defaultLookupMap,
+      // BACKWARD COMPAT: Default QCSale (first shipment)
       qcSale: {
-        SaleId: qcSale.SaleId,
-        OrderId: qcSale.OrderId,
-        Status: qcSale.Status,
-        TotalItems: qcSale.TotalItems,
-        PassedItems: qcSale.PassedItems,
-        Items: qcSale.Items,
+        SaleId: defaultQcSale.SaleId,
+        OrderId: defaultQcSale.OrderId,
+        Status: defaultQcSale.Status,
+        TotalItems: defaultQcSale.TotalItems,
+        PassedItems: defaultQcSale.PassedItems,
+        Items: defaultQcSale.Items,
       },
       // BACKWARD COMPAT: Single shipment field (first shippable or null)
       shipment: defaultShipment ? serializeShipmentForCache(defaultShipment) : null,
-      // NEW: Array of all shippable shipments for UI selection
+      // NEW: QC Sales and lookup maps keyed by shipment ID
+      qcSalesByShipment,
+      lookupMapsByShipment,
+      // Array of all shippable shipments for UI selection
       shippableShipments: shippableShipmentsData,
-      // NEW: Default shipment ID (auto-set when exactly 1 shippable)
+      // Default shipment ID (auto-set when exactly 1 shippable)
       defaultShipmentId: shipmentsResult.defaultShipmentId,
-      // NEW: Reason for the result (single/multiple/none)
+      // Reason for the result (single/multiple/none)
       shippableReason: shipmentsResult.reason,
     };
     
@@ -353,7 +396,9 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       }
     }
     
-    log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries + ${shipmentCount} shippable shipment(s) (${WARM_TTL_SECONDS}s TTL)`);
+    const qcSalesCount = Object.keys(qcSalesByShipment).length;
+    const totalBarcodes = Object.values(lookupMapsByShipment).reduce((sum, map) => sum + Object.keys(map).length, 0);
+    log(`Cached order ${orderNumber} with ${qcSalesCount} QC Sale(s), ${totalBarcodes} barcode entries, ${shipmentCount} shippable shipment(s) (${WARM_TTL_SECONDS}s TTL)`);
     
     if (force) {
       metrics.manualRefreshes++;

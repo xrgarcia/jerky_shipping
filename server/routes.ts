@@ -5176,16 +5176,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // 2. Get QCSale data (prefer warm cache, fallback to SkuVault API)
-        // For multi-shipment orders, we need to pass the shipmentId to get the correct QCSale
-        const shipmentIdForQC = (shipment as any).shipment_id || (shipment as any).shipmentId;
+        // For multi-shipment orders, we need to pass the internal shipmentId (se-XXX) to get the correct QCSale
+        const selectedShipmentId = shipment?.id;
         
-        if (warmCacheData?.qcSale) {
-          console.log(`[Packing Validation] WARM CACHE HIT for QCSale: ${orderNumber}`);
+        // Check if warm cache has shipment-specific QCSale data (multi-shipment support)
+        // Priority: qcSalesByShipment[shipmentId] > qcSale (backward compat default)
+        const qcSalesByShipment = warmCacheData?.qcSalesByShipment as Record<string, any> | undefined;
+        const cachedQcSaleForShipment = selectedShipmentId && qcSalesByShipment?.[selectedShipmentId];
+        
+        if (cachedQcSaleForShipment) {
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${orderNumber}, shipmentId: ${selectedShipmentId}`);
+          qcSale = cachedQcSaleForShipment as import('@shared/skuvault-types').QCSale;
+          if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
+        } else if (warmCacheData?.qcSale) {
+          // Fallback to default QCSale (single-shipment orders or backward compat)
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (default): ${orderNumber}`);
           qcSale = warmCacheData.qcSale as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else {
-          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber} (shipmentId: ${shipmentIdForQC || 'none'})`);
-          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipmentIdForQC);
+          // Use internal shipment ID (se-XXX format) for SkuVault lookup
+          // This is the same format used by cache warming
+          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber} (shipmentId: ${selectedShipmentId || 'none'})`);
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, selectedShipmentId);
           if (cacheSource === 'database') cacheSource = 'skuvault_api';
         }
         
