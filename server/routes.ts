@@ -4922,6 +4922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const explicitShipmentId = req.query.shipmentId as string | undefined;
       const user = req.user;
       
+      console.log(`[Packing Validation] Request for order ${orderNumber}, explicitShipmentId: ${explicitShipmentId || 'none'}`);
+      
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
