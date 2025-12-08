@@ -1,0 +1,100 @@
+2025-12-08 13:32:16.58
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB1042-K-X2
+2025-12-08 13:50:29.28
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-8-16
+2025-12-08 13:51:58.37
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BAJ-38-17
+2025-12-08 13:51:58.37
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU BTG-PRT-84-18
+2025-12-08 13:51:58.37
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU BTG-SFS-38-5
+2025-12-08 13:51:58.37
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BAJ-1-17
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-1-16
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-8-16
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-GFT-C-BOX-MED
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-TUJ-1-16
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-3-16
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-2-16
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BUJ-1-17
+2025-12-08 13:53:13.25
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-5-16
+2025-12-08 13:58:13.36
+97b55fb6
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:7910:3)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:10292:26)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:10335:7)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7557:20)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+[QCSaleWarmer] Failed to warm cache for order JK3825351425: Could not reach SkuVault: No authentication token available
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:10262:7)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6693:17)
+2025-12-08 13:58:13.36
+97b55fb6
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7187:27)
+2025-12-08 14:18:10.68
+97b55fb6
+User
+[Packing Validation] No shipment item found for SKU JCB-BEJ-30-16
