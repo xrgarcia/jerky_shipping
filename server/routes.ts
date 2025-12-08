@@ -5403,7 +5403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return {
                 id: `sv-${svItem.Id || index}-kit-${compIndex}`,
                 sku: component.Sku || null,
-                code: component.Code || null, // Scannable barcode
+                code: component.PartNumber || component.Code || null, // Prefer PartNumber (UPC) over Code for scannable barcode
                 partNumber: component.PartNumber || null,
                 name: component.Title || component.Sku || 'Unknown Component',
                 quantity: componentTotalQty,
@@ -5427,7 +5427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unitPrice: svItem.UnitPrice?.a?.toString() || null,
             imageUrl: svItem.Picture || matchingSSItem?.imageUrl || null,
             skuvaultItemId: svItem.Id || null,
-            skuvaultCode: svItem.Code || null,
+            skuvaultCode: svItem.PartNumber || svItem.Code || null, // Prefer PartNumber (UPC) over Code for scannable barcode
             skuvaultPartNumber: svItem.PartNumber || null,
             passedStatus: svItem.PassedStatus || null,
             // Kit-related fields
