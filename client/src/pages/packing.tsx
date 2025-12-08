@@ -1278,7 +1278,7 @@ export default function Packing() {
       });
       // Re-validate the order to pick up fresh cache
       if (currentShipment?.orderNumber) {
-        loadShipmentMutation.mutate({ orderNumber: currentShipment.orderNumber });
+        loadShipmentMutation.mutate({ orderNumber: currentShipment.orderNumber, shipmentId: currentShipment.id });
       }
     },
     onError: (error: Error) => {
