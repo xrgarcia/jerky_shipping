@@ -696,12 +696,15 @@ export const packingLogs = pgTable("packing_logs", {
   success: boolean("success").notNull(),
   errorMessage: text("error_message"),
   skuVaultRawResponse: jsonb("skuvault_raw_response"), // Full SkuVault API response for debugging/audit
+  station: text("station"), // 'boxing' | 'bagging' - nullable for historical logs
+  stationId: text("station_id"), // UUID of specific workstation
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   shipmentIdIdx: index("packing_logs_shipment_id_idx").on(table.shipmentId),
   userIdIdx: index("packing_logs_user_id_idx").on(table.userId),
   orderNumberIdx: index("packing_logs_order_number_idx").on(table.orderNumber),
   createdAtIdx: index("packing_logs_created_at_idx").on(table.createdAt),
+  stationIdx: index("packing_logs_station_idx").on(table.station),
 }));
 
 export const insertPackingLogSchema = createInsertSchema(packingLogs).omit({

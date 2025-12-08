@@ -6371,6 +6371,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let shipment: Awaited<ReturnType<typeof storage.getShipment>> | null = null;
     let isNotShippable = false; // Track if order is missing MOVE OVER tag
     
+    // Station info will be set after webSession is loaded
+    let sessionStationId: string | null = null;
+    
     // Helper to log packing actions with request/response data
     async function logPackingAction(
       action: string, 
@@ -6399,6 +6402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             request: details.requestData,
             response: details.responseData,
           } : null,
+          station: "boxing", // Boxing workflow uses /api/packing/complete
+          stationId: sessionStationId,
         });
       } catch (logError) {
         console.error(`[Packing] Failed to create audit log for action ${action}:`, logError);
@@ -6418,6 +6423,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
       }
+      
+      // Set station ID for packing logs
+      sessionStationId = webSession.stationId;
       
       // Get printer for this station
       const stationPrinters = await storage.getPrintersByStation(webSession.stationId);
