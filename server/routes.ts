@@ -6709,7 +6709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get user's current station session
-      const webSession = await storage.getWebSessionByUserId(user.id);
+      const webSession = await storage.getActiveWebPackingSession(user.id);
       if (!webSession || !webSession.stationId) {
         return res.status(400).json({
           success: false,
@@ -6722,7 +6722,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the station's printer
-      const selectedPrinter = await storage.getStationPrinter(webSession.stationId);
+      const stationPrinters = await storage.getPrintersByStation(webSession.stationId);
+      const selectedPrinter = stationPrinters.length > 0 ? stationPrinters[0] : null;
       
       console.log(`[Packing] Reprint label requested for order ${orderNumber || shipment.orderNumber} at station ${webSession.stationId}`);
       
