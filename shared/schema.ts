@@ -195,8 +195,8 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").references(() => orders.id), // Nullable to allow shipments without linked orders
-  shipmentId: text("shipment_id"), // ShipStation shipment ID
-  orderNumber: text("order_number"), // Customer-facing order number from ShipStation (e.g., "JK3825345229")
+  shipmentId: text("shipment_id").notNull(), // ShipStation shipment ID - REQUIRED to prevent orphan records
+  orderNumber: text("order_number").notNull(), // Customer-facing order number from ShipStation (e.g., "JK3825345229") - REQUIRED
   trackingNumber: text("tracking_number"),
   carrierCode: text("carrier_code"),
   serviceCode: text("service_code"),
