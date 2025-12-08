@@ -7,10 +7,17 @@
  * - Firestore sync worker (firestore-sync.ts)  
  * - Order validation endpoint (routes.ts)
  * 
- * SHIPPABILITY CRITERIA:
- * A shipment is shippable if:
+ * SHIPPABILITY CRITERIA (with fallback hierarchy):
+ * 
+ * PRIMARY: A shipment is fully shippable if:
  * 1. It has the "MOVE OVER" tag (indicates picking is complete in SkuVault)
  * 2. Its shipmentStatus is NOT 'on_hold'
+ * 
+ * FALLBACK: When NO shipments pass the primary criteria, we fall back to:
+ * - Shipments that are simply NOT 'on_hold' (even without MOVE OVER tag)
+ * 
+ * This fallback handles cases where split orders have some shipments on hold
+ * and others pending, but none have been tagged with MOVE OVER yet.
  */
 
 import type { Shipment, ShipmentTag } from '@shared/schema';
@@ -35,17 +42,30 @@ export function isShipmentShippable(
 }
 
 /**
- * Filter an array of shipments to only those that are shippable.
+ * Filter an array of shipments to only those that are shippable (primary criteria).
  * 
  * @param shipments - Array of shipment records
  * @param allTags - Array of all tags for these shipments
- * @returns Array of shippable shipments
+ * @returns Array of shippable shipments (MOVE OVER tag AND not on_hold)
  */
 export function filterShippableShipments<T extends Pick<Shipment, 'id' | 'shipmentStatus'>>(
   shipments: T[],
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): T[] {
   return shipments.filter(shipment => isShipmentShippable(shipment, allTags));
+}
+
+/**
+ * Filter an array of shipments to only those that are NOT on hold.
+ * Used as a fallback when no shipments pass the primary shippable criteria.
+ * 
+ * @param shipments - Array of shipment records
+ * @returns Array of shipments that are not on hold
+ */
+export function filterNotOnHoldShipments<T extends Pick<Shipment, 'id' | 'shipmentStatus'>>(
+  shipments: T[]
+): T[] {
+  return shipments.filter(shipment => shipment.shipmentStatus !== 'on_hold');
 }
 
 /**
@@ -78,6 +98,9 @@ export interface ShippableShipmentsResult<T> {
 
 /**
  * Analyze an order's shipments and determine shippability.
+ * Uses a fallback hierarchy:
+ * 1. PRIMARY: Shipments with MOVE OVER tag AND not on_hold
+ * 2. FALLBACK: If none match primary, use shipments that are simply NOT on_hold
  * 
  * @param shipments - All shipments for an order
  * @param allTags - All tags for these shipments
@@ -87,7 +110,14 @@ export function analyzeShippableShipments<T extends Pick<Shipment, 'id' | 'shipm
   shipments: T[],
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): ShippableShipmentsResult<T> {
-  const shippableShipments = filterShippableShipments(shipments, allTags);
+  // Try primary criteria first: MOVE OVER tag AND not on_hold
+  let shippableShipments = filterShippableShipments(shipments, allTags);
+  
+  // FALLBACK: If no shipments pass primary criteria, fall back to just "not on_hold"
+  // This handles split orders where some shipments are on hold and others are pending
+  if (shippableShipments.length === 0) {
+    shippableShipments = filterNotOnHoldShipments(shipments);
+  }
   
   let defaultShipmentId: string | null = null;
   let reason: 'single' | 'multiple' | 'none';
