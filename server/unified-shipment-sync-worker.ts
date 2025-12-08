@@ -25,7 +25,11 @@ import {
   getShopifyOrderSyncQueueLength,
   getOldestShopifyQueueMessage,
   getOldestShipmentSyncQueueMessage,
-  getOldestShopifyOrderSyncQueueMessage
+  getOldestShopifyOrderSyncQueueMessage,
+  incrementShipmentSyncFailureCount,
+  clearShipmentSyncFailureCount,
+  isShipmentDeadLettered,
+  markShipmentAsDeadLettered,
 } from './utils/queue';
 import { storage } from './storage';
 
@@ -39,6 +43,7 @@ const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 const TRACKING_BACKFILL_BATCH_SIZE = 10; // Max shipments to backfill per poll cycle
 const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older than 2 days
 const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
+const MAX_SYNC_FAILURES_BEFORE_DEADLETTER = 3; // Dead-letter after this many failed attempts
 
 // Worker state
 let isPolling = false;
@@ -473,21 +478,82 @@ async function pollCycle(): Promise<{
       
       // Process each shipment (now with labels/tracking attached)
       for (const shipment of pageResult.shipments) {
+        const shipmentId = shipment.shipment_id;
+        const modifiedAt = shipment.modified_at || '';
+        
+        // Skip already dead-lettered shipments - don't block cursor advancement
+        if (shipmentId && modifiedAt) {
+          const alreadyDeadLettered = await isShipmentDeadLettered(shipmentId, modifiedAt);
+          if (alreadyDeadLettered) {
+            console.log(`[UnifiedSync] Skipping dead-lettered shipment ${shipmentId} (modified ${modifiedAt})`);
+            // Treat as success for cursor advancement - we're intentionally skipping it
+            successTimestamps.push(modifiedAt);
+            continue;
+          }
+        }
+        
         try {
           await syncShipment(shipment);
           totalProcessed++;
           // Track successful timestamps for cursor advancement
-          if (shipment.modified_at) {
-            successTimestamps.push(shipment.modified_at);
-          }
-        } catch (err) {
-          totalErrored++;
-          console.error(`[UnifiedSync] Error syncing shipment ${shipment.shipment_id}:`, err);
-          // Track earliest failure - cursor cannot advance past this
-          if (shipment.modified_at) {
-            if (!earliestFailureTimestamp || shipment.modified_at < earliestFailureTimestamp) {
-              earliestFailureTimestamp = shipment.modified_at;
+          if (modifiedAt) {
+            successTimestamps.push(modifiedAt);
+            // Clear any previous failure count on success
+            if (shipmentId) {
+              await clearShipmentSyncFailureCount(shipmentId, modifiedAt);
             }
+          }
+        } catch (err: any) {
+          totalErrored++;
+          const errorMessage = err?.message || 'Unknown error';
+          console.error(`[UnifiedSync] Error syncing shipment ${shipmentId}:`, err);
+          
+          // Track failure in Redis and check if we should dead-letter
+          if (shipmentId && modifiedAt) {
+            const failureCount = await incrementShipmentSyncFailureCount(shipmentId, modifiedAt);
+            
+            if (failureCount >= MAX_SYNC_FAILURES_BEFORE_DEADLETTER) {
+              // Dead-letter this shipment
+              console.log(`[UnifiedSync] Dead-lettering shipment ${shipmentId} after ${failureCount} failures`);
+              
+              try {
+                // Insert into shipmentSyncFailures table
+                await db.insert(shipmentSyncFailures).values({
+                  shipstationShipmentId: shipmentId,
+                  modifiedAt: modifiedAt,
+                  orderNumber: shipment.order_number || 'unknown',
+                  reason: 'unified_sync',
+                  errorMessage: errorMessage,
+                  requestData: shipment,
+                  retryCount: failureCount,
+                  failedAt: new Date(),
+                }).onConflictDoNothing(); // Don't fail if already exists
+                
+                // Mark as dead-lettered in Redis
+                await markShipmentAsDeadLettered(shipmentId, modifiedAt);
+                await clearShipmentSyncFailureCount(shipmentId, modifiedAt);
+                
+                // IMPORTANT: Dead-lettered shipments don't block cursor advancement
+                // Treat them as "processed" for cursor purposes
+                successTimestamps.push(modifiedAt);
+                console.log(`[UnifiedSync] Shipment ${shipmentId} moved to dead-letter queue, cursor can advance past it`);
+              } catch (dlErr) {
+                console.error(`[UnifiedSync] Failed to dead-letter shipment ${shipmentId}:`, dlErr);
+                // If dead-lettering fails, still track as failure to block cursor
+                if (!earliestFailureTimestamp || modifiedAt < earliestFailureTimestamp) {
+                  earliestFailureTimestamp = modifiedAt;
+                }
+              }
+            } else {
+              // Not yet at dead-letter threshold - track as failure to block cursor
+              console.log(`[UnifiedSync] Shipment ${shipmentId} failed (attempt ${failureCount}/${MAX_SYNC_FAILURES_BEFORE_DEADLETTER})`);
+              if (!earliestFailureTimestamp || modifiedAt < earliestFailureTimestamp) {
+                earliestFailureTimestamp = modifiedAt;
+              }
+            }
+          } else {
+            // No shipmentId or modifiedAt - can't track properly, just log
+            console.warn(`[UnifiedSync] Shipment missing ID or modified_at, cannot track failure`);
           }
         }
       }

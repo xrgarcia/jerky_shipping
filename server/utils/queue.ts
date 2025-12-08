@@ -847,3 +847,104 @@ export async function requeueSkuVaultQCSyncMessages(messages: SkuVaultQCSyncMess
   const serialized = updatedMessages.reverse().map(msg => JSON.stringify(msg));
   await redis.rpush(SKUVAULT_QC_QUEUE_KEY, ...serialized);
 }
+
+// Unified Shipment Sync Failure Tracking
+// Used by the unified shipment sync worker to track and dead-letter persistently failing shipments
+const SHIPMENT_SYNC_FAILURE_PREFIX = 'shipstation:sync-failure:';
+const SHIPMENT_SYNC_FAILURE_TTL_HOURS = 24;
+
+/**
+ * Generate a unique key for tracking sync failures of a specific shipment version
+ * Uses shipmentId + modifiedAt to distinguish between different versions of the same shipment
+ */
+function getShipmentSyncFailureKey(shipmentId: string, modifiedAt: string): string {
+  return `${SHIPMENT_SYNC_FAILURE_PREFIX}${shipmentId}:${modifiedAt}`;
+}
+
+/**
+ * Increment the failure count for a shipment sync attempt
+ * Returns the new failure count after incrementing
+ * Sets 24-hour TTL so old failures don't block future syncs of the same shipment
+ */
+export async function incrementShipmentSyncFailureCount(shipmentId: string, modifiedAt: string): Promise<number> {
+  const redis = getRedisClient();
+  const key = getShipmentSyncFailureKey(shipmentId, modifiedAt);
+  
+  const newCount = await redis.incr(key);
+  await redis.expire(key, SHIPMENT_SYNC_FAILURE_TTL_HOURS * 3600);
+  
+  return newCount;
+}
+
+/**
+ * Get the current failure count for a shipment sync attempt
+ * Returns 0 if no failures recorded (key doesn't exist)
+ */
+export async function getShipmentSyncFailureCount(shipmentId: string, modifiedAt: string): Promise<number> {
+  const redis = getRedisClient();
+  const key = getShipmentSyncFailureKey(shipmentId, modifiedAt);
+  
+  const count = await redis.get<number>(key);
+  return count || 0;
+}
+
+/**
+ * Clear the failure count for a shipment sync attempt
+ * Call this after successful sync or after moving to dead-letter queue
+ */
+export async function clearShipmentSyncFailureCount(shipmentId: string, modifiedAt: string): Promise<void> {
+  const redis = getRedisClient();
+  const key = getShipmentSyncFailureKey(shipmentId, modifiedAt);
+  
+  await redis.del(key);
+}
+
+/**
+ * Check if a shipment has been dead-lettered (exceeded max retries)
+ * Uses a separate set to track dead-lettered shipments for the current sync cycle
+ */
+const SHIPMENT_SYNC_DEADLETTER_SET = 'shipstation:sync-deadlettered';
+const SHIPMENT_SYNC_DEADLETTER_TTL_HOURS = 24;
+
+/**
+ * Mark a shipment as dead-lettered in Redis
+ * This prevents the cursor from being blocked by this shipment
+ */
+export async function markShipmentAsDeadLettered(shipmentId: string, modifiedAt: string): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = `${shipmentId}:${modifiedAt}`;
+  
+  await redis.sadd(SHIPMENT_SYNC_DEADLETTER_SET, dedupeKey);
+  await redis.expire(SHIPMENT_SYNC_DEADLETTER_SET, SHIPMENT_SYNC_DEADLETTER_TTL_HOURS * 3600);
+}
+
+/**
+ * Check if a shipment is currently dead-lettered
+ */
+export async function isShipmentDeadLettered(shipmentId: string, modifiedAt: string): Promise<boolean> {
+  const redis = getRedisClient();
+  const dedupeKey = `${shipmentId}:${modifiedAt}`;
+  
+  const isMember = await redis.sismember(SHIPMENT_SYNC_DEADLETTER_SET, dedupeKey);
+  return isMember === 1;
+}
+
+/**
+ * Clear a shipment from the dead-letter set
+ * Call this if the shipment is manually fixed and should be retried
+ */
+export async function clearShipmentFromDeadLetter(shipmentId: string, modifiedAt: string): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = `${shipmentId}:${modifiedAt}`;
+  
+  await redis.srem(SHIPMENT_SYNC_DEADLETTER_SET, dedupeKey);
+}
+
+/**
+ * Get all dead-lettered shipment keys (for debugging/monitoring)
+ */
+export async function getDeadLetteredShipments(): Promise<string[]> {
+  const redis = getRedisClient();
+  const members = await redis.smembers(SHIPMENT_SYNC_DEADLETTER_SET);
+  return members || [];
+}
