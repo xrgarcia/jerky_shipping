@@ -803,7 +803,7 @@ export class SkuVaultService {
   private async getApiHeaders(): Promise<Record<string, string>> {
     const token = await this.tokenCache.get();
     if (!token) {
-      throw new Error('No authentication token available');
+      throw new Error('No authentication token available (token may be refreshing)');
     }
 
     return {

@@ -5203,7 +5203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 );
                 
                 if (!matchedShipmentItem) {
-                  console.warn(`[Packing Validation] No shipment item found for SKU ${passedItem.Sku}`);
+                  console.log(`[Packing Validation] No shipment item found for SKU ${passedItem.Sku} (may be kit component or removed item)`);
                   continue;
                 }
                 

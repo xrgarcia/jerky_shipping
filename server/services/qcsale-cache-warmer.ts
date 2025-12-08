@@ -363,7 +363,13 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     
     return true;
   } catch (err: any) {
-    error(`Failed to warm cache for order ${orderNumber}: ${err.message}`);
+    // Token refresh is expected during startup or token expiry - log at info level
+    const isTokenRefresh = err.message?.includes('No authentication token available');
+    if (isTokenRefresh) {
+      log(`Skipped warming cache for order ${orderNumber}: token refresh in progress`);
+    } else {
+      error(`Failed to warm cache for order ${orderNumber}: ${err.message}`);
+    }
     metrics.lastError = err.message;
     return false;
   }
