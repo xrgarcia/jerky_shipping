@@ -5072,6 +5072,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             const firstShipment = shipmentsResult.allShipments[0];
             const allShipmentsCount = shipmentsResult.allShipments.length;
+            
+            // Fetch items for all shipments so warehouse can distinguish them
+            const shipmentsWithItems = await Promise.all(
+              shipmentsResult.allShipments.map(async (s: any) => {
+                const items = await storage.getShipmentItems(s.id);
+                return {
+                  id: s.id,
+                  shipmentId: s.shipmentId,
+                  carrierCode: s.carrierCode,
+                  serviceCode: s.serviceCode,
+                  shipToName: s.shipToName,
+                  shipToCity: s.shipToCity,
+                  shipToState: s.shipToState,
+                  items: items.map(item => ({
+                    sku: item.sku,
+                    name: item.name,
+                    quantity: item.quantity,
+                  })),
+                };
+              })
+            );
+            
             return res.status(422).json({
               error: {
                 code: 'ALL_ON_HOLD',
@@ -5080,7 +5102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 resolution: 'Check ShipStation for hold dates. If this is unexpected, contact a supervisor.'
               },
               orderNumber,
-              shipmentId: firstShipment?.id
+              shipmentId: firstShipment?.id,
+              shipments: shipmentsWithItems,
             });
           }
         }

@@ -264,12 +264,30 @@ type LabelError = {
   resolution: string;
 };
 
+type ScanErrorShipmentItem = {
+  sku: string | null;
+  name: string;
+  quantity: number;
+};
+
+type ScanErrorShipment = {
+  id: string;
+  shipmentId: string | null;
+  carrierCode: string | null;
+  serviceCode: string | null;
+  shipToName: string | null;
+  shipToCity: string | null;
+  shipToState: string | null;
+  items: ScanErrorShipmentItem[];
+};
+
 type ScanError = {
   code: string;
   message: string;
   explanation: string;
   resolution: string;
   orderNumber?: string;
+  shipments?: ScanErrorShipment[];
 };
 
 export default function Bagging() {
@@ -1327,6 +1345,7 @@ export default function Bagging() {
           explanation: structuredError.explanation || '',
           resolution: structuredError.resolution || '',
           orderNumber: error.data?.orderNumber,
+          shipments: error.data?.shipments || undefined,
         });
         console.log(`[Bagging] Scan error: ${structuredError.code} - ${structuredError.message}`);
       }
@@ -2847,6 +2866,58 @@ export default function Bagging() {
                         <strong>What to do:</strong> {scanError.resolution}
                       </p>
                     </div>
+                    
+                    {/* Shipments accordion - helps warehouse distinguish between orders */}
+                    {scanError.shipments && scanError.shipments.length > 0 && (
+                      <Accordion type="multiple" className="w-full">
+                        {scanError.shipments.map((shipment, index) => (
+                          <AccordionItem 
+                            key={shipment.id} 
+                            value={shipment.id}
+                            className="border-amber-300 dark:border-amber-700"
+                          >
+                            <AccordionTrigger 
+                              className="text-sm text-amber-800 dark:text-amber-200 hover:no-underline py-2"
+                              data-testid={`accordion-trigger-shipment-${index}`}
+                            >
+                              <div className="flex items-center gap-2 text-left">
+                                <Package className="h-4 w-4 flex-shrink-0" />
+                                <span className="font-medium">
+                                  Shipment {index + 1}: {shipment.shipToName || 'Unknown'}
+                                </span>
+                                {(shipment.shipToCity || shipment.shipToState) && (
+                                  <span className="text-amber-600 dark:text-amber-400 text-xs">
+                                    ({shipment.shipToCity || 'Unknown'}, {shipment.shipToState || 'Unknown'})
+                                  </span>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pb-2">
+                              <div className="space-y-1 pl-6">
+                                {shipment.items.length > 0 ? (
+                                  shipment.items.map((item, itemIndex) => (
+                                    <div 
+                                      key={itemIndex}
+                                      className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300"
+                                    >
+                                      <span className="font-mono text-xs bg-amber-200 dark:bg-amber-800 px-1 rounded">
+                                        {item.quantity}x
+                                      </span>
+                                      <span className="font-mono text-xs">{item.sku || 'N/A'}</span>
+                                      <span className="truncate">{item.name}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-amber-600 dark:text-amber-400 italic">
+                                    No items found
+                                  </p>
+                                )}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    )}
                     
                     <div className="flex gap-2 pt-2">
                       <Button
