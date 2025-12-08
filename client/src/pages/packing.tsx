@@ -49,6 +49,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
+import { ShipmentChoiceDialog, type ShippableShipmentOption } from "@/components/shipment-choice-dialog";
 
 // Import sound files
 import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3"; // QC scan success (coin)
@@ -301,6 +302,11 @@ export default function Packing() {
   // State for "Already Packed" dialog (guard rail for re-scanning packed orders)
   const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
   const [alreadyPackedShipment, setAlreadyPackedShipment] = useState<ShipmentWithItems | null>(null);
+
+  // State for "Shipment Selection" dialog (when order has multiple shippable shipments)
+  const [showShipmentChoiceDialog, setShowShipmentChoiceDialog] = useState(false);
+  const [pendingOrderNumber, setPendingOrderNumber] = useState<string | null>(null);
+  const [shippableShipmentOptions, setShippableShipmentOptions] = useState<ShippableShipmentOption[]>([]);
 
   // Concurrency protection: Local processing flags set IMMEDIATELY on interaction
   // These prevent double-clicks/scans before React Query's isPending can update
@@ -1157,12 +1163,30 @@ export default function Packing() {
 
   // Load shipment by order number (includes items from backend + SkuVault validation)
   // Boxing uses allowNotShippable=true to load orders for QC even if not yet shippable
+  // Supports explicit shipmentId for multi-shipment orders
   const loadShipmentMutation = useMutation({
-    mutationFn: async (orderNumber: string) => {
-      const response = await apiRequest("GET", `/api/packing/validate-order/${encodeURIComponent(orderNumber)}?allowNotShippable=true`);
-      return (await response.json()) as ShipmentWithItems;
+    mutationFn: async ({ orderNumber, shipmentId }: { orderNumber: string; shipmentId?: string }) => {
+      let url = `/api/packing/validate-order/${encodeURIComponent(orderNumber)}?allowNotShippable=true`;
+      if (shipmentId) {
+        url += `&shipmentId=${encodeURIComponent(shipmentId)}`;
+      }
+      const response = await apiRequest("GET", url);
+      return (await response.json()) as ShipmentWithItems & { 
+        requiresShipmentSelection?: boolean;
+        shippableShipments?: ShippableShipmentOption[];
+      };
     },
     onSuccess: (shipment) => {
+      // Handle multi-shipment selection scenario
+      if ((shipment as any).requiresShipmentSelection && (shipment as any).shippableShipments) {
+        console.log(`[Packing] Order ${(shipment as any).orderNumber} has multiple shippable shipments - showing selection dialog`);
+        setPendingOrderNumber((shipment as any).orderNumber);
+        setShippableShipmentOptions((shipment as any).shippableShipments);
+        setShowShipmentChoiceDialog(true);
+        setOrderScan(""); // Clear the input
+        return; // Don't proceed - wait for selection
+      }
+
       if (!shipment.items || shipment.items.length === 0) {
         // No items - clear and refocus for next scan
         setOrderScan("");
@@ -1186,9 +1210,11 @@ export default function Packing() {
       setCompletionSuccess(null); // Clear any previous success state
       progressRestoredRef.current = false; // Reset so restoration runs for new order
       
-      // Log order loaded event
+      // Log order loaded event (include selected shipment ID for multi-shipment tracking)
       logShipmentEvent("order_loaded", {
         shipmentId: shipment.id,
+        selectedShipmentId: (shipment as any).selectedShipmentId,
+        shippableCount: (shipment as any).shippableCount,
         itemCount: shipment.items.length,
         orderNumber: shipment.orderNumber,
         skuvaultSaleId: shipment.saleId,
@@ -1252,7 +1278,7 @@ export default function Packing() {
       });
       // Re-validate the order to pick up fresh cache
       if (currentShipment?.orderNumber) {
-        loadShipmentMutation.mutate(currentShipment.orderNumber);
+        loadShipmentMutation.mutate({ orderNumber: currentShipment.orderNumber });
       }
     },
     onError: (error: Error) => {
@@ -1298,6 +1324,29 @@ export default function Packing() {
   const handleCancelAlreadyPacked = () => {
     setShowAlreadyPackedDialog(false);
     setAlreadyPackedShipment(null);
+    setOrderScan("");
+    // Focus order input for next scan
+    setTimeout(() => orderInputRef.current?.focus(), 100);
+  };
+
+  // Handle shipment selection from multi-shipment dialog
+  const handleShipmentSelect = (shipmentId: string) => {
+    console.log(`[Packing] User selected shipment: ${shipmentId} for order ${pendingOrderNumber}`);
+    setShowShipmentChoiceDialog(false);
+    setShippableShipmentOptions([]);
+    // Re-load with explicit shipment selection
+    if (pendingOrderNumber) {
+      setIsOrderScanProcessing(true);
+      loadShipmentMutation.mutate({ orderNumber: pendingOrderNumber, shipmentId });
+    }
+    setPendingOrderNumber(null);
+  };
+
+  // Handle cancel from shipment selection dialog
+  const handleCancelShipmentSelection = () => {
+    setShowShipmentChoiceDialog(false);
+    setShippableShipmentOptions([]);
+    setPendingOrderNumber(null);
     setOrderScan("");
     // Focus order input for next scan
     setTimeout(() => orderInputRef.current?.focus(), 100);
@@ -1927,7 +1976,7 @@ export default function Packing() {
       setIsOrderScanProcessing(true);
       // Log order scan event
       logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
-      loadShipmentMutation.mutate(orderScan.trim());
+      loadShipmentMutation.mutate({ orderNumber: orderScan.trim() });
     }
   };
 
@@ -2205,6 +2254,15 @@ export default function Packing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Shipment Selection Dialog - For orders with multiple shippable shipments */}
+      <ShipmentChoiceDialog
+        open={showShipmentChoiceDialog}
+        orderNumber={pendingOrderNumber || ""}
+        shippableShipments={shippableShipmentOptions}
+        onSelect={handleShipmentSelect}
+        onCancel={handleCancelShipmentSelection}
+      />
 
       {/* Workstation Mismatch Blocking Screen */}
       {workstationMismatch && (
