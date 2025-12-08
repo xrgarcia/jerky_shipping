@@ -1295,7 +1295,7 @@ export default function Packing() {
   // Reprint label for already-packed orders
   const reprintLabelMutation = useMutation({
     mutationFn: async ({ shipmentId, orderNumber }: { shipmentId: string; orderNumber: string }) => {
-      const response = await apiRequest("POST", "/api/packing/reprint-label", { shipmentId, orderNumber });
+      const response = await apiRequest("POST", "/api/packing/reprint-label", { shipmentId, orderNumber, station: "boxing" });
       return (await response.json()) as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
     },
     onSuccess: (data) => {
@@ -1851,6 +1851,8 @@ export default function Packing() {
     await apiRequest("POST", "/api/packing-logs", {
       shipmentId: currentShipment.id,
       orderNumber: currentShipment.orderNumber,
+      station: "boxing",
+      stationId: currentStation?.stationId || null,
       ...log,
     });
 
@@ -1864,7 +1866,7 @@ export default function Packing() {
   const logShipmentEvent = async (eventName: string, metadata?: any, orderNumber?: string) => {
     try {
       await apiRequest("POST", "/api/shipment-events", {
-        station: "packing",
+        station: "boxing",
         stationId: currentStation?.stationId || null, // Specific workstation ID
         eventName,
         orderNumber: orderNumber || currentShipment?.orderNumber || null,

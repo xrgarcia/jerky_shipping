@@ -6817,7 +6817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Used when order is scanned but was already packed - allows reprinting existing label
   app.post("/api/packing/reprint-label", requireAuth, async (req, res) => {
     try {
-      const { shipmentId, orderNumber } = req.body;
+      const { shipmentId, orderNumber, station } = req.body;
       const user = req.user!;
       
       if (!shipmentId) {
@@ -6897,7 +6897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the reprint event
       await storage.createShipmentEvent({
         username: user.email,
-        station: "packing",
+        station: station || "packing", // Accept station from request, default to "packing" for backwards compatibility
         stationId: webSession.stationId,
         eventName: "label_reprinted",
         orderNumber: shipment.orderNumber,
