@@ -5057,25 +5057,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cacheSource,
           });
         } else {
-          // NO shippable shipments - check allowNotShippable
+          // NO shippable shipments - ALL shipments are on hold
+          // (after our fallback logic, if nothing is shippable, it means everything is on_hold)
           if (allowNotShippable && shipmentsResult.allShipments.length > 0) {
             // Use first shipment but mark as not shippable
             shipment = shipmentsResult.allShipments[0];
             notShippable = {
-              code: 'NOT_SHIPPABLE',
-              message: 'This order is not shippable',
-              explanation: 'The order does not have any shipments with the "MOVE OVER" tag that are not on hold.',
-              resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor.'
+              code: 'ALL_ON_HOLD',
+              message: 'All shipments for this order are on hold',
+              explanation: 'Every shipment for this order has a hold date set in ShipStation. None can be packed until the hold is released.',
+              resolution: 'Check ShipStation to see hold dates, or contact a supervisor if this is unexpected.'
             };
-            console.log(`[Packing Validation] No shippable shipments but allowNotShippable=true, using first shipment with warning`);
+            console.log(`[Packing Validation] All ${shipmentsResult.allShipments.length} shipments are on hold for order ${orderNumber}`);
           } else {
             const firstShipment = shipmentsResult.allShipments[0];
+            const allShipmentsCount = shipmentsResult.allShipments.length;
             return res.status(422).json({
               error: {
-                code: 'NOT_SHIPPABLE',
-                message: 'This order is not shippable',
-                explanation: 'No shipments have the "MOVE OVER" tag or all are on hold.',
-                resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor.'
+                code: 'ALL_ON_HOLD',
+                message: 'All shipments are on hold',
+                explanation: `This order has ${allShipmentsCount} shipment${allShipmentsCount > 1 ? 's' : ''}, but ${allShipmentsCount > 1 ? 'all are' : 'it is'} on hold. Orders on hold cannot be packed.`,
+                resolution: 'Check ShipStation for hold dates. If this is unexpected, contact a supervisor.'
               },
               orderNumber,
               shipmentId: firstShipment?.id

@@ -264,6 +264,14 @@ type LabelError = {
   resolution: string;
 };
 
+type ScanError = {
+  code: string;
+  message: string;
+  explanation: string;
+  resolution: string;
+  orderNumber?: string;
+};
+
 export default function Bagging() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -291,6 +299,7 @@ export default function Bagging() {
   const [skuProgress, setSkuProgress] = useState<Map<string, SkuProgress>>(new Map());
   const [packingComplete, setPackingComplete] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null);
+  const [scanError, setScanError] = useState<ScanError | null>(null); // Scan-level errors (all on hold, etc.)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showStationModal, setShowStationModal] = useState(false);
   
@@ -1307,15 +1316,19 @@ export default function Bagging() {
       setCurrentShipment(null);
       setOrderScan("");
       
-      // Check if this is a NOT_SHIPPABLE error (or other structured error)
-      if (error.data?.error?.code === 'NOT_SHIPPABLE') {
-        const notShippableError = error.data.error;
-        setLabelError({
-          code: notShippableError.code,
-          message: notShippableError.message,
-          shipStationError: notShippableError.explanation,
-          resolution: notShippableError.resolution,
+      // Check if this is a structured error (ALL_ON_HOLD, NOT_SHIPPABLE, etc.)
+      const errorCode = error.data?.error?.code;
+      if (errorCode === 'ALL_ON_HOLD' || errorCode === 'NOT_SHIPPABLE' || errorCode === 'SHIPMENT_NOT_SHIPPABLE') {
+        const structuredError = error.data.error;
+        // Display as scan error (on scan page, not QC page)
+        setScanError({
+          code: structuredError.code,
+          message: structuredError.message,
+          explanation: structuredError.explanation || '',
+          resolution: structuredError.resolution || '',
+          orderNumber: error.data?.orderNumber,
         });
+        console.log(`[Bagging] Scan error: ${structuredError.code} - ${structuredError.message}`);
       }
       // Focus on scan input for next order
       setTimeout(() => orderInputRef.current?.focus(), 100);
@@ -2045,6 +2058,8 @@ export default function Bagging() {
       return;
     }
     if (orderScan.trim()) {
+      // Clear any previous scan error before new scan
+      setScanError(null);
       // Set processing flag IMMEDIATELY to prevent double-clicks
       setIsOrderScanProcessing(true);
       // Log order scan event
@@ -2792,6 +2807,71 @@ export default function Bagging() {
                   </form>
                 </CardContent>
               </Card>
+            )}
+            
+            {/* Scan Error Display - Shows when order cannot be scanned (all on hold, etc.) */}
+            {scanError && !isLabelPrinting && (
+              <div 
+                className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 rounded-lg p-4 space-y-3"
+                data-testid="alert-scan-error"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-lg">
+                      {scanError.code === 'ALL_ON_HOLD' 
+                        ? 'All Shipments On Hold' 
+                        : scanError.message}
+                    </h4>
+                    
+                    {scanError.orderNumber && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-amber-700 dark:text-amber-300">Order:</span>
+                        <Badge 
+                          variant="outline" 
+                          className="font-mono cursor-pointer hover-elevate"
+                          onClick={() => copyToClipboard(scanError.orderNumber!)}
+                        >
+                          {scanError.orderNumber}
+                          <Copy className="h-3 w-3 ml-1" />
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      {scanError.explanation}
+                    </p>
+                    
+                    <div className="bg-amber-100 dark:bg-amber-900 rounded p-3">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        <strong>What to do:</strong> {scanError.resolution}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setScanError(null)}
+                        data-testid="button-dismiss-scan-error"
+                      >
+                        Dismiss
+                      </Button>
+                      {scanError.orderNumber && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`https://ship11.shipstation.com/orders/all-orders-search-result?quickSearch=${encodeURIComponent(scanError.orderNumber!)}`, '_blank')}
+                          data-testid="button-view-in-shipstation"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View in ShipStation
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
             
             {/* Print Queue Status Indicator - Separate container below scan card */}
