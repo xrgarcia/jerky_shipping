@@ -5253,7 +5253,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validationWarnings.push("Using ShipStation items - SkuVault data unavailable");
       }
       
-      // 7. Return combined data with pending print jobs
+      // 7. Check if order is already packed (has tracking number = label was purchased)
+      // This is more robust than checking events because it catches labels created outside the system
+      const alreadyPacked = !!shipment.trackingNumber;
+      
+      if (alreadyPacked) {
+        console.log(`[Packing Validation] Order ${orderNumber} is already packed - trackingNumber: ${shipment.trackingNumber}`);
+      }
+      
+      // 8. Return combined data with pending print jobs
       res.json({
         ...shipment,
         items: itemsToReturn, // SkuVault items (golden source) or ShipStation fallback
@@ -5266,6 +5274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cacheSource, // Whether data came from warm cache or direct API call
         sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
         notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
+        alreadyPacked, // True if order has tracking number (label already purchased)
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
@@ -6660,6 +6669,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         error: "Failed to log bagging completion" 
+      });
+    }
+  });
+
+  // Reprint label for already-packed order
+  // Used when order is scanned but was already packed - allows reprinting existing label
+  app.post("/api/packing/reprint-label", requireAuth, async (req, res) => {
+    try {
+      const { shipmentId, orderNumber } = req.body;
+      const user = req.user!;
+      
+      if (!shipmentId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "shipmentId is required" 
+        });
+      }
+      
+      // Get shipment to verify it has a label
+      const shipment = await storage.getShipment(shipmentId);
+      if (!shipment) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Shipment not found" 
+        });
+      }
+      
+      // Verify the shipment has a label URL
+      if (!shipment.labelUrl) {
+        return res.status(422).json({
+          success: false,
+          error: {
+            code: 'NO_LABEL_URL',
+            message: 'This order does not have a label URL to reprint',
+            resolution: 'The order may not have been properly packed. Try packing it through the normal flow.'
+          }
+        });
+      }
+      
+      // Get user's current station session
+      const webSession = await storage.getWebSessionByUserId(user.id);
+      if (!webSession || !webSession.stationId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_STATION_SESSION',
+            message: 'You must select a station before reprinting labels',
+            resolution: 'Please select a packing station first.'
+          }
+        });
+      }
+      
+      // Get the station's printer
+      const selectedPrinter = await storage.getStationPrinter(webSession.stationId);
+      
+      console.log(`[Packing] Reprint label requested for order ${orderNumber || shipment.orderNumber} at station ${webSession.stationId}`);
+      
+      // Create print job using existing label URL
+      const printJob = await storage.createPrintJob({
+        stationId: webSession.stationId,
+        orderId: shipment.orderId || undefined,
+        shipmentId: shipment.id,
+        jobType: "label",
+        payload: { 
+          labelUrl: shipment.labelUrl,
+          orderNumber: shipment.orderNumber,
+          trackingNumber: shipment.trackingNumber,
+          requestedBy: user.displayName || user.email || 'Unknown',
+          printerName: selectedPrinter?.name || null,
+          isReprint: true, // Flag to indicate this is a reprint
+        },
+        status: "pending",
+        requestedBy: user.id,
+      });
+      
+      // Send job to desktop client via WebSocket
+      broadcastDesktopPrintJob(webSession.stationId, printJob);
+      
+      // Also broadcast to browser print queue for visibility
+      broadcastPrintQueueUpdate({ 
+        type: "job_added", 
+        job: printJob 
+      });
+      
+      // Log the reprint event
+      await storage.createShipmentEvent({
+        username: user.email,
+        station: "packing",
+        stationId: webSession.stationId,
+        eventName: "label_reprinted",
+        orderNumber: shipment.orderNumber,
+        metadata: {
+          printJobId: printJob.id,
+          labelUrl: shipment.labelUrl,
+          trackingNumber: shipment.trackingNumber,
+          requestedBy: user.displayName || user.email,
+        },
+      });
+      
+      console.log(`[Packing] Created reprint job ${printJob.id} for order ${shipment.orderNumber}`);
+      
+      res.json({ 
+        success: true, 
+        printQueued: true, 
+        printJobId: printJob.id,
+        message: "Label reprint queued successfully."
+      });
+    } catch (error: any) {
+      console.error("[Packing] Error reprinting label:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to queue reprint" 
       });
     }
   });

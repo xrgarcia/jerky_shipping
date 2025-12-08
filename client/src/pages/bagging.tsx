@@ -294,6 +294,10 @@ export default function Bagging() {
   // State for successful completion (displayed inline, requires acknowledgment)
   const [completionSuccess, setCompletionSuccess] = useState<{ printJobId: string; message: string } | null>(null);
 
+  // State for "Already Packed" dialog (guard rail for re-scanning packed orders)
+  const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
+  const [alreadyPackedShipment, setAlreadyPackedShipment] = useState<ShipmentWithItems | null>(null);
+
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
     queryKey: ['/api/packing/station-session'],
@@ -1170,6 +1174,16 @@ export default function Bagging() {
         return;
       }
 
+      // GUARD RAIL: Check if order is already packed (has tracking number)
+      // This MUST be checked BEFORE printing in bagging workflow to prevent duplicate labels
+      if ((shipment as any).alreadyPacked) {
+        console.log(`[Bagging] Order ${shipment.orderNumber} is already packed - showing reprint dialog`);
+        setAlreadyPackedShipment(shipment);
+        setShowAlreadyPackedDialog(true);
+        setOrderScan(""); // Clear the input
+        return; // Don't proceed with normal flow or label printing
+      }
+
       // Reset state for new order
       setPackingComplete(false);
       setLabelError(null); // Clear any previous label errors when loading new order
@@ -1321,6 +1335,44 @@ export default function Bagging() {
       });
     },
   });
+
+  // Reprint label for already-packed orders
+  const reprintLabelMutation = useMutation({
+    mutationFn: async ({ shipmentId, orderNumber }: { shipmentId: string; orderNumber: string }) => {
+      const response = await apiRequest("POST", "/api/packing/reprint-label", { shipmentId, orderNumber });
+      return (await response.json()) as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
+    },
+    onSuccess: (data) => {
+      console.log('[Bagging] Reprint label queued:', data.printJobId);
+      toast({
+        title: "Label Reprint Queued",
+        description: "The label will print shortly.",
+      });
+      // Close dialog and reset
+      setShowAlreadyPackedDialog(false);
+      setAlreadyPackedShipment(null);
+      setOrderScan("");
+      // Focus order input for next scan
+      setTimeout(() => orderInputRef.current?.focus(), 100);
+    },
+    onError: (error: Error) => {
+      console.error('[Bagging] Reprint failed:', error.message);
+      toast({
+        title: "Reprint Failed",
+        description: error.message || "Could not queue label reprint. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle cancel from already-packed dialog
+  const handleCancelAlreadyPacked = () => {
+    setShowAlreadyPackedDialog(false);
+    setAlreadyPackedShipment(null);
+    setOrderScan("");
+    // Focus order input for next scan
+    setTimeout(() => orderInputRef.current?.focus(), 100);
+  };
 
   // SkuVault barcode validation (cached lookup including kit components)
   type LocalBarcodeResponse = {
@@ -2100,6 +2152,84 @@ export default function Bagging() {
               </Button>
             </DialogFooter>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Already Packed Dialog - Guard Rail for re-scanning packed orders */}
+      <Dialog open={showAlreadyPackedDialog} onOpenChange={(open) => {
+        if (!open) handleCancelAlreadyPacked();
+      }}>
+        <DialogContent 
+          className="sm:max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          hideCloseButton
+        >
+          <DialogHeader>
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <DialogTitle className="text-center text-xl">Order Already Packed</DialogTitle>
+            <DialogDescription className="text-center">
+              This order has already been packed and has a shipping label.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="bg-muted rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Order Number:</span>
+                <span className="font-semibold">{alreadyPackedShipment?.orderNumber}</span>
+              </div>
+              {(alreadyPackedShipment as any)?.trackingNumber && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tracking:</span>
+                  <span className="font-mono text-xs">{(alreadyPackedShipment as any)?.trackingNumber}</span>
+                </div>
+              )}
+            </div>
+            
+            <p className="text-sm text-center text-muted-foreground">
+              Do you want to reprint the shipping label?
+            </p>
+          </div>
+          
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={handleCancelAlreadyPacked}
+              className="flex-1"
+              data-testid="button-cancel-already-packed"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (alreadyPackedShipment) {
+                  reprintLabelMutation.mutate({
+                    shipmentId: alreadyPackedShipment.id,
+                    orderNumber: alreadyPackedShipment.orderNumber,
+                  });
+                }
+              }}
+              disabled={reprintLabelMutation.isPending}
+              className="flex-1"
+              data-testid="button-reprint-label"
+            >
+              {reprintLabelMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reprinting...
+                </>
+              ) : (
+                <>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Re-print Order
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
