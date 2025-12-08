@@ -29,6 +29,7 @@ import { db } from '../db';
 import { shipments, shipmentTags, type Shipment } from '@shared/schema';
 import { eq, and, isNull, isNotNull, ne, sql, inArray } from 'drizzle-orm';
 import { skuVaultService } from './skuvault-service';
+import { analyzeShippableShipments, type ShippableShipmentsResult } from '../utils/shipment-eligibility';
 
 const log = (message: string) => console.log(`[QCSaleWarmer] ${message}`);
 const error = (message: string) => console.error(`[QCSaleWarmer] ${message}`);
@@ -179,15 +180,19 @@ function buildLookupMap(qcSale: import('@shared/skuvault-types').QCSale): Record
 }
 
 /**
- * Get the single shippable shipment for an order.
+ * Get all shippable shipments for an order using centralized eligibility logic.
+ * 
  * A shipment is shippable if:
- * - Has "MOVE OVER" tag
+ * - Has "MOVE OVER" tag (picking complete in SkuVault)
  * - shipmentStatus is NOT 'on_hold'
  * 
- * Returns the shipment if exactly 1 is shippable, null otherwise.
- * Logs the reason when returning null (0 shippable or multiple shippable).
+ * Returns analysis result with:
+ * - allShipments: All shipments for the order
+ * - shippableShipments: Filtered to only shippable ones
+ * - defaultShipmentId: Auto-set when exactly 1 shippable
+ * - reason: 'single' | 'multiple' | 'none'
  */
-async function getShippableShipment(orderNumber: string): Promise<Shipment | null> {
+export async function getShippableShipmentsForOrder(orderNumber: string): Promise<ShippableShipmentsResult<Shipment> | null> {
   try {
     // Fetch ALL shipments for this order
     const allShipments = await db
@@ -200,53 +205,66 @@ async function getShippableShipment(orderNumber: string): Promise<Shipment | nul
       return null;
     }
     
-    // If only one shipment, still need to check if it's shippable
-    const shipmentIds = allShipments.map(s => s.id);
-    
     // Batch fetch tags for all shipments
+    const shipmentIds = allShipments.map(s => s.id);
     const tagsResult = await db
       .select()
       .from(shipmentTags)
       .where(inArray(shipmentTags.shipmentId, shipmentIds));
     
-    // Build map of shipmentId -> has MOVE OVER tag
-    const hasMoveOverTag = new Map<string, boolean>();
-    for (const tag of tagsResult) {
-      if (tag.name === 'MOVE OVER') {
-        hasMoveOverTag.set(tag.shipmentId, true);
-      }
-    }
+    // Use centralized eligibility logic
+    const result = analyzeShippableShipments(allShipments, tagsResult);
     
-    // Filter to shippable shipments:
-    // - Has "MOVE OVER" tag
-    // - shipmentStatus is NOT 'on_hold'
-    const shippableShipments = allShipments.filter(shipment => {
-      const hasTag = hasMoveOverTag.get(shipment.id) === true;
-      const notOnHold = shipment.shipmentStatus !== 'on_hold';
-      return hasTag && notOnHold;
-    });
-    
-    if (shippableShipments.length === 0) {
+    // Log based on reason
+    if (result.reason === 'none') {
       log(`No shippable shipments for order ${orderNumber} (${allShipments.length} total, none with MOVE OVER tag and not on_hold)`);
-      return null;
+    } else if (result.reason === 'multiple') {
+      log(`Multiple shippable shipments for order ${orderNumber} (${result.shippableShipments.length} found)`);
+    } else {
+      log(`Single shippable shipment for order ${orderNumber}: ${result.defaultShipmentId}`);
     }
     
-    if (shippableShipments.length > 1) {
-      log(`Multiple shippable shipments for order ${orderNumber} (${shippableShipments.length} found), skipping cache warming`);
-      return null;
-    }
-    
-    // Exactly 1 shippable shipment
-    return shippableShipments[0];
+    return result;
   } catch (err: any) {
-    error(`Failed to get shippable shipment for order ${orderNumber}: ${err.message}`);
+    error(`Failed to get shippable shipments for order ${orderNumber}: ${err.message}`);
     return null;
   }
 }
 
 /**
+ * Helper to serialize a shipment for cache storage
+ */
+function serializeShipmentForCache(shipment: Shipment) {
+  return {
+    id: shipment.id,
+    orderNumber: shipment.orderNumber,
+    orderId: shipment.orderId,
+    carrierCode: shipment.carrierCode,
+    serviceCode: shipment.serviceCode,
+    shipmentStatus: shipment.shipmentStatus,
+    shipToName: shipment.shipToName,
+    shipToCompany: shipment.shipToCompany,
+    shipToAddressLine1: shipment.shipToAddressLine1,
+    shipToAddressLine2: shipment.shipToAddressLine2,
+    shipToCity: shipment.shipToCity,
+    shipToState: shipment.shipToState,
+    shipToPostalCode: shipment.shipToPostalCode,
+    shipToCountry: shipment.shipToCountry,
+    shipToPhone: shipment.shipToPhone,
+    totalWeight: shipment.totalWeight,
+    shipDate: shipment.shipDate,
+    trackingNumber: shipment.trackingNumber,
+    shipmentId: shipment.shipmentId,
+    sessionStatus: shipment.sessionStatus,
+    cacheWarmedAt: shipment.cacheWarmedAt,
+  };
+}
+
+/**
  * Warm the cache for a single order by fetching QCSale data from SkuVault
  * Uses extended TTL for pre-warmed entries
+ * 
+ * NEW: Supports multiple shippable shipments - stores array in cache for UI selection
  */
 export async function warmCacheForOrder(orderNumber: string, force: boolean = false): Promise<boolean> {
   try {
@@ -264,16 +282,17 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       }
     }
     
-    // First, find the single shippable shipment (has MOVE OVER tag, not on_hold)
-    const shipment = await getShippableShipment(orderNumber);
+    // Get all shippable shipments using centralized eligibility logic
+    const shipmentsResult = await getShippableShipmentsForOrder(orderNumber);
     
-    if (!shipment) {
-      // getShippableShipment already logs the reason (0 found, or multiple found)
+    if (!shipmentsResult || shipmentsResult.reason === 'none') {
+      // No shippable shipments found - don't cache
       return false;
     }
     
     // Now fetch QCSale data from SkuVault
-    log(`Warming cache for order ${orderNumber} (shipment ${shipment.id})${force ? ' (forced refresh)' : ''}...`);
+    const shipmentCount = shipmentsResult.shippableShipments.length;
+    log(`Warming cache for order ${orderNumber} (${shipmentCount} shippable shipment${shipmentCount > 1 ? 's' : ''})${force ? ' (forced refresh)' : ''}...`);
     
     const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
     
@@ -284,6 +303,16 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     
     // Build cache data with lookup map AND shipment data
     const lookupMap = buildLookupMap(qcSale);
+    
+    // Serialize all shippable shipments for cache
+    const shippableShipmentsData = shipmentsResult.shippableShipments.map(serializeShipmentForCache);
+    
+    // For backward compatibility, keep 'shipment' as the default (first/only shippable)
+    // Add new fields for multiple shipment support
+    const defaultShipment = shipmentsResult.shippableShipments.length > 0 
+      ? shipmentsResult.shippableShipments[0] 
+      : null;
+    
     const cacheData = {
       saleId: qcSale.SaleId || '',
       orderNumber,
@@ -299,47 +328,32 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         PassedItems: qcSale.PassedItems,
         Items: qcSale.Items,
       },
-      // Store shipment data to eliminate PostgreSQL query during order load
-      shipment: shipment ? {
-        id: shipment.id,
-        orderNumber: shipment.orderNumber,
-        orderId: shipment.orderId,
-        carrierCode: shipment.carrierCode,
-        serviceCode: shipment.serviceCode,
-        shipmentStatus: shipment.shipmentStatus,
-        // Recipient address (ship_to fields)
-        shipToName: shipment.shipToName,
-        shipToCompany: shipment.shipToCompany,
-        shipToAddressLine1: shipment.shipToAddressLine1,
-        shipToAddressLine2: shipment.shipToAddressLine2,
-        shipToCity: shipment.shipToCity,
-        shipToState: shipment.shipToState,
-        shipToPostalCode: shipment.shipToPostalCode,
-        shipToCountry: shipment.shipToCountry,
-        shipToPhone: shipment.shipToPhone,
-        totalWeight: shipment.totalWeight,
-        shipDate: shipment.shipDate,
-        trackingNumber: shipment.trackingNumber,
-        shipmentId: shipment.shipmentId,
-        sessionStatus: shipment.sessionStatus,
-        cacheWarmedAt: shipment.cacheWarmedAt,
-      } : null,
+      // BACKWARD COMPAT: Single shipment field (first shippable or null)
+      shipment: defaultShipment ? serializeShipmentForCache(defaultShipment) : null,
+      // NEW: Array of all shippable shipments for UI selection
+      shippableShipments: shippableShipmentsData,
+      // NEW: Default shipment ID (auto-set when exactly 1 shippable)
+      defaultShipmentId: shipmentsResult.defaultShipmentId,
+      // NEW: Reason for the result (single/multiple/none)
+      shippableReason: shipmentsResult.reason,
     };
     
     // Store with extended TTL
     await redis.set(warmKey, JSON.stringify(cacheData), { ex: WARM_TTL_SECONDS });
     
-    // Update the specific shipment record with cache_warmed_at timestamp for visibility
-    try {
-      await db.update(shipments)
-        .set({ cacheWarmedAt: new Date() })
-        .where(eq(shipments.id, shipment.id));
-    } catch (dbErr: any) {
-      // Non-critical - don't fail warming if DB update fails
-      error(`Failed to update cacheWarmedAt for shipment ${shipment.id}: ${dbErr.message}`);
+    // Update cacheWarmedAt timestamp for all shippable shipments
+    for (const shipment of shipmentsResult.shippableShipments) {
+      try {
+        await db.update(shipments)
+          .set({ cacheWarmedAt: new Date() })
+          .where(eq(shipments.id, shipment.id));
+      } catch (dbErr: any) {
+        // Non-critical - don't fail warming if DB update fails
+        error(`Failed to update cacheWarmedAt for shipment ${shipment.id}: ${dbErr.message}`);
+      }
     }
     
-    log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries + shipment data (${WARM_TTL_SECONDS}s TTL)`);
+    log(`Cached order ${orderNumber} with ${Object.keys(lookupMap).length} barcode/SKU entries + ${shipmentCount} shippable shipment(s) (${WARM_TTL_SECONDS}s TTL)`);
     
     if (force) {
       metrics.manualRefreshes++;
