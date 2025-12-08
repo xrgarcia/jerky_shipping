@@ -47,6 +47,8 @@ import {
   WifiOff,
   RotateCcw,
   LogOut,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 import { ShipmentChoiceDialog, type ShippableShipmentOption } from "@/components/shipment-choice-dialog";
@@ -275,6 +277,12 @@ type LabelError = {
 export default function Packing() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: "Copied", description: text, duration: 1500 });
+    });
+  }, [toast]);
   const orderInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const completeButtonRef = useRef<HTMLButtonElement>(null); // Ref for Complete Boxing button
@@ -2701,6 +2709,19 @@ export default function Packing() {
                 >
                   {clearHistoryMutation.isPending ? "Clearing..." : "Clear History"}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `https://ship11.shipstation.com/orders/all-orders-search-result?quickSearch=${encodeURIComponent(currentShipment.orderNumber)}`;
+                    window.open(url, '_blank');
+                  }}
+                  data-testid="button-view-shipstation"
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  View in ShipStation
+                </Button>
               </div>
             </div>
 
@@ -3089,6 +3110,16 @@ export default function Packing() {
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">Barcode:</span>
                                       <span className="font-mono select-all cursor-text" data-testid={`text-kit-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 p-0"
+                                        onClick={() => copyToClipboard(progress.skuvaultCode!)}
+                                        data-testid={`button-copy-kit-barcode-${progress.sku}`}
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
                                     </div>
                                   )}
                                 </div>
@@ -3192,6 +3223,16 @@ export default function Packing() {
                                                 <div className="flex items-center gap-1">
                                                   <span>Barcode:</span>
                                                   <span className="font-mono select-all cursor-text" data-testid={`text-comp-barcode-value-${comp.sku || comp.id}`}>{comp.code}</span>
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 p-0"
+                                                    onClick={() => copyToClipboard(comp.code!)}
+                                                    data-testid={`button-copy-comp-barcode-${comp.sku || comp.id}`}
+                                                  >
+                                                    <Copy className="h-2.5 w-2.5" />
+                                                  </Button>
                                                 </div>
                                               )}
                                             </div>
@@ -3289,6 +3330,16 @@ export default function Packing() {
                                 <div className="flex items-center gap-1">
                                   <span className="text-xs">Barcode:</span>
                                   <span className="font-mono select-all cursor-text" data-testid={`text-barcode-value-${progress.sku}`}>{progress.skuvaultCode}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 p-0"
+                                    onClick={() => copyToClipboard(progress.skuvaultCode!)}
+                                    data-testid={`button-copy-barcode-${progress.sku}`}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               )}
                             </div>
