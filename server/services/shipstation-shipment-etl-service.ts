@@ -32,14 +32,50 @@ export class ShipStationShipmentETLService {
       throw new Error('Shipment data missing shipment_id field');
     }
     
-    // Check if shipment already exists by ShipStation shipment ID
-    let existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
+    // Extract tracking number and order number for lookups
+    const trackingNumber = this.extractTrackingNumber(shipmentData);
+    const orderNumber = this.extractOrderNumber(shipmentData);
+    
+    // SMART LOOKUP: Orders can have multiple shipments, so we must be careful about matching
+    // Priority 1: If incoming shipment has a tracking number, find by tracking number first
+    //             (tracking numbers are unique across all shipments in our schema)
+    // Priority 2: Fall back to ShipStation shipment ID
+    // Priority 3: Fall back to session-derived shipment by order number
+    let existing: Awaited<ReturnType<typeof this.storage.getShipmentByShipmentId>> = undefined;
+    
+    // Priority 1: Lookup by tracking number (most reliable for updates)
+    // SAFETY: Only use tracking match if shipmentId matches OR is null (session-derived placeholder)
+    // This prevents overwriting a different historical shipment that happens to share the tracking number
+    if (trackingNumber) {
+      const trackingMatch = await this.storage.getShipmentByTrackingNumber(trackingNumber);
+      if (trackingMatch) {
+        const matchingShipmentId = trackingMatch.shipmentId;
+        // Accept the match if:
+        // 1. The existing shipment has no shipmentId (session-derived placeholder waiting for ShipStation data)
+        // 2. The existing shipment has the same ShipStation shipmentId as the incoming data
+        if (!matchingShipmentId || matchingShipmentId === String(shipmentId)) {
+          existing = trackingMatch;
+          console.log(`[ETL] Found existing shipment ${existing.id} by tracking number ${trackingNumber} (shipmentId: ${matchingShipmentId || 'null'})`);
+        } else {
+          // Different shipmentIds with same tracking - likely label re-generation scenario
+          // Fall through to shipmentId lookup to find the correct record
+          console.log(`[ETL] Tracking match ${trackingMatch.id} has different shipmentId (${matchingShipmentId} vs ${shipmentId}), continuing to shipmentId lookup`);
+        }
+      }
+    }
+    
+    // Priority 2: If not found by tracking, try ShipStation shipment ID
+    if (!existing) {
+      existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
+      if (existing) {
+        console.log(`[ETL] Found existing shipment ${existing.id} by ShipStation ID ${shipmentId}`);
+      }
+    }
     
     // If no orderId provided, try to link to existing order using order number
     let resolvedOrderId = orderId;
-    const orderNumber = this.extractOrderNumber(shipmentData);
     
-    // FALLBACK: If not found by shipmentId, try to find by orderNumber
+    // Priority 3 (FALLBACK): If not found by shipmentId, try to find by orderNumber
     // This handles shipments created by SkuVault session sync (which have no shipmentId yet)
     // We look for a session-derived shipment: no tracking, no shipmentId, and session is closed (ready to pack)
     if (!existing && orderNumber) {

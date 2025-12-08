@@ -1,0 +1,371 @@
+SHIPMENT SYNC FAILURE ANALYSIS
+=====================================
+
+Order Number: unknown
+Failure ID: 1508e8f9-d7f6-4873-9f5a-fa2d53f966e1
+Failed At: 12/8/2025, 9:16:37 AM
+Created At: 12/8/2025, 9:16:37 AM
+Retry Count: 3
+Reason: unified_sync
+
+Error Message:
+duplicate key value violates unique constraint "shipments_tracking_number_idx"
+
+Request Data:
+{
+  "tags": [
+    {
+      "name": "All Orders",
+      "color": null,
+      "tag_id": 0
+    },
+    {
+      "name": "MOVE OVER",
+      "color": null,
+      "tag_id": 0
+    },
+    {
+      "name": "TikTok Order",
+      "color": null,
+      "tag_id": 0
+    }
+  ],
+  "zone": 8,
+  "items": [
+    {
+      "sku": "JCB-GFT-EJSGB",
+      "upc": "811007029150",
+      "asin": null,
+      "name": "Exotic Jerky Snacks Gift Box",
+      "weight": {
+        "unit": "ounce",
+        "value": 16
+      },
+      "item_id": "1656891195",
+      "options": [
+        {
+          "name": "External SKU ID",
+          "value": "1729953478693130896"
+        }
+      ],
+      "quantity": 2,
+      "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/files/Product_Images_-_1080_X_1080_16.png?v=1748012787",
+      "bundle_sku": null,
+      "product_id": "3604403",
+      "tax_amount": 0,
+      "unit_price": 39.99,
+      "sales_order_id": null,
+      "fullfilment_sku": null,
+      "shipping_amount": 0,
+      "allocation_status": null,
+      "external_order_id": null,
+      "order_source_code": null,
+      "inventory_location": null,
+      "sales_order_item_id": null,
+      "external_order_item_id": "16625832263994"
+    },
+    {
+      "sku": "",
+      "upc": null,
+      "asin": null,
+      "name": "TikTok Shop Discount (Only Seller Discount)",
+      "weight": {
+        "unit": "ounce",
+        "value": 0
+      },
+      "item_id": "1656891196",
+      "options": [],
+      "quantity": 1,
+      "image_url": null,
+      "bundle_sku": null,
+      "product_id": null,
+      "tax_amount": null,
+      "unit_price": -10,
+      "sales_order_id": null,
+      "fullfilment_sku": null,
+      "shipping_amount": null,
+      "allocation_status": null,
+      "external_order_id": null,
+      "order_source_code": null,
+      "inventory_location": null,
+      "sales_order_item_id": null,
+      "external_order_item_id": "TikTok Shop Discount (Only Seller Discount)"
+    }
+  ],
+  "labels": [
+    {
+      "status": "completed",
+      "voided": false,
+      "ship_to": {
+        "name": "Angela Grooms",
+        "email": "v4bdlxwge4yger5ag7pmabglqdr24@scs.tiktokw.us",
+        "phone": "+13379655296",
+        "geolocation": [],
+        "postal_code": "99645-1850",
+        "company_name": null,
+        "country_code": "US",
+        "instructions": null,
+        "address_line1": "10575 E MYSTICAL VIEW CIR",
+        "address_line2": "",
+        "address_line3": null,
+        "city_locality": "PALMER",
+        "state_province": "AK",
+        "address_residential_indicator": "yes"
+      },
+      "batch_id": "se-303109575",
+      "label_id": "se-596804423",
+      "packages": [
+        {
+          "weight": {
+            "unit": "ounce",
+            "value": 32
+          },
+          "sequence": 1,
+          "dimensions": {
+            "unit": "inch",
+            "width": 12,
+            "height": 8,
+            "length": 12
+          },
+          "package_id": 395484648,
+          "package_code": "package",
+          "insured_value": {
+            "amount": 0,
+            "currency": "usd"
+          },
+          "label_download": {
+            "pdf": "https://api.shipstation.com/v2/downloads/11/WAMBqldjU0GcE_0loBUr3w/labelpackage-395484648.pdf",
+            "png": "https://api.shipstation.com/v2/downloads/11/WAMBqldjU0GcE_0loBUr3w/labelpackage-395484648.png",
+            "zpl": "https://api.shipstation.com/v2/downloads/11/WAMBqldjU0GcE_0loBUr3w/labelpackage-395484648.zpl"
+          },
+          "label_messages": {
+            "reference1": null,
+            "reference2": null,
+            "reference3": null
+          },
+          "tracking_number": "9434650105501086812534",
+          "qr_code_download": null,
+          "has_form_documents": false,
+          "paperless_download": null,
+          "content_description": null,
+          "external_package_id": null,
+          "has_label_documents": false,
+          "has_qr_code_documents": false,
+          "alternative_identifiers": [],
+          "has_paperless_label_documents": false
+        }
+      ],
+      "ship_date": "2025-11-28T08:00:00Z",
+      "trackable": true,
+      "voided_at": null,
+      "carrier_id": "se-118080",
+      "created_at": "2025-11-28T15:23:31.323Z",
+      "rma_number": null,
+      "shipment_id": "se-926820567",
+      "carrier_code": "usps",
+      "charge_event": "carrier_default",
+      "confirmation": "none",
+      "label_format": "pdf",
+      "label_layout": "4x6",
+      "package_code": "package",
+      "rate_details": [],
+      "service_code": "usps_ground_advantage",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9434650105501086812534",
+      "form_download": null,
+      "shipment_cost": {
+        "amount": 11.85,
+        "currency": "usd"
+      },
+      "carrier_weight": null,
+      "display_scheme": "label",
+      "insurance_cost": {
+        "amount": 0,
+        "currency": "usd"
+      },
+      "label_download": {
+        "pdf": "https://api.shipstation.com/v2/downloads/11/ecEmOdg5Fk-eueKjpNz4Ew/label-596804423.pdf",
+        "png": "https://api.shipstation.com/v2/downloads/11/ecEmOdg5Fk-eueKjpNz4Ew/label-596804423.png",
+        "zpl": "https://api.shipstation.com/v2/downloads/11/ecEmOdg5Fk-eueKjpNz4Ew/label-596804423.zpl",
+        "href": "https://api.shipstation.com/v2/downloads/11/ecEmOdg5Fk-eueKjpNz4Ew/label-596804423.pdf"
+      },
+      "label_image_id": null,
+      "insurance_claim": null,
+      "is_return_label": false,
+      "tracking_number": "9434650105501086812534",
+      "tracking_status": "in_transit",
+      "is_international": false,
+      "qr_code_download": null,
+      "shipping_rule_id": null,
+      "external_order_id": null,
+      "paperless_download": null,
+      "external_shipment_id": "6868390445370-7857377247546",
+      "alternative_identifiers": [],
+      "requested_comparison_amount": {
+        "amount": 0,
+        "currency": "usd"
+      }
+    }
+  ],
+  "customs": null,
+  "is_gift": false,
+  "ship_to": {
+    "name": "Angela Grooms",
+    "email": "v4bdlxwge4yger5ag7pmabglqdr24@scs.tiktokw.us",
+    "phone": "+13379655296",
+    "geolocation": null,
+    "postal_code": "99645-1850",
+    "company_name": null,
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "10575 E MYSTICAL VIEW CIR",
+    "address_line2": "",
+    "address_line3": null,
+    "city_locality": "PALMER",
+    "state_province": "AK",
+    "address_residential_indicator": "yes"
+  },
+  "packages": [
+    {
+      "weight": {
+        "unit": "ounce",
+        "value": 32
+      },
+      "products": null,
+      "dimensions": {
+        "unit": "inch",
+        "width": 12,
+        "height": 8,
+        "length": 12
+      },
+      "package_id": "se-153789",
+      "package_code": "package",
+      "package_name": "Box #1 (12 x 12 x 8)",
+      "insured_value": {
+        "amount": 0,
+        "currency": "usd"
+      },
+      "label_messages": {
+        "reference1": null,
+        "reference2": null,
+        "reference3": null
+      },
+      "content_description": null,
+      "external_package_id": null,
+      "shipment_package_id": "se-1185249128",
+      "dangerous_goods_package_info": null
+    }
+  ],
+  "store_id": "se-138162",
+  "tax_paid": {
+    "amount": 0,
+    "currency": "usd"
+  },
+  "is_return": false,
+  "return_to": {
+    "name": "JERKY. COM",
+    "email": "talktous@jerky.com",
+    "phone": "8779753759",
+    "postal_code": "73108",
+    "company_name": "Over 100 Kinds of Jerky",
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "4132 Will Rogers Pkwy  ",
+    "address_line2": "Suite #1000",
+    "address_line3": "",
+    "city_locality": "Oklahoma City",
+    "state_province": "OK",
+    "address_residential_indicator": "no"
+  },
+  "ship_date": "2025-11-28T00:00:00Z",
+  "ship_from": {
+    "name": "JERKY. COM",
+    "email": "talktous@jerky.com",
+    "phone": "8779753759",
+    "postal_code": "73108",
+    "company_name": "Over 100 Kinds of Jerky",
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "4132 Will Rogers Pkwy  ",
+    "address_line2": "Suite #1000",
+    "address_line3": "",
+    "city_locality": "Oklahoma City",
+    "state_province": "OK",
+    "address_residential_indicator": "no"
+  },
+  "carrier_id": "se-118080",
+  "created_at": "2025-11-27T08:45:42.38Z",
+  "amount_paid": {
+    "amount": 80.43,
+    "currency": "usd"
+  },
+  "modified_at": "2025-12-06T16:33:55.56Z",
+  "retail_rate": null,
+  "sender_info": null,
+  "shipment_id": "se-926820567",
+  "confirmation": "none",
+  "service_code": "usps_ground_advantage",
+  "ship_by_date": null,
+  "total_weight": {
+    "unit": "ounce",
+    "value": 32
+  },
+  "warehouse_id": "se-228129",
+  "assigned_user": null,
+  "shipping_paid": {
+    "amount": 10.45,
+    "currency": "usd"
+  },
+  "notes_for_gift": null,
+  "hold_until_date": null,
+  "shipment_number": "JK3825347356",
+  "shipment_status": "label_purchased",
+  "tracking_number": "9434650105501086812534",
+  "advanced_options": {
+    "dry_ice": false,
+    "bill_to_name": null,
+    "bill_to_party": null,
+    "custom_field1": "none",
+    "custom_field2": "1, 13584  #9",
+    "custom_field3": "577198431026910049, TikTok Shop",
+    "fedex_freight": null,
+    "freight_class": null,
+    "dry_ice_weight": null,
+    "non_machinable": false,
+    "bill_to_account": null,
+    "import_services": false,
+    "contains_alcohol": false,
+    "limited_quantity": false,
+    "override_holiday": false,
+    "saturday_delivery": false,
+    "event_notification": false,
+    "additional_handling": false,
+    "bill_to_postal_code": null,
+    "collect_on_delivery": null,
+    "delivered_duty_paid": false,
+    "own_document_upload": false,
+    "bill_to_country_code": null,
+    "bill_to_address_line1": null,
+    "third_party_consignee": false,
+    "return_pickup_attempts": null,
+    "guaranteed_duties_and_taxes": false,
+    "ancillary_endorsements_option": null
+  },
+  "notes_from_buyer": "Sales Channel: TikTok Shop - JerkyDotCom<br/>TikTok Order Number: 577198431026910049<br/>Seller Discount on Items: USD 10.00",
+  "shipping_rule_id": null,
+  "external_order_id": null,
+  "order_source_code": null,
+  "insurance_provider": "none",
+  "comparison_rate_type": null,
+  "external_shipment_id": "6868390445370-7857377247546",
+  "requested_shipment_service": null,
+  "dangerous_goods_declaration": null
+}
+
+Response Data:
+null
+
+=====================================
+Please analyze this failure and help me understand:
+1. What caused this shipment sync to fail?
+2. Is this a data issue, API issue, or integration issue?
+3. What steps should I take to fix it?
