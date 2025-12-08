@@ -302,6 +302,12 @@ export default function Packing() {
   const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
   const [alreadyPackedShipment, setAlreadyPackedShipment] = useState<ShipmentWithItems | null>(null);
 
+  // Concurrency protection: Local processing flags set IMMEDIATELY on interaction
+  // These prevent double-clicks/scans before React Query's isPending can update
+  const [isOrderScanProcessing, setIsOrderScanProcessing] = useState(false);
+  const [isProductScanProcessing, setIsProductScanProcessing] = useState(false);
+  const [isCompletingPacking, setIsCompletingPacking] = useState(false);
+
   // Fetch current user's station session
   const { data: stationSessionData, isLoading: isLoadingSession } = useQuery<{ session: StationSession | null }>({
     queryKey: ['/api/packing/station-session'],
@@ -1199,6 +1205,10 @@ export default function Packing() {
       setOrderScan("");
       setTimeout(() => orderInputRef.current?.focus(), 100);
     },
+    onSettled: () => {
+      // Always clear processing flag when mutation completes (success or error)
+      setIsOrderScanProcessing(false);
+    },
   });
 
   // Clear packing history (for testing/re-scanning)
@@ -1765,6 +1775,10 @@ export default function Packing() {
       setProductScan("");
       setTimeout(() => productInputRef.current?.focus(), 0);
     },
+    onSettled: () => {
+      // Always clear processing flag when mutation completes (success or error)
+      setIsProductScanProcessing(false);
+    },
   });
 
   // Create packing log entry
@@ -1891,6 +1905,10 @@ export default function Packing() {
         });
       }
     },
+    onSettled: () => {
+      // Always clear processing flag when mutation completes (success or error)
+      setIsCompletingPacking(false);
+    },
   });
 
   const handleOrderScan = (e: React.FormEvent) => {
@@ -1900,7 +1918,13 @@ export default function Packing() {
       setShowStationModal(true);
       return;
     }
+    // Guard: prevent double-submission if already processing
+    if (isOrderScanProcessing || loadShipmentMutation.isPending) {
+      return;
+    }
     if (orderScan.trim()) {
+      // Set processing flag IMMEDIATELY to prevent double-clicks
+      setIsOrderScanProcessing(true);
       // Log order scan event
       logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
       loadShipmentMutation.mutate(orderScan.trim());
@@ -1914,7 +1938,13 @@ export default function Packing() {
       setShowStationModal(true);
       return;
     }
+    // Guard: prevent double-submission if already processing
+    if (isProductScanProcessing || validateProductMutation.isPending) {
+      return;
+    }
     if (productScan.trim() && currentShipment) {
+      // Set processing flag IMMEDIATELY to prevent double-scans
+      setIsProductScanProcessing(true);
       validateProductMutation.mutate(productScan.trim());
     }
   };
@@ -1925,6 +1955,12 @@ export default function Packing() {
       setShowStationModal(true);
       return;
     }
+    // Guard: prevent double-submission if already processing
+    if (isCompletingPacking || completePackingMutation.isPending) {
+      return;
+    }
+    // Set processing flag IMMEDIATELY to prevent double-clicks
+    setIsCompletingPacking(true);
     completePackingMutation.mutate();
   };
 
@@ -2374,11 +2410,11 @@ export default function Packing() {
                     placeholder={hasCriticalPrintQueue ? "Resolve print queue first..." : "Scan order number..."}
                     value={orderScan}
                     onChange={(e) => setOrderScan(e.target.value)}
-                    disabled={loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue}
+                    disabled={isOrderScanProcessing || loadShipmentMutation.isPending || !hasValidSession || hasCriticalPrintQueue}
                     className="text-2xl h-16 text-center font-mono"
                     data-testid="input-order-scan"
                   />
-                  {loadShipmentMutation.isPending && (
+                  {(isOrderScanProcessing || loadShipmentMutation.isPending) && (
                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin" />
                       <span className="text-sm">Loading order...</span>
@@ -2743,7 +2779,7 @@ export default function Packing() {
               {!allItemsScanned && (
                 <div
                   className={`rounded-lg border-4 transition-all ${
-                    validateProductMutation.isPending
+                    isProductScanProcessing || validateProductMutation.isPending
                       ? "border-primary bg-primary/5 animate-pulse-border"
                       : scanFeedback
                       ? scanFeedback.type === "success"
@@ -2764,7 +2800,7 @@ export default function Packing() {
                       value={productScan}
                       onChange={(e) => setProductScan(e.target.value)}
                       onFocus={handleFirstInteraction}
-                      disabled={validateProductMutation.isPending}
+                      disabled={isProductScanProcessing || validateProductMutation.isPending}
                       className="text-2xl h-16 text-center font-mono"
                       data-testid="input-product-scan"
                     />
@@ -2776,7 +2812,7 @@ export default function Packing() {
                     onClick={() => productInputRef.current?.focus()}
                     data-testid="feedback-area"
                   >
-                    {validateProductMutation.isPending ? (
+                    {isProductScanProcessing || validateProductMutation.isPending ? (
                       // VALIDATING STATE - Large spinner + explicit status message
                       <div className="flex flex-col items-center gap-3 w-full">
                         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -3373,6 +3409,7 @@ export default function Packing() {
                 onClick={handleCompletePacking}
                 disabled={
                   !allItemsScanned || 
+                  isCompletingPacking ||
                   completePackingMutation.isPending || 
                   (currentShipment?.notShippable ? false : (hasPendingPrintJob || !isPrinterReady))
                 }
@@ -3380,7 +3417,7 @@ export default function Packing() {
                 size="lg"
                 data-testid="button-complete-packing"
               >
-                {completePackingMutation.isPending ? (
+                {isCompletingPacking || completePackingMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Completing...
@@ -3546,16 +3583,19 @@ export default function Packing() {
                     {canRetry && (
                       <Button
                         onClick={() => {
+                          // Guard: prevent double-submission
+                          if (isCompletingPacking || completePackingMutation.isPending) return;
+                          setIsCompletingPacking(true);
                           setLabelError(null);
                           // Revalidate printer status before retrying
                           queryClient.invalidateQueries({ queryKey: ['/api/stations'] });
                           completePackingMutation.mutate();
                         }}
-                        disabled={completePackingMutation.isPending}
+                        disabled={isCompletingPacking || completePackingMutation.isPending}
                         size="sm"
                         data-testid="button-retry-label"
                       >
-                        {completePackingMutation.isPending ? (
+                        {isCompletingPacking || completePackingMutation.isPending ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             Retrying...
