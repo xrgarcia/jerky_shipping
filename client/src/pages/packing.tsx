@@ -2224,6 +2224,35 @@ export default function Packing() {
             <p className="text-sm text-center text-muted-foreground">
               Do you want to reprint the shipping label?
             </p>
+            
+            {/* Centered Re-print button */}
+            <div className="flex justify-center">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (alreadyPackedShipment) {
+                    reprintLabelMutation.mutate({
+                      shipmentId: alreadyPackedShipment.id,
+                      orderNumber: alreadyPackedShipment.orderNumber,
+                    });
+                  }
+                }}
+                disabled={reprintLabelMutation.isPending}
+                data-testid="button-reprint-label"
+              >
+                {reprintLabelMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Reprinting...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Re-print Label
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
           
           <DialogFooter className="flex gap-2 sm:justify-center">
@@ -2236,30 +2265,22 @@ export default function Packing() {
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={() => {
                 if (alreadyPackedShipment) {
-                  reprintLabelMutation.mutate({
-                    shipmentId: alreadyPackedShipment.id,
-                    orderNumber: alreadyPackedShipment.orderNumber,
-                  });
+                  console.log(`[Packing] Proceeding to QC for already-packed order ${alreadyPackedShipment.orderNumber}`);
+                  setCurrentShipment(alreadyPackedShipment);
+                  setShowAlreadyPackedDialog(false);
+                  setAlreadyPackedShipment(null);
+                  setPackingComplete(false);
+                  setLabelError(null);
+                  setCompletionSuccess(null);
                 }
               }}
-              disabled={reprintLabelMutation.isPending}
               className="flex-1"
-              data-testid="button-reprint-label"
+              data-testid="button-proceed-to-qc"
             >
-              {reprintLabelMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Reprinting...
-                </>
-              ) : (
-                <>
-                  <Printer className="h-4 w-4 mr-2" />
-                  Re-print Order
-                </>
-              )}
+              Proceed to QC
             </Button>
           </DialogFooter>
         </DialogContent>
