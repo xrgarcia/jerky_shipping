@@ -1220,6 +1220,7 @@ export default function Packing() {
         skuvaultSaleId: shipment.saleId,
         hasSkuvaultData: !!shipment.qcSale,
         skuvaultPassedItems: shipment.qcSale?.PassedItems?.length ?? 0,
+        station: "boxing",
       }, shipment.orderNumber);
       
       // Focus product input after loading shipment
@@ -1425,6 +1426,7 @@ export default function Packing() {
         logShipmentEvent("product_scan_failed", {
           scannedCode,
           errorMessage: data.error || "Product not found",
+          station: "boxing",
         });
 
         showScanFeedback(
@@ -1667,6 +1669,7 @@ export default function Packing() {
             sku: data.sku,
             errorMessage: qcResult.error || "SkuVault QC verification failed",
             skuVaultError: true,
+            station: "boxing",
           });
 
           showScanFeedback(
@@ -1700,6 +1703,7 @@ export default function Packing() {
           itemId: matchingItemKey,
           scannedCount: currentProgress.scanned + 1,
           expectedCount: currentProgress.expected,
+          station: "boxing",
           skuVaultVerified: true,
           isKitComponent: matchingComponentIndex !== null,
         });
@@ -1779,6 +1783,7 @@ export default function Packing() {
           sku: data.sku,
           errorMessage: qcError.message || "SkuVault QC request failed",
           networkError: true,
+          station: "boxing",
         });
 
         showScanFeedback(
@@ -1810,6 +1815,7 @@ export default function Packing() {
       logShipmentEvent("product_scan_failed", {
         scannedCode,
         errorMessage: error.message,
+        station: "boxing",
       });
 
       showScanFeedback(
@@ -1903,6 +1909,7 @@ export default function Packing() {
         totalScans,
         printQueued: result.printQueued,
         qcOnly: result.qcOnly || false,
+        station: "boxing",
       });
       
       // Show QC-only toast for non-shippable orders
@@ -1975,7 +1982,7 @@ export default function Packing() {
       // Set processing flag IMMEDIATELY to prevent double-clicks
       setIsOrderScanProcessing(true);
       // Log order scan event
-      logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
+      logShipmentEvent("order_scanned", { scannedValue: orderScan.trim(), station: "boxing" }, orderScan.trim());
       loadShipmentMutation.mutate({ orderNumber: orderScan.trim() });
     }
   };
@@ -2052,6 +2059,7 @@ export default function Packing() {
       sku: progress.sku,
       name: progress.name,
       quantity: progress.expected,
+      station: "boxing",
     });
 
     // Mark as verified (scanned)

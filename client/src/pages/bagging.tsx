@@ -1507,6 +1507,7 @@ export default function Bagging() {
         logShipmentEvent("product_scan_failed", {
           scannedCode,
           errorMessage: data.error || "Product not found",
+          station: "bagging",
         });
 
         showScanFeedback(
@@ -1749,6 +1750,7 @@ export default function Bagging() {
             sku: data.sku,
             errorMessage: qcResult.error || "SkuVault QC verification failed",
             skuVaultError: true,
+            station: "bagging",
           });
 
           showScanFeedback(
@@ -1782,6 +1784,7 @@ export default function Bagging() {
           itemId: matchingItemKey,
           scannedCount: currentProgress.scanned + 1,
           expectedCount: currentProgress.expected,
+          station: "bagging",
           skuVaultVerified: true,
           isKitComponent: matchingComponentIndex !== null,
         });
@@ -1861,6 +1864,7 @@ export default function Bagging() {
           sku: data.sku,
           errorMessage: qcError.message || "SkuVault QC request failed",
           networkError: true,
+          station: "bagging",
         });
 
         showScanFeedback(
@@ -1892,6 +1896,7 @@ export default function Bagging() {
       logShipmentEvent("product_scan_failed", {
         scannedCode,
         errorMessage: error.message,
+        station: "bagging",
       });
 
       showScanFeedback(
@@ -2033,7 +2038,7 @@ export default function Bagging() {
       // Set processing flag IMMEDIATELY to prevent double-clicks
       setIsOrderScanProcessing(true);
       // Log order scan event
-      logShipmentEvent("order_scanned", { scannedValue: orderScan.trim() }, orderScan.trim());
+      logShipmentEvent("order_scanned", { scannedValue: orderScan.trim(), station: "bagging" }, orderScan.trim());
       loadShipmentMutation.mutate({ orderNumber: orderScan.trim() });
     }
   };
@@ -2110,6 +2115,7 @@ export default function Bagging() {
       sku: progress.sku,
       name: progress.name,
       quantity: progress.expected,
+      station: "bagging",
     });
 
     // Mark as verified (scanned)
