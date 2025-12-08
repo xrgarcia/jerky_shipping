@@ -3142,6 +3142,26 @@ export default function Bagging() {
                           )}
                         </div>
                       </div>
+
+                      {/* Shipment ID */}
+                      <div>
+                        <div className="text-xs text-muted-foreground font-semibold mb-2">Shipment ID</div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-sm select-all cursor-text" data-testid="text-shipment-id">
+                            {currentShipment.id}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 p-0"
+                            onClick={() => copyToClipboard(String(currentShipment.id))}
+                            data-testid="button-copy-shipment-id"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </AccordionContent>
