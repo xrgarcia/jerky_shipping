@@ -23,7 +23,8 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
+import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -4913,10 +4914,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Query params:
   //   - allowNotShippable: If "true", returns shipment with notShippable warning instead of 422 error
   //     This is used by boxing page which can load orders for QC even if not yet shippable
+  //   - shipmentId: If provided, explicitly select this shipment (for multiple shippable shipments scenario)
   app.get("/api/packing/validate-order/:orderNumber", requireAuth, async (req, res) => {
     try {
       const { orderNumber } = req.params;
       const allowNotShippable = req.query.allowNotShippable === 'true';
+      const explicitShipmentId = req.query.shipmentId as string | undefined;
       const user = req.user;
       
       if (!user) {
@@ -4937,55 +4940,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track shippability for response (used when allowNotShippable=true)
       let notShippable: { code: string; message: string; explanation: string; resolution: string } | null = null;
       
-      // 1. Get shipment data (prefer warm cache, fallback to PostgreSQL)
-      if (warmCacheData?.shipment) {
-        console.log(`[Packing Validation] WARM CACHE HIT for shipment: ${orderNumber} (cached at ${new Date(warmCacheData.warmedAt).toISOString()})`);
-        shipment = warmCacheData.shipment;
+      // NEW: Shippable shipments analysis result (for multiple shipment selection)
+      let shippableShipments: any[] = [];
+      let shippableReason: 'single' | 'multiple' | 'none' = 'none';
+      let defaultShipmentId: string | undefined;
+      
+      // 1. Get shipment data with MULTI-SHIPMENT SUPPORT
+      // Check warm cache first for shippable shipments array
+      if (warmCacheData?.shippableShipments && warmCacheData.shippableShipments.length > 0) {
+        console.log(`[Packing Validation] WARM CACHE HIT for shippable shipments: ${orderNumber} (${warmCacheData.shippableShipments.length} shippable, cached at ${new Date(warmCacheData.warmedAt).toISOString()})`);
+        shippableShipments = warmCacheData.shippableShipments;
+        shippableReason = warmCacheData.shippableReason || (shippableShipments.length === 1 ? 'single' : 'multiple');
+        defaultShipmentId = warmCacheData.defaultShipmentId;
         cacheSource = 'warm_cache';
-      } else {
-        console.log(`[Packing Validation] Cache miss for shipment, fetching from PostgreSQL: ${orderNumber}`);
-        const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
         
-        if (shipmentResults.length === 0) {
+        // Determine which shipment to load based on explicit selection or auto-select
+        if (explicitShipmentId) {
+          // User explicitly selected a shipment
+          shipment = shippableShipments.find((s: any) => s.id === explicitShipmentId);
+          if (!shipment) {
+            return res.status(404).json({ 
+              error: "Selected shipment not found",
+              orderNumber,
+              requestedShipmentId: explicitShipmentId
+            });
+          }
+          console.log(`[Packing Validation] Using explicitly selected shipment: ${explicitShipmentId}`);
+        } else if (shippableShipments.length === 1) {
+          // Auto-select single shippable shipment
+          shipment = shippableShipments[0];
+          console.log(`[Packing Validation] Auto-selecting single shippable shipment: ${shipment.id}`);
+        } else if (shippableShipments.length > 1) {
+          // MULTIPLE SHIPPABLE SHIPMENTS - Return early with selection options
+          console.log(`[Packing Validation] Multiple shippable shipments (${shippableShipments.length}) - returning selection options`);
+          return res.json({
+            requiresShipmentSelection: true,
+            orderNumber,
+            shippableShipments: shippableShipments.map((s: any) => ({
+              id: s.id,
+              shipmentId: s.shipmentId,
+              carrierCode: s.carrierCode,
+              serviceCode: s.serviceCode,
+              shipmentStatus: s.shipmentStatus,
+              shipToName: s.shipToName,
+              shipToCity: s.shipToCity,
+              shipToState: s.shipToState,
+              trackingNumber: s.trackingNumber,
+            })),
+            shippableCount: shippableShipments.length,
+            cacheSource,
+          });
+        }
+      } else {
+        // Fall back to database query with centralized eligibility analysis
+        console.log(`[Packing Validation] Cache miss for shippable shipments, fetching from PostgreSQL: ${orderNumber}`);
+        
+        const shipmentsResult = await getShippableShipmentsForOrder(orderNumber);
+        
+        if (!shipmentsResult || shipmentsResult.allShipments.length === 0) {
           return res.status(404).json({ 
             error: "Order not found",
             orderNumber 
           });
         }
         
-        if (shipmentResults.length > 1) {
-          console.warn(`[Packing Validation] Multiple shipments for order ${orderNumber}, using most recent (ID: ${shipmentResults[0].id})`);
-        }
+        shippableShipments = shipmentsResult.shippableShipments;
+        shippableReason = shipmentsResult.reason;
+        defaultShipmentId = shipmentsResult.defaultShipmentId;
         
-        shipment = shipmentResults[0];
+        // Determine which shipment to load
+        if (explicitShipmentId) {
+          shipment = shippableShipments.find((s: any) => s.id === explicitShipmentId);
+          if (!shipment) {
+            // Check if it exists but isn't shippable
+            const existingShipment = shipmentsResult.allShipments.find((s: any) => s.id === explicitShipmentId);
+            if (existingShipment) {
+              return res.status(422).json({
+                error: {
+                  code: 'SHIPMENT_NOT_SHIPPABLE',
+                  message: 'Selected shipment is not shippable',
+                  explanation: 'This shipment either doesn\'t have the "MOVE OVER" tag or is on hold.',
+                  resolution: 'Select a different shipment or wait for this one to become shippable.'
+                },
+                orderNumber,
+                requestedShipmentId: explicitShipmentId
+              });
+            }
+            return res.status(404).json({ 
+              error: "Selected shipment not found",
+              orderNumber,
+              requestedShipmentId: explicitShipmentId
+            });
+          }
+          console.log(`[Packing Validation] Using explicitly selected shipment: ${explicitShipmentId}`);
+        } else if (shippableShipments.length === 1) {
+          shipment = shippableShipments[0];
+          console.log(`[Packing Validation] Auto-selecting single shippable shipment: ${shipment.id}`);
+        } else if (shippableShipments.length > 1) {
+          // MULTIPLE SHIPPABLE SHIPMENTS - Return early with selection options
+          console.log(`[Packing Validation] Multiple shippable shipments (${shippableShipments.length}) - returning selection options`);
+          return res.json({
+            requiresShipmentSelection: true,
+            orderNumber,
+            shippableShipments: shippableShipments.map((s: any) => ({
+              id: s.id,
+              shipmentId: s.shipmentId,
+              carrierCode: s.carrierCode,
+              serviceCode: s.serviceCode,
+              shipmentStatus: s.shipmentStatus,
+              shipToName: s.shipToName,
+              shipToCity: s.shipToCity,
+              shipToState: s.shipToState,
+              trackingNumber: s.trackingNumber,
+            })),
+            shippableCount: shippableShipments.length,
+            cacheSource,
+          });
+        } else {
+          // NO shippable shipments - check allowNotShippable
+          if (allowNotShippable && shipmentsResult.allShipments.length > 0) {
+            // Use first shipment but mark as not shippable
+            shipment = shipmentsResult.allShipments[0];
+            notShippable = {
+              code: 'NOT_SHIPPABLE',
+              message: 'This order is not shippable',
+              explanation: 'The order does not have any shipments with the "MOVE OVER" tag that are not on hold.',
+              resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor.'
+            };
+            console.log(`[Packing Validation] No shippable shipments but allowNotShippable=true, using first shipment with warning`);
+          } else {
+            const firstShipment = shipmentsResult.allShipments[0];
+            return res.status(422).json({
+              error: {
+                code: 'NOT_SHIPPABLE',
+                message: 'This order is not shippable',
+                explanation: 'No shipments have the "MOVE OVER" tag or all are on hold.',
+                resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor.'
+              },
+              orderNumber,
+              shipmentId: firstShipment?.id
+            });
+          }
+        }
       }
       
       // SHIPPABILITY CHECK: Verify order has "MOVE OVER" tag before allowing packing
-      // The MOVE OVER tag indicates the order has completed picking in SkuVault and is ready to ship
-      const shipmentTags = await storage.getShipmentTags(shipment.id);
-      const hasMoveOverTag = shipmentTags.some((tag: { name: string }) => tag.name === 'MOVE OVER');
-      
-      if (!hasMoveOverTag) {
-        console.log(`[Packing Validation] Order ${orderNumber} is not shippable - missing MOVE OVER tag`);
+      // Skip this check if we already selected from shippable shipments (they're pre-filtered)
+      // Only run if we got here via legacy path or allowNotShippable fallback
+      if (!shippableShipments.some((s: any) => s.id === shipment?.id) && shipment && !notShippable) {
+        const shipmentTagsData = await storage.getShipmentTags(shipment.id);
+        const hasMoveOverTag = shipmentTagsData.some((tag: { name: string }) => tag.name === 'MOVE OVER');
         
-        const notShippableError = {
-          code: 'NOT_SHIPPABLE',
-          message: 'This order is not shippable',
-          explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
-          resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
-        };
-        
-        // If allowNotShippable is true (boxing page), continue loading but include warning
-        // Otherwise (bagging page), return 422 error to block the scan
-        if (allowNotShippable) {
-          notShippable = notShippableError;
-          console.log(`[Packing Validation] allowNotShippable=true, continuing with warning for order ${orderNumber}`);
-        } else {
-          return res.status(422).json({
-            error: notShippableError,
-            orderNumber,
-            shipmentId: shipment.id
-          });
+        if (!hasMoveOverTag) {
+          console.log(`[Packing Validation] Order ${orderNumber} is not shippable - missing MOVE OVER tag`);
+          
+          const notShippableError = {
+            code: 'NOT_SHIPPABLE',
+            message: 'This order is not shippable',
+            explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
+            resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
+          };
+          
+          // If allowNotShippable is true (boxing page), continue loading but include warning
+          // Otherwise (bagging page), return 422 error to block the scan
+          if (allowNotShippable) {
+            notShippable = notShippableError;
+            console.log(`[Packing Validation] allowNotShippable=true, continuing with warning for order ${orderNumber}`);
+          } else {
+            return res.status(422).json({
+              error: notShippableError,
+              orderNumber,
+              shipmentId: shipment.id
+            });
+          }
         }
       }
       
@@ -5275,6 +5402,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
         notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
         alreadyPacked, // True if order has tracking number (label already purchased)
+        // NEW: Multi-shipment support fields
+        requiresShipmentSelection: false, // False when a shipment was successfully selected
+        shippableCount: shippableShipments.length, // How many shippable shipments exist for this order
+        selectedShipmentId: shipment.id, // Which shipment was loaded
+        shippableReason, // 'single' | 'multiple' | 'none' - why this shipment was selected
       });
     } catch (error: any) {
       console.error("[Packing Validation] Error validating order:", error);
