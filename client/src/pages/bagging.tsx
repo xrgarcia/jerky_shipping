@@ -2857,8 +2857,20 @@ export default function Bagging() {
               <div className="flex items-center gap-4 flex-wrap">
                 <div>
                   <div className="text-xs text-muted-foreground font-semibold mb-1">Order</div>
-                  <div className="text-xl font-bold font-mono" data-testid="badge-order-number">
-                    {currentShipment.orderNumber}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold font-mono" data-testid="badge-order-number">
+                      {currentShipment.orderNumber}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 p-0"
+                      onClick={() => copyToClipboard(currentShipment.orderNumber)}
+                      data-testid="button-copy-order-number"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 <div className="h-12 w-[2px] bg-border" />
