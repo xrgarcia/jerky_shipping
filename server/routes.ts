@@ -6029,7 +6029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: expectedItem.Id,
           quantity: expectedItem.Quantity,
           passedStatus: expectedItem.PassedStatus,
-          frontendIsKitComponent: isKitComponent, // What frontend claimed
+          frontendIsKitComponent: cachedIsKitComponent, // What frontend claimed
           fallbackIsKitComponentMatch: isKitComponentMatch, // What fallback determined
           componentId: matchedKitComponent?.Id,
           componentSku: matchedKitComponent?.Sku,
@@ -6046,7 +6046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           idItem = matchedKitComponent.Id;
           kitId = expectedItem.Id || null; // Parent kit's SkuVault ID
           console.log(`[Packing QC] BRANCH: KIT_COMPONENT - componentId=${idItem}, parentKitId=${kitId}, componentSku=${matchedKitComponent.Sku}`);
-        } else if (isKitComponent) {
+        } else if (cachedIsKitComponent) {
           // BRANCH: KIT_MISMATCH - Frontend claimed kit component but:
           // a) KitProducts match failed (no matchedKitComponent), or
           // b) Legacy pattern matched parent kit only
