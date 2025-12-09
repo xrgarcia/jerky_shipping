@@ -306,13 +306,17 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     // Fetch QC Sale for each shippable shipment
     for (const shipment of shipmentsResult.shippableShipments) {
       try {
-        // Pass shipment ID to get the correct QC Sale for this specific shipment
-        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipment.id);
+        // IMPORTANT: Two different IDs are used here:
+        // - shipment.id: Our internal UUID, used as cache key
+        // - shipment.shipmentId: ShipStation ID (se-XXX format), used for SkuVault API lookup
+        // SkuVault uses the ShipStation ID suffix in their composite order IDs (e.g., "480797-ORDER-123-933001022")
+        const shipstationId = (shipment as any).shipmentId;
+        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipstationId);
         
         if (qcSale) {
           const lookupMap = buildLookupMap(qcSale);
           
-          // Store by shipment ID
+          // Store by INTERNAL shipment ID (matches cache lookup in routes.ts)
           qcSalesByShipment[shipment.id] = {
             SaleId: qcSale.SaleId,
             OrderId: qcSale.OrderId,
@@ -329,9 +333,9 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
             defaultLookupMap = lookupMap;
           }
           
-          log(`  Fetched QC Sale for shipment ${shipment.id} (${Object.keys(lookupMap).length} barcode entries)`);
+          log(`  Fetched QC Sale for shipment ${shipment.id} (shipstationId: ${shipstationId}, ${Object.keys(lookupMap).length} barcode entries)`);
         } else {
-          log(`  No QC Sale found for shipment ${shipment.id}`);
+          log(`  No QC Sale found for shipment ${shipment.id} (shipstationId: ${shipstationId})`);
         }
       } catch (err: any) {
         error(`  Failed to fetch QC Sale for shipment ${shipment.id}: ${err.message}`);
