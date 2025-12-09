@@ -5358,17 +5358,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const transformedItems: any[] = [];
         
         qcSale.Items.forEach((svItem, index) => {
-          // DEBUG: Log raw SkuVault item data to identify barcode field
-          console.log(`[Packing Validation] RAW svItem[${index}]:`, JSON.stringify({
-            Sku: svItem.Sku,
-            Code: svItem.Code,
-            PartNumber: svItem.PartNumber,
-            AlternateCodes: svItem.AlternateCodes,
-            AlternateSkus: svItem.AlternateSkus,
-            IsKit: svItem.IsKit,
-            Title: svItem.Title?.substring(0, 50),
-          }));
-          
           // Try to find matching ShipStation item for additional data (imageUrl, etc.)
           const matchingSSItem = shipmentItems.find(ssItem => 
             ssItem.sku && svItem.Sku && 
