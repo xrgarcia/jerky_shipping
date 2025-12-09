@@ -278,6 +278,8 @@ type ScanErrorShipment = {
   shipToName: string | null;
   shipToCity: string | null;
   shipToState: string | null;
+  trackingNumber?: string | null;
+  exclusionReason?: 'already_shipped' | 'on_hold' | 'eligible' | string;
   items: ScanErrorShipmentItem[];
 };
 
@@ -1334,9 +1336,9 @@ export default function Bagging() {
       setCurrentShipment(null);
       setOrderScan("");
       
-      // Check if this is a structured error (ALL_ON_HOLD, NOT_SHIPPABLE, etc.)
+      // Check if this is a structured error (NO_ELIGIBLE_SHIPMENTS, ALL_ON_HOLD, NOT_SHIPPABLE, etc.)
       const errorCode = error.data?.error?.code;
-      if (errorCode === 'ALL_ON_HOLD' || errorCode === 'NOT_SHIPPABLE' || errorCode === 'SHIPMENT_NOT_SHIPPABLE') {
+      if (errorCode === 'NO_ELIGIBLE_SHIPMENTS' || errorCode === 'ALL_ON_HOLD' || errorCode === 'NOT_SHIPPABLE' || errorCode === 'SHIPMENT_NOT_SHIPPABLE') {
         const structuredError = error.data.error;
         // Display as scan error (on scan page, not QC page)
         setScanError({
@@ -2838,8 +2840,8 @@ export default function Bagging() {
                   <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 space-y-2">
                     <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-lg">
-                      {scanError.code === 'ALL_ON_HOLD' 
-                        ? 'All Shipments On Hold' 
+                      {scanError.code === 'NO_ELIGIBLE_SHIPMENTS' || scanError.code === 'ALL_ON_HOLD'
+                        ? 'No Shipments Available' 
                         : scanError.message}
                     </h4>
                     
@@ -2880,11 +2882,40 @@ export default function Bagging() {
                               className="text-sm text-amber-800 dark:text-amber-200 hover:no-underline py-2"
                               data-testid={`accordion-trigger-shipment-${index}`}
                             >
-                              <div className="flex items-center gap-2 text-left">
+                              <div className="flex items-center gap-2 text-left flex-wrap">
                                 <Package className="h-4 w-4 flex-shrink-0" />
                                 <span className="font-medium">
                                   Shipment {index + 1}: {shipment.shipToName || 'Unknown'}
                                 </span>
+                                {shipment.exclusionReason && (
+                                  <Badge 
+                                    variant={shipment.exclusionReason === 'already_shipped' ? 'secondary' : 'outline'}
+                                    className={`text-xs ${
+                                      shipment.exclusionReason === 'already_shipped' 
+                                        ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' 
+                                        : shipment.exclusionReason === 'on_hold'
+                                          ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                                          : ''
+                                    }`}
+                                  >
+                                    {shipment.exclusionReason === 'already_shipped' ? 'Already Shipped' : 
+                                     shipment.exclusionReason === 'on_hold' ? 'On Hold' : 
+                                     shipment.exclusionReason}
+                                  </Badge>
+                                )}
+                                {shipment.trackingNumber && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-xs font-mono cursor-pointer hover-elevate"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyToClipboard(shipment.trackingNumber!);
+                                    }}
+                                  >
+                                    {shipment.trackingNumber}
+                                    <Copy className="h-3 w-3 ml-1" />
+                                  </Badge>
+                                )}
                                 {(shipment.shipToCity || shipment.shipToState) && (
                                   <span className="text-amber-600 dark:text-amber-400 text-xs">
                                     ({shipment.shipToCity || 'Unknown'}, {shipment.shipToState || 'Unknown'})
