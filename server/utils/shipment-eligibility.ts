@@ -9,12 +9,15 @@
  * 
  * SHIPPABILITY CRITERIA (with fallback hierarchy):
  * 
- * PRIMARY: A shipment is fully shippable if:
+ * ALWAYS EXCLUDED (hard filters applied first):
+ * - Shipments that are already shipped (have a tracking number)
+ * - Shipments that are on_hold
+ * 
+ * PRIMARY: A shipment is fully shippable if (after hard filters):
  * 1. It has the "MOVE OVER" tag (indicates picking is complete in SkuVault)
- * 2. Its shipmentStatus is NOT 'on_hold'
  * 
  * FALLBACK: When NO shipments pass the primary criteria, we fall back to:
- * - Shipments that are simply NOT 'on_hold' (even without MOVE OVER tag)
+ * - All shipments that pass the hard filters (not shipped, not on_hold)
  * 
  * This fallback handles cases where split orders have some shipments on hold
  * and others pending, but none have been tagged with MOVE OVER yet.
@@ -23,32 +26,71 @@
 import type { Shipment, ShipmentTag } from '@shared/schema';
 
 /**
- * Check if a shipment is shippable based on its status and tags.
+ * Minimum shipment type required for eligibility checks.
+ * Includes trackingNumber to filter out already shipped shipments.
+ */
+export type ShipmentForEligibility = Pick<Shipment, 'id' | 'shipmentStatus' | 'trackingNumber'>;
+
+/**
+ * Check if a shipment passes the hard filters (excluded from ALL eligibility).
+ * A shipment is excluded if:
+ * - It already has a tracking number (already shipped)
+ * - Its status is 'on_hold'
+ * 
+ * @param shipment - The shipment record
+ * @returns true if shipment is NOT excluded (passes hard filters)
+ */
+export function passesHardFilters(shipment: ShipmentForEligibility): boolean {
+  const notShipped = !shipment.trackingNumber;
+  const notOnHold = shipment.shipmentStatus !== 'on_hold';
+  return notShipped && notOnHold;
+}
+
+/**
+ * Check if a shipment is shippable based on its status and tags (primary criteria).
+ * This is applied AFTER hard filters.
  * 
  * @param shipment - The shipment record
  * @param tags - Array of tags associated with this shipment
- * @returns true if shipment is shippable (has MOVE OVER tag AND not on_hold)
+ * @returns true if shipment is shippable (passes hard filters AND has MOVE OVER tag)
  */
 export function isShipmentShippable(
-  shipment: Pick<Shipment, 'id' | 'shipmentStatus'>,
+  shipment: ShipmentForEligibility,
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): boolean {
+  if (!passesHardFilters(shipment)) {
+    return false;
+  }
+  
   const hasMoveOverTag = tags.some(tag => 
     tag.shipmentId === shipment.id && tag.name === 'MOVE OVER'
   );
-  const notOnHold = shipment.shipmentStatus !== 'on_hold';
   
-  return hasMoveOverTag && notOnHold;
+  return hasMoveOverTag;
+}
+
+/**
+ * Filter an array of shipments to only those that pass hard filters.
+ * (Not shipped AND not on_hold)
+ * 
+ * @param shipments - Array of shipment records
+ * @returns Array of shipments that pass hard filters
+ */
+export function filterEligibleShipments<T extends ShipmentForEligibility>(
+  shipments: T[]
+): T[] {
+  return shipments.filter(shipment => passesHardFilters(shipment));
 }
 
 /**
  * Filter an array of shipments to only those that are shippable (primary criteria).
+ * This applies hard filters first, then checks for MOVE OVER tag.
  * 
  * @param shipments - Array of shipment records
  * @param allTags - Array of all tags for these shipments
- * @returns Array of shippable shipments (MOVE OVER tag AND not on_hold)
+ * @returns Array of shippable shipments (passes hard filters AND has MOVE OVER tag)
  */
-export function filterShippableShipments<T extends Pick<Shipment, 'id' | 'shipmentStatus'>>(
+export function filterShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): T[] {
@@ -56,13 +98,13 @@ export function filterShippableShipments<T extends Pick<Shipment, 'id' | 'shipme
 }
 
 /**
- * Filter an array of shipments to only those that are NOT on hold.
- * Used as a fallback when no shipments pass the primary shippable criteria.
+ * @deprecated Use filterEligibleShipments instead. This is kept for backward compatibility.
+ * Filter an array of shipments to only those that are NOT on hold (but may be shipped).
  * 
  * @param shipments - Array of shipment records
  * @returns Array of shipments that are not on hold
  */
-export function filterNotOnHoldShipments<T extends Pick<Shipment, 'id' | 'shipmentStatus'>>(
+export function filterNotOnHoldShipments<T extends ShipmentForEligibility>(
   shipments: T[]
 ): T[] {
   return shipments.filter(shipment => shipment.shipmentStatus !== 'on_hold');
@@ -99,24 +141,38 @@ export interface ShippableShipmentsResult<T> {
 /**
  * Analyze an order's shipments and determine shippability.
  * Uses a fallback hierarchy:
- * 1. PRIMARY: Shipments with MOVE OVER tag AND not on_hold
- * 2. FALLBACK: If none match primary, use shipments that are simply NOT on_hold
+ * 
+ * HARD FILTERS (always applied):
+ * - Exclude shipments with tracking numbers (already shipped)
+ * - Exclude shipments that are on_hold
+ * 
+ * PRIMARY: Shipments that pass hard filters AND have MOVE OVER tag
+ * FALLBACK: If none match primary, use all shipments that pass hard filters
  * 
  * @param shipments - All shipments for an order
  * @param allTags - All tags for these shipments
  * @returns Analysis result with shippable shipments and default selection
  */
-export function analyzeShippableShipments<T extends Pick<Shipment, 'id' | 'shipmentStatus'>>(
+export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): ShippableShipmentsResult<T> {
-  // Try primary criteria first: MOVE OVER tag AND not on_hold
-  let shippableShipments = filterShippableShipments(shipments, allTags);
+  // First apply hard filters: not shipped AND not on_hold
+  const eligibleShipments = filterEligibleShipments(shipments);
   
-  // FALLBACK: If no shipments pass primary criteria, fall back to just "not on_hold"
-  // This handles split orders where some shipments are on hold and others are pending
+  // Try primary criteria: eligible + MOVE OVER tag
+  let shippableShipments = eligibleShipments.filter(shipment => {
+    const hasMoveOverTag = allTags.some(tag => 
+      tag.shipmentId === shipment.id && tag.name === 'MOVE OVER'
+    );
+    return hasMoveOverTag;
+  });
+  
+  // FALLBACK: If no shipments pass primary criteria, use all eligible shipments
+  // This handles split orders where some shipments are on hold and others are pending,
+  // but none have been tagged with MOVE OVER yet.
   if (shippableShipments.length === 0) {
-    shippableShipments = filterNotOnHoldShipments(shipments);
+    shippableShipments = eligibleShipments;
   }
   
   let defaultShipmentId: string | null = null;
