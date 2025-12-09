@@ -5087,25 +5087,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cacheSource,
           });
         } else {
-          // NO shippable shipments - ALL shipments are on hold
-          // (after our fallback logic, if nothing is shippable, it means everything is on_hold)
+          // NO shippable shipments - all shipments are excluded for various reasons
+          // Count exclusion reasons for better error messaging
+          const statuses = shipmentsResult.shipmentStatuses;
+          const shippedCount = statuses.filter(s => s.reason === 'already_shipped').length;
+          const onHoldCount = statuses.filter(s => s.reason === 'on_hold').length;
+          const allShipmentsCount = shipmentsResult.allShipments.length;
+          
+          // Build dynamic explanation based on actual reasons
+          const parts: string[] = [];
+          if (shippedCount > 0) {
+            parts.push(`${shippedCount} already shipped`);
+          }
+          if (onHoldCount > 0) {
+            parts.push(`${onHoldCount} on hold`);
+          }
+          const reasonSummary = parts.length > 0 ? parts.join(', ') : 'not eligible';
+          
+          const errorInfo = {
+            code: 'NO_ELIGIBLE_SHIPMENTS',
+            message: 'No shipments available for packing',
+            explanation: `This order has ${allShipmentsCount} shipment${allShipmentsCount > 1 ? 's' : ''} (${reasonSummary}). None can be packed right now.`,
+            resolution: shippedCount > 0 && onHoldCount === 0 
+              ? 'All shipments have already been shipped. Check ShipStation for tracking info.'
+              : onHoldCount > 0 && shippedCount === 0
+                ? 'Check ShipStation for hold dates. If unexpected, contact a supervisor.'
+                : 'Check ShipStation for details on each shipment. Contact a supervisor if unexpected.'
+          };
+          
           if (allowNotShippable && shipmentsResult.allShipments.length > 0) {
             // Use first shipment but mark as not shippable
             shipment = shipmentsResult.allShipments[0];
-            notShippable = {
-              code: 'ALL_ON_HOLD',
-              message: 'All shipments for this order are on hold',
-              explanation: 'Every shipment for this order has a hold date set in ShipStation. None can be packed until the hold is released.',
-              resolution: 'Check ShipStation to see hold dates, or contact a supervisor if this is unexpected.'
-            };
-            console.log(`[Packing Validation] All ${shipmentsResult.allShipments.length} shipments are on hold for order ${orderNumber}`);
+            notShippable = errorInfo;
+            console.log(`[Packing Validation] No eligible shipments for order ${orderNumber}: ${shippedCount} shipped, ${onHoldCount} on hold`);
           } else {
             const firstShipment = shipmentsResult.allShipments[0];
-            const allShipmentsCount = shipmentsResult.allShipments.length;
             
             // Fetch items for all shipments so warehouse can distinguish them
             const shipmentsWithItems = await Promise.all(
               shipmentsResult.allShipments.map(async (s: any) => {
+                // Find the status for this shipment
+                const status = statuses.find(st => st.id === s.id);
                 const items = await storage.getShipmentItems(s.id);
                 return {
                   id: s.id,
@@ -5115,6 +5137,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   shipToName: s.shipToName,
                   shipToCity: s.shipToCity,
                   shipToState: s.shipToState,
+                  trackingNumber: s.trackingNumber,
+                  exclusionReason: status?.reason || 'unknown',
                   items: items.map(item => ({
                     sku: item.sku,
                     name: item.name,
@@ -5125,15 +5149,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             
             return res.status(422).json({
-              error: {
-                code: 'ALL_ON_HOLD',
-                message: 'All shipments are on hold',
-                explanation: `This order has ${allShipmentsCount} shipment${allShipmentsCount > 1 ? 's' : ''}, but ${allShipmentsCount > 1 ? 'all are' : 'it is'} on hold. Orders on hold cannot be packed.`,
-                resolution: 'Check ShipStation for hold dates. If this is unexpected, contact a supervisor.'
-              },
+              error: errorInfo,
               orderNumber,
               shipmentId: firstShipment?.id,
               shipments: shipmentsWithItems,
+              shipmentStatuses: statuses,
             });
           }
         }
