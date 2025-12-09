@@ -129,6 +129,50 @@ export function buildMoveOverTagMap(
 }
 
 /**
+ * Exclusion reasons for shipments that are not eligible for packing.
+ */
+export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'eligible';
+
+/**
+ * Per-shipment status with exclusion reason.
+ */
+export interface ShipmentStatus {
+  id: string;
+  reason: ShipmentExclusionReason;
+}
+
+/**
+ * Get the exclusion reason for a shipment.
+ * 
+ * @param shipment - The shipment to check
+ * @returns The reason why it's excluded, or 'eligible' if it passes hard filters
+ */
+export function getShipmentExclusionReason(shipment: ShipmentForEligibility): ShipmentExclusionReason {
+  if (shipment.trackingNumber) {
+    return 'already_shipped';
+  }
+  if (shipment.shipmentStatus === 'on_hold') {
+    return 'on_hold';
+  }
+  return 'eligible';
+}
+
+/**
+ * Get exclusion reasons for all shipments in an order.
+ * 
+ * @param shipments - All shipments for an order
+ * @returns Array of shipment statuses with their exclusion reasons
+ */
+export function getShipmentStatuses<T extends ShipmentForEligibility>(
+  shipments: T[]
+): ShipmentStatus[] {
+  return shipments.map(shipment => ({
+    id: shipment.id,
+    reason: getShipmentExclusionReason(shipment),
+  }));
+}
+
+/**
  * Result of analyzing shippable shipments for an order.
  */
 export interface ShippableShipmentsResult<T> {
@@ -136,6 +180,8 @@ export interface ShippableShipmentsResult<T> {
   shippableShipments: T[];
   defaultShipmentId: string | null;
   reason: 'single' | 'multiple' | 'none';
+  /** Per-shipment status with exclusion reasons */
+  shipmentStatuses: ShipmentStatus[];
 }
 
 /**
@@ -157,6 +203,9 @@ export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): ShippableShipmentsResult<T> {
+  // Get per-shipment exclusion reasons
+  const shipmentStatuses = getShipmentStatuses(shipments);
+  
   // First apply hard filters: not shipped AND not on_hold
   const eligibleShipments = filterEligibleShipments(shipments);
   
@@ -192,5 +241,6 @@ export function analyzeShippableShipments<T extends ShipmentForEligibility>(
     shippableShipments,
     defaultShipmentId,
     reason,
+    shipmentStatuses,
   };
 }
