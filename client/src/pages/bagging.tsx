@@ -1309,6 +1309,7 @@ export default function Bagging() {
         
         const printResponse = await apiRequest("POST", "/api/packing/complete", {
           shipmentId: shipment.id,
+          skipCacheInvalidation: true, // Bagging: don't invalidate cache yet - we need it for QC scans
         });
         const printResult = await printResponse.json() as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
         

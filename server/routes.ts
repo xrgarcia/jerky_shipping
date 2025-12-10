@@ -6723,7 +6723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Complete order packing
   app.post("/api/packing/complete", requireAuth, async (req, res) => {
-    const { shipmentId, skipLabel } = req.body;
+    const { shipmentId, skipLabel, skipCacheInvalidation } = req.body;
     const user = req.user!;
     let orderNumber = 'unknown';
     let shipment: Awaited<ReturnType<typeof storage.getShipment>> | null = null;
@@ -6949,12 +6949,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               console.log(`[Packing] Created and saved new label: ${labelUrl}, updated shipmentStatus to label_created`);
               
-              // CACHE INVALIDATION: Label created means order is complete, invalidate warm cache
-              // This prevents stale data from being served for completed orders
-              if (shipment.orderNumber) {
+              // CACHE INVALIDATION: For boxing workflow, label created means order is complete
+              // For bagging workflow (skipCacheInvalidation=true), we keep the cache until QC scanning is done
+              if (shipment.orderNumber && !skipCacheInvalidation) {
                 onLabelCreated(shipment.orderNumber).catch(err => {
                   console.warn(`[Packing] Cache invalidation error for ${shipment.orderNumber}:`, err.message);
                 });
+              } else if (skipCacheInvalidation) {
+                console.log(`[Packing] Skipping cache invalidation for ${shipment.orderNumber} (bagging workflow - QC scans pending)`);
               }
             }
           }
@@ -7178,6 +7180,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           qcCompletedAt: new Date(),
         });
         console.log(`[Bagging] Marked QC complete for shipment ${shipmentId} (order ${orderNumber})`);
+      }
+      
+      // BAGGING WORKFLOW: Now that QC is complete, invalidate the warm cache
+      // This was deferred from label creation to allow product scans during QC
+      if (orderNumber) {
+        invalidateCacheForOrder(orderNumber).catch(err => {
+          console.warn(`[Bagging] Cache invalidation error for ${orderNumber}:`, err.message);
+        });
+        console.log(`[Bagging] Invalidated cache for order ${orderNumber} (QC complete)`);
       }
       
       res.json({ 

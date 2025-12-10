@@ -1,0 +1,267 @@
+You are analyzing packing logs from a warehouse fulfillment system. Please review all log entries for this order and provide a comprehensive analysis.
+
+## Context
+These logs are from a warehouse packing station where workers scan orders and products for quality control (QC) validation against SkuVault inventory system.
+
+## Order Summary
+
+**Order Number:** 111-8705804-4221847
+**Total Log Entries:** 7
+**Successful Actions:** 5
+**Failed Actions:** 2
+**Total Duration:** 1 minutes
+
+## Action Breakdown
+1× COMPLETE ORDER START, 1× FETCH EXISTING LABELS, 1× LABEL CREATE ATTEMPT, 1× LABEL CREATED, 1× COMPLETE ORDER SUCCESS, 2× PRODUCT SCANNED
+
+## Detected Patterns
+- All 2 failures by same user: stephanie
+
+## All Log Entries (Chronological)
+
+### Entry 1
+- **Timestamp:** Dec 10, 2025 3:45:29 PM
+- **User:** stephanie
+- **Action:** COMPLETE ORDER START
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "skipLabel": false,
+    "stationId": "85d575ed-48ec-4942-948d-6be827deb117",
+    "hasOrderId": false,
+    "shipmentId": "1735f694-6292-44bd-9beb-dbc9e89a9a94",
+    "hasLabelUrl": false,
+    "isNotShippable": false
+  }
+}
+```
+
+### Entry 2
+- **Timestamp:** Dec 10, 2025 3:45:29 PM
+- **User:** stephanie
+- **Action:** FETCH EXISTING LABELS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "shipStationShipmentId": "se-933871790"
+  }
+}
+```
+
+### Entry 3
+- **Timestamp:** Dec 10, 2025 3:45:29 PM
+- **User:** stephanie
+- **Action:** LABEL CREATE ATTEMPT
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "request": {
+    "action": "createLabelForExistingShipment",
+    "shipStationShipmentId": "se-933871790"
+  }
+}
+```
+
+### Entry 4
+- **Timestamp:** Dec 10, 2025 3:45:31 PM
+- **User:** stephanie
+- **Action:** LABEL CREATED
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.pdf",
+    "rawResponse": {
+      "status": "completed",
+      "voided": false,
+      "ship_to": {
+        "name": "HADDAD'S",
+        "email": "x7h2cz9xnvvbb17@marketplace.amazon.com",
+        "phone": "+1 480-618-5344 ext. 78943",
+        "geolocation": [],
+        "postal_code": "15236-4605",
+        "company_name": "",
+        "country_code": "US",
+        "instructions": null,
+        "address_line1": "221 CURRY HOLLOW RD",
+        "address_line2": "",
+        "address_line3": "",
+        "city_locality": "PITTSBURGH",
+        "state_province": "PA",
+        "address_residential_indicator": "no"
+      },
+      "batch_id": "",
+      "label_id": "se-601137326",
+      "packages": [
+        {
+          "weight": {
+            "unit": "ounce",
+            "value": 36
+          },
+          "sequence": 1,
+          "dimensions": {
+            "unit": "inch",
+            "width": 12,
+            "height": 8,
+            "length": 12
+          },
+          "package_id": 398822652,
+          "package_code": "package",
+          "insured_value": {
+            "amount": 86,
+            "currency": "usd"
+          },
+          "label_download": {
+            "pdf": "https://api.shipstation.com/v2/downloads/11/CS5YQqTp1U2miZ_dj4cqZQ/labelpackage-398822652.pdf",
+            "png": "https://api.shipstation.com/v2/downloads/11/CS5YQqTp1U2miZ_dj4cqZQ/labelpackage-398822652.png",
+            "zpl": "https://api.shipstation.com/v2/downloads/11/CS5YQqTp1U2miZ_dj4cqZQ/labelpackage-398822652.zpl"
+          },
+          "label_messages": {
+            "reference1": null,
+            "reference2": null,
+            "reference3": null
+          },
+          "tracking_number": "9405550105501053685995",
+          "qr_code_download": null,
+          "has_form_documents": false,
+          "paperless_download": null,
+          "content_description": null,
+          "external_package_id": null,
+          "has_label_documents": true,
+          "has_qr_code_documents": false,
+          "alternative_identifiers": [],
+          "has_paperless_label_documents": false
+        }
+      ],
+      "ship_date": "2025-12-10T08:00:00Z",
+      "trackable": true,
+      "voided_at": null,
+      "carrier_id": "se-118080",
+      "created_at": "2025-12-10T21:45:30.2180749Z",
+      "rma_number": null,
+      "shipment_id": "se-933871790",
+      "carrier_code": "usps",
+      "charge_event": "carrier_default",
+      "confirmation": "none",
+      "label_format": "pdf",
+      "label_layout": "4x6",
+      "package_code": "package",
+      "rate_details": [],
+      "service_code": "usps_priority_mail",
+      "tracking_url": "https://tools.usps.com/go/TrackConfirmAction.action?tLabels=9405550105501053685995",
+      "form_download": null,
+      "shipment_cost": {
+        "amount": 15.13,
+        "currency": "usd"
+      },
+      "carrier_weight": null,
+      "display_scheme": "label",
+      "insurance_cost": {
+        "amount": 0,
+        "currency": "usd"
+      },
+      "label_download": {
+        "pdf": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.pdf",
+        "png": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.png",
+        "zpl": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.zpl",
+        "href": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.pdf"
+      },
+      "label_image_id": null,
+      "insurance_claim": null,
+      "is_return_label": false,
+      "tracking_number": "9405550105501053685995",
+      "tracking_status": "in_transit",
+      "is_international": false,
+      "qr_code_download": null,
+      "shipping_rule_id": null,
+      "external_order_id": "149067661150161",
+      "paperless_download": null,
+      "external_shipment_id": "111-8705804-4221847",
+      "alternative_identifiers": [],
+      "requested_comparison_amount": {
+        "amount": 0,
+        "currency": "usd"
+      }
+    },
+    "trackingNumber": "9405550105501053685995"
+  }
+}
+```
+
+### Entry 5
+- **Timestamp:** Dec 10, 2025 3:45:31 PM
+- **User:** stephanie
+- **Action:** COMPLETE ORDER SUCCESS
+- **Success:** Yes
+- **SKU:** N/A
+- **Scanned Barcode:** N/A
+- **SkuVault Product ID:** N/A
+- **Error:** None
+- **SkuVault Response:** `See below`
+```json
+{
+  "response": {
+    "labelUrl": "https://api.shipstation.com/v2/downloads/11/T_Qxg8uJB0GoaVLnfndiVw/label-601137326.pdf",
+    "stationId": "85d575ed-48ec-4942-948d-6be827deb117",
+    "printJobId": "8f00cd6e-bec0-4a2e-a736-8d2db9833ee6",
+    "trackingNumber": "9405550105501053685995"
+  }
+}
+```
+
+### Entry 6
+- **Timestamp:** Dec 10, 2025 3:45:39 PM
+- **User:** stephanie
+- **Action:** PRODUCT SCANNED
+- **Success:** No
+- **SKU:** N/A
+- **Scanned Barcode:** 4000003409
+- **SkuVault Product ID:** N/A
+- **Error:** 404: {"valid":false,"error":"Product not found in order","scannedValue":"4000003409","orderNumber":"111-8705804-4221847"}
+- **SkuVault Response:** `No data`
+
+
+### Entry 7
+- **Timestamp:** Dec 10, 2025 3:46:43 PM
+- **User:** stephanie
+- **Action:** PRODUCT SCANNED
+- **Success:** No
+- **SKU:** N/A
+- **Scanned Barcode:** JCB1042-K-X2
+- **SkuVault Product ID:** N/A
+- **Error:** 404: {"valid":false,"error":"Product not found in order","scannedValue":"JCB1042-K-X2","orderNumber":"111-8705804-4221847"}
+- **SkuVault Response:** `No data`
+
+
+## Questions to Answer
+
+1. **Timeline Analysis:** What is the sequence of events that occurred during packing?
+2. **Failure Patterns:** Are there any patterns in the failures? (e.g., same user, same SKU, same error type)
+3. **Root Cause:** If there are failures, what is the likely root cause?
+4. **User Behavior:** Did any workers scan the wrong items or make procedural errors?
+5. **System Issues:** Are there any red flags suggesting system configuration problems?
+6. **Recommendations:** What steps should the warehouse team take to prevent similar issues?
+
+Please provide a clear, actionable analysis with specific recommendations.

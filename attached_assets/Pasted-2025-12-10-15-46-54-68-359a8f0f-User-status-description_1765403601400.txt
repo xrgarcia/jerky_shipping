@@ -1,0 +1,188 @@
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"status_description": "Delivered",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"carrier_detail_code": "FS",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"carrier_occurred_at": "2025-12-10T16:41:01Z",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"status_description": "Delivered",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"signer": null,
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"event_description": "Delivered",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+Timestamp: 2025-12-10T21:46:54.682Z
+2025-12-10 15:46:54.68
+359a8f0f
+User
+{
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"resource_url": "https://api.shipengine.com/v1/tracking?carrier_code=ups_walleted&tracking_number=1ZHH36200301705060",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"resource_type": "API_TRACK",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"x-shipengine-rsa-sha256-key-id": "webhook-signing-key-1",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"tracking_number": "1ZHH36200301705060",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"city_locality": "TALLAHASSEE",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"status_code": "DE",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"company_name": null,
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"exception_description": null,
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"carrier_status_description": "Delivered",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"country_code": "US",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"status_detail_code": null,
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"event_code": "D",
+2025-12-10 15:46:54.68
+359a8f0f
+User
+"occurred_at": "2025-12-10T14:50:32Z",
+2025-12-10 15:46:57.10
+359a8f0f
+User
+Updated shipment 49b912b2-0931-4bc2-8447-37c92c2b88c9 with tracking 1ZHH36200301705060 from webhook
+2025-12-10 15:46:57.15
+359a8f0f
+User
+9:46:57 PM [express] Background worker processed 1 webhook(s) in 188ms, 0 remaining
+2025-12-10 15:46:58.18
+359a8f0f
+User
+[QCSaleWarmer] Order JK3825352479 already in cache, skipping
+2025-12-10 15:47:00.73
+359a8f0f
+User
+[QCSaleWarmer] Order JK3825352495 already in cache, skipping
+2025-12-10 15:47:00.93
+359a8f0f
+User
+9:47:00 PM [express] GET /api/print-jobs/shipment/1735f694-6292-44bd-9beb-dbc9e89a9a94 304 in 167ms …
+2025-12-10 15:47:01.69
+359a8f0f
+User
+9:47:01 PM [express] POST /api/auth/logout 200 in 170ms :: {"success":true}
+2025-12-10 15:47:01.73
+359a8f0f
+User
+WebSocket client disconnected from room: default
+2025-12-10 15:47:01.73
+359a8f0f
+User
+WebSocket client disconnected from room: default
+2025-12-10 15:47:01.73
+359a8f0f
+User
+WebSocket client disconnected from room: default
+2025-12-10 15:47:01.77
+359a8f0f
+User
+9:47:01 PM [express] GET /api/auth/me 401 in 0ms :: {"error":"Not authenticated"}
+2025-12-10 15:47:02.89
+359a8f0f
+User
+[Google OAuth] Redirect URI: https://ship.jerky.com/api/auth/google/callback
+2025-12-10 15:47:02.89
+359a8f0f
+User
+9:47:02 PM [express] GET /api/auth/google 302 in 2ms
+2025-12-10 15:47:03.28
+359a8f0f
+User
+[QCSaleWarmer] Order JK3825352499 already in cache, skipping
+2025-12-10 15:47:05.49
+359a8f0f
+User
+9:47:05 PM [express] GET /api/auth/google/callback 302 in 229ms
+2025-12-10 15:47:05.84
+359a8f0f
+User
+[QCSaleWarmer] Order JK3825352505 already in cache, skipping
+2025-12-10 15:47:05.90
+359a8f0f
+User
+9:47:05 PM [express] GET /api/auth/me 304 in 87ms :: {"user":{"id":"3fa2e905-8f59-409c-8930-7a9b4a73…
+2025-12-10 15:47:06.14
+359a8f0f
+User
+WebSocket client connected to room: orders
+2025-12-10 15:47:07.33
+359a8f0f
+User
+WebSocket client disconnected from room: orders
+2025-12-10 15:47:07.60
+359a8f0f
+User
+9:47:07 PM [express] GET /api/packing/station-session 200 in 250ms :: {"session":null}
+2025-12-10 15:47:07.86
+359a8f0f
+User
+9:47:07 PM [express] GET /api/packing/stations 304 in 201ms :: [{"id":"85d575ed-48ec-4942-948d-6be82…
+2025-12-10 15:47:08.41
+359a8f0f
+User
+[QCSaleWarmer] Order JK3825352414 already in cache, skipping
+2025-12-10 15:47:09.14
+359a8f0f
+User
+[Packing] User stephanie@jerky.com selected station Bagging Station (expires 2025-12-11T06:00:00.000Z)
+2025-12-10 15:47:09.14
+359a8f0f
+User
+9:47:09 PM [express] POST /api/packing/station-session 200 in 321ms :: {"session":{"id":"150c83a9-7f…
+2025-12-10 15:47:09.48
+359a8f0f
+User
+9:47:09 PM [express] GET /api/packing/station-session 200 in 252ms :: {"session":{"id":"150c83a9-7f5…
+2025-12-10 15:47:09.71
+359a8f0f
+User
+9:47:09 PM [express] GET /api/print-queue/stale-metrics 200 in 146ms :: {"totalStale":0,"warningCoun…
+2025-12-10 15:47:09.78
+359a8f0f
+User
+WebSocket client connected to room: default

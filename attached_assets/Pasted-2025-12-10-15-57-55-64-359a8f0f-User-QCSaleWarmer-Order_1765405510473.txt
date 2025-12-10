@@ -1,0 +1,212 @@
+2025-12-10 15:57:55.64
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 15:59:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 15:59:55.64
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:00:25.70
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:00:55.70
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:01:25.67
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:01:55.65
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:02:25.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:02:55.69
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:03:25.65
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:03:55.69
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:04:25.67
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:05:25.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:05:55.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:06:55.65
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:07:25.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:07:55.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:08:25.70
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:08:29.96
+359a8f0f
+User
+10:08:29 PM [express] GET /api/packing/cache-debug/113-4826030-7778643 200 in 189ms :: {"orderNumber"…
+2025-12-10 16:08:55.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:09:55.70
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:10:25.70
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:10:55.66
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:11:25.68
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:11:51.93
+359a8f0f
+User
+[ETL] Extracted shipmentStatus: pending for order 113-4826030-7778643
+2025-12-10 16:12:08.44
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:12:38.43
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:13:13.56
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:13:41.00
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:14:11.04
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:14:41.06
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:15:11.00
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:16:11.15
+359a8f0f
+User
+[QCSaleWarmer] Order 113-4826030-7778643 already in cache, skipping
+2025-12-10 16:16:19.11
+359a8f0f
+User
+[Packing Validation] Request for order 113-4826030-7778643, explicitShipmentId: none
+2025-12-10 16:16:19.19
+359a8f0f
+User
+[Packing Validation] WARM CACHE HIT for shippable shipments: 113-4826030-7778643 (1 shippable, cached at 2025-12-10T21:39:31.611Z)
+2025-12-10 16:16:19.23
+359a8f0f
+User
+[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): 113-4826030-7778643, internalId: 8dab4865-b00d-431c-bb7e-63de43aae15e
+2025-12-10 16:16:19.23
+359a8f0f
+User
+SaleId: '1-352444-8-12075-113-4826030-7778643',
+2025-12-10 16:16:19.24
+359a8f0f
+User
+[QCSaleCache] Cached order 113-4826030-7778643 with 2 barcode/SKU entries
+2025-12-10 16:16:19.28
+359a8f0f
+User
+10:16:19 PM [express] GET /api/packing/validate-order/113-4826030-7778643 200 in 251ms :: {"id":"8dab…
+2025-12-10 16:16:19.47
+359a8f0f
+User
+10:16:19 PM [express] GET /api/shipment-events/order/113-4826030-7778643 200 in 123ms :: [{"id":"1249…
+2025-12-10 16:16:19.62
+359a8f0f
+User
+[Packing] Shipment 113-4826030-7778643 has no label URL - fetching from ShipStation...
+2025-12-10 16:16:21.66
+359a8f0f
+User
+[Desktop WS] Sent job 47582026-5e61-4331-ae17-32ffe77f404a (order 113-4826030-7778643) to station 85d575ed-48ec-4942-948d-6be827deb117
+2025-12-10 16:16:21.72
+359a8f0f
+User
+[QCSaleWarmer] Invalidated cache for order 113-4826030-7778643
+2025-12-10 16:16:21.75
+359a8f0f
+User
+[Packing] Marked QC complete for shipment 8dab4865-b00d-431c-bb7e-63de43aae15e (order 113-4826030-7778643)
+2025-12-10 16:16:52.77
+359a8f0f
+User
+[Packing Validation] Barcode 4000003661 not found in cache for order 113-4826030-7778643, warming cache with shipment-specific maps
+2025-12-10 16:16:52.77
+359a8f0f
+User
+[QCSaleCache] Cache miss for order 113-4826030-7778643
+2025-12-10 16:16:52.89
+359a8f0f
+User
+[Packing Validation] No QC Sale data for order 113-4826030-7778643, trying direct product lookup
+2025-12-10 16:16:52.89
+359a8f0f
+User
+[QCSaleWarmer] No shippable shipments for order 113-4826030-7778643 (1 total, none with MOVE OVER tag and not on_hold)
+2025-12-10 16:17:42.04
+359a8f0f
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 113-4826030-7778643
+2025-12-10 16:17:52.75
+359a8f0f
+User
+10:17:52 PM [express] GET /api/packing/cache-debug/113-4826030-7778643 404 in 88ms :: {"error":"No ca…
+2025-12-10 16:17:53.44
+359a8f0f
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 113-4826030-7778643
+2025-12-10 16:18:24.31
+359a8f0f
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 113-4826030-7778643
+2025-12-10 16:18:48.92
+359a8f0f
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 113-4826030-7778643
