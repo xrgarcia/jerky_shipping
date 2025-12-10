@@ -1,0 +1,208 @@
+2025-12-10 01:50:24.76
+face5b68
+User
+builtins: {
+2025-12-10 01:50:24.76
+face5b68
+User
+INT8: 20,
+2025-12-10 01:50:24.76
+face5b68
+User
+connectionParameters: ConnectionParameters {
+2025-12-10 01:50:24.76
+face5b68
+User
+_eventsCount: 5,
+2025-12-10 01:50:24.76
+face5b68
+User
+getTypeParser: [Function: getTypeParser],
+2025-12-10 01:50:24.76
+face5b68
+User
+binary: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+connect_timeout: 0
+2025-12-10 01:50:24.76
+face5b68
+User
+_events: [Object: null prototype] { error: [Function (anonymous)] },
+2025-12-10 01:50:24.76
+face5b68
+User
+application_name: undefined,
+2025-12-10 01:50:24.76
+face5b68
+User
+at v. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1202:66)
+2025-12-10 01:50:24.76
+face5b68
+User
+replication: undefined,
+2025-12-10 01:50:24.76
+face5b68
+User
+Error: Connection terminated unexpectedly
+2025-12-10 01:50:24.76
+face5b68
+User
+connecting: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+_hadError: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+_parent: null,
+2025-12-10 01:50:24.76
+face5b68
+User
+database: 'neondb',
+2025-12-10 01:50:24.76
+face5b68
+User
+_eventsCount: 1,
+2025-12-10 01:50:24.76
+face5b68
+User
+query_timeout: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+setTypeParser: [Function: setTypeParser],
+2025-12-10 01:50:24.76
+face5b68
+User
+statement_timeout: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+allowHalfOpen: false,
+2025-12-10 01:50:24.76
+face5b68
+User
+host: 'ep-raspy-bonus-afz5fn6v.c-2.us-west-2.aws.neon.tech',
+2025-12-10 01:50:24.76
+face5b68
+User
+user: 'neondb_owner',
+2025-12-10 01:50:24.76
+face5b68
+User
+0&&(o=t[0]),o instanceof Error)throw o;var u=new Error("Unhandled error."+(o?" ("+
+2025-12-10 01:50:24.76
+face5b68
+User
+client: NeonClient {
+2025-12-10 01:50:24.76
+face5b68
+User
+database: 'neondb',
+2025-12-10 01:50:24.76
+face5b68
+User
+at WebSocket.onClose (/home/runner/workspace/node_modules/ws/lib/event-target.js:220:9)
+2025-12-10 01:50:24.76
+face5b68
+User
+client_encoding: '',
+2025-12-10 04:02:14.13
+face5b68
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-10 04:02:14.13
+face5b68
+User
+internalQuery: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+dataType: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+position: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+2025-12-10 04:02:14.13
+face5b68
+User
+constraint: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+at async Timeout.processQueue [as _onTimeout] (file:///home/runner/workspace/dist/index.js:12408:27) {
+2025-12-10 04:02:14.13
+face5b68
+User
+file: 'execMain.c',
+2025-12-10 04:02:14.13
+face5b68
+User
+at async processShipmentSyncBatch (file:///home/runner/workspace/dist/index.js:11961:13)
+2025-12-10 04:02:14.13
+face5b68
+User
+line: '2021',
+2025-12-10 04:02:14.13
+face5b68
+User
+table: 'shipment_sync_failures',
+2025-12-10 04:02:14.13
+face5b68
+User
+detail: 'Failing row contains (0939ac01-3476-41cb-9ec5-766c08f650b2, 9434650206217106528788, webhook_tracking, Tracking webhook has no order number and label lookup failed, {"labelUrl": "https://api.shipengine.com/v1/labels/se-590625337"..., {"events": [{"signer": null, "latitude": 32.7539, "longitude": -..., 0, 2025-12-10 10:02:13.993, 2025-12-10 10:02:14.098434, null, null).',
+2025-12-10 04:02:14.13
+face5b68
+User
+routine: 'ExecConstraints'
+2025-12-10 04:02:14.13
+face5b68
+User
+code: '23502',
+2025-12-10 04:02:14.13
+face5b68
+User
+hint: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+column: 'shipstation_shipment_id',
+2025-12-10 04:02:14.13
+face5b68
+User
+where: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+severity: 'ERROR',
+2025-12-10 04:02:14.13
+face5b68
+User
+length: 604,
+2025-12-10 04:02:14.13
+face5b68
+User
+schema: 'public',
+2025-12-10 04:02:14.13
+face5b68
+User
+[shipment-sync] Failed to log failure to dead letter queue: error: null value in column "shipstation_shipment_id" of relation "shipment_sync_failures" violates not-null constraint
+2025-12-10 04:02:14.13
+face5b68
+User
+internalPosition: undefined,
+2025-12-10 04:02:14.13
+face5b68
+User
+}
+2025-12-10 04:02:14.13
+face5b68
+User
+at async logShipmentSyncFailur

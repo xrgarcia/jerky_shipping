@@ -628,8 +628,8 @@ export type PrintQueue = typeof printQueue.$inferSelect;
 // Shipment sync failures table for dead letter queue
 export const shipmentSyncFailures = pgTable("shipment_sync_failures", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  shipstationShipmentId: text("shipstation_shipment_id").notNull(), // ShipStation shipment ID for deduplication
-  modifiedAt: text("modified_at").notNull(), // Shipment modified_at timestamp (ISO string) for cursor tracking
+  shipstationShipmentId: text("shipstation_shipment_id"), // ShipStation shipment ID (nullable for orphan failures)
+  modifiedAt: text("modified_at"), // Shipment modified_at timestamp (nullable for webhooks without timestamp)
   orderNumber: text("order_number").notNull(),
   reason: text("reason").notNull(), // 'unified_sync' | 'backfill' | 'webhook' | 'manual'
   errorMessage: text("error_message").notNull(),
@@ -641,14 +641,16 @@ export const shipmentSyncFailures = pgTable("shipment_sync_failures", {
 }, (table) => ({
   orderNumberIdx: index("shipment_sync_failures_order_number_idx").on(table.orderNumber),
   failedAtIdx: index("shipment_sync_failures_failed_at_idx").on(table.failedAt),
-  // Unique index on shipment ID + modified_at for deduplication
-  shipmentModifiedIdx: uniqueIndex("shipment_sync_failures_shipment_modified_idx").on(table.shipstationShipmentId, table.modifiedAt),
+  // Index on shipment ID for lookups (no longer unique since we may have nulls)
+  shipmentIdIdx: index("shipment_sync_failures_shipment_id_idx").on(table.shipstationShipmentId),
 }));
 
 export const insertShipmentSyncFailureSchema = createInsertSchema(shipmentSyncFailures).omit({
   id: true,
   createdAt: true,
 }).extend({
+  shipstationShipmentId: z.string().nullish(),
+  modifiedAt: z.string().nullish(),
   requestData: z.any().nullish(),
   responseData: z.any().nullish(),
 });
