@@ -68,6 +68,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
 - **Packing Completion Audit Logging**: All packing actions are logged to the `packing_logs` table.
 - **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
+- **QC Completion Tracking**: `shipments.qc_completed` boolean flag set to `true` when packing QC is completed (boxing or bagging). Enables fast lookup for reprint scenarios to determine if full QC is needed. Timestamp stored in `qc_completed_at`. Set alongside existing `shipment_events` timeline logging.
 - **ShipStation Label Creation Endpoints**: Differentiates between creating labels for existing shipments (`/v2/labels/shipment/{shipment_id}`) and new shipments (`/v2/labels`).
 
 ## External Dependencies
