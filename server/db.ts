@@ -50,7 +50,7 @@ export async function initializeDatabase() {
 let heartbeatInterval: NodeJS.Timeout | null = null;
 
 // Start database heartbeat to prevent Neon compute from suspending
-// Runs a lightweight query every 3 minutes to keep the database compute awake
+// Also pings the public endpoint to prevent container hibernation
 export function startDatabaseHeartbeat() {
   // Clear any existing heartbeat
   if (heartbeatInterval) {
@@ -59,16 +59,49 @@ export function startDatabaseHeartbeat() {
   
   const HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
   
-  console.log('[DB Heartbeat] Starting heartbeat (every 3 minutes)');
+  // Determine the public URL for self-ping
+  // In production: ship.jerky.com
+  // In development: use REPL_SLUG (e.g. workspace-name.username.repl.co)
+  const publicUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://ship.jerky.com'
+    : process.env.REPL_SLUG 
+      ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+      : null;
+  
+  console.log('[Heartbeat] Starting heartbeat (every 3 minutes)');
+  if (publicUrl) {
+    console.log(`[Heartbeat] Container keep-alive URL: ${publicUrl}/api/health/heart-beat`);
+  }
   
   heartbeatInterval = setInterval(async () => {
+    // Database heartbeat
     try {
-      const start = Date.now();
+      const dbStart = Date.now();
       await db.execute(sql`SELECT 1`);
-      const duration = Date.now() - start;
-      console.log(`[DB Heartbeat] Ping successful (${duration}ms)`);
+      const dbDuration = Date.now() - dbStart;
+      console.log(`[Heartbeat] DB ping successful (${dbDuration}ms)`);
     } catch (error) {
-      console.error('[DB Heartbeat] Ping failed:', error);
+      console.error('[Heartbeat] DB ping failed:', error);
+    }
+    
+    // Container keep-alive self-ping
+    if (publicUrl) {
+      try {
+        const httpStart = Date.now();
+        const response = await fetch(`${publicUrl}/api/health/heart-beat`, {
+          method: 'GET',
+          headers: { 'User-Agent': 'Heartbeat-Self-Ping' },
+        });
+        const httpDuration = Date.now() - httpStart;
+        if (response.ok) {
+          console.log(`[Heartbeat] Container ping successful (${httpDuration}ms)`);
+        } else {
+          console.warn(`[Heartbeat] Container ping returned ${response.status}`);
+        }
+      } catch (error) {
+        // Don't log full error - likely ECONNREFUSED in dev which is expected
+        console.warn('[Heartbeat] Container ping failed (expected in dev)');
+      }
     }
   }, HEARTBEAT_INTERVAL_MS);
   
