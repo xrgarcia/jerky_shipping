@@ -6618,6 +6618,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         
+        // Mark QC as completed even for QC-only (no label) completions
+        await storage.updateShipment(shipment.id, {
+          qcCompleted: true,
+          qcCompletedAt: new Date(),
+        });
+        console.log(`[Packing] Marked QC complete (no label) for shipment ${shipment.id} (order ${orderNumber})`);
+        
         return res.json({
           success: true,
           printQueued: false,
@@ -6859,6 +6866,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
+      // Mark QC as completed (for fast lookup on reprints/re-scans)
+      await storage.updateShipment(shipment.id, {
+        qcCompleted: true,
+        qcCompletedAt: new Date(),
+      });
+      console.log(`[Packing] Marked QC complete for shipment ${shipment.id} (order ${orderNumber})`);
+      
       res.json({ 
         success: true, 
         printQueued: true, 
@@ -6924,6 +6938,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       console.log(`[Bagging] Logged packing_completed event for order ${orderNumber}`);
+      
+      // Mark QC as completed on the shipment (for fast lookup on reprints/re-scans)
+      if (shipmentId) {
+        await storage.updateShipment(shipmentId, {
+          qcCompleted: true,
+          qcCompletedAt: new Date(),
+        });
+        console.log(`[Bagging] Marked QC complete for shipment ${shipmentId} (order ${orderNumber})`);
+      }
       
       res.json({ 
         success: true, 
