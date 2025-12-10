@@ -163,6 +163,11 @@ export function AppSidebar() {
       url: "/reports/broken-shipments",
       icon: AlertTriangle,
     },
+    {
+      title: "Packing Ready (Debug)",
+      url: "/packing-ready",
+      icon: Database,
+    },
   ];
 
   return (
