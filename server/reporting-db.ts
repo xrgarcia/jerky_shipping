@@ -6,10 +6,12 @@ if (!process.env.REPORTING_DATABASE_URL) {
   );
 }
 
+// Pool configuration with keep-alive to prevent connection timeouts during idle periods
 export const reportingSql = postgres(process.env.REPORTING_DATABASE_URL, {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
+  keep_alive: 30,
 });
 
 export async function testReportingConnection() {
