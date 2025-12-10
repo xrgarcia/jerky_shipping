@@ -1547,13 +1547,32 @@ export class SkuVaultService {
       
       if (qcSales.length > 0) {
         if (shipmentIdSuffix) {
-          // Look for a QC Sale that ends with the shipment ID suffix
+          // STRATEGY 1: Look for a QC Sale that ends with the ShipStation shipment ID suffix
+          // This works for Shopify orders where SaleId format is: "{prefix}-{orderNumber}-{shipmentSuffix}"
           qcSale = qcSales.find(sale => sale.SaleId && sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
           
           if (qcSale) {
             console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment suffix ${shipmentIdSuffix} in initial results`);
           } else {
-            console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} in ${qcSales.length} results, trying composite search...`);
+            // STRATEGY 2: For Amazon orders, SaleId format is: "{prefix}-{amazonOrderNumber}" (no ShipStation ID)
+            // Try to find a QC Sale that contains the order number but NOT the shipment suffix
+            // Amazon order numbers have hyphens (e.g., "111-4851804-4464211")
+            const amazonMatch = qcSales.find(sale => {
+              if (!sale.SaleId) return false;
+              // Check if SaleId contains the order number (case-insensitive)
+              const saleIdUpper = sale.SaleId.toUpperCase();
+              const orderNumberUpper = orderNumber.toUpperCase();
+              // Order number should be at the end of SaleId for Amazon orders
+              // Format: 1-352444-8-12075-{order_number}
+              return saleIdUpper.endsWith(`-${orderNumberUpper}`) || saleIdUpper.includes(`-${orderNumberUpper}`);
+            });
+            
+            if (amazonMatch) {
+              qcSale = amazonMatch;
+              console.log(`[SkuVault QC Sales] Found QC Sale containing order number ${orderNumber} (Amazon-style SaleId: ${amazonMatch.SaleId})`);
+            } else {
+              console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} or order number ${orderNumber} in ${qcSales.length} results, trying composite search...`);
+            }
           }
         } else {
           // No shipmentId specified, use first result
@@ -1675,16 +1694,31 @@ export class SkuVaultService {
           // Apply same shipmentId filtering logic as main path
           let qcSale = qcSales[0]; // Default to first match
           
-          if (shipmentId && qcSales.length > 1) {
+          if (shipmentId && qcSales.length >= 1) {
             const shipmentIdSuffix = shipmentId.replace(/^se-/, '');
             console.log(`[SkuVault QC Sales] Multiple QC Sales (${qcSales.length}) found in 404, filtering by shipmentId suffix: ${shipmentIdSuffix}`);
             
-            const matchingQcSale = qcSales.find(sale => sale.SaleId && sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+            // STRATEGY 1: Try suffix matching (works for Shopify orders)
+            let matchingQcSale = qcSales.find(sale => sale.SaleId && sale.SaleId.endsWith(`-${shipmentIdSuffix}`));
+            
             if (matchingQcSale) {
               qcSale = matchingQcSale;
               console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment ${shipmentId} in 404 response`);
             } else {
-              console.warn(`[SkuVault QC Sales] No QC Sale matching shipmentId ${shipmentId} in 404 response, using first result`);
+              // STRATEGY 2: For Amazon orders, match by order number in SaleId
+              const amazonMatch = qcSales.find(sale => {
+                if (!sale.SaleId) return false;
+                const saleIdUpper = sale.SaleId.toUpperCase();
+                const orderNumberUpper = orderNumber.toUpperCase();
+                return saleIdUpper.endsWith(`-${orderNumberUpper}`) || saleIdUpper.includes(`-${orderNumberUpper}`);
+              });
+              
+              if (amazonMatch) {
+                qcSale = amazonMatch;
+                console.log(`[SkuVault QC Sales] Found QC Sale containing order number ${orderNumber} in 404 response (Amazon-style SaleId: ${amazonMatch.SaleId})`);
+              } else {
+                console.warn(`[SkuVault QC Sales] No QC Sale matching shipmentId ${shipmentId} or order number ${orderNumber} in 404 response, using first result`);
+              }
             }
           }
           

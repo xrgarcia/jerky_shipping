@@ -698,6 +698,124 @@ export async function refreshCacheForOrder(orderNumber: string): Promise<boolean
 }
 
 /**
+ * Detailed result from cache refresh operation for logging/debugging
+ */
+export interface CacheRefreshDetailedResult {
+  success: boolean;
+  orderNumber: string;
+  shipmentId?: string;
+  shipstationId?: string;
+  saleId?: string;
+  itemsFound?: number;
+  barcodesFound?: number;
+  passedItemsCount?: number;
+  qcSaleStatus?: string;
+  skuvaultOrderId?: string;
+  errorStage?: 'shipment_lookup' | 'skuvault_api' | 'validation' | 'cache_write';
+  errorMessage?: string;
+  skuvaultRawResponse?: any;
+  lookupAttempts?: Array<{
+    searchTerm: string;
+    resultCount: number;
+    matched: boolean;
+  }>;
+}
+
+/**
+ * Manual refresh with detailed result - for packing_logs
+ * Returns rich diagnostic data about what happened
+ */
+export async function refreshCacheForOrderDetailed(orderNumber: string): Promise<CacheRefreshDetailedResult> {
+  log(`Manual refresh (detailed) requested for order ${orderNumber}`);
+  
+  const result: CacheRefreshDetailedResult = {
+    success: false,
+    orderNumber,
+  };
+  
+  try {
+    const redis = getRedisClient();
+    const warmKey = getWarmCacheKey(orderNumber);
+    
+    // Get all shippable shipments using centralized eligibility logic
+    const shipmentsResult = await getShippableShipmentsForOrder(orderNumber);
+    
+    if (!shipmentsResult || shipmentsResult.reason === 'none') {
+      result.errorStage = 'shipment_lookup';
+      result.errorMessage = 'No shippable shipments found for order';
+      return result;
+    }
+    
+    // Use the first shippable shipment
+    const shipment = shipmentsResult.shippableShipments[0];
+    const shipstationId = (shipment as any).shipmentId;
+    
+    result.shipmentId = shipment.id;
+    result.shipstationId = shipstationId;
+    
+    // Fetch QC Sale from SkuVault with detailed tracking
+    const lookupAttempts: CacheRefreshDetailedResult['lookupAttempts'] = [];
+    
+    // Get QC Sale - this call internally handles suffix matching and composite search
+    const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipstationId);
+    
+    // Store raw response for debugging
+    if (qcSale) {
+      result.skuvaultRawResponse = {
+        SaleId: qcSale.SaleId,
+        OrderId: qcSale.OrderId,
+        Status: qcSale.Status,
+        TotalItems: qcSale.TotalItems,
+        ItemsCount: qcSale.Items?.length || 0,
+        PassedItemsCount: qcSale.PassedItems?.length || 0,
+        ItemSkus: qcSale.Items?.map(i => i.Sku).slice(0, 10), // First 10 SKUs
+      };
+      
+      result.saleId = qcSale.SaleId || undefined;
+      result.skuvaultOrderId = qcSale.OrderId || undefined;
+      result.qcSaleStatus = qcSale.Status || undefined;
+      result.itemsFound = qcSale.TotalItems ?? undefined;
+      result.passedItemsCount = qcSale.PassedItems?.length || 0;
+      
+      // Build lookup map to count barcodes
+      const lookupMap = buildLookupMap(qcSale);
+      result.barcodesFound = Object.keys(lookupMap).length;
+      
+      // Validate completeness
+      const validationResult = validateLookupMapCompleteness(qcSale, lookupMap);
+      
+      if (!validationResult.isValid) {
+        result.errorStage = 'validation';
+        result.errorMessage = `${validationResult.missingItems.length} items missing barcodes: ${validationResult.missingItems.slice(0, 3).map(i => i.sku).join(', ')}`;
+        // Still continue - cache what we have
+      }
+      
+      // Cache the data
+      const cacheSuccess = await warmCacheForOrder(orderNumber, true);
+      
+      if (cacheSuccess) {
+        result.success = true;
+        await clearFailedOrderTracking(orderNumber);
+      } else {
+        result.errorStage = 'cache_write';
+        result.errorMessage = 'Failed to write cache after fetching data';
+      }
+    } else {
+      result.errorStage = 'skuvault_api';
+      result.errorMessage = `No QC Sale found in SkuVault for order ${orderNumber} (shipstationId: ${shipstationId})`;
+      result.skuvaultRawResponse = { status: 'no_match', shipstationId };
+    }
+    
+    return result;
+  } catch (err: any) {
+    result.errorStage = 'skuvault_api';
+    result.errorMessage = err.message;
+    result.skuvaultRawResponse = { error: err.message, stack: err.stack?.split('\n').slice(0, 3) };
+    return result;
+  }
+}
+
+/**
  * Passed item data for cache update after a successful scan
  */
 interface PassedItemUpdate {

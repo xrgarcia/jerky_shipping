@@ -23,7 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, refreshCacheForOrderDetailed, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
 import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -5617,6 +5617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/packing/refresh-cache/:orderNumber", requireAuth, async (req, res) => {
     try {
       const { orderNumber } = req.params;
+      const user = (req as any).user;
       
       console.log(`[Packing] Manual cache refresh requested for order: ${orderNumber}`);
       
@@ -5658,21 +5659,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Force refresh the cache from SkuVault
-      const success = await refreshCacheForOrder(orderNumber);
+      // Force refresh the cache from SkuVault - use detailed function for logging
+      const refreshResult = await refreshCacheForOrderDetailed(orderNumber);
       
-      if (success) {
+      // Log the refresh attempt to packing_logs for analysis
+      try {
+        await storage.createPackingLog({
+          userId: user.id,
+          shipmentId: refreshResult.shipmentId || shipment.id,
+          orderNumber,
+          action: 'cache_refresh_attempt',
+          productSku: null,
+          scannedCode: null,
+          skuVaultProductId: refreshResult.saleId || null,
+          success: refreshResult.success,
+          errorMessage: refreshResult.errorMessage || null,
+          skuVaultRawResponse: {
+            ...(refreshResult.skuvaultRawResponse || {}),
+            shipstationId: refreshResult.shipstationId || null,
+            saleId: refreshResult.saleId || null,
+            skuvaultOrderId: refreshResult.skuvaultOrderId || null,
+            qcSaleStatus: refreshResult.qcSaleStatus || null,
+            itemsFound: refreshResult.itemsFound ?? 0,
+            barcodesFound: refreshResult.barcodesFound ?? 0,
+            passedItemsCount: refreshResult.passedItemsCount ?? 0,
+            errorStage: refreshResult.errorStage || null,
+          },
+          station: null,
+          stationId: null,
+        });
+      } catch (logError: any) {
+        console.error(`[Packing] Failed to log cache refresh attempt: ${logError.message}`);
+      }
+      
+      if (refreshResult.success) {
         res.json({
           success: true,
           message: "Cache refreshed successfully",
-          orderNumber
+          orderNumber,
+          details: {
+            saleId: refreshResult.saleId,
+            itemsFound: refreshResult.itemsFound,
+            barcodesFound: refreshResult.barcodesFound,
+          }
         });
       } else {
         res.status(500).json({
           success: false,
           error: "Failed to refresh cache - order may not be sessioned in SkuVault",
           orderNumber,
-          resolution: "The order may not have been picked yet. Check SkuVault session status."
+          resolution: "The order may not have been picked yet. Check SkuVault session status.",
+          details: {
+            errorStage: refreshResult.errorStage,
+            errorMessage: refreshResult.errorMessage,
+            shipstationId: refreshResult.shipstationId,
+          }
         });
       }
     } catch (error: any) {
