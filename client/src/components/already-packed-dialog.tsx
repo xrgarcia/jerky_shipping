@@ -44,6 +44,8 @@ export interface AlreadyPackedShipment {
   shipToName: string | null;
   shipToCity: string | null;
   shipToState: string | null;
+  qcCompleted?: boolean | null;
+  qcCompletedAt?: string | null;
   items?: AlreadyPackedShipmentItem[];
 }
 
@@ -166,6 +168,16 @@ export function AlreadyPackedDialog({
                             <Badge variant="outline" className="font-mono">
                               Shipment {index + 1}
                             </Badge>
+                            {shipment.qcCompleted && (
+                              <Badge
+                                variant="default"
+                                className="flex items-center gap-1 bg-green-600 hover:bg-green-600"
+                                data-testid={`badge-qc-complete-${shipment.id}`}
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                QC Complete
+                              </Badge>
+                            )}
                             {shipment.carrier && (
                               <Badge
                                 variant="secondary"
@@ -271,7 +283,19 @@ export function AlreadyPackedDialog({
             <div className="bg-muted rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Order Number:</span>
-                <span className="font-semibold">{orderNumber}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{orderNumber}</span>
+                  {shipments[0]?.qcCompleted && (
+                    <Badge
+                      variant="default"
+                      className="flex items-center gap-1 bg-green-600 hover:bg-green-600"
+                      data-testid="badge-qc-complete-single"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      QC Complete
+                    </Badge>
+                  )}
+                </div>
               </div>
               {shipments[0]?.trackingNumber && (
                 <div className="flex justify-between text-sm">
@@ -375,11 +399,11 @@ export function AlreadyPackedDialog({
           <Button
             variant="outline"
             onClick={handleProceedToQC}
-            disabled={!selectedShipmentId}
+            disabled={!selectedShipmentId || !!selectedShipment?.qcCompleted}
             className="flex-1"
             data-testid="button-proceed-to-qc"
           >
-            Proceed to QC
+            {selectedShipment?.qcCompleted ? "QC Already Done" : "Proceed to QC"}
           </Button>
         </DialogFooter>
       </DialogContent>
