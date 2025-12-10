@@ -380,6 +380,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check endpoint for container keep-alive
+  // This endpoint is public (no auth required) to allow external/self pings
+  app.get("/api/health/heart-beat", (_req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+
   // Desktop app downloads - fetches latest release from GitHub
   app.get("/api/downloads/latest", async (req, res) => {
     try {
