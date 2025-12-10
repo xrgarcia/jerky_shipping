@@ -1,0 +1,212 @@
+2025-12-10 16:33:55.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:34:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:35:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:36:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:37:25.71
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:37:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:38:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:38:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:39:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:39:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:40:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:40:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:41:25.69
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:41:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:42:25.73
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:42:55.68
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:43:55.70
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:44:25.70
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:44:55.70
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:45:25.70
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:45:55.70
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:46:25.71
+359a8f0f
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:46:28.09
+9a962268
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:47:17.95
+9a962268
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:47:32.06
+9a962268
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:48:02.34
+9a962268
+User
+[QCSaleWarmer] Order 112-4290148-3454627 already in cache, skipping
+2025-12-10 16:48:06.07
+9a962268
+User
+[Packing Validation] Request for order 112-4290148-3454627, explicitShipmentId: none
+2025-12-10 16:48:06.20
+9a962268
+User
+[Packing Validation] WARM CACHE HIT for shippable shipments: 112-4290148-3454627 (1 shippable, cached at 2025-12-10T22:12:30.866Z)
+2025-12-10 16:48:06.24
+9a962268
+User
+[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): 112-4290148-3454627, internalId: 743616de-278e-43e6-8f86-59e3d60bdc8c
+2025-12-10 16:48:06.24
+9a962268
+User
+SaleId: '1-352444-8-12075-112-4290148-3454627',
+2025-12-10 16:48:06.30
+9a962268
+User
+[QCSaleCache] Cached order 112-4290148-3454627 with 2 barcode/SKU entries
+2025-12-10 16:48:06.34
+9a962268
+User
+10:48:06 PM [express] GET /api/packing/validate-order/112-4290148-3454627 200 in 351ms :: {"id":"7436…
+2025-12-10 16:48:06.53
+9a962268
+User
+10:48:06 PM [express] GET /api/shipment-events/order/112-4290148-3454627 200 in 133ms :: [{"id":"9958…
+2025-12-10 16:48:06.70
+9a962268
+User
+[Packing] Shipment 112-4290148-3454627 has no label URL - fetching from ShipStation...
+2025-12-10 16:48:08.76
+9a962268
+User
+[Packing] Skipping cache invalidation for 112-4290148-3454627 (bagging workflow - QC scans pending)
+2025-12-10 16:48:08.81
+9a962268
+User
+[Desktop WS] Sent job a2634c4e-fc40-44dd-83c4-9ded73542160 (order 112-4290148-3454627) to station 85d575ed-48ec-4942-948d-6be827deb117
+2025-12-10 16:48:08.90
+9a962268
+User
+[Packing] Marked QC complete for shipment 743616de-278e-43e6-8f86-59e3d60bdc8c (order 112-4290148-3454627)
+2025-12-10 16:48:18.09
+9a962268
+User
+[QCSaleCache] Warm cache hit (shipment-specific) for 4000003661 in order 112-4290148-3454627, shipment 743616de-278e-43e6-8f86-59e3d60bdc8c
+2025-12-10 16:48:18.10
+9a962268
+User
+10:48:18 PM [express] GET /api/packing/validate-barcode/112-4290148-3454627/4000003661 200 in 165ms :…
+2025-12-10 16:48:18.27
+9a962268
+User
+[Packing QC] Synchronous QC scan: KLM-GFT-MS-VS-10X+2 x1 for order 112-4290148-3454627
+2025-12-10 16:48:18.27
+9a962268
+User
+[Packing QC] OPTIMIZATION: Using cached data - SaleId=1-352444-8-12075-112-4290148-3454627, IdItem=3661, KitId=null, isKit=false
+2025-12-10 16:48:18.27
+9a962268
+User
+IdSale: '1-352444-8-12075-112-4290148-3454627',
+2025-12-10 16:48:18.27
+9a962268
+User
+IdSale: '1-352444-8-12075-112-4290148-3454627',
+2025-12-10 16:48:21.08
+9a962268
+User
+[Packing QC] Successfully passed QC: KLM-GFT-MS-VS-10X+2 for order 112-4290148-3454627
+2025-12-10 16:48:21.16
+9a962268
+User
+[QCSaleWarmer] Updated cache for 112-4290148-3454627: added passed item KLM-GFT-MS-VS-10X+2 (total passed: 1)
+2025-12-10 16:48:31.97
+9a962268
+User
+[Bagging] Logged packing_completed event for order 112-4290148-3454627
+2025-12-10 16:48:32.06
+9a962268
+User
+[Bagging] Invalidated cache for order 112-4290148-3454627 (QC complete)
+2025-12-10 16:48:32.06
+9a962268
+User
+[Bagging] Marked QC complete for shipment 743616de-278e-43e6-8f86-59e3d60bdc8c (order 112-4290148-3454627)
+2025-12-10 16:48:32.66
+9a962268
+User
+[QCSaleWarmer] Invalidated cache for order 112-4290148-3454627
+2025-12-10 16:48:54.96
+9a962268
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 112-4290148-3454627
+2025-12-10 16:48:54.96
+9a962268
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 112-4290148-3454627
+2025-12-10 16:49:33.85
+9a962268
+User
+[QCSaleWarmer] No shippable shipments for order 112-4290148-3454627 (1 total, none with MOVE OVER tag and not on_hold)
+2025-12-10 16:49:55.24
+9a962268
+User
+[QCSaleWarmer] Tracked failed order 112-4290148-3454627 (attempt 1)
