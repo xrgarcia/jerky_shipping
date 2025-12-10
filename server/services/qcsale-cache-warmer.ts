@@ -257,6 +257,9 @@ function serializeShipmentForCache(shipment: Shipment) {
     shipmentId: shipment.shipmentId,
     sessionStatus: shipment.sessionStatus,
     cacheWarmedAt: shipment.cacheWarmedAt,
+    // QC completion tracking - for fast reprint QC determination
+    qcCompleted: shipment.qcCompleted,
+    qcCompletedAt: shipment.qcCompletedAt,
   };
 }
 
