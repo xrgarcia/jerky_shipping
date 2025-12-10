@@ -142,6 +142,27 @@ export function AlreadyPackedDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Order verification info - shows order number and destination */}
+        <div className="bg-muted/50 rounded-lg p-3 mt-2" data-testid="order-verification-info">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-muted-foreground" />
+              <span className="font-semibold text-lg" data-testid="text-order-number">{orderNumber}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span data-testid="text-customer-info">
+                {shipments[0]?.shipToName || "Unknown"}
+                {(shipments[0]?.shipToCity || shipments[0]?.shipToState) && (
+                  <span className="ml-1">
+                    — {[shipments[0]?.shipToCity, shipments[0]?.shipToState].filter(Boolean).join(", ")}
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4 py-4">
           {isMultipleShipments ? (
             <div className="grid gap-3" data-testid="shipment-selection-list">
