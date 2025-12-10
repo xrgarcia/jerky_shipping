@@ -5111,6 +5111,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const onHoldCount = statuses.filter(s => s.reason === 'on_hold').length;
           const allShipmentsCount = shipmentsResult.allShipments.length;
           
+          // SPECIAL CASE: If ALL shipments are already shipped (none on hold), 
+          // return alreadyPacked success response instead of error
+          // This enables the AlreadyPackedDialog with reprint/QC options
+          if (shippedCount === allShipmentsCount && onHoldCount === 0 && allShipmentsCount > 0) {
+            console.log(`[Packing Validation] All ${allShipmentsCount} shipments already shipped for order ${resolvedOrderNumber} - returning alreadyPacked response`);
+            
+            // Fetch items for all shipped shipments
+            const alreadyPackedShipments = await Promise.all(
+              shipmentsResult.allShipments.map(async (s: any) => {
+                const items = await storage.getShipmentItems(s.id);
+                return {
+                  id: s.id,
+                  orderNumber: s.orderNumber,
+                  trackingNumber: s.trackingNumber,
+                  carrier: s.carrierCode,
+                  serviceCode: s.serviceCode,
+                  shipToName: s.shipToName,
+                  shipToCity: s.shipToCity,
+                  shipToState: s.shipToState,
+                  qcCompleted: s.qcCompleted,
+                  qcCompletedAt: s.qcCompletedAt,
+                  items: items.map(item => ({
+                    sku: item.sku,
+                    name: item.name,
+                    quantity: item.quantity,
+                    imageUrl: item.imageUrl,
+                  })),
+                };
+              })
+            );
+            
+            // Return success response with alreadyPacked flag
+            // Use the first shipment as the "selected" one for consistency
+            const firstShipment = shipmentsResult.allShipments[0];
+            const firstShipmentItems = await storage.getShipmentItems(firstShipment.id);
+            
+            return res.json({
+              ...firstShipment,
+              items: firstShipmentItems,
+              alreadyPacked: true,
+              alreadyPackedShipments,
+              cacheSource,
+              requiresShipmentSelection: false,
+              shippableCount: 0,
+              selectedShipmentId: firstShipment.id,
+              shippableReason: 'none',
+            });
+          }
+          
           // Build dynamic explanation based on actual reasons
           const parts: string[] = [];
           if (shippedCount > 0) {
