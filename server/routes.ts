@@ -7120,45 +7120,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isLabelVoided()) {
         console.log(`[Packing] Label is VOIDED for order ${shipment.orderNumber} - creating NEW label instead of reprinting`);
         
-        // Import ShipStation utilities for label creation
-        const { createShipStationLabel, extractPdfLabelUrl } = await import("./shipstation");
-        
-        // Get the raw shipment data to create new label
-        const shipmentData = shipment.shipmentData as any;
-        if (!shipmentData) {
+        // Get the shipment ID for creating new label on existing shipment
+        const shipStationShipmentId = shipment.shipmentId;
+        if (!shipStationShipmentId) {
           return res.status(422).json({
             success: false,
             error: {
-              code: 'NO_SHIPMENT_DATA',
-              message: 'Cannot create new label - shipment data is missing',
+              code: 'NO_SHIPMENT_ID',
+              message: 'Cannot create new label - ShipStation shipment ID is missing',
               resolution: 'Please sync the order from ShipStation and try again.',
               isVoided: true,
             }
           });
         }
         
-        // Prepare shipment data for new label creation
-        // CRITICAL: Must have shipment_id to attach label to existing shipment
-        const cleanShipmentData: any = { ...shipmentData };
-        
-        // Ensure shipment_id is present in snake_case format
-        if (!cleanShipmentData.shipment_id && cleanShipmentData.shipmentId) {
-          cleanShipmentData.shipment_id = cleanShipmentData.shipmentId;
-        }
-        
-        // Remove old label data so ShipStation creates a fresh one
-        delete cleanShipmentData.labels;
-        delete cleanShipmentData.label_id;
-        delete cleanShipmentData.tracking_number;
-        delete cleanShipmentData.trackingNumber;
-        
-        console.log(`[Packing] Creating new label for voided shipment ${shipment.shipmentId}...`);
+        console.log(`[Packing] Creating new label for voided shipment ${shipStationShipmentId}...`);
         
         let newLabelUrl: string | null = null;
         let newTrackingNumber: string | null = null;
         
         try {
-          const labelData = await createShipStationLabel(cleanShipmentData);
+          // Use createLabelForExistingShipment - takes just the shipment ID
+          const labelData = await createLabelForExistingShipment(shipStationShipmentId);
           
           if (!labelData || !labelData.label_download) {
             console.error(`[Packing] ShipStation did not return label data for voided order`);
