@@ -275,6 +275,9 @@ export const shipments = pgTable("shipments", {
   shipstationModifiedAt: timestamp("shipstation_modified_at"), // ShipStation's modified_at timestamp (for cursor-based polling)
   // Cache warmer tracking
   cacheWarmedAt: timestamp("cache_warmed_at"), // When QCSale data was pre-warmed into cache (null = not warmed)
+  // QC completion tracking
+  qcCompleted: boolean("qc_completed").default(false), // True when packing QC scan is complete (set on boxing/bagging completion)
+  qcCompletedAt: timestamp("qc_completed_at"), // When QC was completed (null = not completed)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
