@@ -4928,9 +4928,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
+      // TRACKING NUMBER FALLBACK: If the scanned value is a tracking number, resolve it to an order number
+      // This allows workers to scan a shipping label to look up the order (e.g., for packing mistakes)
+      let resolvedOrderNumber = orderNumber;
+      let scannedTrackingNumber: string | null = null;
+      
+      // Quick check: Try to find shipments by order number first
+      const orderCheck = await storage.getShipmentsByOrderNumber(orderNumber);
+      if (orderCheck.length === 0) {
+        // No shipments found by order number - try tracking number lookup
+        const shipmentByTracking = await storage.getShipmentByTrackingNumber(orderNumber);
+        if (shipmentByTracking) {
+          console.log(`[Packing Validation] Scanned value "${orderNumber}" resolved as tracking number -> order ${shipmentByTracking.orderNumber}`);
+          resolvedOrderNumber = shipmentByTracking.orderNumber;
+          scannedTrackingNumber = orderNumber;
+        }
+      }
+      
       // PERFORMANCE OPTIMIZATION: Check warm cache first for BOTH shipment and QCSale data
       // The cache warmer service pre-loads both for orders with sessionStatus='closed' and no tracking
-      const warmCacheData = await getWarmCache(orderNumber);
+      const warmCacheData = await getWarmCache(resolvedOrderNumber);
       
       let shipment: any = null;
       let shipmentItems: any[] = [];
@@ -5001,7 +5018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           return res.json({
             requiresShipmentSelection: true,
-            orderNumber,
+            orderNumber: resolvedOrderNumber,
             shippableShipments: shipmentsWithItems,
             shippableCount: shippableShipments.length,
             cacheSource,
@@ -5009,14 +5026,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Fall back to database query with centralized eligibility analysis
-        console.log(`[Packing Validation] Cache miss for shippable shipments, fetching from PostgreSQL: ${orderNumber}`);
+        console.log(`[Packing Validation] Cache miss for shippable shipments, fetching from PostgreSQL: ${resolvedOrderNumber}`);
         
-        const shipmentsResult = await getShippableShipmentsForOrder(orderNumber);
+        const shipmentsResult = await getShippableShipmentsForOrder(resolvedOrderNumber);
         
         if (!shipmentsResult || shipmentsResult.allShipments.length === 0) {
           return res.status(404).json({ 
             error: "Order not found",
-            orderNumber 
+            orderNumber: resolvedOrderNumber 
           });
         }
         
@@ -5038,13 +5055,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   explanation: 'This shipment either doesn\'t have the "MOVE OVER" tag or is on hold.',
                   resolution: 'Select a different shipment or wait for this one to become shippable.'
                 },
-                orderNumber,
+                orderNumber: resolvedOrderNumber,
                 requestedShipmentId: explicitShipmentId
               });
             }
             return res.status(404).json({ 
               error: "Selected shipment not found",
-              orderNumber,
+              orderNumber: resolvedOrderNumber,
               requestedShipmentId: explicitShipmentId
             });
           }
@@ -5081,7 +5098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           return res.json({
             requiresShipmentSelection: true,
-            orderNumber,
+            orderNumber: resolvedOrderNumber,
             shippableShipments: shipmentsWithItems,
             shippableCount: shippableShipments.length,
             cacheSource,
@@ -5119,7 +5136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Use first shipment but mark as not shippable
             shipment = shipmentsResult.allShipments[0];
             notShippable = errorInfo;
-            console.log(`[Packing Validation] No eligible shipments for order ${orderNumber}: ${shippedCount} shipped, ${onHoldCount} on hold`);
+            console.log(`[Packing Validation] No eligible shipments for order ${resolvedOrderNumber}: ${shippedCount} shipped, ${onHoldCount} on hold`);
           } else {
             const firstShipment = shipmentsResult.allShipments[0];
             
@@ -5150,7 +5167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             return res.status(422).json({
               error: errorInfo,
-              orderNumber,
+              orderNumber: resolvedOrderNumber,
               shipmentId: firstShipment?.id,
               shipments: shipmentsWithItems,
               shipmentStatuses: statuses,
@@ -5167,7 +5184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hasMoveOverTag = shipmentTagsData.some((tag: { name: string }) => tag.name === 'MOVE OVER');
         
         if (!hasMoveOverTag) {
-          console.log(`[Packing Validation] Order ${orderNumber} is not shippable - missing MOVE OVER tag`);
+          console.log(`[Packing Validation] Order ${resolvedOrderNumber} is not shippable - missing MOVE OVER tag`);
           
           const notShippableError = {
             code: 'NOT_SHIPPABLE',
@@ -5180,11 +5197,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Otherwise (bagging page), return 422 error to block the scan
           if (allowNotShippable) {
             notShippable = notShippableError;
-            console.log(`[Packing Validation] allowNotShippable=true, continuing with warning for order ${orderNumber}`);
+            console.log(`[Packing Validation] allowNotShippable=true, continuing with warning for order ${resolvedOrderNumber}`);
           } else {
             return res.status(422).json({
               error: notShippableError,
-              orderNumber,
+              orderNumber: resolvedOrderNumber,
               shipmentId: shipment.id
             });
           }
@@ -5208,19 +5225,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cachedQcSaleForShipment = internalShipmentId && qcSalesByShipment?.[internalShipmentId];
         
         if (cachedQcSaleForShipment) {
-          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${orderNumber}, internalId: ${internalShipmentId}`);
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${resolvedOrderNumber}, internalId: ${internalShipmentId}`);
           qcSale = cachedQcSaleForShipment as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else if (warmCacheData?.qcSale) {
           // Fallback to default QCSale (single-shipment orders or backward compat)
-          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (default): ${orderNumber}`);
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (default): ${resolvedOrderNumber}`);
           qcSale = warmCacheData.qcSale as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else {
           // Use ShipStation shipment ID (se-XXX format) for SkuVault lookup
           // SkuVault uses this format in their composite order IDs (e.g., "480797-ORDER-123-933001022")
-          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${orderNumber} (shipstationId: ${shipstationShipmentId || 'none'})`);
-          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipstationShipmentId);
+          console.log(`[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: ${resolvedOrderNumber} (shipstationId: ${shipstationShipmentId || 'none'})`);
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(resolvedOrderNumber, shipstationShipmentId);
           if (cacheSource === 'database') cacheSource = 'skuvault_api';
         }
         
@@ -5234,7 +5251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           // Cache QCSale data for barcode validation (includes kit components)
-          await qcSaleCache.set(orderNumber, qcSale);
+          await qcSaleCache.set(resolvedOrderNumber, qcSale);
           
           // 3. Cross-validate items between ShipStation and SkuVault
           const skuVaultSkus = new Set((qcSale.Items ?? []).map(item => item.Sku).filter(Boolean));
@@ -5305,7 +5322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   username: passedItem.UserName || `SkuVault User ${passedItem.UserId || 'Unknown'}`,
                   station: "skuvault_qc",
                   eventName: "product_scan_success",
-                  orderNumber: orderNumber,
+                  orderNumber: resolvedOrderNumber,
                   skuvaultImport: true, // Mark as imported from SkuVault
                   metadata: {
                     sku: passedItem.Sku,
@@ -5481,13 +5498,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This supports multi-shipment scenarios where an order was split across packages
       let alreadyPackedShipments: any[] = [];
       if (alreadyPacked) {
-        console.log(`[Packing Validation] Order ${orderNumber} is already packed - trackingNumber: ${shipment.trackingNumber}`);
+        console.log(`[Packing Validation] Order ${resolvedOrderNumber} is already packed - trackingNumber: ${shipment.trackingNumber}`);
         
         // Fetch all shipments for this order and filter to those with tracking numbers
-        const allOrderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
+        const allOrderShipments = await storage.getShipmentsByOrderNumber(resolvedOrderNumber);
         const shippedShipments = allOrderShipments.filter(s => !!s.trackingNumber);
         
-        console.log(`[Packing Validation] Found ${shippedShipments.length} shipped shipments for order ${orderNumber}`);
+        console.log(`[Packing Validation] Found ${shippedShipments.length} shipped shipments for order ${resolvedOrderNumber}`);
         
         // Fetch items for each shipped shipment
         alreadyPackedShipments = await Promise.all(
