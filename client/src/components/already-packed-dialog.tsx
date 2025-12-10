@@ -219,9 +219,9 @@ export function AlreadyPackedDialog({
                               collapsible
                               className="w-full"
                             >
-                              <AccordionItem value="items" className="border-0">
+                              <AccordionItem value="items" className="border-0 border-none">
                                 <AccordionTrigger
-                                  className="py-2 text-sm text-muted-foreground hover:no-underline"
+                                  className="py-2 text-sm text-muted-foreground hover:no-underline focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                                   onClick={(e) => e.stopPropagation()}
                                   data-testid={`accordion-trigger-items-${shipment.id}`}
                                 >
@@ -289,9 +289,9 @@ export function AlreadyPackedDialog({
               
               {shipments[0]?.items && shipments[0].items.length > 0 && (
                 <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="items" className="border-0">
+                  <AccordionItem value="items" className="border-0 border-none">
                     <AccordionTrigger
-                      className="py-2 text-sm text-muted-foreground hover:no-underline"
+                      className="py-2 text-sm text-muted-foreground hover:no-underline focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                       data-testid="accordion-trigger-items-single"
                     >
                       <div className="flex items-center gap-2">

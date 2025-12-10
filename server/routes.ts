@@ -5477,8 +5477,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This is more robust than checking events because it catches labels created outside the system
       const alreadyPacked = !!shipment.trackingNumber;
       
+      // 7b. NEW: If already packed, collect ALL shipped shipments for this order
+      // This supports multi-shipment scenarios where an order was split across packages
+      let alreadyPackedShipments: any[] = [];
       if (alreadyPacked) {
         console.log(`[Packing Validation] Order ${orderNumber} is already packed - trackingNumber: ${shipment.trackingNumber}`);
+        
+        // Fetch all shipments for this order and filter to those with tracking numbers
+        const allOrderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
+        const shippedShipments = allOrderShipments.filter(s => !!s.trackingNumber);
+        
+        console.log(`[Packing Validation] Found ${shippedShipments.length} shipped shipments for order ${orderNumber}`);
+        
+        // Fetch items for each shipped shipment
+        alreadyPackedShipments = await Promise.all(
+          shippedShipments.map(async (s) => {
+            const items = await storage.getShipmentItems(s.id);
+            return {
+              id: s.id,
+              orderNumber: s.orderNumber,
+              trackingNumber: s.trackingNumber,
+              carrier: s.carrierCode,
+              serviceCode: s.serviceCode,
+              shipToName: s.shipToName,
+              shipToCity: s.shipToCity,
+              shipToState: s.shipToState,
+              items: items.map(item => ({
+                sku: item.sku,
+                name: item.name,
+                quantity: item.quantity,
+                imageUrl: item.imageUrl,
+              })),
+            };
+          })
+        );
       }
       
       // 8. Return combined data with pending print jobs
@@ -5495,6 +5527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
         notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
         alreadyPacked, // True if order has tracking number (label already purchased)
+        alreadyPackedShipments, // Array of all shipped shipments for this order (multi-shipment support)
         // NEW: Multi-shipment support fields
         requiresShipmentSelection: false, // False when a shipment was successfully selected
         shippableCount: shippableShipments.length, // How many shippable shipments exist for this order

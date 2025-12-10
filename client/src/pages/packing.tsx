@@ -1236,25 +1236,33 @@ export default function Packing() {
       // GUARD RAIL: Check if order is already packed (has tracking number)
       // This interrupts the flow and requires deliberate action to continue
       if ((shipment as any).alreadyPacked) {
-        console.log(`[Packing] Order ${shipment.orderNumber} is already packed - showing reprint dialog`);
-        // Convert shipment to AlreadyPackedShipment format
-        const alreadyPackedData: AlreadyPackedShipment = {
-          id: shipment.id,
-          orderNumber: shipment.orderNumber,
-          trackingNumber: shipment.trackingNumber || null,
-          carrier: shipment.carrier || null,
-          serviceCode: shipment.serviceCode || null,
-          shipToName: shipment.shipToName || null,
-          shipToCity: shipment.shipToCity || null,
-          shipToState: shipment.shipToState || null,
-          items: shipment.items?.map(item => ({
-            sku: item.sku,
-            name: item.name,
-            quantity: item.quantity,
-            imageUrl: item.imageUrl,
-          })),
-        };
-        setAlreadyPackedShipments([alreadyPackedData]);
+        // Use the alreadyPackedShipments array from backend (supports multi-shipment orders)
+        const backendShipments = (shipment as any).alreadyPackedShipments as AlreadyPackedShipment[] | undefined;
+        
+        if (backendShipments && backendShipments.length > 0) {
+          console.log(`[Packing] Order ${shipment.orderNumber} is already packed - ${backendShipments.length} shipped shipment(s) found`);
+          setAlreadyPackedShipments(backendShipments);
+        } else {
+          // Fallback: Convert single shipment to AlreadyPackedShipment format
+          console.log(`[Packing] Order ${shipment.orderNumber} is already packed - using fallback (single shipment)`);
+          const alreadyPackedData: AlreadyPackedShipment = {
+            id: shipment.id,
+            orderNumber: shipment.orderNumber,
+            trackingNumber: shipment.trackingNumber || null,
+            carrier: shipment.carrier || null,
+            serviceCode: shipment.serviceCode || null,
+            shipToName: shipment.shipToName || null,
+            shipToCity: shipment.shipToCity || null,
+            shipToState: shipment.shipToState || null,
+            items: shipment.items?.map(item => ({
+              sku: item.sku,
+              name: item.name,
+              quantity: item.quantity,
+              imageUrl: item.imageUrl,
+            })),
+          };
+          setAlreadyPackedShipments([alreadyPackedData]);
+        }
         setShowAlreadyPackedDialog(true);
         setOrderScan(""); // Clear the input
         return; // Don't proceed with normal flow
