@@ -23,7 +23,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, refreshCacheForOrderDetailed, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
+import { onLabelCreated, refreshCacheForOrder, refreshCacheForOrderDetailed, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder, warmCacheForOrder } from "./services/qcsale-cache-warmer";
 import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -6090,25 +6090,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lookupResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
       
       if (!lookupResult.found) {
-        // Cache miss or barcode not in order - try to refresh cache
-        console.log(`[Packing Validation] Barcode ${barcode} not found in cache for order ${orderNumber}, fetching fresh data`);
+        // Cache miss or barcode not in order - try to warm cache with shipment-specific data
+        console.log(`[Packing Validation] Barcode ${barcode} not found in cache for order ${orderNumber}, warming cache with shipment-specific maps`);
         
-        // Wrap in try-catch to allow fallback when getQCSalesByOrderNumber throws (e.g., unsessioned orders)
-        let qcSale = null;
+        // Use warmCacheForOrder to build proper warm cache with lookupMapsByShipment
+        // This ensures multi-shipment orders have correct per-shipment PassedItems lists
+        let cacheWarmed = false;
         try {
-          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
-        } catch (qcError) {
-          console.log(`[Packing Validation] QC Sale lookup failed for ${orderNumber} (order may not be sessioned):`, qcError);
+          cacheWarmed = await warmCacheForOrder(orderNumber, true); // force=true to refresh
+        } catch (warmError) {
+          console.log(`[Packing Validation] Cache warming failed for ${orderNumber} (order may not be sessioned):`, warmError);
           // Continue to fallback - don't re-throw
         }
         
-        if (qcSale) {
-          await qcSaleCache.set(orderNumber, qcSale);
-          
-          // Retry lookup with fresh cache (note: short-TTL cache doesn't have shipment-specific maps)
+        if (cacheWarmed) {
+          // Retry lookup with warm cache (now has shipment-specific lookupMapsByShipment)
           const retryResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
           if (retryResult.found) {
-            console.log(`[Packing Validation] Barcode ${barcode} found after cache refresh: ${retryResult.sku} (kit=${retryResult.isKitComponent})`);
+            console.log(`[Packing Validation] Barcode ${barcode} found after cache warming: ${retryResult.sku} (kit=${retryResult.isKitComponent})`);
             return res.json({
               valid: true,
               sku: retryResult.sku,
@@ -6138,8 +6137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const orderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
             
             if (orderShipments.length > 0) {
-              // Get items from the most recent shipment (first one due to DESC order)
-              const shipmentItemsList = await storage.getShipmentItems(orderShipments[0].id);
+              // Use specific shipment if shipmentId provided, otherwise fall back to most recent
+              // This ensures multi-shipment orders validate against the correct shipment's items
+              const targetShipmentId = shipmentId as string | undefined;
+              const targetShipment = targetShipmentId 
+                ? orderShipments.find(s => s.id === targetShipmentId) || orderShipments[0]
+                : orderShipments[0];
+              const shipmentItemsList = await storage.getShipmentItems(targetShipment.id);
               
               // 3. Match SKU against shipment items (case-insensitive)
               const matchedItem = shipmentItemsList.find(item => 
@@ -6147,7 +6151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
               
               if (matchedItem) {
-                console.log(`[Packing Validation] Fallback match: barcode ${barcode} -> SKU ${product.Sku} found in shipment items`);
+                console.log(`[Packing Validation] Fallback match: barcode ${barcode} -> SKU ${product.Sku} found in shipment ${targetShipment.id} items`);
                 return res.json({
                   valid: true,
                   sku: product.Sku,
@@ -6163,7 +6167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fallbackValidation: true, // Flag indicating this used fallback path
                 });
               } else {
-                console.log(`[Packing Validation] Product ${product.Sku} not in order ${orderNumber}'s shipment items`);
+                console.log(`[Packing Validation] Product ${product.Sku} not in order ${orderNumber}'s shipment ${targetShipment.id} items`);
               }
             }
           }
