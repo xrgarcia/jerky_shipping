@@ -6142,15 +6142,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // FALLBACK: Order not sessioned in SkuVault (no QC Sale data)
         // Use direct product lookup and match against shipment items
-        console.log(`[Packing Validation] No QC Sale data for order ${orderNumber}, trying direct product lookup`);
+        console.log(`[Packing Validation] No QC Sale data for order ${orderNumber}, trying direct product lookup for barcode: ${barcode}`);
         
         try {
           // 1. Look up product by barcode in SkuVault
+          console.log(`[Packing Validation] Calling SkuVault getProductByCode for barcode: ${barcode}`);
           const { product } = await skuVaultService.getProductByCode(barcode);
           
           if (product && product.Sku) {
+            console.log(`[Packing Validation] SkuVault found product: SKU=${product.Sku}, Description=${product.Description}`);
+            
             // 2. Get shipment items for this order from our database
             const orderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
+            console.log(`[Packing Validation] Found ${orderShipments.length} shipment(s) for order ${orderNumber}`);
             
             if (orderShipments.length > 0) {
               // Use specific shipment if shipmentId provided, otherwise fall back to most recent
@@ -6160,6 +6164,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ? orderShipments.find(s => s.id === targetShipmentId) || orderShipments[0]
                 : orderShipments[0];
               const shipmentItemsList = await storage.getShipmentItems(targetShipment.id);
+              
+              console.log(`[Packing Validation] Shipment ${targetShipment.id} has ${shipmentItemsList.length} items: ${shipmentItemsList.map(i => i.sku).join(', ')}`);
               
               // 3. Match SKU against shipment items (case-insensitive)
               const matchedItem = shipmentItemsList.find(item => 
@@ -6183,12 +6189,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fallbackValidation: true, // Flag indicating this used fallback path
                 });
               } else {
-                console.log(`[Packing Validation] Product ${product.Sku} not in order ${orderNumber}'s shipment ${targetShipment.id} items`);
+                console.log(`[Packing Validation] SKU mismatch: SkuVault product SKU '${product.Sku}' not in order ${orderNumber}'s shipment ${targetShipment.id} items (items: ${shipmentItemsList.map(i => i.sku).join(', ')})`);
               }
+            } else {
+              console.log(`[Packing Validation] No shipments found in database for order ${orderNumber}`);
             }
+          } else {
+            console.log(`[Packing Validation] SkuVault returned no product for barcode: ${barcode}`);
           }
-        } catch (fallbackError) {
-          console.error(`[Packing Validation] Fallback product lookup failed:`, fallbackError);
+        } catch (fallbackError: any) {
+          console.error(`[Packing Validation] Fallback product lookup failed for barcode ${barcode}:`, fallbackError.message || fallbackError);
         }
         
         return res.status(404).json({ 
