@@ -5502,6 +5502,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               shipToName: s.shipToName,
               shipToCity: s.shipToCity,
               shipToState: s.shipToState,
+              qcCompleted: s.qcCompleted,
+              qcCompletedAt: s.qcCompletedAt,
               items: items.map(item => ({
                 sku: item.sku,
                 name: item.name,
