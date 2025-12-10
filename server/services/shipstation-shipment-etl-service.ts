@@ -591,16 +591,40 @@ export class ShipStationShipmentETLService {
   }
 
   /**
+   * Check if shipment has a voided label
+   * ShipStation stores voided status in multiple places:
+   * - Top-level: shipmentData.voided
+   * - Inside labels array: labels[0].voided or labels[0].status === 'voided'
+   */
+  private isLabelVoided(shipmentData: any): boolean {
+    // Check top-level voided flag
+    if (shipmentData.voided === true) {
+      return true;
+    }
+    
+    // Check labels array for voided status
+    const labels = shipmentData.labels;
+    if (Array.isArray(labels) && labels.length > 0) {
+      const label = labels[0];
+      if (label.voided === true || label.status === 'voided') {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
    * Normalize ShipStation status to our internal status values
    * Handles voided, delivered, in_transit, on_hold, etc.
    */
   private normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
-    const voided = shipmentData.voided ?? false;
+    const voided = this.isLabelVoided(shipmentData);
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
     // Handle voided shipments first
     if (voided) {
-      return { status: 'cancelled', statusDescription: 'Shipment voided' };
+      return { status: 'cancelled', statusDescription: 'Label voided' };
     }
     
     // Handle tracking updates (tracking webhooks use different fields)

@@ -112,6 +112,30 @@ export class ShipStationShipmentService {
   }
 
   /**
+   * Check if shipment has a voided label
+   * ShipStation stores voided status in multiple places:
+   * - Top-level: shipmentData.voided
+   * - Inside labels array: labels[0].voided or labels[0].status === 'voided'
+   */
+  private isLabelVoided(shipStationData: any): boolean {
+    // Check top-level voided flag
+    if (shipStationData.voided === true) {
+      return true;
+    }
+    
+    // Check labels array for voided status
+    const labels = shipStationData.labels;
+    if (Array.isArray(labels) && labels.length > 0) {
+      const label = labels[0];
+      if (label.voided === true || label.status === 'voided') {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
    * Normalize ShipStation V2 API response to our database schema
    * Handles both camelCase (V2 API) and snake_case (webhook) formats
    * Field mapping and type conversions in ONE place
@@ -123,7 +147,7 @@ export class ShipStationShipmentService {
     const trackingNumber = this.firstNonEmpty(shipStationData.trackingNumber, shipStationData.tracking_number);
     const carrierCode = this.firstNonEmpty(shipStationData.carrierCode, shipStationData.carrier_code);
     const serviceCode = this.firstNonEmpty(shipStationData.serviceCode, shipStationData.service_code);
-    const voided = shipStationData.voided ?? false;
+    const voided = this.isLabelVoided(shipStationData);
     const shipmentStatus = this.firstNonEmpty(shipStationData.shipmentStatus, shipStationData.shipment_status);
     const shipDate = this.firstNonEmpty(shipStationData.shipDate, shipStationData.ship_date);
     

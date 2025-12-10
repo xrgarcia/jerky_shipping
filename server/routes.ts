@@ -7084,6 +7084,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Packing] Reprint label requested for order ${orderNumber || shipment.orderNumber} at station ${webSession.stationId}`);
       
+      // CHECK FOR VOIDED LABEL - If voided, create new label instead of reprinting old one
+      // Check database status OR raw shipment data for voided flag
+      const isLabelVoided = (): boolean => {
+        // Check if our normalized status is 'cancelled'
+        if (shipment.status === 'cancelled') {
+          return true;
+        }
+        
+        // Check raw ShipStation data for voided labels
+        const shipmentData = shipment.shipmentData as any;
+        if (shipmentData) {
+          // Top-level voided flag
+          if (shipmentData.voided === true) {
+            return true;
+          }
+          
+          // Check labels array for voided status
+          const labels = shipmentData.labels;
+          if (Array.isArray(labels) && labels.length > 0) {
+            const label = labels[0];
+            if (label.voided === true || label.status === 'voided') {
+              return true;
+            }
+          }
+        }
+        
+        return false;
+      };
+      
+      if (isLabelVoided()) {
+        console.log(`[Packing] Label is VOIDED for order ${shipment.orderNumber} - creating NEW label instead of reprinting`);
+        
+        // Import ShipStation utilities for label creation
+        const { createShipStationLabel, extractPdfLabelUrl } = await import("./shipstation");
+        
+        // Get the raw shipment data to create new label
+        const shipmentData = shipment.shipmentData as any;
+        if (!shipmentData) {
+          return res.status(422).json({
+            success: false,
+            error: {
+              code: 'NO_SHIPMENT_DATA',
+              message: 'Cannot create new label - shipment data is missing',
+              resolution: 'Please sync the order from ShipStation and try again.',
+              isVoided: true,
+            }
+          });
+        }
+        
+        // Prepare shipment data for new label creation
+        // CRITICAL: Must have shipment_id to attach label to existing shipment
+        const cleanShipmentData: any = { ...shipmentData };
+        
+        // Ensure shipment_id is present in snake_case format
+        if (!cleanShipmentData.shipment_id && cleanShipmentData.shipmentId) {
+          cleanShipmentData.shipment_id = cleanShipmentData.shipmentId;
+        }
+        
+        // Remove old label data so ShipStation creates a fresh one
+        delete cleanShipmentData.labels;
+        delete cleanShipmentData.label_id;
+        delete cleanShipmentData.tracking_number;
+        delete cleanShipmentData.trackingNumber;
+        
+        console.log(`[Packing] Creating new label for voided shipment ${shipment.shipmentId}...`);
+        
+        let newLabelUrl: string | null = null;
+        let newTrackingNumber: string | null = null;
+        
+        try {
+          const labelData = await createShipStationLabel(cleanShipmentData);
+          
+          if (!labelData || !labelData.label_download) {
+            console.error(`[Packing] ShipStation did not return label data for voided order`);
+            return res.status(422).json({
+              success: false,
+              error: {
+                code: 'LABEL_CREATION_FAILED',
+                message: 'ShipStation did not return a new label',
+                resolution: 'Please check ShipStation for errors and try again.',
+                isVoided: true,
+              }
+            });
+          }
+          
+          newLabelUrl = extractPdfLabelUrl(labelData.label_download);
+          newTrackingNumber = labelData.tracking_number || null;
+          
+          console.log(`[Packing] New label created: ${newLabelUrl}, tracking: ${newTrackingNumber}`);
+        } catch (labelError: any) {
+          console.error(`[Packing] Failed to create new label for voided order:`, labelError);
+          return res.status(422).json({
+            success: false,
+            error: {
+              code: 'LABEL_CREATION_FAILED',
+              message: labelError.message || 'Failed to create new label for voided shipment',
+              resolution: 'Please check ShipStation for errors and try again.',
+              isVoided: true,
+            }
+          });
+        }
+        
+        if (!newLabelUrl) {
+          // ShipStation returned a label but no PDF format - don't mutate shipment
+          console.error(`[Packing] New label created but extractPdfLabelUrl returned null - label may only have ZPL/PNG`);
+          return res.status(422).json({
+            success: false,
+            error: {
+              code: 'NO_PDF_LABEL',
+              message: 'New label was created but no PDF format is available',
+              resolution: 'The label may only be available in ZPL or PNG format. Please check ShipStation label settings.',
+              isVoided: true,
+            }
+          });
+        }
+        
+        // Create station-bound print job with new label FIRST (before mutating shipment)
+        // This ensures shipment data stays consistent if print job creation fails
+        const printJob = await storage.createPrintJob({
+          stationId: webSession.stationId,
+          orderId: shipment.orderId || undefined,
+          shipmentId: shipment.id,
+          jobType: "label",
+          payload: { 
+            labelUrl: newLabelUrl,
+            orderNumber: shipment.orderNumber,
+            trackingNumber: newTrackingNumber,
+            requestedBy: user.displayName || user.email || 'Unknown',
+            printerName: selectedPrinter?.name || null,
+            isVoidedReplacement: true, // Flag indicating this replaced a voided label
+          },
+          status: "pending",
+          requestedBy: user.id,
+        });
+        
+        // Send job to desktop client via WebSocket
+        broadcastDesktopPrintJob(webSession.stationId, printJob);
+        
+        // Also broadcast to browser print queue for visibility
+        broadcastPrintQueueUpdate({ 
+          type: "job_added", 
+          job: printJob 
+        });
+        
+        // SUCCESS: Now update shipment with new label data (after print job is created)
+        await storage.updateShipment(shipment.id, {
+          labelUrl: newLabelUrl,
+          trackingNumber: newTrackingNumber,
+          status: 'shipped', // Reset to shipped status
+        });
+        console.log(`[Packing] Updated shipment with new label URL and tracking number`);
+        
+        // Invalidate QC cache for this order (so fresh data is fetched)
+        try {
+          const { qcSaleCache } = await import("./services/qcsale-cache-warmer");
+          await qcSaleCache.invalidate(shipment.orderNumber);
+          console.log(`[Packing] Invalidated QC cache for voided order ${shipment.orderNumber}`);
+        } catch (err) {
+          console.log(`[Packing] Cache invalidation skipped:`, err);
+        }
+        
+        // Log the new label creation (replacing voided label)
+        await storage.createShipmentEvent({
+          username: user.email,
+          station: station || "packing",
+          stationId: webSession.stationId,
+          eventName: "label_created_after_void",
+          orderNumber: shipment.orderNumber,
+          metadata: {
+            printJobId: printJob.id,
+            newLabelUrl: newLabelUrl,
+            newTrackingNumber: newTrackingNumber,
+            previousTrackingNumber: shipment.trackingNumber,
+            previousLabelWasVoided: true,
+            requestedBy: user.displayName || user.email,
+          },
+        });
+        
+        console.log(`[Packing] Created new label for voided order ${shipment.orderNumber}, print job: ${printJob.id}`);
+        
+        return res.json({ 
+          success: true, 
+          printQueued: true, 
+          printJobId: printJob.id,
+          labelUrl: newLabelUrl,
+          trackingNumber: newTrackingNumber,
+          wasVoided: true,
+          message: "Previous label was voided. New label created and queued for printing."
+        });
+      }
+      
+      // Normal reprint flow - label is NOT voided
       // Create print job using existing label URL
       const printJob = await storage.createPrintJob({
         stationId: webSession.stationId,
