@@ -180,6 +180,91 @@ function buildLookupMap(qcSale: import('@shared/skuvault-types').QCSale): Record
 }
 
 /**
+ * Validation result for barcode completeness check
+ */
+interface BarcodeValidationResult {
+  isValid: boolean;
+  missingItems: Array<{
+    sku: string;
+    title: string | null;
+    isKitComponent: boolean;
+    kitSku?: string;
+  }>;
+  totalItems: number;
+  coveredItems: number;
+}
+
+/**
+ * Validate that all QCSale items have at least one scannable barcode in the lookup map.
+ * Returns validation result with details about any missing items.
+ * 
+ * An item is considered "covered" if it has at least one of:
+ * - Code (barcode)
+ * - SKU
+ * - PartNumber (UPC)
+ * - AlternateCode
+ */
+function validateLookupMapCompleteness(
+  qcSale: import('@shared/skuvault-types').QCSale,
+  lookupMap: Record<string, any>
+): BarcodeValidationResult {
+  const missingItems: BarcodeValidationResult['missingItems'] = [];
+  let totalItems = 0;
+  let coveredItems = 0;
+  
+  for (const item of qcSale.Items || []) {
+    const isKit = item.KitProducts && item.KitProducts.length > 0;
+    
+    if (!isKit) {
+      totalItems++;
+      const hasScannable = 
+        (item.Code && lookupMap[item.Code.toUpperCase()]) ||
+        (item.Sku && lookupMap[item.Sku.toUpperCase()]) ||
+        (item.PartNumber && lookupMap[item.PartNumber.toUpperCase()]) ||
+        (item.AlternateCodes?.some(ac => ac && typeof ac === 'string' && lookupMap[ac.toUpperCase()]));
+      
+      if (hasScannable) {
+        coveredItems++;
+      } else {
+        missingItems.push({
+          sku: item.Sku || 'UNKNOWN',
+          title: item.Title || null,
+          isKitComponent: false,
+        });
+      }
+    }
+    
+    if (isKit && item.KitProducts) {
+      for (const component of item.KitProducts) {
+        totalItems++;
+        const hasScannable = 
+          (component.Code && lookupMap[component.Code.toUpperCase()]) ||
+          (component.Sku && lookupMap[component.Sku.toUpperCase()]) ||
+          (component.PartNumber && lookupMap[component.PartNumber.toUpperCase()]);
+        
+        if (hasScannable) {
+          coveredItems++;
+        } else {
+          missingItems.push({
+            sku: component.Sku || 'UNKNOWN',
+            title: component.Title || null,
+            isKitComponent: true,
+            kitSku: item.Sku || undefined,
+          });
+        }
+      }
+    }
+  }
+  
+  return {
+    isValid: missingItems.length === 0,
+    missingItems,
+    totalItems,
+    coveredItems,
+  };
+}
+
+/**
  * Get all shippable shipments for an order using centralized eligibility logic.
  * 
  * A shipment is shippable if:
@@ -306,7 +391,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     let defaultQcSale: any = null;
     let defaultLookupMap: Record<string, any> = {};
     
-    // Fetch QC Sale for each shippable shipment
+    // Fetch QC Sale for each shippable shipment with barcode validation and retry
     for (const shipment of shipmentsResult.shippableShipments) {
       try {
         // IMPORTANT: Two different IDs are used here:
@@ -314,11 +399,51 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         // - shipment.shipmentId: ShipStation ID (se-XXX format), used for SkuVault API lookup
         // SkuVault uses the ShipStation ID suffix in their composite order IDs (e.g., "480797-ORDER-123-933001022")
         const shipstationId = (shipment as any).shipmentId;
-        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipstationId);
         
-        if (qcSale) {
-          const lookupMap = buildLookupMap(qcSale);
+        // Attempt to fetch and validate QC Sale data with one retry
+        let qcSale: import('@shared/skuvault-types').QCSale | null = null;
+        let lookupMap: Record<string, any> = {};
+        let validationResult: BarcodeValidationResult | null = null;
+        let attempt = 0;
+        const maxAttempts = 2;
+        
+        while (attempt < maxAttempts) {
+          attempt++;
+          qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipstationId);
           
+          if (!qcSale) {
+            log(`  No QC Sale found for shipment ${shipment.id} (shipstationId: ${shipstationId})`);
+            break; // No data at all, don't retry
+          }
+          
+          lookupMap = buildLookupMap(qcSale);
+          validationResult = validateLookupMapCompleteness(qcSale, lookupMap);
+          
+          if (validationResult.isValid) {
+            // All items have scannable barcodes
+            break;
+          }
+          
+          // Validation failed - some items are missing barcodes
+          if (attempt < maxAttempts) {
+            log(`  [BARCODE VALIDATION] Shipment ${shipment.id}: ${validationResult.coveredItems}/${validationResult.totalItems} items have barcodes - retrying in 500ms...`);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Brief delay before retry
+          } else {
+            // Final attempt failed - log details and skip this shipment for now
+            error(`  [BARCODE VALIDATION FAILED] Shipment ${shipment.id}: ${validationResult.missingItems.length} items missing barcodes after ${maxAttempts} attempts:`);
+            for (const missing of validationResult.missingItems.slice(0, 5)) {
+              const kitInfo = missing.isKitComponent ? ` (kit component of ${missing.kitSku})` : '';
+              error(`    - SKU: ${missing.sku}${kitInfo}${missing.title ? ` - ${missing.title}` : ''}`);
+            }
+            if (validationResult.missingItems.length > 5) {
+              error(`    ... and ${validationResult.missingItems.length - 5} more`);
+            }
+            error(`  Skipping shipment ${shipment.id} - will retry on next cache warmer run`);
+            qcSale = null; // Clear so we don't cache incomplete data
+          }
+        }
+        
+        if (qcSale && validationResult?.isValid) {
           // Store by INTERNAL shipment ID (matches cache lookup in routes.ts)
           qcSalesByShipment[shipment.id] = {
             SaleId: qcSale.SaleId,
@@ -336,9 +461,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
             defaultLookupMap = lookupMap;
           }
           
-          log(`  Fetched QC Sale for shipment ${shipment.id} (shipstationId: ${shipstationId}, ${Object.keys(lookupMap).length} barcode entries)`);
-        } else {
-          log(`  No QC Sale found for shipment ${shipment.id} (shipstationId: ${shipstationId})`);
+          log(`  Fetched QC Sale for shipment ${shipment.id} (shipstationId: ${shipstationId}, ${Object.keys(lookupMap).length} barcode entries, validated OK)`);
         }
       } catch (err: any) {
         error(`  Failed to fetch QC Sale for shipment ${shipment.id}: ${err.message}`);
