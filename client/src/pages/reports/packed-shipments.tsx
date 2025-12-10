@@ -437,82 +437,123 @@ export default function PackedShipmentsReport() {
                     onOpenChange={() => toggleDateExpanded(day.date)}
                   >
                     <CollapsibleTrigger
-                      className="w-full flex items-center justify-between p-4 rounded-lg bg-muted/50 hover-elevate active-elevate-2"
+                      className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 rounded-lg bg-muted/50 hover-elevate active-elevate-2 gap-2 sm:gap-4"
                       data-testid={`day-row-${day.date}`}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 sm:gap-4">
                         {expandedDates.has(day.date) ? (
-                          <ChevronDown className="h-5 w-5" />
+                          <ChevronDown className="h-5 w-5 flex-shrink-0" />
                         ) : (
-                          <ChevronRight className="h-5 w-5" />
+                          <ChevronRight className="h-5 w-5 flex-shrink-0" />
                         )}
-                        <span className="font-semibold text-lg">{formatDisplayDate(day.date)}</span>
+                        <span className="font-semibold text-base sm:text-lg">{formatDisplayDate(day.date)}</span>
+                        <Badge className="bg-green-600 hover:bg-green-700 sm:hidden">{day.count}</Badge>
                         {day.avgPackingSeconds !== null && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300">
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 hidden sm:flex">
                             <Clock className="h-3 w-3 mr-1" />
                             avg {formatPackingTime(day.avgPackingSeconds)}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex gap-2">
+                      <div className="flex items-center gap-2 sm:gap-4 flex-wrap pl-7 sm:pl-0">
+                        {day.avgPackingSeconds !== null && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 sm:hidden">
+                            <Clock className="h-3 w-3 mr-1" />
+                            avg {formatPackingTime(day.avgPackingSeconds)}
+                          </Badge>
+                        )}
+                        <div className="flex gap-1 sm:gap-2 flex-wrap">
                           {Object.entries(day.userBreakdown).map(([username, count]) => (
                             <Badge key={username} variant="outline" className="text-xs">
                               {extractUsername(username)}: {count}
                             </Badge>
                           ))}
                         </div>
-                        <Badge className="bg-green-600 hover:bg-green-700">{day.count} orders</Badge>
+                        <Badge className="bg-green-600 hover:bg-green-700 hidden sm:flex">{day.count} orders</Badge>
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="mt-2 ml-9 border-l-2 border-muted pl-4 space-y-1">
+                      <div className="mt-2 ml-2 sm:ml-9 border-l-2 border-muted pl-2 sm:pl-4 space-y-2 sm:space-y-1">
                         {day.orders.map((order, idx) => (
                           <div
                             key={`${order.orderNumber}-${idx}`}
-                            className="grid grid-cols-[1fr_90px_1fr_100px_70px_100px] items-center gap-2 py-2 px-3 rounded hover:bg-muted/30"
+                            className="flex flex-col gap-1 py-2 px-2 sm:px-3 rounded hover:bg-muted/30 lg:grid lg:grid-cols-[1fr_90px_1fr_100px_70px_100px] lg:items-center lg:gap-2"
                             data-testid={`order-row-${order.orderNumber}`}
                           >
-                            <div className="flex items-center gap-1 min-w-0">
-                              <a
-                                href={`/shipments?search=${order.orderNumber}`}
-                                className="font-mono text-sm text-primary hover:underline truncate"
-                                data-testid={`link-order-${order.orderNumber}`}
-                              >
-                                {order.orderNumber}
-                              </a>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="flex-shrink-0"
-                                onClick={() => copyOrderNumber(order.orderNumber)}
-                                data-testid={`button-copy-${order.orderNumber}`}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
+                            {/* Order number row - always visible */}
+                            <div className="flex items-center justify-between gap-1 min-w-0 lg:justify-start">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <a
+                                  href={`/shipments?search=${order.orderNumber}`}
+                                  className="font-mono text-sm text-primary hover:underline truncate"
+                                  data-testid={`link-order-${order.orderNumber}`}
+                                >
+                                  {order.orderNumber}
+                                </a>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="flex-shrink-0 h-6 w-6"
+                                  onClick={() => copyOrderNumber(order.orderNumber)}
+                                  data-testid={`button-copy-${order.orderNumber}`}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              {/* Mobile: show time on same row as order number */}
+                              <span className="text-sm text-muted-foreground lg:hidden">
+                                {formatDateTime(order.packedAt)}
+                              </span>
                             </div>
-                            {order.sessionId ? (
-                              <button
-                                onClick={() => setSelectedSessionId(order.sessionId)}
-                                className="text-xs font-mono text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-200 flex items-center gap-1"
-                                data-testid={`button-session-${order.sessionId}`}
-                              >
-                                <Layers className="h-3 w-3" />
-                                {order.sessionId}
-                              </button>
-                            ) : (
-                              <span className="text-sm text-muted-foreground text-center">—</span>
-                            )}
-                            <span className="text-sm text-muted-foreground truncate text-center" data-testid={`station-${order.orderNumber}`}>
+                            
+                            {/* Mobile: metadata row */}
+                            <div className="flex items-center gap-2 flex-wrap text-xs lg:hidden">
+                              <span className="text-muted-foreground">
+                                {extractUsername(order.packedBy)}
+                              </span>
+                              <span className="text-amber-600 font-medium">
+                                {order.packingSeconds !== null ? formatPackingTime(order.packingSeconds) : '-'}
+                              </span>
+                              {order.sessionId && (
+                                <button
+                                  onClick={() => setSelectedSessionId(order.sessionId)}
+                                  className="font-mono text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-200 flex items-center gap-1"
+                                  data-testid={`button-session-mobile-${order.sessionId}`}
+                                >
+                                  <Layers className="h-3 w-3" />
+                                  {order.sessionId}
+                                </button>
+                              )}
+                              <span className="text-muted-foreground" data-testid={`station-mobile-${order.orderNumber}`}>
+                                {getStationDisplay(order.stationId, order.stationType)}
+                              </span>
+                            </div>
+                            
+                            {/* Desktop: remaining columns (hidden on mobile) */}
+                            <div className="hidden lg:block">
+                              {order.sessionId ? (
+                                <button
+                                  onClick={() => setSelectedSessionId(order.sessionId)}
+                                  className="text-xs font-mono text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-200 flex items-center gap-1"
+                                  data-testid={`button-session-${order.sessionId}`}
+                                >
+                                  <Layers className="h-3 w-3" />
+                                  {order.sessionId}
+                                </button>
+                              ) : (
+                                <span className="text-sm text-muted-foreground text-center">—</span>
+                              )}
+                            </div>
+                            <span className="hidden lg:block text-sm text-muted-foreground truncate text-center" data-testid={`station-${order.orderNumber}`}>
                               {getStationDisplay(order.stationId, order.stationType)}
                             </span>
-                            <span className="text-sm text-muted-foreground truncate text-right">
+                            <span className="hidden lg:block text-sm text-muted-foreground truncate text-right">
                               {extractUsername(order.packedBy)}
                             </span>
-                            <span className="text-sm text-amber-600 font-medium text-right">
+                            <span className="hidden lg:block text-sm text-amber-600 font-medium text-right">
                               {order.packingSeconds !== null ? formatPackingTime(order.packingSeconds) : '-'}
                             </span>
-                            <span className="text-sm text-muted-foreground text-right">
+                            <span className="hidden lg:block text-sm text-muted-foreground text-right">
                               {formatDateTime(order.packedAt)}
                             </span>
                           </div>
