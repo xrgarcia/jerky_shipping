@@ -5183,38 +5183,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 : 'Check ShipStation for details on each shipment. Contact a supervisor if unexpected.'
           };
           
+          // Fetch items for all shipments so warehouse can distinguish them (needed for both paths)
+          const shipmentsWithItems = await Promise.all(
+            shipmentsResult.allShipments.map(async (s: any) => {
+              // Find the status for this shipment
+              const status = statuses.find(st => st.id === s.id);
+              const items = await storage.getShipmentItems(s.id);
+              return {
+                id: s.id,
+                shipmentId: s.shipmentId,
+                carrierCode: s.carrierCode,
+                serviceCode: s.serviceCode,
+                shipToName: s.shipToName,
+                shipToCity: s.shipToCity,
+                shipToState: s.shipToState,
+                trackingNumber: s.trackingNumber,
+                exclusionReason: status?.reason || 'unknown',
+                items: items.map(item => ({
+                  sku: item.sku,
+                  name: item.name,
+                  quantity: item.quantity,
+                })),
+              };
+            })
+          );
+          
           if (allowNotShippable && shipmentsResult.allShipments.length > 0) {
-            // Use first shipment but mark as not shippable
-            shipment = shipmentsResult.allShipments[0];
-            notShippable = errorInfo;
-            console.log(`[Packing Validation] No eligible shipments for order ${resolvedOrderNumber}: ${shippedCount} shipped, ${onHoldCount} on hold`);
+            // Boxing page: Return early with noEligibleShipments response so frontend can show scan error UI
+            // This matches how bagging page handles it via the error path
+            console.log(`[Packing Validation] No eligible shipments for order ${resolvedOrderNumber}: ${shippedCount} shipped, ${onHoldCount} on hold - returning noEligibleShipments response`);
+            return res.status(200).json({
+              noEligibleShipments: true,
+              error: errorInfo,
+              orderNumber: resolvedOrderNumber,
+              shipments: shipmentsWithItems,
+              shipmentStatuses: statuses,
+            });
           } else {
             const firstShipment = shipmentsResult.allShipments[0];
-            
-            // Fetch items for all shipments so warehouse can distinguish them
-            const shipmentsWithItems = await Promise.all(
-              shipmentsResult.allShipments.map(async (s: any) => {
-                // Find the status for this shipment
-                const status = statuses.find(st => st.id === s.id);
-                const items = await storage.getShipmentItems(s.id);
-                return {
-                  id: s.id,
-                  shipmentId: s.shipmentId,
-                  carrierCode: s.carrierCode,
-                  serviceCode: s.serviceCode,
-                  shipToName: s.shipToName,
-                  shipToCity: s.shipToCity,
-                  shipToState: s.shipToState,
-                  trackingNumber: s.trackingNumber,
-                  exclusionReason: status?.reason || 'unknown',
-                  items: items.map(item => ({
-                    sku: item.sku,
-                    name: item.name,
-                    quantity: item.quantity,
-                  })),
-                };
-              })
-            );
             
             return res.status(422).json({
               error: errorInfo,

@@ -1216,6 +1216,25 @@ export default function Packing() {
       };
     },
     onSuccess: (shipment) => {
+      // Handle NO_ELIGIBLE_SHIPMENTS response (all on hold, already shipped, etc.)
+      // This is the boxing page equivalent of bagging's error handler for structured errors
+      if ((shipment as any).noEligibleShipments) {
+        const errorData = shipment as any;
+        console.log(`[Packing] No eligible shipments for order ${errorData.orderNumber} - displaying scan error UI`);
+        setScanError({
+          code: errorData.error?.code || 'NO_ELIGIBLE_SHIPMENTS',
+          message: errorData.error?.message || 'No shipments available for packing',
+          explanation: errorData.error?.explanation || '',
+          resolution: errorData.error?.resolution || '',
+          orderNumber: errorData.orderNumber,
+          shipments: errorData.shipments || undefined,
+        });
+        setOrderScan(""); // Clear the input
+        setIsOrderScanProcessing(false);
+        setTimeout(() => orderInputRef.current?.focus(), 100);
+        return; // Don't proceed - show scan error UI
+      }
+      
       // Handle multi-shipment selection scenario
       if ((shipment as any).requiresShipmentSelection && (shipment as any).shippableShipments) {
         console.log(`[Packing] Order ${(shipment as any).orderNumber} has multiple shippable shipments - showing selection dialog`);
