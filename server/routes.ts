@@ -5726,6 +5726,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint: Get full cache data for an order (shows qcSalesByShipment structure)
+  app.get("/api/packing/cache-debug/:orderNumber", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      
+      if (!orderNumber) {
+        return res.status(400).json({ error: "Order number is required" });
+      }
+      
+      // Get the raw cache data
+      const cacheData = await getWarmCache(orderNumber);
+      
+      if (!cacheData) {
+        return res.status(404).json({ 
+          error: "No cache found",
+          orderNumber,
+          message: "This order is not in the warm cache. It may not be ready for packing or the cache has expired."
+        });
+      }
+      
+      // Get all shipments for this order from the database
+      const shipments = await storage.getShipmentsByOrderNumber(orderNumber);
+      
+      // Build a comprehensive debug response
+      const debugResponse = {
+        orderNumber,
+        cachedAt: cacheData.cachedAt ? new Date(cacheData.cachedAt).toISOString() : null,
+        warmedAt: cacheData.warmedAt ? new Date(cacheData.warmedAt).toISOString() : null,
+        
+        // Default QCSale (backward compat - first shipment)
+        defaultQcSale: cacheData.qcSale ? {
+          SaleId: cacheData.qcSale.SaleId,
+          OrderId: cacheData.qcSale.OrderId,
+          Status: cacheData.qcSale.Status,
+          TotalItems: cacheData.qcSale.TotalItems,
+          ItemsCount: cacheData.qcSale.Items?.length ?? 0,
+          PassedItemsCount: cacheData.qcSale.PassedItems?.length ?? 0,
+          PassedItems: cacheData.qcSale.PassedItems ?? [],
+          Items: cacheData.qcSale.Items ?? [],
+        } : null,
+        
+        // Per-shipment QCSale data (multi-shipment support)
+        qcSalesByShipment: cacheData.qcSalesByShipment ? 
+          Object.fromEntries(
+            Object.entries(cacheData.qcSalesByShipment).map(([shipmentId, qcSale]: [string, any]) => [
+              shipmentId,
+              {
+                SaleId: qcSale.SaleId,
+                OrderId: qcSale.OrderId,
+                Status: qcSale.Status,
+                TotalItems: qcSale.TotalItems,
+                ItemsCount: qcSale.Items?.length ?? 0,
+                PassedItemsCount: qcSale.PassedItems?.length ?? 0,
+                PassedItems: qcSale.PassedItems ?? [],
+                Items: qcSale.Items ?? [],
+              }
+            ])
+          ) : {},
+        
+        // Shipment metadata from cache
+        shippableShipments: cacheData.shippableShipments ?? [],
+        defaultShipmentId: cacheData.defaultShipmentId ?? null,
+        shippableReason: cacheData.shippableReason ?? null,
+        
+        // Shipments from database for comparison
+        databaseShipments: shipments.map(s => ({
+          id: s.id,
+          shipmentId: s.shipmentId,
+          orderNumber: s.orderNumber,
+          sessionStatus: s.sessionStatus,
+          trackingNumber: s.trackingNumber,
+          qcCompleted: s.qcCompleted,
+          shipmentStatus: s.shipmentStatus,
+        })),
+        
+        // Lookup map keys (for barcode debugging)
+        lookupMapKeys: cacheData.lookupMap ? Object.keys(cacheData.lookupMap) : [],
+        lookupMapsByShipmentKeys: cacheData.lookupMapsByShipment ?
+          Object.fromEntries(
+            Object.entries(cacheData.lookupMapsByShipment).map(([shipmentId, map]: [string, any]) => [
+              shipmentId,
+              Object.keys(map)
+            ])
+          ) : {},
+      };
+      
+      res.json(debugResponse);
+    } catch (error: any) {
+      console.error("[Packing] Error fetching cache debug data:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch cache debug data",
+        message: error.message 
+      });
+    }
+  });
+
   // Get cache warmer status and metrics
   app.get("/api/operations/cache-warmer-status", requireAuth, async (req, res) => {
     try {
