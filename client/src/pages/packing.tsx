@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 import { ShipmentChoiceDialog, type ShippableShipmentOption } from "@/components/shipment-choice-dialog";
+import { AlreadyPackedDialog, type AlreadyPackedShipment } from "@/components/already-packed-dialog";
 
 // Import sound files
 import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3"; // QC scan success (coin)
@@ -337,8 +338,9 @@ export default function Packing() {
   const [completionSuccess, setCompletionSuccess] = useState<{ printJobId: string; message: string } | null>(null);
 
   // State for "Already Packed" dialog (guard rail for re-scanning packed orders)
+  // Supports multiple shipments for orders split across packages
   const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
-  const [alreadyPackedShipment, setAlreadyPackedShipment] = useState<ShipmentWithItems | null>(null);
+  const [alreadyPackedShipments, setAlreadyPackedShipments] = useState<AlreadyPackedShipment[]>([]);
 
   // State for "Shipment Selection" dialog (when order has multiple shippable shipments)
   const [showShipmentChoiceDialog, setShowShipmentChoiceDialog] = useState(false);
@@ -1235,7 +1237,24 @@ export default function Packing() {
       // This interrupts the flow and requires deliberate action to continue
       if ((shipment as any).alreadyPacked) {
         console.log(`[Packing] Order ${shipment.orderNumber} is already packed - showing reprint dialog`);
-        setAlreadyPackedShipment(shipment);
+        // Convert shipment to AlreadyPackedShipment format
+        const alreadyPackedData: AlreadyPackedShipment = {
+          id: shipment.id,
+          orderNumber: shipment.orderNumber,
+          trackingNumber: shipment.trackingNumber || null,
+          carrier: shipment.carrier || null,
+          serviceCode: shipment.serviceCode || null,
+          shipToName: shipment.shipToName || null,
+          shipToCity: shipment.shipToCity || null,
+          shipToState: shipment.shipToState || null,
+          items: shipment.items?.map(item => ({
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            imageUrl: item.imageUrl,
+          })),
+        };
+        setAlreadyPackedShipments([alreadyPackedData]);
         setShowAlreadyPackedDialog(true);
         setOrderScan(""); // Clear the input
         return; // Don't proceed with normal flow
@@ -1360,7 +1379,7 @@ export default function Packing() {
       });
       // Close dialog and reset
       setShowAlreadyPackedDialog(false);
-      setAlreadyPackedShipment(null);
+      setAlreadyPackedShipments([]);
       setOrderScan("");
       // Focus order input for next scan
       setTimeout(() => orderInputRef.current?.focus(), 100);
@@ -1378,10 +1397,27 @@ export default function Packing() {
   // Handle cancel from already-packed dialog
   const handleCancelAlreadyPacked = () => {
     setShowAlreadyPackedDialog(false);
-    setAlreadyPackedShipment(null);
+    setAlreadyPackedShipments([]);
     setOrderScan("");
     // Focus order input for next scan
     setTimeout(() => orderInputRef.current?.focus(), 100);
+  };
+
+  // Handle proceed to QC from already-packed dialog
+  const handleProceedToQCFromAlreadyPacked = (shipment: AlreadyPackedShipment) => {
+    console.log(`[Packing] Proceeding to QC for already-packed order ${shipment.orderNumber}`);
+    // Re-load the shipment to get full data for QC scanning
+    loadShipmentMutation.mutate({ 
+      orderNumber: shipment.orderNumber, 
+      shipmentId: shipment.id 
+    });
+    setShowAlreadyPackedDialog(false);
+    setAlreadyPackedShipments([]);
+  };
+
+  // Handle reprint from already-packed dialog
+  const handleReprintFromAlreadyPacked = (shipmentId: string, orderNumber: string) => {
+    reprintLabelMutation.mutate({ shipmentId, orderNumber });
   };
 
   // Handle shipment selection from multi-shipment dialog
@@ -2244,103 +2280,15 @@ export default function Packing() {
       </Dialog>
 
       {/* Already Packed Dialog - Guard Rail for re-scanning packed orders */}
-      <Dialog open={showAlreadyPackedDialog} onOpenChange={(open) => {
-        if (!open) handleCancelAlreadyPacked();
-      }}>
-        <DialogContent 
-          className="sm:max-w-md"
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          hideCloseButton
-        >
-          <DialogHeader>
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
-            </div>
-            <DialogTitle className="text-center text-xl">Order Already Packed</DialogTitle>
-            <DialogDescription className="text-center">
-              This order has already been packed and has a shipping label.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="bg-muted rounded-lg p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Order Number:</span>
-                <span className="font-semibold">{alreadyPackedShipment?.orderNumber}</span>
-              </div>
-              {(alreadyPackedShipment as any)?.trackingNumber && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tracking:</span>
-                  <span className="font-mono text-xs">{(alreadyPackedShipment as any)?.trackingNumber}</span>
-                </div>
-              )}
-            </div>
-            
-            <p className="text-sm text-center text-muted-foreground">
-              Do you want to reprint the shipping label?
-            </p>
-            
-            {/* Centered Re-print button */}
-            <div className="flex justify-center">
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (alreadyPackedShipment) {
-                    reprintLabelMutation.mutate({
-                      shipmentId: alreadyPackedShipment.id,
-                      orderNumber: alreadyPackedShipment.orderNumber,
-                    });
-                  }
-                }}
-                disabled={reprintLabelMutation.isPending}
-                data-testid="button-reprint-label"
-              >
-                {reprintLabelMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Reprinting...
-                  </>
-                ) : (
-                  <>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Re-print Label
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex gap-2 sm:justify-center">
-            <Button
-              variant="outline"
-              onClick={handleCancelAlreadyPacked}
-              className="flex-1"
-              data-testid="button-cancel-already-packed"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (alreadyPackedShipment) {
-                  console.log(`[Packing] Proceeding to QC for already-packed order ${alreadyPackedShipment.orderNumber}`);
-                  setCurrentShipment(alreadyPackedShipment);
-                  setShowAlreadyPackedDialog(false);
-                  setAlreadyPackedShipment(null);
-                  setPackingComplete(false);
-                  setLabelError(null);
-                  setCompletionSuccess(null);
-                }
-              }}
-              className="flex-1"
-              data-testid="button-proceed-to-qc"
-            >
-              Proceed to QC
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Supports multiple shipments for orders split across packages */}
+      <AlreadyPackedDialog
+        open={showAlreadyPackedDialog}
+        shipments={alreadyPackedShipments}
+        isReprintPending={reprintLabelMutation.isPending}
+        onReprint={handleReprintFromAlreadyPacked}
+        onProceedToQC={handleProceedToQCFromAlreadyPacked}
+        onCancel={handleCancelAlreadyPacked}
+      />
 
       {/* Shipment Selection Dialog - For orders with multiple shippable shipments */}
       <ShipmentChoiceDialog
