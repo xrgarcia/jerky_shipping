@@ -45,3 +45,42 @@ export async function initializeDatabase() {
     throw error;
   }
 }
+
+// Heartbeat interval reference for cleanup
+let heartbeatInterval: NodeJS.Timeout | null = null;
+
+// Start database heartbeat to prevent Neon compute from suspending
+// Runs a lightweight query every 3 minutes to keep the database compute awake
+export function startDatabaseHeartbeat() {
+  // Clear any existing heartbeat
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+  
+  const HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+  
+  console.log('[DB Heartbeat] Starting heartbeat (every 3 minutes)');
+  
+  heartbeatInterval = setInterval(async () => {
+    try {
+      const start = Date.now();
+      await db.execute(sql`SELECT 1`);
+      const duration = Date.now() - start;
+      console.log(`[DB Heartbeat] Ping successful (${duration}ms)`);
+    } catch (error) {
+      console.error('[DB Heartbeat] Ping failed:', error);
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  
+  // Don't block process exit
+  heartbeatInterval.unref();
+}
+
+// Stop the heartbeat (for graceful shutdown)
+export function stopDatabaseHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    console.log('[DB Heartbeat] Stopped');
+  }
+}

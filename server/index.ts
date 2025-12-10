@@ -6,7 +6,7 @@ import path from "path";
 import { ensureWebhooksRegistered } from "./utils/shopify-webhook";
 import { ensureShipStationWebhooksRegistered } from "./utils/shipstation-webhook";
 import { setupWebSocket } from "./websocket";
-import { initializeDatabase } from "./db";
+import { initializeDatabase, startDatabaseHeartbeat } from "./db";
 // Note: storage imported lazily after initializeDatabase() to ensure pg_trgm extension exists
 
 const app = express();
@@ -58,6 +58,9 @@ app.use((req, res, next) => {
 (async () => {
   // Initialize database extensions (must happen before any database operations)
   await initializeDatabase();
+  
+  // Start database heartbeat to prevent Neon compute from suspending
+  startDatabaseHeartbeat();
   
   // Import storage after extension initialization to ensure pg_trgm exists for queries
   const { storage } = await import("./storage");
