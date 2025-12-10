@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Copy,
   CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -44,6 +45,7 @@ export interface AlreadyPackedShipment {
   shipToName: string | null;
   shipToCity: string | null;
   shipToState: string | null;
+  status?: string | null;
   qcCompleted?: boolean | null;
   qcCompletedAt?: string | null;
   items?: AlreadyPackedShipmentItem[];
@@ -199,6 +201,16 @@ export function AlreadyPackedDialog({
                                 QC Complete
                               </Badge>
                             )}
+                            {shipment.status === 'cancelled' && (
+                              <Badge
+                                variant="destructive"
+                                className="flex items-center gap-1"
+                                data-testid={`badge-voided-${shipment.id}`}
+                              >
+                                <XCircle className="h-3 w-3" />
+                                Voided
+                              </Badge>
+                            )}
                             {shipment.carrier && (
                               <Badge
                                 variant="secondary"
@@ -314,6 +326,16 @@ export function AlreadyPackedDialog({
                     >
                       <CheckCircle2 className="h-3 w-3" />
                       QC Complete
+                    </Badge>
+                  )}
+                  {shipments[0]?.status === 'cancelled' && (
+                    <Badge
+                      variant="destructive"
+                      className="flex items-center gap-1"
+                      data-testid="badge-voided-single"
+                    >
+                      <XCircle className="h-3 w-3" />
+                      Voided
                     </Badge>
                   )}
                 </div>

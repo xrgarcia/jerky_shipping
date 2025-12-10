@@ -5130,6 +5130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   shipToName: s.shipToName,
                   shipToCity: s.shipToCity,
                   shipToState: s.shipToState,
+                  status: s.status,
                   qcCompleted: s.qcCompleted,
                   qcCompletedAt: s.qcCompletedAt,
                   items: items.map(item => ({
@@ -5568,6 +5569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               shipToName: s.shipToName,
               shipToCity: s.shipToCity,
               shipToState: s.shipToState,
+              status: s.status,
               qcCompleted: s.qcCompleted,
               qcCompletedAt: s.qcCompletedAt,
               items: items.map(item => ({
