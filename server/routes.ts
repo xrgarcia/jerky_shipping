@@ -7111,11 +7111,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Mark QC as completed (for fast lookup on reprints/re-scans)
-      await storage.updateShipment(shipment.id, {
-        qcCompleted: true,
-        qcCompletedAt: new Date(),
-      });
-      console.log(`[Packing] Marked QC complete for shipment ${shipment.id} (order ${orderNumber})`);
+      // BOXING ONLY: For bagging workflow (skipCacheInvalidation=true), QC complete is marked
+      // in /api/packing/bagging-complete AFTER product scans are done
+      if (!skipCacheInvalidation) {
+        await storage.updateShipment(shipment.id, {
+          qcCompleted: true,
+          qcCompletedAt: new Date(),
+        });
+        console.log(`[Packing] Marked QC complete for shipment ${shipment.id} (order ${orderNumber})`);
+      } else {
+        console.log(`[Packing] Skipping QC complete mark for ${orderNumber} (bagging workflow - QC scans pending)`);
+      }
       
       res.json({ 
         success: true, 
@@ -7182,6 +7188,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       console.log(`[Bagging] Logged packing_completed event for order ${orderNumber}`);
+      
+      // Log to packing_logs table for audit trail (matches boxing workflow logging)
+      try {
+        await storage.createPackingLog({
+          userId: user.id,
+          shipmentId: shipmentId || null,
+          orderNumber,
+          action: 'bagging_completed',
+          productSku: null,
+          scannedCode: null,
+          skuVaultProductId: null,
+          success: true,
+          errorMessage: null,
+          skuVaultRawResponse: {
+            request: { shipmentId, orderNumber, totalScans, labelPrintedOnLoad },
+            response: { eventId: event.id },
+          },
+          station: "bagging",
+          stationId: stationId || null,
+        });
+        console.log(`[Bagging] Logged packing_log for order ${orderNumber}`);
+      } catch (logError) {
+        console.error(`[Bagging] Failed to create packing_log for ${orderNumber}:`, logError);
+      }
       
       // Mark QC as completed on the shipment (for fast lookup on reprints/re-scans)
       if (shipmentId) {
