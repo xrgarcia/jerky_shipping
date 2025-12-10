@@ -314,6 +314,13 @@ export const shipments = pgTable("shipments", {
   sessionStatusUpdatedAtIdx: index("shipments_session_status_updated_at_idx").on(table.sessionStatus, table.updatedAt.desc()),
   // Index for cache warming tracking (when was this order's cache warmed)
   cacheWarmedAtIdx: index("shipments_cache_warmed_at_idx").on(table.cacheWarmedAt.desc().nullsLast()).where(sql`${table.cacheWarmedAt} IS NOT NULL`),
+  // PERFORMANCE INDEXES: Composite indexes for common shipments page query patterns
+  // Status + ship_date for filtering by status with date sorting
+  statusShipDateIdx: index("shipments_status_ship_date_idx").on(table.shipmentStatus, table.shipDate.desc().nullsLast()).where(sql`${table.shipmentStatus} IS NOT NULL`),
+  // Carrier + ship_date for carrier filtering with date sorting
+  carrierShipDateIdx: index("shipments_carrier_ship_date_idx").on(table.carrierCode, table.shipDate.desc().nullsLast()).where(sql`${table.carrierCode} IS NOT NULL`),
+  // QC completed timestamp for packed shipments report queries
+  qcCompletedAtIdx: index("shipments_qc_completed_at_idx").on(table.qcCompletedAt.desc().nullsLast()).where(sql`${table.qcCompletedAt} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({

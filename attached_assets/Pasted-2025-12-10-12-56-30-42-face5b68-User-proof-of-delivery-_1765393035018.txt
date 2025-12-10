@@ -1,0 +1,212 @@
+2025-12-10 12:56:30.42
+face5b68
+User
+"proof_of_delivery_url": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_detail_description": "Your shipment is on its way between the carrier hubs.",
+2025-12-10 12:56:30.42
+face5b68
+User
+"description": "ARRIVE USPS FACILITY",
+2025-12-10 12:56:30.42
+face5b68
+User
+"x-shipengine-rsa-sha256-signature": "present",
+2025-12-10 12:56:30.42
+face5b68
+User
+},
+2025-12-10 12:56:30.42
+face5b68
+User
+"event_description": "PROCESSED THROUGH USPS FACILITY",
+2025-12-10 12:56:30.42
+face5b68
+User
+"label_url": "https://api.shipengine.com/v1/labels/se-599717940",
+2025-12-10 12:56:30.42
+face5b68
+User
+"city_locality": "NORTHWEST ROCHESTER NY DISTRIBU",
+2025-12-10 12:56:30.42
+face5b68
+User
+"occurred_at": "2025-12-10T18:05:00Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+"exception_description": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"event_description": "ARRIVE USPS FACILITY",
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_detail_code": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"country_code": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"resource_type": "API_TRACK",
+2025-12-10 12:56:30.42
+face5b68
+User
+"tracking_number": "9400150206217424808881",
+2025-12-10 12:56:30.42
+face5b68
+User
+"company_name": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+{
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_occurred_at": "2025-12-10T09:33:00Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+"x-shipengine-timestamp": "2025-12-10T18:56:30Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_status_description": "PROCESSED THROUGH USPS FACILITY",
+2025-12-10 12:56:30.42
+face5b68
+User
+"description": "PROCESSED THROUGH USPS FACILITY",
+2025-12-10 12:56:30.42
+face5b68
+User
+"state_province": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_code": "IT",
+2025-12-10 12:56:30.42
+face5b68
+User
+"occurred_at": "2025-12-10T14:33:00Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+"country_code": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"city_locality": "NORTHWEST ROCHESTER NY DISTRIBU",
+2025-12-10 12:56:30.42
+face5b68
+User
+"content-type": "application/json"
+2025-12-10 12:56:30.42
+face5b68
+User
+"data": {
+2025-12-10 12:56:30.42
+face5b68
+User
+Body: {
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_detail_code": "IN_TRANSIT",
+2025-12-10 12:56:30.42
+face5b68
+User
+Timestamp: 2025-12-10T18:56:30.423Z
+2025-12-10 12:56:30.42
+face5b68
+User
+"estimated_delivery_date": "2025-12-11T08:00:00Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+{
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_detail_code": "IN_TRANSIT",
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_detail_code": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"longitude": -77.6963
+2025-12-10 12:56:30.42
+face5b68
+User
+"actual_delivery_date": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"latitude": 43.1725,
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_detail_code": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_description": "In Transit",
+2025-12-10 12:56:30.42
+face5b68
+User
+"proof_of_delivery_url": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"signer": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_code": "IT",
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_status_code": "10",
+2025-12-10 12:56:30.42
+face5b68
+User
+"signer": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"event_code": "10",
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_description": "In Transit",
+2025-12-10 12:56:30.42
+face5b68
+User
+"events": [
+2025-12-10 12:56:30.42
+face5b68
+User
+"company_name": null,
+2025-12-10 12:56:30.42
+face5b68
+User
+"carrier_occurred_at": "2025-12-10T13:05:00Z",
+2025-12-10 12:56:30.42
+face5b68
+User
+"status_detail_description": "Your shipment is on its way between the carrier hubs.",
+2025-12-10 12:56:30.42
+face5b68
+User
+}
+2025-12-10 12:56:30.42
+face5b68
+User
+"resource_url": "https://api.shipengine.com/v1/tracking?carrier_code=usps&tracking_number=9400150206217424808881",

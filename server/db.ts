@@ -12,7 +12,23 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Pool configuration optimized for Neon serverless to prevent cold starts
+// keepAlive prevents connections from going idle and triggering Neon compute suspension
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  // Keep connections alive to prevent Neon cold starts
+  keepAlive: true,
+  // Send keepalive probe immediately when connection becomes idle
+  keepAliveInitialDelayMillis: 0,
+  // Maximum number of connections in the pool
+  max: 10,
+  // Minimum number of connections to keep warm (prevents full cold start)
+  min: 1,
+  // How long a connection can be idle before being closed (5 minutes)
+  idleTimeoutMillis: 300000,
+  // How long to wait for a connection before timing out (10 seconds)
+  connectionTimeoutMillis: 10000,
+});
 export const db = drizzle({ client: pool, schema });
 
 // Initialize database extensions (pg_trgm for fuzzy text search)
