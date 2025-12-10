@@ -42,6 +42,17 @@ const WARM_TTL_SECONDS = 172800; // 48 hours for pre-warmed entries
 // Now we only check redis.exists() on the actual cache key which respects TTL.
 const POLL_INTERVAL_MS = 30000; // 30 seconds
 const MAX_ORDERS_PER_POLL = 10; // Limit API calls per poll cycle
+const DELAY_BETWEEN_ORDERS_MS = 2500; // 2.5 seconds between orders for session stability
+
+// Failed order retry tracking with exponential backoff
+const FAILED_ORDER_KEY_PREFIX = 'skuvault:qcsale:failed:';
+const BACKOFF_SCHEDULE_MS = [
+  2 * 60 * 1000,    // 1st retry: 2 minutes
+  5 * 60 * 1000,    // 2nd retry: 5 minutes
+  15 * 60 * 1000,   // 3rd retry: 15 minutes
+  60 * 60 * 1000,   // 4th+ retry: 1 hour
+];
+const MAX_RETRY_ATTEMPTS = 10; // After this, stop retrying until manual refresh
 
 // Metrics
 interface CacheWarmerMetrics {
@@ -79,6 +90,90 @@ let pollIntervalId: NodeJS.Timeout | null = null;
  */
 function getWarmCacheKey(orderNumber: string): string {
   return `${WARM_CACHE_KEY_PREFIX}${orderNumber}`;
+}
+
+/**
+ * Get the failed order tracking key
+ */
+function getFailedOrderKey(orderNumber: string): string {
+  return `${FAILED_ORDER_KEY_PREFIX}${orderNumber}`;
+}
+
+/**
+ * Track a failed warming attempt for exponential backoff
+ */
+async function trackFailedOrder(orderNumber: string): Promise<void> {
+  try {
+    const redis = getRedisClient();
+    const key = getFailedOrderKey(orderNumber);
+    
+    const existing = await redis.get(key);
+    const data = existing ? (typeof existing === 'string' ? JSON.parse(existing) : existing) : null;
+    
+    const attempts = (data?.attempts || 0) + 1;
+    const newData = {
+      orderNumber,
+      attempts,
+      lastAttemptAt: Date.now(),
+      firstFailedAt: data?.firstFailedAt || Date.now(),
+    };
+    
+    // TTL of 24 hours - if order hasn't been retried in 24 hours, reset
+    await redis.set(key, JSON.stringify(newData), { ex: 86400 });
+    log(`Tracked failed order ${orderNumber} (attempt ${attempts})`);
+  } catch (err: any) {
+    error(`Failed to track failed order ${orderNumber}: ${err.message}`);
+  }
+}
+
+/**
+ * Check if an order should be retried based on exponential backoff
+ */
+async function shouldRetryOrder(orderNumber: string): Promise<boolean> {
+  try {
+    const redis = getRedisClient();
+    const key = getFailedOrderKey(orderNumber);
+    
+    const existing = await redis.get(key);
+    if (!existing) return true; // No failure record, can try
+    
+    const data = typeof existing === 'string' ? JSON.parse(existing) : existing;
+    const attempts = data.attempts || 0;
+    const lastAttemptAt = data.lastAttemptAt || 0;
+    
+    // Max retries reached - don't auto-retry, wait for manual refresh
+    if (attempts >= MAX_RETRY_ATTEMPTS) {
+      return false;
+    }
+    
+    // Calculate backoff delay based on attempt count
+    const backoffIndex = Math.min(attempts - 1, BACKOFF_SCHEDULE_MS.length - 1);
+    const backoffDelay = BACKOFF_SCHEDULE_MS[Math.max(0, backoffIndex)];
+    const timeSinceLastAttempt = Date.now() - lastAttemptAt;
+    
+    if (timeSinceLastAttempt < backoffDelay) {
+      // Not enough time has passed
+      return false;
+    }
+    
+    return true;
+  } catch (err: any) {
+    error(`Failed to check retry status for ${orderNumber}: ${err.message}`);
+    return true; // On error, allow retry
+  }
+}
+
+/**
+ * Clear failed order tracking (called on success or when order ships)
+ */
+async function clearFailedOrderTracking(orderNumber: string): Promise<void> {
+  try {
+    const redis = getRedisClient();
+    const key = getFailedOrderKey(orderNumber);
+    await redis.del(key);
+  } catch (err: any) {
+    error(`Failed to clear failed order tracking for ${orderNumber}: ${err.message}`);
+  }
 }
 
 /**
@@ -566,6 +661,9 @@ export async function invalidateCacheForOrder(orderNumber: string): Promise<void
     const regularKey = `skuvault:qcsale:${orderNumber}`;
     await redis.del(regularKey);
     
+    // Clear failed order tracking (order shipped, no longer needs retry)
+    await clearFailedOrderTracking(orderNumber);
+    
     // Clear the cacheWarmedAt timestamp in the database
     try {
       await db.update(shipments)
@@ -589,7 +687,14 @@ export async function invalidateCacheForOrder(orderNumber: string): Promise<void
  */
 export async function refreshCacheForOrder(orderNumber: string): Promise<boolean> {
   log(`Manual refresh requested for order ${orderNumber}`);
-  return warmCacheForOrder(orderNumber, true);
+  const success = await warmCacheForOrder(orderNumber, true);
+  
+  if (success) {
+    // Clear backoff tracking on successful manual refresh
+    await clearFailedOrderTracking(orderNumber);
+  }
+  
+  return success;
 }
 
 /**
@@ -846,6 +951,9 @@ export async function getInactiveSessionShipments(): Promise<Array<{ orderNumber
 /**
  * Poll for ready-to-pack orders and warm their cache
  * Called on interval (every 30 seconds)
+ * 
+ * Now uses exponential backoff for failed orders to avoid
+ * hammering SkuVault with requests that keep failing.
  */
 async function pollAndWarm(): Promise<void> {
   try {
@@ -860,18 +968,53 @@ async function pollAndWarm(): Promise<void> {
       return;
     }
     
-    log(`Found ${orderNumbers.length} orders ready to pack, warming cache...`);
+    // Filter orders based on backoff - skip orders that failed recently
+    const ordersToProcess: string[] = [];
+    const skippedDueToBackoff: string[] = [];
     
-    let warmed = 0;
     for (const orderNumber of orderNumbers) {
-      const success = await warmCacheForOrder(orderNumber);
-      if (success) warmed++;
-      
-      // Small delay between API calls to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const canRetry = await shouldRetryOrder(orderNumber);
+      if (canRetry) {
+        ordersToProcess.push(orderNumber);
+      } else {
+        skippedDueToBackoff.push(orderNumber);
+      }
     }
     
-    log(`Warmed cache for ${warmed}/${orderNumbers.length} orders`);
+    if (skippedDueToBackoff.length > 0) {
+      log(`Skipping ${skippedDueToBackoff.length} orders due to backoff (failed recently)`);
+    }
+    
+    if (ordersToProcess.length === 0) {
+      log(`All ${orderNumbers.length} orders are in backoff period`);
+      metrics.workerStatus = 'sleeping';
+      return;
+    }
+    
+    log(`Processing ${ordersToProcess.length}/${orderNumbers.length} orders (${skippedDueToBackoff.length} in backoff)...`);
+    
+    let warmed = 0;
+    let failed = 0;
+    
+    // Process orders serially with longer delay for session stability
+    for (const orderNumber of ordersToProcess) {
+      const success = await warmCacheForOrder(orderNumber);
+      
+      if (success) {
+        warmed++;
+        // Clear any previous failure tracking on success
+        await clearFailedOrderTracking(orderNumber);
+      } else {
+        failed++;
+        // Track failure for exponential backoff
+        await trackFailedOrder(orderNumber);
+      }
+      
+      // Longer delay between orders for SkuVault session stability (2.5 seconds)
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ORDERS_MS));
+    }
+    
+    log(`Warmed ${warmed}/${ordersToProcess.length} orders (${failed} failed, will retry with backoff)`);
     metrics.workerStatus = 'sleeping';
   } catch (err: any) {
     error(`Poll and warm error: ${err.message}`);
