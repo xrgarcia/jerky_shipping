@@ -6065,9 +6065,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Fast barcode validation for packing - uses SkuVault cached data (includes kit components)
   // Requires orderNumber to look up in the cached QCSale data
+  // Optional query param: ?shipmentId=<internal-uuid> for multi-shipment order support
   app.get("/api/packing/validate-barcode/:orderNumber/:barcode", requireAuth, async (req, res) => {
     try {
       const { orderNumber, barcode } = req.params;
+      const { shipmentId } = req.query; // Optional: internal shipment UUID for multi-shipment orders
       
       if (!orderNumber || orderNumber.trim() === '') {
         return res.status(400).json({ 
@@ -6084,7 +6086,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Look up barcode in cached QCSale data (includes regular items AND kit components)
-      const lookupResult = await qcSaleCache.lookup(orderNumber, barcode);
+      // When shipmentId is provided, uses shipment-specific lookup map for multi-shipment orders
+      const lookupResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
       
       if (!lookupResult.found) {
         // Cache miss or barcode not in order - try to refresh cache
@@ -6102,8 +6105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (qcSale) {
           await qcSaleCache.set(orderNumber, qcSale);
           
-          // Retry lookup with fresh cache
-          const retryResult = await qcSaleCache.lookup(orderNumber, barcode);
+          // Retry lookup with fresh cache (note: short-TTL cache doesn't have shipment-specific maps)
+          const retryResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
           if (retryResult.found) {
             console.log(`[Packing Validation] Barcode ${barcode} found after cache refresh: ${retryResult.sku} (kit=${retryResult.isKitComponent})`);
             return res.json({

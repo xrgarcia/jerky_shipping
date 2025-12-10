@@ -359,20 +359,67 @@ class QCSaleCache {
   /**
    * Look up a barcode/SKU in the cached order data
    * Returns item info if found, or not-found result
+   * 
+   * Multi-shipment support: When shipmentId is provided, we first check the warm cache
+   * for shipment-specific lookupMaps (lookupMapsByShipment[shipmentId]) to ensure
+   * we're validating against the correct shipment's items.
    */
-  async lookup(orderNumber: string, barcodeOrSku: string): Promise<BarcodeLookup> {
+  async lookup(orderNumber: string, barcodeOrSku: string, shipmentId?: string): Promise<BarcodeLookup> {
     try {
       const redis = getRedisClient();
+      const key = barcodeOrSku.toUpperCase();
+      
+      // Priority 1: If shipmentId provided, try warm cache with shipment-specific lookup map
+      if (shipmentId) {
+        const warmCacheKey = `skuvault:qcsale:warm:${orderNumber}`;
+        const warmCacheData = await redis.get(warmCacheKey);
+        
+        if (warmCacheData) {
+          const warmParsed = typeof warmCacheData === 'string' ? JSON.parse(warmCacheData) : warmCacheData;
+          
+          // Check shipment-specific lookupMap first
+          if (warmParsed.lookupMapsByShipment && warmParsed.lookupMapsByShipment[shipmentId]) {
+            const shipmentLookupMap = warmParsed.lookupMapsByShipment[shipmentId];
+            if (shipmentLookupMap[key]) {
+              console.log(`[QCSaleCache] Warm cache hit (shipment-specific) for ${barcodeOrSku} in order ${orderNumber}, shipment ${shipmentId}`);
+              return shipmentLookupMap[key];
+            }
+            console.log(`[QCSaleCache] Barcode ${barcodeOrSku} not found in shipment ${shipmentId}'s warm cache for order ${orderNumber}`);
+            return { found: false, saleId: warmParsed.saleId };
+          }
+          
+          // Fallback to default warm cache lookupMap if no shipment-specific map
+          if (warmParsed.lookupMap && warmParsed.lookupMap[key]) {
+            console.log(`[QCSaleCache] Warm cache hit (default) for ${barcodeOrSku} in order ${orderNumber}`);
+            return warmParsed.lookupMap[key];
+          }
+        }
+      }
+      
+      // Priority 2: Check the short-TTL cache (set by qcSaleCache.set())
       const cacheData = await redis.get(this.getCacheKey(orderNumber));
       
       if (!cacheData) {
+        // Priority 3: Check warm cache without shipment filter as last resort
+        const warmCacheKey = `skuvault:qcsale:warm:${orderNumber}`;
+        const warmCacheData = await redis.get(warmCacheKey);
+        
+        if (warmCacheData) {
+          const warmParsed = typeof warmCacheData === 'string' ? JSON.parse(warmCacheData) : warmCacheData;
+          if (warmParsed.lookupMap && warmParsed.lookupMap[key]) {
+            console.log(`[QCSaleCache] Warm cache hit (fallback) for ${barcodeOrSku} in order ${orderNumber}`);
+            return warmParsed.lookupMap[key];
+          }
+          console.log(`[QCSaleCache] Barcode ${barcodeOrSku} not found in warm cache for order ${orderNumber}`);
+          return { found: false, saleId: warmParsed.saleId };
+        }
+        
         console.log(`[QCSaleCache] Cache miss for order ${orderNumber}`);
         return { found: false };
       }
       
       // Upstash Redis auto-parses JSON, so handle both string and object
       const parsed = typeof cacheData === 'string' ? JSON.parse(cacheData) : cacheData;
-      const key = barcodeOrSku.toUpperCase();
       
       if (parsed.lookupMap && parsed.lookupMap[key]) {
         console.log(`[QCSaleCache] Cache hit for ${barcodeOrSku} in order ${orderNumber}`);
