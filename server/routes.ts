@@ -5153,6 +5153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               items: firstShipmentItems,
               alreadyPacked: true,
               alreadyPackedShipments,
+              scannedTrackingNumber, // If user scanned a tracking number, include it for filtering
               cacheSource,
               requiresShipmentSelection: false,
               shippableCount: 0,
