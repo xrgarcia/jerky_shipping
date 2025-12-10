@@ -5598,6 +5598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
         alreadyPacked, // True if order has tracking number (label already purchased)
         alreadyPackedShipments, // Array of all shipped shipments for this order (multi-shipment support)
+        scannedTrackingNumber, // If user scanned a tracking number, this is the tracking number they scanned (for filtering)
         // NEW: Multi-shipment support fields
         requiresShipmentSelection: false, // False when a shipment was successfully selected
         shippableCount: shippableShipments.length, // How many shippable shipments exist for this order

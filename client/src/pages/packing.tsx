@@ -1237,7 +1237,17 @@ export default function Packing() {
       // This interrupts the flow and requires deliberate action to continue
       if ((shipment as any).alreadyPacked) {
         // Use the alreadyPackedShipments array from backend (supports multi-shipment orders)
-        const backendShipments = (shipment as any).alreadyPackedShipments as AlreadyPackedShipment[] | undefined;
+        let backendShipments = (shipment as any).alreadyPackedShipments as AlreadyPackedShipment[] | undefined;
+        
+        // If user scanned a tracking number, filter to only show that specific shipment
+        const scannedTrackingNumber = (shipment as any).scannedTrackingNumber as string | undefined;
+        if (scannedTrackingNumber && backendShipments && backendShipments.length > 1) {
+          const matchingShipment = backendShipments.find(s => s.trackingNumber === scannedTrackingNumber);
+          if (matchingShipment) {
+            console.log(`[Packing] Filtered to single shipment matching scanned tracking: ${scannedTrackingNumber}`);
+            backendShipments = [matchingShipment];
+          }
+        }
         
         if (backendShipments && backendShipments.length > 0) {
           console.log(`[Packing] Order ${shipment.orderNumber} is already packed - ${backendShipments.length} shipped shipment(s) found`);
