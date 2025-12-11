@@ -365,6 +365,7 @@ function validateLookupMapCompleteness(
  * A shipment is shippable if:
  * - Has "MOVE OVER" tag (picking complete in SkuVault)
  * - shipmentStatus is NOT 'on_hold'
+ * - Does NOT have "**DO NOT SHIP (ALERT MGR)**" package
  * 
  * Returns analysis result with:
  * - allShipments: All shipments for the order
@@ -385,19 +386,19 @@ export async function getShippableShipmentsForOrder(orderNumber: string): Promis
       return null;
     }
     
-    // Batch fetch tags for all shipments
+    // Batch fetch tags and packages for all shipments
     const shipmentIds = allShipments.map(s => s.id);
-    const tagsResult = await db
-      .select()
-      .from(shipmentTags)
-      .where(inArray(shipmentTags.shipmentId, shipmentIds));
+    const [tagsResult, packagesResult] = await Promise.all([
+      db.select().from(shipmentTags).where(inArray(shipmentTags.shipmentId, shipmentIds)),
+      db.select().from(shipmentPackages).where(inArray(shipmentPackages.shipmentId, shipmentIds)),
+    ]);
     
-    // Use centralized eligibility logic
-    const result = analyzeShippableShipments(allShipments, tagsResult);
+    // Use centralized eligibility logic (includes DO NOT SHIP package check)
+    const result = analyzeShippableShipments(allShipments, tagsResult, packagesResult);
     
     // Log based on reason
     if (result.reason === 'none') {
-      log(`No shippable shipments for order ${orderNumber} (${allShipments.length} total, none with MOVE OVER tag and not on_hold)`);
+      log(`No shippable shipments for order ${orderNumber} (${allShipments.length} total, none eligible)`);
     } else if (result.reason === 'multiple') {
       log(`Multiple shippable shipments for order ${orderNumber} (${result.shippableShipments.length} found)`);
     } else {
