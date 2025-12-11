@@ -3186,7 +3186,7 @@ export default function Bagging() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 pb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2 pb-4">
                     {/* Left Column: Shipping Information */}
                     <div className="space-y-4">
                       {/* Contact Information */}
@@ -3280,36 +3280,9 @@ export default function Bagging() {
                           )}
                         </div>
                       )}
-
-                      {/* Packages Section */}
-                      {currentShipment.packages && currentShipment.packages.length > 0 && (
-                        <div className="pt-3 border-t space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Box className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              {currentShipment.packages.length} Package{currentShipment.packages.length > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="pl-6 space-y-1">
-                            {currentShipment.packages.map((pkg, idx) => (
-                              <div key={pkg.id || idx} className="text-xs text-muted-foreground flex items-center gap-2" data-testid={`package-info-${idx}`}>
-                                {pkg.weight && (
-                                  <span className="font-mono">{pkg.weight} {pkg.weightUnits || 'lbs'}</span>
-                                )}
-                                {pkg.length && pkg.width && pkg.height && (
-                                  <span className="font-mono">({pkg.length}x{pkg.width}x{pkg.height})</span>
-                                )}
-                                {pkg.insuredValue && (
-                                  <span className="text-green-600">${pkg.insuredValue}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Right Column: Order Notes */}
+                    {/* Center Column: Order Notes */}
                     <div className="space-y-4 md:border-l md:pl-6">
                       {/* Gift Message */}
                       <div>
@@ -3354,6 +3327,55 @@ export default function Bagging() {
                           </Button>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Right Column: Package Details */}
+                    <div className="space-y-4 lg:border-l lg:pl-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Box className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground font-semibold">
+                          Package Details ({currentShipment.packages?.length || 0})
+                        </span>
+                      </div>
+                      {currentShipment.packages && currentShipment.packages.length > 0 ? (
+                        <div className="space-y-3">
+                          {currentShipment.packages.map((pkg, idx) => (
+                            <div key={pkg.id || idx} className="p-3 bg-muted/30 rounded-lg space-y-2" data-testid={`package-detail-${idx}`}>
+                              <div className="text-xs font-semibold text-muted-foreground">
+                                Package {idx + 1}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                {pkg.weight && (
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Weight</div>
+                                    <div className="font-mono font-medium">{pkg.weight} {pkg.weightUnits || 'lbs'}</div>
+                                  </div>
+                                )}
+                                {pkg.length && pkg.width && pkg.height && (
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Dimensions</div>
+                                    <div className="font-mono font-medium">{pkg.length} x {pkg.width} x {pkg.height}</div>
+                                  </div>
+                                )}
+                                {pkg.insuredValue && (
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Insured</div>
+                                    <div className="font-medium text-green-600">${pkg.insuredValue} {pkg.insuredCurrency || 'USD'}</div>
+                                  </div>
+                                )}
+                                {pkg.trackingNumber && (
+                                  <div className="col-span-2">
+                                    <div className="text-xs text-muted-foreground">Tracking</div>
+                                    <div className="font-mono text-xs">{pkg.trackingNumber}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No package details available</div>
+                      )}
                     </div>
                   </div>
                 </AccordionContent>
