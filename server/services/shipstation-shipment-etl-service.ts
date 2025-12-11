@@ -167,8 +167,10 @@ export class ShipStationShipmentETLService {
     const trackingNumber = this.extractTrackingNumber(shipmentData);
     const orderNumber = this.extractOrderNumber(shipmentData);
     
-    // Extract status information
-    const { status, statusDescription } = this.normalizeShipmentStatus(shipmentData);
+    // Extract status information - use RAW tracking status to match production behavior
+    // This preserves ShipStation status codes like 'ac', 'it', 'de' instead of normalizing them
+    const status = this.extractRawTrackingStatus(shipmentData);
+    const statusDescription = this.extractStatusDescription(shipmentData);
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
     // Debug logging for shipmentStatus extraction
@@ -669,8 +671,96 @@ export class ShipStationShipmentETLService {
   }
 
   /**
+   * Extract raw tracking status code from ShipStation data
+   * Preserves the original status codes like 'AC', 'IT', 'DE', 'UN', etc. (UPPERCASE)
+   * This is used for the 'status' field to match production behavior where webhooks
+   * store uppercase codes from ShipStation tracking updates.
+   * 
+   * Fallback hierarchy for shipments without tracking updates:
+   * 1. voided → 'cancelled'
+   * 2. label_purchased → 'AC' (Accepted - carrier awaiting pickup, enables "On the Dock")
+   * 3. on_hold → 'pending'
+   * 4. awaiting_shipment → 'pending' (pre-label state)
+   * 5. cancelled → 'cancelled'
+   * 6. otherwise → 'shipped'
+   */
+  private extractRawTrackingStatus(shipmentData: any): string {
+    if (!shipmentData) return 'pending';
+    
+    // Check for voided shipments first
+    if (this.isLabelVoided(shipmentData)) {
+      return 'cancelled';
+    }
+    
+    // Extract raw tracking status code (both camelCase and snake_case)
+    const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
+    if (trackingStatus) {
+      // Return the raw status code UPPERCASE to match production webhook behavior
+      return String(trackingStatus).toUpperCase();
+    }
+    
+    // For shipments without tracking updates, use lifecycle status with proper fallbacks
+    const shipmentStatus = this.extractShipmentStatus(shipmentData);
+    
+    // label_purchased → 'AC' - enables "On the Dock" badge
+    if (shipmentStatus === 'label_purchased') {
+      return 'AC';
+    }
+    
+    // on_hold → 'pending' - awaiting warehouse processing
+    if (shipmentStatus === 'on_hold') {
+      return 'pending';
+    }
+    
+    // awaiting_shipment → 'pending' - pre-label state
+    if (shipmentStatus === 'awaiting_shipment') {
+      return 'pending';
+    }
+    
+    // cancelled → 'cancelled'
+    if (shipmentStatus === 'cancelled') {
+      return 'cancelled';
+    }
+    
+    // Default fallback for other states
+    return 'shipped';
+  }
+
+  /**
+   * Extract status description from ShipStation data
+   */
+  private extractStatusDescription(shipmentData: any): string {
+    if (!shipmentData) return 'Pending';
+    
+    // Check for voided
+    if (this.isLabelVoided(shipmentData)) {
+      return 'Label voided';
+    }
+    
+    // Try to get carrier status description
+    const description = shipmentData.carrier_status_description || 
+                       shipmentData.status_description ||
+                       shipmentData.statusDescription;
+    if (description) {
+      return description;
+    }
+    
+    // Generate description based on status
+    const shipmentStatus = this.extractShipmentStatus(shipmentData);
+    if (shipmentStatus === 'label_purchased') {
+      return 'Accepted - carrier awaiting pickup';
+    }
+    if (shipmentStatus === 'on_hold') {
+      return 'On hold - awaiting warehouse processing';
+    }
+    
+    return 'Shipment created';
+  }
+
+  /**
    * Normalize ShipStation status to our internal status values
    * Handles voided, delivered, in_transit, on_hold, etc.
+   * @deprecated Use extractRawTrackingStatus instead to preserve raw status codes
    */
   private normalizeShipmentStatus(shipmentData: any): { status: string; statusDescription: string } {
     const voided = this.isLabelVoided(shipmentData);

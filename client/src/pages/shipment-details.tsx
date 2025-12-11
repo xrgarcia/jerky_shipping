@@ -55,13 +55,24 @@ export default function ShipmentDetails() {
     }
 
     const statusConfig: Record<string, { variant: "default" | "secondary" | "outline"; className?: string; label: string }> = {
+      // Raw ShipStation tracking codes (UPPERCASE - matches production)
+      "DE": { variant: "default", className: "bg-green-600 hover:bg-green-700 text-lg", label: "Delivered" },
+      "IT": { variant: "default", className: "bg-blue-600 hover:bg-blue-700 text-lg", label: "In Transit" },
+      "AC": { variant: "default", className: "bg-cyan-600 hover:bg-cyan-700 text-lg", label: "Accepted" },
+      "SP": { variant: "default", className: "bg-green-500 hover:bg-green-600 text-lg", label: "Delivered (Locker)" },
+      "AT": { variant: "default", className: "bg-orange-500 hover:bg-orange-600 text-lg", label: "Attempted Delivery" },
+      "EX": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400 text-lg", label: "Exception" },
+      "UN": { variant: "outline", className: "border-gray-500 text-gray-700 dark:text-gray-400 text-lg", label: "Unknown" },
+      // Legacy/normalized values for backwards compatibility
       "delivered": { variant: "default", className: "bg-green-600 hover:bg-green-700 text-lg", label: "Delivered" },
       "in_transit": { variant: "default", className: "bg-blue-600 hover:bg-blue-700 text-lg", label: "In Transit" },
       "shipped": { variant: "secondary", className: "text-lg", label: "Shipped" },
       "cancelled": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400 text-lg", label: "Cancelled" },
+      "pending": { variant: "outline", className: "border-amber-500 text-amber-700 dark:text-amber-400 text-lg", label: "Pending" },
     };
 
-    const config = statusConfig[status.toLowerCase()] || { variant: "outline" as const, className: "text-lg", label: status };
+    // Try exact match first, then uppercase for resilience
+    const config = statusConfig[status] || statusConfig[status.toUpperCase()] || { variant: "outline" as const, className: "text-lg", label: status };
     
     return (
       <Badge variant={config.variant} className={config.className}>
@@ -84,12 +95,13 @@ export default function ShipmentDetails() {
     const hasTracking = !!shipment.trackingNumber;
     const sessionStatus = shipment.sessionStatus?.toLowerCase();
     const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
-    const status = shipment.status?.toLowerCase();
+    // Normalize status to uppercase for consistent comparison with raw ShipStation codes
+    const status = shipment.status?.toUpperCase();
 
-    if (status === 'delivered') {
+    if (status === 'DE' || status === 'DELIVERED') {
       return {
         step: 'Delivered',
-        reason: `status = 'delivered'`,
+        reason: `status = 'DE' (ShipStation delivered)`,
         matchedFields: ['status'],
         badge: <Badge className="bg-green-600 text-white">Delivered</Badge>
       };
@@ -105,7 +117,7 @@ export default function ShipmentDetails() {
     }
 
     // On the Dock: Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
-    if (shipmentStatus === 'label_purchased' && status === 'ac') {
+    if (shipmentStatus === 'label_purchased' && status === 'AC') {
       return {
         step: 'On the Dock',
         reason: `shipmentStatus = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting pickup)`,

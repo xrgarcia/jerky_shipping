@@ -405,7 +405,7 @@ export default function Orders() {
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Shipment Status</label>
                     <div className="flex flex-wrap gap-2">
-                      {['pending', 'shipped', 'DE', 'exception', 'cancelled'].map(status => (
+                      {['pending', 'shipped', 'DE', 'AC', 'IT', 'EX', 'cancelled'].map(status => (
                         <Badge
                           key={status}
                           variant={shipmentStatus.includes(status) ? "default" : "outline"}
@@ -413,7 +413,10 @@ export default function Orders() {
                           onClick={() => toggleArrayFilter(status, shipmentStatus, setShipmentStatus)}
                           data-testid={`filter-shipment-${status}`}
                         >
-                          {status === 'DE' ? 'Delivered' : status}
+                          {status === 'DE' ? 'Delivered' : 
+                           status === 'AC' ? 'Accepted' :
+                           status === 'IT' ? 'In Transit' : 
+                           status === 'EX' ? 'Exception' : status}
                         </Badge>
                       ))}
                     </div>

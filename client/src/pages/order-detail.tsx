@@ -631,14 +631,32 @@ export default function OrderDetail() {
                           </div>
                           <div>
                             <Badge 
-                              className={
-                                shipment.status === 'delivered' ? 'bg-green-600 text-white' :
-                                shipment.status === 'shipped' ? 'bg-blue-600 text-white' :
-                                shipment.status === 'cancelled' ? 'bg-red-600 text-white' : ''
-                              }
+                              className={(() => {
+                                const s = shipment.status?.toUpperCase();
+                                if (s === 'DE' || s === 'DELIVERED') return 'bg-green-600 text-white';
+                                if (s === 'SP') return 'bg-green-500 text-white';
+                                if (s === 'IT' || s === 'IN_TRANSIT') return 'bg-blue-600 text-white';
+                                if (s === 'AC') return 'bg-cyan-600 text-white';
+                                if (s === 'AT') return 'bg-orange-500 text-white';
+                                if (s === 'EX') return 'bg-red-500 text-white';
+                                if (s === 'UN') return 'bg-gray-500 text-white';
+                                if (s === 'SHIPPED') return 'bg-blue-600 text-white';
+                                if (s === 'CANCELLED') return 'bg-red-600 text-white';
+                                return '';
+                              })()}
                               data-testid={`badge-status-${shipment.id}`}
                             >
-                              {shipment.statusDescription || shipment.status}
+                              {shipment.statusDescription || (() => {
+                                const s = shipment.status?.toUpperCase();
+                                if (s === 'DE' || s === 'DELIVERED') return 'Delivered';
+                                if (s === 'SP') return 'Delivered (Locker)';
+                                if (s === 'IT' || s === 'IN_TRANSIT') return 'In Transit';
+                                if (s === 'AC') return 'Accepted';
+                                if (s === 'AT') return 'Attempted Delivery';
+                                if (s === 'EX') return 'Exception';
+                                if (s === 'UN') return 'Unknown';
+                                return shipment.status;
+                              })()}
                             </Badge>
                           </div>
                         </div>

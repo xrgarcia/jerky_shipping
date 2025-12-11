@@ -103,6 +103,15 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     }
 
     const statusConfig: Record<string, { variant: "default" | "secondary" | "outline"; className?: string; label: string }> = {
+      // Raw ShipStation tracking codes (UPPERCASE - matches production)
+      "DE": { variant: "default", className: "bg-green-600 hover:bg-green-700", label: "Delivered" },
+      "IT": { variant: "default", className: "bg-blue-600 hover:bg-blue-700", label: "In Transit" },
+      "AC": { variant: "default", className: "bg-cyan-600 hover:bg-cyan-700", label: "Accepted" },
+      "SP": { variant: "default", className: "bg-green-500 hover:bg-green-600", label: "Delivered (Locker)" },
+      "AT": { variant: "default", className: "bg-orange-500 hover:bg-orange-600", label: "Attempted Delivery" },
+      "EX": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400", label: "Exception" },
+      "UN": { variant: "outline", className: "border-gray-500 text-gray-700 dark:text-gray-400", label: "Unknown" },
+      // Legacy/normalized values for backwards compatibility
       "delivered": { variant: "default", className: "bg-green-600 hover:bg-green-700", label: "Delivered" },
       "in_transit": { variant: "default", className: "bg-blue-600 hover:bg-blue-700", label: "In Transit" },
       "shipped": { variant: "secondary", label: "Shipped" },
@@ -110,7 +119,8 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       "cancelled": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400", label: "Cancelled" },
     };
 
-    const config = statusConfig[status.toLowerCase()] || { variant: "outline" as const, label: status };
+    // Try exact match first, then uppercase, then lowercase for resilience
+    const config = statusConfig[status] || statusConfig[status.toUpperCase()] || statusConfig[status.toLowerCase()] || { variant: "outline" as const, label: status };
     
     return (
       <Badge variant={config.variant} className={config.className}>
@@ -171,11 +181,12 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     const sessionStatus = shipment.sessionStatus?.toLowerCase();
     const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
     const hasTracking = !!shipment.trackingNumber;
-    const status = shipment.status?.toLowerCase();
+    // Normalize status to uppercase for consistent comparison with raw ShipStation codes
+    const status = shipment.status?.toUpperCase();
     
     // Order of priority for workflow steps:
-    // 1. Delivered - final state
-    if (status === 'delivered') {
+    // 1. Delivered - final state (status = 'DE' from ShipStation tracking)
+    if (status === 'DE' || status === 'DELIVERED') {
       return (
         <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <CheckCircle className="h-3 w-3" />
@@ -185,7 +196,8 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     }
     
     // 2. On the Dock - Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
-    if (shipmentStatus === 'label_purchased' && status === 'ac') {
+    // Note: status is UPPERCASE 'AC' from ETL and webhooks, matching production behavior
+    if (shipmentStatus === 'label_purchased' && status === 'AC') {
       return (
         <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <Truck className="h-3 w-3" />

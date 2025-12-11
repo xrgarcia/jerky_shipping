@@ -185,7 +185,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
             // Update existing shipment with latest tracking data from webhook (no API call!)
             await storage.updateShipment(existingShipment.id, {
               carrierCode: trackingData.carrier_code || existingShipment.carrierCode,
-              status: trackingData.status_code || 'unknown',
+              status: trackingData.status_code ? String(trackingData.status_code).toUpperCase() : 'unknown',
               statusDescription: trackingData.carrier_status_description || trackingData.status_description,
               shipDate: trackingData.ship_date ? new Date(trackingData.ship_date) : existingShipment.shipDate,
               shipmentData: trackingData,
