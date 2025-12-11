@@ -22,6 +22,8 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Core Features**:
     - **Order Management**: Synchronized product catalog, SkuVault wave picking session display, and QC integration for packing.
     - **Packing Page (Boxing/Bagging)**: Supports a single-warehouse MVP with SkuVault QC validation, scan-first workflow, individual unit scanning, and audit trails. The bagging workflow includes immediate label printing on scan, robust error handling for printing failures, and printer pre-checks.
+        - **Boxing page** → Used for Boxing Machine AND Hand Pack stations (QC before print workflow)
+        - **Bagging page** → Used for Poly Bag Station (immediate print on scan workflow)
     - **Workstation Guard System**: Prevents workers from packing at incorrect physical workstations using browser local storage for station ID tracking and mismatch detection with a blocking UI.
     - **Shipment Management**: Unified shipments page with three navigation modes: Lifecycle View (default, 5 tabs for warehouse lifecycle), Workflow View (3 business process tabs), and All shipments view.
     - **Order Backfill System**: Fault-tolerant, task-based architecture for historical Shopify orders and ShipStation shipments, using Redis-queued processing and WebSocket updates.
