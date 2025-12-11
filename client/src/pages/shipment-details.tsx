@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, Order, ShipmentItem, ShipmentTag } from "@shared/schema";
+import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -33,6 +33,11 @@ export default function ShipmentDetails() {
 
   const { data: tags } = useQuery<ShipmentTag[]>({
     queryKey: ['/api/shipments', shipmentId, 'tags'],
+    enabled: !!shipmentId,
+  });
+
+  const { data: packages } = useQuery<ShipmentPackage[]>({
+    queryKey: ['/api/shipments', shipmentId, 'packages'],
     enabled: !!shipmentId,
   });
 
@@ -697,6 +702,80 @@ export default function ShipmentDetails() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Packages */}
+      {packages && packages.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Boxes className="h-5 w-5" />
+              Packages ({packages.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-6 py-4 font-semibold">Package</th>
+                    <th className="text-center px-6 py-4 font-semibold">Weight</th>
+                    <th className="text-center px-6 py-4 font-semibold">Dimensions</th>
+                    <th className="text-right px-6 py-4 font-semibold">Insured Value</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {packages.map((pkg, index) => {
+                    const hasSize = pkg.dimensionLength && pkg.dimensionWidth && pkg.dimensionHeight &&
+                      (parseFloat(pkg.dimensionLength) > 0 || parseFloat(pkg.dimensionWidth) > 0 || parseFloat(pkg.dimensionHeight) > 0);
+                    
+                    return (
+                      <tr key={pkg.id || index} className="hover-elevate" data-testid={`row-package-${index}`}>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-base font-medium">{pkg.packageName || 'Package'}</span>
+                            {pkg.packageCode && (
+                              <code className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded w-fit">
+                                {pkg.packageCode}
+                              </code>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {pkg.weightValue && pkg.weightUnit ? (
+                            <span className="text-lg font-medium">
+                              {pkg.weightValue} {pkg.weightUnit}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {hasSize ? (
+                            <span className="text-sm">
+                              {pkg.dimensionLength} x {pkg.dimensionWidth} x {pkg.dimensionHeight} {pkg.dimensionUnit}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {pkg.insuredAmount && parseFloat(pkg.insuredAmount) > 0 ? (
+                            <span className="text-lg">
+                              ${parseFloat(pkg.insuredAmount).toFixed(2)} {pkg.insuredCurrency?.toUpperCase()}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">None</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
