@@ -10,9 +10,9 @@
 
 import { storage } from '../storage';
 import type { IStorage } from '../storage';
-import type { InsertShipment, InsertShipmentItem, InsertShipmentTag } from '@shared/schema';
+import type { InsertShipment, InsertShipmentItem, InsertShipmentTag, InsertShipmentPackage } from '@shared/schema';
 import { db } from '../db';
-import { shipmentItems, shipmentTags, orderItems } from '@shared/schema';
+import { shipmentItems, shipmentTags, shipmentPackages, orderItems } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 export class ShipStationShipmentETLService {
@@ -149,9 +149,10 @@ export class ShipStationShipmentETLService {
       finalShipmentId = created.id;
     }
     
-    // Process normalized items and tags
+    // Process normalized items, tags, and packages
     await this.processShipmentItems(finalShipmentId, shipmentData);
     await this.processShipmentTags(finalShipmentId, shipmentData);
+    await this.processShipmentPackages(finalShipmentId, shipmentData);
     
     return finalShipmentId;
   }
@@ -302,6 +303,59 @@ export class ShipStationShipmentETLService {
       }
     } catch (error) {
       console.error(`[ShipStationShipmentETL] Error processing tags for shipment ${shipmentId}:`, error);
+    }
+  }
+
+  /**
+   * Process shipment packages - normalize into shipment_packages table
+   * Deletes existing entries and re-creates from current shipmentData
+   * Flattens nested weight, dimensions, insured_value, and label_messages structures
+   */
+  async processShipmentPackages(shipmentId: string, shipmentData: any): Promise<void> {
+    if (!shipmentData || !shipmentData.packages || !Array.isArray(shipmentData.packages)) {
+      return;
+    }
+
+    try {
+      // Delete existing entries for this shipment (ensure clean state)
+      await db.delete(shipmentPackages).where(eq(shipmentPackages.shipmentId, shipmentId));
+
+      // Build packages to insert with flattened nested structures
+      const packagesToInsert: InsertShipmentPackage[] = shipmentData.packages
+        .filter((pkg: any) => pkg != null)
+        .map((pkg: any) => ({
+          shipmentId,
+          shipmentPackageId: pkg.shipment_package_id || null,
+          packageId: pkg.package_id || null,
+          packageCode: pkg.package_code || null,
+          packageName: pkg.package_name || null,
+          externalPackageId: pkg.external_package_id || null,
+          contentDescription: pkg.content_description || null,
+          // Flatten weight object
+          weightValue: pkg.weight?.value !== undefined ? String(pkg.weight.value) : null,
+          weightUnit: pkg.weight?.unit || null,
+          // Flatten dimensions object
+          dimensionLength: pkg.dimensions?.length !== undefined ? String(pkg.dimensions.length) : null,
+          dimensionWidth: pkg.dimensions?.width !== undefined ? String(pkg.dimensions.width) : null,
+          dimensionHeight: pkg.dimensions?.height !== undefined ? String(pkg.dimensions.height) : null,
+          dimensionUnit: pkg.dimensions?.unit || null,
+          // Flatten insured_value object
+          insuredAmount: pkg.insured_value?.amount !== undefined ? String(pkg.insured_value.amount) : null,
+          insuredCurrency: pkg.insured_value?.currency || null,
+          // Flatten label_messages object
+          labelReference1: pkg.label_messages?.reference1 || null,
+          labelReference2: pkg.label_messages?.reference2 || null,
+          labelReference3: pkg.label_messages?.reference3 || null,
+          // Store complex objects as JSONB
+          products: pkg.products || null,
+          dangerousGoodsInfo: pkg.dangerous_goods_package_info || null,
+        }));
+
+      if (packagesToInsert.length > 0) {
+        await db.insert(shipmentPackages).values(packagesToInsert);
+      }
+    } catch (error) {
+      console.error(`[ShipStationShipmentETL] Error processing packages for shipment ${shipmentId}:`, error);
     }
   }
 
