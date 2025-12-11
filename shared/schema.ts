@@ -488,6 +488,51 @@ export const insertShipmentTagSchema = createInsertSchema(shipmentTags).omit({
 export type InsertShipmentTag = z.infer<typeof insertShipmentTagSchema>;
 export type ShipmentTag = typeof shipmentTags.$inferSelect;
 
+// Shipment packages table for normalized package details from ShipStation
+export const shipmentPackages = pgTable("shipment_packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  shipmentPackageId: text("shipment_package_id"), // ShipStation's unique package ID (e.g., "se-1196610004")
+  packageId: text("package_id"), // Package type ID (e.g., "se-153790")
+  packageCode: text("package_code"), // Package code (e.g., "package")
+  packageName: text("package_name"), // Package display name (e.g., "Box #2 (13 x 13 x 13)")
+  externalPackageId: text("external_package_id"), // External reference ID
+  contentDescription: text("content_description"), // Description of package contents
+  // Flattened weight fields
+  weightValue: text("weight_value"), // Weight value as text for precision (e.g., "40.00")
+  weightUnit: text("weight_unit"), // Weight unit (e.g., "ounce", "pound")
+  // Flattened dimension fields
+  dimensionLength: text("dimension_length"), // Length as text for precision
+  dimensionWidth: text("dimension_width"), // Width as text for precision
+  dimensionHeight: text("dimension_height"), // Height as text for precision
+  dimensionUnit: text("dimension_unit"), // Dimension unit (e.g., "inch", "cm")
+  // Flattened insured value fields
+  insuredAmount: text("insured_amount"), // Insured amount as text for precision
+  insuredCurrency: text("insured_currency"), // Currency code (e.g., "usd")
+  // Flattened label message fields
+  labelReference1: text("label_reference1"), // Label reference 1
+  labelReference2: text("label_reference2"), // Label reference 2
+  labelReference3: text("label_reference3"), // Label reference 3
+  // Additional package info
+  products: jsonb("products"), // Products array (usually null, stored as jsonb if present)
+  dangerousGoodsInfo: jsonb("dangerous_goods_info"), // Dangerous goods package info
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  shipmentIdIdx: index("shipment_packages_shipment_id_idx").on(table.shipmentId),
+  shipmentPackageIdIdx: index("shipment_packages_shipment_package_id_idx").on(table.shipmentPackageId).where(sql`${table.shipmentPackageId} IS NOT NULL`),
+  packageIdIdx: index("shipment_packages_package_id_idx").on(table.packageId).where(sql`${table.packageId} IS NOT NULL`),
+}));
+
+export const insertShipmentPackageSchema = createInsertSchema(shipmentPackages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipmentPackage = z.infer<typeof insertShipmentPackageSchema>;
+export type ShipmentPackage = typeof shipmentPackages.$inferSelect;
+
 // Shipment events table for comprehensive audit trail
 export const shipmentEvents = pgTable("shipment_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
