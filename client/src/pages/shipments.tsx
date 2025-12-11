@@ -184,8 +184,8 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 2. On the Dock - has tracking, in transit
-    if (hasTracking && (status === 'in_transit' || status === 'shipped' || shipmentStatus === 'label_purchased')) {
+    // 2. On the Dock - Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
+    if (shipmentStatus === 'label_purchased' && status === 'ac') {
       return (
         <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <Truck className="h-3 w-3" />
