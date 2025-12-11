@@ -54,6 +54,15 @@ interface CacheStatus {
   warmedAt: string | null;
 }
 
+// Special package name that indicates a shipment should NOT be shipped and requires manager alert
+const DO_NOT_SHIP_PACKAGE = "**DO NOT SHIP (ALERT MGR)**";
+
+// Helper to check if any package is a DO NOT SHIP package
+function hasDoNotShipPackage(packages?: ShipmentPackage[]): boolean {
+  if (!packages || packages.length === 0) return false;
+  return packages.some(pkg => pkg.packageName === DO_NOT_SHIP_PACKAGE);
+}
+
 function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[]; packages?: ShipmentPackage[]; cacheStatus?: CacheStatus }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
@@ -61,6 +70,9 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
   
   const shipmentIdOrUuid = shipment.shipmentId ?? shipment.id;
   const sessionInfo = parseCustomField2(shipment.customField2);
+  
+  // Check if this shipment has the DO NOT SHIP package
+  const isDoNotShip = hasDoNotShipPackage(packages);
 
   // Determine if this order is ready to pack (closed session, no tracking, pending status)
   // Must match cache warmer criteria: sessionStatus='closed', no tracking, shipmentStatus='pending'
@@ -488,7 +500,14 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
 
             {/* Status & Special Handling Badges */}
             <div className="flex flex-wrap items-center justify-end gap-2 w-full">
-              {/* Cancelled Badge - Most prominent, show first */}
+              {/* DO NOT SHIP Badge - Critical alert, show first */}
+              {isDoNotShip && (
+                <Badge className="bg-red-700 hover:bg-red-800 text-white text-xs gap-1 animate-pulse" data-testid={`badge-do-not-ship-${shipment.orderNumber}`}>
+                  <AlertTriangle className="h-3 w-3" />
+                  DO NOT SHIP
+                </Badge>
+              )}
+              {/* Cancelled Badge */}
               {(shipment.status === 'cancelled' || shipment.shipmentStatus === 'cancelled') && (
                 <Badge className="bg-red-600 hover:bg-red-700 text-white text-xs gap-1" data-testid={`badge-cancelled-${shipment.orderNumber}`}>
                   <Ban className="h-3 w-3" />
@@ -662,6 +681,7 @@ export default function Shipments() {
   const [showOrphanedOnly, setShowOrphanedOnly] = useState(false);
   const [showWithoutOrders, setShowWithoutOrders] = useState(false);
   const [showShippedWithoutTracking, setShowShippedWithoutTracking] = useState(false);
+  const [showDoNotShipOnly, setShowDoNotShipOnly] = useState(false);
 
   // Pagination and sorting
   const [page, setPage] = useState(1);
@@ -787,6 +807,7 @@ export default function Shipments() {
     if (showOrphanedOnly) params.set('orphaned', 'true');
     if (showWithoutOrders) params.set('withoutOrders', 'true');
     if (showShippedWithoutTracking) params.set('shippedWithoutTracking', 'true');
+    if (showDoNotShipOnly) params.set('doNotShip', 'true');
     
     if (page !== 1) params.set('page', page.toString());
     if (pageSize !== 50) params.set('pageSize', pageSize.toString());
@@ -802,7 +823,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -938,6 +959,7 @@ export default function Shipments() {
     if (showOrphanedOnly) params.append('orphaned', 'true');
     if (showWithoutOrders) params.append('withoutOrders', 'true');
     if (showShippedWithoutTracking) params.append('shippedWithoutTracking', 'true');
+    if (showDoNotShipOnly) params.append('doNotShip', 'true');
     
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
@@ -1000,7 +1022,7 @@ export default function Shipments() {
   const packageNames = packageNamesData?.packageNames || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -1128,6 +1150,7 @@ export default function Shipments() {
     showOrphanedOnly,
     showWithoutOrders,
     showShippedWithoutTracking,
+    showDoNotShipOnly,
   ].filter(Boolean).length;
 
   const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
@@ -1552,6 +1575,23 @@ export default function Shipments() {
                           className="text-sm cursor-pointer"
                         >
                           Show shipped without tracking only
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="do-not-ship-filter"
+                          checked={showDoNotShipOnly}
+                          onCheckedChange={(checked) => {
+                            setShowDoNotShipOnly(checked as boolean);
+                            setPage(1);
+                          }}
+                          data-testid="checkbox-do-not-ship-filter"
+                        />
+                        <label
+                          htmlFor="do-not-ship-filter"
+                          className="text-sm cursor-pointer text-red-600 dark:text-red-400 font-semibold"
+                        >
+                          Show DO NOT SHIP only
                         </label>
                       </div>
                     </div>

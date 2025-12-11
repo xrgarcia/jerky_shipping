@@ -110,6 +110,7 @@ export interface ShipmentFilters {
   orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
   withoutOrders?: boolean; // Filter for shipments with no linked order
   shippedWithoutTracking?: boolean; // Filter for shipments with status='shipped' but no tracking number
+  doNotShip?: boolean; // Filter for shipments with "**DO NOT SHIP (ALERT MGR)**" package
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode' | 'orderDate';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -1393,6 +1394,16 @@ export class DatabaseStorage implements IStorage {
           isNull(shipments.trackingNumber)
         )
       );
+    }
+
+    // DO NOT SHIP filter (shipments with "**DO NOT SHIP (ALERT MGR)**" package)
+    if (filters.doNotShip) {
+      const doNotShipPackageName = "**DO NOT SHIP (ALERT MGR)**";
+      const shipmentIdsWithDoNotShip = db
+        .select({ shipmentId: shipmentPackages.shipmentId })
+        .from(shipmentPackages)
+        .where(eq(shipmentPackages.packageName, doNotShipPackageName));
+      conditions.push(inArray(shipments.id, shipmentIdsWithDoNotShip));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
