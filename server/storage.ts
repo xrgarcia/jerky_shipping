@@ -20,6 +20,8 @@ import {
   shipmentItems,
   type ShipmentTag,
   shipmentTags,
+  type ShipmentPackage,
+  shipmentPackages,
   type Product,
   type InsertProduct,
   products,
@@ -177,6 +179,8 @@ export interface IStorage {
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentTagsBatch(shipmentIds: string[]): Promise<Map<string, ShipmentTag[]>>;
+  getShipmentPackages(shipmentId: string): Promise<ShipmentPackage[]>;
+  getShipmentPackagesBatch(shipmentIds: string[]): Promise<Map<string, ShipmentPackage[]>>;
   getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
@@ -1017,6 +1021,35 @@ export class DatabaseStorage implements IStorage {
       tagsByShipment.set(tag.shipmentId, existing);
     }
     return tagsByShipment;
+  }
+
+  async getShipmentPackages(shipmentId: string): Promise<ShipmentPackage[]> {
+    const result = await db
+      .select()
+      .from(shipmentPackages)
+      .where(eq(shipmentPackages.shipmentId, shipmentId))
+      .orderBy(asc(shipmentPackages.createdAt));
+    return result;
+  }
+
+  async getShipmentPackagesBatch(shipmentIds: string[]): Promise<Map<string, ShipmentPackage[]>> {
+    if (shipmentIds.length === 0) {
+      return new Map();
+    }
+    
+    const result = await db
+      .select()
+      .from(shipmentPackages)
+      .where(inArray(shipmentPackages.shipmentId, shipmentIds))
+      .orderBy(asc(shipmentPackages.createdAt));
+    
+    const packagesByShipment = new Map<string, ShipmentPackage[]>();
+    for (const pkg of result) {
+      const existing = packagesByShipment.get(pkg.shipmentId) || [];
+      existing.push(pkg);
+      packagesByShipment.set(pkg.shipmentId, existing);
+    }
+    return packagesByShipment;
   }
 
   async getShipmentItemsByOrderItemId(orderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>> {

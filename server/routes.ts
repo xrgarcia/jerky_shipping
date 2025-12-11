@@ -1679,6 +1679,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipment packages for a specific shipment (accepts shipmentId or UUID)
+  app.get("/api/shipments/:shipmentId/packages", requireAuth, async (req, res) => {
+    try {
+      const idParam = req.params.shipmentId;
+      
+      // Try lookup by ShipStation shipmentId first
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      
+      // Fall back to database UUID
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Fetch packages using the database ID
+      const packages = await storage.getShipmentPackages(shipment.id);
+      res.json(packages);
+    } catch (error: any) {
+      console.error(`Error fetching shipment packages for ${req.params.shipmentId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment packages" });
+    }
+  });
+
+  // Batch fetch shipment packages - reduces N+1 queries on shipments list page
+  app.post("/api/shipments/packages/batch", requireAuth, async (req, res) => {
+    try {
+      const { shipmentIds } = req.body;
+      
+      if (!Array.isArray(shipmentIds)) {
+        return res.status(400).json({ error: "shipmentIds must be an array" });
+      }
+      
+      if (shipmentIds.length > 100) {
+        return res.status(400).json({ error: "Maximum 100 shipments per batch request" });
+      }
+      
+      // Fetch all packages in one query
+      const packagesMap = await storage.getShipmentPackagesBatch(shipmentIds);
+      
+      // Convert Map to object for JSON response
+      const result: Record<string, any[]> = {};
+      for (const [shipmentId, packages] of packagesMap.entries()) {
+        result[shipmentId] = packages;
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching batch shipment packages:", error);
+      res.status(500).json({ error: "Failed to fetch shipment packages" });
+    }
+  });
+
   // Batch fetch shipment tags - reduces N+1 queries on shipments list page
   app.post("/api/shipments/tags/batch", requireAuth, async (req, res) => {
     try {
