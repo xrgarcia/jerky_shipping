@@ -4,6 +4,9 @@
 - **ship.** = This application (ship.jerky.com)
 - **jerky.com** = The business name
 
+## Current Feature Under Development
+See **CURRENT_FEATURE.md** for the Smart Shipping Engine feature specification, implementation phases, and progress tracking.
+
 ## Overview
 This application (ship.) is the warehouse fulfillment tool for jerky.com, integrated with Shopify for order management. It aims to enhance order processing and inventory management through real-time synchronization, a user-friendly interface for warehouse staff, streamlined order management, real-time visibility into SkuVault wave picking sessions, efficient historical order backfill, comprehensive reporting, a print queue system for shipping labels, and real-time order status updates. The project seeks to improve operational efficiency and provide a robust platform for e-commerce fulfillment.
 
