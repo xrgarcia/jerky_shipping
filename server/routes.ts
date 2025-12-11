@@ -5325,6 +5325,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // DO NOT SHIP PACKAGE CHECK: ALWAYS verify package type even for cached shipments
+      // This catches stale cache data and ensures DO NOT SHIP orders are never processed
+      if (shipment && !notShippable) {
+        const shipmentPackagesData = await storage.getShipmentPackages(shipment.id);
+        const hasDoNotShipPkg = shipmentPackagesData.some((pkg: { packageName: string | null }) => 
+          pkg.packageName === '**DO NOT SHIP (ALERT MGR)**'
+        );
+        
+        if (hasDoNotShipPkg) {
+          console.log(`[Packing Validation] Order ${resolvedOrderNumber} has DO NOT SHIP package - blocking`);
+          
+          const doNotShipError = {
+            code: 'DO_NOT_SHIP_PACKAGE',
+            message: 'DO NOT SHIP - Alert Manager',
+            explanation: 'This order has a "DO NOT SHIP" package type assigned in ShipStation.',
+            resolution: 'Contact a manager immediately before proceeding. This order requires special handling.'
+          };
+          
+          // DO NOT SHIP orders should NEVER be packed - always return error
+          // Unlike missing MOVE OVER tag, this is a hard block even on boxing page
+          if (allowNotShippable) {
+            // Return noEligibleShipments response for boxing page UI
+            return res.status(200).json({
+              noEligibleShipments: true,
+              error: doNotShipError,
+              orderNumber: resolvedOrderNumber,
+              shipments: [{
+                id: shipment.id,
+                shipmentId: shipment.shipmentId,
+                carrierCode: shipment.carrierCode,
+                serviceCode: shipment.serviceCode,
+                shipToName: shipment.shipToName,
+                shipToCity: shipment.shipToCity,
+                shipToState: shipment.shipToState,
+                trackingNumber: shipment.trackingNumber,
+                exclusionReason: 'do_not_ship_package',
+                items: [],
+              }],
+              shipmentStatuses: [{ id: shipment.id, reason: 'do_not_ship_package' }],
+            });
+          } else {
+            return res.status(422).json({
+              error: doNotShipError,
+              orderNumber: resolvedOrderNumber,
+              shipmentId: shipment.id
+            });
+          }
+        }
+      }
+      
       // SHIPPABILITY CHECK: Verify order has "MOVE OVER" tag before allowing packing
       // Skip this check if we already selected from shippable shipments (they're pre-filtered)
       // Only run if we got here via legacy path or allowNotShippable fallback
