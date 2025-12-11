@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap } from "lucide-react";
+import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -488,6 +488,13 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
 
             {/* Status & Special Handling Badges */}
             <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+              {/* Cancelled Badge - Most prominent, show first */}
+              {(shipment.status === 'cancelled' || shipment.shipmentStatus === 'cancelled') && (
+                <Badge className="bg-red-600 hover:bg-red-700 text-white text-xs gap-1" data-testid={`badge-cancelled-${shipment.orderNumber}`}>
+                  <Ban className="h-3 w-3" />
+                  Cancelled
+                </Badge>
+              )}
               {isOrphanedShipment(shipment) && (
                 <Badge variant="outline" className="border-orange-500 text-orange-700 dark:text-orange-400 text-xs">
                   Orphaned
