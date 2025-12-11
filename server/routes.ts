@@ -5256,17 +5256,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (onHoldCount > 0) {
             parts.push(`${onHoldCount} on hold`);
           }
+          const doNotShipCount = statuses.filter(s => s.reason === 'do_not_ship_package').length;
+          if (doNotShipCount > 0) {
+            parts.push(`${doNotShipCount} DO NOT SHIP`);
+          }
           const reasonSummary = parts.length > 0 ? parts.join(', ') : 'not eligible';
           
           const errorInfo = {
-            code: 'NO_ELIGIBLE_SHIPMENTS',
-            message: 'No shipments available for packing',
+            code: doNotShipCount > 0 ? 'DO_NOT_SHIP_PACKAGE' : 'NO_ELIGIBLE_SHIPMENTS',
+            message: doNotShipCount > 0 ? 'DO NOT SHIP - Alert Manager' : 'No shipments available for packing',
             explanation: `This order has ${allShipmentsCount} shipment${allShipmentsCount > 1 ? 's' : ''} (${reasonSummary}). None can be packed right now.`,
-            resolution: shippedCount > 0 && onHoldCount === 0 
-              ? 'All shipments have already been shipped. Check ShipStation for tracking info.'
-              : onHoldCount > 0 && shippedCount === 0
-                ? 'Check ShipStation for hold dates. If unexpected, contact a supervisor.'
-                : 'Check ShipStation for details on each shipment. Contact a supervisor if unexpected.'
+            resolution: doNotShipCount > 0
+              ? 'This order has a "DO NOT SHIP" package type. Contact a manager immediately before proceeding.'
+              : shippedCount > 0 && onHoldCount === 0 
+                ? 'All shipments have already been shipped. Check ShipStation for tracking info.'
+                : onHoldCount > 0 && shippedCount === 0
+                  ? 'Check ShipStation for hold dates. If unexpected, contact a supervisor.'
+                  : 'Check ShipStation for details on each shipment. Contact a supervisor if unexpected.'
           };
           
           // Fetch items for all shipments so warehouse can distinguish them (needed for both paths)
