@@ -1168,6 +1168,7 @@ export class DatabaseStorage implements IStorage {
       statusDescription,
       shipmentStatus,
       carrierCode: carrierFilters,
+      packageName: packageNameFilters,
       dateFrom,
       dateTo,
       orphaned,
@@ -1349,6 +1350,15 @@ export class DatabaseStorage implements IStorage {
     // Carrier filter
     if (carrierFilters && carrierFilters.length > 0) {
       conditions.push(inArray(shipments.carrierCode, carrierFilters));
+    }
+
+    // Package name filter (uses subquery to find shipments with matching packages)
+    if (packageNameFilters && packageNameFilters.length > 0) {
+      const shipmentIdsWithPackage = db
+        .selectDistinct({ shipmentId: shipmentPackages.shipmentId })
+        .from(shipmentPackages)
+        .where(inArray(shipmentPackages.packageName, packageNameFilters));
+      conditions.push(inArray(shipments.id, shipmentIdsWithPackage));
     }
 
     // Date range filter (ship date)
