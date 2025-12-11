@@ -820,6 +820,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct package names for filtering
+  app.get("/api/shipments/package-names", requireAuth, async (req, res) => {
+    try {
+      const packageNames = await storage.getDistinctPackageNames();
+      res.json({ packageNames });
+    } catch (error) {
+      console.error("Error fetching package names:", error);
+      res.status(500).json({ error: "Failed to fetch package names" });
+    }
+  });
+
   // Get tab counts for workflow tabs
   app.get("/api/shipments/tab-counts", requireAuth, async (req, res) => {
     try {
@@ -881,6 +892,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.carrierCode = Array.isArray(req.query.carrierCode)
           ? req.query.carrierCode
           : [req.query.carrierCode];
+      }
+      if (req.query.packageName) {
+        filters.packageName = Array.isArray(req.query.packageName)
+          ? req.query.packageName
+          : [req.query.packageName];
       }
 
       // Parse date parameters - make dateTo inclusive (end of day) using Central Time

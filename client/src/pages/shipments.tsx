@@ -649,6 +649,7 @@ export default function Shipments() {
   const [statusDescription, setStatusDescription] = useState<string>("");
   const [shipmentStatus, setShipmentStatus] = useState<string[]>([]); // Warehouse status filter (multi-select)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
+  const [packageName, setPackageName] = useState<string[]>([]); // Package type filter (multi-select)
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showOrphanedOnly, setShowOrphanedOnly] = useState(false);
@@ -717,6 +718,7 @@ export default function Shipments() {
     const shipmentStatusValues = params.getAll('shipmentStatus');
     setShipmentStatus(shipmentStatusValues);
     setCarrierCode(params.getAll('carrierCode'));
+    setPackageName(params.getAll('packageName'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
     setShowOrphanedOnly(params.get('orphaned') === 'true');
@@ -733,6 +735,7 @@ export default function Shipments() {
       params.get('statusDescription') ||
       params.getAll('shipmentStatus').length ||
       params.getAll('carrierCode').length ||
+      params.getAll('packageName').length ||
       params.get('dateFrom') ||
       params.get('dateTo') ||
       params.get('orphaned') === 'true' ||
@@ -770,6 +773,7 @@ export default function Shipments() {
     if (statusDescription) params.set('statusDescription', statusDescription);
     shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
+    packageName.forEach(p => params.append('packageName', p));
     
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
@@ -791,7 +795,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -920,6 +924,7 @@ export default function Shipments() {
     if (statusDescription) params.append('statusDescription', statusDescription);
     shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
+    packageName.forEach(p => params.append('packageName', p));
     
     if (dateFrom) params.append('dateFrom', dateFrom);
     if (dateTo) params.append('dateTo', dateTo);
@@ -980,8 +985,15 @@ export default function Shipments() {
 
   const shipmentStatuses = shipmentStatusesData?.shipmentStatuses || [];
 
+  // Fetch distinct package names for the package type filter dropdown
+  const { data: packageNamesData } = useQuery<{ packageNames: string[] }>({
+    queryKey: ["/api/shipments/package-names"],
+  });
+
+  const packageNames = packageNamesData?.packageNames || [];
+
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -1088,6 +1100,7 @@ export default function Shipments() {
     setStatusDescription("");
     setShipmentStatus([]);
     setCarrierCode([]);
+    setPackageName([]);
     setDateFrom("");
     setDateTo("");
     setShowOrphanedOnly(false);
@@ -1102,6 +1115,7 @@ export default function Shipments() {
     statusDescription,
     shipmentStatus.length > 0,
     carrierCode.length > 0,
+    packageName.length > 0,
     dateFrom,
     dateTo,
     showOrphanedOnly,
@@ -1436,6 +1450,26 @@ export default function Shipments() {
                     ))}
                   </div>
                 </div>
+
+                {/* Package Type Filter */}
+                {packageNames.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Package Type</label>
+                    <div className="flex flex-wrap gap-2">
+                      {packageNames.map(pkg => (
+                        <Badge
+                          key={pkg}
+                          variant={packageName.includes(pkg) ? "default" : "outline"}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => toggleArrayFilter(pkg, packageName, setPackageName)}
+                          data-testid={`filter-package-${pkg.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          {pkg}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Date Filter */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

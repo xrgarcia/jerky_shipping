@@ -522,6 +522,7 @@ export const shipmentPackages = pgTable("shipment_packages", {
   shipmentIdIdx: index("shipment_packages_shipment_id_idx").on(table.shipmentId),
   shipmentPackageIdIdx: index("shipment_packages_shipment_package_id_idx").on(table.shipmentPackageId).where(sql`${table.shipmentPackageId} IS NOT NULL`),
   packageIdIdx: index("shipment_packages_package_id_idx").on(table.packageId).where(sql`${table.packageId} IS NOT NULL`),
+  packageNameIdx: index("shipment_packages_package_name_idx").on(table.packageName).where(sql`${table.packageName} IS NOT NULL`),
 }));
 
 export const insertShipmentPackageSchema = createInsertSchema(shipmentPackages).omit({

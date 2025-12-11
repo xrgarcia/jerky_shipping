@@ -104,6 +104,7 @@ export interface ShipmentFilters {
   statusDescription?: string;
   shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
   carrierCode?: string[];
+  packageName?: string[]; // Package type filter (e.g., "Box #2 (13 x 13 x 13)")
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
   orphaned?: boolean; // Filter for shipments missing tracking number, ship date, and shipment ID
@@ -176,6 +177,7 @@ export interface IStorage {
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
+  getDistinctPackageNames(): Promise<string[]>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentTagsBatch(shipmentIds: string[]): Promise<Map<string, ShipmentTag[]>>;
@@ -1624,12 +1626,23 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => r.shipmentStatus);
   }
 
+  async getDistinctPackageNames(): Promise<string[]> {
+    const results = await db
+      .selectDistinct({ packageName: shipmentPackages.packageName })
+      .from(shipmentPackages)
+      .where(isNotNull(shipmentPackages.packageName))
+      .orderBy(shipmentPackages.packageName);
+    
+    return results.map(r => r.packageName).filter((s): s is string => s !== null);
+  }
+
   async getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }> {
     const {
       search,
       status: statusFilters,
       statusDescription,
       carrierCode: carrierFilters,
+      packageName: packageNameFilters,
       dateFrom,
       dateTo,
       orphaned,
@@ -1670,6 +1683,15 @@ export class DatabaseStorage implements IStorage {
     // Carrier filter
     if (carrierFilters && carrierFilters.length > 0) {
       conditions.push(inArray(shipments.carrierCode, carrierFilters));
+    }
+
+    // Package name filter (uses subquery to find shipments with matching packages)
+    if (packageNameFilters && packageNameFilters.length > 0) {
+      const shipmentIdsWithPackage = db
+        .selectDistinct({ shipmentId: shipmentPackages.shipmentId })
+        .from(shipmentPackages)
+        .where(inArray(shipmentPackages.packageName, packageNameFilters));
+      conditions.push(inArray(shipments.id, shipmentIdsWithPackage));
     }
 
     // Date range filter (ship date)
