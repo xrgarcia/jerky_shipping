@@ -26,7 +26,7 @@
 
 import { getRedisClient } from '../utils/queue';
 import { db } from '../db';
-import { shipments, shipmentTags, type Shipment } from '@shared/schema';
+import { shipments, shipmentTags, shipmentPackages, type Shipment, type ShipmentPackage } from '@shared/schema';
 import { eq, and, isNull, isNotNull, ne, sql, inArray } from 'drizzle-orm';
 import { skuVaultService } from './skuvault-service';
 import { analyzeShippableShipments, type ShippableShipmentsResult } from '../utils/shipment-eligibility';
@@ -414,7 +414,7 @@ export async function getShippableShipmentsForOrder(orderNumber: string): Promis
 /**
  * Helper to serialize a shipment for cache storage
  */
-function serializeShipmentForCache(shipment: Shipment) {
+function serializeShipmentForCache(shipment: Shipment, packages?: ShipmentPackage[]) {
   return {
     id: shipment.id,
     orderNumber: shipment.orderNumber,
@@ -440,6 +440,8 @@ function serializeShipmentForCache(shipment: Shipment) {
     // QC completion tracking - for fast reprint QC determination
     qcCompleted: shipment.qcCompleted,
     qcCompletedAt: shipment.qcCompletedAt,
+    // Package details for shipping info display
+    packages: packages || [],
   };
 }
 
@@ -569,8 +571,25 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       return false;
     }
     
-    // Serialize all shippable shipments for cache
-    const shippableShipmentsData = shipmentsResult.shippableShipments.map(serializeShipmentForCache);
+    // Batch fetch packages for all shippable shipments
+    const shippableIds = shipmentsResult.shippableShipments.map(s => s.id);
+    const allPackages = shippableIds.length > 0 
+      ? await db.select().from(shipmentPackages).where(inArray(shipmentPackages.shipmentId, shippableIds))
+      : [];
+    
+    // Group packages by shipment ID
+    const packagesByShipmentId: Record<string, ShipmentPackage[]> = {};
+    for (const pkg of allPackages) {
+      if (!packagesByShipmentId[pkg.shipmentId]) {
+        packagesByShipmentId[pkg.shipmentId] = [];
+      }
+      packagesByShipmentId[pkg.shipmentId].push(pkg);
+    }
+    
+    // Serialize all shippable shipments for cache (with packages)
+    const shippableShipmentsData = shipmentsResult.shippableShipments.map(s => 
+      serializeShipmentForCache(s, packagesByShipmentId[s.id] || [])
+    );
     
     // For backward compatibility, keep 'shipment' as the default (first/only shippable)
     const defaultShipment = shipmentsResult.shippableShipments.length > 0 
@@ -594,7 +613,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         Items: defaultQcSale.Items,
       },
       // BACKWARD COMPAT: Single shipment field (first shippable or null)
-      shipment: defaultShipment ? serializeShipmentForCache(defaultShipment) : null,
+      shipment: defaultShipment ? serializeShipmentForCache(defaultShipment, packagesByShipmentId[defaultShipment.id] || []) : null,
       // NEW: QC Sales and lookup maps keyed by shipment ID
       qcSalesByShipment,
       lookupMapsByShipment,
