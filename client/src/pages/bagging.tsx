@@ -49,6 +49,7 @@ import {
   LogOut,
   Copy,
   ExternalLink,
+  Box,
 } from "lucide-react";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 import { ShipmentChoiceDialog, ShippableShipmentOption } from "@/components/shipment-choice-dialog";
@@ -197,6 +198,18 @@ type ShipmentWithItems = {
   // Pre-calculated pending print jobs (immediate display on order load)
   pendingPrintJobs?: PendingPrintJob[];
   hasPendingPrintJobs?: boolean;
+  // Package details from ShipStation
+  packages?: Array<{
+    id: string;
+    weight: string | null;
+    weightUnits: string | null;
+    length: string | null;
+    width: string | null;
+    height: string | null;
+    insuredValue: string | null;
+    insuredCurrency: string | null;
+    trackingNumber: string | null;
+  }>;
 };
 
 type PackingLog = {
@@ -3265,6 +3278,33 @@ export default function Bagging() {
                               </Badge>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Packages Section */}
+                      {currentShipment.packages && currentShipment.packages.length > 0 && (
+                        <div className="pt-3 border-t space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Box className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              {currentShipment.packages.length} Package{currentShipment.packages.length > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="pl-6 space-y-1">
+                            {currentShipment.packages.map((pkg, idx) => (
+                              <div key={pkg.id || idx} className="text-xs text-muted-foreground flex items-center gap-2" data-testid={`package-info-${idx}`}>
+                                {pkg.weight && (
+                                  <span className="font-mono">{pkg.weight} {pkg.weightUnits || 'lbs'}</span>
+                                )}
+                                {pkg.length && pkg.width && pkg.height && (
+                                  <span className="font-mono">({pkg.length}x{pkg.width}x{pkg.height})</span>
+                                )}
+                                {pkg.insuredValue && (
+                                  <span className="text-green-600">${pkg.insuredValue}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
