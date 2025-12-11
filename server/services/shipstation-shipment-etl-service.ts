@@ -678,11 +678,10 @@ export class ShipStationShipmentETLService {
    * 
    * Fallback hierarchy for shipments without tracking updates:
    * 1. voided → 'cancelled'
-   * 2. label_purchased → 'AC' (Accepted - carrier awaiting pickup, enables "On the Dock")
-   * 3. on_hold → 'pending'
-   * 4. awaiting_shipment → 'pending' (pre-label state)
-   * 5. cancelled → 'cancelled'
-   * 6. otherwise → 'shipped'
+   * 2. on_hold → 'pending'
+   * 3. awaiting_shipment → 'pending' (pre-label state)
+   * 4. cancelled → 'cancelled'
+   * 5. otherwise → 'shipped' (including label_purchased - only webhooks provide actual status codes)
    */
   private extractRawTrackingStatus(shipmentData: any): string {
     if (!shipmentData) return 'pending';
@@ -702,11 +701,6 @@ export class ShipStationShipmentETLService {
     // For shipments without tracking updates, use lifecycle status with proper fallbacks
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
-    // label_purchased → 'AC' - enables "On the Dock" badge
-    if (shipmentStatus === 'label_purchased') {
-      return 'AC';
-    }
-    
     // on_hold → 'pending' - awaiting warehouse processing
     if (shipmentStatus === 'on_hold') {
       return 'pending';
@@ -722,7 +716,8 @@ export class ShipStationShipmentETLService {
       return 'cancelled';
     }
     
-    // Default fallback for other states
+    // Default fallback for other states (including label_purchased)
+    // Only webhooks provide actual tracking status codes like AC, IT, DE
     return 'shipped';
   }
 
