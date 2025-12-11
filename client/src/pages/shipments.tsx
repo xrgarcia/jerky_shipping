@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, ShipmentItem, ShipmentTag } from "@shared/schema";
+import type { Shipment, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -54,7 +54,7 @@ interface CacheStatus {
   warmedAt: string | null;
 }
 
-function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[]; cacheStatus?: CacheStatus }) {
+function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: ShipmentWithItemCount; tags?: ShipmentTag[]; packages?: ShipmentPackage[]; cacheStatus?: CacheStatus }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [, setLocation] = useLocation();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -406,6 +406,32 @@ function ShipmentCard({ shipment, tags, cacheStatus }: { shipment: ShipmentWithI
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Scale className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span className="font-medium">Shipping weight {shipment.totalWeight}</span>
+              </div>
+            )}
+
+            {/* Packages */}
+            {packages && packages.length > 0 && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Boxes className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  {packages.slice(0, 3).map((pkg, index) => {
+                    const hasSize = pkg.dimensionLength && pkg.dimensionWidth && pkg.dimensionHeight &&
+                      (parseFloat(pkg.dimensionLength) > 0 || parseFloat(pkg.dimensionWidth) > 0 || parseFloat(pkg.dimensionHeight) > 0);
+                    const sizeStr = hasSize 
+                      ? `${pkg.dimensionLength}x${pkg.dimensionWidth}x${pkg.dimensionHeight} ${pkg.dimensionUnit || ''}`
+                      : (pkg.weightValue && pkg.weightUnit ? `${pkg.weightValue} ${pkg.weightUnit}` : '');
+                    const displayStr = [pkg.packageName || 'Package', sizeStr].filter(Boolean).join(', ');
+                    
+                    return (
+                      <span key={pkg.id || index} data-testid={`text-package-${index}`}>
+                        {displayStr}
+                      </span>
+                    );
+                  })}
+                  {packages.length > 3 && (
+                    <span className="text-xs text-muted-foreground">+{packages.length - 3} more</span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -978,6 +1004,17 @@ export default function Shipments() {
     queryFn: async () => {
       if (shipmentIds.length === 0) return {};
       const response = await apiRequest("POST", "/api/shipments/tags/batch", { shipmentIds });
+      return response.json();
+    },
+    enabled: shipmentIds.length > 0,
+  });
+
+  // Batch fetch packages for all shipments
+  const { data: batchPackagesData } = useQuery<Record<string, ShipmentPackage[]>>({
+    queryKey: ["/api/shipments/packages/batch", shipmentIds],
+    queryFn: async () => {
+      if (shipmentIds.length === 0) return {};
+      const response = await apiRequest("POST", "/api/shipments/packages/batch", { shipmentIds });
       return response.json();
     },
     enabled: shipmentIds.length > 0,
@@ -1656,6 +1693,7 @@ export default function Shipments() {
                   key={shipment.id} 
                   shipment={shipment} 
                   tags={batchTagsData?.[shipment.id]}
+                  packages={batchPackagesData?.[shipment.id]}
                   cacheStatus={shipment.orderNumber ? cacheStatusMap.get(shipment.orderNumber) : undefined}
                 />
               ))}
