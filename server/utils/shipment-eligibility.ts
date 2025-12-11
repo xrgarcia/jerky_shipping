@@ -6,12 +6,16 @@
  * - Cache warmer service (qcsale-cache-warmer.ts)
  * - Firestore sync worker (firestore-sync.ts)  
  * - Order validation endpoint (routes.ts)
+ * - Shipments page (filters and badges)
+ * - Boxing and Bagging pages (packing workflow)
+ * - Shipment details page
  * 
  * SHIPPABILITY CRITERIA (with fallback hierarchy):
  * 
  * ALWAYS EXCLUDED (hard filters applied first):
  * - Shipments that are already shipped (have a tracking number)
  * - Shipments that are on_hold
+ * - Shipments with package type "**DO NOT SHIP (ALERT MGR)**"
  * 
  * PRIMARY: A shipment is fully shippable if (after hard filters):
  * 1. It has the "MOVE OVER" tag (indicates picking is complete in SkuVault)
@@ -23,7 +27,18 @@
  * and others pending, but none have been tagged with MOVE OVER yet.
  */
 
-import type { Shipment, ShipmentTag } from '@shared/schema';
+import type { Shipment, ShipmentTag, ShipmentPackage } from '@shared/schema';
+
+/**
+ * Package name that indicates a shipment should NOT be shipped.
+ * This is used by the warehouse to flag orders that need manager attention.
+ */
+export const DO_NOT_SHIP_PACKAGE_NAME = '**DO NOT SHIP (ALERT MGR)**';
+
+/**
+ * Minimum package type required for eligibility checks.
+ */
+export type PackageForEligibility = Pick<ShipmentPackage, 'shipmentId' | 'packageName'>;
 
 /**
  * Minimum shipment type required for eligibility checks.
@@ -32,33 +47,62 @@ import type { Shipment, ShipmentTag } from '@shared/schema';
 export type ShipmentForEligibility = Pick<Shipment, 'id' | 'shipmentStatus' | 'trackingNumber'>;
 
 /**
+ * Check if a shipment has a "DO NOT SHIP" package assigned.
+ * 
+ * @param shipmentId - The shipment ID to check
+ * @param packages - Array of all packages to search
+ * @returns true if shipment has a DO NOT SHIP package
+ */
+export function hasDoNotShipPackage(
+  shipmentId: string,
+  packages: PackageForEligibility[]
+): boolean {
+  return packages.some(pkg => 
+    pkg.shipmentId === shipmentId && 
+    pkg.packageName === DO_NOT_SHIP_PACKAGE_NAME
+  );
+}
+
+/**
  * Check if a shipment passes the hard filters (excluded from ALL eligibility).
  * A shipment is excluded if:
  * - It already has a tracking number (already shipped)
  * - Its status is 'on_hold'
+ * - It has a "DO NOT SHIP (ALERT MGR)" package (when packages are provided)
  * 
  * @param shipment - The shipment record
+ * @param packages - Optional array of packages for this shipment (for DO NOT SHIP check)
  * @returns true if shipment is NOT excluded (passes hard filters)
  */
-export function passesHardFilters(shipment: ShipmentForEligibility): boolean {
+export function passesHardFilters(
+  shipment: ShipmentForEligibility,
+  packages: PackageForEligibility[] = []
+): boolean {
   const notShipped = !shipment.trackingNumber;
   const notOnHold = shipment.shipmentStatus !== 'on_hold';
-  return notShipped && notOnHold;
+  const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
+  return notShipped && notOnHold && notDoNotShip;
 }
 
 /**
- * Check if a shipment is shippable based on its status and tags (primary criteria).
- * This is applied AFTER hard filters.
+ * Check if a shipment is shippable based on its status, tags, and packages.
+ * This is the main function for determining if a shipment can be shipped today.
+ * 
+ * A shipment is shippable if:
+ * 1. It passes hard filters (not shipped, not on hold, no DO NOT SHIP package)
+ * 2. It has the "MOVE OVER" tag (indicates picking is complete)
  * 
  * @param shipment - The shipment record
  * @param tags - Array of tags associated with this shipment
- * @returns true if shipment is shippable (passes hard filters AND has MOVE OVER tag)
+ * @param packages - Optional array of packages for DO NOT SHIP check
+ * @returns true if shipment is shippable
  */
 export function isShipmentShippable(
   shipment: ShipmentForEligibility,
-  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
+  packages: PackageForEligibility[] = []
 ): boolean {
-  if (!passesHardFilters(shipment)) {
+  if (!passesHardFilters(shipment, packages)) {
     return false;
   }
   
@@ -71,15 +115,17 @@ export function isShipmentShippable(
 
 /**
  * Filter an array of shipments to only those that pass hard filters.
- * (Not shipped AND not on_hold)
+ * (Not shipped AND not on_hold AND no DO NOT SHIP package)
  * 
  * @param shipments - Array of shipment records
+ * @param packages - Optional array of all packages for these shipments
  * @returns Array of shipments that pass hard filters
  */
 export function filterEligibleShipments<T extends ShipmentForEligibility>(
-  shipments: T[]
+  shipments: T[],
+  packages: PackageForEligibility[] = []
 ): T[] {
-  return shipments.filter(shipment => passesHardFilters(shipment));
+  return shipments.filter(shipment => passesHardFilters(shipment, packages));
 }
 
 /**
@@ -88,13 +134,15 @@ export function filterEligibleShipments<T extends ShipmentForEligibility>(
  * 
  * @param shipments - Array of shipment records
  * @param allTags - Array of all tags for these shipments
+ * @param packages - Optional array of all packages for these shipments
  * @returns Array of shippable shipments (passes hard filters AND has MOVE OVER tag)
  */
 export function filterShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
-  allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
+  allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
+  packages: PackageForEligibility[] = []
 ): T[] {
-  return shipments.filter(shipment => isShipmentShippable(shipment, allTags));
+  return shipments.filter(shipment => isShipmentShippable(shipment, allTags, packages));
 }
 
 /**
@@ -131,7 +179,7 @@ export function buildMoveOverTagMap(
 /**
  * Exclusion reasons for shipments that are not eligible for packing.
  */
-export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'eligible';
+export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'do_not_ship_package' | 'eligible';
 
 /**
  * Per-shipment status with exclusion reason.
@@ -145,14 +193,21 @@ export interface ShipmentStatus {
  * Get the exclusion reason for a shipment.
  * 
  * @param shipment - The shipment to check
+ * @param packages - Optional array of packages for DO NOT SHIP check
  * @returns The reason why it's excluded, or 'eligible' if it passes hard filters
  */
-export function getShipmentExclusionReason(shipment: ShipmentForEligibility): ShipmentExclusionReason {
+export function getShipmentExclusionReason(
+  shipment: ShipmentForEligibility,
+  packages: PackageForEligibility[] = []
+): ShipmentExclusionReason {
   if (shipment.trackingNumber) {
     return 'already_shipped';
   }
   if (shipment.shipmentStatus === 'on_hold') {
     return 'on_hold';
+  }
+  if (hasDoNotShipPackage(shipment.id, packages)) {
+    return 'do_not_ship_package';
   }
   return 'eligible';
 }
@@ -161,14 +216,16 @@ export function getShipmentExclusionReason(shipment: ShipmentForEligibility): Sh
  * Get exclusion reasons for all shipments in an order.
  * 
  * @param shipments - All shipments for an order
+ * @param packages - Optional array of all packages for these shipments
  * @returns Array of shipment statuses with their exclusion reasons
  */
 export function getShipmentStatuses<T extends ShipmentForEligibility>(
-  shipments: T[]
+  shipments: T[],
+  packages: PackageForEligibility[] = []
 ): ShipmentStatus[] {
   return shipments.map(shipment => ({
     id: shipment.id,
-    reason: getShipmentExclusionReason(shipment),
+    reason: getShipmentExclusionReason(shipment, packages),
   }));
 }
 
@@ -191,23 +248,26 @@ export interface ShippableShipmentsResult<T> {
  * HARD FILTERS (always applied):
  * - Exclude shipments with tracking numbers (already shipped)
  * - Exclude shipments that are on_hold
+ * - Exclude shipments with "DO NOT SHIP (ALERT MGR)" package
  * 
  * PRIMARY: Shipments that pass hard filters AND have MOVE OVER tag
  * FALLBACK: If none match primary, use all shipments that pass hard filters
  * 
  * @param shipments - All shipments for an order
  * @param allTags - All tags for these shipments
+ * @param packages - Optional array of all packages for these shipments
  * @returns Analysis result with shippable shipments and default selection
  */
 export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
-  allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
+  allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
+  packages: PackageForEligibility[] = []
 ): ShippableShipmentsResult<T> {
-  // Get per-shipment exclusion reasons
-  const shipmentStatuses = getShipmentStatuses(shipments);
+  // Get per-shipment exclusion reasons (including DO NOT SHIP package check)
+  const shipmentStatuses = getShipmentStatuses(shipments, packages);
   
-  // First apply hard filters: not shipped AND not on_hold
-  const eligibleShipments = filterEligibleShipments(shipments);
+  // First apply hard filters: not shipped AND not on_hold AND no DO NOT SHIP package
+  const eligibleShipments = filterEligibleShipments(shipments, packages);
   
   // Try primary criteria: eligible + MOVE OVER tag
   let shippableShipments = eligibleShipments.filter(shipment => {
