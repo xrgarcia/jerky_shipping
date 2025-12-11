@@ -5655,9 +5655,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
       
+      // 7c. Fetch packages for the selected shipment
+      // For cache hit path, packages may already be in shipment from cache warmer
+      // For database fallback path, fetch them now
+      let shipmentPackages = shipment.packages || [];
+      if (!shipment.packages || shipment.packages.length === 0) {
+        shipmentPackages = await storage.getShipmentPackages(shipment.id);
+      }
+      
       // 8. Return combined data with pending print jobs
       res.json({
         ...shipment,
+        packages: shipmentPackages, // Package details for shipping info display
         items: itemsToReturn, // SkuVault items (golden source) or ShipStation fallback
         saleId, // SkuVault Sale ID for QC scanning
         qcSale, // Full SkuVault QC Sale data (includes PassedItems, Items, etc.)
