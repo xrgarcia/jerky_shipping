@@ -1,0 +1,196 @@
+{
+    "shipment_id": "se-934136863",
+    "carrier_id": "se-118080",
+    "service_code": "usps_ground_advantage",
+    "requested_shipment_service": "USPS First Class",
+    "external_shipment_id": "JK3825347856-LF",
+    "shipment_number": "JK3825347856-LF",
+    "hold_until_date": null,
+    "ship_date": "2025-12-10T00:00:00Z",
+    "ship_by_date": null,
+    "created_at": "2025-12-10T21:33:36.387Z",
+    "modified_at": "2025-12-10T22:54:48.347Z",
+    "shipment_status": "label_purchased",
+    "ship_to": {
+        "geolocation": null,
+        "instructions": null,
+        "name": "Lisa Fortney",
+        "phone": null,
+        "email": null,
+        "company_name": null,
+        "address_line1": "2669 CHESTNUT FLATS RD",
+        "address_line2": "",
+        "address_line3": null,
+        "city_locality": "BELINGTON",
+        "state_province": "WV",
+        "postal_code": "26250-9388",
+        "country_code": "US",
+        "address_residential_indicator": "yes"
+    },
+    "ship_from": {
+        "instructions": null,
+        "name": "JERKY. COM",
+        "phone": "8779753759",
+        "email": "talktous@jerky.com",
+        "company_name": "Over 100 Kinds of Jerky",
+        "address_line1": "4132 Will Rogers Pkwy  ",
+        "address_line2": "Suite #1000",
+        "address_line3": "",
+        "city_locality": "Oklahoma City",
+        "state_province": "OK",
+        "postal_code": "73108",
+        "country_code": "US",
+        "address_residential_indicator": "no"
+    },
+    "warehouse_id": "se-228129",
+    "return_to": {
+        "instructions": null,
+        "name": "JERKY. COM",
+        "phone": "8779753759",
+        "email": "talktous@jerky.com",
+        "company_name": "Over 100 Kinds of Jerky",
+        "address_line1": "4132 Will Rogers Pkwy  ",
+        "address_line2": "Suite #1000",
+        "address_line3": "",
+        "city_locality": "Oklahoma City",
+        "state_province": "OK",
+        "postal_code": "73108",
+        "country_code": "US",
+        "address_residential_indicator": "no"
+    },
+    "is_return": false,
+    "confirmation": "none",
+    "customs": null,
+    "external_order_id": null,
+    "order_source_code": null,
+    "advanced_options": {
+        "bill_to_account": null,
+        "bill_to_country_code": null,
+        "bill_to_party": null,
+        "bill_to_postal_code": null,
+        "bill_to_name": null,
+        "bill_to_address_line1": null,
+        "contains_alcohol": false,
+        "delivered_duty_paid": false,
+        "non_machinable": false,
+        "saturday_delivery": false,
+        "dry_ice": false,
+        "dry_ice_weight": null,
+        "fedex_freight": null,
+        "third_party_consignee": false,
+        "guaranteed_duties_and_taxes": false,
+        "ancillary_endorsements_option": null,
+        "freight_class": null,
+        "custom_field1": null,
+        "custom_field2": null,
+        "custom_field3": null,
+        "collect_on_delivery": null,
+        "return_pickup_attempts": null,
+        "additional_handling": false,
+        "own_document_upload": false,
+        "limited_quantity": false,
+        "event_notification": false,
+        "import_services": false,
+        "override_holiday": false
+    },
+    "comparison_rate_type": null,
+    "retail_rate": null,
+    "shipping_rule_id": null,
+    "insurance_provider": "none",
+    "tags": [
+        {
+            "tag_id": 0,
+            "name": "All Orders",
+            "color": null
+        },
+        {
+            "tag_id": 0,
+            "name": "MOVE OVER",
+            "color": null
+        }
+    ],
+    "store_id": "se-480797",
+    "packages": [
+        {
+            "shipment_package_id": "se-1196392099",
+            "package_id": "se-154036",
+            "package_code": "package",
+            "package_name": "Large Jerky.com Envelope",
+            "weight": {
+                "value": 0.00,
+                "unit": "ounce"
+            },
+            "dimensions": {
+                "unit": "inch",
+                "length": 15.00,
+                "width": 12.00,
+                "height": 3.00
+            },
+            "insured_value": {
+                "currency": "usd",
+                "amount": 0.00
+            },
+            "label_messages": {
+                "reference1": null,
+                "reference2": null,
+                "reference3": null
+            },
+            "external_package_id": null,
+            "content_description": null,
+            "products": null,
+            "dangerous_goods_package_info": null
+        }
+    ],
+    "total_weight": {
+        "value": 0.00,
+        "unit": "ounce"
+    },
+    "items": [
+        {
+            "sales_order_id": null,
+            "sales_order_item_id": null,
+            "quantity": 2,
+            "name": "12 pc. Snack Stick Gift Stocking",
+            "sku": "JCB-GFT-A12-XSTOCK",
+            "bundle_sku": null,
+            "external_order_id": null,
+            "external_order_item_id": null,
+            "asin": null,
+            "order_source_code": null,
+            "item_id": "1672110984",
+            "allocation_status": null,
+            "image_url": null,
+            "weight": {
+                "value": 0.0,
+                "unit": "ounce"
+            },
+            "unit_price": 0.00,
+            "tax_amount": null,
+            "shipping_amount": null,
+            "inventory_location": null,
+            "options": [],
+            "product_id": "61672904",
+            "fullfilment_sku": null,
+            "upc": null
+        }
+    ],
+    "notes_from_buyer": null,
+    "notes_for_gift": null,
+    "is_gift": false,
+    "assigned_user": null,
+    "amount_paid": {
+        "currency": "usd",
+        "amount": 0.00
+    },
+    "shipping_paid": {
+        "currency": "usd",
+        "amount": 0.00
+    },
+    "tax_paid": {
+        "currency": "usd",
+        "amount": 0.00
+    },
+    "zone": 5,
+    "dangerous_goods_declaration": null,
+    "sender_info": null
+}
