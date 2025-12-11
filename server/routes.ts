@@ -5325,9 +5325,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // DO NOT SHIP PACKAGE CHECK: ALWAYS verify package type even for cached shipments
-      // This catches stale cache data and ensures DO NOT SHIP orders are never processed
+      // DO NOT SHIP PACKAGE & SERVICE CODE CHECK: ALWAYS verify even for cached shipments
+      // This catches stale cache data and ensures DO NOT SHIP or missing service code orders are never processed
       if (shipment && !notShippable) {
+        // Check for missing serviceCode
+        if (!shipment.serviceCode) {
+          console.log(`[Packing Validation] Order ${resolvedOrderNumber} is missing serviceCode - blocking`);
+          
+          const missingServiceError = {
+            code: 'MISSING_SERVICE_CODE',
+            message: 'No Carrier/Service Selected',
+            explanation: 'This order does not have a carrier and service method selected in ShipStation.',
+            resolution: 'Contact ShipStation or a manager to select a carrier and service for this order before proceeding.'
+          };
+          
+          if (allowNotShippable) {
+            return res.status(200).json({
+              noEligibleShipments: true,
+              error: missingServiceError,
+              orderNumber: resolvedOrderNumber,
+              shipments: [{
+                id: shipment.id,
+                shipmentId: shipment.shipmentId,
+                carrierCode: shipment.carrierCode,
+                serviceCode: shipment.serviceCode,
+                shipToName: shipment.shipToName,
+                shipToCity: shipment.shipToCity,
+                shipToState: shipment.shipToState,
+                trackingNumber: shipment.trackingNumber,
+                exclusionReason: 'missing_service_code',
+                items: [],
+              }],
+              shipmentStatuses: [{ id: shipment.id, reason: 'missing_service_code' }],
+            });
+          } else {
+            return res.status(422).json({
+              error: missingServiceError,
+              orderNumber: resolvedOrderNumber,
+              shipmentId: shipment.id
+            });
+          }
+        }
+        
+        // Check for DO NOT SHIP package
         const shipmentPackagesData = await storage.getShipmentPackages(shipment.id);
         const hasDoNotShipPkg = shipmentPackagesData.some((pkg: { packageName: string | null }) => 
           pkg.packageName === '**DO NOT SHIP (ALERT MGR)**'

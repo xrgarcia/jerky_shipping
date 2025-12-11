@@ -2896,7 +2896,7 @@ export default function Bagging() {
                                         ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' 
                                         : shipment.exclusionReason === 'on_hold'
                                           ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                                          : shipment.exclusionReason === 'do_not_ship_package'
+                                          : (shipment.exclusionReason === 'do_not_ship_package' || shipment.exclusionReason === 'missing_service_code')
                                             ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
                                             : ''
                                     }`}
@@ -2904,6 +2904,7 @@ export default function Bagging() {
                                     {shipment.exclusionReason === 'already_shipped' ? 'Already Shipped' : 
                                      shipment.exclusionReason === 'on_hold' ? 'On Hold' : 
                                      shipment.exclusionReason === 'do_not_ship_package' ? 'DO NOT SHIP' :
+                                     shipment.exclusionReason === 'missing_service_code' ? 'No Service Code' :
                                      shipment.exclusionReason}
                                   </Badge>
                                 )}

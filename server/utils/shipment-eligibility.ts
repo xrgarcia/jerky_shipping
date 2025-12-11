@@ -16,6 +16,7 @@
  * - Shipments that are already shipped (have a tracking number)
  * - Shipments that are on_hold
  * - Shipments with package type "**DO NOT SHIP (ALERT MGR)**"
+ * - Shipments with missing serviceCode (no carrier/service selected)
  * 
  * PRIMARY: A shipment is fully shippable if (after hard filters):
  * 1. It has the "MOVE OVER" tag (indicates picking is complete in SkuVault)
@@ -43,8 +44,9 @@ export type PackageForEligibility = Pick<ShipmentPackage, 'shipmentId' | 'packag
 /**
  * Minimum shipment type required for eligibility checks.
  * Includes trackingNumber to filter out already shipped shipments.
+ * Includes serviceCode to verify carrier/service is selected.
  */
-export type ShipmentForEligibility = Pick<Shipment, 'id' | 'shipmentStatus' | 'trackingNumber'>;
+export type ShipmentForEligibility = Pick<Shipment, 'id' | 'shipmentStatus' | 'trackingNumber' | 'serviceCode'>;
 
 /**
  * Check if a shipment has a "DO NOT SHIP" package assigned.
@@ -69,6 +71,7 @@ export function hasDoNotShipPackage(
  * - It already has a tracking number (already shipped)
  * - Its status is 'on_hold'
  * - It has a "DO NOT SHIP (ALERT MGR)" package (when packages are provided)
+ * - It is missing a serviceCode (carrier/service not selected)
  * 
  * @param shipment - The shipment record
  * @param packages - Optional array of packages for this shipment (for DO NOT SHIP check)
@@ -81,7 +84,8 @@ export function passesHardFilters(
   const notShipped = !shipment.trackingNumber;
   const notOnHold = shipment.shipmentStatus !== 'on_hold';
   const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
-  return notShipped && notOnHold && notDoNotShip;
+  const hasServiceCode = !!shipment.serviceCode;
+  return notShipped && notOnHold && notDoNotShip && hasServiceCode;
 }
 
 /**
@@ -179,7 +183,7 @@ export function buildMoveOverTagMap(
 /**
  * Exclusion reasons for shipments that are not eligible for packing.
  */
-export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'do_not_ship_package' | 'eligible';
+export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'do_not_ship_package' | 'missing_service_code' | 'eligible';
 
 /**
  * Per-shipment status with exclusion reason.
@@ -208,6 +212,9 @@ export function getShipmentExclusionReason(
   }
   if (hasDoNotShipPackage(shipment.id, packages)) {
     return 'do_not_ship_package';
+  }
+  if (!shipment.serviceCode) {
+    return 'missing_service_code';
   }
   return 'eligible';
 }
@@ -249,6 +256,7 @@ export interface ShippableShipmentsResult<T> {
  * - Exclude shipments with tracking numbers (already shipped)
  * - Exclude shipments that are on_hold
  * - Exclude shipments with "DO NOT SHIP (ALERT MGR)" package
+ * - Exclude shipments with missing serviceCode
  * 
  * PRIMARY: Shipments that pass hard filters AND have MOVE OVER tag
  * FALLBACK: If none match primary, use all shipments that pass hard filters
