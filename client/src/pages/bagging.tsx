@@ -1376,9 +1376,9 @@ export default function Bagging() {
       setCurrentShipment(null);
       setOrderScan("");
       
-      // Check if this is a structured error (NO_ELIGIBLE_SHIPMENTS, ALL_ON_HOLD, NOT_SHIPPABLE, etc.)
+      // Check if this is a structured error (NO_ELIGIBLE_SHIPMENTS, ALL_ON_HOLD, NOT_SHIPPABLE, DO_NOT_SHIP_PACKAGE, etc.)
       const errorCode = error.data?.error?.code;
-      if (errorCode === 'NO_ELIGIBLE_SHIPMENTS' || errorCode === 'ALL_ON_HOLD' || errorCode === 'NOT_SHIPPABLE' || errorCode === 'SHIPMENT_NOT_SHIPPABLE') {
+      if (errorCode === 'NO_ELIGIBLE_SHIPMENTS' || errorCode === 'ALL_ON_HOLD' || errorCode === 'NOT_SHIPPABLE' || errorCode === 'SHIPMENT_NOT_SHIPPABLE' || errorCode === 'DO_NOT_SHIP_PACKAGE') {
         const structuredError = error.data.error;
         // Display as scan error (on scan page, not QC page)
         setScanError({
@@ -2804,21 +2804,39 @@ export default function Bagging() {
             {/* Scan Error Display - Shows when order cannot be scanned (all on hold, etc.) */}
             {scanError && !isLabelPrinting && (
               <div 
-                className="bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 rounded-lg p-4 space-y-3"
+                className={`rounded-lg p-4 space-y-3 ${
+                  scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                    ? 'bg-red-100 dark:bg-red-950 border-2 border-red-500 dark:border-red-600 animate-pulse'
+                    : 'bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700'
+                }`}
                 data-testid="alert-scan-error"
               >
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className={`h-6 w-6 flex-shrink-0 mt-0.5 ${
+                    scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`} />
                   <div className="flex-1 space-y-2">
-                    <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-lg">
-                      {scanError.code === 'NO_ELIGIBLE_SHIPMENTS' || scanError.code === 'ALL_ON_HOLD'
-                        ? 'No Shipments Available' 
-                        : scanError.message}
+                    <h4 className={`font-semibold text-lg ${
+                      scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                        ? 'text-red-800 dark:text-red-200'
+                        : 'text-amber-800 dark:text-amber-200'
+                    }`}>
+                      {scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                        ? 'DO NOT SHIP - ALERT MANAGER'
+                        : scanError.code === 'NO_ELIGIBLE_SHIPMENTS' || scanError.code === 'ALL_ON_HOLD'
+                          ? 'No Shipments Available' 
+                          : scanError.message}
                     </h4>
                     
                     {scanError.orderNumber && (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-amber-700 dark:text-amber-300">Order:</span>
+                        <span className={`text-sm ${
+                          scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                            ? 'text-red-700 dark:text-red-300'
+                            : 'text-amber-700 dark:text-amber-300'
+                        }`}>Order:</span>
                         <Badge 
                           variant="outline" 
                           className="font-mono cursor-pointer hover-elevate"
@@ -2830,12 +2848,24 @@ export default function Bagging() {
                       </div>
                     )}
                     
-                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                    <p className={`text-sm ${
+                      scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                        ? 'text-red-700 dark:text-red-300'
+                        : 'text-amber-700 dark:text-amber-300'
+                    }`}>
                       {scanError.explanation}
                     </p>
                     
-                    <div className="bg-amber-100 dark:bg-amber-900 rounded p-3">
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <div className={`rounded p-3 ${
+                      scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                        ? 'bg-red-200 dark:bg-red-900'
+                        : 'bg-amber-100 dark:bg-amber-900'
+                    }`}>
+                      <p className={`text-sm ${
+                        scanError.code === 'DO_NOT_SHIP_PACKAGE'
+                          ? 'text-red-800 dark:text-red-200'
+                          : 'text-amber-800 dark:text-amber-200'
+                      }`}>
                         <strong>What to do:</strong> {scanError.resolution}
                       </p>
                     </div>
@@ -2866,11 +2896,14 @@ export default function Bagging() {
                                         ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' 
                                         : shipment.exclusionReason === 'on_hold'
                                           ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                                          : ''
+                                          : shipment.exclusionReason === 'do_not_ship_package'
+                                            ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
+                                            : ''
                                     }`}
                                   >
                                     {shipment.exclusionReason === 'already_shipped' ? 'Already Shipped' : 
                                      shipment.exclusionReason === 'on_hold' ? 'On Hold' : 
+                                     shipment.exclusionReason === 'do_not_ship_package' ? 'DO NOT SHIP' :
                                      shipment.exclusionReason}
                                   </Badge>
                                 )}
