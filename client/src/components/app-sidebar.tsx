@@ -38,6 +38,10 @@ export function AppSidebar() {
   // Auto-expand Reports section if on a reports page
   const isReportsPage = location.startsWith('/reports');
   const [reportsOpen, setReportsOpen] = useState(isReportsPage);
+  
+  // Auto-expand Tools section if on a tools page
+  const isToolsPage = location.startsWith('/tools');
+  const [toolsOpen, setToolsOpen] = useState(isToolsPage);
 
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -90,16 +94,6 @@ export function AppSidebar() {
       icon: ListChecks,
     },
     {
-      title: "Backfill",
-      url: "/backfill",
-      icon: Database,
-    },
-    {
-      title: "Operations",
-      url: "/operations",
-      icon: Activity,
-    },
-    {
       title: "Print Queue",
       url: "/print-queue",
       icon: Printer,
@@ -133,6 +127,20 @@ export function AppSidebar() {
       title: "Profile",
       url: "/profile",
       icon: UserIcon,
+    },
+  ];
+  
+  // Tools submenu items
+  const toolsItems = [
+    {
+      title: "Backfill",
+      url: "/tools/backfill",
+      icon: Database,
+    },
+    {
+      title: "Operations",
+      url: "/tools/operations",
+      icon: Activity,
     },
   ];
   
@@ -204,6 +212,44 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               
+              {/* Collapsible Tools Section */}
+              <Collapsible open={toolsOpen} onOpenChange={setToolsOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger 
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                      isToolsPage
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
+                    data-testid="link-tools"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="flex-1 text-left">Tools</span>
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${toolsOpen ? 'rotate-90' : ''}`} />
+                  </CollapsibleTrigger>
+                </SidebarMenuItem>
+                <CollapsibleContent>
+                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
+                    {toolsItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <Link 
+                          href={item.url}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                            location === item.url 
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                              : 'text-sidebar-foreground'
+                          }`}
+                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuItem>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+              
               {/* Collapsible Reports Section */}
               <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
                 <SidebarMenuItem>
@@ -242,7 +288,7 @@ export function AppSidebar() {
                 </CollapsibleContent>
               </Collapsible>
               
-              {menuItems.slice(8).map((item) => (
+              {menuItems.slice(6).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}

@@ -16,7 +16,7 @@ import Products from "@/pages/products";
 import Packing from "@/pages/packing";
 import Bagging from "@/pages/bagging";
 import PackingReady from "@/pages/packing-ready";
-import Backfill from "@/pages/backfill";
+import Backfill from "@/pages/tools/backfill";
 import PrintQueue from "@/pages/print-queue";
 import Profile from "@/pages/profile";
 import ShopifySalesReport from "@/pages/reports/shopify-sales";
@@ -25,7 +25,7 @@ import PackedShipmentsReport from "@/pages/reports/packed-shipments";
 import ShipmentEventsReport from "@/pages/reports/shipment-events";
 import PackingLogsReport from "@/pages/reports/packing-logs";
 import Sessions from "@/pages/sessions";
-import Operations from "@/pages/operations";
+import Operations from "@/pages/tools/operations";
 import PORecommendations from "@/pages/po-recommendations";
 import SessionOrders from "@/pages/session-orders";
 import CustomerService from "@/pages/customer-service";
@@ -88,8 +88,8 @@ function AppContent() {
       <Route path="/packing-ready" component={PackingReady} />
       <Route path="/products" component={Products} />
       <Route path="/sessions" component={Sessions} />
-      <Route path="/backfill" component={Backfill} />
-      <Route path="/operations" component={Operations} />
+      <Route path="/tools/backfill" component={Backfill} />
+      <Route path="/tools/operations" component={Operations} />
       <Route path="/print-queue" component={PrintQueue} />
       <Route path="/reports/shopify-sales" component={ShopifySalesReport} />
       <Route path="/reports/broken-shipments" component={BrokenShipmentsReport} />
