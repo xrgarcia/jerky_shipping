@@ -14,6 +14,8 @@ const SUPPLIERS_KEY = `${CACHE_PREFIX}suppliers`;
 export interface IReportingStorage {
   getFullSnapshot(): Promise<PORecommendation[]>;
   getLatestStockCheckDate(): Promise<Date | null>;
+  getAvailableDates(): Promise<string[]>;
+  getRecommendationsByDate(date: string): Promise<PORecommendation[]>;
   getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]>;
   getUniqueSuppliers(): Promise<string[]>;
   invalidateCache(): Promise<void>;
@@ -27,6 +29,67 @@ export class ReportingStorage implements IReportingStorage {
       FROM vw_po_recommendations
     `;
     return result[0]?.latest_date || null;
+  }
+
+  /**
+   * Get all available stock_check_dates from the database.
+   * Returns dates as CST-formatted strings in descending order (newest first).
+   */
+  async getAvailableDates(): Promise<string[]> {
+    const results = await reportingSql`
+      SELECT DISTINCT stock_check_date
+      FROM vw_po_recommendations
+      ORDER BY stock_check_date DESC
+    `;
+    
+    // Format dates in CST timezone to ensure correct day alignment
+    return results.map((row: any) => 
+      formatInTimeZone(row.stock_check_date, CST_TIMEZONE, 'yyyy-MM-dd')
+    );
+  }
+
+  /**
+   * Get all PO recommendations for a specific date.
+   * @param date - Date string in 'yyyy-MM-dd' format (CST)
+   */
+  async getRecommendationsByDate(date: string): Promise<PORecommendation[]> {
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('Invalid date format. Expected yyyy-MM-dd');
+    }
+    
+    const results = await reportingSql`
+      SELECT 
+        sku,
+        supplier,
+        title,
+        lead_time,
+        current_total_stock,
+        base_velocity,
+        projected_velocity,
+        growth_rate,
+        kit_driven_velocity,
+        individual_velocity,
+        ninety_day_forecast,
+        case_adjustment_applied,
+        current_days_cover,
+        moq_applied,
+        quantity_incoming,
+        recommended_quantity,
+        is_assembled_product,
+        stock_check_date,
+        next_holiday_count_down_in_days,
+        next_holiday_recommended_quantity,
+        next_holiday_season,
+        next_holiday_start_date
+      FROM vw_po_recommendations
+      WHERE stock_check_date = ${date}
+    `;
+    
+    const recommendations = results as unknown as PORecommendation[];
+    console.log(`[ReportingStorage] Fetched ${recommendations.length} recommendations for ${date}`);
+    
+    return recommendations;
   }
 
   /**
