@@ -542,8 +542,10 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
         }
         
         if (qcSale && validationResult?.isValid) {
-          // Store by INTERNAL shipment ID (matches cache lookup in routes.ts)
-          qcSalesByShipment[shipment.id] = {
+          // Store by SHIPSTATION shipment ID (se-XXX format) - this is the canonical key
+          // that aligns with SkuVault sale naming convention for split shipments
+          const shipstationId = shipment.shipmentId; // se-XXX format
+          qcSalesByShipment[shipstationId] = {
             SaleId: qcSale.SaleId,
             OrderId: qcSale.OrderId,
             Status: qcSale.Status,
@@ -551,7 +553,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
             PassedItems: qcSale.PassedItems,
             Items: qcSale.Items,
           };
-          lookupMapsByShipment[shipment.id] = lookupMap;
+          lookupMapsByShipment[shipstationId] = lookupMap;
           
           // Set default to first successful fetch (for backward compat)
           if (!defaultQcSale) {

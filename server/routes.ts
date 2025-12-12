@@ -5550,19 +5550,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // 2. Get QCSale data (prefer warm cache, fallback to SkuVault API)
-        // IMPORTANT: Two different IDs are used here:
-        // - shipment.id: Our internal UUID, used as cache key (matches cache warmer storage)
-        // - shipment.shipmentId: ShipStation ID (se-XXX format), used for SkuVault API lookups
-        const internalShipmentId = shipment?.id; // For cache lookup
-        const shipstationShipmentId = shipment?.shipmentId; // For SkuVault API (se-XXX format)
+        // Use ShipStation ID (se-XXX format) as the canonical key for cache lookups
+        // This aligns with how the cache warmer stores data and SkuVault's sale naming convention
+        const shipstationShipmentId = shipment?.shipmentId; // se-XXX format - canonical key
         
         // Check if warm cache has shipment-specific QCSale data (multi-shipment support)
-        // Priority: qcSalesByShipment[internalId] > qcSale (backward compat default)
+        // Priority: qcSalesByShipment[shipstationId] > qcSale (backward compat default)
         const qcSalesByShipment = warmCacheData?.qcSalesByShipment as Record<string, any> | undefined;
-        const cachedQcSaleForShipment = internalShipmentId && qcSalesByShipment?.[internalShipmentId];
+        const cachedQcSaleForShipment = shipstationShipmentId && qcSalesByShipment?.[shipstationShipmentId];
         
         if (cachedQcSaleForShipment) {
-          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${resolvedOrderNumber}, internalId: ${internalShipmentId}`);
+          console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${resolvedOrderNumber}, shipstationId: ${shipstationShipmentId}`);
           qcSale = cachedQcSaleForShipment as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else if (warmCacheData?.qcSale) {
