@@ -34,6 +34,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
+
+const CST_TIMEZONE = 'America/Chicago';
 import { ViewManager, type ColumnDefinition } from "@/components/view-manager";
 import type { PORecommendation, PORecommendationStep } from "@shared/reporting-schema";
 import type { SavedView, SavedViewConfig } from "@shared/schema";
@@ -383,12 +386,9 @@ export default function PORecommendations() {
     );
   };
 
+  // Format the stock_check_date in CST timezone to ensure correct day display
   const dataTimestamp = recommendations.length > 0 
-    ? new Date(recommendations[0].stock_check_date).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      })
+    ? formatInTimeZone(new Date(recommendations[0].stock_check_date), CST_TIMEZONE, 'MMMM d, yyyy')
     : null;
 
   // Helper function to render cell values based on column type

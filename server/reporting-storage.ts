@@ -1,6 +1,9 @@
 import { reportingSql } from './reporting-db';
 import type { PORecommendation, PORecommendationStep } from '@shared/reporting-schema';
 import { getRedisClient } from './utils/queue';
+import { formatInTimeZone } from 'date-fns-tz';
+
+const CST_TIMEZONE = 'America/Chicago';
 
 // Single snapshot cache - one key for all recommendations
 // No TTL - cache only invalidates when stock_check_date changes (handled by cache warmer)
@@ -53,7 +56,9 @@ export class ReportingStorage implements IReportingStorage {
       return [];
     }
     
-    const latestDateStr = latestDate.toISOString().split('T')[0];
+    // Format date in CST timezone to ensure correct day alignment
+    // The GCP database stores dates in CST context, so we need to preserve that
+    const latestDateStr = formatInTimeZone(latestDate, CST_TIMEZONE, 'yyyy-MM-dd');
     
     // Fetch all recommendations for the latest date
     const results = await reportingSql`
@@ -109,7 +114,8 @@ export class ReportingStorage implements IReportingStorage {
       throw new Error('No stock check data available');
     }
     
-    const latestDateStr = latestDate.toISOString().split('T')[0];
+    // Format date in CST timezone to ensure correct day alignment
+    const latestDateStr = formatInTimeZone(latestDate, CST_TIMEZONE, 'yyyy-MM-dd');
     
     // Fetch all recommendations
     const results = await reportingSql`
