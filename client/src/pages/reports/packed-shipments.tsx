@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers, Copy } from "lucide-react";
+import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers, Copy, Monitor, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
@@ -50,6 +50,20 @@ interface UserSummary {
   ordersWithTiming: number;
 }
 
+interface StationSummary {
+  stationId: string;
+  count: number;
+  avgPackingSeconds: number | null;
+  ordersWithTiming: number;
+}
+
+interface SessionSummary {
+  sessionId: string;
+  count: number;
+  avgPackingSeconds: number | null;
+  ordersWithTiming: number;
+}
+
 interface PackedShipmentsResponse {
   startDate: string;
   endDate: string;
@@ -57,6 +71,8 @@ interface PackedShipmentsResponse {
   overallAvgPackingSeconds: number | null;
   ordersWithTiming: number;
   userSummary: UserSummary[];
+  stationSummary: StationSummary[];
+  sessionSummary: SessionSummary[];
   dailySummary: DailySummary[];
 }
 
@@ -374,6 +390,86 @@ export default function PackedShipmentsReport() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Station & Session Timing Summary */}
+        {data && (data.stationSummary?.length > 0 || data.sessionSummary?.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Station Timing */}
+            {data.stationSummary && data.stationSummary.length > 0 && (
+              <Card className="border-cyan-500/30 bg-cyan-500/5">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Monitor className="h-5 w-5 text-cyan-500" />
+                    Avg Time by Station
+                  </CardTitle>
+                  <CardDescription>
+                    Average packing time per workstation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {data.stationSummary.map((station) => {
+                      const stationInfo = stationMap.get(station.stationId);
+                      const displayName = stationInfo?.name || station.stationId;
+                      return (
+                        <div
+                          key={station.stationId}
+                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                          data-testid={`station-timing-${station.stationId}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{displayName}</span>
+                            <Badge variant="secondary" className="text-xs">{station.count} orders</Badge>
+                          </div>
+                          <Badge variant="outline" className="text-cyan-600 border-cyan-300">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {formatPackingTime(station.avgPackingSeconds)}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Session Timing */}
+            {data.sessionSummary && data.sessionSummary.length > 0 && (
+              <Card className="border-indigo-500/30 bg-indigo-500/5">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ListChecks className="h-5 w-5 text-indigo-500" />
+                    Avg Time by Session
+                  </CardTitle>
+                  <CardDescription>
+                    Average packing time per SkuVault session
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {data.sessionSummary.map((session) => (
+                      <div
+                        key={session.sessionId}
+                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50 cursor-pointer hover-elevate"
+                        onClick={() => setSelectedSessionId(session.sessionId)}
+                        data-testid={`session-timing-${session.sessionId}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Session {session.sessionId}</span>
+                          <Badge variant="secondary" className="text-xs">{session.count} orders</Badge>
+                        </div>
+                        <Badge variant="outline" className="text-indigo-600 border-indigo-300">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {formatPackingTime(session.avgPackingSeconds)}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
