@@ -34,7 +34,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
-import { formatInTimeZone } from "date-fns-tz";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { parseISO, format } from "date-fns";
 
 const CST_TIMEZONE = 'America/Chicago';
 import { ViewManager, type ColumnDefinition } from "@/components/view-manager";
@@ -93,6 +95,10 @@ export default function PORecommendations() {
   // View and column states
   const [currentViewId, setCurrentViewId] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+  
+  // Date picker state
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   // Fetch a specific saved view if referenced in URL
   const viewIdFromUrl = useMemo(() => {
@@ -226,11 +232,36 @@ export default function PORecommendations() {
     }
   }, []);
 
-  // Fetch full snapshot once - cached for 24 hours
-  const { data: rawRecommendations = [], isLoading } = useQuery<PORecommendation[]>({
-    queryKey: ['/api/reporting/po-recommendations'],
+  // Fetch available dates for the date picker
+  const { data: availableDatesData } = useQuery<{ dates: string[] }>({
+    queryKey: ['/api/reporting/po-recommendations/available-dates'],
     staleTime: STALE_TIME,
     gcTime: STALE_TIME,
+  });
+  
+  const availableDates = availableDatesData?.dates ?? [];
+  
+  // Set default selected date to the latest available date
+  useEffect(() => {
+    if (availableDates.length > 0 && selectedDate === null) {
+      setSelectedDate(availableDates[0]); // First date is the latest (desc order)
+    }
+  }, [availableDates, selectedDate]);
+
+  // Fetch recommendations - cached for 24 hours, refetches when date changes
+  const { data: rawRecommendations = [], isLoading } = useQuery<PORecommendation[]>({
+    queryKey: ['/api/reporting/po-recommendations', selectedDate],
+    queryFn: async () => {
+      const url = selectedDate 
+        ? `/api/reporting/po-recommendations?date=${selectedDate}`
+        : '/api/reporting/po-recommendations';
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch recommendations');
+      return response.json();
+    },
+    staleTime: STALE_TIME,
+    gcTime: STALE_TIME,
+    enabled: selectedDate !== null || availableDates.length === 0, // Fetch once date is selected, or if no dates available
   });
 
   // Get unique suppliers from the data (computed locally)
@@ -386,10 +417,30 @@ export default function PORecommendations() {
     );
   };
 
-  // Format the stock_check_date in CST timezone to ensure correct day display
-  const dataTimestamp = recommendations.length > 0 
-    ? formatInTimeZone(new Date(recommendations[0].stock_check_date), CST_TIMEZONE, 'MMMM d, yyyy')
+  // Format the selected date for display
+  const formattedSelectedDate = selectedDate 
+    ? formatInTimeZone(parseISO(selectedDate), CST_TIMEZONE, 'MMMM d, yyyy')
     : null;
+  
+  // Convert available dates to Date objects for the calendar
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  
+  // Disable dates that aren't in the available dates list
+  const disabledDates = useCallback((date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return !availableDateSet.has(dateStr);
+  }, [availableDateSet]);
+  
+  // Handle date selection from calendar
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      if (availableDateSet.has(dateStr)) {
+        setSelectedDate(dateStr);
+        setDatePickerOpen(false);
+      }
+    }
+  };
 
   // Helper function to render cell values based on column type
   const renderCellValue = (rec: PORecommendation, columnKey: string): React.ReactNode => {
@@ -458,12 +509,37 @@ export default function PORecommendations() {
               onViewChange={handleViewChange}
               getCurrentConfig={getCurrentConfig}
             />
-            {dataTimestamp && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-data-timestamp">
-                <Calendar className="h-4 w-4" />
-                <span>Data as of: <span className="font-medium text-foreground">{dataTimestamp}</span></span>
-              </div>
-            )}
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  data-testid="button-date-picker"
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    Data as of: <span className="font-medium">{formattedSelectedDate || 'Select date'}</span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate ? parseISO(selectedDate) : undefined}
+                  onSelect={handleDateSelect}
+                  disabled={disabledDates}
+                  initialFocus
+                />
+                {availableDates.length > 0 && (
+                  <div className="p-2 border-t">
+                    <p className="text-xs text-muted-foreground text-center">
+                      {availableDates.length} date{availableDates.length !== 1 ? 's' : ''} available
+                    </p>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
         
