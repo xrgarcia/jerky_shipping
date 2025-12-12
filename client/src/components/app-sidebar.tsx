@@ -69,11 +69,6 @@ export function AppSidebar() {
 
   const menuItems = [
     {
-      title: "Orders",
-      url: "/orders",
-      icon: Package,
-    },
-    {
       title: "Shipments",
       url: "/shipments",
       icon: Truck,
@@ -141,6 +136,11 @@ export function AppSidebar() {
   
   // Reports submenu items
   const reportsItems = [
+    {
+      title: "Shopify Orders",
+      url: "/orders",
+      icon: Package,
+    },
     {
       title: "Shopify Sales",
       url: "/reports/shopify-sales",
