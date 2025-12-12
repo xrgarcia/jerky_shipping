@@ -7866,14 +7866,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reporting API endpoints
-  // Returns full snapshot - frontend handles all filtering/sorting locally for instant performance
+  // Returns full snapshot or date-specific data - frontend handles all filtering/sorting locally for instant performance
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
     try {
-      const recommendations = await reportingStorage.getFullSnapshot();
+      const dateParam = req.query.date as string | undefined;
+      
+      let recommendations;
+      if (dateParam) {
+        // Validate date format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+          return res.status(400).json({ error: "Invalid date format. Expected yyyy-MM-dd" });
+        }
+        recommendations = await reportingStorage.getRecommendationsByDate(dateParam);
+      } else {
+        // Default to latest snapshot (cached)
+        recommendations = await reportingStorage.getFullSnapshot();
+      }
+      
       res.json(recommendations);
     } catch (error: any) {
       console.error("[Reporting] Error fetching PO recommendations:", error);
       res.status(500).json({ error: "Failed to fetch PO recommendations" });
+    }
+  });
+
+  // Get all available stock check dates for the date picker
+  app.get("/api/reporting/po-recommendations/available-dates", requireAuth, async (req, res) => {
+    try {
+      const dates = await reportingStorage.getAvailableDates();
+      res.json({ dates });
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching available dates:", error);
+      res.status(500).json({ error: "Failed to fetch available dates" });
     }
   });
 
