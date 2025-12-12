@@ -552,6 +552,8 @@ export const shipmentEvents = pgTable("shipment_events", {
   usernameIdx: index("shipment_events_username_idx").on(table.username),
   stationIdIdx: index("shipment_events_station_id_idx").on(table.stationId).where(sql`${table.stationId} IS NOT NULL`),
   timingIdx: index("shipment_events_timing_idx").on(table.orderNumber, table.username, table.eventName, table.occurredAt),
+  // Composite index for date range + station aggregation queries
+  stationTimingIdx: index("shipment_events_station_timing_idx").on(table.occurredAt, table.stationId).where(sql`${table.stationId} IS NOT NULL`),
 }));
 
 export const insertShipmentEventSchema = createInsertSchema(shipmentEvents).omit({

@@ -3044,6 +3044,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Group unique orders by date (in Central Time)
       const byDate: Record<string, typeof uniqueOrders> = {};
       const byUser: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
+      const byStation: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
+      const bySession: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
       
       for (const order of uniqueOrders) {
         // Format date as YYYY-MM-DD in Central Time
@@ -3062,6 +3064,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (order.packingSeconds !== null) {
           byUser[order.packedBy].totalSeconds += order.packingSeconds;
           byUser[order.packedBy].ordersWithTiming++;
+        }
+        
+        // Aggregate station timing stats
+        if (order.stationId) {
+          if (!byStation[order.stationId]) {
+            byStation[order.stationId] = { count: 0, totalSeconds: 0, ordersWithTiming: 0 };
+          }
+          byStation[order.stationId].count++;
+          if (order.packingSeconds !== null) {
+            byStation[order.stationId].totalSeconds += order.packingSeconds;
+            byStation[order.stationId].ordersWithTiming++;
+          }
+        }
+        
+        // Aggregate session timing stats
+        if (order.sessionId) {
+          if (!bySession[order.sessionId]) {
+            bySession[order.sessionId] = { count: 0, totalSeconds: 0, ordersWithTiming: 0 };
+          }
+          bySession[order.sessionId].count++;
+          if (order.packingSeconds !== null) {
+            bySession[order.sessionId].totalSeconds += order.packingSeconds;
+            bySession[order.sessionId].ordersWithTiming++;
+          }
         }
       }
       
@@ -3113,6 +3139,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userSummary: Object.entries(byUser)
           .map(([username, stats]) => ({ 
             username, 
+            count: stats.count,
+            avgPackingSeconds: stats.ordersWithTiming > 0 
+              ? stats.totalSeconds / stats.ordersWithTiming 
+              : null,
+            ordersWithTiming: stats.ordersWithTiming,
+          }))
+          .sort((a, b) => b.count - a.count),
+        // Per-station summary with timing
+        stationSummary: Object.entries(byStation)
+          .map(([stationId, stats]) => ({ 
+            stationId, 
+            count: stats.count,
+            avgPackingSeconds: stats.ordersWithTiming > 0 
+              ? stats.totalSeconds / stats.ordersWithTiming 
+              : null,
+            ordersWithTiming: stats.ordersWithTiming,
+          }))
+          .sort((a, b) => b.count - a.count),
+        // Per-session summary with timing
+        sessionSummary: Object.entries(bySession)
+          .map(([sessionId, stats]) => ({ 
+            sessionId, 
             count: stats.count,
             avgPackingSeconds: stats.ordersWithTiming > 0 
               ? stats.totalSeconds / stats.ordersWithTiming 
