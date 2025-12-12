@@ -647,14 +647,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get filtered orders with pagination
       const { orders, total } = await storage.getFilteredOrders(filters);
 
-      // Enrich orders with shipment status
-      const allShipments = await storage.getAllShipments();
-      const shipmentsMap = new Map<string, boolean>();
-      allShipments.forEach(shipment => shipmentsMap.set(shipment.orderId, true));
+      // Enrich orders with shipment status (only check for current page's orders)
+      const orderIds = orders.map(order => order.id);
+      const orderIdsWithShipments = await storage.getOrderIdsWithShipments(orderIds);
       
       const ordersWithShipmentStatus = orders.map(order => ({
         ...order,
-        hasShipment: shipmentsMap.has(order.id),
+        hasShipment: orderIdsWithShipments.has(order.id),
       }));
 
       res.json({ 

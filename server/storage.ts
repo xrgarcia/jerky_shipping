@@ -166,6 +166,7 @@ export interface IStorage {
   getShipment(id: string): Promise<Shipment | undefined>;
   getAllShipments(): Promise<Shipment[]>;
   getShipmentsByOrderId(orderId: string): Promise<Shipment[]>;
+  getOrderIdsWithShipments(orderIds: string[]): Promise<Set<string>>;
   getShipmentsByOrderNumber(orderNumber: string): Promise<Shipment[]>;
   getShipmentByTrackingNumber(trackingNumber: string): Promise<Shipment | undefined>;
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
@@ -938,6 +939,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(shipments.orderId, orderId))
       .orderBy(desc(shipments.createdAt));
     return result;
+  }
+
+  async getOrderIdsWithShipments(orderIds: string[]): Promise<Set<string>> {
+    if (orderIds.length === 0) {
+      return new Set();
+    }
+    const result = await db
+      .selectDistinct({ orderId: shipments.orderId })
+      .from(shipments)
+      .where(inArray(shipments.orderId, orderIds));
+    return new Set(result.map(r => r.orderId).filter((id): id is string => id !== null));
   }
 
   async getShipmentsByOrderNumber(orderNumber: string): Promise<Shipment[]> {
