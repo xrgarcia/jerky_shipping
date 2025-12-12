@@ -113,11 +113,6 @@ export function AppSidebar() {
       url: "/downloads",
       icon: Download,
     },
-    {
-      title: "Profile",
-      url: "/profile",
-      icon: UserIcon,
-    },
   ];
   
   // Settings submenu items
@@ -250,6 +245,24 @@ export function AppSidebar() {
                 </CollapsibleContent>
               </Collapsible>
               
+              {/* Downloads */}
+              {menuItems.slice(8).map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <Link 
+                    href={item.url}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                      location === item.url 
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
+                    data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuItem>
+              ))}
+              
               {/* Collapsible Settings Section */}
               <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <SidebarMenuItem>
@@ -287,23 +300,6 @@ export function AppSidebar() {
                   </div>
                 </CollapsibleContent>
               </Collapsible>
-              
-              {menuItems.slice(8).map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <Link 
-                    href={item.url}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                      location === item.url 
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                        : 'text-sidebar-foreground'
-                    }`}
-                    data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -335,13 +331,6 @@ export function AppSidebar() {
                 className="w-56"
                 align="end"
               >
-                <DropdownMenuItem
-                  onClick={() => setLocation("/profile")}
-                  data-testid="menu-item-profile"
-                >
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   data-testid="menu-item-logout"
