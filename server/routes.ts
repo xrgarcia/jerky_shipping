@@ -5557,10 +5557,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if warm cache has shipment-specific QCSale data (multi-shipment support)
         // Priority: qcSalesByShipment[shipstationId] > qcSale (backward compat default)
         const qcSalesByShipment = warmCacheData?.qcSalesByShipment as Record<string, any> | undefined;
+        
+        // DEBUG: Log available cache keys for multi-shipment debugging
+        const cacheKeys = qcSalesByShipment ? Object.keys(qcSalesByShipment) : [];
+        console.log(`[Packing Validation] [MULTI-SHIPMENT DEBUG] Looking up key=${shipstationShipmentId}, available keys=[${cacheKeys.join(', ')}]`);
+        
         const cachedQcSaleForShipment = shipstationShipmentId && qcSalesByShipment?.[shipstationShipmentId];
         
         if (cachedQcSaleForShipment) {
           console.log(`[Packing Validation] WARM CACHE HIT for QCSale (shipment-specific): ${resolvedOrderNumber}, shipstationId: ${shipstationShipmentId}`);
+          // DEBUG: Log QCSale details to verify correct data
+          const itemSkus = (cachedQcSaleForShipment.Items || []).slice(0, 5).map((i: any) => i.Sku).join(', ');
+          console.log(`[Packing Validation] [MULTI-SHIPMENT DEBUG] Retrieved SaleId=${cachedQcSaleForShipment.SaleId}, Items=${cachedQcSaleForShipment.Items?.length || 0} [${itemSkus}], PassedItems=${cachedQcSaleForShipment.PassedItems?.length || 0}`);
           qcSale = cachedQcSaleForShipment as import('@shared/skuvault-types').QCSale;
           if (cacheSource !== 'warm_cache') cacheSource = 'warm_cache';
         } else if (warmCacheData?.qcSale) {

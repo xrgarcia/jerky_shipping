@@ -545,6 +545,11 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
           // Store by SHIPSTATION shipment ID (se-XXX format) - this is the canonical key
           // that aligns with SkuVault sale naming convention for split shipments
           const shipstationId = shipment.shipmentId; // se-XXX format
+          
+          // DEBUG: Log the QCSale SaleId to verify correct matching
+          const itemSkus = (qcSale.Items || []).slice(0, 5).map((i: any) => i.Sku).join(', ');
+          log(`  [MULTI-SHIPMENT DEBUG] Shipment ${shipstationId}: SaleId=${qcSale.SaleId}, Items=${qcSale.Items?.length || 0} [${itemSkus}${(qcSale.Items?.length || 0) > 5 ? '...' : ''}]`);
+          
           qcSalesByShipment[shipstationId] = {
             SaleId: qcSale.SaleId,
             OrderId: qcSale.OrderId,
