@@ -98,9 +98,10 @@ export const orders = pgTable("orders", {
   financialStatusIdx: index("orders_financial_status_idx").on(table.financialStatus),
   // Index for sync monitoring queries
   lastSyncedAtIdx: index("orders_last_synced_at_idx").on(table.lastSyncedAt),
-  // GIN trigram indexes for ILIKE search on order numbers and customer names
+  // GIN trigram indexes for ILIKE search on order numbers, customer names, and emails
   orderNumberTrigramIdx: index("orders_order_number_trgm_idx").using("gin", table.orderNumber.op("gin_trgm_ops")),
   customerNameTrigramIdx: index("orders_customer_name_trgm_idx").using("gin", table.customerName.op("gin_trgm_ops")),
+  customerEmailTrigramIdx: index("orders_customer_email_trgm_idx").using("gin", table.customerEmail.op("gin_trgm_ops")),
 }));
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
@@ -180,6 +181,9 @@ export const orderItems = pgTable("order_items", {
   requiresShippingIdx: index("order_items_requires_shipping_idx").on(table.orderId, table.requiresShipping),
   // Unique constraint: same line item ID cannot appear twice in database
   uniqueLineItemIdx: uniqueIndex("order_items_shopify_line_item_id_idx").on(table.shopifyLineItemId),
+  // GIN trigram indexes for ILIKE search on SKUs and product titles
+  skuTrigramIdx: index("order_items_sku_trgm_idx").using("gin", table.sku.op("gin_trgm_ops")),
+  titleTrigramIdx: index("order_items_title_trgm_idx").using("gin", table.title.op("gin_trgm_ops")),
 }));
 
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
@@ -321,6 +325,8 @@ export const shipments = pgTable("shipments", {
   carrierShipDateIdx: index("shipments_carrier_ship_date_idx").on(table.carrierCode, table.shipDate.desc().nullsLast()).where(sql`${table.carrierCode} IS NOT NULL`),
   // QC completed timestamp for packed shipments report queries
   qcCompletedAtIdx: index("shipments_qc_completed_at_idx").on(table.qcCompletedAt.desc().nullsLast()).where(sql`${table.qcCompletedAt} IS NOT NULL`),
+  // GIN trigram index for ILIKE search on tracking numbers
+  trackingNumberTrigramIdx: index("shipments_tracking_number_trgm_idx").using("gin", table.trackingNumber.op("gin_trgm_ops")),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
