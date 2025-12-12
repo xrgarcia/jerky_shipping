@@ -66,6 +66,12 @@ interface SessionSummary {
   ordersWithTiming: number;
 }
 
+interface StationSessionSummary {
+  stationId: string;
+  sessionCount: number;
+  avgSessionSeconds: number | null;
+}
+
 interface PackedShipmentsResponse {
   startDate: string;
   endDate: string;
@@ -75,6 +81,7 @@ interface PackedShipmentsResponse {
   userSummary: UserSummary[];
   stationSummary: StationSummary[];
   sessionSummary: SessionSummary[];
+  stationSessionSummary: StationSessionSummary[];
   dailySummary: DailySummary[];
 }
 
@@ -462,6 +469,45 @@ export default function PackedShipmentsReport() {
                       </div>
                     );
                   })()}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Avg Session Time per Station */}
+            {data.stationSessionSummary && data.stationSessionSummary.length > 0 && (
+              <Card className="border-purple-500/30 bg-purple-500/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-purple-500" />
+                    Avg Session Time by Station
+                  </CardTitle>
+                  <CardDescription>
+                    Average time to complete a full session (~28 orders) at each station
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {data.stationSessionSummary.map((station) => {
+                      const stationInfo = stationMap.get(station.stationId);
+                      const displayName = stationInfo?.name || station.stationId;
+                      return (
+                        <div
+                          key={station.stationId}
+                          className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                          data-testid={`station-session-${station.stationId}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{displayName}</span>
+                            <Badge variant="secondary" className="text-xs">{station.sessionCount} session{station.sessionCount !== 1 ? 's' : ''}</Badge>
+                          </div>
+                          <Badge variant="outline" className="text-purple-600 border-purple-300">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {formatPackingTime(station.avgSessionSeconds)}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             )}
