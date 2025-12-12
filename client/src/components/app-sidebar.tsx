@@ -84,14 +84,14 @@ export function AppSidebar() {
       icon: PackageOpen,
     },
     {
-      title: "Skuvault Sessions",
-      url: "/sessions",
-      icon: ListChecks,
-    },
-    {
       title: "Print Queue",
       url: "/print-queue",
       icon: Printer,
+    },
+    {
+      title: "Skuvault Sessions",
+      url: "/sessions",
+      icon: ListChecks,
     },
     {
       title: "PO Recommend",
