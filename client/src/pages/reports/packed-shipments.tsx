@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers, Copy, Monitor, ListChecks } from "lucide-react";
+import { PackageCheck, RefreshCw, Calendar, User, Loader2, ChevronDown, ChevronRight, Clock, Layers, Copy, Monitor, ListChecks, Trophy, Medal, Award } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { subDays } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
@@ -45,6 +46,7 @@ interface DailySummary {
 
 interface UserSummary {
   username: string;
+  avatarUrl: string | null;
   count: number;
   avgPackingSeconds: number | null;
   ordersWithTiming: number;
@@ -466,36 +468,117 @@ export default function PackedShipmentsReport() {
           </div>
         )}
 
-        {/* User Leaderboard */}
+        {/* User Leaderboard - Gamified */}
         {data && data.userSummary.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-2">
-                <User className="h-5 w-5" />
+                <Trophy className="h-5 w-5 text-amber-500" />
                 Packer Leaderboard
               </CardTitle>
               <CardDescription>
-                Orders packed by user in the selected date range (with average pack time)
+                Top performers for the selected date range
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-3">
-                {data.userSummary.map((user, index) => (
-                  <div
-                    key={user.username}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted"
-                    data-testid={`packer-${index}`}
-                  >
-                    <span className="font-medium">{extractUsername(user.username)}</span>
-                    <Badge variant="secondary">{user.count}</Badge>
-                    {user.avgPackingSeconds !== null && (
-                      <Badge variant="outline" className="text-amber-600 border-amber-300">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatPackingTime(user.avgPackingSeconds)}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {data.userSummary.map((user, index) => {
+                  const rank = index + 1;
+                  const isGold = rank === 1;
+                  const isSilver = rank === 2;
+                  const isBronze = rank === 3;
+                  const isTopThree = rank <= 3;
+                  
+                  // Get initials for avatar fallback
+                  const name = extractUsername(user.username);
+                  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || name.slice(0, 2).toUpperCase();
+                  
+                  // Rank badge styling
+                  const getRankBadge = () => {
+                    if (isGold) return (
+                      <div className="absolute -top-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-md border-2 border-yellow-300">
+                        <Trophy className="h-4 w-4 text-white" />
+                      </div>
+                    );
+                    if (isSilver) return (
+                      <div className="absolute -top-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-md border-2 border-gray-200">
+                        <Medal className="h-4 w-4 text-white" />
+                      </div>
+                    );
+                    if (isBronze) return (
+                      <div className="absolute -top-1 -left-1 w-7 h-7 rounded-full bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-md border-2 border-amber-500">
+                        <Award className="h-4 w-4 text-white" />
+                      </div>
+                    );
+                    return (
+                      <div className="absolute -top-1 -left-1 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground border">
+                        {rank}
+                      </div>
+                    );
+                  };
+                  
+                  return (
+                    <div
+                      key={user.username}
+                      className={`relative flex flex-col items-center p-4 rounded-xl transition-all ${
+                        isGold ? 'bg-gradient-to-br from-yellow-50 to-amber-100 border-2 border-yellow-300 shadow-lg dark:from-yellow-900/20 dark:to-amber-900/30 dark:border-yellow-700' :
+                        isSilver ? 'bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-300 shadow-md dark:from-gray-800/50 dark:to-gray-700/50 dark:border-gray-600' :
+                        isBronze ? 'bg-gradient-to-br from-amber-50 to-orange-100 border-2 border-amber-400 shadow-md dark:from-amber-900/20 dark:to-orange-900/30 dark:border-amber-700' :
+                        'bg-muted/50 border border-border'
+                      }`}
+                      data-testid={`packer-${index}`}
+                    >
+                      {/* Rank Badge */}
+                      {getRankBadge()}
+                      
+                      {/* Avatar */}
+                      <Avatar className={`${isTopThree ? 'h-14 w-14' : 'h-12 w-12'} mb-2 ${isGold ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}>
+                        <AvatarImage src={user.avatarUrl || undefined} alt={name} />
+                        <AvatarFallback className={`text-sm font-semibold ${
+                          isGold ? 'bg-yellow-200 text-yellow-800' :
+                          isSilver ? 'bg-gray-200 text-gray-700' :
+                          isBronze ? 'bg-amber-200 text-amber-800' :
+                          'bg-primary/10 text-primary'
+                        }`}>
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      {/* Name */}
+                      <span className={`font-semibold text-center truncate w-full ${isTopThree ? 'text-base' : 'text-sm'}`}>
+                        {name}
+                      </span>
+                      
+                      {/* Stats */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge 
+                          className={`${
+                            isGold ? 'bg-yellow-500 hover:bg-yellow-600 text-white' :
+                            isSilver ? 'bg-gray-400 hover:bg-gray-500 text-white' :
+                            isBronze ? 'bg-amber-600 hover:bg-amber-700 text-white' :
+                            ''
+                          }`}
+                          variant={isTopThree ? 'default' : 'secondary'}
+                        >
+                          {user.count} orders
+                        </Badge>
+                      </div>
+                      
+                      {/* Avg Time */}
+                      {user.avgPackingSeconds !== null && (
+                        <div className={`flex items-center gap-1 mt-1 text-sm ${
+                          isGold ? 'text-yellow-700 dark:text-yellow-400' :
+                          isSilver ? 'text-gray-600 dark:text-gray-300' :
+                          isBronze ? 'text-amber-700 dark:text-amber-400' :
+                          'text-muted-foreground'
+                        }`}>
+                          <Clock className="h-3 w-3" />
+                          <span>{formatPackingTime(user.avgPackingSeconds)} avg</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

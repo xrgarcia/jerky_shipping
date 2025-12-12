@@ -3128,6 +3128,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .sort((a, b) => b.date.localeCompare(a.date));
       
+      // Fetch user data (including avatars) for all users in the summary
+      const userEmails = Object.keys(byUser);
+      const userDataMap = new Map<string, { avatarUrl: string | null }>();
+      
+      // Fetch user avatars in parallel
+      await Promise.all(
+        userEmails.map(async (email) => {
+          const user = await storage.getUserByEmail(email);
+          userDataMap.set(email, { avatarUrl: user?.avatarUrl || null });
+        })
+      );
+      
       res.json({
         startDate,
         endDate,
@@ -3135,10 +3147,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Overall timing metrics
         overallAvgPackingSeconds,
         ordersWithTiming: ordersWithTiming.length,
-        // Per-user summary with timing
+        // Per-user summary with timing and avatar
         userSummary: Object.entries(byUser)
           .map(([username, stats]) => ({ 
             username, 
+            avatarUrl: userDataMap.get(username)?.avatarUrl || null,
             count: stats.count,
             avgPackingSeconds: stats.ordersWithTiming > 0 
               ? stats.totalSeconds / stats.ordersWithTiming 
