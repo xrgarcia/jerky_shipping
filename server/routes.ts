@@ -3046,6 +3046,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const byUser: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
       const byStation: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
       const bySession: Record<string, { count: number; totalSeconds: number; ordersWithTiming: number }> = {};
+      // Track session totals per station (key: stationId:sessionId)
+      const byStationSession: Record<string, { stationId: string; sessionId: string; totalSeconds: number; orderCount: number }> = {};
       
       for (const order of uniqueOrders) {
         // Format date as YYYY-MM-DD in Central Time
@@ -3088,6 +3090,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bySession[order.sessionId].totalSeconds += order.packingSeconds;
             bySession[order.sessionId].ordersWithTiming++;
           }
+        }
+        
+        // Aggregate station-session timing (for avg session time per station)
+        if (order.stationId && order.sessionId && order.packingSeconds !== null) {
+          const stationSessionKey = `${order.stationId}:${order.sessionId}`;
+          if (!byStationSession[stationSessionKey]) {
+            byStationSession[stationSessionKey] = { 
+              stationId: order.stationId, 
+              sessionId: order.sessionId, 
+              totalSeconds: 0, 
+              orderCount: 0 
+            };
+          }
+          byStationSession[stationSessionKey].totalSeconds += order.packingSeconds;
+          byStationSession[stationSessionKey].orderCount++;
         }
       }
       
@@ -3181,6 +3198,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ordersWithTiming: stats.ordersWithTiming,
           }))
           .sort((a, b) => b.count - a.count),
+        // Per-station session summary (avg session duration per station)
+        stationSessionSummary: (() => {
+          // Group station-sessions by stationId
+          const stationSessionTotals: Record<string, { sessionCount: number; totalSessionSeconds: number }> = {};
+          for (const ss of Object.values(byStationSession)) {
+            if (!stationSessionTotals[ss.stationId]) {
+              stationSessionTotals[ss.stationId] = { sessionCount: 0, totalSessionSeconds: 0 };
+            }
+            stationSessionTotals[ss.stationId].sessionCount++;
+            stationSessionTotals[ss.stationId].totalSessionSeconds += ss.totalSeconds;
+          }
+          return Object.entries(stationSessionTotals)
+            .map(([stationId, stats]) => ({
+              stationId,
+              sessionCount: stats.sessionCount,
+              avgSessionSeconds: stats.sessionCount > 0 
+                ? stats.totalSessionSeconds / stats.sessionCount 
+                : null,
+            }))
+            .sort((a, b) => b.sessionCount - a.sessionCount);
+        })(),
         dailySummary,
       });
     } catch (error) {
