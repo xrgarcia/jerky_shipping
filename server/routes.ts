@@ -6358,11 +6358,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Fast barcode validation for packing - uses SkuVault cached data (includes kit components)
   // Requires orderNumber to look up in the cached QCSale data
-  // Optional query param: ?shipmentId=<internal-uuid> for multi-shipment order support
+  // Optional query param: ?shipmentId=<se-XXX> for multi-shipment order support (ShipStation ID)
   app.get("/api/packing/validate-barcode/:orderNumber/:barcode", requireAuth, async (req, res) => {
     try {
       const { orderNumber, barcode } = req.params;
-      const { shipmentId } = req.query; // Optional: internal shipment UUID for multi-shipment orders
+      const { shipmentId } = req.query; // Optional: ShipStation shipment ID (se-XXX format) for multi-shipment orders
       
       if (!orderNumber || orderNumber.trim() === '') {
         return res.status(400).json({ 

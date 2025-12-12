@@ -1545,12 +1545,12 @@ export default function Packing() {
     mutationFn: async (scannedCode: string) => {
       // Use orderNumber from currentShipment to look up in SkuVault cache
       const orderNumber = currentShipment?.orderNumber;
-      const shipmentId = currentShipment?.id; // Internal UUID for multi-shipment support
+      const shipstationShipmentId = currentShipment?.shipmentId; // ShipStation ID (se-XXX format) for multi-shipment support
       if (!orderNumber) {
         return { valid: false, error: "No order selected" } as LocalBarcodeResponse;
       }
-      // Pass shipmentId as query param for multi-shipment orders (uses correct lookupMap)
-      const url = `/api/packing/validate-barcode/${encodeURIComponent(orderNumber)}/${encodeURIComponent(scannedCode)}${shipmentId ? `?shipmentId=${encodeURIComponent(shipmentId)}` : ''}`;
+      // Pass ShipStation shipmentId as query param for multi-shipment orders (uses correct lookupMap)
+      const url = `/api/packing/validate-barcode/${encodeURIComponent(orderNumber)}/${encodeURIComponent(scannedCode)}${shipstationShipmentId ? `?shipmentId=${encodeURIComponent(shipstationShipmentId)}` : ''}`;
       const response = await apiRequest("GET", url);
       return (await response.json()) as LocalBarcodeResponse;
     },
