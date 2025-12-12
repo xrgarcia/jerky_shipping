@@ -435,38 +435,31 @@ export default function PackedShipmentsReport() {
               </Card>
             )}
 
-            {/* Session Timing */}
+            {/* Session Timing - Overall Average */}
             {data.sessionSummary && data.sessionSummary.length > 0 && (
               <Card className="border-indigo-500/30 bg-indigo-500/5">
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <ListChecks className="h-5 w-5 text-indigo-500" />
-                    Avg Time by Session
+                    Avg Pack Time per Session
                   </CardTitle>
                   <CardDescription>
-                    Average packing time per SkuVault session
+                    Overall average across {data.sessionSummary.length} session{data.sessionSummary.length !== 1 ? 's' : ''}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {data.sessionSummary.map((session) => (
-                      <div
-                        key={session.sessionId}
-                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50 cursor-pointer hover-elevate"
-                        onClick={() => setSelectedSessionId(session.sessionId)}
-                        data-testid={`session-timing-${session.sessionId}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Session {session.sessionId}</span>
-                          <Badge variant="secondary" className="text-xs">{session.count} orders</Badge>
-                        </div>
-                        <Badge variant="outline" className="text-indigo-600 border-indigo-300">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatPackingTime(session.avgPackingSeconds)}
-                        </Badge>
+                  {(() => {
+                    const sessionsWithTiming = data.sessionSummary.filter(s => s.avgPackingSeconds !== null);
+                    const totalAvgSeconds = sessionsWithTiming.reduce((sum, s) => sum + (s.avgPackingSeconds || 0), 0);
+                    const overallSessionAvg = sessionsWithTiming.length > 0 
+                      ? totalAvgSeconds / sessionsWithTiming.length 
+                      : null;
+                    return (
+                      <div className="text-4xl font-bold text-indigo-600" data-testid="text-avg-session-time">
+                        {formatPackingTime(overallSessionAvg)}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
