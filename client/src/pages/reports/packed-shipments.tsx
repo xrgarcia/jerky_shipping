@@ -474,18 +474,18 @@ export default function PackedShipmentsReport() {
             )}
 
             {/* Avg Session Time per Station */}
-            {data.stationSessionSummary && data.stationSessionSummary.length > 0 && (
-              <Card className="border-purple-500/30 bg-purple-500/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Layers className="h-5 w-5 text-purple-500" />
-                    Avg Session Time by Station
-                  </CardTitle>
-                  <CardDescription>
-                    Average time to complete a full session (~28 orders) at each station
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Card className="border-purple-500/30 bg-purple-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-purple-500" />
+                  Avg Session Time by Station
+                </CardTitle>
+                <CardDescription>
+                  Average time to complete a full session (~28 orders) at each station
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {data.stationSessionSummary && data.stationSessionSummary.length > 0 ? (
                   <div className="space-y-2">
                     {data.stationSessionSummary.map((station) => {
                       const stationInfo = stationMap.get(station.stationId);
@@ -508,9 +508,13 @@ export default function PackedShipmentsReport() {
                       );
                     })}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-4xl font-bold text-purple-600" data-testid="text-no-station-sessions">
+                    0
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
