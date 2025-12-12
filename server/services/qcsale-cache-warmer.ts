@@ -99,6 +99,134 @@ function getFailedOrderKey(orderNumber: string): string {
   return `${FAILED_ORDER_KEY_PREFIX}${orderNumber}`;
 }
 
+// ============================================================================
+// SHIPMENT-TO-SALEID MATCHING
+// ============================================================================
+// 
+// SkuVault creates QC Sales with composite IDs that may or may not include
+// the ShipStation shipment ID as a suffix. This section handles the logic
+// to correctly match a QCSale to the shipment that requested it.
+//
+// SaleId Patterns:
+// - Single shipment:    "480797-ORDER-123"           (no suffix)
+// - First of multi:     "480797-ORDER-123"           (no suffix - legacy)
+// - Subsequent multi:   "480797-ORDER-123-935187097" (with ShipStation ID suffix)
+// ============================================================================
+
+/**
+ * Minimum number of digits for a valid ShipStation ID suffix.
+ * ShipStation IDs are typically 9+ digits (e.g., 935187097).
+ * Using 6 as minimum to be safe while avoiding false positives.
+ */
+const SHIPSTATION_ID_MIN_DIGITS = 6;
+
+/**
+ * Regex pattern to detect if a SaleId ends with a ShipStation ID suffix.
+ * Matches: "-935187097" at the end of the string
+ * Does NOT match: "-123" (too short to be a ShipStation ID)
+ */
+const SALEID_SUFFIX_PATTERN = new RegExp(`-\\d{${SHIPSTATION_ID_MIN_DIGITS},}$`);
+
+/**
+ * Result of matching a QCSale's SaleId to a requested shipment.
+ * Uses discriminated union for clear, exhaustive handling of all cases.
+ */
+type SaleIdMatchReason = 
+  | 'single_shipment'           // Only one shipment - no validation needed
+  | 'suffix_matched'            // Multi-shipment: SaleId suffix matches shipmentId
+  | 'first_shipment_no_suffix'  // Multi-shipment: SaleId has no suffix, accepted for first shipment
+  | 'suffix_mismatch'           // Multi-shipment: SaleId suffix doesn't match shipmentId
+  | 'not_first_shipment';       // Multi-shipment: SaleId has no suffix but this isn't the first shipment
+
+interface SaleIdMatchResult {
+  matches: boolean;
+  reason: SaleIdMatchReason;
+  details: string;  // Human-readable explanation for logging
+}
+
+/**
+ * Determines if a SkuVault QCSale's SaleId matches the requested shipment.
+ * 
+ * This is a pure function with no side effects, making it easy to test and reason about.
+ * 
+ * @param saleId - The SaleId from the SkuVault QCSale (e.g., "480797-ORDER-123-935187097")
+ * @param shipstationId - The ShipStation ID we're looking for (e.g., "se-935187097")
+ * @param shipmentIndex - Zero-based index of this shipment in the shippable list
+ * @param totalShipments - Total number of shippable shipments for this order
+ * 
+ * @returns SaleIdMatchResult with match status and reason
+ * 
+ * @example
+ * // Single shipment - always matches
+ * matchSaleIdToShipment("480797-ORDER-123", "se-935187097", 0, 1)
+ * // => { matches: true, reason: 'single_shipment', details: '...' }
+ * 
+ * @example
+ * // Multi-shipment with matching suffix
+ * matchSaleIdToShipment("480797-ORDER-123-935187097", "se-935187097", 1, 2)
+ * // => { matches: true, reason: 'suffix_matched', details: '...' }
+ * 
+ * @example
+ * // Multi-shipment with mismatched suffix
+ * matchSaleIdToShipment("480797-ORDER-123-935187094", "se-935187097", 1, 2)
+ * // => { matches: false, reason: 'suffix_mismatch', details: '...' }
+ */
+function matchSaleIdToShipment(
+  saleId: string,
+  shipstationId: string,
+  shipmentIndex: number,
+  totalShipments: number
+): SaleIdMatchResult {
+  // Extract the numeric suffix from the ShipStation ID (e.g., "se-935187097" -> "935187097")
+  const shipmentSuffix = shipstationId.replace(/^se-/, '');
+  
+  // Case 1: Single shipment order - no validation needed
+  if (totalShipments === 1) {
+    return {
+      matches: true,
+      reason: 'single_shipment',
+      details: `Single shipment order - accepting SaleId ${saleId}`,
+    };
+  }
+  
+  // Case 2+: Multi-shipment order - need to validate
+  const saleIdHasSuffix = SALEID_SUFFIX_PATTERN.test(saleId);
+  
+  if (saleIdHasSuffix) {
+    // SaleId has a suffix - it MUST match the requested shipment
+    const expectedSuffix = `-${shipmentSuffix}`;
+    if (saleId.endsWith(expectedSuffix)) {
+      return {
+        matches: true,
+        reason: 'suffix_matched',
+        details: `SaleId ${saleId} matches shipment ${shipstationId} (suffix: ${expectedSuffix})`,
+      };
+    } else {
+      return {
+        matches: false,
+        reason: 'suffix_mismatch',
+        details: `SaleId ${saleId} does not match shipment ${shipstationId} (expected suffix: ${expectedSuffix})`,
+      };
+    }
+  } else {
+    // SaleId has no suffix - this is the legacy "first shipment" pattern
+    // Accept it only if this is the first shipment (index 0)
+    if (shipmentIndex === 0) {
+      return {
+        matches: true,
+        reason: 'first_shipment_no_suffix',
+        details: `SaleId ${saleId} has no suffix - accepted for first shipment ${shipstationId}`,
+      };
+    } else {
+      return {
+        matches: false,
+        reason: 'not_first_shipment',
+        details: `SaleId ${saleId} has no suffix but ${shipstationId} is shipment #${shipmentIndex + 1}, not first`,
+      };
+    }
+  }
+}
+
 /**
  * Track a failed warming attempt for exponential backoff
  */
@@ -490,12 +618,12 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     let defaultLookupMap: Record<string, any> = {};
     
     // Fetch QC Sale for each shippable shipment with barcode validation and retry
-    for (const shipment of shipmentsResult.shippableShipments) {
+    for (let shipmentIndex = 0; shipmentIndex < shipmentsResult.shippableShipments.length; shipmentIndex++) {
+      const shipment = shipmentsResult.shippableShipments[shipmentIndex];
       try {
         // IMPORTANT: Two different IDs are used here:
         // - shipment.id: Our internal UUID, used as cache key
         // - shipment.shipmentId: ShipStation ID (se-XXX format), used for SkuVault API lookup
-        // SkuVault uses the ShipStation ID suffix in their composite order IDs (e.g., "480797-ORDER-123-933001022")
         const shipstationId = (shipment as any).shipmentId;
         
         // Attempt to fetch and validate QC Sale data with one retry
@@ -514,45 +642,24 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
             break; // No data at all, don't retry
           }
           
-          // CRITICAL FIX: Validate the returned QCSale matches the requested shipment
-          // For multi-shipment orders, SkuVault may return a QCSale for a different shipment
-          // 
-          // SaleId patterns:
-          // - Single shipment or first of multi: "480797-ORDER-NUMBER" (no suffix)
-          // - Subsequent multi-shipments: "480797-ORDER-NUMBER-935187097" (with ShipStation ID suffix)
-          // 
-          // Validation rules:
-          // 1. Single shippable shipment → accept any QCSale (no suffix validation needed)
-          // 2. Multiple shippable shipments:
-          //    a. If SaleId has a numeric suffix (-XXXXXXXX), it MUST match the requested shipmentId
-          //    b. If SaleId has no suffix, accept it only for the FIRST shipment in our list
-          //       (handles legacy pattern where first shipment doesn't have suffix appended)
-          const isMultiShipment = shipmentCount > 1;
-          
-          if (isMultiShipment && qcSale.SaleId) {
-            const shipmentSuffix = shipstationId.replace(/^se-/, '');
-            // Check if SaleId has a shipment suffix pattern (ends with -XXXXXXXX where X is a digit)
-            const saleIdHasSuffix = /-\d{6,}$/.test(qcSale.SaleId);
+          // Validate the returned QCSale matches the requested shipment
+          // Uses the pure matchSaleIdToShipment function for testable, maintainable logic
+          if (qcSale.SaleId) {
+            const matchResult = matchSaleIdToShipment(
+              qcSale.SaleId,
+              shipstationId,
+              shipmentIndex,
+              shipmentCount
+            );
             
-            if (saleIdHasSuffix) {
-              // SaleId has a suffix - it MUST match the requested shipment
-              if (!qcSale.SaleId.endsWith(`-${shipmentSuffix}`)) {
-                log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} does not match requested shipment ${shipstationId} (expected suffix: -${shipmentSuffix})`);
-                qcSale = null; // Reject mismatched QCSale - don't cache wrong data
-                break;
-              }
-              log(`  [MULTI-SHIPMENT] SaleId suffix validated: ${qcSale.SaleId} matches ${shipstationId}`);
-            } else {
-              // SaleId has no suffix - this is the "first shipment" pattern
-              // Accept it only if this is the first shipment we're processing in this order
-              const isFirstShipment = shipmentsResult.shippableShipments[0].shipmentId === shipstationId;
-              if (!isFirstShipment) {
-                log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} has no suffix but ${shipstationId} is not the first shipment - skipping`);
-                qcSale = null;
-                break;
-              }
-              log(`  [MULTI-SHIPMENT] SaleId has no suffix, accepting for first shipment: ${shipstationId}`);
+            if (!matchResult.matches) {
+              log(`  [SHIPMENT MISMATCH] ${matchResult.details}`);
+              qcSale = null; // Reject mismatched QCSale - don't cache wrong data
+              break;
             }
+            
+            // Log successful match with reason for debugging
+            log(`  [SHIPMENT MATCH] ${matchResult.reason}: ${matchResult.details}`);
           }
           
           lookupMap = buildLookupMap(qcSale);
