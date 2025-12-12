@@ -329,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sameSite: "lax",
       });
 
-      res.redirect("/orders");
+      res.redirect("/shipments");
     } catch (error) {
       console.error("Error in Google OAuth callback:", error);
       res.redirect("/login?error=auth_failed");
