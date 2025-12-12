@@ -39,9 +39,9 @@ export function AppSidebar() {
   const isReportsPage = location.startsWith('/reports');
   const [reportsOpen, setReportsOpen] = useState(isReportsPage);
   
-  // Auto-expand Tools section if on a tools page
-  const isToolsPage = location.startsWith('/tools');
-  const [toolsOpen, setToolsOpen] = useState(isToolsPage);
+  // Auto-expand Settings section if on a tools page
+  const isSettingsPage = location.startsWith('/tools') || location === '/stations' || location === '/desktop-config';
+  const [settingsOpen, setSettingsOpen] = useState(isSettingsPage);
 
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
@@ -114,24 +114,14 @@ export function AppSidebar() {
       icon: Download,
     },
     {
-      title: "Stations",
-      url: "/stations",
-      icon: Monitor,
-    },
-    {
-      title: "Desktop Config",
-      url: "/desktop-config",
-      icon: Settings,
-    },
-    {
       title: "Profile",
       url: "/profile",
       icon: UserIcon,
     },
   ];
   
-  // Tools submenu items
-  const toolsItems = [
+  // Settings submenu items
+  const settingsItems = [
     {
       title: "Backfill",
       url: "/tools/backfill",
@@ -141,6 +131,16 @@ export function AppSidebar() {
       title: "Operations",
       url: "/tools/operations",
       icon: Activity,
+    },
+    {
+      title: "Stations",
+      url: "/stations",
+      icon: Monitor,
+    },
+    {
+      title: "Desktop Config",
+      url: "/desktop-config",
+      icon: Settings,
     },
   ];
   
@@ -212,44 +212,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               
-              {/* Collapsible Tools Section */}
-              <Collapsible open={toolsOpen} onOpenChange={setToolsOpen}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger 
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
-                      isToolsPage
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                        : 'text-sidebar-foreground'
-                    }`}
-                    data-testid="link-tools"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span className="flex-1 text-left">Tools</span>
-                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${toolsOpen ? 'rotate-90' : ''}`} />
-                  </CollapsibleTrigger>
-                </SidebarMenuItem>
-                <CollapsibleContent>
-                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
-                    {toolsItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <Link 
-                          href={item.url}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                            location === item.url 
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                              : 'text-sidebar-foreground'
-                          }`}
-                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuItem>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-              
               {/* Collapsible Reports Section */}
               <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
                 <SidebarMenuItem>
@@ -288,7 +250,45 @@ export function AppSidebar() {
                 </CollapsibleContent>
               </Collapsible>
               
-              {menuItems.slice(6).map((item) => (
+              {/* Collapsible Settings Section */}
+              <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger 
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                      isSettingsPage
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                        : 'text-sidebar-foreground'
+                    }`}
+                    data-testid="link-settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="flex-1 text-left">Settings</span>
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? 'rotate-90' : ''}`} />
+                  </CollapsibleTrigger>
+                </SidebarMenuItem>
+                <CollapsibleContent>
+                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
+                    {settingsItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <Link 
+                          href={item.url}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                            location === item.url 
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                              : 'text-sidebar-foreground'
+                          }`}
+                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuItem>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+              
+              {menuItems.slice(8).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
