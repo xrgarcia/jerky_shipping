@@ -514,6 +514,19 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
             break; // No data at all, don't retry
           }
           
+          // CRITICAL FIX: Validate the returned QCSale matches the requested shipment
+          // For multi-shipment orders, SkuVault may return a QCSale for a different shipment
+          // The SaleId format is: "warehouseId-ORDER-shipstationIdSuffix" (e.g., "480797-TEST-121225-RG-935187097")
+          // We must verify the suffix matches the requested shipstationId (e.g., "se-935187097" -> "935187097")
+          if (qcSale.SaleId) {
+            const shipmentSuffix = shipstationId.replace(/^se-/, '');
+            if (!qcSale.SaleId.endsWith(`-${shipmentSuffix}`)) {
+              log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} does not match requested shipment ${shipstationId} (expected suffix: -${shipmentSuffix})`);
+              qcSale = null; // Reject mismatched QCSale - don't cache wrong data
+              break;
+            }
+          }
+          
           lookupMap = buildLookupMap(qcSale);
           validationResult = validateLookupMapCompleteness(qcSale, lookupMap);
           
