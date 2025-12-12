@@ -84,7 +84,7 @@ export function AppSidebar() {
       icon: PackageOpen,
     },
     {
-      title: "Sessions",
+      title: "Skuvault Sessions",
       url: "/sessions",
       icon: ListChecks,
     },
