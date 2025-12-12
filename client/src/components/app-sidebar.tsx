@@ -332,6 +332,13 @@ export function AppSidebar() {
                 align="end"
               >
                 <DropdownMenuItem
+                  onClick={() => setLocation("/profile")}
+                  data-testid="menu-item-profile"
+                >
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => logoutMutation.mutate()}
                   data-testid="menu-item-logout"
                 >
