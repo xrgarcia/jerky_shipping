@@ -139,7 +139,7 @@ export default function Sessions() {
   const [sessionIdFilter, setSessionIdFilter] = useState("");
   const [picklistIdFilter, setPicklistIdFilter] = useState("");
   const [orderNumberFilter, setOrderNumberFilter] = useState("");
-  const [stateFilter, setStateFilter] = useState<string>("all");
+  const [stateFilter, setStateFilter] = useState<string>("new");
   const [sortDescending, setSortDescending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
@@ -518,7 +518,7 @@ export default function Sessions() {
                 {sortDescending ? "Newest First" : "Oldest First"}
               </Button>
               
-              {(sessionIdFilter || picklistIdFilter || orderNumberFilter || stateFilter !== "all") && (
+              {(sessionIdFilter || picklistIdFilter || orderNumberFilter || stateFilter !== "new") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -526,7 +526,7 @@ export default function Sessions() {
                     setSessionIdFilter("");
                     setPicklistIdFilter("");
                     setOrderNumberFilter("");
-                    setStateFilter("all");
+                    setStateFilter("new");
                     setCurrentPage(1);
                   }}
                   data-testid="button-clear-filters"
