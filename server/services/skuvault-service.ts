@@ -1601,32 +1601,30 @@ export class SkuVaultService {
           if (qcSale) {
             console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment suffix ${shipmentIdSuffix} in initial results`);
           } else {
-            // STRATEGY 2: For Amazon orders (ONLY when there's exactly 1 result from SkuVault)
-            // SaleId format for Amazon: "{prefix}-{amazonOrderNumber}" (no ShipStation ID suffix)
-            // IMPORTANT: Only use this fallback when we got exactly 1 result, because if SkuVault
-            // returned multiple QCSales (multi-shipment order) and none matched our suffix,
-            // then order-number matching would pick the WRONG shipment!
-            if (qcSales.length === 1) {
-              const singleSale = qcSales[0];
-              if (singleSale.SaleId) {
-                const saleIdUpper = singleSale.SaleId.toUpperCase();
-                const orderNumberUpper = orderNumber.toUpperCase();
-                // Order number should be at the end of SaleId for Amazon orders
-                // Format: 1-352444-8-12075-{order_number}
-                if (saleIdUpper.endsWith(`-${orderNumberUpper}`) || saleIdUpper.includes(`-${orderNumberUpper}`)) {
-                  qcSale = singleSale;
-                  console.log(`[SkuVault QC Sales] Single result matches order number ${orderNumber} (Amazon-style SaleId: ${singleSale.SaleId})`);
-                }
-              }
-            }
-            
-            if (!qcSale) {
-              console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} in ${qcSales.length} results, trying composite search...`);
-            }
+            // When we have a specific shipmentIdSuffix, DO NOT fall back to order number matching.
+            // Go directly to composite search to find the exact shipment.
+            // This prevents matching the WRONG QCSale when SkuVault only returns one result
+            // that happens to contain the order number but is for a different shipment.
+            console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} in ${qcSales.length} results, trying composite search...`);
           }
         } else {
-          // No shipmentId specified, use first result
-          qcSale = qcSales[0];
+          // No shipmentId specified - for Amazon orders or single-shipment orders
+          // Use order number matching as a fallback
+          const amazonMatch = qcSales.find(sale => {
+            if (!sale.SaleId) return false;
+            const saleIdUpper = sale.SaleId.toUpperCase();
+            const orderNumberUpper = orderNumber.toUpperCase();
+            return saleIdUpper.endsWith(`-${orderNumberUpper}`) || saleIdUpper.includes(`-${orderNumberUpper}`);
+          });
+          
+          if (amazonMatch) {
+            qcSale = amazonMatch;
+            console.log(`[SkuVault QC Sales] Found QC Sale matching order number ${orderNumber} (SaleId: ${amazonMatch.SaleId})`);
+          } else {
+            // Just use first result
+            qcSale = qcSales[0];
+            console.log(`[SkuVault QC Sales] Using first result (SaleId: ${qcSale?.SaleId})`);
+          }
         }
       }
       
