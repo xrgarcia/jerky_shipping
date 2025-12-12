@@ -516,14 +516,42 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
           
           // CRITICAL FIX: Validate the returned QCSale matches the requested shipment
           // For multi-shipment orders, SkuVault may return a QCSale for a different shipment
-          // The SaleId format is: "warehouseId-ORDER-shipstationIdSuffix" (e.g., "480797-TEST-121225-RG-935187097")
-          // We must verify the suffix matches the requested shipstationId (e.g., "se-935187097" -> "935187097")
-          if (qcSale.SaleId) {
+          // 
+          // SaleId patterns:
+          // - Single shipment or first of multi: "480797-ORDER-NUMBER" (no suffix)
+          // - Subsequent multi-shipments: "480797-ORDER-NUMBER-935187097" (with ShipStation ID suffix)
+          // 
+          // Validation rules:
+          // 1. Single shippable shipment → accept any QCSale (no suffix validation needed)
+          // 2. Multiple shippable shipments:
+          //    a. If SaleId has a numeric suffix (-XXXXXXXX), it MUST match the requested shipmentId
+          //    b. If SaleId has no suffix, accept it only for the FIRST shipment in our list
+          //       (handles legacy pattern where first shipment doesn't have suffix appended)
+          const isMultiShipment = shipmentCount > 1;
+          
+          if (isMultiShipment && qcSale.SaleId) {
             const shipmentSuffix = shipstationId.replace(/^se-/, '');
-            if (!qcSale.SaleId.endsWith(`-${shipmentSuffix}`)) {
-              log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} does not match requested shipment ${shipstationId} (expected suffix: -${shipmentSuffix})`);
-              qcSale = null; // Reject mismatched QCSale - don't cache wrong data
-              break;
+            // Check if SaleId has a shipment suffix pattern (ends with -XXXXXXXX where X is a digit)
+            const saleIdHasSuffix = /-\d{6,}$/.test(qcSale.SaleId);
+            
+            if (saleIdHasSuffix) {
+              // SaleId has a suffix - it MUST match the requested shipment
+              if (!qcSale.SaleId.endsWith(`-${shipmentSuffix}`)) {
+                log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} does not match requested shipment ${shipstationId} (expected suffix: -${shipmentSuffix})`);
+                qcSale = null; // Reject mismatched QCSale - don't cache wrong data
+                break;
+              }
+              log(`  [MULTI-SHIPMENT] SaleId suffix validated: ${qcSale.SaleId} matches ${shipstationId}`);
+            } else {
+              // SaleId has no suffix - this is the "first shipment" pattern
+              // Accept it only if this is the first shipment we're processing in this order
+              const isFirstShipment = shipmentsResult.shippableShipments[0].shipmentId === shipstationId;
+              if (!isFirstShipment) {
+                log(`  [SHIPMENT MISMATCH] QCSale SaleId ${qcSale.SaleId} has no suffix but ${shipstationId} is not the first shipment - skipping`);
+                qcSale = null;
+                break;
+              }
+              log(`  [MULTI-SHIPMENT] SaleId has no suffix, accepting for first shipment: ${shipstationId}`);
             }
           }
           
