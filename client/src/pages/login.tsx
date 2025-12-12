@@ -26,7 +26,7 @@ export default function Login() {
 
   useEffect(() => {
     if (authData?.user) {
-      setLocation("/orders");
+      setLocation("/shipments");
     }
   }, [authData, setLocation]);
 
