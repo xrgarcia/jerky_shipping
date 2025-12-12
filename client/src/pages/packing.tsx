@@ -2908,9 +2908,9 @@ export default function Packing() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Show refresh button when using cached data OR session is closed (ready to pack) */}
-                {/* This allows users to fix stale cache issues or refresh after customer service changes */}
-                {((currentShipment?.sessionStatus === 'closed' || currentShipment?.cacheSource === 'warm_cache') && !currentShipment?.trackingNumber && currentShipment?.orderNumber) && (
+                {/* Always show refresh button for loaded orders without tracking (not shipped yet) */}
+                {/* Allows users to fix stale cache/data issues or refresh after customer service changes */}
+                {(!currentShipment?.trackingNumber && currentShipment?.orderNumber) && (
                   <Button
                     type="button"
                     variant="outline"
