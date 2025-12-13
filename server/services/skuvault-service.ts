@@ -630,6 +630,9 @@ export class SkuVaultService {
   /**
    * Ensure we're authenticated, with mutex protection to prevent concurrent logins
    * Automatically called by service methods before making API requests
+   * 
+   * IMPORTANT: Verifies token exists in Redis, not just the in-memory flag.
+   * This prevents stale isAuthenticated flag when Redis token expires.
    */
   private async ensureAuthenticated(): Promise<void> {
     // Check credentials before attempting authentication
@@ -637,9 +640,16 @@ export class SkuVaultService {
       throw new Error('SKUVAULT_USERNAME and SKUVAULT_PASSWORD environment variables are required');
     }
 
-    // If already authenticated, we're good
-    if (this.isAuthenticated) {
+    // Verify both the flag AND that token actually exists in Redis
+    // This prevents stale isAuthenticated flag when Redis token expires (24hr TTL)
+    if (this.isAuthenticated && await this.tokenCache.isValid()) {
       return;
+    }
+    
+    // Reset flag if token is missing from Redis
+    if (this.isAuthenticated) {
+      console.log('[SkuVault] isAuthenticated flag was true but token missing from Redis, re-authenticating...');
+      this.isAuthenticated = false;
     }
 
     // If there's already a login in progress, wait for it
@@ -858,11 +868,12 @@ export class SkuVaultService {
 
   /**
    * Get API headers with authentication and required fields
-   * Implements retry with exponential backoff if token is temporarily unavailable (during refresh)
+   * If token is missing, triggers re-authentication instead of failing immediately.
+   * Implements retry with backoff to handle concurrent refresh scenarios.
    */
   private async getApiHeaders(): Promise<Record<string, string>> {
-    const MAX_RETRIES = 5;
-    const BASE_DELAY_MS = 500;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 1000;
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const token = await this.tokenCache.get();
@@ -878,16 +889,39 @@ export class SkuVaultService {
         };
       }
       
-      // Token not available - wait with exponential backoff before retry
+      // Token not available - trigger authentication
+      console.log(`[SkuVault] Token unavailable in getApiHeaders, triggering re-authentication (attempt ${attempt}/${MAX_RETRIES})`);
+      
+      try {
+        // Reset flag and trigger fresh login
+        this.isAuthenticated = false;
+        await this.ensureAuthenticated();
+        
+        // After successful auth, get the token
+        const newToken = await this.tokenCache.get();
+        if (newToken) {
+          return {
+            'Authorization': `Token ${newToken}`,
+            'Partition': 'default',
+            'tid': Math.floor(Date.now() / 1000).toString(),
+            'idempotency-key': uuidv4(),
+            'dataread': 'true',
+            'Content-Type': 'application/json',
+          };
+        }
+      } catch (authError) {
+        console.error(`[SkuVault] Re-authentication attempt ${attempt} failed:`, authError);
+      }
+      
+      // Wait before next retry
       if (attempt < MAX_RETRIES) {
-        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1); // 500ms, 1s, 2s, 4s
-        console.log(`[SkuVault] Token unavailable, waiting ${delayMs}ms before retry (attempt ${attempt}/${MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        console.log(`[SkuVault] Waiting ${RETRY_DELAY_MS}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
       }
     }
     
     // All retries exhausted - throw error
-    throw new Error('No authentication token available after retries (token refresh may have failed)');
+    throw new Error('No authentication token available after re-authentication attempts');
   }
 
   /**
