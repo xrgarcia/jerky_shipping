@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClipboardList, RefreshCw, Loader2, Search, CheckCircle, XCircle, Package, Scan, FileCheck, Eye, Copy, Sparkles } from "lucide-react";
+import { ClipboardList, RefreshCw, Loader2, Search, CheckCircle, XCircle, Package, Scan, FileCheck, Eye, Copy, Sparkles, Truck, ChevronDown } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,8 +57,33 @@ interface PackingLog {
 
 interface PackingLogsResponse {
   orderNumber: string;
+  shipmentId: string | null;
   totalLogs: number;
   logs: PackingLog[];
+}
+
+interface ShipmentItem {
+  id: string;
+  sku: string | null;
+  name: string;
+  quantity: number;
+  imageUrl: string | null;
+}
+
+interface ShipmentWithItems {
+  id: string;
+  shipmentId: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  serviceCode: string | null;
+  status: string | null;
+  createdAt: string;
+  items: ShipmentItem[];
+}
+
+interface ShipmentsByOrderResponse {
+  orderNumber: string;
+  shipments: ShipmentWithItems[];
 }
 
 const extractUsername = (email: string) => {
@@ -145,7 +183,6 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
   const successCount = logs.filter(l => l.success).length;
   const failureCount = logs.filter(l => !l.success).length;
   
-  // Generate action type summary
   const actionCounts: Record<string, number> = {};
   logs.forEach(log => {
     const action = formatActionLabel(log.action);
@@ -155,16 +192,13 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
     .map(([action, count]) => `${count}× ${action}`)
     .join(', ');
   
-  // Detect patterns
   const patterns: string[] = [];
   
-  // Check for duplicate order completions
   const completeOrderCount = logs.filter(l => l.action === 'complete_order' || l.action === 'complete_order_success').length;
   if (completeOrderCount > 1) {
     patterns.push(`Order was completed ${completeOrderCount} times (possible reprints or retries)`);
   }
   
-  // Check for repeated failed barcodes
   const failedBarcodes = logs.filter(l => !l.success && l.scannedCode).map(l => l.scannedCode);
   const barcodeCounts: Record<string, number> = {};
   failedBarcodes.forEach(code => {
@@ -176,7 +210,6 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
     }
   });
   
-  // Check for same user on all failures
   const failedLogs = logs.filter(l => !l.success);
   if (failedLogs.length > 1) {
     const failedUsers = Array.from(new Set(failedLogs.map(l => extractUsername(l.username))));
@@ -185,7 +218,6 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
     }
   }
   
-  // Calculate timing gaps
   const timingGaps: string[] = [];
   for (let i = 1; i < logs.length; i++) {
     const prevTime = new Date(logs[i - 1].createdAt).getTime();
@@ -196,7 +228,6 @@ const generateAllLogsAIPrompt = (logs: PackingLog[], orderNumber: string): strin
     }
   }
   
-  // Calculate total duration
   let durationStr = '';
   if (logs.length >= 2) {
     const firstTime = new Date(logs[0].createdAt).getTime();
@@ -325,94 +356,91 @@ function LogDetailsModal({
     } catch (error) {
       toast({
         title: "Copy failed",
-        description: "Your browser doesn't support clipboard access. Please manually select and copy the text.",
+        description: "Your browser doesn't support clipboard access.",
         variant: "destructive",
       });
     }
   };
-  
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <Eye className="h-5 w-5 text-blue-500" />
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
             Log Entry Details
           </DialogTitle>
           <DialogDescription>
-            Full details for packing log on order {orderNumber}
+            Full details for this packing log entry
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <Badge variant={actionStyle.variant} className={`${actionStyle.className} text-sm py-1 px-3`}>
-                  {getActionIcon(log.action)}
-                  {formatActionLabel(log.action)}
-                </Badge>
-                {log.success ? (
-                  <Badge variant="outline" className="border-green-500 text-green-600">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Success
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Failed
-                  </Badge>
-                )}
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {formatDateTime(log.createdAt)} CST
-              </span>
-            </div>
-            
-            <Separator />
-            
+        <ScrollArea className="flex-1 overflow-auto pr-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">User</Label>
+              <div>
+                <Label className="text-muted-foreground text-xs">Timestamp</Label>
+                <p className="font-medium">{formatDateTime(log.createdAt)}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">User</Label>
                 <p className="font-medium">{extractUsername(log.username)}</p>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Log ID</Label>
-                <p className="font-mono text-sm text-muted-foreground">{log.id}</p>
-              </div>
             </div>
             
             <Separator />
             
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Product SKU</Label>
-                <p className="font-mono">{log.productSku || <span className="text-muted-foreground">-</span>}</p>
+              <div>
+                <Label className="text-muted-foreground text-xs">Action</Label>
+                <div className="mt-1">
+                  <Badge variant={actionStyle.variant} className={actionStyle.className}>
+                    {getActionIcon(log.action)}
+                    {formatActionLabel(log.action)}
+                  </Badge>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Scanned Barcode</Label>
-                <p className="font-mono">{log.scannedCode || <span className="text-muted-foreground">-</span>}</p>
+              <div>
+                <Label className="text-muted-foreground text-xs">Status</Label>
+                <div className="mt-1">
+                  {log.success ? (
+                    <Badge variant="outline" className="border-green-500 text-green-600">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Success
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Failed
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             
-            {log.skuVaultProductId && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">SkuVault Product ID</Label>
-                <p className="font-mono">{log.skuVaultProductId}</p>
+            <Separator />
+            
+            <div className="space-y-3">
+              <div>
+                <Label className="text-muted-foreground text-xs">Product SKU</Label>
+                <p className="font-mono">{log.productSku || 'N/A'}</p>
               </div>
-            )}
+              <div>
+                <Label className="text-muted-foreground text-xs">Scanned Code</Label>
+                <p className="font-mono">{log.scannedCode || 'N/A'}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">SkuVault Product ID</Label>
+                <p className="font-mono">{log.skuVaultProductId || 'N/A'}</p>
+              </div>
+            </div>
             
             {log.errorMessage && (
               <>
                 <Separator />
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <XCircle className="h-3 w-3 text-red-500" />
-                    Error Message
-                  </Label>
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-md p-3">
-                    <p className="text-red-600 dark:text-red-400">{log.errorMessage}</p>
-                  </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Error Message</Label>
+                  <p className="text-destructive font-medium">{log.errorMessage}</p>
                 </div>
               </>
             )}
@@ -420,8 +448,8 @@ function LogDetailsModal({
             {jsonString && (
               <>
                 <Separator />
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">SkuVault Raw Response</Label>
+                <div>
+                  <Label className="text-muted-foreground text-xs">SkuVault Raw Response</Label>
                   <div className="bg-muted rounded-md p-3 max-h-64 overflow-auto">
                     <pre className="text-xs font-mono whitespace-pre-wrap break-words">
                       {jsonString}
@@ -456,12 +484,13 @@ export default function PackingLogsReport() {
   const { toast } = useToast();
   const [searchOrderNumber, setSearchOrderNumber] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<PackingLog | null>(null);
 
-  const { data, isLoading, refetch, isRefetching, isFetched } = useQuery<PackingLogsResponse>({
-    queryKey: ['/api/reports/packing-logs', orderNumber],
+  const { data: shipmentsData, isLoading: isLoadingShipments, isFetched: isShipmentsFetched } = useQuery<ShipmentsByOrderResponse>({
+    queryKey: ['/api/reports/shipments-by-order', orderNumber],
     queryFn: async () => {
-      const url = `/api/reports/packing-logs?orderNumber=${encodeURIComponent(orderNumber)}`;
+      const url = `/api/reports/shipments-by-order?orderNumber=${encodeURIComponent(orderNumber)}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
         const text = (await res.text()) || res.statusText;
@@ -472,9 +501,35 @@ export default function PackingLogsReport() {
     enabled: !!orderNumber,
   });
 
+  useEffect(() => {
+    if (shipmentsData?.shipments?.length && !selectedShipmentId) {
+      setSelectedShipmentId(shipmentsData.shipments[0].id);
+    }
+  }, [shipmentsData, selectedShipmentId]);
+
+  const selectedShipment = shipmentsData?.shipments?.find(s => s.id === selectedShipmentId);
+
+  const { data: logsData, isLoading: isLoadingLogs, refetch, isRefetching, isFetched: isLogsFetched } = useQuery<PackingLogsResponse>({
+    queryKey: ['/api/reports/packing-logs', orderNumber, selectedShipmentId],
+    queryFn: async () => {
+      let url = `/api/reports/packing-logs?orderNumber=${encodeURIComponent(orderNumber)}`;
+      if (selectedShipmentId) {
+        url += `&shipmentId=${encodeURIComponent(selectedShipmentId)}`;
+      }
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(`${res.status}: ${text}`);
+      }
+      return await res.json();
+    },
+    enabled: !!orderNumber && !!selectedShipmentId,
+  });
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchOrderNumber.trim()) {
+      setSelectedShipmentId(null);
       setOrderNumber(searchOrderNumber.trim());
     }
   };
@@ -482,6 +537,7 @@ export default function PackingLogsReport() {
   const handleClear = () => {
     setSearchOrderNumber('');
     setOrderNumber('');
+    setSelectedShipmentId(null);
   };
 
   const handleCopyAllForAI = async (logs: PackingLog[], orderNum: string) => {
@@ -529,6 +585,10 @@ export default function PackingLogsReport() {
     }
   };
 
+  const isLoading = isLoadingShipments || isLoadingLogs;
+  const shipments = shipmentsData?.shipments || [];
+  const hasMultipleShipments = shipments.length > 1;
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -542,7 +602,7 @@ export default function PackingLogsReport() {
               Search and view detailed packing logs by order number
             </p>
           </div>
-          {orderNumber && (
+          {orderNumber && selectedShipmentId && (
             <Button
               variant="outline"
               onClick={() => refetch()}
@@ -591,128 +651,229 @@ export default function PackingLogsReport() {
           </CardContent>
         </Card>
 
-        {isLoading && (
+        {isLoadingShipments && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <span className="ml-3 text-lg text-muted-foreground">Loading packing logs...</span>
+            <span className="ml-3 text-lg text-muted-foreground">Loading shipments...</span>
           </div>
         )}
 
-        {isFetched && orderNumber && !isLoading && (
+        {isShipmentsFetched && orderNumber && !isLoadingShipments && shipments.length > 0 && (
           <>
-            {data && data.totalLogs > 0 ? (
-              <>
-                <Card className="border-blue-500/30 bg-blue-500/5">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Package className="h-5 w-5 text-blue-500" />
-                      Order: {data.orderNumber}
-                    </CardTitle>
-                    <CardDescription>
-                      {data.totalLogs} log entries found
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-xl">
-                        Log Entries
-                      </CardTitle>
-                      <CardDescription>
-                        Chronological list of packing actions for this order. Click "View" to see full details.
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleCopyAllForAI(data.logs, data.orderNumber)}
-                      data-testid="button-copy-all-ai"
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5 text-blue-500" />
+                  Order: {shipmentsData?.orderNumber}
+                </CardTitle>
+                <CardDescription>
+                  {shipments.length} shipment{shipments.length > 1 ? 's' : ''} found
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {hasMultipleShipments && (
+                  <div className="space-y-2">
+                    <Label>Select Shipment</Label>
+                    <Select
+                      value={selectedShipmentId || ''}
+                      onValueChange={(value) => setSelectedShipmentId(value)}
                     >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Copy All for AI Analysis
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="rounded-md border overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[180px]">Timestamp</TableHead>
-                            <TableHead className="w-[100px]">User</TableHead>
-                            <TableHead className="w-[140px]">Action</TableHead>
-                            <TableHead className="w-[140px]">SKU</TableHead>
-                            <TableHead className="w-[80px]">Status</TableHead>
-                            <TableHead className="w-[80px] text-right">Details</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {data.logs.map((log, index) => {
-                            const actionStyle = getActionBadgeVariant(log.action, log.success);
-                            return (
-                              <TableRow key={log.id} data-testid={`row-log-${index}`}>
-                                <TableCell className="text-sm whitespace-nowrap">
-                                  {formatDateTime(log.createdAt)}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">
-                                    {extractUsername(log.username)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={actionStyle.variant} className={actionStyle.className}>
-                                    {getActionIcon(log.action)}
-                                    {formatActionLabel(log.action)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                  {log.productSku || '-'}
-                                </TableCell>
-                                <TableCell>
-                                  {log.success ? (
-                                    <Badge variant="outline" className="border-green-500 text-green-600">
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      Pass
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="destructive">
-                                      <XCircle className="h-3 w-3 mr-1" />
-                                      Fail
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost"
-                                    onClick={() => setSelectedLog(log)}
-                                    data-testid={`button-view-${index}`}
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <Card>
-                <CardContent className="py-12">
-                  <div className="text-center text-muted-foreground">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">No packing logs found</p>
-                    <p className="text-sm">No packing logs exist for order "{orderNumber}"</p>
+                      <SelectTrigger className="w-full max-w-md" data-testid="select-shipment">
+                        <SelectValue placeholder="Select a shipment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shipments.map((shipment, index) => (
+                          <SelectItem key={shipment.id} value={shipment.id} data-testid={`option-shipment-${index}`}>
+                            <div className="flex items-center gap-2">
+                              <Truck className="h-4 w-4" />
+                              <span className="font-mono text-sm">{shipment.shipmentId}</span>
+                              {shipment.trackingNumber && (
+                                <span className="text-muted-foreground text-xs">
+                                  ({shipment.trackingNumber})
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                {selectedShipment && (
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="items" className="border rounded-md px-4">
+                      <AccordionTrigger className="hover:no-underline" data-testid="accordion-items">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          <span>Shipment Items ({selectedShipment.items.length})</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-2 pt-2">
+                          {selectedShipment.items.map((item, index) => (
+                            <div 
+                              key={item.id} 
+                              className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
+                              data-testid={`item-${index}`}
+                            >
+                              {item.imageUrl && (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.name}
+                                  className="w-10 h-10 object-cover rounded"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{item.name}</p>
+                                <p className="text-sm text-muted-foreground font-mono">
+                                  {item.sku || 'No SKU'}
+                                </p>
+                              </div>
+                              <Badge variant="secondary">
+                                Qty: {item.quantity}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                )}
+
+                {!hasMultipleShipments && selectedShipment && (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-mono">{selectedShipment.shipmentId}</span>
+                    {selectedShipment.trackingNumber && (
+                      <span> - Tracking: {selectedShipment.trackingNumber}</span>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {isLoadingLogs && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-3 text-lg text-muted-foreground">Loading packing logs...</span>
+              </div>
+            )}
+
+            {isLogsFetched && !isLoadingLogs && logsData && (
+              <>
+                {logsData.totalLogs > 0 ? (
+                  <Card>
+                    <CardHeader className="flex flex-row items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-xl">
+                          Log Entries
+                        </CardTitle>
+                        <CardDescription>
+                          {logsData.totalLogs} log entries for this shipment. Click "View" to see full details.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleCopyAllForAI(logsData.logs, logsData.orderNumber)}
+                        data-testid="button-copy-all-ai"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Copy All for AI Analysis
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[180px]">Timestamp</TableHead>
+                              <TableHead className="w-[100px]">User</TableHead>
+                              <TableHead className="w-[140px]">Action</TableHead>
+                              <TableHead className="w-[140px]">SKU</TableHead>
+                              <TableHead className="w-[80px]">Status</TableHead>
+                              <TableHead className="w-[80px] text-right">Details</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {logsData.logs.map((log, index) => {
+                              const actionStyle = getActionBadgeVariant(log.action, log.success);
+                              return (
+                                <TableRow key={log.id} data-testid={`row-log-${index}`}>
+                                  <TableCell className="text-sm whitespace-nowrap">
+                                    {formatDateTime(log.createdAt)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {extractUsername(log.username)}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={actionStyle.variant} className={actionStyle.className}>
+                                      {getActionIcon(log.action)}
+                                      {formatActionLabel(log.action)}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm">
+                                    {log.productSku || '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.success ? (
+                                      <Badge variant="outline" className="border-green-500 text-green-600">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Pass
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive">
+                                        <XCircle className="h-3 w-3 mr-1" />
+                                        Fail
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost"
+                                      onClick={() => setSelectedLog(log)}
+                                      data-testid={`button-view-${index}`}
+                                    >
+                                      <Eye className="h-4 w-4 mr-1" />
+                                      View
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="py-12">
+                      <div className="text-center text-muted-foreground">
+                        <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-medium">No packing logs found</p>
+                        <p className="text-sm">No packing logs exist for this shipment</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </>
+        )}
+
+        {isShipmentsFetched && orderNumber && !isLoadingShipments && shipments.length === 0 && (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center text-muted-foreground">
+                <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">No shipments found</p>
+                <p className="text-sm">No shipments exist for order "{orderNumber}"</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {!orderNumber && !isLoading && (
@@ -730,7 +891,7 @@ export default function PackingLogsReport() {
       
       <LogDetailsModal
         log={selectedLog}
-        orderNumber={data?.orderNumber || orderNumber}
+        orderNumber={logsData?.orderNumber || orderNumber}
         isOpen={!!selectedLog}
         onClose={() => setSelectedLog(null)}
       />
