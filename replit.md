@@ -7,6 +7,28 @@
 ## Current Feature Under Development
 See **CURRENT_FEATURE.md** for the Smart Shipping Engine feature specification, implementation phases, and progress tracking.
 
+## TODO: Add GIN Trigram Indexes After Deployment
+GIN trigram indexes were removed to fix deployment issues with Drizzle. After deployment, run this SQL in production to restore fast ILIKE search performance:
+
+```sql
+-- Enable the pg_trgm extension first
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Orders table indexes
+CREATE INDEX CONCURRENTLY orders_order_number_trgm_idx ON orders USING gin (order_number gin_trgm_ops);
+CREATE INDEX CONCURRENTLY orders_customer_name_trgm_idx ON orders USING gin (customer_name gin_trgm_ops);
+CREATE INDEX CONCURRENTLY orders_customer_email_trgm_idx ON orders USING gin (customer_email gin_trgm_ops);
+
+-- Order items table indexes
+CREATE INDEX CONCURRENTLY order_items_sku_trgm_idx ON order_items USING gin (sku gin_trgm_ops);
+CREATE INDEX CONCURRENTLY order_items_title_trgm_idx ON order_items USING gin (title gin_trgm_ops);
+
+-- Shipments table index
+CREATE INDEX CONCURRENTLY shipments_tracking_number_trgm_idx ON shipments USING gin (tracking_number gin_trgm_ops);
+```
+
+**Note:** Use CONCURRENTLY to avoid locking tables during index creation. Run in production database after successful deployment.
+
 ## Overview
 This application (ship.) is the warehouse fulfillment tool for jerky.com, integrated with Shopify for order management. It aims to enhance order processing and inventory management through real-time synchronization, a user-friendly interface for warehouse staff, streamlined order management, real-time visibility into SkuVault wave picking sessions, efficient historical order backfill, comprehensive reporting, a print queue system for shipping labels, and real-time order status updates. The project seeks to improve operational efficiency and provide a robust platform for e-commerce fulfillment.
 
