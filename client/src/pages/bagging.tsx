@@ -58,7 +58,7 @@ import { AlreadyPackedDialog, type AlreadyPackedShipment } from "@/components/al
 // Import sound files
 import successSoundUrl from "@assets/20251206_105157_1765040537045.mp3"; // QC scan success (coin)
 import errorSoundUrl from "@assets/20251206_144623_1765054040309.mp3"; // QC scan error
-import completionSoundUrl from "@assets/smb_powerup_1765055020444.wav"; // Complete packing (powerup)
+import completionSoundUrl from "@assets/20251210_082609_1765376852047.mp3"; // Complete packing (powerup)
 
 // Station session types
 type StationSession = {
