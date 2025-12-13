@@ -378,19 +378,31 @@ class QCSaleCache {
           const warmParsed = typeof warmCacheData === 'string' ? JSON.parse(warmCacheData) : warmCacheData;
           
           // Check shipment-specific lookupMap first
-          if (warmParsed.lookupMapsByShipment && warmParsed.lookupMapsByShipment[shipmentId]) {
-            const shipmentLookupMap = warmParsed.lookupMapsByShipment[shipmentId];
-            if (shipmentLookupMap[key]) {
-              console.log(`[QCSaleCache] Warm cache hit (shipment-specific) for ${barcodeOrSku} in order ${orderNumber}, shipment ${shipmentId}`);
-              return shipmentLookupMap[key];
+          if (warmParsed.lookupMapsByShipment) {
+            // Log available shipment keys for debugging multi-shipment issues
+            const availableShipmentKeys = Object.keys(warmParsed.lookupMapsByShipment);
+            
+            if (warmParsed.lookupMapsByShipment[shipmentId]) {
+              const shipmentLookupMap = warmParsed.lookupMapsByShipment[shipmentId];
+              if (shipmentLookupMap[key]) {
+                console.log(`[QCSaleCache] Warm cache hit (shipment-specific) for ${barcodeOrSku} in order ${orderNumber}, shipment ${shipmentId}`);
+                return shipmentLookupMap[key];
+              }
+              console.log(`[QCSaleCache] Barcode ${barcodeOrSku} not found in shipment ${shipmentId}'s warm cache for order ${orderNumber}`);
+              return { found: false, saleId: warmParsed.saleId };
             }
-            console.log(`[QCSaleCache] Barcode ${barcodeOrSku} not found in shipment ${shipmentId}'s warm cache for order ${orderNumber}`);
+            
+            // CRITICAL FIX: If shipmentId was provided but not found in lookupMapsByShipment,
+            // DO NOT fall back to default lookupMap - that could return items from wrong shipment!
+            // This prevents the bug where UUID was passed instead of ShipStation ID (se-XXX format)
+            console.log(`[QCSaleCache] WARNING: shipmentId ${shipmentId} not found in lookupMapsByShipment. Available keys: [${availableShipmentKeys.join(', ')}]`);
+            console.log(`[QCSaleCache] Returning not found - refusing to fall back to default map for multi-shipment order ${orderNumber}`);
             return { found: false, saleId: warmParsed.saleId };
           }
           
-          // Fallback to default warm cache lookupMap if no shipment-specific map
+          // Only use default lookupMap if NO shipment-specific maps exist (single-shipment order)
           if (warmParsed.lookupMap && warmParsed.lookupMap[key]) {
-            console.log(`[QCSaleCache] Warm cache hit (default) for ${barcodeOrSku} in order ${orderNumber}`);
+            console.log(`[QCSaleCache] Warm cache hit (default, no shipment maps) for ${barcodeOrSku} in order ${orderNumber}`);
             return warmParsed.lookupMap[key];
           }
         }
