@@ -2244,23 +2244,24 @@ export default function Bagging() {
   const successfulScans = packingLogs?.filter((log) => log.success && log.action === "product_scanned").length || 0;
   const failedScans = packingLogs?.filter((log) => !log.success && log.action === "product_scanned").length || 0;
 
-  // Auto-focus Complete Packing button when all items are scanned
+  // Auto-complete packing when all items are scanned
   // In bagging workflow, the label is printed when order is scanned (not when completing)
   // So we don't need to wait for printer to be ready - just check that there's no pending print job
   useEffect(() => {
     // In bagging, labelPrintedOnLoad means the label was already printed when the order was scanned
-    // So we can focus the Complete button even if printer goes offline later
-    const canFocusComplete = allItemsScanned && currentShipment && !hasPendingPrintJob && 
-      (labelPrintedOnLoad || isPrinterReady);
+    // So we can auto-complete even if printer goes offline later
+    const canAutoComplete = allItemsScanned && currentShipment && !hasPendingPrintJob && 
+      (labelPrintedOnLoad || isPrinterReady) &&
+      !isCompletingPacking && !packingComplete && !completePackingMutation.isPending;
     
-    if (canFocusComplete) {
-      // Small delay to ensure DOM is ready after state updates
+    if (canAutoComplete) {
+      // Small delay to ensure state is stable after last scan
       const timer = setTimeout(() => {
-        completeButtonRef.current?.focus();
+        handleCompletePacking();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [allItemsScanned, currentShipment, hasPendingPrintJob, labelPrintedOnLoad, isPrinterReady]);
+  }, [allItemsScanned, currentShipment, hasPendingPrintJob, labelPrintedOnLoad, isPrinterReady, isCompletingPacking, packingComplete, completePackingMutation.isPending]);
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
