@@ -858,21 +858,36 @@ export class SkuVaultService {
 
   /**
    * Get API headers with authentication and required fields
+   * Implements retry with exponential backoff if token is temporarily unavailable (during refresh)
    */
   private async getApiHeaders(): Promise<Record<string, string>> {
-    const token = await this.tokenCache.get();
-    if (!token) {
-      throw new Error('No authentication token available (token may be refreshing)');
+    const MAX_RETRIES = 5;
+    const BASE_DELAY_MS = 500;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const token = await this.tokenCache.get();
+      
+      if (token) {
+        return {
+          'Authorization': `Token ${token}`,
+          'Partition': 'default',
+          'tid': Math.floor(Date.now() / 1000).toString(),
+          'idempotency-key': uuidv4(),
+          'dataread': 'true',
+          'Content-Type': 'application/json',
+        };
+      }
+      
+      // Token not available - wait with exponential backoff before retry
+      if (attempt < MAX_RETRIES) {
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1); // 500ms, 1s, 2s, 4s
+        console.log(`[SkuVault] Token unavailable, waiting ${delayMs}ms before retry (attempt ${attempt}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
-
-    return {
-      'Authorization': `Token ${token}`,
-      'Partition': 'default',
-      'tid': Math.floor(Date.now() / 1000).toString(),
-      'idempotency-key': uuidv4(),
-      'dataread': 'true',
-      'Content-Type': 'application/json',
-    };
+    
+    // All retries exhausted - throw error
+    throw new Error('No authentication token available after retries (token refresh may have failed)');
   }
 
   /**
