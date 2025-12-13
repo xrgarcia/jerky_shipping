@@ -3226,10 +3226,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipments with items by order number (for packing logs report dropdown)
+  app.get("/api/reports/shipments-by-order", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.query;
+      
+      if (!orderNumber || typeof orderNumber !== 'string') {
+        return res.status(400).json({ error: "orderNumber query parameter is required" });
+      }
+
+      const normalizedOrderNumber = orderNumber.trim();
+      const shipmentsWithItems = await storage.getShipmentsWithItemsByOrderNumber(normalizedOrderNumber);
+      
+      res.json({
+        orderNumber: normalizedOrderNumber,
+        shipments: shipmentsWithItems.map(({ shipment, items }) => ({
+          id: shipment.id,
+          shipmentId: shipment.shipmentId, // ShipStation ID (se-XXX)
+          trackingNumber: shipment.trackingNumber,
+          carrier: shipment.carrierCode,
+          serviceCode: shipment.serviceCode,
+          status: shipment.status,
+          createdAt: shipment.createdAt,
+          items: items.map(item => ({
+            id: item.id,
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            imageUrl: item.imageUrl,
+          })),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching shipments by order:", error);
+      res.status(500).json({ error: "Failed to fetch shipments" });
+    }
+  });
+
   // Packing logs report - search and view packing logs by order number
   app.get("/api/reports/packing-logs", requireAuth, async (req, res) => {
     try {
-      const { orderNumber } = req.query;
+      const { orderNumber, shipmentId } = req.query;
       
       if (!orderNumber || typeof orderNumber !== 'string') {
         return res.status(400).json({ error: "orderNumber query parameter is required" });
@@ -3238,11 +3275,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Normalize order number (strip JK prefix if present for consistency)
       const normalizedOrderNumber = orderNumber.trim();
       
-      // Get packing logs with username joined
-      const logs = await storage.getPackingLogsByOrderNumber(normalizedOrderNumber);
+      // Get packing logs with username joined, optionally filtered by shipmentId (our internal UUID)
+      const logs = await storage.getPackingLogsByOrderNumber(
+        normalizedOrderNumber,
+        typeof shipmentId === 'string' ? shipmentId : undefined
+      );
       
       res.json({
         orderNumber: normalizedOrderNumber,
+        shipmentId: typeof shipmentId === 'string' ? shipmentId : null,
         totalLogs: logs.length,
         logs: logs.map(log => ({
           id: log.id,

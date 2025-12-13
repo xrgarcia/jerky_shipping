@@ -235,7 +235,8 @@ export interface IStorage {
   createPackingLog(log: InsertPackingLog): Promise<PackingLog>;
   getPackingLogsByShipment(shipmentId: string): Promise<PackingLog[]>;
   getPackingLogsByUser(userId: string, limit?: number): Promise<PackingLog[]>;
-  getPackingLogsByOrderNumber(orderNumber: string): Promise<(PackingLog & { username: string })[]>;
+  getPackingLogsByOrderNumber(orderNumber: string, shipmentId?: string): Promise<(PackingLog & { username: string })[]>;
+  getShipmentsWithItemsByOrderNumber(orderNumber: string): Promise<Array<{ shipment: Shipment; items: ShipmentItem[] }>>;
   deletePackingLogsByShipment(shipmentId: string): Promise<void>;
   
   // Shipment Events
@@ -2238,7 +2239,14 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getPackingLogsByOrderNumber(orderNumber: string): Promise<(PackingLog & { username: string })[]> {
+  async getPackingLogsByOrderNumber(orderNumber: string, shipmentId?: string): Promise<(PackingLog & { username: string })[]> {
+    const conditions = [eq(packingLogs.orderNumber, orderNumber)];
+    
+    // If shipmentId provided, filter by that specific shipment (our internal UUID)
+    if (shipmentId) {
+      conditions.push(eq(packingLogs.shipmentId, shipmentId));
+    }
+    
     const result = await db
       .select({
         id: packingLogs.id,
@@ -2257,13 +2265,35 @@ export class DatabaseStorage implements IStorage {
       })
       .from(packingLogs)
       .leftJoin(users, eq(packingLogs.userId, users.id))
-      .where(eq(packingLogs.orderNumber, orderNumber))
+      .where(and(...conditions))
       .orderBy(packingLogs.createdAt); // Chronological order for tracking workflow
     
     return result.map(row => ({
       ...row,
       username: row.username || 'Unknown User',
     }));
+  }
+
+  async getShipmentsWithItemsByOrderNumber(orderNumber: string): Promise<Array<{ shipment: Shipment; items: ShipmentItem[] }>> {
+    // Get all shipments for this order
+    const shipmentsResult = await db
+      .select()
+      .from(shipments)
+      .where(eq(shipments.orderNumber, orderNumber))
+      .orderBy(desc(shipments.createdAt));
+    
+    // Get items for each shipment
+    const result: Array<{ shipment: Shipment; items: ShipmentItem[] }> = [];
+    for (const shipment of shipmentsResult) {
+      const items = await db
+        .select()
+        .from(shipmentItems)
+        .where(eq(shipmentItems.shipmentId, shipment.id))
+        .orderBy(asc(shipmentItems.createdAt));
+      result.push({ shipment, items });
+    }
+    
+    return result;
   }
 
   async deletePackingLogsByShipment(shipmentId: string): Promise<void> {
