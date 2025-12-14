@@ -1,0 +1,148 @@
+2025-12-14 08:48:40.83
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 1ff5840a-510c-4b29-bb12-313e136e0bf4 (shipstationId: se-935882524)
+2025-12-14 08:48:40.83
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 114-0856448-2117033
+2025-12-14 08:48:40.83
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 113-7943003-1687459
+2025-12-14 08:48:40.83
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 72a352f4-5baa-4c93-8654-2b7e478e96fe (shipstationId: se-935729223)
+2025-12-14 08:48:40.97
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 112-8346949-8376249: b69463f3-90a0-4cdc-a143-3e821c75da6b
+2025-12-14 08:48:40.97
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 112-8346949-8376249 (1 shippable shipment)...
+2025-12-14 08:48:41.01
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 111-6078291-5493065: d7dac512-6a76-4229-810c-0fed6efec817
+2025-12-14 08:48:41.01
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 111-6078291-5493065 (1 shippable shipment)...
+2025-12-14 08:48:45.27
+44d258ed
+User
+[QCSaleWarmer] Skipping 10 orders due to backoff (failed recently)
+2025-12-14 08:48:45.27
+44d258ed
+User
+[QCSaleWarmer] All 10 orders are in backoff period
+2025-12-14 08:48:45.28
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 112-8346949-8376249
+2025-12-14 08:48:45.28
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment b69463f3-90a0-4cdc-a143-3e821c75da6b (shipstationId: se-935729225)
+2025-12-14 08:48:45.41
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 112-2274500-9998636 (1 shippable shipment)...
+2025-12-14 08:48:45.41
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 112-2274500-9998636: b9e71064-2a14-41fd-ad1b-3d2d4f1cfa45
+2025-12-14 08:48:52.84
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 26e35ddd-3e5e-4c3d-9267-98b1c2c941b5 (shipstationId: se-936015166)
+2025-12-14 08:48:52.84
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 111-8365895-5861806
+2025-12-14 08:48:52.84
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 114-5124828-6789812
+2025-12-14 08:48:53.01
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 114-1267102-1265052: 172efbb6-ad5c-424c-994f-1be46fac1349
+2025-12-14 08:48:56.81
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 114-1267102-1265052
+2025-12-14 08:48:56.81
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 172efbb6-ad5c-424c-994f-1be46fac1349 (shipstationId: se-936040491)
+2025-12-14 08:48:56.82
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 113-5794593-6211422
+2025-12-14 08:48:56.82
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 4bf8f38d-5733-4849-a956-df8479cfc4f3 (shipstationId: se-935963932)
+2025-12-14 08:48:56.95
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 111-8563693-4334603: b286a072-a3c2-415f-a840-cc578152bce4
+2025-12-14 08:48:56.95
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 111-8563693-4334603 (1 shippable shipment)...
+2025-12-14 08:48:56.99
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 111-0950115-2354634: 4a54d6a4-bf7c-485a-9b95-a7660cb1c9b3
+2025-12-14 08:48:56.99
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 111-0950115-2354634 (1 shippable shipment)...
+2025-12-14 08:49:00.81
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment 4a54d6a4-bf7c-485a-9b95-a7660cb1c9b3 (shipstationId: se-935856497)
+2025-12-14 08:49:00.81
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 111-0950115-2354634
+2025-12-14 08:49:00.81
+44d258ed
+User
+[QCSaleWarmer] No QCSale data found for any shipment of order 111-8563693-4334603
+2025-12-14 08:49:00.81
+44d258ed
+User
+[QCSaleWarmer] No QC Sale found for shipment b286a072-a3c2-415f-a840-cc578152bce4 (shipstationId: se-935729249)
+2025-12-14 08:49:00.96
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 111-6001463-4845006 (1 shippable shipment)...
+2025-12-14 08:49:00.99
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order 114-4000380-7528208: 3d19562b-a8c4-4ea0-85ff-5f17c8a82187
+2025-12-14 08:49:00.99
+44d258ed
+User
+[QCSaleWarmer] Warming cache for order 114-4000380-7528208 (1 shippable shipment)...
+2025-12-14 08:49:07.02
+8c52acb1
+User
+[QCSaleWarmer] Skipping 9 orders due to backoff (failed recently)
+2025-12-14 08:49:07.02
+8c52acb1
+User
+[QCSaleWarmer] Processing 1/10 orders (9 in backoff)...
+2025-12-14 08:49:07.12
+8c52acb1
+User
+[QCSaleWarmer] Warming cache for order 113-5263318-2649817 (1 shippable shipment)...
+2025-12-14 08:49:07.12
+8c52acb1
+User
+[QCSaleWarmer] Single shippable shipment for order 113-5263318-2649817: a0446dc5-fae5-47a0-aabe-359f84d8ed65

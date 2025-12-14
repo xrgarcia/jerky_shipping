@@ -1641,6 +1641,15 @@ export class SkuVaultService {
       // Extract the QC sales from the array
       let qcSales = validatedResponse.Data?.QcSales ?? [];
       
+      // DEBUG: Log full response details for troubleshooting
+      console.log(`[SkuVault QC Sales] DEBUG: Search for "${orderNumber}" returned ${qcSales.length} results`);
+      if (qcSales.length > 0) {
+        console.log(`[SkuVault QC Sales] DEBUG: Found SaleIds:`, qcSales.map(s => s.SaleId).join(', '));
+      } else {
+        console.log(`[SkuVault QC Sales] DEBUG: Empty QcSales array - order may not be picked yet in SkuVault`);
+        console.log(`[SkuVault QC Sales] DEBUG: Full response Data:`, JSON.stringify(validatedResponse.Data));
+      }
+      
       // Extract the numeric part from shipmentId for matching (e.g., "se-933001024" -> "933001024")
       const shipmentIdSuffix = shipmentId ? shipmentId.replace(/^se-/, '') : null;
       
@@ -1661,11 +1670,24 @@ export class SkuVaultService {
           
           if (qcSale) {
             console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment suffix ${shipmentIdSuffix} in initial results`);
+          } else if (qcSales.length === 1) {
+            // SINGLE RESULT FALLBACK: For Amazon orders and single-shipment orders,
+            // SkuVault may use internal SaleId format (e.g., "1-352444-8-12075-ORDER-NUMBER")
+            // that doesn't contain the ShipStation suffix.
+            // If we have exactly ONE result that contains the order number, accept it.
+            const singleResult = qcSales[0];
+            const saleIdUpper = (singleResult.SaleId || '').toUpperCase();
+            const orderNumberUpper = orderNumber.toUpperCase();
+            
+            if (saleIdUpper.includes(orderNumberUpper)) {
+              qcSale = singleResult;
+              console.log(`[SkuVault QC Sales] Single result contains order number - accepting as match (SaleId: ${singleResult.SaleId})`);
+            } else {
+              console.log(`[SkuVault QC Sales] Single result doesn't contain order number, trying composite search...`);
+            }
           } else {
-            // When we have a specific shipmentIdSuffix, DO NOT fall back to order number matching.
-            // Go directly to composite search to find the exact shipment.
-            // This prevents matching the WRONG QCSale when SkuVault only returns one result
-            // that happens to contain the order number but is for a different shipment.
+            // Multiple results but none match the suffix - try composite search
+            // This prevents matching the WRONG QCSale for multi-shipment orders
             console.log(`[SkuVault QC Sales] No QC Sale matching suffix ${shipmentIdSuffix} in ${qcSales.length} results, trying composite search...`);
           }
         } else {
