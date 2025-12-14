@@ -1597,7 +1597,9 @@ export class SkuVaultService {
       console.log(`[SkuVault QC Sales] Raw response (first 200 chars):`, rawData.substring(0, 200));
       
       // Check if response is HTML (session expired - SkuVault redirects to login page)
-      if (rawData.trim().startsWith('<!doctype') || rawData.trim().startsWith('<html')) {
+      // Use case-insensitive check since HTML can be <!DOCTYPE or <!doctype
+      const trimmedData = rawData.trim().toLowerCase();
+      if (trimmedData.startsWith('<!doctype') || trimmedData.startsWith('<html') || trimmedData.startsWith('<')) {
         console.log('[SkuVault QC Sales] Received HTML response (session expired), re-authenticating...');
         await this.tokenCache.clear();
         this.isAuthenticated = false;
@@ -1613,12 +1615,34 @@ export class SkuVaultService {
         });
         rawData = retryResponse.data as string;
         console.log(`[SkuVault QC Sales] Retry response (first 200 chars):`, rawData.substring(0, 200));
+        
+        // Check if retry ALSO returned HTML - means re-auth failed
+        const retryTrimmed = rawData.trim().toLowerCase();
+        if (retryTrimmed.startsWith('<!doctype') || retryTrimmed.startsWith('<html') || (retryTrimmed.startsWith('<') && !rawData.startsWith(")]}',"))) {
+          console.error('[SkuVault QC Sales] Re-authentication failed - still receiving HTML after retry');
+          throw new SkuVaultError(
+            'SkuVault authentication failed - received HTML login page instead of JSON. Please check SkuVault credentials.',
+            401,
+            ['Authentication failed']
+          );
+        }
       }
       
       // SkuVault returns responses with anti-XSSI prefix - strip it if present
       if (rawData.startsWith(")]}',")) {
         rawData = rawData.substring(6); // Remove ")]}',\n"
         console.log(`[SkuVault QC Sales] Stripped anti-XSSI prefix`);
+      }
+      
+      // Final safety check before parsing - ensure it looks like JSON
+      const jsonTrimmed = rawData.trim();
+      if (!jsonTrimmed.startsWith('{') && !jsonTrimmed.startsWith('[')) {
+        console.error(`[SkuVault QC Sales] Response is not valid JSON (first 100 chars): ${rawData.substring(0, 100)}`);
+        throw new SkuVaultError(
+          'SkuVault returned invalid response (not JSON). Server may be down or session expired.',
+          503,
+          ['Invalid response format']
+        );
       }
       
       // Parse JSON
@@ -1730,8 +1754,9 @@ export class SkuVaultService {
         let compositeRawData = compositeResponse.data as string;
         console.log(`[SkuVault QC Sales] Composite search response (first 200 chars):`, compositeRawData.substring(0, 200));
         
-        // Handle HTML response (session expired)
-        if (compositeRawData.trim().startsWith('<!doctype') || compositeRawData.trim().startsWith('<html')) {
+        // Handle HTML response (session expired) - case insensitive
+        const compositeTrimmed = compositeRawData.trim().toLowerCase();
+        if (compositeTrimmed.startsWith('<!doctype') || compositeTrimmed.startsWith('<html') || compositeTrimmed.startsWith('<')) {
           console.log('[SkuVault QC Sales] Composite search got HTML, re-authenticating...');
           await this.tokenCache.clear();
           this.isAuthenticated = false;
@@ -1745,11 +1770,29 @@ export class SkuVaultService {
             transformResponse: [],
           });
           compositeRawData = retryResponse.data as string;
+          
+          // Check if retry also returned HTML
+          const retryTrimmed = compositeRawData.trim().toLowerCase();
+          if (retryTrimmed.startsWith('<!doctype') || retryTrimmed.startsWith('<html') || (retryTrimmed.startsWith('<') && !compositeRawData.startsWith(")]}',"))) {
+            console.error('[SkuVault QC Sales] Composite search re-auth failed - still receiving HTML');
+            throw new SkuVaultError(
+              'SkuVault authentication failed during composite search. Please check credentials.',
+              401,
+              ['Authentication failed']
+            );
+          }
         }
         
         // Strip anti-XSSI prefix
         if (compositeRawData.startsWith(")]}',")) {
           compositeRawData = compositeRawData.substring(6);
+        }
+        
+        // Safety check before parsing
+        const compositeJsonTrimmed = compositeRawData.trim();
+        if (!compositeJsonTrimmed.startsWith('{') && !compositeJsonTrimmed.startsWith('[')) {
+          console.error(`[SkuVault QC Sales] Composite response not valid JSON: ${compositeRawData.substring(0, 100)}`);
+          throw new SkuVaultError('SkuVault returned invalid response format', 503, ['Invalid response']);
         }
         
         const compositeParsedData = JSON.parse(compositeRawData);

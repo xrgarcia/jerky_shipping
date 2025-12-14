@@ -1,0 +1,148 @@
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:11265:7)
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8775:3)
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+[SkuVault QC Sales] Error looking up order: SyntaxError: Unexpected token '<', "
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:8249:20)
+2025-12-14 09:01:29.68
+3e9dda1b
+User
+at SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7548:35)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:8249:20)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at JSON.parse ()
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8775:3)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:11265:7)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at async initialSync (file:///home/runner/workspace/dist/index.js:11315:25)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:11295:26)
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment 536418bd-565c-42ba-8cdc-64966c0fcd93: Could not reach SkuVault: Unexpected token '<', "
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+[SkuVault QC Sales] Error looking up order: SyntaxError: Unexpected token '<', "
+2025-12-14 09:01:35.41
+3e9dda1b
+User
+at SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7548:35)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7548:35)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8775:3)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+[SkuVault QC Sales] Error looking up order: SyntaxError: Unexpected token '<', "
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:11295:26)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at async initialSync (file:///home/runner/workspace/dist/index.js:11315:25)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:11265:7)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:8249:20)
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at JSON.parse ()
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment d4dbb61d-e065-4ec3-beff-3258823535b7: Could not reach SkuVault: Unexpected token '<', "
+2025-12-14 09:02:14.80
+3e9dda1b
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+[SkuVault QC Sales] Error looking up order: SyntaxError: Unexpected token '<', "
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:8249:20)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at JSON.parse ()
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8775:3)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:11265:7)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:11295:26)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7548:35)
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment d4dbb61d-e065-4ec3-beff-3258823535b7: Could not reach SkuVault: Unexpected token '<', "
+2025-12-14 09:02:14.82
+3e9dda1b
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:11338:7)
+2025-12-14 09:02:34.80
+8c52acb1
+User
+[SkuVault] Login appears to have failed - no success indicators found
