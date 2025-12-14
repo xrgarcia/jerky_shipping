@@ -575,12 +575,22 @@ function serializeShipmentForCache(shipment: Shipment, packages?: ShipmentPackag
 }
 
 /**
+ * Result of cache warming operation
+ */
+export interface WarmCacheResult {
+  success: boolean;
+  apiCallMade: boolean;  // True if SkuVault API was called (vs cache hit)
+}
+
+/**
  * Warm the cache for a single order by fetching QCSale data from SkuVault
  * Uses extended TTL for pre-warmed entries
  * 
  * NEW: Supports multiple shippable shipments - stores array in cache for UI selection
+ * 
+ * Returns: { success, apiCallMade } - apiCallMade indicates if SkuVault API was hit
  */
-export async function warmCacheForOrder(orderNumber: string, force: boolean = false): Promise<boolean> {
+export async function warmCacheForOrder(orderNumber: string, force: boolean = false): Promise<WarmCacheResult> {
   try {
     const redis = getRedisClient();
     const warmKey = getWarmCacheKey(orderNumber);
@@ -592,7 +602,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       if (exists > 0) {
         log(`Order ${orderNumber} already in cache, skipping`);
         metrics.apiCallsSaved++;
-        return true;
+        return { success: true, apiCallMade: false };  // Cache hit - no API call
       }
     }
     
@@ -600,8 +610,8 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     const shipmentsResult = await getShippableShipmentsForOrder(orderNumber);
     
     if (!shipmentsResult || shipmentsResult.reason === 'none') {
-      // No shippable shipments found - don't cache
-      return false;
+      // No shippable shipments found - don't cache (no API call made yet)
+      return { success: false, apiCallMade: false };
     }
     
     // Now fetch QCSale data from SkuVault for EACH shippable shipment
@@ -724,7 +734,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
     // If no QC Sales found for any shipment, don't cache
     if (!defaultQcSale) {
       log(`No QCSale data found for any shipment of order ${orderNumber}`);
-      return false;
+      return { success: false, apiCallMade: true };  // API was called but no data found
     }
     
     // Batch fetch packages for all shippable shipments
@@ -806,7 +816,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       metrics.ordersWarmed++;
     }
     
-    return true;
+    return { success: true, apiCallMade: true };  // Success, API was called
   } catch (err: any) {
     // Token refresh is expected during startup or token expiry - log at info level
     const isTokenRefresh = err.message?.includes('No authentication token available');
@@ -816,7 +826,7 @@ export async function warmCacheForOrder(orderNumber: string, force: boolean = fa
       error(`Failed to warm cache for order ${orderNumber}: ${err.message}`);
     }
     metrics.lastError = err.message;
-    return false;
+    return { success: false, apiCallMade: true };  // Error during API call
   }
 }
 
