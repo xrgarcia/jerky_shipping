@@ -5976,13 +5976,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const shipment = shipmentResults[0];
       
-      // Only allow refresh for orders that are ready to pack (closed session, no tracking)
-      if (shipment.trackingNumber) {
+      // Only allow refresh for orders that haven't completed QC yet
+      // NOTE: Bagging workflow prints label FIRST, then scans items for QC.
+      // So having a tracking number is NOT enough to block refresh - we must check qcCompleted flag.
+      if (shipment.qcCompleted === true) {
         return res.status(400).json({
           success: false,
-          error: "Cannot refresh cache for orders that already have a label",
+          error: "Cannot refresh cache for orders that have completed QC",
           orderNumber,
-          resolution: "This order has already been packed and has a tracking number."
+          resolution: "This order has already been packed and QC completed."
         });
       }
       
