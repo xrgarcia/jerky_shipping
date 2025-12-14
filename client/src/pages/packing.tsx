@@ -354,6 +354,8 @@ export default function Packing() {
   // Supports multiple shipments for orders split across packages
   const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
   const [alreadyPackedShipments, setAlreadyPackedShipments] = useState<AlreadyPackedShipment[]>([]);
+  // Flag to skip alreadyPacked modal when user explicitly clicks "Proceed to QC"
+  const [isProceedingToQC, setIsProceedingToQC] = useState(false);
 
   // State for "Shipment Selection" dialog (when order has multiple shippable shipments)
   const [showShipmentChoiceDialog, setShowShipmentChoiceDialog] = useState(false);
@@ -1267,7 +1269,8 @@ export default function Packing() {
 
       // GUARD RAIL: Check if order is already packed (has tracking number)
       // This interrupts the flow and requires deliberate action to continue
-      if ((shipment as any).alreadyPacked) {
+      // EXCEPTION: If user clicked "Proceed to QC", skip the modal and go directly to QC mode
+      if ((shipment as any).alreadyPacked && !isProceedingToQC) {
         // Use the alreadyPackedShipments array from backend (supports multi-shipment orders)
         let backendShipments = (shipment as any).alreadyPackedShipments as AlreadyPackedShipment[] | undefined;
         
@@ -1308,6 +1311,12 @@ export default function Packing() {
         setShowAlreadyPackedDialog(true);
         setOrderScan(""); // Clear the input
         return; // Don't proceed with normal flow
+      }
+      
+      // Reset the "Proceed to QC" flag after it's been used
+      if (isProceedingToQC) {
+        console.log(`[Packing] Proceeding to QC mode for already-packed order ${shipment.orderNumber}`);
+        setIsProceedingToQC(false);
       }
 
       setCurrentShipment(shipment);
@@ -1456,6 +1465,8 @@ export default function Packing() {
   // Handle proceed to QC from already-packed dialog
   const handleProceedToQCFromAlreadyPacked = (shipment: AlreadyPackedShipment) => {
     console.log(`[Packing] Proceeding to QC for already-packed order ${shipment.orderNumber}`);
+    // Set flag to skip alreadyPacked modal check on reload
+    setIsProceedingToQC(true);
     // Re-load the shipment to get full data for QC scanning
     loadShipmentMutation.mutate({ 
       orderNumber: shipment.orderNumber, 
