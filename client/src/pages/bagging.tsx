@@ -349,6 +349,8 @@ export default function Bagging() {
   // State for "Already Packed" dialog (guard rail for re-scanning packed orders)
   const [showAlreadyPackedDialog, setShowAlreadyPackedDialog] = useState(false);
   const [alreadyPackedShipments, setAlreadyPackedShipments] = useState<AlreadyPackedShipment[]>([]);
+  // Flag to skip alreadyPacked modal when user explicitly clicks "Proceed to QC"
+  const [isProceedingToQC, setIsProceedingToQC] = useState(false);
 
   // State for "Shipment Selection" dialog (when order has multiple shippable shipments)
   const [showShipmentChoiceDialog, setShowShipmentChoiceDialog] = useState(false);
@@ -1257,7 +1259,8 @@ export default function Bagging() {
 
       // GUARD RAIL: Check if order is already packed (has tracking number)
       // This MUST be checked BEFORE printing in bagging workflow to prevent duplicate labels
-      if ((shipment as any).alreadyPacked) {
+      // EXCEPTION: If user clicked "Proceed to QC", skip the modal and go directly to QC mode
+      if ((shipment as any).alreadyPacked && !isProceedingToQC) {
         // Use the alreadyPackedShipments array from backend (supports multi-shipment orders)
         const backendShipments = (shipment as any).alreadyPackedShipments as AlreadyPackedShipment[] | undefined;
         
@@ -1289,6 +1292,14 @@ export default function Bagging() {
         setOrderScan(""); // Clear the input
         return; // Don't proceed with normal flow or label printing
       }
+      
+      // Reset the "Proceed to QC" flag after it's been used
+      // For already-packed orders proceeding to QC, skip label printing entirely
+      const skipLabelPrint = isProceedingToQC || (shipment as any).alreadyPacked;
+      if (isProceedingToQC) {
+        console.log(`[Bagging] Proceeding to QC mode for already-packed order ${shipment.orderNumber} - skipping label print`);
+        setIsProceedingToQC(false);
+      }
 
       // Reset state for new order
       setPackingComplete(false);
@@ -1316,56 +1327,64 @@ export default function Bagging() {
       
       // BAGGING WORKFLOW: Print label immediately (before QC scanning)
       // The poly bagging machine advances the bag roll and prints the label as soon as order is scanned
-      try {
-        console.log('[Bagging] Printing label immediately for order:', shipment.orderNumber);
-        setJustCreatedPrintJob(true);
-        
-        const printResponse = await apiRequest("POST", "/api/packing/complete", {
-          shipmentId: shipment.id,
-          skipCacheInvalidation: true, // Bagging: don't invalidate cache yet - we need it for QC scans
-        });
-        const printResult = await printResponse.json() as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
-        
-        if (printResult.success && printResult.printQueued) {
-          console.log('[Bagging] Label print job queued successfully:', printResult.printJobId);
-          setLabelPrintedOnLoad(true);
-          setIsLabelPrinting(false); // Label printed successfully, allow QC page
-          // Clear optimistic print job flag - the label has been queued, so we don't need to block UI anymore
-          // This allows the Complete Packing button to receive focus when all items are scanned
-          setJustCreatedPrintJob(false);
-          logShipmentEvent("label_printed_on_load", {
-            printJobId: printResult.printJobId,
-            orderNumber: shipment.orderNumber,
-            station: "bagging",
-          }, shipment.orderNumber);
-          // Focus product input after successful label print
-          setTimeout(() => productInputRef.current?.focus(), 100);
-        } else {
-          console.warn('[Bagging] Label print queuing returned unexpected result:', printResult);
-          setIsLabelPrinting(false); // Allow QC page even if unexpected result
-          setJustCreatedPrintJob(false); // Also clear on unexpected result to avoid stuck state
-          setTimeout(() => productInputRef.current?.focus(), 100);
-        }
-      } catch (printError: any) {
-        console.error('[Bagging] Failed to print label on order load:', printError);
-        setJustCreatedPrintJob(false);
-        setIsLabelPrinting(false); // Stop loading, show error on scan page
-        
-        // Extract error details if available
-        let parsedError: LabelError | null = null;
-        if (printError.data?.error) {
-          parsedError = printError.data.error as LabelError;
-        }
-        
-        if (parsedError) {
-          setLabelError(parsedError);
-        } else {
-          setLabelError({
-            code: 'LABEL_PRINT_FAILED',
-            message: 'Failed to print label when loading order',
-            shipStationError: printError.message || 'Unknown error occurred',
-            resolution: 'Check printer connection and try scanning the order again.',
+      // EXCEPTION: Skip label printing for already-packed orders proceeding to QC
+      if (skipLabelPrint) {
+        console.log('[Bagging] Skipping label print for already-packed order proceeding to QC:', shipment.orderNumber);
+        setIsLabelPrinting(false);
+        setLabelPrintedOnLoad(true); // Mark as "printed" so QC flow works
+        setTimeout(() => productInputRef.current?.focus(), 100);
+      } else {
+        try {
+          console.log('[Bagging] Printing label immediately for order:', shipment.orderNumber);
+          setJustCreatedPrintJob(true);
+          
+          const printResponse = await apiRequest("POST", "/api/packing/complete", {
+            shipmentId: shipment.id,
+            skipCacheInvalidation: true, // Bagging: don't invalidate cache yet - we need it for QC scans
           });
+          const printResult = await printResponse.json() as { success: boolean; printQueued: boolean; printJobId?: string; message?: string };
+          
+          if (printResult.success && printResult.printQueued) {
+            console.log('[Bagging] Label print job queued successfully:', printResult.printJobId);
+            setLabelPrintedOnLoad(true);
+            setIsLabelPrinting(false); // Label printed successfully, allow QC page
+            // Clear optimistic print job flag - the label has been queued, so we don't need to block UI anymore
+            // This allows the Complete Packing button to receive focus when all items are scanned
+            setJustCreatedPrintJob(false);
+            logShipmentEvent("label_printed_on_load", {
+              printJobId: printResult.printJobId,
+              orderNumber: shipment.orderNumber,
+              station: "bagging",
+            }, shipment.orderNumber);
+            // Focus product input after successful label print
+            setTimeout(() => productInputRef.current?.focus(), 100);
+          } else {
+            console.warn('[Bagging] Label print queuing returned unexpected result:', printResult);
+            setIsLabelPrinting(false); // Allow QC page even if unexpected result
+            setJustCreatedPrintJob(false); // Also clear on unexpected result to avoid stuck state
+            setTimeout(() => productInputRef.current?.focus(), 100);
+          }
+        } catch (printError: any) {
+          console.error('[Bagging] Failed to print label on order load:', printError);
+          setJustCreatedPrintJob(false);
+          setIsLabelPrinting(false); // Stop loading, show error on scan page
+          
+          // Extract error details if available
+          let parsedError: LabelError | null = null;
+          if (printError.data?.error) {
+            parsedError = printError.data.error as LabelError;
+          }
+          
+          if (parsedError) {
+            setLabelError(parsedError);
+          } else {
+            setLabelError({
+              code: 'LABEL_PRINT_FAILED',
+              message: 'Failed to print label when loading order',
+              shipStationError: printError.message || 'Unknown error occurred',
+              resolution: 'Check printer connection and try scanning the order again.',
+            });
+          }
         }
       }
     },
@@ -1496,6 +1515,8 @@ export default function Bagging() {
   // Handle proceed to QC from already-packed dialog
   const handleProceedToQCFromAlreadyPacked = (shipment: AlreadyPackedShipment) => {
     console.log(`[Bagging] Proceeding to QC for already-packed order ${shipment.orderNumber}`);
+    // Set flag to skip alreadyPacked modal check on reload
+    setIsProceedingToQC(true);
     // Re-load the shipment to get full data for QC scanning
     loadShipmentMutation.mutate({ 
       orderNumber: shipment.orderNumber, 
