@@ -273,18 +273,19 @@ async function initializeAfterListen(storage: any) {
     log("Skipping Firestore session sync worker - Firebase not configured");
   }
 
-  // Start QCSale cache warmer (pre-warms cache for ready-to-pack orders)
-  // This dramatically reduces SkuVault API calls during active packing operations
-  // Must start after Firestore worker since cache warming targets sessioned shipments
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      const { startCacheWarmer } = await import("./services/qcsale-cache-warmer");
-      startCacheWarmer();
-      log("QCSale cache warmer started");
-    } catch (error) {
-      console.error("Failed to start QCSale cache warmer:", error);
-    }
-  }
+  // DISABLED: QCSale cache warmer - bypassing cache entirely for now
+  // The cache was causing reliability issues (stale data, workflow mismatches, race conditions).
+  // Packing pages now go directly to SkuVault API. Can re-enable with simpler logic later.
+  // if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  //   try {
+  //     const { startCacheWarmer } = await import("./services/qcsale-cache-warmer");
+  //     startCacheWarmer();
+  //     log("QCSale cache warmer started");
+  //   } catch (error) {
+  //     console.error("Failed to start QCSale cache warmer:", error);
+  //   }
+  // }
+  log("QCSale cache warmer DISABLED - using direct SkuVault API calls");
 
   // Bootstrap products asynchronously after server starts
   if (process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
