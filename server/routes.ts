@@ -6431,50 +6431,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Look up barcode in cached QCSale data (includes regular items AND kit components)
-      // When shipmentId is provided, uses shipment-specific lookup map for multi-shipment orders
-      const lookupResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
+      // CACHE BYPASS: Skip cache entirely and go directly to SkuVault API
+      // The cache was causing reliability issues (stale data, validation errors).
+      // Going direct to the source is more reliable even if slightly slower.
+      console.log(`[Packing Validation] Direct SkuVault lookup for barcode ${barcode} in order ${orderNumber} (cache bypassed)`);
       
-      if (!lookupResult.found) {
-        // Cache miss or barcode not in order - try to warm cache with shipment-specific data
-        console.log(`[Packing Validation] Barcode ${barcode} not found in cache for order ${orderNumber}, warming cache with shipment-specific maps`);
-        
-        // Use warmCacheForOrder to build proper warm cache with lookupMapsByShipment
-        // This ensures multi-shipment orders have correct per-shipment PassedItems lists
-        let cacheWarmed = false;
-        try {
-          cacheWarmed = await warmCacheForOrder(orderNumber, true); // force=true to refresh
-        } catch (warmError) {
-          console.log(`[Packing Validation] Cache warming failed for ${orderNumber} (order may not be sessioned):`, warmError);
-          // Continue to fallback - don't re-throw
-        }
-        
-        if (cacheWarmed) {
-          // Retry lookup with warm cache (now has shipment-specific lookupMapsByShipment)
-          const retryResult = await qcSaleCache.lookup(orderNumber, barcode, shipmentId as string | undefined);
-          if (retryResult.found) {
-            console.log(`[Packing Validation] Barcode ${barcode} found after cache warming: ${retryResult.sku} (kit=${retryResult.isKitComponent})`);
-            return res.json({
-              valid: true,
-              sku: retryResult.sku,
-              barcode: retryResult.code,
-              title: retryResult.title,
-              quantity: retryResult.quantity,
-              itemId: retryResult.itemId,
-              saleId: retryResult.saleId,
-              isKitComponent: retryResult.isKitComponent,
-              kitId: retryResult.kitId,
-              kitSku: retryResult.kitSku,
-              kitTitle: retryResult.kitTitle,
-            });
-          }
-        }
-        
-        // FALLBACK: Order not sessioned in SkuVault (no QC Sale data)
-        // Use direct product lookup and match against shipment items
-        console.log(`[Packing Validation] No QC Sale data for order ${orderNumber}, trying direct product lookup for barcode: ${barcode}`);
-        
-        try {
+      try {
           // 1. Look up product by barcode in SkuVault
           console.log(`[Packing Validation] Calling SkuVault getProductByCode for barcode: ${barcode}`);
           const { product } = await skuVaultService.getProductByCode(barcode);
@@ -6531,29 +6493,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`[Packing Validation] Fallback product lookup failed for barcode ${barcode}:`, fallbackError.message || fallbackError);
         }
         
-        return res.status(404).json({ 
-          valid: false, 
-          error: "Product not found in order",
-          scannedValue: barcode,
-          orderNumber,
-        });
-      }
-      
-      console.log(`[Packing Validation] Barcode ${barcode} validated: ${lookupResult.sku} (kit=${lookupResult.isKitComponent})`);
-      
-      // Return full data needed for packing validation (SkuVault-sourced)
-      res.json({
-        valid: true,
-        sku: lookupResult.sku,
-        barcode: lookupResult.code,
-        title: lookupResult.title,
-        quantity: lookupResult.quantity,
-        itemId: lookupResult.itemId,
-        saleId: lookupResult.saleId,
-        isKitComponent: lookupResult.isKitComponent,
-        kitId: lookupResult.kitId,
-        kitSku: lookupResult.kitSku,
-        kitTitle: lookupResult.kitTitle,
+      return res.status(404).json({ 
+        valid: false, 
+        error: "Product not found in order",
+        scannedValue: barcode,
+        orderNumber,
       });
     } catch (error: any) {
       console.error("[Packing] Error validating barcode:", error);
