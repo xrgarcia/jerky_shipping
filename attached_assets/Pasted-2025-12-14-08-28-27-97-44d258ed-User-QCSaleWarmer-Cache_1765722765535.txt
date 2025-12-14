@@ -1,0 +1,148 @@
+2025-12-14 08:28:27.97
+44d258ed
+User
+[QCSaleWarmer] Cached order JK3825353730 with 1 QC Sale(s), 6 barcode entries, 1 shippable shipment(s) (172800s TTL)
+2025-12-14 08:28:28.09
+44d258ed
+User
+[QCSaleWarmer] Single shippable shipment for order JK3825353666: d8d0d254-b77e-4a7f-bc41-0f9b15e4f6ad
+2025-12-14 08:28:29.79
+44d258ed
+User
+[QCSaleWarmer] [MULTI-SHIPMENT DEBUG] Shipment se-935731408: SaleId=1-352444-5-13038-138162-JK3825353666-935731408, Items=1 [JCB-GB-TPGCP-REG]
+2025-12-14 08:28:44.93
+44d258ed
+User
+[QCSaleWarmer] Processing 5/5 orders (0 in backoff)...
+2025-12-14 08:28:44.98
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353654 already in cache, skipping
+2025-12-14 08:28:47.58
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:28:50.19
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353730 already in cache, skipping
+2025-12-14 08:28:52.79
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353726 already in cache, skipping
+2025-12-14 08:28:55.40
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:28:57.95
+44d258ed
+User
+[QCSaleWarmer] Warmed 5/5 orders (0 failed, will retry with backoff)
+2025-12-14 08:29:15.01
+44d258ed
+User
+[QCSaleWarmer] Processing 5/5 orders (0 in backoff)...
+2025-12-14 08:29:15.09
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353654 already in cache, skipping
+2025-12-14 08:29:20.30
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353730 already in cache, skipping
+2025-12-14 08:29:22.95
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353726 already in cache, skipping
+2025-12-14 08:29:25.56
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:29:47.48
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:29:52.69
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353726 already in cache, skipping
+2025-12-14 08:29:55.29
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:29:57.85
+44d258ed
+User
+[QCSaleWarmer] Warmed 5/5 orders (0 failed, will retry with backoff)
+2025-12-14 08:30:14.68
+44d258ed
+User
+[QCSaleWarmer] Processing 5/5 orders (0 in backoff)...
+2025-12-14 08:30:17.18
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:30:19.69
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353730 already in cache, skipping
+2025-12-14 08:30:22.19
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353726 already in cache, skipping
+2025-12-14 08:30:24.70
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:30:27.20
+44d258ed
+User
+[QCSaleWarmer] Warmed 5/5 orders (0 failed, will retry with backoff)
+2025-12-14 08:30:44.92
+44d258ed
+User
+[QCSaleWarmer] Processing 5/5 orders (0 in backoff)...
+2025-12-14 08:30:44.97
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353654 already in cache, skipping
+2025-12-14 08:30:47.57
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:30:50.17
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353730 already in cache, skipping
+2025-12-14 08:30:52.77
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353726 already in cache, skipping
+2025-12-14 08:30:55.37
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:30:57.92
+44d258ed
+User
+[QCSaleWarmer] Warmed 5/5 orders (0 failed, will retry with backoff)
+2025-12-14 08:31:17.42
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:31:25.23
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353666 already in cache, skipping
+2025-12-14 08:31:44.93
+44d258ed
+User
+[QCSaleWarmer] Processing 4/4 orders (0 in backoff)...
+2025-12-14 08:31:44.99
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353930 already in cache, skipping
+2025-12-14 08:31:47.59
+44d258ed
+User
+[QCSaleWarmer] Order JK3825353730 already in cache, skippin

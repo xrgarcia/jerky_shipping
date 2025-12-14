@@ -1,0 +1,148 @@
+2025-12-13 13:59:41.60
+9a962268
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:10905:7)
+2025-12-13 13:59:41.60
+9a962268
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8447:3)
+2025-12-13 13:59:41.60
+9a962268
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment f05e6869-8290-4aac-a5ab-68dc7aa85c14: Could not reach SkuVault: No authentication token available (token may be refreshing)
+2025-12-13 13:59:41.60
+9a962268
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7307:27)
+2025-12-13 13:59:41.60
+9a962268
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7957:20)
+2025-12-13 13:59:41.60
+9a962268
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:10832:7)
+2025-12-13 13:59:41.60
+9a962268
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:10862:26)
+2025-12-13 13:59:41.60
+9a962268
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6811:17)
+2025-12-13 13:59:41.60
+9a962268
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available (token may be refreshing)
+2025-12-13 14:00:07.04
+9a962268
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7307:27)
+2025-12-13 14:00:07.04
+9a962268
+User
+at async Timeout.pollAndWarm [as _onTimeout] (file:///home/runner/workspace/dist/index.js:8331:23)
+2025-12-13 14:00:07.04
+9a962268
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-13 14:00:07.04
+9a962268
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment b46beb47-f5af-461b-8209-8dd13cce8767: Could not reach SkuVault: No authentication token available (token may be refreshing)
+2025-12-13 14:00:07.04
+9a962268
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6811:17)
+2025-12-13 14:00:07.04
+9a962268
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7957:20)
+2025-12-13 14:00:07.04
+9a962268
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available (token may be refreshing)
+2025-12-13 14:00:39.82
+9a962268
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8447:3)
+2025-12-13 14:00:39.82
+9a962268
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6811:17)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7957:20)
+2025-12-13 14:00:39.82
+9a962268
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment b46beb47-f5af-461b-8209-8dd13cce8767: Could not reach SkuVault: No authentication token available (token may be refreshing)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7307:27)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:10905:7)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:10862:26)
+2025-12-13 14:00:39.82
+9a962268
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available (token may be refreshing)
+2025-12-13 14:00:39.82
+9a962268
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:10832:7)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async ensureClosedSessionsWarmed (file:///home/runner/workspace/dist/index.js:10832:7)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async onSessionClosed (file:///home/runner/workspace/dist/index.js:8447:3)
+2025-12-13 14:01:39.79
+9a962268
+User
+at SkuVaultService.getApiHeaders (file:///home/runner/workspace/dist/index.js:6811:17)
+2025-12-13 14:01:39.79
+9a962268
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:7307:27)
+2025-12-13 14:01:39.79
+9a962268
+User
+[QCSaleWarmer] Failed to fetch QC Sale for shipment b46beb47-f5af-461b-8209-8dd13cce8767: Could not reach SkuVault: No authentication token available (token may be refreshing)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:10905:7)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async warmCacheForOrder (file:///home/runner/workspace/dist/index.js:7957:20)
+2025-12-13 14:01:39.79
+9a962268
+User
+at async syncFirestoreSessions (file:///home/runner/workspace/dist/index.js:10862:26)
+2025-12-13 14:01:39.79
+9a962268
+User
+[SkuVault QC Sales] Error looking up order: Error: No authentication token available (token may be refreshing)
+2025-12-14 06:46:55.25
+44d258ed
+User
+[Heartbeat] Container ping failed (expected in dev
