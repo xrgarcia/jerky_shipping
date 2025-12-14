@@ -6513,6 +6513,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             } else {
               console.log(`[Packing Validation] SKU mismatch: SkuVault product SKU '${product.Sku}' not in order ${orderNumber}'s shipment ${targetShipment.id} items (items: ${shipmentItemsList.map(i => i.sku).join(', ')})`);
+              
+              // FIX: Check if scanned barcode is a kit component by fetching QCSale data
+              // This handles cases where shipment_items has the parent kit SKU but user scans component barcode
+              console.log(`[Packing Validation] Checking if barcode ${barcode} is a kit component via QCSale lookup...`);
+              try {
+                const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+                if (qcSale && qcSale.Items) {
+                  const normalizedBarcode = barcode.toUpperCase().trim();
+                  const normalizedProductSku = product.Sku?.toUpperCase().trim() || '';
+                  
+                  // Check if the scanned barcode/SKU matches any kit component
+                  for (const item of qcSale.Items) {
+                    // Skip non-kit items
+                    if (!item.IsKit || !item.KitProducts || item.KitProducts.length === 0) {
+                      continue;
+                    }
+                    
+                    // Check if scanned barcode matches any kit component's Code/SKU/PartNumber
+                    const matchedComponent = item.KitProducts.find(comp => {
+                      const componentCode = (comp.Code || '').toUpperCase().trim();
+                      const componentSku = (comp.Sku || '').toUpperCase().trim();
+                      const componentPartNumber = (comp.PartNumber || '').toUpperCase().trim();
+                      return componentCode === normalizedBarcode || 
+                             componentSku === normalizedBarcode || 
+                             componentPartNumber === normalizedBarcode ||
+                             componentCode === normalizedProductSku || 
+                             componentSku === normalizedProductSku || 
+                             componentPartNumber === normalizedProductSku;
+                    });
+                    
+                    if (matchedComponent) {
+                      console.log(`[Packing Validation] Kit component match: barcode ${barcode} -> component ${matchedComponent.Sku} (ID: ${matchedComponent.Id}) of kit ${item.Sku}`);
+                      return res.json({
+                        valid: true,
+                        sku: matchedComponent.Sku || product.Sku,
+                        barcode: barcode,
+                        title: matchedComponent.Description || product.Description || 'Kit Component',
+                        quantity: matchedComponent.Quantity || 1,
+                        itemId: matchedComponent.Id?.toString() || null,
+                        saleId: qcSale.SaleId || null,
+                        isKitComponent: true,
+                        kitId: item.Id?.toString() || null,
+                        kitSku: item.Sku || null,
+                        kitTitle: item.Description || null,
+                        fallbackValidation: true,
+                      });
+                    }
+                  }
+                  console.log(`[Packing Validation] Barcode ${barcode} not found as kit component in QCSale (checked ${qcSale.Items.length} items)`);
+                }
+              } catch (qcLookupError: any) {
+                console.error(`[Packing Validation] QCSale kit component lookup failed:`, qcLookupError.message || qcLookupError);
+              }
             }
           } else {
             console.log(`[Packing Validation] No shipments found in database for order ${orderNumber}`);
