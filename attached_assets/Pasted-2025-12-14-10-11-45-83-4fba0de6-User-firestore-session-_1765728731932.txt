@@ -1,0 +1,148 @@
+2025-12-14 10:11:45.83
+4fba0de6
+User
+[firestore-session-sync] Synced session 14025 to shipment JK3825354016
+2025-12-14 10:11:45.96
+4fba0de6
+User
+[firestore-session-sync] Synced session 14017 to shipment 112-7117608-0463402
+2025-12-14 10:11:45.99
+38c0031d
+User
+4:11:45 PM [express] GET /api/shipments 200 in 347ms :: {"shipments":[{"id":"35b20937-cdc4-4748-857e…
+2025-12-14 10:11:46.18
+38c0031d
+User
+[ETL] Extracted shipmentStatus: label_purchased for order JK3825353775
+2025-12-14 10:11:46.23
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353779 (2 items updated)
+2025-12-14 10:11:46.27
+4fba0de6
+User
+[ETL] Found existing shipment bc75da47-4d09-4f74-90ee-83b60ad4f575 by ShipStation ID se-931821895
+2025-12-14 10:11:46.31
+4fba0de6
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825350668
+2025-12-14 10:11:46.31
+4fba0de6
+User
+[ETL] Fresh hold_until_date: 2026-12-05T08:00:00Z
+2025-12-14 10:11:46.31
+4fba0de6
+User
+[ETL] Cached hold_until_date: 2026-12-05T08:00:00Z
+2025-12-14 10:11:46.31
+4fba0de6
+User
+[ETL] Updating existing shipment bc75da47-4d09-4f74-90ee-83b60ad4f575 (ShipStation ID: se-931821895)
+2025-12-14 10:11:46.35
+4fba0de6
+User
+[ETL] Update succeeded - new hold_until_date in DB: 2026-12-05T08:00:00Z
+2025-12-14 10:11:46.57
+4fba0de6
+User
+[firestore-session-sync] Synced session 14019 to shipment JK3825353755 (3 items updated)
+2025-12-14 10:11:46.84
+4fba0de6
+User
+[ETL] Found existing shipment d27412f6-1e23-46ff-a1c2-1b0181466d6f by ShipStation ID se-924890293
+2025-12-14 10:11:46.88
+4fba0de6
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825346239
+2025-12-14 10:11:46.88
+4fba0de6
+User
+[ETL] Updating existing shipment d27412f6-1e23-46ff-a1c2-1b0181466d6f (ShipStation ID: se-924890293)
+2025-12-14 10:11:46.88
+4fba0de6
+User
+[ETL] Fresh hold_until_date: 2026-11-22T08:00:00Z
+2025-12-14 10:11:46.88
+4fba0de6
+User
+[ETL] Cached hold_until_date: 2026-11-22T08:00:00Z
+2025-12-14 10:11:46.92
+4fba0de6
+User
+[ETL] Update succeeded - new hold_until_date in DB: 2026-11-22T08:00:00Z
+2025-12-14 10:11:46.92
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354039 (3 items updated)
+2025-12-14 10:11:47.36
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353884 (4 items updated)
+2025-12-14 10:11:47.40
+4fba0de6
+User
+[ETL] Found existing shipment 4f934f00-4b13-4538-9e41-72508459a16c by tracking number 1Z6W14490397563220 (shipmentId: se-935695624)
+2025-12-14 10:11:47.44
+4fba0de6
+User
+[ETL] Extracted shipmentStatus: label_purchased for order JK3825353661
+2025-12-14 10:11:47.44
+4fba0de6
+User
+[ETL] Fresh hold_until_date: null
+2025-12-14 10:11:47.44
+4fba0de6
+User
+[ETL] Updating existing shipment 4f934f00-4b13-4538-9e41-72508459a16c (ShipStation ID: se-935695624)
+2025-12-14 10:11:47.44
+4fba0de6
+User
+[ETL] Cached hold_until_date: null
+2025-12-14 10:11:47.49
+4fba0de6
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2025-12-14 10:11:47.80
+4fba0de6
+User
+[firestore-session-sync] Synced session 14016 to shipment JK3825353776 (4 items updated)
+2025-12-14 10:11:47.98
+4fba0de6
+User
+[ETL] Found existing shipment 26d924c2-f9ce-496a-848e-e83e68e0dc21 by tracking number 1Z6W14490397357033 (shipmentId: se-935805934)
+2025-12-14 10:11:47.98
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354056 (1 items updated)
+2025-12-14 10:11:48.02
+4fba0de6
+User
+[ETL] Extracted shipmentStatus: label_purchased for order JK3825353775
+2025-12-14 10:11:48.11
+4fba0de6
+User
+[firestore-session-sync] Synced session 14025 to shipment JK3825354010
+2025-12-14 10:11:48.24
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353859
+2025-12-14 10:11:48.50
+4fba0de6
+User
+[firestore-session-sync] Synced session 14017 to shipment JK3825353633 (2 items updated)
+2025-12-14 10:11:48.66
+4fba0de6
+User
+[ETL] Updating existing shipment a399ecaf-4d49-4f79-8301-fa74d4295e78 (ShipStation ID: se-935882532)
+2025-12-14 10:11:48.66
+4fba0de6
+User
+[ETL] Extracted shipmentStatus: label_purchased for order 112-4531359-9653854
+2025-12-14 10:11:48.70
+4fba0de6
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2025-12-14 10:11:48.89
+4fba0de6
+User
+[firestore-session-sync] Synced session 14021 to shipment JK3825353834 (1 items updated)
