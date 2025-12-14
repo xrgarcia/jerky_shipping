@@ -872,14 +872,14 @@ export async function invalidateCacheForOrder(orderNumber: string): Promise<void
  */
 export async function refreshCacheForOrder(orderNumber: string): Promise<boolean> {
   log(`Manual refresh requested for order ${orderNumber}`);
-  const success = await warmCacheForOrder(orderNumber, true);
+  const result = await warmCacheForOrder(orderNumber, true);
   
-  if (success) {
+  if (result.success) {
     // Clear backoff tracking on successful manual refresh
     await clearFailedOrderTracking(orderNumber);
   }
   
-  return success;
+  return result.success;
 }
 
 /**
@@ -1298,26 +1298,36 @@ async function pollAndWarm(): Promise<void> {
     
     let warmed = 0;
     let failed = 0;
+    let cacheHits = 0;
     
-    // Process orders serially with longer delay for session stability
+    // Process orders serially with delay only when API calls are made
     for (const orderNumber of ordersToProcess) {
-      const success = await warmCacheForOrder(orderNumber);
+      const result = await warmCacheForOrder(orderNumber);
       
-      if (success) {
+      if (result.success) {
         warmed++;
         // Clear any previous failure tracking on success
         await clearFailedOrderTracking(orderNumber);
+        
+        if (!result.apiCallMade) {
+          cacheHits++;
+        }
       } else {
         failed++;
-        // Track failure for exponential backoff
-        await trackFailedOrder(orderNumber);
+        // Track failure for exponential backoff (only if API was actually called)
+        if (result.apiCallMade) {
+          await trackFailedOrder(orderNumber);
+        }
       }
       
-      // Longer delay between orders for SkuVault session stability (2.5 seconds)
-      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ORDERS_MS));
+      // Only apply rate limit delay when SkuVault API was actually called
+      // Cache hits (apiCallMade=false) don't need any delay
+      if (result.apiCallMade) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ORDERS_MS));
+      }
     }
     
-    log(`Warmed ${warmed}/${ordersToProcess.length} orders (${failed} failed, will retry with backoff)`);
+    log(`Warmed ${warmed}/${ordersToProcess.length} orders (${cacheHits} cache hits, ${failed} failed, will retry with backoff)`);
     metrics.workerStatus = 'sleeping';
   } catch (err: any) {
     error(`Poll and warm error: ${err.message}`);
