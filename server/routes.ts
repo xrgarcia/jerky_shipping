@@ -6437,62 +6437,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Packing Validation] Direct SkuVault lookup for barcode ${barcode} in order ${orderNumber} (cache bypassed)`);
       
       try {
-          // 1. Look up product by barcode in SkuVault
-          console.log(`[Packing Validation] Calling SkuVault getProductByCode for barcode: ${barcode}`);
-          const { product } = await skuVaultService.getProductByCode(barcode);
+        // 1. Look up product by barcode in SkuVault
+        console.log(`[Packing Validation] Calling SkuVault getProductByCode for barcode: ${barcode}`);
+        const { product } = await skuVaultService.getProductByCode(barcode);
+        
+        if (product && product.Sku) {
+          console.log(`[Packing Validation] SkuVault found product: SKU=${product.Sku}, Description=${product.Description}`);
           
-          if (product && product.Sku) {
-            console.log(`[Packing Validation] SkuVault found product: SKU=${product.Sku}, Description=${product.Description}`);
+          // 2. Get shipment items for this order from our database
+          const orderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
+          console.log(`[Packing Validation] Found ${orderShipments.length} shipment(s) for order ${orderNumber}`);
+          
+          if (orderShipments.length > 0) {
+            // Use specific shipment if shipmentId provided, otherwise fall back to most recent
+            // This ensures multi-shipment orders validate against the correct shipment's items
+            const targetShipmentId = shipmentId as string | undefined;
+            const targetShipment = targetShipmentId 
+              ? orderShipments.find(s => s.id === targetShipmentId) || orderShipments[0]
+              : orderShipments[0];
+            const shipmentItemsList = await storage.getShipmentItems(targetShipment.id);
             
-            // 2. Get shipment items for this order from our database
-            const orderShipments = await storage.getShipmentsByOrderNumber(orderNumber);
-            console.log(`[Packing Validation] Found ${orderShipments.length} shipment(s) for order ${orderNumber}`);
+            console.log(`[Packing Validation] Shipment ${targetShipment.id} has ${shipmentItemsList.length} items: ${shipmentItemsList.map(i => i.sku).join(', ')}`);
             
-            if (orderShipments.length > 0) {
-              // Use specific shipment if shipmentId provided, otherwise fall back to most recent
-              // This ensures multi-shipment orders validate against the correct shipment's items
-              const targetShipmentId = shipmentId as string | undefined;
-              const targetShipment = targetShipmentId 
-                ? orderShipments.find(s => s.id === targetShipmentId) || orderShipments[0]
-                : orderShipments[0];
-              const shipmentItemsList = await storage.getShipmentItems(targetShipment.id);
-              
-              console.log(`[Packing Validation] Shipment ${targetShipment.id} has ${shipmentItemsList.length} items: ${shipmentItemsList.map(i => i.sku).join(', ')}`);
-              
-              // 3. Match SKU against shipment items (case-insensitive)
-              const matchedItem = shipmentItemsList.find(item => 
-                item.sku?.toUpperCase() === product.Sku?.toUpperCase()
-              );
-              
-              if (matchedItem) {
-                console.log(`[Packing Validation] Fallback match: barcode ${barcode} -> SKU ${product.Sku} found in shipment ${targetShipment.id} items`);
-                return res.json({
-                  valid: true,
-                  sku: product.Sku,
-                  barcode: barcode,
-                  title: matchedItem.name || product.Description || 'Unknown Product',
-                  quantity: matchedItem.quantity,
-                  itemId: null, // No SkuVault item ID for unsessioned orders
-                  saleId: null, // No SkuVault sale ID for unsessioned orders
-                  isKitComponent: false,
-                  kitId: null,
-                  kitSku: null,
-                  kitTitle: null,
-                  fallbackValidation: true, // Flag indicating this used fallback path
-                });
-              } else {
-                console.log(`[Packing Validation] SKU mismatch: SkuVault product SKU '${product.Sku}' not in order ${orderNumber}'s shipment ${targetShipment.id} items (items: ${shipmentItemsList.map(i => i.sku).join(', ')})`);
-              }
+            // 3. Match SKU against shipment items (case-insensitive)
+            const matchedItem = shipmentItemsList.find(item => 
+              item.sku?.toUpperCase() === product.Sku?.toUpperCase()
+            );
+            
+            if (matchedItem) {
+              console.log(`[Packing Validation] Match: barcode ${barcode} -> SKU ${product.Sku} found in shipment ${targetShipment.id} items`);
+              return res.json({
+                valid: true,
+                sku: product.Sku,
+                barcode: barcode,
+                title: matchedItem.name || product.Description || 'Unknown Product',
+                quantity: matchedItem.quantity,
+                itemId: null, // No SkuVault item ID for unsessioned orders
+                saleId: null, // No SkuVault sale ID for unsessioned orders
+                isKitComponent: false,
+                kitId: null,
+                kitSku: null,
+                kitTitle: null,
+                fallbackValidation: true, // Flag indicating this used direct SkuVault lookup
+              });
             } else {
-              console.log(`[Packing Validation] No shipments found in database for order ${orderNumber}`);
+              console.log(`[Packing Validation] SKU mismatch: SkuVault product SKU '${product.Sku}' not in order ${orderNumber}'s shipment ${targetShipment.id} items (items: ${shipmentItemsList.map(i => i.sku).join(', ')})`);
             }
           } else {
-            console.log(`[Packing Validation] SkuVault returned no product for barcode: ${barcode}`);
+            console.log(`[Packing Validation] No shipments found in database for order ${orderNumber}`);
           }
-        } catch (fallbackError: any) {
-          console.error(`[Packing Validation] Fallback product lookup failed for barcode ${barcode}:`, fallbackError.message || fallbackError);
+        } else {
+          console.log(`[Packing Validation] SkuVault returned no product for barcode: ${barcode}`);
         }
-        
+      } catch (lookupError: any) {
+        console.error(`[Packing Validation] Product lookup failed for barcode ${barcode}:`, lookupError.message || lookupError);
+      }
+      
       return res.status(404).json({ 
         valid: false, 
         error: "Product not found in order",
