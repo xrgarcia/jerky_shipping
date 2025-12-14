@@ -1,0 +1,148 @@
+2025-12-14 12:14:01.05
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:15:01.17
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:16:01.26
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:17:01.25
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:18:01.18
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:18:59.00
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:20:00.20
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:20:59.31
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:21:59.40
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:23:59.25
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:24:59.74
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:25:58.23
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:26:58.17
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:28:59.51
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:29:52.04
+03b5f422
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353856
+2025-12-14 12:34:35.40
+dbb76f5c
+User
+[Packing Validation] Request for order JK3825353856, explicitShipmentId: none
+2025-12-14 12:34:35.44
+dbb76f5c
+User
+[Packing Validation] Cache miss for shippable shipments, fetching from PostgreSQL: JK3825353856
+2025-12-14 12:34:35.53
+dbb76f5c
+User
+[QCSaleWarmer] Single shippable shipment for order JK3825353856: 607624bc-0162-4ab4-b959-e88758551417
+2025-12-14 12:34:35.61
+dbb76f5c
+User
+[Packing Validation] Warm cache miss for QCSale, fetching from SkuVault API: JK3825353856 (shipstationId: se-935840240)
+2025-12-14 12:34:35.61
+dbb76f5c
+User
+[SkuVault QC Sales] Looking up order: JK3825353856 (shipmentId: se-935840240)
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+{"Errors":[],"Messages":[],"Data":{"MergeBinsFlag":false,"QcSales":[{"TotalItems":3,"Status":"ReadyToShip","SaleId":"1-352444-5-13038-138162-JK3825353856-935840240","OrderId":"138162-JK38253538
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+[SkuVault QC Sales] DEBUG: Found SaleIds: 1-352444-5-13038-138162-JK3825353856-935840240
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+SaleId: '1-352444-5-13038-138162-JK3825353856-935840240',
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+SaleId: '1-352444-5-13038-138162-JK3825353856-935840240',
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+OrderId: '138162-JK3825353856-935840240',
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+[SkuVault QC Sales] DEBUG: Search for "JK3825353856" returned 1 results
+2025-12-14 12:34:37.70
+dbb76f5c
+User
+[QCSaleCache] Cached order JK3825353856 with 7 barcode/SKU entries
+2025-12-14 12:34:37.79
+dbb76f5c
+User
+6:34:37 PM [express] GET /api/packing/validate-order/JK3825353856 200 in 2473ms :: {"id":"607624bc-0…
+2025-12-14 12:34:37.96
+dbb76f5c
+User
+6:34:37 PM [express] GET /api/shipment-events/order/JK3825353856 200 in 122ms :: [{"id":"f42f0a76-b4…
+2025-12-14 12:34:38.13
+dbb76f5c
+User
+[Packing] Shipment JK3825353856 has no label URL - fetching from ShipStation...
+2025-12-14 12:34:40.05
+dbb76f5c
+User
+[Packing] Skipping cache invalidation for JK3825353856 (bagging workflow - QC scans pending)
+2025-12-14 12:34:40.10
+dbb76f5c
+User
+[Desktop WS] Sent job e1ddde8a-5169-462d-9100-45f552ca8fc0 (order JK3825353856) to station 85d575ed-48ec-4942-948d-6be827deb117
+2025-12-14 12:34:41.88
+dbb76f5c
+User
+[Packing Validation] Direct SkuVault lookup for barcode 111007023890 in order JK3825353856 (cache bypassed)
+2025-12-14 12:34:47.78
+dbb76f5c
+User
+[Packing Validation] Direct SkuVault lookup for barcode 811007027187 in order JK3825353856 (cache bypassed)
+2025-12-14 12:34:56.57
+dbb76f5c
+User
+[Packing] Manual cache refresh requested for order: JK3825353856
+2025-12-14 12:34:56.61
+dbb76f5c
+User
+6:34:56 PM [express] POST /api/packing/refresh-cache/JK3825353856 400 in 129ms :: {"success":false,"…
+2025-12-14 12:37:05.98
+dbb76f5c
+User
+[ETL] Extracted shipmentStatus: label_purchased for order JK3825353856
