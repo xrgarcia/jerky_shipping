@@ -5275,22 +5275,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Check if it exists but isn't shippable
             const existingShipment = shipmentsResult.allShipments.find((s: any) => s.id === explicitShipmentId);
             if (existingShipment) {
-              return res.status(422).json({
-                error: {
-                  code: 'SHIPMENT_NOT_SHIPPABLE',
-                  message: 'Selected shipment is not shippable',
-                  explanation: 'This shipment either doesn\'t have the "MOVE OVER" tag or is on hold.',
-                  resolution: 'Select a different shipment or wait for this one to become shippable.'
-                },
+              // Get the specific status for this shipment to provide accurate error message
+              const shipmentStatus = shipmentsResult.shipmentStatuses?.find((s: any) => s.id === explicitShipmentId);
+              const exclusionReason = shipmentStatus?.reason || 'unknown';
+              
+              // ALLOW already-shipped orders to proceed for QC purposes
+              // This enables the "Proceed to QC" flow on bagging page for already-packed orders
+              if (exclusionReason === 'already_shipped' || existingShipment.trackingNumber) {
+                console.log(`[Packing Validation] Allowing already-shipped shipment ${explicitShipmentId} for QC purposes`);
+                shipment = existingShipment;
+              } else {
+                // Build accurate error message based on actual exclusion reason
+                let explanation = '';
+                let resolution = '';
+                
+                if (exclusionReason === 'on_hold') {
+                  explanation = 'This shipment is currently on hold.';
+                  resolution = 'Check ShipStation for the hold date, or contact a supervisor if unexpected.';
+                } else if (exclusionReason === 'missing_move_over_tag') {
+                  explanation = 'This shipment doesn\'t have the "MOVE OVER" tag yet.';
+                  resolution = 'Wait for picking to complete in SkuVault, or check with a supervisor.';
+                } else if (exclusionReason === 'do_not_ship_package') {
+                  explanation = 'This shipment has a "DO NOT SHIP" package type.';
+                  resolution = 'Contact a manager immediately before proceeding.';
+                } else {
+                  explanation = `This shipment is not eligible for packing (reason: ${exclusionReason}).`;
+                  resolution = 'Select a different shipment or contact a supervisor.';
+                }
+                
+                return res.status(422).json({
+                  error: {
+                    code: 'SHIPMENT_NOT_SHIPPABLE',
+                    message: 'Selected shipment is not shippable',
+                    explanation,
+                    resolution
+                  },
+                  orderNumber: resolvedOrderNumber,
+                  requestedShipmentId: explicitShipmentId,
+                  exclusionReason
+                });
+              }
+            } else {
+              return res.status(404).json({ 
+                error: "Selected shipment not found",
                 orderNumber: resolvedOrderNumber,
                 requestedShipmentId: explicitShipmentId
               });
             }
-            return res.status(404).json({ 
-              error: "Selected shipment not found",
-              orderNumber: resolvedOrderNumber,
-              requestedShipmentId: explicitShipmentId
-            });
           }
           console.log(`[Packing Validation] Using explicitly selected shipment: ${explicitShipmentId}`);
         } else if (shippableShipments.length === 1) {
