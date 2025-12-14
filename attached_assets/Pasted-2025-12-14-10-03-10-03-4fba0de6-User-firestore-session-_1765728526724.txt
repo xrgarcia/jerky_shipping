@@ -1,0 +1,154 @@
+2025-12-14 10:03:10.03
+4fba0de6
+User
+[firestore-session-sync] Synced session 14015 to shipment JK3825354051 (2 items updated)
+2025-12-14 10:03:10.16
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354027
+2025-12-14 10:03:10.35
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353799 (6 items updated)
+2025-12-14 10:03:10.73
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353878
+2025-12-14 10:03:10.87
+4fba0de6
+User
+[firestore-session-sync] Synced session 14019 to shipment JK3825353744
+2025-12-14 10:03:10.89
+4fba0de6
+User
+4:03:10 PM [express] POST /api/webhooks/shopify/products 200 in 54ms :: {"success":true}
+2025-12-14 10:03:11.05
+4fba0de6
+User
+[firestore-session-sync] Synced session 14018 to shipment JK3825353689 (1 items updated)
+2025-12-14 10:03:11.05
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353797 (2 items updated)
+2025-12-14 10:03:11.22
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353787 (1 items updated)
+2025-12-14 10:03:11.41
+4fba0de6
+User
+[firestore-session-sync] Synced session 14015 to shipment JK3825354035 (3 items updated)
+2025-12-14 10:03:11.54
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353806 (2 items updated)
+2025-12-14 10:03:11.58
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354043 (1 items updated)
+2025-12-14 10:03:11.71
+4fba0de6
+User
+[firestore-session-sync] Synced session 14019 to shipment JK3825353753
+2025-12-14 10:03:11.72
+4fba0de6
+User
+[firestore-session-sync] Synced session 14024 to shipment JK3825353963 (1 items updated)
+2025-12-14 10:03:11.85
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353882
+2025-12-14 10:03:12.05
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353858 (1 items updated)
+2025-12-14 10:03:12.11
+4fba0de6
+User
+[firestore-session-sync] Synced session 14018 to shipment JK3825353723 (2 items updated)
+2025-12-14 10:03:12.23
+4fba0de6
+User
+[firestore-session-sync] Synced session 14019 to shipment JK3825353738 (1 items updated)
+2025-12-14 10:03:12.28
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353778 (1 items updated)
+2025-12-14 10:03:12.40
+4fba0de6
+User
+[firestore-session-sync] Synced session 14019 to shipment JK3825353758
+2025-12-14 10:03:12.63
+4fba0de6
+User
+[firestore-session-sync] Synced session 14016 to shipment JK3825354062 (2 items updated)
+2025-12-14 10:03:12.90
+4fba0de6
+User
+[firestore-session-sync] Synced session 14021 to shipment JK3825353847 (2 items updated)
+2025-12-14 10:03:13.08
+4fba0de6
+User
+[firestore-session-sync] Synced session 14023 to shipment JK3825353908 (1 items updated)
+2025-12-14 10:03:13.10
+4fba0de6
+User
+[firestore-session-sync] Synced session 14020 to shipment JK3825353777 (7 items updated)
+2025-12-14 10:03:13.18
+4fba0de6
+User
+4:03:13 PM [express] GET /api/print-queue/stale-metrics 200 in 84ms :: {"totalStale":0,"warningCount…
+2025-12-14 10:03:13.25
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354058 (1 items updated)
+2025-12-14 10:03:13.32
+4fba0de6
+User
+[firestore-session-sync] Synced session 14025 to shipment JK3825354012
+2025-12-14 10:03:13.43
+4fba0de6
+User
+[firestore-session-sync] Synced session 14021 to shipment JK3825353845 (1 items updated)
+2025-12-14 10:03:13.49
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354059 (1 items updated)
+2025-12-14 10:03:13.66
+4fba0de6
+User
+[firestore-session-sync] Synced session 14024 to shipment JK3825353975 (1 items updated)
+2025-12-14 10:03:13.73
+4fba0de6
+User
+[firestore-session-sync] Synced session 14024 to shipment JK3825353958 (2 items updated)
+2025-12-14 10:03:13.91
+4fba0de6
+User
+[firestore-session-sync] Synced session 14025 to shipment JK3825353985 (1 items updated)
+2025-12-14 10:03:13.95
+4fba0de6
+User
+[firestore-session-sync] Synced session 14022 to shipment JK3825353885 (2 items updated)
+2025-12-14 10:03:14.25
+4fba0de6
+User
+[firestore-session-sync] Synced session 14018 to shipment JK3825353702 (2 items updated)
+2025-12-14 10:03:14.26
+4fba0de6
+User
+[firestore-session-sync] Synced session 14018 to shipment JK3825353707 (3 items updated)
+2025-12-14 10:03:14.43
+4fba0de6
+User
+[firestore-session-sync] Synced session 14026 to shipment JK3825354049
+2025-12-14 10:03:14.44
+4fba0de6
+User
+[firestore-session-sync] Synced session 14017 to shipment JK3825353657 (1 items updated)
+
+Collapse
+
+Wrap
+
+Colors
