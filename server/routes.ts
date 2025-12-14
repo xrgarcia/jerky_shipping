@@ -5170,9 +5170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // PERFORMANCE OPTIMIZATION: Check warm cache first for BOTH shipment and QCSale data
-      // The cache warmer service pre-loads both for orders with sessionStatus='closed' and no tracking
-      const warmCacheData = await getWarmCache(resolvedOrderNumber);
+      // CACHE BYPASS: Skip cache entirely and go direct to SkuVault API
+      // The cache was causing issues with stale data, workflow mismatches (bagging vs boxing),
+      // and race conditions. The fallback path (database + direct API) is more reliable.
+      // TODO: Consider re-enabling cache with simpler logic after stabilizing the packing workflow.
+      const warmCacheData = null; // Bypassed: await getWarmCache(resolvedOrderNumber);
       
       let shipment: any = null;
       let shipmentItems: any[] = [];
