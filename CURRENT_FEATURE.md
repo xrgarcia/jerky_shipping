@@ -136,7 +136,7 @@ Tasks:
 - [ ] Define Footprints schema (collection combos) — deferred to Phase 3
 - [ ] Define Models schema (footprint → packaging mappings) — deferred to Phase 3
 
-### Phase 2: Collection Management ⬜
+### Phase 2: Collection Management ✅
 **Page:** `/collections` | **Sidebar:** "Collections"
 
 **Layout:** Split-panel design
@@ -145,25 +145,32 @@ Tasks:
 
 **Data Sources:**
 - `inventory_forecasts_daily` (latest stock_check_date) — product catalog
-- `vw_internal_kit_component_inventory_latest` — identify products with components (Kit/AP badge)
+- `is_assembled_product` field — identify Kit/AP products (badge display)
 - `product_collections` / `product_collection_mappings` — local DB tables
 
 **UX Features:**
-- Searchable product list with SKU, title, supplier, stock level
+- Searchable product list with SKU, description, supplier, stock level
 - Multi-select products for bulk assignment to collections
-- "Kit/AP" badge for products that have components
+- "Select All" option to select all visible products at once
+- Dropdown filters: Category, Supplier, Kit/AP (Yes/No/Either)
+- Debounced search input to reduce UI bounce
+- "Kit/AP" badge for assembled products
 - Product count per collection in list
-- "Already assigned" indicator when SKU is in other collections
+- "In Collection" badge indicator when SKU is already assigned
 - Inline "New Collection" creation with modal (name + description)
 - Empty state guidance for new users
 
 Tasks:
-- [ ] Create /collections page with sidebar entry
-- [ ] Build collections list panel with CRUD (create, edit, delete)
-- [ ] Build products panel with search from inventory_forecasts_daily
-- [ ] Add product-to-collection assignment with multi-select
-- [ ] Show Kit/AP badges from vw_internal_kit_component_inventory_latest
-- [ ] Display product count per collection and "already assigned" indicators
+- [x] Create /collections page with sidebar entry
+- [x] Build collections list panel with CRUD (create, edit, delete)
+- [x] Build products panel with search from inventory_forecasts_daily
+- [x] Add product-to-collection assignment with multi-select
+- [x] Add "Select All" for visible products
+- [x] Add dropdown filters (Category, Supplier, Kit/AP)
+- [x] Add debounced search to reduce UI bounce
+- [x] Show Kit/AP badges using is_assembled_product field
+- [x] Display product count per collection and "In Collection" indicators
+- [x] Increase search limit to 500 products for full catalog visibility
 
 ### Phase 3: Footprint Detection & Learning ⬜
 Tasks:
