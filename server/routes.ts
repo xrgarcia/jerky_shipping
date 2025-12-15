@@ -9496,38 +9496,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { search, category, supplier, isKit } = req.query;
       
-      // Build dynamic conditions
-      const conditions: string[] = [];
       const searchTerm = search ? `%${String(search)}%` : null;
-      
-      // Text search (optional now)
-      if (searchTerm) {
-        conditions.push("text_match");
-      }
-      
-      // Category filter
-      if (category && category !== "all") {
-        conditions.push("category_match");
-      }
-      
-      // Supplier filter
-      if (supplier && supplier !== "all") {
-        conditions.push("supplier_match");
-      }
-      
-      // Kit filter
-      if (isKit === "yes") {
-        conditions.push("is_kit");
-      } else if (isKit === "no") {
-        conditions.push("not_kit");
-      }
+      const categoryFilter = category && category !== "all" ? String(category) : null;
+      const supplierFilter = supplier && supplier !== "all" ? String(supplier) : null;
       
       // Need at least a search term or one filter
-      if (!searchTerm && conditions.length === 0) {
+      const hasFilters = categoryFilter || supplierFilter || isKit === "yes" || isKit === "no";
+      if (!searchTerm && !hasFilters) {
         return res.json({ products: [], total: 0 });
       }
       
-      // Build query with proper parameterization
+      // Determine kit filter value (null = either, true = yes, false = no)
+      const kitFilterValue = isKit === "yes" ? true : isKit === "no" ? false : null;
+      
       const products = await reportingSql`
         SELECT DISTINCT ON (sku) 
           sku, description, supplier, product_category, quantity_available, is_assembled_product
@@ -9539,13 +9520,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             OR product_category ILIKE ${searchTerm}
             OR supplier ILIKE ${searchTerm}
           ))
-          AND (${category === "all" || !category ? null : category}::text IS NULL OR product_category = ${category})
-          AND (${supplier === "all" || !supplier ? null : supplier}::text IS NULL OR supplier = ${supplier})
-          AND (
-            ${isKit !== "yes" && isKit !== "no"}::boolean = true
-            OR (${isKit === "yes"}::boolean = true AND is_assembled_product = true)
-            OR (${isKit === "no"}::boolean = true AND is_assembled_product = false)
-          )
+          AND (${categoryFilter}::text IS NULL OR product_category = ${categoryFilter})
+          AND (${supplierFilter}::text IS NULL OR supplier = ${supplierFilter})
+          AND (${kitFilterValue}::boolean IS NULL OR is_assembled_product = ${kitFilterValue})
         ORDER BY sku
         LIMIT 50
       `;
