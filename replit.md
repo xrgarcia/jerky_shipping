@@ -71,3 +71,16 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 -   **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 -   **Neon Database**: Serverless PostgreSQL database for primary data storage.
 -   **GCP PostgreSQL**: Separate reporting database for purchase order recommendations and inventory forecasting analytics.
+
+### Reporting Database Schema
+The reporting database (`REPORTING_DATABASE_URL`) is a separate GCP PostgreSQL instance used for analytics and product catalog data. Connection is established via `server/reporting-db.ts` using the `reportingSql` client.
+
+**Key Tables:**
+- `inventory_forecasts_daily` — Daily product catalog snapshot (~701 SKUs), synced nightly from SkuVault. Contains product details, stock levels, and the `is_assembled_product` flag.
+- `vw_internal_kit_component_inventory_latest` — View showing kit/AP (Assembled Product) to component mappings. Each row represents one component of a kit with `sku` (parent), `component_sku`, and `component_quantity`.
+
+**Usage:**
+- **PO Recommendations**: Uses `vw_po_recommendations` view for purchase order suggestions
+- **Collection Management (Ship.)**: Managers use product catalog data to assign products to collections for footprint detection
+
+**Important Note:** For live order processing, the SkuVault API provides already-exploded order line items with barcodes (via the QC Sale endpoint used by boxing/bagging pages). Ship. does not need to perform kit explosion at runtime—SkuVault handles this.
