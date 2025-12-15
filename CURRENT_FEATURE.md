@@ -207,6 +207,7 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - [x] Create `footprints` table (unique collection combos)
 - [x] Create `footprint_models` table (footprint → packaging rules)
 - [x] Add fields to `shipments`: qc_station_id, footprint_id, packaging_type_id, packaging_decision_type
+- [x] Seed `packaging_types` from historical `shipment_packages` data (10 types: boxes, poly bags, envelopes)
 
 **Background Job Tasks:**
 - [ ] Build job to populate `shipment_qc_items` for new shipments
