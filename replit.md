@@ -84,3 +84,24 @@ The reporting database (`REPORTING_DATABASE_URL`) is a separate GCP PostgreSQL i
 - **Collection Management (Ship.)**: Managers use product catalog data to assign products to collections for footprint detection
 
 **Important Note:** For live order processing, the SkuVault API provides already-exploded order line items with barcodes (via the QC Sale endpoint used by boxing/bagging pages). Ship. does not need to perform kit explosion at runtime—SkuVault handles this.
+
+### PO Recommendations Page (`/po-recommendations`)
+Helps managers identify products that need reordering based on sales velocity, lead times, and upcoming holidays.
+
+**Data Source:** `vw_po_recommendations` view from reporting database (Redis-cached snapshots)
+
+**Key Features:**
+- **Inventory Forecasting**: 90-day forecast based on base/projected velocity and growth rates
+- **Holiday Planning**: Shows upcoming holiday seasons with countdown and recommended quantities
+- **Supplier Filtering**: Multi-select filter by supplier
+- **Assembled Product Toggle**: Show/hide APs (Assembled Products)
+- **Lead Time Consideration**: Factors in supplier lead times for reorder timing
+- **Saved Views**: Users can save/load column configurations, filters, and sort preferences
+- **Calculation Steps**: Click any SKU to see the detailed calculation breakdown
+
+**Available Columns:**
+- Core: SKU, Supplier, Title, Lead Time, Current Stock, Recommended Qty
+- Velocity: Base Velocity, Projected Velocity, Growth Rate, 90-Day Forecast
+- Inventory: Days Cover, Qty Incoming, Kit Velocity, Individual Velocity
+- Adjustments: Case Adjustment, MOQ Applied, Is Assembled Product
+- Holiday: Next Holiday Days, Holiday Rec Qty, Holiday Season, Holiday Start Date
