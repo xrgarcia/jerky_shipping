@@ -9524,7 +9524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND (${supplierFilter}::text IS NULL OR supplier = ${supplierFilter})
           AND (${kitFilterValue}::boolean IS NULL OR is_assembled_product = ${kitFilterValue})
         ORDER BY sku
-        LIMIT 50
+        LIMIT 500
       `;
 
       res.json({ products, total: products.length });
