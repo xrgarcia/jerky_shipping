@@ -172,13 +172,64 @@ Tasks:
 - [x] Display product count per collection and "In Collection" indicators
 - [x] Increase search limit to 500 products for full catalog visibility
 
-### Phase 3: Footprint Detection & Learning ⬜
-Tasks:
-- [ ] Calculate footprint when order is processed
-- [ ] Detect unknown footprints
-- [ ] Show "unknown footprint" decision UI to manager
-- [ ] Save decision as permanent model rule
-- [ ] Apply model rules to future orders
+### Phase 3: Footprint Detection & Learning 🔄
+
+**Goal:** Automatically determine packaging for orders based on their product collection composition.
+
+**Core Tables:**
+- `shipment_qc_items` — Exploded line items for each shipment with QC tracking
+- `packaging_types` — Discrete set of packaging options (seeded from historical data)
+- `footprints` — Unique "shape signatures" based on collection composition
+- `footprint_models` — Learned rules mapping footprint → packaging type
+
+**Data Sources for Explosion:**
+- Kit components: `vw_internal_kit_component_inventory_latest` joined with `internal_inventory` for barcodes
+- Non-kit products: `inventory_forecasts_daily` joined with `internal_inventory` for barcodes
+
+**Barcode Lookups (Reporting DB):**
+```sql
+-- For kit components:
+SELECT vw.*, ii.code as component_barcode
+FROM vw_internal_kit_component_inventory_latest vw
+JOIN internal_inventory ii ON ii.snapshot_timestamp = vw.snapshot_timestamp 
+  AND ii.sku = vw.component_sku
+
+-- For regular products:
+SELECT ifd.*, ii.code as barcode
+FROM inventory_forecasts_daily ifd
+JOIN internal_inventory ii ON ii.sku = ifd.sku AND ii.snapshot_timestamp = ifd.stock_check_date
+WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
+```
+
+**Schema Tasks:**
+- [ ] Create `shipment_qc_items` table (exploded items with QC tracking)
+- [ ] Create `packaging_types` table (discrete packaging options)
+- [ ] Create `footprints` table (unique collection combos)
+- [ ] Create `footprint_models` table (footprint → packaging rules)
+- [ ] Add fields to `shipments`: qc_station_id, footprint_id, packaging_type_id, packaging_decision_type
+
+**Background Job Tasks:**
+- [ ] Build job to populate `shipment_qc_items` for new shipments
+- [ ] Explode kits using reporting DB kit mappings
+- [ ] Map SKUs to collections for footprint calculation
+- [ ] Calculate and assign footprint_id to shipments
+
+**Footprint Calculation Logic:**
+- [ ] Aggregate exploded items by collection
+- [ ] Generate canonical footprint signature (e.g., `{"GiftBox": 2, "SmallJerky": 5}`)
+- [ ] Match against existing footprints or create new
+
+**Learning UI Tasks:**
+- [ ] Morning decision page showing orders needing packaging
+- [ ] Auto-apply known footprint models
+- [ ] Prompt for unknown footprints → save as new model
+- [ ] Track decision type: 'auto' vs 'manual'
+
+**QC Integration:**
+- [ ] Update `quantity_scanned` during packing
+- [ ] Mark `qc_complete` when all items scanned
+- [ ] Push to SkuVault via passQCitem endpoint
+- [ ] Track `synced_to_skuvault` status
 
 ### Phase 4: Station Routing & Session Building ⬜
 Tasks:
