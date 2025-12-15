@@ -275,6 +275,11 @@ export const shipments = pgTable("shipments", {
   // QC completion tracking
   qcCompleted: boolean("qc_completed").default(false), // True when packing QC scan is complete (set on boxing/bagging completion)
   qcCompletedAt: timestamp("qc_completed_at"), // When QC was completed (null = not completed)
+  // Smart Shipping Engine fields (Phase 3)
+  qcStationId: varchar("qc_station_id"), // FK to stations table - where this order was packed (set during QC)
+  footprintId: varchar("footprint_id"), // FK to footprints table - calculated collection composition
+  packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
+  packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -318,6 +323,11 @@ export const shipments = pgTable("shipments", {
   carrierShipDateIdx: index("shipments_carrier_ship_date_idx").on(table.carrierCode, table.shipDate.desc().nullsLast()).where(sql`${table.carrierCode} IS NOT NULL`),
   // QC completed timestamp for packed shipments report queries
   qcCompletedAtIdx: index("shipments_qc_completed_at_idx").on(table.qcCompletedAt.desc().nullsLast()).where(sql`${table.qcCompletedAt} IS NOT NULL`),
+  // Smart Shipping Engine indexes (Phase 3)
+  qcStationIdIdx: index("shipments_qc_station_id_idx").on(table.qcStationId).where(sql`${table.qcStationId} IS NOT NULL`),
+  footprintIdIdx: index("shipments_footprint_id_idx").on(table.footprintId).where(sql`${table.footprintId} IS NOT NULL`),
+  packagingTypeIdIdx: index("shipments_packaging_type_id_idx").on(table.packagingTypeId).where(sql`${table.packagingTypeId} IS NOT NULL`),
+  packagingDecisionTypeIdx: index("shipments_packaging_decision_type_idx").on(table.packagingDecisionType).where(sql`${table.packagingDecisionType} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -392,6 +402,11 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   shipstationModifiedAt: z.coerce.date().optional().or(z.null()),
   // Cache warmer tracking
   cacheWarmedAt: z.coerce.date().optional().or(z.null()),
+  // Smart Shipping Engine fields (Phase 3)
+  qcStationId: z.string().nullish(),
+  footprintId: z.string().nullish(),
+  packagingTypeId: z.string().nullish(),
+  packagingDecisionType: z.string().nullish(),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
@@ -1069,3 +1084,116 @@ export const insertProductCollectionMappingSchema = createInsertSchema(productCo
 
 export type InsertProductCollectionMapping = z.infer<typeof insertProductCollectionMappingSchema>;
 export type ProductCollectionMapping = typeof productCollectionMappings.$inferSelect;
+
+// ============================================================================
+// PHASE 3: SMART SHIPPING ENGINE - FOOTPRINT DETECTION & LEARNING
+// ============================================================================
+
+// Packaging Types - Discrete set of packaging options used by jerky.com
+// Seeded from historical shipment_packages data
+export const packagingTypes = pgTable("packaging_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // e.g., "Box #2 (13 x 13 x 13)", "Poly Bag 16x18"
+  packageCode: text("package_code"), // ShipStation package code
+  dimensionLength: text("dimension_length"),
+  dimensionWidth: text("dimension_width"),
+  dimensionHeight: text("dimension_height"),
+  dimensionUnit: text("dimension_unit").default("inch"),
+  stationType: text("station_type"), // 'boxing_machine', 'poly_bag', 'hand_pack'
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("packaging_types_name_idx").on(table.name),
+  stationTypeIdx: index("packaging_types_station_type_idx").on(table.stationType),
+}));
+
+export const insertPackagingTypeSchema = createInsertSchema(packagingTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPackagingType = z.infer<typeof insertPackagingTypeSchema>;
+export type PackagingType = typeof packagingTypes.$inferSelect;
+
+// Footprints - Unique "shape signatures" based on collection composition
+// A footprint represents a specific combination of collections + quantities
+export const footprints = pgTable("footprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  signature: text("signature").notNull().unique(), // Canonical JSON string, e.g., '{"GiftBox":2,"SmallJerky":5}'
+  signatureHash: text("signature_hash").notNull().unique(), // Hash for fast lookup
+  displayName: text("display_name"), // Human-readable, e.g., "2 Gift Boxes + 5 Small Jerky"
+  totalItems: integer("total_items").notNull(), // Sum of all quantities
+  collectionCount: integer("collection_count").notNull(), // Number of distinct collections
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  signatureHashIdx: index("footprints_signature_hash_idx").on(table.signatureHash),
+  totalItemsIdx: index("footprints_total_items_idx").on(table.totalItems),
+}));
+
+export const insertFootprintSchema = createInsertSchema(footprints).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFootprint = z.infer<typeof insertFootprintSchema>;
+export type Footprint = typeof footprints.$inferSelect;
+
+// Footprint Models - Learned rules mapping footprint → packaging type
+// When a manager decides packaging for an unknown footprint, it becomes a permanent rule
+export const footprintModels = pgTable("footprint_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  footprintId: varchar("footprint_id").notNull().references(() => footprints.id),
+  packagingTypeId: varchar("packaging_type_id").notNull().references(() => packagingTypes.id),
+  confidence: text("confidence").default("manual"), // 'manual', 'high', 'medium', 'low' (for future ML)
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  notes: text("notes"), // Optional notes about the decision
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  footprintIdIdx: uniqueIndex("footprint_models_footprint_id_idx").on(table.footprintId), // One model per footprint
+  packagingTypeIdIdx: index("footprint_models_packaging_type_id_idx").on(table.packagingTypeId),
+}));
+
+export const insertFootprintModelSchema = createInsertSchema(footprintModels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFootprintModel = z.infer<typeof insertFootprintModelSchema>;
+export type FootprintModel = typeof footprintModels.$inferSelect;
+
+// Shipment QC Items - Exploded line items for each shipment with QC tracking
+// Each row represents one SKU (post-explosion) that needs to be scanned during packing
+export const shipmentQcItems = pgTable("shipment_qc_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  sku: text("sku").notNull(), // Individual product SKU (post-explosion)
+  barcode: text("barcode"), // Scannable barcode (from internal_inventory.code)
+  description: text("description"), // Product name for display
+  quantityExpected: integer("quantity_expected").notNull().default(1), // How many we need to scan
+  quantityScanned: integer("quantity_scanned").notNull().default(0), // How many we've scanned so far
+  collectionId: varchar("collection_id").references(() => productCollections.id), // For footprint calculation
+  syncedToSkuvault: boolean("synced_to_skuvault").notNull().default(false), // Have we pushed passQCitem
+  isKitComponent: boolean("is_kit_component").notNull().default(false), // True if this is an exploded kit component
+  parentSku: text("parent_sku"), // If kit component, the parent kit SKU
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  shipmentIdIdx: index("shipment_qc_items_shipment_id_idx").on(table.shipmentId),
+  skuIdx: index("shipment_qc_items_sku_idx").on(table.sku),
+  barcodeIdx: index("shipment_qc_items_barcode_idx").on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
+  collectionIdIdx: index("shipment_qc_items_collection_id_idx").on(table.collectionId).where(sql`${table.collectionId} IS NOT NULL`),
+  syncedToSkuvaultIdx: index("shipment_qc_items_synced_idx").on(table.syncedToSkuvault),
+}));
+
+export const insertShipmentQcItemSchema = createInsertSchema(shipmentQcItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipmentQcItem = z.infer<typeof insertShipmentQcItemSchema>;
+export type ShipmentQcItem = typeof shipmentQcItems.$inferSelect;
