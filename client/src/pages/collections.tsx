@@ -98,9 +98,25 @@ export default function Collections() {
     enabled: !!selectedCollectionId,
   });
 
-  const { data: catalogData, isLoading: catalogLoading } = useQuery<ProductCatalogResponse>({
+  const productCatalogQuery = useQuery<ProductCatalogResponse>({
     queryKey: [`/api/product-catalog?search=${encodeURIComponent(productSearch)}`],
     enabled: productSearch.length >= 2,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  
+  const catalogData = productCatalogQuery.data;
+  const catalogLoading = productCatalogQuery.isLoading;
+  
+  console.log('[ProductCatalog] Query state:', {
+    search: productSearch,
+    enabled: productSearch.length >= 2,
+    isLoading: productCatalogQuery.isLoading,
+    isFetching: productCatalogQuery.isFetching,
+    isError: productCatalogQuery.isError,
+    error: productCatalogQuery.error,
+    dataCount: catalogData?.products?.length ?? 0,
+    queryKey: `/api/product-catalog?search=${encodeURIComponent(productSearch)}`,
   });
 
   const collections = collectionsData?.collections || [];

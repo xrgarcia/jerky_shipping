@@ -9465,11 +9465,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
       const { search } = req.query;
+      console.log("[Product Catalog] Search request received:", { search });
+      
       if (!search || String(search).length < 2) {
+        console.log("[Product Catalog] Search too short, returning empty");
         return res.json({ products: [], total: 0 });
       }
 
       const searchTerm = `%${String(search)}%`;
+      console.log("[Product Catalog] Querying reporting DB with term:", searchTerm);
+      
       const products = await reportingSql`
         SELECT DISTINCT ON (sku) 
           sku, title, supplier, current_stock, is_assembled_product
@@ -9480,6 +9485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LIMIT 50
       `;
 
+      console.log("[Product Catalog] Query returned:", products.length, "products");
       res.json({ products, total: products.length });
     } catch (error: any) {
       console.error("[Product Catalog] Error searching products:", error);
