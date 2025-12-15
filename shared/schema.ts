@@ -1022,3 +1022,50 @@ export const insertWebPackingSessionSchema = createInsertSchema(webPackingSessio
 
 export type InsertWebPackingSession = z.infer<typeof insertWebPackingSessionSchema>;
 export type WebPackingSession = typeof webPackingSessions.$inferSelect;
+
+// Product Collections - Groups of products with similar physical characteristics for Ship. Smart Shipping Engine
+// Used for footprint detection to determine packaging type and station routing
+export const productCollections = pgTable("product_collections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  updatedBy: varchar("updated_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("product_collections_name_idx").on(table.name),
+}));
+
+export const insertProductCollectionSchema = createInsertSchema(productCollections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductCollection = z.infer<typeof insertProductCollectionSchema>;
+export type ProductCollection = typeof productCollections.$inferSelect;
+
+// Product Collection Mappings - Maps product SKUs to collections (many-to-many)
+// A SKU can belong to multiple collections for flexibility
+export const productCollectionMappings = pgTable("product_collection_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCollectionId: varchar("product_collection_id").notNull().references(() => productCollections.id),
+  sku: text("sku").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  updatedBy: varchar("updated_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  productCollectionIdIdx: index("product_collection_mappings_collection_id_idx").on(table.productCollectionId),
+  skuIdx: index("product_collection_mappings_sku_idx").on(table.sku),
+}));
+
+export const insertProductCollectionMappingSchema = createInsertSchema(productCollectionMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductCollectionMapping = z.infer<typeof insertProductCollectionMappingSchema>;
+export type ProductCollectionMapping = typeof productCollectionMappings.$inferSelect;
