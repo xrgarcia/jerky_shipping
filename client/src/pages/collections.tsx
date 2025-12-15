@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -77,6 +78,11 @@ interface CollectionProductsResponse {
   collection: ProductCollection;
 }
 
+interface FiltersResponse {
+  categories: string[];
+  suppliers: string[];
+}
+
 export default function Collections() {
   const { toast } = useToast();
   
@@ -88,7 +94,19 @@ export default function Collections() {
   const [formData, setFormData] = useState({ name: "", description: "" });
   
   const [productSearch, setProductSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [kitFilter, setKitFilter] = useState("either");
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(productSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch]);
 
   const { data: collectionsData, isLoading: collectionsLoading, refetch: refetchCollections } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections"],
@@ -99,26 +117,41 @@ export default function Collections() {
     enabled: !!selectedCollectionId,
   });
 
+  // Fetch filter options
+  const { data: filtersData } = useQuery<FiltersResponse>({
+    queryKey: ["/api/product-catalog/filters"],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Check if we have any active filters
+  const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either";
+  const shouldQuery = debouncedSearch.length >= 2 || hasActiveFilters;
+
   const productCatalogQuery = useQuery<ProductCatalogResponse>({
-    queryKey: [`/api/product-catalog?search=${encodeURIComponent(productSearch)}`],
-    enabled: productSearch.length >= 2,
+    queryKey: ["/api/product-catalog", { 
+      search: debouncedSearch, 
+      category: categoryFilter, 
+      supplier: supplierFilter, 
+      isKit: kitFilter 
+    }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (categoryFilter !== "all") params.set("category", categoryFilter);
+      if (supplierFilter !== "all") params.set("supplier", supplierFilter);
+      if (kitFilter !== "either") params.set("isKit", kitFilter);
+      
+      const res = await fetch(`/api/product-catalog?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+    enabled: shouldQuery,
     staleTime: 0,
     gcTime: 0,
   });
   
   const catalogData = productCatalogQuery.data;
-  const catalogLoading = productCatalogQuery.isLoading;
-  
-  console.log('[ProductCatalog] Query state:', {
-    search: productSearch,
-    enabled: productSearch.length >= 2,
-    isLoading: productCatalogQuery.isLoading,
-    isFetching: productCatalogQuery.isFetching,
-    isError: productCatalogQuery.isError,
-    error: productCatalogQuery.error,
-    dataCount: catalogData?.products?.length ?? 0,
-    queryKey: `/api/product-catalog?search=${encodeURIComponent(productSearch)}`,
-  });
+  const catalogLoading = productCatalogQuery.isLoading || productCatalogQuery.isFetching;
 
   const collections = collectionsData?.collections || [];
   const selectedCollection = collections.find(c => c.id === selectedCollectionId);
@@ -503,7 +536,7 @@ export default function Collections() {
               <Separator />
 
               {/* Product Search & Add */}
-              <div className="p-4 flex-1 overflow-hidden flex flex-col">
+              <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0">
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <h3 className="text-sm font-medium">Add Products from Catalog</h3>
                   {selectedSkus.size > 0 && (
@@ -520,10 +553,11 @@ export default function Collections() {
                   )}
                 </div>
                 
+                {/* Search Input */}
                 <div className="relative mb-3">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by SKU or title (min 2 characters)..."
+                    placeholder="Search by SKU, description, category, or supplier..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     className="pl-9"
@@ -531,10 +565,48 @@ export default function Collections() {
                   />
                 </div>
 
-                <ScrollArea className="flex-1">
-                  {productSearch.length < 2 ? (
+                {/* Filter Dropdowns */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-category-filter">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {filtersData?.categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-supplier-filter">
+                      <SelectValue placeholder="Supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Suppliers</SelectItem>
+                      {filtersData?.suppliers.map((sup) => (
+                        <SelectItem key={sup} value={sup}>{sup}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={kitFilter} onValueChange={setKitFilter}>
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-kit-filter">
+                      <SelectValue placeholder="Kit/AP" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="either">Either</SelectItem>
+                      <SelectItem value="yes">Kit/AP Only</SelectItem>
+                      <SelectItem value="no">Non-Kit Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <ScrollArea className="flex-1 min-h-0">
+                  {!shouldQuery ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
-                      Type at least 2 characters to search the product catalog
+                      Type at least 2 characters or select a filter to search
                     </p>
                   ) : catalogLoading ? (
                     <div className="space-y-2">
@@ -544,7 +616,7 @@ export default function Collections() {
                     </div>
                   ) : catalogProducts.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
-                      No products found matching "{productSearch}"
+                      No products found matching your search/filters
                     </p>
                   ) : (
                     <div className="space-y-1">

@@ -9461,36 +9461,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct filter options for product catalog
+  app.get("/api/product-catalog/filters", requireAuth, async (req, res) => {
+    try {
+      const [categories, suppliers] = await Promise.all([
+        reportingSql`
+          SELECT DISTINCT product_category 
+          FROM inventory_forecasts_daily 
+          WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
+            AND product_category IS NOT NULL AND product_category != ''
+          ORDER BY product_category
+        `,
+        reportingSql`
+          SELECT DISTINCT supplier 
+          FROM inventory_forecasts_daily 
+          WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
+            AND supplier IS NOT NULL AND supplier != ''
+          ORDER BY supplier
+        `
+      ]);
+
+      res.json({
+        categories: categories.map((r: any) => r.product_category),
+        suppliers: suppliers.map((r: any) => r.supplier)
+      });
+    } catch (error: any) {
+      console.error("[Product Catalog] Error fetching filters:", error);
+      res.status(500).json({ error: "Failed to fetch filter options" });
+    }
+  });
+
   // Search product catalog from reporting database
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
-      const { search } = req.query;
-      console.log("[Product Catalog] Search request received:", { search });
+      const { search, category, supplier, isKit } = req.query;
       
-      if (!search || String(search).length < 2) {
-        console.log("[Product Catalog] Search too short, returning empty");
+      // Build dynamic conditions
+      const conditions: string[] = [];
+      const searchTerm = search ? `%${String(search)}%` : null;
+      
+      // Text search (optional now)
+      if (searchTerm) {
+        conditions.push("text_match");
+      }
+      
+      // Category filter
+      if (category && category !== "all") {
+        conditions.push("category_match");
+      }
+      
+      // Supplier filter
+      if (supplier && supplier !== "all") {
+        conditions.push("supplier_match");
+      }
+      
+      // Kit filter
+      if (isKit === "yes") {
+        conditions.push("is_kit");
+      } else if (isKit === "no") {
+        conditions.push("not_kit");
+      }
+      
+      // Need at least a search term or one filter
+      if (!searchTerm && conditions.length === 0) {
         return res.json({ products: [], total: 0 });
       }
-
-      const searchTerm = `%${String(search)}%`;
-      console.log("[Product Catalog] Querying reporting DB with term:", searchTerm);
       
+      // Build query with proper parameterization
       const products = await reportingSql`
         SELECT DISTINCT ON (sku) 
           sku, description, supplier, product_category, quantity_available, is_assembled_product
         FROM inventory_forecasts_daily
         WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
-          AND (
+          AND (${searchTerm}::text IS NULL OR (
             sku ILIKE ${searchTerm} 
             OR description ILIKE ${searchTerm}
             OR product_category ILIKE ${searchTerm}
             OR supplier ILIKE ${searchTerm}
+          ))
+          AND (${category === "all" || !category ? null : category}::text IS NULL OR product_category = ${category})
+          AND (${supplier === "all" || !supplier ? null : supplier}::text IS NULL OR supplier = ${supplier})
+          AND (
+            ${isKit !== "yes" && isKit !== "no"}::boolean = true
+            OR (${isKit === "yes"}::boolean = true AND is_assembled_product = true)
+            OR (${isKit === "no"}::boolean = true AND is_assembled_product = false)
           )
         ORDER BY sku
         LIMIT 50
       `;
 
-      console.log("[Product Catalog] Query returned:", products.length, "products");
       res.json({ products, total: products.length });
     } catch (error: any) {
       console.error("[Product Catalog] Error searching products:", error);
