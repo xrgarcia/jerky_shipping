@@ -137,11 +137,33 @@ Tasks:
 - [ ] Define Models schema (footprint → packaging mappings) — deferred to Phase 3
 
 ### Phase 2: Collection Management ⬜
+**Page:** `/collections` | **Sidebar:** "Collections"
+
+**Layout:** Split-panel design
+- Left panel: Collections list (master table CRUD)
+- Right panel: Products in selected collection + product catalog search
+
+**Data Sources:**
+- `inventory_forecasts_daily` (latest stock_check_date) — product catalog
+- `vw_internal_kit_component_inventory_latest` — identify products with components (Kit/AP badge)
+- `product_collections` / `product_collection_mappings` — local DB tables
+
+**UX Features:**
+- Searchable product list with SKU, title, supplier, stock level
+- Multi-select products for bulk assignment to collections
+- "Kit/AP" badge for products that have components
+- Product count per collection in list
+- "Already assigned" indicator when SKU is in other collections
+- Inline "New Collection" creation with modal (name + description)
+- Empty state guidance for new users
+
 Tasks:
-- [ ] UI to view products from catalog
-- [ ] UI to create/edit collections
-- [ ] UI to assign products to collections
-- [ ] Display assigned products per collection
+- [ ] Create /collections page with sidebar entry
+- [ ] Build collections list panel with CRUD (create, edit, delete)
+- [ ] Build products panel with search from inventory_forecasts_daily
+- [ ] Add product-to-collection assignment with multi-select
+- [ ] Show Kit/AP badges from vw_internal_kit_component_inventory_latest
+- [ ] Display product count per collection and "already assigned" indicators
 
 ### Phase 3: Footprint Detection & Learning ⬜
 Tasks:
