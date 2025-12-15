@@ -99,7 +99,7 @@ export default function Collections() {
   });
 
   const { data: catalogData, isLoading: catalogLoading } = useQuery<ProductCatalogResponse>({
-    queryKey: ["/api/product-catalog", { search: productSearch }],
+    queryKey: [`/api/product-catalog?search=${encodeURIComponent(productSearch)}`],
     enabled: productSearch.length >= 2,
   });
 
