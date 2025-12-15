@@ -17,6 +17,19 @@ GIN trigram indexes and other advanced PostgreSQL features are managed via manua
 
 See `/scripts/sql/README.md` for the full process and applied scripts log.
 
+## Database Deployment Process
+
+**How schema changes reach production:**
+
+1. **Development:** Run `npm run db:push` to sync Drizzle schema (`shared/schema.ts`) to the development database
+2. **Publish:** When you publish, Replit automatically applies structural changes (new tables, columns) to the production database
+3. **Manual SQL scripts:** For features Drizzle can't handle (GIN indexes, extensions), run scripts manually via the Database pane after publishing
+
+**Important notes:**
+- Brief downtime may occur during publishing while database changes are applied
+- Non-backward compatible changes (dropping columns with data) require careful planning
+- Always test schema changes in development before publishing
+
 ## Overview
 This application (ship.) is the warehouse fulfillment tool for jerky.com, integrated with Shopify for order management. It aims to enhance order processing and inventory management through real-time synchronization, a user-friendly interface for warehouse staff, streamlined order management, real-time visibility into SkuVault wave picking sessions, efficient historical order backfill, comprehensive reporting, a print queue system for shipping labels, and real-time order status updates. The project seeks to improve operational efficiency and provide a robust platform for e-commerce fulfillment.
 
