@@ -317,6 +317,34 @@ export default function Collections() {
     });
   };
 
+  // Get selectable products (visible products not already in collection)
+  const selectableProducts = useMemo(() => {
+    return catalogProducts.filter(p => !assignedSkusInCollection.has(p.sku));
+  }, [catalogProducts, assignedSkusInCollection]);
+
+  const allVisibleSelected = selectableProducts.length > 0 && 
+    selectableProducts.every(p => selectedSkus.has(p.sku));
+
+  const someVisibleSelected = selectableProducts.some(p => selectedSkus.has(p.sku));
+
+  const handleSelectAll = () => {
+    if (allVisibleSelected) {
+      // Deselect all visible
+      setSelectedSkus(prev => {
+        const next = new Set(prev);
+        selectableProducts.forEach(p => next.delete(p.sku));
+        return next;
+      });
+    } else {
+      // Select all visible
+      setSelectedSkus(prev => {
+        const next = new Set(prev);
+        selectableProducts.forEach(p => next.add(p.sku));
+        return next;
+      });
+    }
+  };
+
   const handleAddSelectedProducts = () => {
     if (!selectedCollectionId || selectedSkus.size === 0) return;
     addProductsMutation.mutate({
@@ -620,6 +648,27 @@ export default function Collections() {
                     </p>
                   ) : (
                     <div className="space-y-1">
+                      {/* Select All Row */}
+                      {selectableProducts.length > 0 && (
+                        <div 
+                          className="flex items-center gap-3 p-2 rounded border bg-muted/30 mb-2 sticky top-0 z-10"
+                          data-testid="select-all-row"
+                        >
+                          <Checkbox
+                            checked={allVisibleSelected}
+                            ref={(el) => {
+                              if (el) {
+                                (el as any).indeterminate = someVisibleSelected && !allVisibleSelected;
+                              }
+                            }}
+                            onCheckedChange={handleSelectAll}
+                            data-testid="checkbox-select-all"
+                          />
+                          <span className="text-sm font-medium">
+                            Select All ({selectableProducts.length} available)
+                          </span>
+                        </div>
+                      )}
                       {catalogProducts.map((product) => {
                         const isInCollection = assignedSkusInCollection.has(product.sku);
                         const isSelected = selectedSkus.has(product.sku);
