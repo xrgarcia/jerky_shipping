@@ -18,7 +18,7 @@ import {
   productCollectionMappings,
   type InsertShipmentQcItem,
 } from '@shared/schema';
-import { eq, and, exists, sql, notExists } from 'drizzle-orm';
+import { eq, and, exists, sql, notExists, inArray } from 'drizzle-orm';
 import { 
   ensureCacheFresh, 
   getProduct, 
@@ -110,7 +110,7 @@ async function buildCollectionCache(skus: string[]): Promise<Map<string, string>
       collectionId: productCollectionMappings.productCollectionId,
     })
     .from(productCollectionMappings)
-    .where(sql`${productCollectionMappings.sku} = ANY(${skus})`);
+    .where(inArray(productCollectionMappings.sku, skus));
   
   const cache = new Map<string, string>();
   for (const r of results as { sku: string; collectionId: string }[]) {

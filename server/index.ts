@@ -232,6 +232,10 @@ async function initializeAfterListen(storage: any) {
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours
     
+    // Start QC item hydrator worker (populates shipment_qc_items for Ready to Fulfill orders)
+    const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
+    startQCHydratorWorker(60000); // Hydrate QC items every 1 minute
+    
     // Start print queue worker (processes label fetching for queued print jobs)
     const { startPrintQueueWorker } = await import("./print-queue-worker");
     startPrintQueueWorker(10000); // Process print queue every 10 seconds
