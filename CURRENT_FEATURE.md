@@ -127,13 +127,14 @@ Hold types (TBD): customer service holds, out-of-stock holds, others TBD
 
 ## Implementation Phases
 
-### Phase 1: Data Model & Core Concepts ⬜
+### Phase 1: Data Model & Core Concepts 🔄
 Tasks:
-- [ ] Define Collections schema (products → collection groupings)
-- [ ] Define Packaging Types schema (discrete box/bag types)
-- [ ] Define Footprints schema (collection combos)
-- [ ] Define Models schema (footprint → packaging mappings)
-- [ ] Connect to reporting DB for product catalog
+- [x] Define product_collections schema (products → collection groupings)
+- [x] Define product_collection_mappings schema (SKU → collection mappings)
+- [x] Connect to reporting DB for product catalog (already done via reportingSql)
+- [ ] Define Packaging Types schema (discrete box/bag types) — deferred to Phase 4
+- [ ] Define Footprints schema (collection combos) — deferred to Phase 3
+- [ ] Define Models schema (footprint → packaging mappings) — deferred to Phase 3
 
 ### Phase 2: Collection Management ⬜
 Tasks:
