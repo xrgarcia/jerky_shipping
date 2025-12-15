@@ -9477,10 +9477,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const products = await reportingSql`
         SELECT DISTINCT ON (sku) 
-          sku, title, supplier, current_stock, is_assembled_product
+          sku, description, supplier, product_category, quantity_available, is_assembled_product
         FROM inventory_forecasts_daily
         WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
-          AND (sku ILIKE ${searchTerm} OR title ILIKE ${searchTerm})
+          AND (
+            sku ILIKE ${searchTerm} 
+            OR description ILIKE ${searchTerm}
+            OR product_category ILIKE ${searchTerm}
+            OR supplier ILIKE ${searchTerm}
+          )
         ORDER BY sku
         LIMIT 50
       `;

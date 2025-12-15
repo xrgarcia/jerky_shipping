@@ -45,9 +45,10 @@ import type { ProductCollection } from "@shared/schema";
 
 interface ProductCatalogItem {
   sku: string;
-  title: string;
+  description: string;
   supplier: string | null;
-  current_stock: number | null;
+  product_category: string | null;
+  quantity_available: number | null;
   is_assembled_product: boolean;
 }
 
@@ -473,9 +474,9 @@ export default function Collections() {
                                   <Badge variant="secondary" className="text-xs">Kit/AP</Badge>
                                 )}
                               </div>
-                              {mapping.product?.title && (
+                              {mapping.product?.description && (
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {mapping.product.title}
+                                  {mapping.product.description}
                                 </p>
                               )}
                             </div>
@@ -583,16 +584,16 @@ export default function Collections() {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground truncate">
-                                {product.title}
+                                {product.description}
                               </p>
                             </div>
                             <div className="text-right shrink-0">
                               {product.supplier && (
                                 <p className="text-xs text-muted-foreground">{product.supplier}</p>
                               )}
-                              {product.current_stock !== null && (
+                              {product.quantity_available !== null && (
                                 <p className="text-xs font-medium">
-                                  Stock: {product.current_stock.toLocaleString()}
+                                  Stock: {product.quantity_available.toLocaleString()}
                                 </p>
                               )}
                             </div>
