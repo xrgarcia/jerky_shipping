@@ -76,6 +76,13 @@ import {
   // Web Packing Sessions
   type WebPackingSession,
   webPackingSessions,
+  // Product Collections (Smart Shipping Engine)
+  type ProductCollection,
+  type InsertProductCollection,
+  productCollections,
+  type ProductCollectionMapping,
+  type InsertProductCollectionMapping,
+  productCollectionMappings,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -3499,6 +3506,106 @@ export class DatabaseStorage implements IStorage {
       .where(eq(webPackingSessions.userId, userId))
       .returning();
     return result.length > 0;
+  }
+  // ============================================================================
+  // PRODUCT COLLECTIONS (Smart Shipping Engine)
+  // ============================================================================
+
+  async getProductCollections(): Promise<(ProductCollection & { productCount: number })[]> {
+    const collections = await db.select().from(productCollections).orderBy(asc(productCollections.name));
+    
+    const countsResult = await db
+      .select({
+        productCollectionId: productCollectionMappings.productCollectionId,
+        count: count(),
+      })
+      .from(productCollectionMappings)
+      .groupBy(productCollectionMappings.productCollectionId);
+    
+    const countsMap = new Map(countsResult.map(r => [r.productCollectionId, Number(r.count)]));
+    
+    return collections.map(c => ({
+      ...c,
+      productCount: countsMap.get(c.id) || 0,
+    }));
+  }
+
+  async getProductCollection(id: string): Promise<ProductCollection | undefined> {
+    const result = await db.select().from(productCollections).where(eq(productCollections.id, id));
+    return result[0];
+  }
+
+  async createProductCollection(collection: InsertProductCollection): Promise<ProductCollection> {
+    const [result] = await db.insert(productCollections).values(collection).returning();
+    return result;
+  }
+
+  async updateProductCollection(id: string, updates: Partial<InsertProductCollection>): Promise<ProductCollection | undefined> {
+    const result = await db
+      .update(productCollections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(productCollections.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProductCollection(id: string): Promise<boolean> {
+    // Delete all mappings first
+    await db.delete(productCollectionMappings).where(eq(productCollectionMappings.productCollectionId, id));
+    // Then delete the collection
+    const result = await db.delete(productCollections).where(eq(productCollections.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getProductCollectionMappings(collectionId: string): Promise<ProductCollectionMapping[]> {
+    return db
+      .select()
+      .from(productCollectionMappings)
+      .where(eq(productCollectionMappings.productCollectionId, collectionId))
+      .orderBy(asc(productCollectionMappings.sku));
+  }
+
+  async addProductsToCollection(collectionId: string, skus: string[], userId: string): Promise<ProductCollectionMapping[]> {
+    if (skus.length === 0) return [];
+    
+    const values = skus.map(sku => ({
+      productCollectionId: collectionId,
+      sku,
+      createdBy: userId,
+      updatedBy: userId,
+    }));
+    
+    const results = await db
+      .insert(productCollectionMappings)
+      .values(values)
+      .onConflictDoNothing()
+      .returning();
+    
+    return results;
+  }
+
+  async removeProductFromCollection(mappingId: string): Promise<boolean> {
+    const result = await db
+      .delete(productCollectionMappings)
+      .where(eq(productCollectionMappings.id, mappingId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getSkuCollectionMappings(skus: string[]): Promise<{ sku: string; collectionId: string; collectionName: string }[]> {
+    if (skus.length === 0) return [];
+    
+    const result = await db
+      .select({
+        sku: productCollectionMappings.sku,
+        collectionId: productCollectionMappings.productCollectionId,
+        collectionName: productCollections.name,
+      })
+      .from(productCollectionMappings)
+      .innerJoin(productCollections, eq(productCollectionMappings.productCollectionId, productCollections.id))
+      .where(inArray(productCollectionMappings.sku, skus));
+    
+    return result;
   }
 }
 

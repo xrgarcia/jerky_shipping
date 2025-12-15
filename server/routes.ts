@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
+import { reportingSql } from "./reporting-db";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull } from "drizzle-orm";
@@ -9337,6 +9338,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Desktop] Error updating config:", error);
       res.status(500).json({ error: error.message || "Failed to update desktop configuration" });
+    }
+  });
+
+  // ========================================
+  // Product Collections API
+  // ========================================
+
+  // Get all collections with product counts
+  app.get("/api/collections", requireAuth, async (req, res) => {
+    try {
+      const collections = await storage.getProductCollections();
+      res.json({ collections });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching collections:", error);
+      res.status(500).json({ error: "Failed to fetch collections" });
+    }
+  });
+
+  // Get a single collection with its products
+  app.get("/api/collections/:id/products", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const collection = await storage.getProductCollection(id);
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      const mappings = await storage.getProductCollectionMappings(id);
+      res.json({ collection, mappings });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching collection products:", error);
+      res.status(500).json({ error: "Failed to fetch collection products" });
+    }
+  });
+
+  // Create a new collection
+  app.post("/api/collections", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { name, description } = req.body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Collection name is required" });
+      }
+      const collection = await storage.createProductCollection({
+        name: name.trim(),
+        description: description?.trim() || null,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+      res.status(201).json(collection);
+    } catch (error: any) {
+      console.error("[Collections] Error creating collection:", error);
+      res.status(500).json({ error: "Failed to create collection" });
+    }
+  });
+
+  // Update a collection
+  app.patch("/api/collections/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      const { name, description } = req.body;
+      const collection = await storage.updateProductCollection(id, {
+        name: name?.trim(),
+        description: description?.trim(),
+        updatedBy: userId,
+      });
+      if (!collection) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      res.json(collection);
+    } catch (error: any) {
+      console.error("[Collections] Error updating collection:", error);
+      res.status(500).json({ error: "Failed to update collection" });
+    }
+  });
+
+  // Delete a collection
+  app.delete("/api/collections/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteProductCollection(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Collections] Error deleting collection:", error);
+      res.status(500).json({ error: "Failed to delete collection" });
+    }
+  });
+
+  // Add products to a collection
+  app.post("/api/collections/:id/products", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      const { skus } = req.body;
+      if (!Array.isArray(skus) || skus.length === 0) {
+        return res.status(400).json({ error: "SKUs array is required" });
+      }
+      const mappings = await storage.addProductsToCollection(id, skus, userId);
+      res.status(201).json({ mappings, added: mappings.length });
+    } catch (error: any) {
+      console.error("[Collections] Error adding products to collection:", error);
+      res.status(500).json({ error: "Failed to add products to collection" });
+    }
+  });
+
+  // Remove a product from a collection
+  app.delete("/api/collections/:collectionId/products/:mappingId", requireAuth, async (req, res) => {
+    try {
+      const { mappingId } = req.params;
+      const deleted = await storage.removeProductFromCollection(mappingId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Mapping not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Collections] Error removing product from collection:", error);
+      res.status(500).json({ error: "Failed to remove product from collection" });
+    }
+  });
+
+  // Search product catalog from reporting database
+  app.get("/api/product-catalog", requireAuth, async (req, res) => {
+    try {
+      const { search } = req.query;
+      if (!search || String(search).length < 2) {
+        return res.json({ products: [], total: 0 });
+      }
+
+      const searchTerm = `%${String(search)}%`;
+      const products = await reportingSql`
+        SELECT DISTINCT ON (sku) 
+          sku, title, supplier, current_stock, is_assembled_product
+        FROM inventory_forecasts_daily
+        WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
+          AND (sku ILIKE ${searchTerm} OR title ILIKE ${searchTerm})
+        ORDER BY sku
+        LIMIT 50
+      `;
+
+      res.json({ products, total: products.length });
+    } catch (error: any) {
+      console.error("[Product Catalog] Error searching products:", error);
+      res.status(500).json({ error: "Failed to search product catalog" });
     }
   });
 

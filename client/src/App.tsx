@@ -32,6 +32,7 @@ import CustomerService from "@/pages/customer-service";
 import Downloads from "@/pages/downloads";
 import Stations from "@/pages/stations";
 import DesktopConfig from "@/pages/desktop-config";
+import Collections from "@/pages/collections";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -105,6 +106,7 @@ function AppContent() {
       <Route path="/downloads" component={Downloads} />
       <Route path="/stations" component={Stations} />
       <Route path="/desktop-config" component={DesktopConfig} />
+      <Route path="/collections" component={Collections} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
