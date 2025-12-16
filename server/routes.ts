@@ -9539,12 +9539,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
 
   // Get uncategorized products with shipment counts
+  // Uses product_collection_mappings as the source of truth for categorization
   app.get("/api/packing-decisions/uncategorized", requireAuth, async (req, res) => {
     try {
-      const { shipmentQcItems, productCollectionMappings, productCollections, shipments: shipmentsTable } = await import("@shared/schema");
+      const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable } = await import("@shared/schema");
       
-      // Get products from QC items that have no collection assigned
+      // Get products from QC items that have NO mapping in product_collection_mappings
       // AND count how many "pending_categorization" shipments they appear in
+      // LEFT JOIN to mappings table and filter where mapping doesn't exist
       const uncategorizedProducts = await db
         .select({
           sku: shipmentQcItems.sku,
@@ -9553,23 +9555,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(shipmentQcItems)
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
+        .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku))
         .where(
           and(
-            sql`${shipmentQcItems.collectionId} IS NULL`,
+            // SKU has no mapping in product_collection_mappings
+            sql`${productCollectionMappings.id} IS NULL`,
             eq(shipmentsTable.footprintStatus, 'pending_categorization')
           )
         )
         .groupBy(shipmentQcItems.sku, shipmentQcItems.description)
         .orderBy(desc(sql`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`));
       
-      // Get coverage stats
+      // Get coverage stats using mappings table as source of truth
+      // Total unique SKUs in QC items vs those that have mappings
       const [coverageStats] = await db
         .select({
           totalProducts: sql<number>`COUNT(DISTINCT ${shipmentQcItems.sku})`,
-          categorizedProducts: sql<number>`COUNT(DISTINCT CASE WHEN ${shipmentQcItems.collectionId} IS NOT NULL THEN ${shipmentQcItems.sku} END)`,
+          categorizedProducts: sql<number>`COUNT(DISTINCT CASE WHEN ${productCollectionMappings.id} IS NOT NULL THEN ${shipmentQcItems.sku} END)`,
           totalShipments: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`,
         })
-        .from(shipmentQcItems);
+        .from(shipmentQcItems)
+        .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku));
       
       const [footprintStats] = await db
         .select({
@@ -9596,6 +9602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quick-assign a product to a collection and recalculate footprints
+  // Uses product_collection_mappings as source of truth - no need to update QC items
   app.post("/api/packing-decisions/assign", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
@@ -9605,27 +9612,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "SKU and collectionId are required" });
       }
       
-      // Add product to collection
+      // Add product to collection (this is the source of truth)
       const mappings = await storage.addProductsToCollection(collectionId, [sku], userId);
       
-      // Find all shipments with pending_categorization that have this SKU
+      // Find all pending_categorization shipments that have this SKU
       const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
       
-      // Update the collection_id for this SKU in all QC items
-      await db
-        .update(shipmentQcItems)
-        .set({ 
-          collectionId: collectionId,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(shipmentQcItems.sku, sku),
-            sql`${shipmentQcItems.collectionId} IS NULL`
-          )
-        );
-      
-      // Find shipments that might now be complete
       const affectedShipments = await db
         .selectDistinct({ shipmentId: shipmentQcItems.shipmentId })
         .from(shipmentQcItems)
@@ -9638,6 +9630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       
       // Recalculate footprints for affected shipments
+      // calculateFootprint now uses product_collection_mappings as source of truth
       const { calculateFootprint } = await import('./services/qc-item-hydrator');
       let footprintsUpdated = 0;
       

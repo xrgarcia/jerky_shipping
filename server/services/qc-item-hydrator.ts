@@ -206,13 +206,14 @@ interface FootprintResult {
 
 /**
  * Calculate and assign footprint for a shipment after QC items are hydrated
+ * Uses product_collection_mappings as the source of truth for collection membership
+ * Exported so it can be called from routes when products are assigned to collections
  */
-async function calculateFootprint(shipmentId: string): Promise<FootprintResult> {
-  // Get all QC items for this shipment
+export async function calculateFootprint(shipmentId: string): Promise<FootprintResult> {
+  // Get all QC items for this shipment (SKU and quantity only)
   const qcItems = await db
     .select({
       sku: shipmentQcItems.sku,
-      collectionId: shipmentQcItems.collectionId,
       quantityExpected: shipmentQcItems.quantityExpected,
     })
     .from(shipmentQcItems)
@@ -222,11 +223,15 @@ async function calculateFootprint(shipmentId: string): Promise<FootprintResult> 
     return { status: 'pending_categorization', uncategorizedSkus: [] };
   }
   
-  // Check for uncategorized SKUs
+  // Get all unique SKUs and look up their collections from mappings table (source of truth)
+  const uniqueSkus = Array.from(new Set(qcItems.map(item => item.sku)));
+  const collectionCache = await buildCollectionCache(uniqueSkus);
+  
+  // Check for uncategorized SKUs (those not in product_collection_mappings)
   const uncategorizedSkus: string[] = [];
-  for (const item of qcItems) {
-    if (!item.collectionId) {
-      uncategorizedSkus.push(item.sku);
+  for (const sku of uniqueSkus) {
+    if (!collectionCache.has(sku)) {
+      uncategorizedSkus.push(sku);
     }
   }
   
@@ -243,11 +248,12 @@ async function calculateFootprint(shipmentId: string): Promise<FootprintResult> 
     };
   }
   
-  // All items have collections - aggregate by collection
+  // All items have collections - aggregate by collection using mappings table
   const collectionQuantities = new Map<string, number>();
   for (const item of qcItems) {
-    const current = collectionQuantities.get(item.collectionId!) || 0;
-    collectionQuantities.set(item.collectionId!, current + item.quantityExpected);
+    const collectionId = collectionCache.get(item.sku)!;
+    const current = collectionQuantities.get(collectionId) || 0;
+    collectionQuantities.set(collectionId, current + item.quantityExpected);
   }
   
   // Generate signature and hash
