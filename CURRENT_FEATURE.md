@@ -210,10 +210,18 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - [x] Seed `packaging_types` from historical `shipment_packages` data (10 types: boxes, poly bags, envelopes)
 
 **Background Job Tasks:**
-- [ ] Build job to populate `shipment_qc_items` for new shipments
-- [ ] Explode kits using reporting DB kit mappings
-- [ ] Map SKUs to collections for footprint calculation
+- [x] Build job to populate `shipment_qc_items` for new shipments
+- [x] Explode kits using reporting DB kit mappings
+- [x] Map SKUs to collections for footprint calculation
 - [ ] Calculate and assign footprint_id to shipments
+
+**Background Job Implementation Notes:**
+- `product-catalog-cache.ts`: Redis caching for product catalog (701 products) and kit mappings (1662 entries)
+- `qc-item-hydrator.ts`: Core explosion logic with kit component lookup and barcode resolution
+- `qc-hydrator-worker.ts`: 60-second interval worker processing 50 shipments/run (~4.4s)
+- Trigger: "Ready to Fulfill" shipments (on_hold status + "MOVE OVER" tag)
+- Cache invalidation: Independent date-based (stock_check_date for products, snapshot_timestamp for kits)
+- Coverage: 96% barcode resolution, 13% collection mapping (expected - feature is new)
 
 **Footprint Calculation Logic:**
 - [ ] Aggregate exploded items by collection
