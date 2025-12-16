@@ -109,6 +109,11 @@ export function AppSidebar() {
       icon: Boxes,
     },
     {
+      title: "Footprints",
+      url: "/footprints",
+      icon: Layers,
+    },
+    {
       title: "Customer Service",
       url: "/customer-service",
       icon: Headset,

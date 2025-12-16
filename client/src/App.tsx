@@ -34,6 +34,7 @@ import Stations from "@/pages/stations";
 import DesktopConfig from "@/pages/desktop-config";
 import Collections from "@/pages/collections";
 import PackingDecisions from "@/pages/packing-decisions";
+import Footprints from "@/pages/footprints";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -109,6 +110,7 @@ function AppContent() {
       <Route path="/desktop-config" component={DesktopConfig} />
       <Route path="/collections" component={Collections} />
       <Route path="/packing-decisions" component={PackingDecisions} />
+      <Route path="/footprints" component={Footprints} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>

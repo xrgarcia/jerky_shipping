@@ -9662,6 +9662,194 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // Footprints API (Smart Shipping Engine)
+  // ========================================
+
+  // Get all footprints with shipment counts and packaging status
+  app.get("/api/footprints", requireAuth, async (req, res) => {
+    try {
+      const { footprints: footprintsTable, footprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
+      
+      // Get all footprints with shipment count and packaging assignment
+      const footprintsWithStats = await db
+        .select({
+          id: footprintsTable.id,
+          signature: footprintsTable.signature,
+          signatureHash: footprintsTable.signatureHash,
+          displayName: footprintsTable.displayName,
+          totalItems: footprintsTable.totalItems,
+          collectionCount: footprintsTable.collectionCount,
+          createdAt: footprintsTable.createdAt,
+          shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('shipment_count'),
+          packagingTypeId: footprintModels.packagingTypeId,
+          packagingTypeName: packagingTypes.name,
+          stationType: packagingTypes.stationType,
+        })
+        .from(footprintsTable)
+        .leftJoin(shipmentsTable, eq(shipmentsTable.footprintId, footprintsTable.id))
+        .leftJoin(footprintModels, eq(footprintModels.footprintId, footprintsTable.id))
+        .leftJoin(packagingTypes, eq(packagingTypes.id, footprintModels.packagingTypeId))
+        .groupBy(
+          footprintsTable.id,
+          footprintsTable.signature,
+          footprintsTable.signatureHash,
+          footprintsTable.displayName,
+          footprintsTable.totalItems,
+          footprintsTable.collectionCount,
+          footprintsTable.createdAt,
+          footprintModels.packagingTypeId,
+          packagingTypes.name,
+          packagingTypes.stationType
+        )
+        .orderBy(desc(sql`COUNT(DISTINCT ${shipmentsTable.id})`));
+      
+      // Parse signatures and build human-readable names with collection names
+      const collectionsMap = new Map<string, string>();
+      const allCollections = await db.select().from(productCollections);
+      allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+      
+      const footprintsWithNames = footprintsWithStats.map(fp => {
+        let humanReadableName = fp.displayName;
+        
+        if (!humanReadableName && fp.signature) {
+          try {
+            const sig = JSON.parse(fp.signature) as Record<string, number>;
+            const parts = Object.entries(sig)
+              .sort((a, b) => b[1] - a[1]) // Sort by quantity desc
+              .map(([collectionId, qty]) => {
+                const collectionName = collectionsMap.get(collectionId) || collectionId;
+                return `${collectionName} (${qty})`;
+              });
+            humanReadableName = parts.join(' + ');
+          } catch {
+            humanReadableName = 'Unknown pattern';
+          }
+        }
+        
+        return {
+          ...fp,
+          humanReadableName: humanReadableName || 'Unknown pattern',
+          hasPackaging: !!fp.packagingTypeId,
+        };
+      });
+      
+      // Get stats
+      const totalFootprints = footprintsWithNames.length;
+      const assignedFootprints = footprintsWithNames.filter(fp => fp.hasPackaging).length;
+      const needsDecision = totalFootprints - assignedFootprints;
+      
+      res.json({
+        footprints: footprintsWithNames,
+        stats: {
+          total: totalFootprints,
+          assigned: assignedFootprints,
+          needsDecision,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Footprints] Error fetching footprints:", error);
+      res.status(500).json({ error: "Failed to fetch footprints" });
+    }
+  });
+
+  // Get all packaging types for dropdown
+  app.get("/api/packaging-types", requireAuth, async (req, res) => {
+    try {
+      const { packagingTypes } = await import("@shared/schema");
+      
+      const types = await db
+        .select()
+        .from(packagingTypes)
+        .where(eq(packagingTypes.isActive, true))
+        .orderBy(packagingTypes.name);
+      
+      res.json({ packagingTypes: types });
+    } catch (error: any) {
+      console.error("[Packaging Types] Error fetching:", error);
+      res.status(500).json({ error: "Failed to fetch packaging types" });
+    }
+  });
+
+  // Assign packaging type to footprint
+  app.post("/api/footprints/:footprintId/assign", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { footprintId } = req.params;
+      const { packagingTypeId, notes } = req.body;
+      
+      if (!packagingTypeId) {
+        return res.status(400).json({ error: "packagingTypeId is required" });
+      }
+      
+      const { footprintModels, footprints: footprintsTable, packagingTypes, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Check if footprint exists
+      const [footprint] = await db.select().from(footprintsTable).where(eq(footprintsTable.id, footprintId));
+      if (!footprint) {
+        return res.status(404).json({ error: "Footprint not found" });
+      }
+      
+      // Check if packaging type exists
+      const [packagingType] = await db.select().from(packagingTypes).where(eq(packagingTypes.id, packagingTypeId));
+      if (!packagingType) {
+        return res.status(404).json({ error: "Packaging type not found" });
+      }
+      
+      // Upsert the footprint model (one model per footprint)
+      const existingModel = await db.select().from(footprintModels).where(eq(footprintModels.footprintId, footprintId));
+      
+      let model;
+      if (existingModel.length > 0) {
+        // Update existing
+        [model] = await db
+          .update(footprintModels)
+          .set({
+            packagingTypeId,
+            notes: notes || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(footprintModels.footprintId, footprintId))
+          .returning();
+      } else {
+        // Create new
+        [model] = await db
+          .insert(footprintModels)
+          .values({
+            footprintId,
+            packagingTypeId,
+            createdBy: userId,
+            notes: notes || null,
+            confidence: 'manual',
+          })
+          .returning();
+      }
+      
+      // Update all shipments with this footprint to have the packaging type
+      const updatedShipments = await db
+        .update(shipmentsTable)
+        .set({
+          packagingTypeId,
+          packagingDecisionType: 'auto',
+          updatedAt: new Date(),
+        })
+        .where(eq(shipmentsTable.footprintId, footprintId))
+        .returning({ id: shipmentsTable.id });
+      
+      console.log(`[Footprints] Assigned packaging ${packagingType.name} to footprint ${footprintId}, updated ${updatedShipments.length} shipments`);
+      
+      res.json({
+        success: true,
+        model,
+        shipmentsUpdated: updatedShipments.length,
+        packagingTypeName: packagingType.name,
+      });
+    } catch (error: any) {
+      console.error("[Footprints] Error assigning packaging:", error);
+      res.status(500).json({ error: "Failed to assign packaging to footprint" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
