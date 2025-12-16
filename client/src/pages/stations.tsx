@@ -26,6 +26,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Plus, 
   MapPin, 
@@ -35,7 +42,10 @@ import {
   Monitor,
   Wifi,
   WifiOff,
-  Printer
+  Printer,
+  Box,
+  Package,
+  Hand,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Station } from "@shared/schema";
@@ -98,7 +108,7 @@ export default function Stations() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedStation, setSelectedStation] = useState<StationWithSession | null>(null);
-  const [formData, setFormData] = useState({ name: "", locationHint: "", isActive: true });
+  const [formData, setFormData] = useState({ name: "", locationHint: "", stationType: "", isActive: true });
 
   const { data, isLoading, refetch, isRefetching } = useQuery<StationsResponse>({
     queryKey: ["/api/stations"],
@@ -188,7 +198,7 @@ export default function Stations() {
       toast({ title: "Station created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
       setShowCreateDialog(false);
-      setFormData({ name: "", locationHint: "", isActive: true });
+      setFormData({ name: "", locationHint: "", stationType: "", isActive: true });
     },
     onError: (error: Error) => {
       toast({
@@ -246,6 +256,7 @@ export default function Stations() {
     createMutation.mutate({
       name: formData.name.trim(),
       locationHint: formData.locationHint.trim() || undefined,
+      stationType: formData.stationType || undefined,
     });
   };
 
@@ -257,6 +268,7 @@ export default function Stations() {
       data: {
         name: formData.name.trim(),
         locationHint: formData.locationHint.trim() || undefined,
+        stationType: formData.stationType || undefined,
         isActive: formData.isActive,
       },
     });
@@ -272,6 +284,7 @@ export default function Stations() {
     setFormData({
       name: station.name,
       locationHint: station.locationHint || "",
+      stationType: station.stationType || "",
       isActive: station.isActive,
     });
     setShowEditDialog(true);
@@ -313,7 +326,7 @@ export default function Stations() {
           </Button>
           <Button
             onClick={() => {
-              setFormData({ name: "", locationHint: "", isActive: true });
+              setFormData({ name: "", locationHint: "", stationType: "", isActive: true });
               setShowCreateDialog(true);
             }}
             className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
@@ -386,7 +399,7 @@ export default function Stations() {
             </p>
             <Button
               onClick={() => {
-                setFormData({ name: "", locationHint: "", isActive: true });
+                setFormData({ name: "", locationHint: "", stationType: "", isActive: true });
                 setShowCreateDialog(true);
               }}
               className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
@@ -419,6 +432,23 @@ export default function Stations() {
                         <MapPin className="h-4 w-4 flex-shrink-0" />
                         <span data-testid={`text-station-location-${station.id}`}>{station.locationHint}</span>
                       </div>
+                    )}
+                    {station.stationType && (
+                      <Badge 
+                        variant="secondary" 
+                        className={`mt-1.5 ${
+                          station.stationType === 'boxing_machine' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                          station.stationType === 'poly_bag' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                        }`}
+                        data-testid={`badge-station-type-${station.id}`}
+                      >
+                        {station.stationType === 'boxing_machine' && <Box className="h-3 w-3 mr-1" />}
+                        {station.stationType === 'poly_bag' && <Package className="h-3 w-3 mr-1" />}
+                        {station.stationType === 'hand_pack' && <Hand className="h-3 w-3 mr-1" />}
+                        {station.stationType === 'boxing_machine' ? 'Boxing Machine' :
+                         station.stationType === 'poly_bag' ? 'Poly Bag' : 'Hand Pack'}
+                      </Badge>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
@@ -590,6 +620,42 @@ export default function Stations() {
                   Optional description to help identify the physical location
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-station-type" className="text-sm font-medium">
+                  Station Type
+                </Label>
+                <Select
+                  value={formData.stationType}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, stationType: value }))}
+                >
+                  <SelectTrigger className="h-11" data-testid="select-station-type">
+                    <SelectValue placeholder="Select station type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boxing_machine">
+                      <div className="flex items-center gap-2">
+                        <Box className="h-4 w-4" />
+                        Boxing Machine
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="poly_bag">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Poly Bag
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hand_pack">
+                      <div className="flex items-center gap-2">
+                        <Hand className="h-4 w-4" />
+                        Hand Pack
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  What type of packing work happens at this station
+                </p>
+              </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button 
@@ -648,6 +714,39 @@ export default function Stations() {
                   className="h-11"
                   data-testid="input-edit-station-location"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-station-type" className="text-sm font-medium">
+                  Station Type
+                </Label>
+                <Select
+                  value={formData.stationType}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, stationType: value }))}
+                >
+                  <SelectTrigger className="h-11" data-testid="select-edit-station-type">
+                    <SelectValue placeholder="Select station type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boxing_machine">
+                      <div className="flex items-center gap-2">
+                        <Box className="h-4 w-4" />
+                        Boxing Machine
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="poly_bag">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Poly Bag
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hand_pack">
+                      <div className="flex items-center gap-2">
+                        <Hand className="h-4 w-4" />
+                        Hand Pack
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-0.5">
