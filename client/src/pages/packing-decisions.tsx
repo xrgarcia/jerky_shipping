@@ -205,7 +205,7 @@ export default function PackingDecisions() {
             Packing Decisions
           </h1>
           <p className="text-muted-foreground">
-            Categorize products to enable automatic packaging decisions
+            Categorize ordered items to enable automatic packaging decisions
           </p>
         </div>
         <Button
