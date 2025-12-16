@@ -280,6 +280,7 @@ export const shipments = pgTable("shipments", {
   footprintId: varchar("footprint_id"), // FK to footprints table - calculated collection composition
   packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
+  footprintStatus: text("footprint_status"), // 'complete' (footprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -328,6 +329,7 @@ export const shipments = pgTable("shipments", {
   footprintIdIdx: index("shipments_footprint_id_idx").on(table.footprintId).where(sql`${table.footprintId} IS NOT NULL`),
   packagingTypeIdIdx: index("shipments_packaging_type_id_idx").on(table.packagingTypeId).where(sql`${table.packagingTypeId} IS NOT NULL`),
   packagingDecisionTypeIdx: index("shipments_packaging_decision_type_idx").on(table.packagingDecisionType).where(sql`${table.packagingDecisionType} IS NOT NULL`),
+  footprintStatusIdx: index("shipments_footprint_status_idx").on(table.footprintStatus).where(sql`${table.footprintStatus} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
