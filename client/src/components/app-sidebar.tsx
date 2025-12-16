@@ -26,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers } from "lucide-react";
+import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -102,6 +102,11 @@ export function AppSidebar() {
       title: "Collections",
       url: "/collections",
       icon: Layers,
+    },
+    {
+      title: "Packing Decisions",
+      url: "/packing-decisions",
+      icon: Boxes,
     },
     {
       title: "Customer Service",

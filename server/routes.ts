@@ -9534,6 +9534,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // Packing Decisions API (Smart Shipping Engine)
+  // ========================================
+
+  // Get uncategorized products with shipment counts
+  app.get("/api/packing-decisions/uncategorized", requireAuth, async (req, res) => {
+    try {
+      const { shipmentQcItems, productCollectionMappings, productCollections, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Get products from QC items that have no collection assigned
+      // AND count how many "pending_categorization" shipments they appear in
+      const uncategorizedProducts = await db
+        .select({
+          sku: shipmentQcItems.sku,
+          description: shipmentQcItems.description,
+          shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`.as('shipment_count'),
+        })
+        .from(shipmentQcItems)
+        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
+        .where(
+          and(
+            sql`${shipmentQcItems.collectionId} IS NULL`,
+            eq(shipmentsTable.footprintStatus, 'pending_categorization')
+          )
+        )
+        .groupBy(shipmentQcItems.sku, shipmentQcItems.description)
+        .orderBy(desc(sql`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`));
+      
+      // Get coverage stats
+      const [coverageStats] = await db
+        .select({
+          totalProducts: sql<number>`COUNT(DISTINCT ${shipmentQcItems.sku})`,
+          categorizedProducts: sql<number>`COUNT(DISTINCT CASE WHEN ${shipmentQcItems.collectionId} IS NOT NULL THEN ${shipmentQcItems.sku} END)`,
+          totalShipments: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`,
+        })
+        .from(shipmentQcItems);
+      
+      const [footprintStats] = await db
+        .select({
+          complete: sql<number>`COUNT(*) FILTER (WHERE footprint_status = 'complete')`,
+          pending: sql<number>`COUNT(*) FILTER (WHERE footprint_status = 'pending_categorization')`,
+        })
+        .from(shipmentsTable)
+        .where(sql`footprint_status IS NOT NULL`);
+
+      res.json({
+        uncategorizedProducts,
+        stats: {
+          totalProducts: coverageStats?.totalProducts || 0,
+          categorizedProducts: coverageStats?.categorizedProducts || 0,
+          totalShipments: coverageStats?.totalShipments || 0,
+          shipmentsComplete: footprintStats?.complete || 0,
+          shipmentsPending: footprintStats?.pending || 0,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error fetching uncategorized products:", error);
+      res.status(500).json({ error: "Failed to fetch uncategorized products" });
+    }
+  });
+
+  // Quick-assign a product to a collection and recalculate footprints
+  app.post("/api/packing-decisions/assign", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { sku, collectionId } = req.body;
+      
+      if (!sku || !collectionId) {
+        return res.status(400).json({ error: "SKU and collectionId are required" });
+      }
+      
+      // Add product to collection
+      const mappings = await storage.addProductsToCollection(collectionId, [sku], userId);
+      
+      // Find all shipments with pending_categorization that have this SKU
+      const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Update the collection_id for this SKU in all QC items
+      await db
+        .update(shipmentQcItems)
+        .set({ 
+          collectionId: collectionId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(shipmentQcItems.sku, sku),
+            sql`${shipmentQcItems.collectionId} IS NULL`
+          )
+        );
+      
+      // Find shipments that might now be complete
+      const affectedShipments = await db
+        .selectDistinct({ shipmentId: shipmentQcItems.shipmentId })
+        .from(shipmentQcItems)
+        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
+        .where(
+          and(
+            eq(shipmentQcItems.sku, sku),
+            eq(shipmentsTable.footprintStatus, 'pending_categorization')
+          )
+        );
+      
+      // Recalculate footprints for affected shipments
+      const { calculateFootprint } = await import('./services/qc-item-hydrator');
+      let footprintsUpdated = 0;
+      
+      for (const { shipmentId } of affectedShipments) {
+        try {
+          const result = await calculateFootprint(shipmentId);
+          if (result.status === 'complete') {
+            footprintsUpdated++;
+          }
+        } catch (err) {
+          console.error(`[Packing Decisions] Error recalculating footprint for ${shipmentId}:`, err);
+        }
+      }
+      
+      console.log(`[Packing Decisions] Assigned ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${footprintsUpdated} now complete`);
+      
+      res.json({
+        success: true,
+        mapping: mappings[0],
+        shipmentsAffected: affectedShipments.length,
+        footprintsCompleted: footprintsUpdated,
+      });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error assigning product:", error);
+      res.status(500).json({ error: "Failed to assign product to collection" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
