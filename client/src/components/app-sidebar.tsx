@@ -205,7 +205,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.slice(0, 8).map((item) => (
+              {menuItems.slice(0, 9).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
@@ -260,8 +260,8 @@ export function AppSidebar() {
                 </CollapsibleContent>
               </Collapsible>
               
-              {/* Downloads */}
-              {menuItems.slice(8).map((item) => (
+              {/* Remaining items after Reports */}
+              {menuItems.slice(9).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
