@@ -834,12 +834,14 @@ export const stations = pgTable("stations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(), // e.g., "Station 1", "Packing Area A"
   locationHint: text("location_hint"), // e.g., "Near shipping dock", "Second floor"
+  stationType: text("station_type"), // 'boxing_machine', 'poly_bag', 'hand_pack' - matches packaging_types.station_type
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   nameIdx: index("stations_name_idx").on(table.name),
   isActiveIdx: index("stations_is_active_idx").on(table.isActive),
+  stationTypeIdx: index("stations_station_type_idx").on(table.stationType),
 }));
 
 export const insertStationSchema = createInsertSchema(stations).omit({
