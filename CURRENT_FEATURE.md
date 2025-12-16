@@ -213,7 +213,7 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - [x] Build job to populate `shipment_qc_items` for new shipments
 - [x] Explode kits using reporting DB kit mappings
 - [x] Map SKUs to collections for footprint calculation
-- [ ] Calculate and assign footprint_id to shipments
+- [x] Calculate and assign footprint_id to shipments (via `calculateFootprint` in qc-item-hydrator.ts)
 
 **Background Job Implementation Notes:**
 - `product-catalog-cache.ts`: Redis caching for product catalog (701 products) and kit mappings (1662 entries)
@@ -221,44 +221,77 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - `qc-hydrator-worker.ts`: 60-second interval worker processing 50 shipments/run (~4.4s)
 - Trigger: "Ready to Fulfill" shipments (on_hold status + "MOVE OVER" tag)
 - Cache invalidation: Independent date-based (stock_check_date for products, snapshot_timestamp for kits)
-- Coverage: 96% barcode resolution, 13% collection mapping (expected - feature is new)
+- Coverage: 96% barcode resolution, ~45% collection mapping (ongoing - managers categorizing products)
 
 **Footprint Calculation Logic:**
-- [ ] Aggregate exploded items by collection
-- [ ] Generate canonical footprint signature (e.g., `{"GiftBox": 2, "SmallJerky": 5}`)
-- [ ] Match against existing footprints or create new
+- [x] Aggregate exploded items by collection (uses `product_collection_mappings` as source of truth)
+- [x] Generate canonical footprint signature (SHA256 hash of sorted collection composition JSON)
+- [x] Match against existing footprints or create new
+- [x] Mark shipment footprint_status: 'complete' or 'pending_categorization'
 
-**Learning UI Tasks:**
-- [ ] Morning decision page showing orders needing packaging
-- [ ] Auto-apply known footprint models
-- [ ] Prompt for unknown footprints → save as new model
-- [ ] Track decision type: 'auto' vs 'manual'
+**Architecture Decision:** `product_collection_mappings` is the single source of truth for SKU → collection. Footprint calculation performs query-time lookups rather than relying on denormalized `collection_id` in `shipment_qc_items`.
 
-**QC Integration:**
-- [ ] Update `quantity_scanned` during packing
-- [ ] Mark `qc_complete` when all items scanned
-- [ ] Push to SkuVault via passQCitem endpoint
-- [ ] Track `synced_to_skuvault` status
+### Phase 4: Packing Decisions UI ✅
 
-### Phase 4: Station Routing & Session Building ⬜
+**Page:** `/packing-decisions` | **Sidebar:** "Packing Decisions" (AlertTriangle icon)
+
+**Goal:** Give managers visibility into uncategorized SKUs blocking footprint completion, and enable quick assignment to collections.
+
+**Metrics Cards:**
+- **SKUs in Orders** — X of Y categorized (with "Since [oldest order date]" subtitle in US Central time)
+- **Shipments Complete** — X of Y with footprints calculated
+- **Needs Categorization** — X SKUs blocking Y shipments
+
+**Features:**
+- [x] List uncategorized SKUs with shipment count (prioritized by most blocking)
+- [x] Quick-assign dropdown to existing collections
+- [x] "Create new collection" option inline
+- [x] Auto-recalculate footprints when SKUs are assigned
+- [x] React Query cache invalidation: Collections page updates → Packing Decisions refreshes
+- [x] Clear terminology: "SKUs in orders" vs "products" (ordered items vs catalog)
+
+**API Endpoints:**
+- `GET /api/packing-decisions/uncategorized` — Stats + uncategorized SKU list
+- `POST /api/packing-decisions/assign` — Assign SKU to collection, recalculate affected footprints
+
+### Phase 5: Learned Footprints UI ⬜
+
+**Page:** `/footprints` (proposed) | **Sidebar:** "Footprints" or "Learned Patterns"
+
+**Goal:** Show managers what footprint patterns the system has learned, and allow them to assign packaging rules.
+
+**Planned Features:**
+- [ ] List unique footprints with collection composition
+- [ ] Show shipment count per footprint
+- [ ] Assign packaging type to each footprint
+- [ ] Mark footprints as "needs review" vs "auto-routable"
+
+### Phase 6: Station Routing & Session Building ⬜
 Tasks:
-- [ ] Route orders to correct station based on packaging
+- [ ] Route orders to correct station based on packaging type
 - [ ] Validate no mixed stations in single session (all poly or all boxes, etc.)
 - [ ] Group orders into optimized 28-order sessions within station lanes
 - [ ] Optimize for: total time + material handling
 
-### Phase 5: Carrier Rate Integration ⬜
+### Phase 7: Carrier Rate Integration ⬜
 Tasks:
 - [ ] Pull carrier/service rates from ShipStation
 - [ ] Auto-select lowest-cost service meeting delivery promise
 - [ ] Store selected rate with order
 
-### Phase 6: Session Management UI ⬜
+### Phase 8: Session Management UI ⬜
 Tasks:
 - [ ] Display ready-to-session orders
 - [ ] Trigger session building
 - [ ] Show session composition (station, packaging types, order count)
 - [ ] Send confirmed sessions to SkuVault
+
+### QC Integration (Parallel Track) 🔄
+These tasks integrate with existing boxing/bagging pages:
+- [x] Update `quantity_scanned` during packing (existing boxing/bagging pages)
+- [x] Mark `qc_complete` when all items scanned
+- [x] Push to SkuVault via passQCitem endpoint
+- [x] Track `synced_to_skuvault` status
 
 ---
 
