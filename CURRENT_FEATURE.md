@@ -268,18 +268,37 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - [x] Station type badges (Boxing Machine / Poly Bag / Hand Pack)
 - [x] Inline success/error feedback (non-intrusive, no toasts blocking UI)
 - [x] Stats cards: Total Patterns, Packaging Assigned (% auto-routable), Needs Decision
+- [x] Filter toggle: All / Needs Mapping / Mapped (client-side filtering)
+- [x] Manage Packaging Types collapsible section (create/edit packaging types with station type assignment)
 
 **API Endpoints:**
 - `GET /api/footprints` — All footprints with shipment counts, packaging status, human-readable names
 - `GET /api/packaging-types` — Active packaging types for dropdown
 - `POST /api/footprints/:footprintId/assign` — Assign packaging type to footprint, update all linked shipments
+- `POST /api/packaging-types` — Create new packaging type with name and station type
+- `PATCH /api/packaging-types/:id` — Update packaging type (name, station type)
 
-### Phase 6: Station Routing & Session Building ⬜
-Tasks:
-- [ ] Route orders to correct station based on packaging type
-- [ ] Validate no mixed stations in single session (all poly or all boxes, etc.)
+### Phase 6: Station Routing & Session Building 🔄
+
+**Goal:** Route orders to physical packing stations based on packaging decisions, then group into optimized sessions.
+
+**Infrastructure (Completed):**
+- [x] Add `stationType` field to `packaging_types` table (boxing_machine | poly_bag | hand_pack)
+- [x] Add `stationType` field to `stations` table for physical station classification
+- [x] Stations page: Station type selector dropdown with color-coded badges
+- [x] Footprints page: Station type badges display on packaging types
+- [x] Full routing chain established: Footprint → Packaging Type → Station Type → Physical Station
+
+**Routing Logic (TODO):**
+- [ ] Auto-assign `qc_station_id` on shipments when packaging type is assigned
+- [ ] Station selection algorithm: Pick station of matching type with lowest current queue
+- [ ] Handle edge cases: No available station of type, station offline, etc.
+
+**Session Building (TODO):**
+- [ ] Validate no mixed station types in single SkuVault session
 - [ ] Group orders into optimized 28-order sessions within station lanes
 - [ ] Optimize for: total time + material handling
+- [ ] Session creation UI or automatic triggering
 
 ### Phase 7: Carrier Rate Integration ⬜
 Tasks:
