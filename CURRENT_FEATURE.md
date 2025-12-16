@@ -172,7 +172,7 @@ Tasks:
 - [x] Display product count per collection and "In Collection" indicators
 - [x] Increase search limit to 500 products for full catalog visibility
 
-### Phase 3: Footprint Detection & Learning 🔄
+### Phase 3: Footprint Detection & Learning ✅
 
 **Goal:** Automatically determine packaging for orders based on their product collection composition.
 
@@ -254,17 +254,25 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - `GET /api/packing-decisions/uncategorized` — Stats + uncategorized SKU list
 - `POST /api/packing-decisions/assign` — Assign SKU to collection, recalculate affected footprints
 
-### Phase 5: Learned Footprints UI ⬜
+### Phase 5: Learned Footprints UI ✅
 
-**Page:** `/footprints` (proposed) | **Sidebar:** "Footprints" or "Learned Patterns"
+**Page:** `/footprints` | **Sidebar:** "Footprints" (below Packing Decisions)
 
 **Goal:** Show managers what footprint patterns the system has learned, and allow them to assign packaging rules.
 
-**Planned Features:**
-- [ ] List unique footprints with collection composition
-- [ ] Show shipment count per footprint
-- [ ] Assign packaging type to each footprint
-- [ ] Mark footprints as "needs review" vs "auto-routable"
+**Features:**
+- [x] List unique footprints with human-readable collection composition (e.g., "Small Jerky (3) + Gift Box (1)")
+- [x] Show shipment count per footprint (sorted by highest volume first)
+- [x] Assign packaging type via inline dropdown
+- [x] Visual indicators: green checkmark (assigned) vs amber warning (needs decision)
+- [x] Station type badges (Boxing Machine / Poly Bag / Hand Pack)
+- [x] Inline success/error feedback (non-intrusive, no toasts blocking UI)
+- [x] Stats cards: Total Patterns, Packaging Assigned (% auto-routable), Needs Decision
+
+**API Endpoints:**
+- `GET /api/footprints` — All footprints with shipment counts, packaging status, human-readable names
+- `GET /api/packaging-types` — Active packaging types for dropdown
+- `POST /api/footprints/:footprintId/assign` — Assign packaging type to footprint, update all linked shipments
 
 ### Phase 6: Station Routing & Session Building ⬜
 Tasks:
