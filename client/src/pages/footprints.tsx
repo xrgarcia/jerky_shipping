@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import {
   Layers,
   Package,
@@ -20,6 +20,9 @@ import {
   RefreshCw,
   Box,
   Truck,
+  Check,
+  X,
+  Loader2,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -73,8 +76,26 @@ function getStationBadge(stationType: string | null) {
   }
 }
 
+type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
+
 export default function Footprints() {
-  const { toast } = useToast();
+  const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
+
+  useEffect(() => {
+    const timeouts: NodeJS.Timeout[] = [];
+    Object.entries(inlineStatus).forEach(([id, status]) => {
+      if (status.type === 'success' || status.type === 'error') {
+        const timeout = setTimeout(() => {
+          setInlineStatus(prev => {
+            const { [id]: _, ...rest } = prev;
+            return rest;
+          });
+        }, 2500);
+        timeouts.push(timeout);
+      }
+    });
+    return () => timeouts.forEach(clearTimeout);
+  }, [inlineStatus]);
 
   const {
     data,
@@ -96,24 +117,24 @@ export default function Footprints() {
       footprintId: string;
       packagingTypeId: string;
     }) => {
+      setInlineStatus(prev => ({ ...prev, [footprintId]: { type: 'loading' } }));
       const res = await apiRequest("POST", `/api/footprints/${footprintId}/assign`, {
         packagingTypeId,
       });
-      return res.json();
+      return { ...(await res.json()), footprintId };
     },
     onSuccess: (result) => {
-      toast({
-        title: "Packaging assigned",
-        description: `${result.packagingTypeName} assigned to ${result.shipmentsUpdated} shipments`,
-      });
+      setInlineStatus(prev => ({
+        ...prev,
+        [result.footprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
+      }));
       queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Assignment failed",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error, variables) => {
+      setInlineStatus(prev => ({
+        ...prev,
+        [variables.footprintId]: { type: 'error', message: 'Failed' }
+      }));
     },
   });
 
@@ -127,6 +148,30 @@ export default function Footprints() {
 
   const handleAssign = (footprintId: string, packagingTypeId: string) => {
     assignMutation.mutate({ footprintId, packagingTypeId });
+  };
+
+  const getStatusIndicator = (footprintId: string) => {
+    const status = inlineStatus[footprintId];
+    if (!status) return null;
+    
+    switch (status.type) {
+      case 'loading':
+        return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+      case 'success':
+        return (
+          <span className="flex items-center gap-1 text-green-600 text-sm animate-in fade-in">
+            <Check className="h-4 w-4" />
+            {status.message}
+          </span>
+        );
+      case 'error':
+        return (
+          <span className="flex items-center gap-1 text-red-600 text-sm animate-in fade-in">
+            <X className="h-4 w-4" />
+            {status.message}
+          </span>
+        );
+    }
   };
 
   if (isLoading) {
@@ -298,7 +343,8 @@ export default function Footprints() {
                       {footprint.shipmentCount} shipment{footprint.shipmentCount !== 1 ? 's' : ''}
                     </Badge>
 
-                    <div className="flex items-center gap-2 flex-shrink-0 min-w-[220px]">
+                    <div className="flex items-center gap-2 flex-shrink-0 min-w-[280px] justify-end">
+                      {getStatusIndicator(footprint.id)}
                       {footprint.hasPackaging ? (
                         <div className="flex items-center gap-2">
                           <Box className="h-4 w-4 text-muted-foreground" />
@@ -307,7 +353,7 @@ export default function Footprints() {
                           </span>
                           <Select
                             onValueChange={(value) => handleAssign(footprint.id, value)}
-                            disabled={assignMutation.isPending}
+                            disabled={!!inlineStatus[footprint.id]}
                           >
                             <SelectTrigger
                               className="w-[140px]"
@@ -331,7 +377,7 @@ export default function Footprints() {
                       ) : (
                         <Select
                           onValueChange={(value) => handleAssign(footprint.id, value)}
-                          disabled={assignMutation.isPending}
+                          disabled={!!inlineStatus[footprint.id]}
                         >
                           <SelectTrigger
                             className="w-[220px]"
