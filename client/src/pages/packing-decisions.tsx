@@ -98,7 +98,7 @@ export default function PackingDecisions() {
     },
     onSuccess: (result) => {
       toast({
-        title: "Product assigned",
+        title: "SKU assigned",
         description: `${result.footprintsCompleted} of ${result.shipmentsAffected} shipments now have complete footprints`,
       });
       queryClient.invalidateQueries({
@@ -209,7 +209,7 @@ export default function PackingDecisions() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Product Coverage
+              SKUs in Orders
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -222,7 +222,7 @@ export default function PackingDecisions() {
               </span>
               <span className="text-sm text-muted-foreground">
                 ({stats?.categorizedProducts || 0} of {stats?.totalProducts || 0}{" "}
-                products)
+                categorized)
               </span>
             </div>
             <Progress value={coveragePercent} className="mt-2 h-2" />
@@ -255,7 +255,7 @@ export default function PackingDecisions() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Categorization
+              Needs Categorization
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -267,7 +267,7 @@ export default function PackingDecisions() {
                 {uncategorized.length}
               </span>
               <span className="text-sm text-muted-foreground">
-                products blocking {stats?.shipmentsPending || 0} shipments
+                SKUs blocking {stats?.shipmentsPending || 0} shipments
               </span>
             </div>
           </CardContent>
@@ -277,9 +277,9 @@ export default function PackingDecisions() {
       {uncategorized.length === 0 ? (
         <Card className="p-12 text-center">
           <CheckCircle2 className="h-12 w-12 mx-auto text-green-500 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">All products categorized!</h2>
+          <h2 className="text-xl font-semibold mb-2">All SKUs categorized!</h2>
           <p className="text-muted-foreground">
-            All products in your shipments have been assigned to collections.
+            All SKUs in your orders have been assigned to collections.
           </p>
         </Card>
       ) : (
@@ -287,7 +287,7 @@ export default function PackingDecisions() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
-              Uncategorized Products
+              Uncategorized SKUs
             </CardTitle>
           </CardHeader>
           <CardContent>
