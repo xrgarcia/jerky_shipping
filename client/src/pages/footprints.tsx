@@ -99,9 +99,12 @@ function getStationBadge(stationType: string | null) {
 
 type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 
+type FilterOption = 'all' | 'needs_mapping' | 'mapped';
+
 export default function Footprints() {
   const { toast } = useToast();
   const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
+  const [filter, setFilter] = useState<FilterOption>('all');
   const [showPackagingSection, setShowPackagingSection] = useState(false);
   const [showCreatePackagingDialog, setShowCreatePackagingDialog] = useState(false);
   const [editingPackaging, setEditingPackaging] = useState<PackagingType | null>(null);
@@ -203,6 +206,12 @@ export default function Footprints() {
   const footprints = data?.footprints || [];
   const stats = data?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
+
+  const filteredFootprints = footprints.filter((fp) => {
+    if (filter === 'needs_mapping') return !fp.hasPackaging;
+    if (filter === 'mapped') return fp.hasPackaging;
+    return true;
+  });
 
   const assignedPercent = stats
     ? Math.round((stats.assigned / Math.max(stats.total, 1)) * 100)
@@ -357,9 +366,47 @@ export default function Footprints() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <Button
+                  variant={filter === 'all' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setFilter('all')}
+                  data-testid="button-filter-all"
+                >
+                  All ({footprints.length})
+                </Button>
+                <Button
+                  variant={filter === 'needs_mapping' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setFilter('needs_mapping')}
+                  className={filter !== 'needs_mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
+                  data-testid="button-filter-needs-mapping"
+                >
+                  Needs Mapping ({stats?.needsDecision || 0})
+                </Button>
+                <Button
+                  variant={filter === 'mapped' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setFilter('mapped')}
+                  className={filter !== 'mapped' ? 'text-green-600 hover:text-green-700' : ''}
+                  data-testid="button-filter-mapped"
+                >
+                  Mapped ({stats?.assigned || 0})
+                </Button>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Showing {filteredFootprints.length} of {footprints.length}
+              </span>
+            </div>
             <ScrollArea className="h-[500px]">
               <div className="space-y-2">
-                {footprints.map((footprint) => (
+                {filteredFootprints.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No footprints match this filter
+                  </div>
+                ) : null}
+                {filteredFootprints.map((footprint) => (
                   <div
                     key={footprint.id}
                     className={`flex items-center gap-4 p-4 rounded-lg border ${
