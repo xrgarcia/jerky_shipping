@@ -513,3 +513,81 @@ export async function getHydrationStatus(): Promise<{
     cacheStats: getCacheStats(),
   };
 }
+
+/**
+ * Backfill footprints for shipments that have QC items but no footprint
+ * Used for shipments hydrated before footprint calculation was added
+ */
+export async function backfillFootprints(limit: number = 100): Promise<{
+  processed: number;
+  complete: number;
+  pendingCategorization: number;
+  newFootprints: number;
+  errors: string[];
+}> {
+  const result = {
+    processed: 0,
+    complete: 0,
+    pendingCategorization: 0,
+    newFootprints: 0,
+    errors: [] as string[],
+  };
+  
+  try {
+    // Find shipments with QC items but no footprint_status
+    const shipmentsToProcess = await db
+      .select({
+        id: shipments.id,
+        orderNumber: shipments.orderNumber,
+      })
+      .from(shipments)
+      .where(
+        and(
+          // Has QC items
+          exists(
+            db.select({ one: sql`1` })
+              .from(shipmentQcItems)
+              .where(eq(shipmentQcItems.shipmentId, shipments.id))
+          ),
+          // No footprint_status yet
+          sql`${shipments.footprintStatus} IS NULL`
+        )
+      )
+      .limit(limit);
+    
+    if (shipmentsToProcess.length === 0) {
+      log('Backfill: No shipments need footprint calculation');
+      return result;
+    }
+    
+    log(`Backfill: Found ${shipmentsToProcess.length} shipments needing footprint calculation`);
+    
+    for (const shipment of shipmentsToProcess) {
+      try {
+        const footprintResult = await calculateFootprint(shipment.id);
+        result.processed++;
+        
+        if (footprintResult.status === 'complete') {
+          result.complete++;
+          if (footprintResult.isNew) {
+            result.newFootprints++;
+          }
+        } else {
+          result.pendingCategorization++;
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        result.errors.push(`${shipment.orderNumber}: ${errorMsg}`);
+      }
+    }
+    
+    log(`Backfill complete: ${result.processed} processed, ${result.complete} complete (${result.newFootprints} new), ${result.pendingCategorization} pending categorization`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`Backfill failed: ${errorMsg}`);
+    result.errors.push(`Fatal: ${errorMsg}`);
+  }
+  
+  return result;
+}

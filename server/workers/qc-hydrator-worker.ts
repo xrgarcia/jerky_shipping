@@ -7,7 +7,7 @@
  * One-time hydration per shipment - once QC items exist, the shipment is skipped.
  */
 
-import { runHydration, getHydrationStatus } from '../services/qc-item-hydrator';
+import { runHydration, getHydrationStatus, backfillFootprints } from '../services/qc-item-hydrator';
 
 const log = (message: string) => console.log(`[qc-hydrator-worker] ${message}`);
 
@@ -97,8 +97,13 @@ export function startQCHydratorWorker(intervalMs: number = 60000): void {
   log(`Worker started (interval: ${intervalMs}ms = ${intervalMs / 1000} seconds)`);
   workerStats.workerStartedAt = new Date();
   
-  // Run immediately on startup
-  setImmediate(() => workerTick());
+  // Run backfill for shipments missing footprints (one-time on startup)
+  setImmediate(async () => {
+    log('Running footprint backfill on startup...');
+    await backfillFootprints(500); // Process up to 500 shipments
+    // Then run normal hydration tick
+    await workerTick();
+  });
   
   // Then run on interval
   workerInterval = setInterval(() => workerTick(), intervalMs);
