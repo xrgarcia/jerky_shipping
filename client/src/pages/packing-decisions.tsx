@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import {
   Select,
   SelectContent,
@@ -50,6 +52,7 @@ interface PackingDecisionsResponse {
     totalShipments: number;
     shipmentsComplete: number;
     shipmentsPending: number;
+    oldestOrderDate: string | null;
   };
 }
 
@@ -160,6 +163,17 @@ export default function PackingDecisions() {
       )
     : 0;
 
+  const formattedOldestDate = useMemo(() => {
+    if (!stats?.oldestOrderDate) return null;
+    try {
+      const date = new Date(stats.oldestOrderDate);
+      const centralTime = toZonedTime(date, "America/Chicago");
+      return format(centralTime, "MMM d, yyyy");
+    } catch {
+      return null;
+    }
+  }, [stats?.oldestOrderDate]);
+
   const handleAssign = (sku: string, collectionId: string) => {
     assignMutation.mutate({ sku, collectionId });
   };
@@ -211,6 +225,11 @@ export default function PackingDecisions() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               SKUs in Orders
             </CardTitle>
+            {formattedOldestDate && (
+              <CardDescription className="text-xs">
+                Since {formattedOldestDate}
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">

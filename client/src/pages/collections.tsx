@@ -235,6 +235,7 @@ export default function Collections() {
       toast({ title: "Products added to collection" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections", selectedCollectionId, "products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
       setSelectedSkus(new Set());
     },
     onError: (error: Error) => {

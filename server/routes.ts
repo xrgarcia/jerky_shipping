@@ -9573,8 +9573,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalProducts: sql<number>`COUNT(DISTINCT ${shipmentQcItems.sku})`,
           categorizedProducts: sql<number>`COUNT(DISTINCT CASE WHEN ${productCollectionMappings.id} IS NOT NULL THEN ${shipmentQcItems.sku} END)`,
           totalShipments: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`,
+          oldestOrderDate: sql<string>`MIN(${shipmentsTable.orderDate})`,
         })
         .from(shipmentQcItems)
+        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku));
       
       const [footprintStats] = await db
@@ -9593,6 +9595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalShipments: coverageStats?.totalShipments || 0,
           shipmentsComplete: footprintStats?.complete || 0,
           shipmentsPending: footprintStats?.pending || 0,
+          oldestOrderDate: coverageStats?.oldestOrderDate || null,
         }
       });
     } catch (error: any) {
