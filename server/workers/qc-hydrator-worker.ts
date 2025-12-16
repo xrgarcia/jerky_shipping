@@ -23,6 +23,9 @@ let workerStats = {
     shipmentsProcessed: number;
     shipmentsSkipped: number;
     totalItemsCreated: number;
+    footprintsComplete: number;
+    footprintsNew: number;
+    footprintsPendingCategorization: number;
     errors: string[];
   } | null,
   workerStartedAt: new Date(),
@@ -119,6 +122,9 @@ export async function triggerManualHydration(batchSize: number = 50): Promise<{
   shipmentsProcessed: number;
   shipmentsSkipped: number;
   totalItemsCreated: number;
+  footprintsComplete: number;
+  footprintsNew: number;
+  footprintsPendingCategorization: number;
   errors: string[];
 }> {
   log('Manual hydration triggered');
