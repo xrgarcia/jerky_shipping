@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,6 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Layers,
   Package,
@@ -23,8 +38,14 @@ import {
   Check,
   X,
   Loader2,
+  Plus,
+  Settings,
+  ChevronDown,
+  Hand,
+  Pencil,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface FootprintData {
   id: string;
@@ -79,7 +100,15 @@ function getStationBadge(stationType: string | null) {
 type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 
 export default function Footprints() {
+  const { toast } = useToast();
   const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
+  const [showPackagingSection, setShowPackagingSection] = useState(false);
+  const [showCreatePackagingDialog, setShowCreatePackagingDialog] = useState(false);
+  const [editingPackaging, setEditingPackaging] = useState<PackagingType | null>(null);
+  const [packagingForm, setPackagingForm] = useState({
+    name: "",
+    stationType: "",
+  });
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -135,6 +164,39 @@ export default function Footprints() {
         ...prev,
         [variables.footprintId]: { type: 'error', message: 'Failed' }
       }));
+    },
+  });
+
+  const createPackagingMutation = useMutation({
+    mutationFn: async (data: { name: string; stationType: string }) => {
+      const res = await apiRequest("POST", "/api/packaging-types", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Packaging type created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
+      setShowCreatePackagingDialog(false);
+      setPackagingForm({ name: "", stationType: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updatePackagingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; stationType?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/packaging-types/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Packaging type updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+      setEditingPackaging(null);
+      setPackagingForm({ name: "", stationType: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
     },
   });
 
@@ -406,6 +468,218 @@ export default function Footprints() {
           </CardContent>
         </Card>
       )}
+
+      <Collapsible open={showPackagingSection} onOpenChange={setShowPackagingSection}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover-elevate">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  <CardTitle>Manage Packaging Types</CardTitle>
+                </div>
+                <ChevronDown className={`h-5 w-5 transition-transform ${showPackagingSection ? 'rotate-180' : ''}`} />
+              </div>
+              <CardDescription>
+                Define packaging options and their station routing
+              </CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="flex justify-end mb-4">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPackagingForm({ name: "", stationType: "" });
+                    setShowCreatePackagingDialog(true);
+                  }}
+                  data-testid="button-add-packaging"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Packaging Type
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {packagingTypes.map((pt) => (
+                  <div
+                    key={pt.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    data-testid={`row-packaging-${pt.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Box className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{pt.name}</span>
+                      {getStationBadge(pt.stationType)}
+                      {!pt.stationType && (
+                        <Badge variant="outline" className="text-amber-600 border-amber-300">
+                          No station assigned
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingPackaging(pt);
+                        setPackagingForm({
+                          name: pt.name,
+                          stationType: pt.stationType || "",
+                        });
+                      }}
+                      data-testid={`button-edit-packaging-${pt.id}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {packagingTypes.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">
+                    No packaging types defined yet. Add one to get started.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      <Dialog open={showCreatePackagingDialog} onOpenChange={setShowCreatePackagingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Packaging Type</DialogTitle>
+            <DialogDescription>
+              Define a new packaging option and which station type handles it
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="packaging-name">Name</Label>
+              <Input
+                id="packaging-name"
+                placeholder='e.g., "Poly Bag 12x16" or "Box #2"'
+                value={packagingForm.name}
+                onChange={(e) => setPackagingForm(prev => ({ ...prev, name: e.target.value }))}
+                data-testid="input-packaging-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Station Type</Label>
+              <Select
+                value={packagingForm.stationType}
+                onValueChange={(value) => setPackagingForm(prev => ({ ...prev, stationType: value }))}
+              >
+                <SelectTrigger data-testid="select-packaging-station-type">
+                  <SelectValue placeholder="Select station type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="boxing_machine">
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4" />
+                      Boxing Machine
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="poly_bag">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Poly Bag
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="hand_pack">
+                    <div className="flex items-center gap-2">
+                      <Hand className="h-4 w-4" />
+                      Hand Pack
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Orders using this packaging will route to stations of this type
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreatePackagingDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createPackagingMutation.mutate(packagingForm)}
+              disabled={!packagingForm.name.trim() || createPackagingMutation.isPending}
+              data-testid="button-save-packaging"
+            >
+              {createPackagingMutation.isPending ? "Creating..." : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingPackaging} onOpenChange={(open) => !open && setEditingPackaging(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Packaging Type</DialogTitle>
+            <DialogDescription>
+              Update packaging details and station routing
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-packaging-name">Name</Label>
+              <Input
+                id="edit-packaging-name"
+                value={packagingForm.name}
+                onChange={(e) => setPackagingForm(prev => ({ ...prev, name: e.target.value }))}
+                data-testid="input-edit-packaging-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Station Type</Label>
+              <Select
+                value={packagingForm.stationType}
+                onValueChange={(value) => setPackagingForm(prev => ({ ...prev, stationType: value }))}
+              >
+                <SelectTrigger data-testid="select-edit-packaging-station-type">
+                  <SelectValue placeholder="Select station type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="boxing_machine">
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4" />
+                      Boxing Machine
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="poly_bag">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Poly Bag
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="hand_pack">
+                    <div className="flex items-center gap-2">
+                      <Hand className="h-4 w-4" />
+                      Hand Pack
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPackaging(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => editingPackaging && updatePackagingMutation.mutate({
+                id: editingPackaging.id,
+                data: packagingForm,
+              })}
+              disabled={!packagingForm.name.trim() || updatePackagingMutation.isPending}
+              data-testid="button-update-packaging"
+            >
+              {updatePackagingMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

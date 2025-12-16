@@ -9771,6 +9771,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a new packaging type
+  app.post("/api/packaging-types", requireAuth, async (req, res) => {
+    try {
+      const { packagingTypes } = await import("@shared/schema");
+      const { name, stationType, packageCode, dimensionLength, dimensionWidth, dimensionHeight } = req.body;
+
+      if (!name?.trim()) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+
+      const [newType] = await db
+        .insert(packagingTypes)
+        .values({
+          name: name.trim(),
+          stationType: stationType || null,
+          packageCode: packageCode || null,
+          dimensionLength: dimensionLength || null,
+          dimensionWidth: dimensionWidth || null,
+          dimensionHeight: dimensionHeight || null,
+        })
+        .returning();
+
+      console.log(`[Packaging Types] Created: ${newType.name} (${newType.stationType || 'no station type'})`);
+      res.json(newType);
+    } catch (error: any) {
+      console.error("[Packaging Types] Error creating:", error);
+      if (error.code === '23505') {
+        res.status(400).json({ error: "A packaging type with this name already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to create packaging type" });
+      }
+    }
+  });
+
+  // Update a packaging type
+  app.patch("/api/packaging-types/:id", requireAuth, async (req, res) => {
+    try {
+      const { packagingTypes } = await import("@shared/schema");
+      const { id } = req.params;
+      const { name, stationType, packageCode, dimensionLength, dimensionWidth, dimensionHeight, isActive } = req.body;
+
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      if (name !== undefined) updateData.name = name.trim();
+      if (stationType !== undefined) updateData.stationType = stationType || null;
+      if (packageCode !== undefined) updateData.packageCode = packageCode || null;
+      if (dimensionLength !== undefined) updateData.dimensionLength = dimensionLength || null;
+      if (dimensionWidth !== undefined) updateData.dimensionWidth = dimensionWidth || null;
+      if (dimensionHeight !== undefined) updateData.dimensionHeight = dimensionHeight || null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const [updated] = await db
+        .update(packagingTypes)
+        .set(updateData)
+        .where(eq(packagingTypes.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Packaging type not found" });
+      }
+
+      console.log(`[Packaging Types] Updated: ${updated.name} (${updated.stationType || 'no station type'})`);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Packaging Types] Error updating:", error);
+      if (error.code === '23505') {
+        res.status(400).json({ error: "A packaging type with this name already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to update packaging type" });
+      }
+    }
+  });
+
   // Assign packaging type to footprint
   app.post("/api/footprints/:footprintId/assign", requireAuth, async (req, res) => {
     try {
