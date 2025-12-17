@@ -5,6 +5,7 @@ import { eq, and, isNull, inArray, isNotNull } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmentContext, type ShipmentContext } from './services/qcsale-cache-warmer';
+import { updateShipmentLifecycle } from './services/lifecycle-service';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
 
@@ -124,6 +125,7 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     }
 
     // Update shipment with normalized session data (no more jsonb)
+    const normalizedSessionStatus = session.session_status?.toLowerCase() || null;
     await db
       .update(shipments)
       .set({
@@ -132,7 +134,7 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
         waveId: session.session_picklist_id || null,
         saleId: session.sale_id || null,
         firestoreDocumentId: session.document_id,
-        sessionStatus: session.session_status,
+        sessionStatus: normalizedSessionStatus,
         spotNumber: session.spot_number?.toString() ?? null,
         pickedByUserId: session.picked_by_user_id?.toString() ?? null,
         pickedByUserName: session.picked_by_user_name,
@@ -142,6 +144,11 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
         updatedAt: new Date(),
       })
       .where(eq(shipments.id, shipment.id));
+
+    // Update lifecycle phase based on new session status
+    await updateShipmentLifecycle(shipment.id, {
+      shipmentData: { sessionStatus: normalizedSessionStatus }
+    });
 
     // Sync session items to shipment_items table
     if (session.order_items && session.order_items.length > 0) {
@@ -254,6 +261,11 @@ async function detectClosedSessionTransitions(
           updatedAt: new Date(),
         })
         .where(eq(shipments.id, shipment.id));
+
+      // Update lifecycle phase based on new session status
+      await updateShipmentLifecycle(shipment.id, {
+        shipmentData: { sessionStatus: 'closed' }
+      });
 
       // Trigger cache warming (only if we have a valid order number)
       if (orderNumber) {
