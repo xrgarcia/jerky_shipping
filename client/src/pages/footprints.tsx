@@ -47,6 +47,11 @@ import {
   Tag,
   Play,
   ListPlus,
+  Clock,
+  Users,
+  ArrowRight,
+  Info,
+  Eye,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -132,6 +137,30 @@ interface BuildSessionsResult {
   sessionsCreated: number;
   shipmentsAssigned: number;
   errors: string[];
+  sessions?: Array<{
+    id: string;
+    name: string;
+    stationType: string;
+    orderCount: number;
+  }>;
+}
+
+interface FulfillmentSession {
+  id: string;
+  name: string | null;
+  sequenceNumber: number | null;
+  stationId: string | null;
+  stationType: string;
+  orderCount: number;
+  maxOrders: number;
+  status: 'draft' | 'ready' | 'picking' | 'packing' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  readyAt: string | null;
+  pickingStartedAt: string | null;
+  packingStartedAt: string | null;
+  completedAt: string | null;
+  createdBy: string | null;
 }
 
 function getStationBadge(stationType: string | null) {
@@ -158,7 +187,7 @@ function getStationTypeLabel(stationType: string): string {
 
 type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 type FilterOption = 'all' | 'needs_mapping' | 'mapped';
-type WorkflowTab = 'categorize' | 'packaging' | 'sessions';
+type WorkflowTab = 'categorize' | 'packaging' | 'sessions' | 'live';
 
 export default function Footprints() {
   const { toast } = useToast();
@@ -172,6 +201,7 @@ export default function Footprints() {
     name: "",
     stationType: "",
   });
+  const [lastBuildResult, setLastBuildResult] = useState<BuildSessionsResult | null>(null);
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -224,6 +254,15 @@ export default function Footprints() {
     refetch: refetchSessionPreview,
   } = useQuery<SessionPreviewResponse>({
     queryKey: ["/api/fulfillment-sessions/preview"],
+  });
+
+  // Live sessions (active sessions not yet completed)
+  const {
+    data: liveSessionsData,
+    isLoading: liveSessionsLoading,
+    refetch: refetchLiveSessions,
+  } = useQuery<FulfillmentSession[]>({
+    queryKey: ["/api/fulfillment-sessions"],
   });
 
   // Mutations
@@ -289,12 +328,14 @@ export default function Footprints() {
     },
     onSuccess: (result) => {
       if (result.success) {
+        setLastBuildResult(result);
         toast({
           title: "Sessions Created",
           description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
         });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+        setActiveTab('live');
       } else {
         toast({
           title: "Failed to build sessions",
@@ -352,6 +393,9 @@ export default function Footprints() {
   const collections = collectionsData?.collections || [];
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
+  const liveSessions = (liveSessionsData || []).filter(
+    s => s.status !== 'completed' && s.status !== 'cancelled'
+  );
 
   const filteredFootprints = footprints.filter((fp) => {
     if (filter === 'needs_mapping') return !fp.hasPackaging;
@@ -399,15 +443,17 @@ export default function Footprints() {
     refetchUncategorized();
     refetchFootprints();
     refetchSessionPreview();
+    refetchLiveSessions();
   };
 
-  const isLoading = footprintsLoading || uncategorizedLoading || sessionPreviewLoading;
+  const isLoading = footprintsLoading || uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
 
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
+          <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
@@ -441,7 +487,7 @@ export default function Footprints() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card 
           className={`cursor-pointer transition-all ${activeTab === 'categorize' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
           onClick={() => setActiveTab('categorize')}
@@ -461,7 +507,7 @@ export default function Footprints() {
                 {uncategorizedProducts.length}
               </span>
               <span className="text-sm text-muted-foreground">
-                {uncategorizedProducts.length === 0 ? 'all products categorized' : 'products need categorization'}
+                {uncategorizedProducts.length === 0 ? 'all categorized' : 'need categories'}
               </span>
             </div>
           </CardContent>
@@ -474,7 +520,7 @@ export default function Footprints() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Package className="h-4 w-4" />
-              Step 2: Assign Packaging
+              Step 2: Packaging
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -486,7 +532,7 @@ export default function Footprints() {
                 {stats?.needsDecision || 0}
               </span>
               <span className="text-sm text-muted-foreground">
-                {(stats?.needsDecision || 0) === 0 ? 'all patterns assigned' : 'patterns need packaging'}
+                {(stats?.needsDecision || 0) === 0 ? 'all assigned' : 'need packaging'}
               </span>
             </div>
           </CardContent>
@@ -499,7 +545,7 @@ export default function Footprints() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ListPlus className="h-4 w-4" />
-              Step 3: Build Sessions
+              Step 3: Build
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -511,7 +557,32 @@ export default function Footprints() {
                 {totalSessionableOrders}
               </span>
               <span className="text-sm text-muted-foreground">
-                orders ready for sessioning
+                ready to session
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${activeTab === 'live' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+          onClick={() => setActiveTab('live')}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Live Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`text-2xl font-bold ${liveSessions.length > 0 ? 'text-green-600' : 'text-muted-foreground'}`}
+                data-testid="text-live-sessions-count"
+              >
+                {liveSessions.length}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                active sessions
               </span>
             </div>
           </CardContent>
@@ -520,10 +591,10 @@ export default function Footprints() {
 
       {/* Workflow Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as WorkflowTab)}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="categorize" className="flex items-center gap-2" data-testid="tab-categorize">
             <Tag className="h-4 w-4" />
-            Categorize SKUs
+            Categorize
             {uncategorizedProducts.length > 0 && (
               <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                 {uncategorizedProducts.length}
@@ -532,7 +603,7 @@ export default function Footprints() {
           </TabsTrigger>
           <TabsTrigger value="packaging" className="flex items-center gap-2" data-testid="tab-packaging">
             <Package className="h-4 w-4" />
-            Assign Packaging
+            Packaging
             {(stats?.needsDecision || 0) > 0 && (
               <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                 {stats?.needsDecision}
@@ -541,10 +612,19 @@ export default function Footprints() {
           </TabsTrigger>
           <TabsTrigger value="sessions" className="flex items-center gap-2" data-testid="tab-sessions">
             <ListPlus className="h-4 w-4" />
-            Build Sessions
+            Build
             {totalSessionableOrders > 0 && (
               <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                 {totalSessionableOrders}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="live" className="flex items-center gap-2" data-testid="tab-live">
+            <Eye className="h-4 w-4" />
+            Live
+            {liveSessions.length > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                {liveSessions.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -916,6 +996,24 @@ export default function Footprints() {
               </div>
             </CardHeader>
             <CardContent>
+              {totalSessionableOrders > 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
+                        What does "Build Sessions" do?
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        Clicking Build Sessions will group the orders below into picking carts (max 28 orders each), 
+                        sorted by station type and product similarity. Sessions will appear in the Live tab 
+                        where you can monitor their progress through picking and packing.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {totalSessionableOrders === 0 ? (
                 <div className="text-center py-12">
                   <ListPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -963,6 +1061,152 @@ export default function Footprints() {
                     <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
                       <span>Total Orders</span>
                       <span>{totalSessionableOrders}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Live Sessions Tab */}
+        <TabsContent value="live" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Active Sessions
+                  </CardTitle>
+                  <CardDescription>
+                    Monitor sessions currently being picked or packed
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchLiveSessions()}
+                  data-testid="button-refresh-sessions"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {lastBuildResult && (
+                <div className="mb-6 p-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800 dark:text-green-200">Sessions Created Successfully</span>
+                  </div>
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    Created {lastBuildResult.sessionsCreated} session{lastBuildResult.sessionsCreated !== 1 ? 's' : ''} with {lastBuildResult.shipmentsAssigned} order{lastBuildResult.shipmentsAssigned !== 1 ? 's' : ''}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-green-700 hover:text-green-800"
+                    onClick={() => setLastBuildResult(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+
+              {liveSessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Active Sessions</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Build sessions from the Build tab to see them here
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setActiveTab('sessions')}
+                    data-testid="button-go-to-build"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Go to Build Sessions
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {['boxing_machine', 'poly_bag', 'hand_pack'].map((stationType) => {
+                    const stationSessions = liveSessions.filter(s => s.stationType === stationType);
+                    if (stationSessions.length === 0) return null;
+                    
+                    return (
+                      <div key={stationType} className="space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          {getStationBadge(stationType)}
+                          <span className="text-sm text-muted-foreground">
+                            {stationSessions.length} session{stationSessions.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        
+                        <div className="grid gap-3">
+                          {stationSessions.map((session) => (
+                            <div
+                              key={session.id}
+                              className="p-4 rounded-lg border bg-card"
+                              data-testid={`session-card-${session.id}`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium">
+                                    {session.name || `Session #${session.sequenceNumber || session.id.slice(0, 8)}`}
+                                  </span>
+                                  <Badge 
+                                    variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
+                                    className={
+                                      session.status === 'picking' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                      session.status === 'packing' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                      session.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                      ''
+                                    }
+                                  >
+                                    {session.status === 'ready' ? 'Ready to Pick' : 
+                                     session.status === 'picking' ? 'Picking' : 
+                                     session.status === 'packing' ? 'Packing' :
+                                     session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Package className="h-4 w-4" />
+                                    {session.orderCount} / {session.maxOrders} orders
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  Created {new Date(session.createdAt).toLocaleString()}
+                                </span>
+                                {session.pickingStartedAt && (
+                                  <span>
+                                    Started picking {new Date(session.pickingStartedAt).toLocaleTimeString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  <div className="mt-6 p-4 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Total Active Sessions</span>
+                      <span className="text-xl font-bold">{liveSessions.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
+                      <span>Total Orders in Sessions</span>
+                      <span>{liveSessions.reduce((sum, s) => sum + s.orderCount, 0)}</span>
                     </div>
                   </div>
                 </div>
