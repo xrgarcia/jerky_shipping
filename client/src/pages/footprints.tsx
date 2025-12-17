@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -43,6 +44,9 @@ import {
   ChevronDown,
   Hand,
   Pencil,
+  Tag,
+  Play,
+  ListPlus,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +88,48 @@ interface PackagingTypesResponse {
   packagingTypes: PackagingType[];
 }
 
+interface UncategorizedProduct {
+  sku: string;
+  productTitle: string | null;
+  affectedShipments: number;
+}
+
+interface UncategorizedResponse {
+  uncategorizedProducts: UncategorizedProduct[];
+  stats: {
+    categorizedProducts: number;
+  };
+  pendingShipments: {
+    pending: number;
+  };
+}
+
+interface Collection {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+interface SessionPreview {
+  stationType: string;
+  stationName: string | null;
+  orderCount: number;
+  footprintGroups: { footprintId: string | null; count: number }[];
+}
+
+interface SessionPreviewResponse {
+  success: boolean;
+  preview: SessionPreview[];
+  totalOrders: number;
+}
+
+interface BuildSessionsResult {
+  success: boolean;
+  sessionsCreated: number;
+  shipmentsAssigned: number;
+  errors: string[];
+}
+
 function getStationBadge(stationType: string | null) {
   switch (stationType) {
     case 'boxing_machine':
@@ -97,12 +143,22 @@ function getStationBadge(stationType: string | null) {
   }
 }
 
-type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
+function getStationTypeLabel(stationType: string): string {
+  switch (stationType) {
+    case 'boxing_machine': return 'Boxing Machine';
+    case 'poly_bag': return 'Poly Bag';
+    case 'hand_pack': return 'Hand Pack';
+    default: return stationType;
+  }
+}
 
+type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 type FilterOption = 'all' | 'needs_mapping' | 'mapped';
+type WorkflowTab = 'categorize' | 'packaging' | 'sessions';
 
 export default function Footprints() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<WorkflowTab>('categorize');
   const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
   const [filter, setFilter] = useState<FilterOption>('all');
   const [showPackagingSection, setShowPackagingSection] = useState(false);
@@ -129,18 +185,44 @@ export default function Footprints() {
     return () => timeouts.forEach(clearTimeout);
   }, [inlineStatus]);
 
+  // Footprints data
   const {
-    data,
-    isLoading,
-    refetch,
+    data: footprintsData,
+    isLoading: footprintsLoading,
+    refetch: refetchFootprints,
   } = useQuery<FootprintsResponse>({
     queryKey: ["/api/footprints"],
   });
 
+  // Packaging types
   const { data: packagingTypesData } = useQuery<PackagingTypesResponse>({
     queryKey: ["/api/packaging-types"],
   });
 
+  // Uncategorized products
+  const {
+    data: uncategorizedData,
+    isLoading: uncategorizedLoading,
+    refetch: refetchUncategorized,
+  } = useQuery<UncategorizedResponse>({
+    queryKey: ["/api/packing-decisions/uncategorized"],
+  });
+
+  // Collections for categorization
+  const { data: collectionsData } = useQuery<Collection[]>({
+    queryKey: ["/api/collections"],
+  });
+
+  // Session preview
+  const {
+    data: sessionPreviewData,
+    isLoading: sessionPreviewLoading,
+    refetch: refetchSessionPreview,
+  } = useQuery<SessionPreviewResponse>({
+    queryKey: ["/api/fulfillment-sessions/preview"],
+  });
+
+  // Mutations
   const assignMutation = useMutation({
     mutationFn: async ({
       footprintId,
@@ -161,12 +243,68 @@ export default function Footprints() {
         [result.footprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
     },
     onError: (error: Error, variables) => {
       setInlineStatus(prev => ({
         ...prev,
         [variables.footprintId]: { type: 'error', message: 'Failed' }
       }));
+    },
+  });
+
+  const categorizeMutation = useMutation({
+    mutationFn: async ({ sku, collectionId }: { sku: string; collectionId: string }) => {
+      setInlineStatus(prev => ({ ...prev, [`cat-${sku}`]: { type: 'loading' } }));
+      const res = await apiRequest("POST", "/api/packing-decisions/categorize", {
+        sku,
+        collectionId,
+      });
+      return { ...(await res.json()), sku };
+    },
+    onSuccess: (result) => {
+      setInlineStatus(prev => ({
+        ...prev,
+        [`cat-${result.sku}`]: { type: 'success', message: 'Categorized' }
+      }));
+      queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+    },
+    onError: (error: Error, variables) => {
+      setInlineStatus(prev => ({
+        ...prev,
+        [`cat-${variables.sku}`]: { type: 'error', message: 'Failed' }
+      }));
+    },
+  });
+
+  const buildSessionsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/fulfillment-sessions/build", {});
+      return res.json() as Promise<BuildSessionsResult>;
+    },
+    onSuccess: (result) => {
+      if (result.success) {
+        toast({
+          title: "Sessions Created",
+          description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      } else {
+        toast({
+          title: "Failed to build sessions",
+          description: result.errors.join(", "),
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error building sessions",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -203,9 +341,13 @@ export default function Footprints() {
     },
   });
 
-  const footprints = data?.footprints || [];
-  const stats = data?.stats;
+  const footprints = footprintsData?.footprints || [];
+  const stats = footprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
+  const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
+  const collections = collectionsData || [];
+  const sessionPreview = sessionPreviewData?.preview || [];
+  const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
 
   const filteredFootprints = footprints.filter((fp) => {
     if (filter === 'needs_mapping') return !fp.hasPackaging;
@@ -221,8 +363,12 @@ export default function Footprints() {
     assignMutation.mutate({ footprintId, packagingTypeId });
   };
 
-  const getStatusIndicator = (footprintId: string) => {
-    const status = inlineStatus[footprintId];
+  const handleCategorize = (sku: string, collectionId: string) => {
+    categorizeMutation.mutate({ sku, collectionId });
+  };
+
+  const getStatusIndicator = (id: string) => {
+    const status = inlineStatus[id];
     if (!status) return null;
     
     switch (status.type) {
@@ -245,6 +391,14 @@ export default function Footprints() {
     }
   };
 
+  const handleRefreshAll = () => {
+    refetchUncategorized();
+    refetchFootprints();
+    refetchSessionPreview();
+  };
+
+  const isLoading = footprintsLoading || uncategorizedLoading || sessionPreviewLoading;
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -261,19 +415,20 @@ export default function Footprints() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Learned Footprints
+            Fulfillment Prep
           </h1>
           <p className="text-muted-foreground">
-            Assign packaging rules to order patterns the system has discovered
+            Prepare orders for picking: categorize products, assign packaging, and build sessions
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => refetch()}
+          onClick={handleRefreshAll}
           data-testid="button-refresh"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -281,316 +436,539 @@ export default function Footprints() {
         </Button>
       </div>
 
+      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all ${activeTab === 'categorize' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+          onClick={() => setActiveTab('categorize')}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Patterns
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              Step 1: Categorize
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className="text-2xl font-bold"
-                data-testid="text-total-footprints"
+                className={`text-2xl font-bold ${uncategorizedProducts.length > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                data-testid="text-uncategorized-count"
               >
-                {stats?.total || 0}
+                {uncategorizedProducts.length}
               </span>
               <span className="text-sm text-muted-foreground">
-                unique footprints discovered
+                {uncategorizedProducts.length === 0 ? 'all products categorized' : 'products need categorization'}
               </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all ${activeTab === 'packaging' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+          onClick={() => setActiveTab('packaging')}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Packaging Assigned
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Step 2: Assign Packaging
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className="text-2xl font-bold text-green-600"
-                data-testid="text-assigned-count"
-              >
-                {stats?.assigned || 0}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                ({assignedPercent}%) auto-routable
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Needs Decision
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-2">
-              <span
-                className="text-2xl font-bold text-amber-600"
-                data-testid="text-needs-decision"
+                className={`text-2xl font-bold ${(stats?.needsDecision || 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                data-testid="text-needs-packaging"
               >
                 {stats?.needsDecision || 0}
               </span>
               <span className="text-sm text-muted-foreground">
-                patterns awaiting packaging rule
+                {(stats?.needsDecision || 0) === 0 ? 'all patterns assigned' : 'patterns need packaging'}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${activeTab === 'sessions' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+          onClick={() => setActiveTab('sessions')}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <ListPlus className="h-4 w-4" />
+              Step 3: Build Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`text-2xl font-bold ${totalSessionableOrders > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
+                data-testid="text-sessionable-count"
+              >
+                {totalSessionableOrders}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                orders ready for sessioning
               </span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {footprints.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No footprints yet</h2>
-          <p className="text-muted-foreground">
-            Footprints are discovered when orders are processed. Make sure all SKUs are categorized first.
-          </p>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5" />
-              Order Patterns
-            </CardTitle>
-            <CardDescription>
-              Sorted by shipment count - assign packaging to high-volume patterns first
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                <Button
-                  variant={filter === 'all' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setFilter('all')}
-                  data-testid="button-filter-all"
-                >
-                  All ({footprints.length})
-                </Button>
-                <Button
-                  variant={filter === 'needs_mapping' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setFilter('needs_mapping')}
-                  className={filter !== 'needs_mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
-                  data-testid="button-filter-needs-mapping"
-                >
-                  Needs Mapping ({stats?.needsDecision || 0})
-                </Button>
-                <Button
-                  variant={filter === 'mapped' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setFilter('mapped')}
-                  className={filter !== 'mapped' ? 'text-green-600 hover:text-green-700' : ''}
-                  data-testid="button-filter-mapped"
-                >
-                  Mapped ({stats?.assigned || 0})
-                </Button>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                Showing {filteredFootprints.length} of {footprints.length}
-              </span>
-            </div>
-            <ScrollArea className="h-[500px]">
-              <div className="space-y-2">
-                {filteredFootprints.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No footprints match this filter
-                  </div>
-                ) : null}
-                {filteredFootprints.map((footprint) => (
-                  <div
-                    key={footprint.id}
-                    className={`flex items-center gap-4 p-4 rounded-lg border ${
-                      footprint.hasPackaging
-                        ? "bg-card border-border"
-                        : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
-                    }`}
-                    data-testid={`row-footprint-${footprint.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {footprint.hasPackaging ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                        )}
-                        <span
-                          className="font-medium"
-                          data-testid={`text-footprint-name-${footprint.id}`}
-                        >
-                          {footprint.humanReadableName}
-                        </span>
-                        {footprint.hasPackaging && getStationBadge(footprint.stationType)}
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Package className="h-3 w-3" />
-                          {footprint.totalItems} items
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Layers className="h-3 w-3" />
-                          {footprint.collectionCount} collection{footprint.collectionCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
+      {/* Workflow Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as WorkflowTab)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="categorize" className="flex items-center gap-2" data-testid="tab-categorize">
+            <Tag className="h-4 w-4" />
+            Categorize SKUs
+            {uncategorizedProducts.length > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                {uncategorizedProducts.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="packaging" className="flex items-center gap-2" data-testid="tab-packaging">
+            <Package className="h-4 w-4" />
+            Assign Packaging
+            {(stats?.needsDecision || 0) > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                {stats?.needsDecision}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="flex items-center gap-2" data-testid="tab-sessions">
+            <ListPlus className="h-4 w-4" />
+            Build Sessions
+            {totalSessionableOrders > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {totalSessionableOrders}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-                    <Badge
-                      variant={footprint.hasPackaging ? "secondary" : "default"}
-                      className="flex-shrink-0"
-                      data-testid={`badge-shipments-${footprint.id}`}
-                    >
-                      <Truck className="h-3 w-3 mr-1" />
-                      {footprint.shipmentCount} shipment{footprint.shipmentCount !== 1 ? 's' : ''}
-                    </Badge>
+        {/* Categorize SKUs Tab */}
+        <TabsContent value="categorize" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                Uncategorized Products
+              </CardTitle>
+              <CardDescription>
+                Assign products to collections so footprints can be calculated
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {uncategorizedProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">All Products Categorized</h3>
+                  <p className="text-muted-foreground">
+                    No products need categorization. Footprints can be calculated.
+                  </p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-2">
+                    {uncategorizedProducts.map((product) => (
+                      <div
+                        key={product.sku}
+                        className="flex items-center gap-4 p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                        data-testid={`row-uncategorized-${product.sku}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                            <span className="font-mono text-sm font-medium">{product.sku}</span>
+                          </div>
+                          {product.productTitle && (
+                            <p className="text-sm text-muted-foreground mt-1 truncate">
+                              {product.productTitle}
+                            </p>
+                          )}
+                        </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0 min-w-[280px] justify-end">
-                      {getStatusIndicator(footprint.id)}
-                      {footprint.hasPackaging ? (
-                        <div className="flex items-center gap-2">
-                          <Box className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">
-                            {footprint.packagingTypeName}
-                          </span>
+                        <Badge variant="secondary" className="flex-shrink-0">
+                          <Truck className="h-3 w-3 mr-1" />
+                          {product.affectedShipments} shipment{product.affectedShipments !== 1 ? 's' : ''}
+                        </Badge>
+
+                        <div className="flex items-center gap-2 flex-shrink-0 min-w-[220px] justify-end">
+                          {getStatusIndicator(`cat-${product.sku}`)}
                           <Select
-                            onValueChange={(value) => handleAssign(footprint.id, value)}
-                            disabled={!!inlineStatus[footprint.id]}
+                            onValueChange={(value) => handleCategorize(product.sku, value)}
+                            disabled={!!inlineStatus[`cat-${product.sku}`]}
                           >
                             <SelectTrigger
-                              className="w-[140px]"
-                              data-testid={`select-change-${footprint.id}`}
+                              className="w-[180px]"
+                              data-testid={`select-collection-${product.sku}`}
                             >
-                              <SelectValue placeholder="Change..." />
+                              <SelectValue placeholder="Assign to collection..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {packagingTypes.map((pt) => (
+                              {collections.map((col) => (
                                 <SelectItem
-                                  key={pt.id}
-                                  value={pt.id}
-                                  data-testid={`option-packaging-${pt.id}`}
+                                  key={col.id}
+                                  value={col.id}
+                                  data-testid={`option-collection-${col.id}`}
                                 >
-                                  {pt.name}
+                                  {col.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                      ) : (
-                        <Select
-                          onValueChange={(value) => handleAssign(footprint.id, value)}
-                          disabled={!!inlineStatus[footprint.id]}
-                        >
-                          <SelectTrigger
-                            className="w-[220px]"
-                            data-testid={`select-packaging-${footprint.id}`}
-                          >
-                            <SelectValue placeholder="Assign packaging..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {packagingTypes.map((pt) => (
-                              <SelectItem
-                                key={pt.id}
-                                value={pt.id}
-                                data-testid={`option-packaging-${pt.id}`}
-                              >
-                                {pt.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Collapsible open={showPackagingSection} onOpenChange={setShowPackagingSection}>
-        <Card>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover-elevate">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  <CardTitle>Manage Packaging Types</CardTitle>
-                </div>
-                <ChevronDown className={`h-5 w-5 transition-transform ${showPackagingSection ? 'rotate-180' : ''}`} />
-              </div>
-              <CardDescription>
-                Define packaging options and their station routing
-              </CardDescription>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              <div className="flex justify-end mb-4">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setPackagingForm({ name: "", stationType: "" });
-                    setShowCreatePackagingDialog(true);
-                  }}
-                  data-testid="button-add-packaging"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Packaging Type
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {packagingTypes.map((pt) => (
-                  <div
-                    key={pt.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                    data-testid={`row-packaging-${pt.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Box className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{pt.name}</span>
-                      {getStationBadge(pt.stationType)}
-                      {!pt.stationType && (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300">
-                          No station assigned
-                        </Badge>
-                      )}
-                    </div>
+        {/* Assign Packaging Tab */}
+        <TabsContent value="packaging" className="mt-6 space-y-6">
+          {footprints.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">No footprints yet</h2>
+              <p className="text-muted-foreground">
+                Footprints are discovered when orders are processed. Make sure all SKUs are categorized first.
+              </p>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layers className="h-5 w-5" />
+                  Order Patterns
+                </CardTitle>
+                <CardDescription>
+                  Sorted by shipment count - assign packaging to high-volume patterns first
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
                     <Button
+                      variant={filter === 'all' ? 'secondary' : 'ghost'}
                       size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingPackaging(pt);
-                        setPackagingForm({
-                          name: pt.name,
-                          stationType: pt.stationType || "",
-                        });
-                      }}
-                      data-testid={`button-edit-packaging-${pt.id}`}
+                      onClick={() => setFilter('all')}
+                      data-testid="button-filter-all"
                     >
-                      <Pencil className="h-4 w-4" />
+                      All ({footprints.length})
+                    </Button>
+                    <Button
+                      variant={filter === 'needs_mapping' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setFilter('needs_mapping')}
+                      className={filter !== 'needs_mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
+                      data-testid="button-filter-needs-mapping"
+                    >
+                      Needs Mapping ({stats?.needsDecision || 0})
+                    </Button>
+                    <Button
+                      variant={filter === 'mapped' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setFilter('mapped')}
+                      className={filter !== 'mapped' ? 'text-green-600 hover:text-green-700' : ''}
+                      data-testid="button-filter-mapped"
+                    >
+                      Mapped ({stats?.assigned || 0})
                     </Button>
                   </div>
-                ))}
-                {packagingTypes.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">
-                    No packaging types defined yet. Add one to get started.
-                  </p>
+                  <span className="text-sm text-muted-foreground">
+                    Showing {filteredFootprints.length} of {footprints.length}
+                  </span>
+                </div>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-2">
+                    {filteredFootprints.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No footprints match this filter
+                      </div>
+                    ) : null}
+                    {filteredFootprints.map((footprint) => (
+                      <div
+                        key={footprint.id}
+                        className={`flex items-center gap-4 p-4 rounded-lg border ${
+                          footprint.hasPackaging
+                            ? "bg-card border-border"
+                            : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                        }`}
+                        data-testid={`row-footprint-${footprint.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {footprint.hasPackaging ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                            )}
+                            <span
+                              className="font-medium"
+                              data-testid={`text-footprint-name-${footprint.id}`}
+                            >
+                              {footprint.humanReadableName}
+                            </span>
+                            {footprint.hasPackaging && getStationBadge(footprint.stationType)}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {footprint.totalItems} items
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              {footprint.collectionCount} collection{footprint.collectionCount !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Badge
+                          variant={footprint.hasPackaging ? "secondary" : "default"}
+                          className="flex-shrink-0"
+                          data-testid={`badge-shipments-${footprint.id}`}
+                        >
+                          <Truck className="h-3 w-3 mr-1" />
+                          {footprint.shipmentCount} shipment{footprint.shipmentCount !== 1 ? 's' : ''}
+                        </Badge>
+
+                        <div className="flex items-center gap-2 flex-shrink-0 min-w-[280px] justify-end">
+                          {getStatusIndicator(footprint.id)}
+                          {footprint.hasPackaging ? (
+                            <div className="flex items-center gap-2">
+                              <Box className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">
+                                {footprint.packagingTypeName}
+                              </span>
+                              <Select
+                                onValueChange={(value) => handleAssign(footprint.id, value)}
+                                disabled={!!inlineStatus[footprint.id]}
+                              >
+                                <SelectTrigger
+                                  className="w-[140px]"
+                                  data-testid={`select-change-${footprint.id}`}
+                                >
+                                  <SelectValue placeholder="Change..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {packagingTypes.map((pt) => (
+                                    <SelectItem
+                                      key={pt.id}
+                                      value={pt.id}
+                                      data-testid={`option-packaging-${pt.id}`}
+                                    >
+                                      {pt.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <Select
+                              onValueChange={(value) => handleAssign(footprint.id, value)}
+                              disabled={!!inlineStatus[footprint.id]}
+                            >
+                              <SelectTrigger
+                                className="w-[220px]"
+                                data-testid={`select-packaging-${footprint.id}`}
+                              >
+                                <SelectValue placeholder="Assign packaging..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {packagingTypes.map((pt) => (
+                                  <SelectItem
+                                    key={pt.id}
+                                    value={pt.id}
+                                    data-testid={`option-packaging-${pt.id}`}
+                                  >
+                                    {pt.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Manage Packaging Types */}
+          <Collapsible open={showPackagingSection} onOpenChange={setShowPackagingSection}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover-elevate">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      <CardTitle>Manage Packaging Types</CardTitle>
+                    </div>
+                    <ChevronDown className={`h-5 w-5 transition-transform ${showPackagingSection ? 'rotate-180' : ''}`} />
+                  </div>
+                  <CardDescription>
+                    Define packaging options and their station routing
+                  </CardDescription>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <div className="flex justify-end mb-4">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setPackagingForm({ name: "", stationType: "" });
+                        setShowCreatePackagingDialog(true);
+                      }}
+                      data-testid="button-add-packaging"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Packaging Type
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {packagingTypes.map((pt) => (
+                      <div
+                        key={pt.id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                        data-testid={`row-packaging-${pt.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Box className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{pt.name}</span>
+                          {getStationBadge(pt.stationType)}
+                          {!pt.stationType && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300">
+                              No station assigned
+                            </Badge>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingPackaging(pt);
+                            setPackagingForm({
+                              name: pt.name,
+                              stationType: pt.stationType || "",
+                            });
+                          }}
+                          data-testid={`button-edit-packaging-${pt.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {packagingTypes.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">
+                        No packaging types defined yet. Add one to get started.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        </TabsContent>
+
+        {/* Build Sessions Tab */}
+        <TabsContent value="sessions" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ListPlus className="h-5 w-5" />
+                    Session Preview
+                  </CardTitle>
+                  <CardDescription>
+                    Orders ready to be grouped into picking sessions (max 28 per cart)
+                  </CardDescription>
+                </div>
+                {totalSessionableOrders > 0 && (
+                  <Button
+                    onClick={() => buildSessionsMutation.mutate()}
+                    disabled={buildSessionsMutation.isPending}
+                    data-testid="button-build-sessions"
+                  >
+                    {buildSessionsMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Building...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Build Sessions
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+            </CardHeader>
+            <CardContent>
+              {totalSessionableOrders === 0 ? (
+                <div className="text-center py-12">
+                  <ListPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Orders Ready for Sessions</h3>
+                  <p className="text-muted-foreground">
+                    Orders need packaging assigned and station routing before they can be grouped into sessions.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sessionPreview.map((station) => (
+                    <div
+                      key={station.stationType}
+                      className="p-4 rounded-lg border bg-card"
+                      data-testid={`preview-station-${station.stationType}`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {getStationBadge(station.stationType)}
+                          {station.stationName && (
+                            <span className="text-sm text-muted-foreground">
+                              {station.stationName}
+                            </span>
+                          )}
+                        </div>
+                        <Badge variant="default" className="text-lg px-3 py-1">
+                          {station.orderCount} orders
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {Math.ceil(station.orderCount / 28)} session{Math.ceil(station.orderCount / 28) !== 1 ? 's' : ''} will be created
+                        <span className="mx-2">·</span>
+                        {station.footprintGroups.length} unique footprint{station.footprintGroups.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  ))}
 
+                  <div className="mt-6 p-4 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Total Sessions to Create</span>
+                      <span className="text-xl font-bold">
+                        {sessionPreview.reduce((sum, s) => sum + Math.ceil(s.orderCount / 28), 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
+                      <span>Total Orders</span>
+                      <span>{totalSessionableOrders}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create Packaging Dialog */}
       <Dialog open={showCreatePackagingDialog} onOpenChange={setShowCreatePackagingDialog}>
         <DialogContent>
           <DialogHeader>
@@ -660,6 +1038,7 @@ export default function Footprints() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Packaging Dialog */}
       <Dialog open={!!editingPackaging} onOpenChange={(open) => !open && setEditingPackaging(null)}>
         <DialogContent>
           <DialogHeader>
