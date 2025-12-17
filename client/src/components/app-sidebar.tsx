@@ -99,7 +99,7 @@ export function AppSidebar() {
       icon: ShoppingCart,
     },
     {
-      title: "Collections",
+      title: "Geometry Collections",
       url: "/collections",
       icon: Layers,
     },

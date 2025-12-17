@@ -205,7 +205,7 @@ export default function Collections() {
       return res.json();
     },
     onSuccess: (newCollection) => {
-      toast({ title: "Collection created successfully" });
+      toast({ title: "Geometry collection created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       setShowCreateDialog(false);
       setFormData({ name: "", description: "" });
@@ -226,7 +226,7 @@ export default function Collections() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Collection updated successfully" });
+      toast({ title: "Geometry collection updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       setShowEditDialog(false);
       setEditingCollection(null);
@@ -246,7 +246,7 @@ export default function Collections() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Collection deleted successfully" });
+      toast({ title: "Geometry collection deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       setShowDeleteDialog(false);
       if (selectedCollectionId === editingCollection?.id) {
@@ -397,7 +397,7 @@ export default function Collections() {
       <div className="w-80 border-r flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="text-lg font-semibold font-serif">Collections</h2>
+            <h2 className="text-lg font-semibold font-serif">Geometry Collections</h2>
             <Button
               size="sm"
               onClick={() => {
@@ -428,9 +428,9 @@ export default function Collections() {
               <div className="w-12 h-12 mx-auto mb-3 bg-[#6B8E23]/10 rounded-full flex items-center justify-center">
                 <Layers className="h-6 w-6 text-[#6B8E23]" />
               </div>
-              <h3 className="font-medium mb-1">No Collections Yet</h3>
+              <h3 className="font-medium mb-1">No Geometry Collections Yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Create your first collection to organize products
+                Create your first geometry collection to organize products
               </p>
               <Button
                 size="sm"
@@ -442,7 +442,7 @@ export default function Collections() {
                 data-testid="button-create-first-collection"
               >
                 <Plus className="h-4 w-4 mr-1" />
-                Create Collection
+                Create Geometry Collection
               </Button>
             </div>
           ) : (
@@ -786,11 +786,11 @@ export default function Collections() {
         )}
       </div>
 
-      {/* Create Collection Dialog */}
+      {/* Create Geometry Collection Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-serif">Create New Collection</DialogTitle>
+            <DialogTitle className="text-xl font-serif">Create Geometry Collection</DialogTitle>
             <DialogDescription>
               Group products with similar physical characteristics for shipping
             </DialogDescription>
@@ -799,7 +799,7 @@ export default function Collections() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="create-name" className="text-sm font-medium">
-                  Collection Name <span className="text-destructive">*</span>
+                  Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="create-name"
@@ -839,27 +839,27 @@ export default function Collections() {
                 className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
                 data-testid="button-submit-create"
               >
-                {createMutation.isPending ? "Creating..." : "Create Collection"}
+                {createMutation.isPending ? "Creating..." : "Create"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Collection Dialog */}
+      {/* Edit Geometry Collection Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-serif">Edit Collection</DialogTitle>
+            <DialogTitle className="text-xl font-serif">Edit Geometry Collection</DialogTitle>
             <DialogDescription>
-              Update the collection name and description
+              Update the geometry collection name and description
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEdit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-name" className="text-sm font-medium">
-                  Collection Name <span className="text-destructive">*</span>
+                  Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="edit-name"
@@ -910,9 +910,9 @@ export default function Collections() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Collection?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Geometry Collection?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{editingCollection?.name}"? This will remove all product assignments from this collection. This action cannot be undone.
+              Are you sure you want to delete "{editingCollection?.name}"? This will remove all product assignments from this geometry collection. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -922,7 +922,7 @@ export default function Collections() {
               className="bg-destructive hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Collection"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
