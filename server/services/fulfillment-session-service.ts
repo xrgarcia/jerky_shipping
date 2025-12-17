@@ -17,6 +17,7 @@ import {
   fulfillmentSessions, 
   stations,
   footprints,
+  DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
   type Station,
@@ -91,12 +92,18 @@ export class FulfillmentSessionService {
   /**
    * Find all shipments that are ready to be assigned to a session
    * 
-   * Ready = has packaging + has assigned station + no existing session
+   * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
+   * 
+   * Uses the lifecycle state machine to ensure only orders that have completed
+   * all prior decision steps (categorization, footprint, packaging) are included.
    */
   async findSessionableShipments(
     stationType?: string
   ): Promise<SessionableShipment[]> {
     const conditions = [
+      // Use lifecycle state machine - only orders waiting to be sessioned
+      eq(shipments.decisionSubphase, DECISION_SUBPHASES.NEEDS_SESSION),
+      // Safety checks (should already be true if in needs_session, but belt-and-suspenders)
       isNotNull(shipments.packagingTypeId),
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
