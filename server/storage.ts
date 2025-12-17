@@ -83,6 +83,8 @@ import {
   type ProductCollectionMapping,
   type InsertProductCollectionMapping,
   productCollectionMappings,
+  // Shipment QC Items
+  shipmentQcItems,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -3550,9 +3552,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProductCollection(id: string): Promise<boolean> {
-    // Delete all mappings first
+    // Step 1: Find shipments that have QC items referencing this collection
+    const affectedShipmentIds = await db
+      .selectDistinct({ shipmentId: shipmentQcItems.shipmentId })
+      .from(shipmentQcItems)
+      .where(eq(shipmentQcItems.collectionId, id));
+    
+    // Step 2: Nullify collection_id on shipment_qc_items that reference this collection
+    await db
+      .update(shipmentQcItems)
+      .set({ collectionId: null, updatedAt: new Date() })
+      .where(eq(shipmentQcItems.collectionId, id));
+    
+    // Step 3: Reset footprintId on affected shipments so they get recalculated
+    if (affectedShipmentIds.length > 0) {
+      const shipmentIds = affectedShipmentIds.map(s => s.shipmentId);
+      await db
+        .update(shipments)
+        .set({ 
+          footprintId: null, 
+          decisionSubphase: 'needs_categorization',
+          updatedAt: new Date() 
+        })
+        .where(inArray(shipments.id, shipmentIds));
+      
+      console.log(`[Collections] Reset ${shipmentIds.length} shipments for footprint recalculation`);
+    }
+    
+    // Step 4: Delete all product mappings
     await db.delete(productCollectionMappings).where(eq(productCollectionMappings.productCollectionId, id));
-    // Then delete the collection
+    
+    // Step 5: Delete the collection
     const result = await db.delete(productCollections).where(eq(productCollections.id, id)).returning();
     return result.length > 0;
   }
