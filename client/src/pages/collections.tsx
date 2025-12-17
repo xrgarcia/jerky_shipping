@@ -551,6 +551,7 @@ export default function Collections() {
                               collectionId: selectedCollectionId,
                               mappingId: mapping.id,
                             })}
+                            disabled={removeProductMutation.isPending}
                             data-testid={`button-remove-product-${mapping.sku}`}
                           >
                             <X className="h-3.5 w-3.5 text-destructive" />
