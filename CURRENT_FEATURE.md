@@ -413,10 +413,11 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 
 ---
 
-**Step 2: Auto Station Assignment**
-- [ ] When packaging type is assigned to footprint, look up station type
-- [ ] Find station matching that type (currently 1 per type)
-- [ ] Set `qc_station_id` on all linked shipments
+**Step 2: Auto Station Assignment** ✅
+- [x] Added `assigned_station_id` field to shipments table (distinct from `qc_station_id` which records where order WAS packed)
+- [x] When packaging type is assigned to footprint, look up station by `stationType`
+- [x] Find active station matching that type (currently 1 per type)
+- [x] Set `assigned_station_id` on all linked shipments automatically
 
 **Step 3: Fulfillment Session Building**
 - [ ] Create `fulfillment_sessions` table (id, station_type, status, order_count, created_at)
