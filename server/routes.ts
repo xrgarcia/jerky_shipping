@@ -9855,7 +9855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "packagingTypeId is required" });
       }
       
-      const { footprintModels, footprints: footprintsTable, packagingTypes, shipments: shipmentsTable } = await import("@shared/schema");
+      const { footprintModels, footprints: footprintsTable, packagingTypes, shipments: shipmentsTable, stations } = await import("@shared/schema");
       
       // Check if footprint exists
       const [footprint] = await db.select().from(footprintsTable).where(eq(footprintsTable.id, footprintId));
@@ -9867,6 +9867,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [packagingType] = await db.select().from(packagingTypes).where(eq(packagingTypes.id, packagingTypeId));
       if (!packagingType) {
         return res.status(404).json({ error: "Packaging type not found" });
+      }
+      
+      // Look up station by stationType (auto station assignment)
+      let assignedStationId: string | null = null;
+      if (packagingType.stationType) {
+        const [station] = await db
+          .select()
+          .from(stations)
+          .where(and(
+            eq(stations.stationType, packagingType.stationType),
+            eq(stations.isActive, true)
+          ))
+          .limit(1);
+        
+        if (station) {
+          assignedStationId = station.id;
+          console.log(`[Station Assignment] Found station ${station.name} (${station.stationType}) for packaging ${packagingType.name}`);
+        } else {
+          console.warn(`[Station Assignment] No active station found for stationType: ${packagingType.stationType}`);
+        }
       }
       
       // Upsert the footprint model (one model per footprint)
@@ -9898,14 +9918,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
       }
       
-      // Update all shipments with this footprint to have the packaging type
+      // Update all shipments with this footprint to have the packaging type and assigned station
+      const updateData: Record<string, any> = {
+        packagingTypeId,
+        packagingDecisionType: 'auto',
+        updatedAt: new Date(),
+      };
+      if (assignedStationId) {
+        updateData.assignedStationId = assignedStationId;
+      }
+      
       const updatedShipments = await db
         .update(shipmentsTable)
-        .set({
-          packagingTypeId,
-          packagingDecisionType: 'auto',
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(shipmentsTable.footprintId, footprintId))
         .returning({ id: shipmentsTable.id });
       
@@ -9915,13 +9940,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await updateShipmentLifecycleBatch(shipmentIds);
       }
       
-      console.log(`[Footprints] Assigned packaging ${packagingType.name} to footprint ${footprintId}, updated ${updatedShipments.length} shipments`);
+      console.log(`[Footprints] Assigned packaging ${packagingType.name} to footprint ${footprintId}, updated ${updatedShipments.length} shipments${assignedStationId ? ` (station: ${assignedStationId})` : ''}`);
       
       res.json({
         success: true,
         model,
         shipmentsUpdated: updatedShipments.length,
         packagingTypeName: packagingType.name,
+        assignedStationId,
       });
     } catch (error: any) {
       console.error("[Footprints] Error assigning packaging:", error);
