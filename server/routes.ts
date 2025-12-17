@@ -10095,6 +10095,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a fulfillment session (unlinks shipments and deletes session)
+  app.delete("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessions, shipments: shipmentsTable, DECISION_SUBPHASES } = await import("@shared/schema");
+      const { id } = req.params;
+      
+      // First, unlink all shipments from this session and reset their decision subphase
+      await db
+        .update(shipmentsTable)
+        .set({
+          fulfillmentSessionId: null,
+          decisionSubphase: DECISION_SUBPHASES.NEEDS_SESSION,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipmentsTable.fulfillmentSessionId, id));
+      
+      // Then delete the session
+      const deleted = await db
+        .delete(fulfillmentSessions)
+        .where(eq(fulfillmentSessions.id, id))
+        .returning();
+      
+      if (deleted.length === 0) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      console.log(`[FulfillmentSessions] Deleted session ${id}`);
+      res.json({ success: true, deletedId: id });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error deleting session:", error);
+      res.status(500).json({ error: "Failed to delete session" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

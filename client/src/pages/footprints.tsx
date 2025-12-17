@@ -52,6 +52,7 @@ import {
   ArrowRight,
   Info,
   Eye,
+  Trash2,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -216,6 +217,7 @@ export default function Footprints() {
   const [lastBuildResult, setLastBuildResult] = useState<BuildSessionsResult | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetailResponse>>({});
+  const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -397,6 +399,24 @@ export default function Footprints() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await apiRequest("DELETE", `/api/fulfillment-sessions/${sessionId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Session deleted", description: "Orders have been released back to the queue" });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      setSessionToDelete(null);
+      setExpandedSessions(new Set());
+      setSessionDetails({});
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete session", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1268,8 +1288,23 @@ export default function Footprints() {
                                       <p className="text-center text-muted-foreground py-4">No orders in this session</p>
                                     ) : (
                                       <div className="space-y-2">
-                                        <div className="text-sm font-medium text-muted-foreground mb-3">
-                                          Orders in Session ({details.shipments.length})
+                                        <div className="flex items-center justify-between mb-3">
+                                          <span className="text-sm font-medium text-muted-foreground">
+                                            Orders in Session ({details.shipments.length})
+                                          </span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSessionToDelete(session);
+                                            }}
+                                            data-testid={`button-delete-session-${session.id}`}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-1" />
+                                            Delete Session
+                                          </Button>
                                         </div>
                                         <div className="grid gap-2 max-h-64 overflow-y-auto">
                                           {details.shipments.map((shipment, idx) => (
@@ -1460,6 +1495,32 @@ export default function Footprints() {
               data-testid="button-update-packaging"
             >
               {updatePackagingMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Session Confirmation Dialog */}
+      <Dialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Session?</DialogTitle>
+            <DialogDescription>
+              This will remove the session and release all {sessionToDelete?.orderCount || 0} orders back to the queue.
+              They can be reassigned to new sessions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSessionToDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete.id)}
+              disabled={deleteSessionMutation.isPending}
+              data-testid="button-confirm-delete-session"
+            >
+              {deleteSessionMutation.isPending ? "Deleting..." : "Delete Session"}
             </Button>
           </DialogFooter>
         </DialogContent>

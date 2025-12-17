@@ -109,7 +109,7 @@ export function AppSidebar() {
       icon: Boxes,
     },
     {
-      title: "Footprints",
+      title: "Fulfillment Prep",
       url: "/footprints",
       icon: Layers,
     },
