@@ -278,7 +278,7 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - `POST /api/packaging-types` — Create new packaging type with name and station type
 - `PATCH /api/packaging-types/:id` — Update packaging type (name, station type)
 
-### Phase 6: Shipment Lifecycle Formalization 🔄
+### Phase 6: Shipment Lifecycle Formalization ✅
 
 **Goal:** Define the complete end-to-end shipment lifecycle with proper enums, state machines, and phase progression.
 
@@ -444,16 +444,20 @@ A fulfillment session spans from packing decisions through to "On the Dock."
   - `GET /api/fulfillment-sessions/:id` - get session with shipments
   - `PATCH /api/fulfillment-sessions/:id/status` - update session status
 
-**Step 4: Lifecycle View UI Updates**
-- [ ] Add "Awaiting Decisions" tab to Lifecycle View (before Ready to Pick)
-- [ ] Show subphase breakdown within Awaiting Decisions
-- [ ] Update tab counts to reflect new phase
+**Step 4: Fulfillment Prep Dashboard** ✅
+- [x] Renamed Footprints page to "Fulfillment Prep" dashboard
+- [x] Added 3-tab workflow: Categorize SKUs → Assign Packaging → Build Sessions
+- [x] Summary cards at top showing action items for each stage (clickable to switch tabs)
+- [x] Categorize tab: Shows uncategorized products with collection assignment dropdown
+- [x] Assign Packaging tab: Existing footprint → packaging assignment (preserved)
+- [x] Build Sessions tab: Preview orders by station type, shows session count, "Build Sessions" button
+- [x] Integrated with existing APIs + new session preview/build endpoints
 
-**Step 5: Fulfillment Session Management UI**
-- [ ] Display ready-to-session orders grouped by station type
-- [ ] Preview session composition before creation
-- [ ] Trigger session building (manual or automatic)
-- [ ] Push confirmed sessions to SkuVault
+**Step 5: Fulfillment Session Management UI** ✅
+- [x] Session preview shows orders grouped by station type (in "Build Sessions" tab)
+- [x] Preview shows: station type, order count, number of sessions to be created, footprint count
+- [x] "Build Sessions" button triggers session creation
+- [ ] Push confirmed sessions to SkuVault (deferred to Phase 8)
 
 ---
 
