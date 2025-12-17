@@ -140,7 +140,7 @@ export class FulfillmentSessionService {
     shipmentList: SessionableShipment[]
   ): Promise<ShipmentGroup[]> {
     // Get station info for each assigned station
-    const stationIds = [...new Set(shipmentList.map(s => s.assignedStationId).filter(Boolean))] as string[];
+    const stationIds = Array.from(new Set(shipmentList.map(s => s.assignedStationId).filter(Boolean))) as string[];
     const stationMap = await this.getStationMap(stationIds);
 
     // Group by stationType → footprint
@@ -252,7 +252,7 @@ export class FulfillmentSessionService {
     const groups = await this.groupShipmentsForBatching(sessionableShipments);
     
     // Get station names
-    const stationIds = [...new Set(groups.map(g => g.stationId).filter(Boolean))] as string[];
+    const stationIds = Array.from(new Set(groups.map(g => g.stationId).filter(Boolean))) as string[];
     const stationMap = await this.getStationMap(stationIds);
 
     // Aggregate by station type
@@ -390,7 +390,7 @@ export class FulfillmentSessionService {
       byStationType.get(group.stationType)!.push(group);
     }
 
-    for (const [stationType, stationGroups] of byStationType) {
+    for (const [stationType, stationGroups] of Array.from(byStationType.entries())) {
       let currentBatch: SessionBatch | null = null;
 
       for (const group of stationGroups) {

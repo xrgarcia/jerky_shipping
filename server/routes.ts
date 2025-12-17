@@ -9955,6 +9955,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // Fulfillment Sessions API - Smart Shipping Engine (Phase 6 Step 3)
+  // ============================================================================
+
+  // Preview sessionable shipments and potential session groupings
+  app.get("/api/fulfillment-sessions/preview", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { stationType } = req.query;
+      
+      const preview = await fulfillmentSessionService.previewSessions(
+        stationType as string | undefined
+      );
+      
+      res.json({
+        success: true,
+        preview,
+        totalOrders: preview.reduce((sum, p) => sum + p.orderCount, 0),
+      });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting preview:", error);
+      res.status(500).json({ error: "Failed to get session preview" });
+    }
+  });
+
+  // Build fulfillment sessions from sessionable shipments
+  app.post("/api/fulfillment-sessions/build", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { stationType, dryRun } = req.body;
+      
+      const result = await fulfillmentSessionService.buildSessions(userId, {
+        stationType: stationType as string | undefined,
+        dryRun: dryRun === true,
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          errors: result.errors,
+        });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error building sessions:", error);
+      res.status(500).json({ error: "Failed to build sessions" });
+    }
+  });
+
+  // Get all fulfillment sessions with optional status filter
+  app.get("/api/fulfillment-sessions", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { FULFILLMENT_SESSION_STATUSES } = await import("@shared/schema");
+      const { status } = req.query;
+      
+      // Validate status if provided
+      if (status && !FULFILLMENT_SESSION_STATUSES.includes(status as any)) {
+        return res.status(400).json({ 
+          error: `Invalid status. Must be one of: ${FULFILLMENT_SESSION_STATUSES.join(', ')}` 
+        });
+      }
+      
+      const sessions = await fulfillmentSessionService.getSessions(status as any);
+      res.json(sessions);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting sessions:", error);
+      res.status(500).json({ error: "Failed to get sessions" });
+    }
+  });
+
+  // Get a specific fulfillment session by ID
+  app.get("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { id } = req.params;
+      
+      const session = await fulfillmentSessionService.getSessionById(id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      // Get shipments in this session
+      const { shipments: shipmentsTable } = await import("@shared/schema");
+      const sessionShipments = await db
+        .select({
+          id: shipmentsTable.id,
+          orderNumber: shipmentsTable.orderNumber,
+          footprintId: shipmentsTable.footprintId,
+          trackingNumber: shipmentsTable.trackingNumber,
+          lifecyclePhase: shipmentsTable.lifecyclePhase,
+        })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.fulfillmentSessionId, id));
+      
+      res.json({
+        ...session,
+        shipments: sessionShipments,
+      });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting session:", error);
+      res.status(500).json({ error: "Failed to get session" });
+    }
+  });
+
+  // Update session status
+  app.patch("/api/fulfillment-sessions/:id/status", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { FULFILLMENT_SESSION_STATUSES } = await import("@shared/schema");
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || !FULFILLMENT_SESSION_STATUSES.includes(status)) {
+        return res.status(400).json({ 
+          error: `Invalid status. Must be one of: ${FULFILLMENT_SESSION_STATUSES.join(', ')}` 
+        });
+      }
+      
+      const updated = await fulfillmentSessionService.updateSessionStatus(id, status);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      console.log(`[FulfillmentSessions] Updated session ${id} status to: ${status}`);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error updating session status:", error);
+      res.status(500).json({ error: "Failed to update session status" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

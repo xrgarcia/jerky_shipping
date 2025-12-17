@@ -419,15 +419,30 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 - [x] Find active station matching that type (currently 1 per type)
 - [x] Set `assigned_station_id` on all linked shipments automatically
 
-**Step 3: Fulfillment Session Building**
-- [ ] Create `fulfillment_sessions` table (id, station_type, status, order_count, created_at)
-- [ ] Add `fulfillment_session_id` field to shipments table
-- [ ] Session building algorithm:
-  1. Query shipments ready for sessioning (have packaging + station, no session yet)
-  2. Sort by: station type → footprint → canonical SKU string (alphabetical)
-  3. Group into batches of max 28 orders
-  4. Create fulfillment session record and link shipments
-- [ ] Optimization: Same-product orders grouped together for picking/packing efficiency
+**Step 3: Fulfillment Session Building** ✅
+- [x] Created `fulfillment_sessions` table with:
+  - id, name, sequenceNumber, stationId, stationType
+  - orderCount, maxOrders (default 28), status enum
+  - Timestamps: createdAt, readyAt, pickingStartedAt, packingStartedAt, completedAt
+  - createdBy (audit trail)
+- [x] `fulfillment_session_id` field already exists on shipments table
+- [x] Created `FulfillmentSessionService` with clean OOP design:
+  - `findSessionableShipments()` - finds shipments ready for sessioning
+  - `groupShipmentsForBatching()` - groups by station type → footprint
+  - `buildSessions()` - creates sessions and links shipments
+  - `previewSessions()` - dry-run preview before building
+  - `updateSessionStatus()` - status transitions with timestamps
+- [x] Session building algorithm implemented:
+  1. Query shipments with packaging + assignedStation, no existing session
+  2. Sort by: station type priority → footprint → order number
+  3. Batch into groups of max 28 orders per session
+  4. Create session records and link shipments
+- [x] API endpoints:
+  - `GET /api/fulfillment-sessions/preview` - preview sessionable shipments
+  - `POST /api/fulfillment-sessions/build` - build sessions (supports dryRun)
+  - `GET /api/fulfillment-sessions` - list sessions with optional status filter
+  - `GET /api/fulfillment-sessions/:id` - get session with shipments
+  - `PATCH /api/fulfillment-sessions/:id/status` - update session status
 
 **Step 4: Lifecycle View UI Updates**
 - [ ] Add "Awaiting Decisions" tab to Lifecycle View (before Ready to Pick)
