@@ -340,11 +340,11 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 
 #### Implementation Tasks
 
-**Step 1: Define Lifecycle Enum & State Machine**
-- [ ] Create `shipmentLifecyclePhase` enum: `awaiting_decisions` | `ready_to_pick` | `picking` | `packing_ready` | `on_dock` | `picking_issues`
-- [ ] Create `decisionSubphase` enum: `needs_categorization` | `needs_footprint` | `needs_packaging` | `needs_session` | `ready_for_skuvault`
-- [ ] Add `lifecyclePhase` and `decisionSubphase` fields to shipments table
-- [ ] Create state machine logic for phase transitions
+**Step 1: Define Lifecycle Enum & State Machine** ✅
+- [x] Create `shipmentLifecyclePhase` enum: `awaiting_decisions` | `ready_to_pick` | `picking` | `packing_ready` | `on_dock` | `picking_issues`
+- [x] Create `decisionSubphase` enum: `needs_categorization` | `needs_footprint` | `needs_packaging` | `needs_session` | `ready_for_skuvault`
+- [x] Add `lifecyclePhase`, `decisionSubphase`, `lifecyclePhaseChangedAt`, `fulfillmentSessionId` fields to shipments table
+- [x] Create state machine logic for phase transitions (`server/services/lifecycle-state-machine.ts`)
 
 **Step 2: Auto Station Assignment**
 - [ ] When packaging type is assigned to footprint, look up station type
