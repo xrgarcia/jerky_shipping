@@ -346,6 +346,73 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 - [x] Add `lifecyclePhase`, `decisionSubphase`, `lifecyclePhaseChangedAt`, `fulfillmentSessionId` fields to shipments table
 - [x] Create state machine logic for phase transitions (`server/services/lifecycle-state-machine.ts`)
 
+---
+
+#### Phase Transition Conditions & Triggers
+
+**Exact Conditions for Each Lifecycle Phase:**
+
+| Phase | Database Conditions | ShipStation/SkuVault Status |
+|-------|--------------------|-----------------------------|
+| **Awaiting Decisions** | No `sessionStatus` yet | Order not in SkuVault |
+| **Ready to Pick** | `sessionStatus = 'new'` AND `trackingNumber IS NULL` | SkuVault session created, not started |
+| **Picking** | `sessionStatus = 'active'` AND `trackingNumber IS NULL` | SkuVault session in progress |
+| **Packing Ready** | `sessionStatus = 'closed'` AND `trackingNumber IS NULL` AND `shipmentStatus = 'pending'` | Picking complete |
+| **On the Dock** | `trackingNumber IS NOT NULL` AND `status = 'AC'` | Accepted by carrier |
+| **Picking Issues** | `sessionStatus = 'inactive'` | Requires supervisor attention |
+
+**Event Sources That Trigger Transitions:**
+
+| Event Source | Event | Transition |
+|--------------|-------|------------|
+| **Ship. Internal** | SKU categorized | Subphase: needs_categorization → needs_footprint |
+| **Ship. Internal** | Footprint calculated | Subphase: needs_footprint → needs_packaging |
+| **Ship. Internal** | Packaging assigned | Subphase: needs_packaging → needs_session |
+| **Ship. Internal** | Fulfillment session created | Subphase: needs_session → ready_for_skuvault |
+| **SkuVault Push** | Session pushed to SkuVault | awaiting_decisions → ready_to_pick |
+| **Firestore Sync** | Session status = 'active' | ready_to_pick → picking |
+| **Firestore Sync** | Session status = 'closed' | picking → packing_ready |
+| **Firestore Sync** | Session status = 'inactive' | Any → picking_issues |
+| **ShipStation Webhook** | Label created (tracking number) | packing_ready → on_dock |
+| **ShipStation Webhook** | Status = 'AC' (carrier accepted) | Confirms on_dock |
+
+---
+
+#### Centralized Transition Logic
+
+**Principle:** All code paths go through one function to determine lifecycle phase.
+
+**Implementation:**
+
+1. **`deriveLifecyclePhase(shipment)`** — Reads shipment data, returns the correct phase based on conditions above
+2. **`updateShipmentLifecycle(shipmentId)`** — Central function that:
+   - Loads the shipment from database
+   - Calls `deriveLifecyclePhase()` to determine current phase
+   - Updates `lifecyclePhase`, `decisionSubphase`, and `lifecyclePhaseChangedAt` fields
+   - Logs the transition for audit trail
+3. **Hook into all event handlers:**
+   - ShipStation webhook processor → calls `updateShipmentLifecycle()`
+   - Firestore sync worker → calls `updateShipmentLifecycle()`
+   - Ship. packaging assignment → calls `updateShipmentLifecycle()`
+   - Label print completion → calls `updateShipmentLifecycle()`
+
+**Benefits:**
+- Single source of truth for phase determination
+- Seamless, automatic transitions regardless of event origin
+- Audit trail of all phase changes via `lifecyclePhaseChangedAt`
+- Easy to add new conditions or phases in one place
+
+---
+
+**Step 1b: Centralized Transition Function** 🔄
+- [ ] Update `deriveLifecyclePhase()` with exact conditions (including `status = 'AC'` for on_dock)
+- [ ] Create `updateShipmentLifecycle(shipmentId)` function in storage or service layer
+- [ ] Hook into ShipStation webhook processor
+- [ ] Hook into Firestore/SkuVault sync worker
+- [ ] Hook into Ship. internal actions (packaging assignment, session creation)
+
+---
+
 **Step 2: Auto Station Assignment**
 - [ ] When packaging type is assigned to footprint, look up station type
 - [ ] Find station matching that type (currently 1 per type)
