@@ -110,6 +110,10 @@ interface Collection {
   description: string | null;
 }
 
+interface CollectionsResponse {
+  collections: Collection[];
+}
+
 interface SessionPreview {
   stationType: string;
   stationName: string | null;
@@ -209,7 +213,7 @@ export default function Footprints() {
   });
 
   // Collections for categorization
-  const { data: collectionsData } = useQuery<Collection[]>({
+  const { data: collectionsData } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections"],
   });
 
@@ -345,7 +349,7 @@ export default function Footprints() {
   const stats = footprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
   const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
-  const collections = collectionsData || [];
+  const collections = collectionsData?.collections || [];
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
 
@@ -570,9 +574,9 @@ export default function Footprints() {
               ) : (
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-2">
-                    {uncategorizedProducts.map((product) => (
+                    {uncategorizedProducts.map((product, index) => (
                       <div
-                        key={product.sku}
+                        key={`${product.sku}-${index}`}
                         className="flex items-center gap-4 p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                         data-testid={`row-uncategorized-${product.sku}`}
                       >
