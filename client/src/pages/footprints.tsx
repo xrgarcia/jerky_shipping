@@ -163,6 +163,18 @@ interface FulfillmentSession {
   createdBy: string | null;
 }
 
+interface SessionShipment {
+  id: string;
+  orderNumber: string;
+  footprintId: string | null;
+  trackingNumber: string | null;
+  lifecyclePhase: string | null;
+}
+
+interface SessionDetailResponse extends FulfillmentSession {
+  shipments: SessionShipment[];
+}
+
 function getStationBadge(stationType: string | null) {
   switch (stationType) {
     case 'boxing_machine':
@@ -202,6 +214,8 @@ export default function Footprints() {
     stationType: "",
   });
   const [lastBuildResult, setLastBuildResult] = useState<BuildSessionsResult | null>(null);
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
+  const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetailResponse>>({});
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -444,6 +458,43 @@ export default function Footprints() {
     refetchFootprints();
     refetchSessionPreview();
     refetchLiveSessions();
+  };
+
+  const toggleSessionExpand = async (sessionId: string) => {
+    const newExpanded = new Set(expandedSessions);
+    if (newExpanded.has(sessionId)) {
+      newExpanded.delete(sessionId);
+    } else {
+      newExpanded.add(sessionId);
+      // Fetch session details if not already loaded
+      if (!sessionDetails[sessionId]) {
+        try {
+          const res = await fetch(`/api/fulfillment-sessions/${sessionId}`, {
+            credentials: 'include',
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setSessionDetails(prev => ({ ...prev, [sessionId]: data }));
+          }
+        } catch (error) {
+          console.error('Failed to fetch session details:', error);
+        }
+      }
+    }
+    setExpandedSessions(newExpanded);
+  };
+
+  const getLifecycleBadge = (phase: string | null) => {
+    switch (phase) {
+      case 'picked':
+        return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Picked</Badge>;
+      case 'packed':
+        return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300">Packed</Badge>;
+      case 'labelled':
+        return <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Labelled</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs">Pending</Badge>;
+    }
   };
 
   const isLoading = footprintsLoading || uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
@@ -1147,53 +1198,112 @@ export default function Footprints() {
                         </div>
                         
                         <div className="grid gap-3">
-                          {stationSessions.map((session) => (
-                            <div
-                              key={session.id}
-                              className="p-4 rounded-lg border bg-card"
-                              data-testid={`session-card-${session.id}`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-3">
-                                  <span className="font-medium">
-                                    {session.name || `Session #${session.sequenceNumber || session.id.slice(0, 8)}`}
-                                  </span>
-                                  <Badge 
-                                    variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
-                                    className={
-                                      session.status === 'picking' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                      session.status === 'packing' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                                      session.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                      ''
-                                    }
-                                  >
-                                    {session.status === 'ready' ? 'Ready to Pick' : 
-                                     session.status === 'picking' ? 'Picking' : 
-                                     session.status === 'packing' ? 'Packing' :
-                                     session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Package className="h-4 w-4" />
-                                    {session.orderCount} / {session.maxOrders} orders
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Created {new Date(session.createdAt).toLocaleString()}
-                                </span>
-                                {session.pickingStartedAt && (
-                                  <span>
-                                    Started picking {new Date(session.pickingStartedAt).toLocaleTimeString()}
-                                  </span>
+                          {stationSessions.map((session) => {
+                            const isExpanded = expandedSessions.has(session.id);
+                            const details = sessionDetails[session.id];
+                            
+                            return (
+                              <div
+                                key={session.id}
+                                className="rounded-lg border bg-card overflow-hidden"
+                                data-testid={`session-card-${session.id}`}
+                              >
+                                <button
+                                  className="w-full p-4 text-left hover-elevate"
+                                  onClick={() => toggleSessionExpand(session.id)}
+                                  data-testid={`button-expand-session-${session.id}`}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-3">
+                                      <ChevronDown 
+                                        className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                                      />
+                                      <span className="font-medium">
+                                        {session.name || `Session #${session.sequenceNumber || session.id.slice(0, 8)}`}
+                                      </span>
+                                      <Badge 
+                                        variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
+                                        className={
+                                          session.status === 'picking' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                          session.status === 'packing' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                                          session.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                          ''
+                                        }
+                                      >
+                                        {session.status === 'ready' ? 'Ready to Pick' : 
+                                         session.status === 'picking' ? 'Picking' : 
+                                         session.status === 'packing' ? 'Packing' :
+                                         session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                      <span className="flex items-center gap-1">
+                                        <Package className="h-4 w-4" />
+                                        {session.orderCount} orders
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground ml-7">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      Created {new Date(session.createdAt).toLocaleString()}
+                                    </span>
+                                    {session.pickingStartedAt && (
+                                      <span>
+                                        Started picking {new Date(session.pickingStartedAt).toLocaleTimeString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                                
+                                {isExpanded && (
+                                  <div className="border-t bg-muted/30 p-4">
+                                    {!details ? (
+                                      <div className="flex items-center justify-center py-4">
+                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                        <span className="ml-2 text-muted-foreground">Loading orders...</span>
+                                      </div>
+                                    ) : details.shipments.length === 0 ? (
+                                      <p className="text-center text-muted-foreground py-4">No orders in this session</p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div className="text-sm font-medium text-muted-foreground mb-3">
+                                          Orders in Session ({details.shipments.length})
+                                        </div>
+                                        <div className="grid gap-2 max-h-64 overflow-y-auto">
+                                          {details.shipments.map((shipment, idx) => (
+                                            <div
+                                              key={shipment.id}
+                                              className="flex items-center justify-between p-2 rounded bg-background border"
+                                              data-testid={`shipment-row-${shipment.id}`}
+                                            >
+                                              <div className="flex items-center gap-3">
+                                                <span className="text-xs text-muted-foreground w-6">
+                                                  {idx + 1}.
+                                                </span>
+                                                <span className="font-mono text-sm font-medium">
+                                                  {shipment.orderNumber}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {shipment.trackingNumber && (
+                                                  <span className="text-xs text-muted-foreground font-mono">
+                                                    {shipment.trackingNumber.slice(0, 12)}...
+                                                  </span>
+                                                )}
+                                                {getLifecycleBadge(shipment.lifecyclePhase)}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
