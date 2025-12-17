@@ -66,6 +66,9 @@ export interface ShipmentLifecycleData {
   footprintId?: string | null;
 }
 
+// Status codes that indicate package is on the dock (at the facility)
+const ON_DOCK_STATUSES = ['NY', 'AC'];
+
 /**
  * Determine the lifecycle phase based on shipment data
  * 
@@ -73,23 +76,31 @@ export interface ShipmentLifecycleData {
  * with shipments that don't yet have explicit lifecyclePhase set.
  * 
  * Phase priority (checked in order):
- * 1. ON_DOCK - Has tracking number AND status='AC' (carrier accepted)
+ * 1. ON_DOCK - Has tracking number AND status IN ['NY', 'AC'] (labeled, at facility)
  * 2. PICKING_ISSUES - Session status is 'inactive'
  * 3. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
  * 4. PICKING - Session is 'active'
  * 5. READY_TO_PICK - Session is 'new'
  * 6. AWAITING_DECISIONS - Default, with subphase based on categorization/footprint/packaging
+ * 
+ * Note: Status codes for tracking:
+ * - NY = Not Yet in System (label created, waiting for carrier pickup)
+ * - AC = Accepted by Carrier (carrier just picked it up)
+ * - IT = In Transit (on the way to customer) - past ON_DOCK
+ * - DE = Delivered (customer received) - past ON_DOCK
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
-  // ON_DOCK: Has tracking number AND carrier has accepted (status='AC')
-  // This is the terminal state for warehouse fulfillment
-  if (shipment.trackingNumber && shipment.status === 'AC') {
-    return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
-  }
-
-  // Also consider ON_DOCK if has tracking but status not yet AC (label created, awaiting carrier scan)
-  // This covers the brief window between label print and carrier acceptance
+  // ON_DOCK: Has tracking number AND status indicates it's still at/leaving the facility
+  // Status 'NY' = label printed, waiting for carrier
+  // Status 'AC' = carrier just accepted/picked up
+  // Once status is 'IT' (In Transit) or 'DE' (Delivered), it's past the dock
   if (shipment.trackingNumber) {
+    const status = shipment.status?.toUpperCase();
+    if (!status || ON_DOCK_STATUSES.includes(status)) {
+      return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
+    }
+    // Has tracking but IT/DE status = shipped, past our lifecycle
+    // Still return ON_DOCK as it's the terminal warehouse phase
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
 
