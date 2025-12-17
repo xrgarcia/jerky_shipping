@@ -278,27 +278,101 @@ WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_
 - `POST /api/packaging-types` — Create new packaging type with name and station type
 - `PATCH /api/packaging-types/:id` — Update packaging type (name, station type)
 
-### Phase 6: Station Routing & Session Building 🔄
+### Phase 6: Shipment Lifecycle Formalization 🔄
 
-**Goal:** Route orders to physical packing stations based on packaging decisions, then group into optimized sessions.
+**Goal:** Define the complete end-to-end shipment lifecycle with proper enums, state machines, and phase progression.
 
-**Infrastructure (Completed):**
+---
+
+#### Lifecycle Overview
+
+**High-Level Workflow View** (for business reporting):
+| Status | Description |
+|--------|-------------|
+| **Ready to Fulfill** | Orders on hold with "MOVE OVER" tag, waiting for warehouse to start |
+| **In Progress** | Orders actively moving through warehouse (spans multiple lifecycle phases) |
+| **On the Way** | Labeled and handed to carrier |
+
+**Detailed Lifecycle View** (warehouse operations):
+| Phase | Description | Current Tracking | Exit Criteria |
+|-------|-------------|------------------|---------------|
+| **Awaiting Decisions** | New orders needing packing decisions | *Not yet formalized* | Assigned to fulfillment session |
+| **Ready to Pick** | Session created in SkuVault, waiting to start | `sessionStatus = 'new'` | SkuVault session starts |
+| **Picking** | Actively being picked | `sessionStatus = 'active'` | All items picked |
+| **Packing Ready** | Picking complete, ready for packing | `sessionStatus = 'closed'` | Label printed |
+| **On the Dock** | Labeled, waiting for carrier pickup | Has `trackingNumber` | Carrier pickup |
+| **Picking Issues** | Exception requiring supervisor attention | `sessionStatus = 'inactive'` | Resolved |
+
+---
+
+#### "Awaiting Decisions" Subphases (NEW)
+
+This is where Ship. does its work before orders enter the warehouse flow:
+
+| Subphase | Description | Exit Criteria |
+|----------|-------------|---------------|
+| **Needs Categorization** | SKUs in order not yet assigned to collections | All SKUs categorized |
+| **Needs Footprint** | Footprint not yet calculated | Footprint assigned |
+| **Needs Packaging** | Footprint has no packaging type mapping | Packaging type assigned |
+| **Needs Session** | Ready for sessioning but not yet grouped | Assigned to fulfillment session |
+| **Ready for SkuVault** | In session, ready to push | Pushed to SkuVault |
+
+---
+
+#### Terminology Clarification
+
+- **Fulfillment Session** = Ship.'s optimized grouping of orders for packing (end-to-end lifecycle)
+- **SkuVault Session** = The picking session in SkuVault (just the picking phase)
+
+A fulfillment session spans from packing decisions through to "On the Dock."
+
+---
+
+#### Infrastructure (Completed)
+
 - [x] Add `stationType` field to `packaging_types` table (boxing_machine | poly_bag | hand_pack)
 - [x] Add `stationType` field to `stations` table for physical station classification
 - [x] Stations page: Station type selector dropdown with color-coded badges
 - [x] Footprints page: Station type badges display on packaging types
 - [x] Full routing chain established: Footprint → Packaging Type → Station Type → Physical Station
 
-**Routing Logic (TODO):**
-- [ ] Auto-assign `qc_station_id` on shipments when packaging type is assigned
-- [ ] Station selection algorithm: Pick station of matching type with lowest current queue
-- [ ] Handle edge cases: No available station of type, station offline, etc.
+---
 
-**Session Building (TODO):**
-- [ ] Validate no mixed station types in single SkuVault session
-- [ ] Group orders into optimized 28-order sessions within station lanes
-- [ ] Optimize for: total time + material handling
-- [ ] Session creation UI or automatic triggering
+#### Implementation Tasks
+
+**Step 1: Define Lifecycle Enum & State Machine**
+- [ ] Create `shipmentLifecyclePhase` enum: `awaiting_decisions` | `ready_to_pick` | `picking` | `packing_ready` | `on_dock` | `picking_issues`
+- [ ] Create `decisionSubphase` enum: `needs_categorization` | `needs_footprint` | `needs_packaging` | `needs_session` | `ready_for_skuvault`
+- [ ] Add `lifecyclePhase` and `decisionSubphase` fields to shipments table
+- [ ] Create state machine logic for phase transitions
+
+**Step 2: Auto Station Assignment**
+- [ ] When packaging type is assigned to footprint, look up station type
+- [ ] Find station matching that type (currently 1 per type)
+- [ ] Set `qc_station_id` on all linked shipments
+
+**Step 3: Fulfillment Session Building**
+- [ ] Create `fulfillment_sessions` table (id, station_type, status, order_count, created_at)
+- [ ] Add `fulfillment_session_id` field to shipments table
+- [ ] Session building algorithm:
+  1. Query shipments ready for sessioning (have packaging + station, no session yet)
+  2. Sort by: station type → footprint → canonical SKU string (alphabetical)
+  3. Group into batches of max 28 orders
+  4. Create fulfillment session record and link shipments
+- [ ] Optimization: Same-product orders grouped together for picking/packing efficiency
+
+**Step 4: Lifecycle View UI Updates**
+- [ ] Add "Awaiting Decisions" tab to Lifecycle View (before Ready to Pick)
+- [ ] Show subphase breakdown within Awaiting Decisions
+- [ ] Update tab counts to reflect new phase
+
+**Step 5: Fulfillment Session Management UI**
+- [ ] Display ready-to-session orders grouped by station type
+- [ ] Preview session composition before creation
+- [ ] Trigger session building (manual or automatic)
+- [ ] Push confirmed sessions to SkuVault
+
+---
 
 ### Phase 7: Carrier Rate Integration ⬜
 Tasks:
