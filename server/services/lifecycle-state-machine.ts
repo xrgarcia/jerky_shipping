@@ -53,21 +53,42 @@ export function canTransitionSubphase(
 }
 
 /**
- * Determine the lifecycle phase based on shipment data
- * 
- * This derives the phase from existing shipment fields for backwards compatibility
- * with shipments that don't yet have explicit lifecyclePhase set.
+ * Shipment data required for lifecycle phase derivation
  */
-export function deriveLifecyclePhase(shipment: {
+export interface ShipmentLifecycleData {
   sessionStatus?: string | null;
   trackingNumber?: string | null;
-  status?: string | null;
+  status?: string | null;           // ShipStation fulfillment status (e.g., 'AC' = accepted by carrier)
+  shipmentStatus?: string | null;   // ShipStation shipment lifecycle status (on_hold, pending, etc.)
   footprintStatus?: string | null;
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
   footprintId?: string | null;
-}): LifecycleState {
-  // ON_DOCK: Has tracking number (labeled, waiting for carrier)
+}
+
+/**
+ * Determine the lifecycle phase based on shipment data
+ * 
+ * This derives the phase from existing shipment fields for backwards compatibility
+ * with shipments that don't yet have explicit lifecyclePhase set.
+ * 
+ * Phase priority (checked in order):
+ * 1. ON_DOCK - Has tracking number AND status='AC' (carrier accepted)
+ * 2. PICKING_ISSUES - Session status is 'inactive'
+ * 3. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
+ * 4. PICKING - Session is 'active'
+ * 5. READY_TO_PICK - Session is 'new'
+ * 6. AWAITING_DECISIONS - Default, with subphase based on categorization/footprint/packaging
+ */
+export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
+  // ON_DOCK: Has tracking number AND carrier has accepted (status='AC')
+  // This is the terminal state for warehouse fulfillment
+  if (shipment.trackingNumber && shipment.status === 'AC') {
+    return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
+  }
+
+  // Also consider ON_DOCK if has tracking but status not yet AC (label created, awaiting carrier scan)
+  // This covers the brief window between label print and carrier acceptance
   if (shipment.trackingNumber) {
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
@@ -77,7 +98,13 @@ export function deriveLifecyclePhase(shipment: {
     return { phase: LIFECYCLE_PHASES.PICKING_ISSUES, subphase: null };
   }
 
-  // PACKING_READY: Session closed, no tracking yet
+  // PACKING_READY: Session closed, no tracking yet, shipment still pending
+  // The shipmentStatus='pending' check ensures we don't include cancelled shipments
+  if (shipment.sessionStatus === 'closed' && shipment.shipmentStatus === 'pending') {
+    return { phase: LIFECYCLE_PHASES.PACKING_READY, subphase: null };
+  }
+
+  // Also handle closed sessions without explicit pending status (backwards compatibility)
   if (shipment.sessionStatus === 'closed') {
     return { phase: LIFECYCLE_PHASES.PACKING_READY, subphase: null };
   }
@@ -237,4 +264,44 @@ export function getLifecycleProgress(state: LifecycleState): number {
   }
   
   return baseProgress;
+}
+
+// ============================================================================
+// LIFECYCLE UPDATE RESULT
+// ============================================================================
+
+export interface LifecycleUpdateResult {
+  shipmentId: string;
+  orderNumber: string;
+  changed: boolean;
+  previousPhase: LifecyclePhase | null;
+  previousSubphase: DecisionSubphase | null;
+  newPhase: LifecyclePhase;
+  newSubphase: DecisionSubphase | null;
+  timestamp: Date;
+}
+
+/**
+ * Compare two lifecycle states for equality
+ */
+export function statesAreEqual(
+  a: { phase: LifecyclePhase | null; subphase: DecisionSubphase | null },
+  b: { phase: LifecyclePhase; subphase: DecisionSubphase | null }
+): boolean {
+  return a.phase === b.phase && a.subphase === b.subphase;
+}
+
+/**
+ * Format a lifecycle transition for logging
+ */
+export function formatTransition(result: LifecycleUpdateResult): string {
+  if (!result.changed) {
+    return `[Lifecycle] ${result.orderNumber}: No change (${result.newPhase}${result.newSubphase ? '/' + result.newSubphase : ''})`;
+  }
+  
+  const prevPhase = result.previousPhase || 'null';
+  const prevSubphase = result.previousSubphase ? '/' + result.previousSubphase : '';
+  const newSubphase = result.newSubphase ? '/' + result.newSubphase : '';
+  
+  return `[Lifecycle] ${result.orderNumber}: ${prevPhase}${prevSubphase} → ${result.newPhase}${newSubphase}`;
 }
