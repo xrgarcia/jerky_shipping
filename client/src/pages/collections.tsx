@@ -155,7 +155,8 @@ export default function Collections() {
 
   // Check if we have any active filters
   const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
-  const shouldQuery = debouncedSearch.length >= 2 || hasActiveFilters;
+  // Auto-load products when a collection is selected, or when searching/filtering
+  const shouldQuery = !!selectedCollectionId || debouncedSearch.length >= 2 || hasActiveFilters;
 
   const productCatalogQuery = useQuery<ProductCatalogResponse>({
     queryKey: ["/api/product-catalog", { 
