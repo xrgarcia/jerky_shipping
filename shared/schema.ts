@@ -344,6 +344,11 @@ export const shipments = pgTable("shipments", {
   packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
   footprintStatus: text("footprint_status"), // 'complete' (footprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
+  // Lifecycle tracking (Phase 6: Smart Shipping Engine)
+  lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
+  decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_footprint, needs_packaging, needs_session, ready_for_skuvault
+  lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
+  fulfillmentSessionId: varchar("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -393,6 +398,10 @@ export const shipments = pgTable("shipments", {
   packagingTypeIdIdx: index("shipments_packaging_type_id_idx").on(table.packagingTypeId).where(sql`${table.packagingTypeId} IS NOT NULL`),
   packagingDecisionTypeIdx: index("shipments_packaging_decision_type_idx").on(table.packagingDecisionType).where(sql`${table.packagingDecisionType} IS NOT NULL`),
   footprintStatusIdx: index("shipments_footprint_status_idx").on(table.footprintStatus).where(sql`${table.footprintStatus} IS NOT NULL`),
+  // Lifecycle tracking indexes (Phase 6)
+  lifecyclePhaseIdx: index("shipments_lifecycle_phase_idx").on(table.lifecyclePhase).where(sql`${table.lifecyclePhase} IS NOT NULL`),
+  decisionSubphaseIdx: index("shipments_decision_subphase_idx").on(table.decisionSubphase).where(sql`${table.decisionSubphase} IS NOT NULL`),
+  fulfillmentSessionIdIdx: index("shipments_fulfillment_session_id_idx").on(table.fulfillmentSessionId).where(sql`${table.fulfillmentSessionId} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -472,6 +481,11 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   footprintId: z.string().nullish(),
   packagingTypeId: z.string().nullish(),
   packagingDecisionType: z.string().nullish(),
+  // Lifecycle tracking (Phase 6)
+  lifecyclePhase: z.string().nullish(),
+  decisionSubphase: z.string().nullish(),
+  lifecyclePhaseChangedAt: z.coerce.date().optional().or(z.null()),
+  fulfillmentSessionId: z.string().nullish(),
 });
 
 export type InsertShipment = z.infer<typeof insertShipmentSchema>;
