@@ -1281,3 +1281,47 @@ export const insertShipmentQcItemSchema = createInsertSchema(shipmentQcItems).om
 
 export type InsertShipmentQcItem = z.infer<typeof insertShipmentQcItemSchema>;
 export type ShipmentQcItem = typeof shipmentQcItems.$inferSelect;
+
+// Fulfillment Session Status Enum
+export const FULFILLMENT_SESSION_STATUSES = ['draft', 'ready', 'picking', 'packing', 'completed', 'cancelled'] as const;
+export type FulfillmentSessionStatus = typeof FULFILLMENT_SESSION_STATUSES[number];
+
+// Fulfillment Sessions - Ship.'s optimized order groupings for warehouse flow
+// Groups orders by station type and similar products for efficient picking/packing
+export const fulfillmentSessions = pgTable("fulfillment_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Session identification
+  name: text("name"), // Optional human-readable name (e.g., "Boxing Session #42")
+  sequenceNumber: integer("sequence_number"), // Auto-incrementing session number per day
+  // Station routing
+  stationId: varchar("station_id").references(() => stations.id), // Target packing station
+  stationType: text("station_type").notNull(), // 'boxing_machine', 'poly_bag', 'hand_pack'
+  // Session composition
+  orderCount: integer("order_count").notNull().default(0), // Number of orders in this session
+  maxOrders: integer("max_orders").notNull().default(28), // Physical cart capacity limit
+  // Status tracking
+  status: text("status").notNull().default('draft'), // draft, ready, picking, packing, completed, cancelled
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  readyAt: timestamp("ready_at"), // When session was marked ready for picking
+  pickingStartedAt: timestamp("picking_started_at"), // When picking began
+  packingStartedAt: timestamp("packing_started_at"), // When packing began
+  completedAt: timestamp("completed_at"), // When all orders completed
+  // Audit
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => ({
+  stationTypeIdx: index("fulfillment_sessions_station_type_idx").on(table.stationType),
+  stationIdIdx: index("fulfillment_sessions_station_id_idx").on(table.stationId).where(sql`${table.stationId} IS NOT NULL`),
+  statusIdx: index("fulfillment_sessions_status_idx").on(table.status),
+  createdAtIdx: index("fulfillment_sessions_created_at_idx").on(table.createdAt.desc()),
+}));
+
+export const insertFulfillmentSessionSchema = createInsertSchema(fulfillmentSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFulfillmentSession = z.infer<typeof insertFulfillmentSessionSchema>;
+export type FulfillmentSession = typeof fulfillmentSessions.$inferSelect;
