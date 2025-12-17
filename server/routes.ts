@@ -34,6 +34,7 @@ import { firestoreStorage } from "./firestore-storage";
 import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
+import { updateShipmentLifecycleBatch } from "./services/lifecycle-service";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -9907,6 +9908,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(shipmentsTable.footprintId, footprintId))
         .returning({ id: shipmentsTable.id });
+      
+      // Update lifecycle phase for all affected shipments (they may move from needs_packaging to needs_session)
+      if (updatedShipments.length > 0) {
+        const shipmentIds = updatedShipments.map(s => s.id);
+        await updateShipmentLifecycleBatch(shipmentIds);
+      }
       
       console.log(`[Footprints] Assigned packaging ${packagingType.name} to footprint ${footprintId}, updated ${updatedShipments.length} shipments`);
       
