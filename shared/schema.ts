@@ -3,6 +3,69 @@ import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniq
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ============================================================================
+// SHIPMENT LIFECYCLE ENUMS (Phase 6: Smart Shipping Engine)
+// ============================================================================
+
+/**
+ * Shipment Lifecycle Phases
+ * 
+ * The complete journey of a shipment from order receipt to carrier pickup:
+ * 
+ * awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ *                                            ↘ picking_issues (exception path)
+ */
+export const LIFECYCLE_PHASES = {
+  AWAITING_DECISIONS: 'awaiting_decisions',  // New order, needs packing decisions
+  READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
+  PICKING: 'picking',                         // Actively being picked
+  PACKING_READY: 'packing_ready',            // Picking complete, ready for packing
+  ON_DOCK: 'on_dock',                         // Labeled, waiting for carrier pickup
+  PICKING_ISSUES: 'picking_issues',          // Exception requiring supervisor attention
+} as const;
+
+export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHASES];
+
+/**
+ * Decision Subphases (within AWAITING_DECISIONS)
+ * 
+ * The progression of packing decisions before orders can be sessioned:
+ * 
+ * needs_categorization → needs_footprint → needs_packaging → needs_session → ready_for_skuvault
+ */
+export const DECISION_SUBPHASES = {
+  NEEDS_CATEGORIZATION: 'needs_categorization',  // SKUs not yet assigned to collections
+  NEEDS_FOOTPRINT: 'needs_footprint',            // Footprint not yet calculated
+  NEEDS_PACKAGING: 'needs_packaging',            // Footprint has no packaging type mapping
+  NEEDS_SESSION: 'needs_session',                // Ready for sessioning but not yet grouped
+  READY_FOR_SKUVAULT: 'ready_for_skuvault',      // In session, ready to push to SkuVault
+} as const;
+
+export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_SUBPHASES];
+
+/**
+ * Valid state transitions for lifecycle phases
+ */
+export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
+  [LIFECYCLE_PHASES.AWAITING_DECISIONS]: [LIFECYCLE_PHASES.READY_TO_PICK],
+  [LIFECYCLE_PHASES.READY_TO_PICK]: [LIFECYCLE_PHASES.PICKING, LIFECYCLE_PHASES.PICKING_ISSUES],
+  [LIFECYCLE_PHASES.PICKING]: [LIFECYCLE_PHASES.PACKING_READY, LIFECYCLE_PHASES.PICKING_ISSUES],
+  [LIFECYCLE_PHASES.PACKING_READY]: [LIFECYCLE_PHASES.ON_DOCK],
+  [LIFECYCLE_PHASES.ON_DOCK]: [], // Terminal state
+  [LIFECYCLE_PHASES.PICKING_ISSUES]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.PICKING], // Can be resolved back
+};
+
+/**
+ * Valid state transitions for decision subphases (within AWAITING_DECISIONS)
+ */
+export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> = {
+  [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: [DECISION_SUBPHASES.NEEDS_FOOTPRINT],
+  [DECISION_SUBPHASES.NEEDS_FOOTPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
+  [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_SESSION],
+  [DECISION_SUBPHASES.NEEDS_SESSION]: [DECISION_SUBPHASES.READY_FOR_SKUVAULT],
+  [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits AWAITING_DECISIONS phase
+};
+
 // Users table for warehouse staff
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
