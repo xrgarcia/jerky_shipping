@@ -342,6 +342,7 @@ export const shipments = pgTable("shipments", {
   qcStationId: varchar("qc_station_id"), // FK to stations table - where this order was packed (set during QC)
   footprintId: varchar("footprint_id"), // FK to footprints table - calculated collection composition
   packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
+  assignedStationId: varchar("assigned_station_id"), // FK to stations table - where this order should be routed for packing (auto-assigned from packagingType.stationType)
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
   footprintStatus: text("footprint_status"), // 'complete' (footprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
@@ -396,6 +397,7 @@ export const shipments = pgTable("shipments", {
   qcStationIdIdx: index("shipments_qc_station_id_idx").on(table.qcStationId).where(sql`${table.qcStationId} IS NOT NULL`),
   footprintIdIdx: index("shipments_footprint_id_idx").on(table.footprintId).where(sql`${table.footprintId} IS NOT NULL`),
   packagingTypeIdIdx: index("shipments_packaging_type_id_idx").on(table.packagingTypeId).where(sql`${table.packagingTypeId} IS NOT NULL`),
+  assignedStationIdIdx: index("shipments_assigned_station_id_idx").on(table.assignedStationId).where(sql`${table.assignedStationId} IS NOT NULL`),
   packagingDecisionTypeIdx: index("shipments_packaging_decision_type_idx").on(table.packagingDecisionType).where(sql`${table.packagingDecisionType} IS NOT NULL`),
   footprintStatusIdx: index("shipments_footprint_status_idx").on(table.footprintStatus).where(sql`${table.footprintStatus} IS NOT NULL`),
   // Lifecycle tracking indexes (Phase 6)
@@ -480,6 +482,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   qcStationId: z.string().nullish(),
   footprintId: z.string().nullish(),
   packagingTypeId: z.string().nullish(),
+  assignedStationId: z.string().nullish(),
   packagingDecisionType: z.string().nullish(),
   // Lifecycle tracking (Phase 6)
   lifecyclePhase: z.string().nullish(),
