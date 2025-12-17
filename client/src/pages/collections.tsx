@@ -83,6 +83,23 @@ interface FiltersResponse {
   suppliers: string[];
 }
 
+interface UncategorizedProduct {
+  sku: string;
+  description: string | null;
+  shipmentCount: number;
+}
+
+interface UncategorizedResponse {
+  uncategorizedProducts: UncategorizedProduct[];
+  stats: {
+    totalProducts: number;
+    categorizedProducts: number;
+    totalShipments: number;
+    shipmentsComplete: number;
+    shipmentsPending: number;
+  };
+}
+
 export default function Collections() {
   const { toast } = useToast();
   
@@ -98,6 +115,7 @@ export default function Collections() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [kitFilter, setKitFilter] = useState("either");
+  const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
 
   // Debounce search input
@@ -123,8 +141,20 @@ export default function Collections() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
+  // Fetch uncategorized products
+  const { data: uncategorizedData } = useQuery<UncategorizedResponse>({
+    queryKey: ["/api/packing-decisions/uncategorized"],
+    staleTime: 30 * 1000, // Refresh every 30 seconds
+  });
+
+  const uncategorizedSkus = useMemo(() => {
+    return new Set(uncategorizedData?.uncategorizedProducts.map(p => p.sku) || []);
+  }, [uncategorizedData]);
+
+  const uncategorizedCount = uncategorizedData?.uncategorizedProducts.length || 0;
+
   // Check if we have any active filters
-  const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either";
+  const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
   const shouldQuery = debouncedSearch.length >= 2 || hasActiveFilters;
 
   const productCatalogQuery = useQuery<ProductCatalogResponse>({
@@ -156,7 +186,13 @@ export default function Collections() {
   const collections = collectionsData?.collections || [];
   const selectedCollection = collections.find(c => c.id === selectedCollectionId);
   const collectionProducts = collectionProductsData?.mappings || [];
-  const catalogProducts = catalogData?.products || [];
+  
+  // Filter catalog products by uncategorized if checkbox is checked
+  const catalogProducts = useMemo(() => {
+    const products = catalogData?.products || [];
+    if (!showUncategorizedOnly) return products;
+    return products.filter(p => uncategorizedSkus.has(p.sku));
+  }, [catalogData?.products, showUncategorizedOnly, uncategorizedSkus]);
 
   const assignedSkusInCollection = useMemo(() => {
     return new Set(collectionProducts.map(m => m.sku));
@@ -596,7 +632,7 @@ export default function Collections() {
                 </div>
 
                 {/* Filter Dropdowns */}
-                <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="grid grid-cols-4 gap-2 mb-3 items-center">
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger className="h-8 text-xs" data-testid="select-category-filter">
                       <SelectValue placeholder="Category" />
@@ -631,6 +667,23 @@ export default function Collections() {
                       <SelectItem value="no">Non-Kit Only</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="uncategorized-filter"
+                      checked={showUncategorizedOnly}
+                      onCheckedChange={(checked) => setShowUncategorizedOnly(checked === true)}
+                      data-testid="checkbox-uncategorized-filter"
+                    />
+                    <Label htmlFor="uncategorized-filter" className="text-xs cursor-pointer">
+                      Uncategorized only
+                      {uncategorizedCount > 0 && (
+                        <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">
+                          {uncategorizedCount}
+                        </Badge>
+                      )}
+                    </Label>
+                  </div>
                 </div>
 
                 <ScrollArea className="flex-1 min-h-0">
