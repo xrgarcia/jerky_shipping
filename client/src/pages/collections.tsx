@@ -172,7 +172,8 @@ export default function Collections() {
       search: debouncedSearch, 
       category: categoryFilter, 
       supplier: supplierFilter, 
-      isKit: kitFilter 
+      isKit: kitFilter,
+      loadAll: showUncategorizedOnly || !!selectedCollectionId
     }],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -180,6 +181,8 @@ export default function Collections() {
       if (categoryFilter !== "all") params.set("category", categoryFilter);
       if (supplierFilter !== "all") params.set("supplier", supplierFilter);
       if (kitFilter !== "either") params.set("isKit", kitFilter);
+      // Load all products when showing uncategorized or when a collection is selected
+      if (showUncategorizedOnly || selectedCollectionId) params.set("loadAll", "true");
       
       const res = await fetch(`/api/product-catalog?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch products");

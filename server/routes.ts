@@ -9495,15 +9495,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search product catalog from reporting database
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
-      const { search, category, supplier, isKit } = req.query;
+      const { search, category, supplier, isKit, loadAll } = req.query;
       
       const searchTerm = search ? `%${String(search)}%` : null;
       const categoryFilter = category && category !== "all" ? String(category) : null;
       const supplierFilter = supplier && supplier !== "all" ? String(supplier) : null;
+      const shouldLoadAll = loadAll === "true";
       
-      // Need at least a search term or one filter
+      // Need at least a search term, one filter, or explicit loadAll flag
       const hasFilters = categoryFilter || supplierFilter || isKit === "yes" || isKit === "no";
-      if (!searchTerm && !hasFilters) {
+      if (!searchTerm && !hasFilters && !shouldLoadAll) {
         return res.json({ products: [], total: 0 });
       }
       
