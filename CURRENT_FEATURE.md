@@ -1,5 +1,29 @@
 # Ship. Smart Shipping Engine — Current Feature Under Development
 
+## Recent Progress (December 18, 2025)
+
+**Phase 6 Complete:** Shipment Lifecycle Formalization is now fully implemented with centralized transition logic.
+
+**Completed This Session:**
+- ✅ Integrated `updateShipmentLifecycle()` into all event handlers
+- ✅ ShipStation ETL service now triggers lifecycle updates after every create/update
+- ✅ Shipment sync worker triggers lifecycle updates on status changes (e.g., cancelled)
+- ✅ Firestore sync worker triggers lifecycle updates on session status changes
+- ✅ Routes.ts packaging assignment triggers lifecycle updates
+- ✅ Fulfillment session service triggers lifecycle updates on session creation
+- ✅ Logs confirm transitions working: `[Lifecycle] JK3825355601: packing_ready → on_dock`
+
+**Key Files Modified:**
+- `server/services/lifecycle-service.ts` — Central `updateShipmentLifecycle()` function
+- `server/services/shipstation-shipment-etl-service.ts` — Lifecycle hook after ETL
+- `server/shipment-sync-worker.ts` — Lifecycle hook for cancelled shipments
+- `server/firestore-session-sync-worker.ts` — Lifecycle hook for SkuVault session updates
+- `server/services/fulfillment-session-service.ts` — Lifecycle hook for session building
+
+**Next Steps:** Phase 7 (Carrier Rate Integration) or Phase 8 (Session Management UI)
+
+---
+
 ## Feature Overview
 
 **Ship.** is an intelligent decision layer that sits upstream of ShipStation and SkuVault. It automatically decides packaging, carrier/service, and packing station routing for every order before it enters the picking phase.
@@ -410,6 +434,12 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 - [x] Hook into ShipStation webhook processor (via `shipstation-shipment-etl-service.ts` and `shipment-sync-worker.ts`)
 - [x] Hook into Firestore/SkuVault sync worker (`firestore-session-sync-worker.ts`)
 - [x] Hook into Ship. internal actions (packaging assignment in `routes.ts`, session creation in `fulfillment-session-service.ts`)
+
+**Implementation Details:**
+- `lifecycle-service.ts` exports `updateShipmentLifecycle(shipmentId, options)` with optional logging
+- `deriveLifecyclePhase()` checks conditions in priority order: tracking → session status → default
+- OOP principle followed: services encapsulate logic, data changes trigger updates via single function
+- Transitions logged with format: `[Lifecycle] {orderNumber}: {oldPhase} → {newPhase}`
 
 ---
 
