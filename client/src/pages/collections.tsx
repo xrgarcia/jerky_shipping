@@ -130,10 +130,16 @@ export default function Collections() {
     return () => clearTimeout(timer);
   }, [productSearch]);
 
-  // Auto-enable uncategorized filter when a collection is selected
+  // Auto-enable uncategorized filter and clear search when a collection is selected
   useEffect(() => {
     if (selectedCollectionId) {
       setShowUncategorizedOnly(true);
+      setProductSearch("");
+      setDebouncedSearch("");
+      setCategoryFilter("all");
+      setSupplierFilter("all");
+      setKitFilter("either");
+      setSelectedSkus(new Set());
     }
   }, [selectedCollectionId]);
 
