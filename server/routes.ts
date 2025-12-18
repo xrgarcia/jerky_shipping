@@ -9605,6 +9605,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all SKUs that have collection assignments (for filtering uncategorized in catalog)
+  app.get("/api/collections/assigned-skus", requireAuth, async (req, res) => {
+    try {
+      const { productCollectionMappings } = await import("@shared/schema");
+      
+      const result = await db
+        .selectDistinct({ sku: productCollectionMappings.sku })
+        .from(productCollectionMappings);
+      
+      const assignedSkus = result.map(r => r.sku);
+      res.json({ assignedSkus });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching assigned SKUs:", error);
+      res.status(500).json({ error: "Failed to fetch assigned SKUs" });
+    }
+  });
+
   // Quick-assign a product to a collection and recalculate footprints
   // Uses product_collection_mappings as source of truth - no need to update QC items
   app.post("/api/packing-decisions/assign", requireAuth, async (req, res) => {

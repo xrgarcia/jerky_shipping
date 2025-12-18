@@ -100,6 +100,10 @@ interface UncategorizedResponse {
   };
 }
 
+interface AssignedSkusResponse {
+  assignedSkus: string[];
+}
+
 export default function Collections() {
   const { toast } = useToast();
   
@@ -126,6 +130,13 @@ export default function Collections() {
     return () => clearTimeout(timer);
   }, [productSearch]);
 
+  // Auto-enable uncategorized filter when a collection is selected
+  useEffect(() => {
+    if (selectedCollectionId) {
+      setShowUncategorizedOnly(true);
+    }
+  }, [selectedCollectionId]);
+
   const { data: collectionsData, isLoading: collectionsLoading, refetch: refetchCollections } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections"],
   });
@@ -141,17 +152,15 @@ export default function Collections() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  // Fetch uncategorized products
-  const { data: uncategorizedData } = useQuery<UncategorizedResponse>({
-    queryKey: ["/api/packing-decisions/uncategorized"],
-    staleTime: 30 * 1000, // Refresh every 30 seconds
+  // Fetch all SKUs that have collection assignments (for uncategorized filter)
+  const { data: assignedSkusData } = useQuery<AssignedSkusResponse>({
+    queryKey: ["/api/collections/assigned-skus"],
+    staleTime: 30 * 1000,
   });
 
-  const uncategorizedSkus = useMemo(() => {
-    return new Set(uncategorizedData?.uncategorizedProducts.map(p => p.sku) || []);
-  }, [uncategorizedData]);
-
-  const uncategorizedCount = uncategorizedData?.uncategorizedProducts.length || 0;
+  const assignedSkusGlobal = useMemo(() => {
+    return new Set(assignedSkusData?.assignedSkus || []);
+  }, [assignedSkusData]);
 
   // Check if we have any active filters
   const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
@@ -189,11 +198,13 @@ export default function Collections() {
   const collectionProducts = collectionProductsData?.mappings || [];
   
   // Filter catalog products by uncategorized if checkbox is checked
+  // Uses assignedSkusGlobal (all SKUs with ANY collection) for accurate filtering
   const catalogProducts = useMemo(() => {
     const products = catalogData?.products || [];
     if (!showUncategorizedOnly) return products;
-    return products.filter(p => uncategorizedSkus.has(p.sku));
-  }, [catalogData?.products, showUncategorizedOnly, uncategorizedSkus]);
+    // Show products that are NOT in any collection
+    return products.filter(p => !assignedSkusGlobal.has(p.sku));
+  }, [catalogData?.products, showUncategorizedOnly, assignedSkusGlobal]);
 
   const assignedSkusInCollection = useMemo(() => {
     return new Set(collectionProducts.map(m => m.sku));
@@ -272,7 +283,7 @@ export default function Collections() {
       toast({ title: "Products added to collection" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections", selectedCollectionId, "products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/assigned-skus"] });
       setSelectedSkus(new Set());
     },
     onError: (error: Error) => {
@@ -293,6 +304,7 @@ export default function Collections() {
       toast({ title: "Product removed from collection" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections", selectedCollectionId, "products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/assigned-skus"] });
     },
     onError: (error: Error) => {
       toast({
@@ -678,11 +690,6 @@ export default function Collections() {
                     />
                     <Label htmlFor="uncategorized-filter" className="text-xs cursor-pointer">
                       Uncategorized only
-                      {uncategorizedCount > 0 && (
-                        <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">
-                          {uncategorizedCount}
-                        </Badge>
-                      )}
                     </Label>
                   </div>
                 </div>
