@@ -404,12 +404,12 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 
 ---
 
-**Step 1b: Centralized Transition Function** 🔄
-- [ ] Update `deriveLifecyclePhase()` with exact conditions (including `status = 'AC'` for on_dock)
-- [ ] Create `updateShipmentLifecycle(shipmentId)` function in storage or service layer
-- [ ] Hook into ShipStation webhook processor
-- [ ] Hook into Firestore/SkuVault sync worker
-- [ ] Hook into Ship. internal actions (packaging assignment, session creation)
+**Step 1b: Centralized Transition Function** ✅
+- [x] Update `deriveLifecyclePhase()` with exact conditions (including `status = 'AC'` for on_dock)
+- [x] Create `updateShipmentLifecycle(shipmentId)` function in storage or service layer
+- [x] Hook into ShipStation webhook processor (via `shipstation-shipment-etl-service.ts` and `shipment-sync-worker.ts`)
+- [x] Hook into Firestore/SkuVault sync worker (`firestore-session-sync-worker.ts`)
+- [x] Hook into Ship. internal actions (packaging assignment in `routes.ts`, session creation in `fulfillment-session-service.ts`)
 
 ---
 
