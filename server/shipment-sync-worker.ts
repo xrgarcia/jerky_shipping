@@ -54,6 +54,7 @@ import {
 } from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
+import { updateShipmentLifecycle } from './services/lifecycle-service';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -162,6 +163,8 @@ async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<
           shipmentStatus: 'cancelled',
           reverseSyncLastCheckedAt: new Date(),
         });
+        // Update lifecycle phase after status change
+        await updateShipmentLifecycle(dbShipment.id, { logTransition: true });
         log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marked as cancelled`);
       }
       return { message, success: true, statusChanged: true, rateLimit };
