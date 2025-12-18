@@ -717,7 +717,7 @@ export default function Collections() {
                       {/* Select All Row */}
                       {selectableProducts.length > 0 && (
                         <div 
-                          className="flex items-center gap-3 p-2 rounded border bg-muted/30 mb-2 sticky top-0 z-10"
+                          className="flex items-center gap-3 p-2 rounded border bg-card mb-2 sticky top-0 z-10"
                           data-testid="select-all-row"
                         >
                           <Checkbox
