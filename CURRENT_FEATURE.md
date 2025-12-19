@@ -1,10 +1,37 @@
 # Ship. Smart Shipping Engine — Current Feature Under Development
 
-## Recent Progress (December 18, 2025)
+## Recent Progress (December 19, 2025)
+
+**Completed: Centralized SkuVault Product Catalog**
+
+Created a new `skuvault_products` table as the single source of truth for product catalog data, synced hourly from the reporting database.
+
+**What was built:**
+- ✅ New `skuvault_products` schema with SKU, title, barcode, category, AP flag, unit cost, and image URL
+- ✅ Sync service fetches data from GCP reporting database (inventory_forecasts_daily + internal_kit_inventory)
+- ✅ Union query merges individual products (701) + kit products (1662) → 2167 unique SKUs
+- ✅ Image URL resolution waterfall: productVariants → shipmentItems → null
+- ✅ Hourly worker checks for new `stock_check_date` and triggers truncate-and-reload sync
+- ✅ Redis tracks last synced date to avoid redundant syncs
+
+**Key Files:**
+- `shared/schema.ts` — Added `skuvaultProducts` table definition
+- `server/services/skuvault-products-sync-service.ts` — Union query, image resolution, batch insert
+- `server/skuvault-products-sync-worker.ts` — Hourly worker with manual force sync support
+- `server/index.ts` — Worker startup integration
+
+**Sync Performance:**
+- 2167 products synced in ~2 seconds
+- 811 products (37%) have resolved image URLs
+- 1653 products are assembled products (kits)
+
+---
+
+## Previous Progress (December 18, 2025)
 
 **Phase 6 Complete:** Shipment Lifecycle Formalization is now fully implemented with centralized transition logic.
 
-**Completed This Session:**
+**Completed:**
 - ✅ Integrated `updateShipmentLifecycle()` into all event handlers
 - ✅ ShipStation ETL service now triggers lifecycle updates after every create/update
 - ✅ Shipment sync worker triggers lifecycle updates on status changes (e.g., cancelled)

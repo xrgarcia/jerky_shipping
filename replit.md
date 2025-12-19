@@ -85,6 +85,25 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 -   **Neon Database**: Serverless PostgreSQL database for primary data storage.
 -   **GCP PostgreSQL**: Separate reporting database for purchase order recommendations and inventory forecasting analytics.
 
+### SkuVault Products (Centralized Product Catalog)
+The `skuvault_products` table is the local single source of truth for product catalog data, synced hourly from the GCP reporting database.
+
+**Data Sources:**
+- `inventory_forecasts_daily` — Individual products (~701 SKUs)
+- `internal_kit_inventory` — Kit/AP products (~1662 SKUs)
+- Union query merges both sources, deduplicates by SKU (individual products take precedence)
+
+**Key Fields:**
+- `sku` (PK), `product_title`, `barcode`, `product_category`, `is_assembled_product`, `unit_cost`
+- `product_image_url` — Resolved via waterfall: productVariants → shipmentItems → null
+- `stock_check_date` — Date of the data snapshot from reporting database
+
+**Sync Worker:**
+- `server/skuvault-products-sync-worker.ts` — Runs hourly, checks for new `stock_check_date`
+- Truncate-and-reload strategy (fast, no incremental complexity)
+- Redis tracks last synced date to avoid redundant syncs
+- ~2167 products synced in ~2 seconds
+
 ### Reporting Database Schema
 The reporting database (`REPORTING_DATABASE_URL`) is a separate GCP PostgreSQL instance used for analytics and product catalog data. Connection is established via `server/reporting-db.ts` using the `reportingSql` client.
 
@@ -95,6 +114,7 @@ The reporting database (`REPORTING_DATABASE_URL`) is a separate GCP PostgreSQL i
 **Usage:**
 - **PO Recommendations**: Uses `vw_po_recommendations` view for purchase order suggestions
 - **Collection Management (Ship.)**: Managers use product catalog data to assign products to collections for footprint detection
+- **SkuVault Products Sync**: Hourly sync populates local `skuvault_products` table for fast product lookups
 
 **Important Note:** For live order processing, the SkuVault API provides already-exploded order line items with barcodes (via the QC Sale endpoint used by boxing/bagging pages). Ship. does not need to perform kit explosion at runtime—SkuVault handles this.
 
