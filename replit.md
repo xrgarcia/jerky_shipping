@@ -104,6 +104,16 @@ The `skuvault_products` table is the local single source of truth for product ca
 - Redis tracks last synced date to avoid redundant syncs
 - ~2167 products synced in ~2 seconds
 
+**Product Lookup Services:**
+- `server/services/product-lookup.ts` — Direct database queries to `skuvault_products` table
+  - `getProduct(sku)` — Single product lookup
+  - `getProductsBatch(skus)` — Batch product lookup (more efficient for multiple products)
+  - Used by QC item hydrator for boxing/bagging pages
+- `server/services/kit-mappings-cache.ts` — Kit→component mappings from GCP `vw_internal_kit_component_inventory_latest`
+  - Redis-cached with automatic refresh
+  - `getKitComponents(sku)` — Get component SKUs for a kit
+  - `getKitMappingsStats()` — Cache statistics for monitoring
+
 ### Reporting Database Schema
 The reporting database (`REPORTING_DATABASE_URL`) is a separate GCP PostgreSQL instance used for analytics and product catalog data. Connection is established via `server/reporting-db.ts` using the `reportingSql` client.
 
