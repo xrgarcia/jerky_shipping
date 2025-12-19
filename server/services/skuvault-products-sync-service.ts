@@ -9,15 +9,16 @@
  * 1. Individual products: inventory_forecasts_daily + internal_inventory
  * 2. Kit products: internal_kit_inventory
  * 
- * Image URL resolution priority:
- * 1. productVariants table (Shopify catalog)
- * 2. shipmentItems table (most recent)
- * 3. null (fallback to default)
+ * Image URL resolution priority (waterfall):
+ * 1. productVariants.imageUrl (variant-specific image)
+ * 2. products.imageUrl (parent product image - Shopify often stores images here)
+ * 3. shipmentItems.imageUrl (most recent order)
+ * 4. null (fallback)
  */
 
 import { reportingSql } from '../reporting-db';
 import { db } from '../db';
-import { skuvaultProducts, productVariants, shipmentItems, shipments } from '@shared/schema';
+import { skuvaultProducts, productVariants, products, shipmentItems, shipments } from '@shared/schema';
 import { eq, sql, desc, isNull } from 'drizzle-orm';
 import { getRedisClient } from '../utils/queue';
 
@@ -140,23 +141,40 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
 
 /**
  * Resolve product image URL using waterfall logic:
- * 1. productVariants (Shopify catalog) - by SKU
- * 2. shipmentItems (most recent) - by SKU
- * 3. null (fallback)
+ * 1. productVariants.imageUrl (variant-specific image)
+ * 2. products.imageUrl (parent product image - Shopify often stores images here)
+ * 3. shipmentItems (most recent) - by SKU
+ * 4. null (fallback)
  */
 async function resolveImageUrl(sku: string): Promise<string | null> {
-  // 1. Check productVariants (Shopify catalog)
+  // 1. Check productVariants (variant-specific image)
   const variant = await db
-    .select({ imageUrl: productVariants.imageUrl })
+    .select({ 
+      variantImageUrl: productVariants.imageUrl,
+      productId: productVariants.productId,
+    })
     .from(productVariants)
     .where(eq(productVariants.sku, sku))
     .limit(1);
   
-  if (variant[0]?.imageUrl) {
-    return variant[0].imageUrl;
+  if (variant[0]?.variantImageUrl) {
+    return variant[0].variantImageUrl;
   }
   
-  // 2. Check shipmentItems (most recent order) - join with shipments for ordering
+  // 2. Check parent product if variant exists but has no image
+  if (variant[0]?.productId) {
+    const parentProduct = await db
+      .select({ imageUrl: products.imageUrl })
+      .from(products)
+      .where(eq(products.id, variant[0].productId))
+      .limit(1);
+    
+    if (parentProduct[0]?.imageUrl) {
+      return parentProduct[0].imageUrl;
+    }
+  }
+  
+  // 3. Check shipmentItems (most recent order) - join with shipments for ordering
   const shipmentItem = await db
     .select({ imageUrl: shipmentItems.imageUrl })
     .from(shipmentItems)
@@ -169,12 +187,13 @@ async function resolveImageUrl(sku: string): Promise<string | null> {
     return shipmentItem[0].imageUrl;
   }
   
-  // 3. Fallback to null
+  // 4. Fallback to null
   return null;
 }
 
 /**
  * Batch resolve image URLs for multiple SKUs
+ * Waterfall: variant image → parent product image → shipment item image → null
  */
 async function batchResolveImageUrls(skus: string[]): Promise<Map<string, string | null>> {
   const imageMap = new Map<string, string | null>();
@@ -183,15 +202,24 @@ async function batchResolveImageUrls(skus: string[]): Promise<Map<string, string
   
   log(`Resolving image URLs for ${skus.length} SKUs...`);
   
-  // Batch fetch from productVariants
-  const variants = await db
-    .select({ sku: productVariants.sku, imageUrl: productVariants.imageUrl })
+  // Step 1: Batch fetch from productVariants (with parent product join for fallback)
+  const variantsWithParent = await db
+    .select({ 
+      sku: productVariants.sku, 
+      variantImageUrl: productVariants.imageUrl,
+      parentImageUrl: products.imageUrl,
+    })
     .from(productVariants)
+    .leftJoin(products, eq(productVariants.productId, products.id))
     .where(sql`${productVariants.sku} IN ${skus}`);
   
-  for (const v of variants) {
-    if (v.sku && v.imageUrl) {
-      imageMap.set(v.sku, v.imageUrl);
+  for (const v of variantsWithParent) {
+    if (v.sku) {
+      // Use variant image if available, otherwise use parent image
+      const imageUrl = v.variantImageUrl || v.parentImageUrl;
+      if (imageUrl) {
+        imageMap.set(v.sku, imageUrl);
+      }
     }
   }
   
@@ -199,7 +227,7 @@ async function batchResolveImageUrls(skus: string[]): Promise<Map<string, string
   const missingSkus = skus.filter(sku => !imageMap.has(sku));
   
   if (missingSkus.length > 0) {
-    // Batch fetch from shipmentItems (get most recent per SKU)
+    // Step 2: Batch fetch from shipmentItems (get most recent per SKU)
     const shipmentImagesRaw = await db
       .select({
         sku: shipmentItems.sku,
