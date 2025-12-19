@@ -9544,20 +9544,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Uses product_collection_mappings as the source of truth for categorization
   app.get("/api/packing-decisions/uncategorized", requireAuth, async (req, res) => {
     try {
-      const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable } = await import("@shared/schema");
+      const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable, productVariants } = await import("@shared/schema");
       
       // Get products from QC items that have NO mapping in product_collection_mappings
       // AND count how many "pending_categorization" shipments they appear in
       // LEFT JOIN to mappings table and filter where mapping doesn't exist
+      // LEFT JOIN to productVariants to get imageUrl and title from Shopify
       const uncategorizedProducts = await db
         .select({
           sku: shipmentQcItems.sku,
           description: shipmentQcItems.description,
+          productTitle: productVariants.title,
+          imageUrl: productVariants.imageUrl,
           shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`.as('shipment_count'),
         })
         .from(shipmentQcItems)
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku))
+        .leftJoin(productVariants, eq(shipmentQcItems.sku, productVariants.sku))
         .where(
           and(
             // SKU has no mapping in product_collection_mappings
@@ -9565,7 +9569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(shipmentsTable.footprintStatus, 'pending_categorization')
           )
         )
-        .groupBy(shipmentQcItems.sku, shipmentQcItems.description)
+        .groupBy(shipmentQcItems.sku, shipmentQcItems.description, productVariants.title, productVariants.imageUrl)
         .orderBy(desc(sql`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`));
       
       // Get coverage stats using mappings table as source of truth

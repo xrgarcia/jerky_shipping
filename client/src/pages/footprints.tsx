@@ -96,17 +96,21 @@ interface PackagingTypesResponse {
 
 interface UncategorizedProduct {
   sku: string;
+  description: string | null;
   productTitle: string | null;
-  affectedShipments: number;
+  imageUrl: string | null;
+  shipmentCount: number;
 }
 
 interface UncategorizedResponse {
   uncategorizedProducts: UncategorizedProduct[];
   stats: {
     categorizedProducts: number;
-  };
-  pendingShipments: {
-    pending: number;
+    totalProducts: number;
+    totalShipments: number;
+    shipmentsComplete: number;
+    shipmentsPending: number;
+    oldestOrderDate: string | null;
   };
 }
 
@@ -723,39 +727,52 @@ export default function Footprints() {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-2">
+                <ScrollArea className="h-[500px]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {uncategorizedProducts.map((product, index) => (
                       <div
                         key={`${product.sku}-${index}`}
-                        className="flex items-center gap-4 p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                        className="flex flex-col p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                         data-testid={`row-uncategorized-${product.sku}`}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                            <span className="font-mono text-sm font-medium">{product.sku}</span>
+                        <div className="flex gap-3 mb-3">
+                          <div className="flex-shrink-0 w-16 h-16 rounded-md bg-muted overflow-hidden border">
+                            {product.imageUrl ? (
+                              <img
+                                src={product.imageUrl}
+                                alt={product.productTitle || product.sku}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`w-full h-full flex items-center justify-center ${product.imageUrl ? 'hidden' : ''}`}>
+                              <Package className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           </div>
-                          {product.productTitle && (
-                            <p className="text-sm text-muted-foreground mt-1 truncate">
-                              {product.productTitle}
-                            </p>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                              {product.productTitle || product.description || 'Unknown Product'}
+                            </h4>
+                            <p className="font-mono text-xs text-muted-foreground mt-1">{product.sku}</p>
+                            <Badge variant="secondary" className="mt-2 text-xs">
+                              <Truck className="h-3 w-3 mr-1" />
+                              {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
+                            </Badge>
+                          </div>
                         </div>
 
-                        <Badge variant="secondary" className="flex-shrink-0">
-                          <Truck className="h-3 w-3 mr-1" />
-                          {product.affectedShipments} shipment{product.affectedShipments !== 1 ? 's' : ''}
-                        </Badge>
-
-                        <div className="flex items-center gap-2 flex-shrink-0 min-w-[220px] justify-end">
+                        <div className="flex items-center gap-2 mt-auto">
                           {getStatusIndicator(`cat-${product.sku}`)}
                           <Select
                             onValueChange={(value) => handleCategorize(product.sku, value)}
                             disabled={!!inlineStatus[`cat-${product.sku}`]}
                           >
                             <SelectTrigger
-                              className="w-[180px]"
+                              className="w-full"
                               data-testid={`select-collection-${product.sku}`}
                             >
                               <SelectValue placeholder="Assign to collection..." />
