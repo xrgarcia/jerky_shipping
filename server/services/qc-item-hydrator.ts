@@ -25,12 +25,12 @@ import {
 } from '@shared/schema';
 import { eq, and, exists, sql, notExists, inArray } from 'drizzle-orm';
 import { 
-  ensureCacheFresh, 
-  getProduct, 
+  ensureKitMappingsFresh, 
   isKit, 
   getKitComponents,
-  getCacheStats,
-} from './product-catalog-cache';
+  getKitCacheStats,
+} from './kit-mappings-cache';
+import { getProductsBatch, type ProductInfo } from './product-lookup';
 
 const log = (message: string) => console.log(`[qc-item-hydrator] ${message}`);
 
@@ -332,9 +332,17 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found' };
     }
     
-    // Build list of all SKUs we'll need (including exploded kit components)
-    const allSkus: string[] = [];
-    const qcItemsToInsert: InsertShipmentQcItem[] = [];
+    // Phase 1: Build list of all SKUs we need (including exploded kit components)
+    // This is a pre-pass to collect all SKUs for batch lookup
+    const skusToLookup: string[] = [];
+    interface ItemToProcess {
+      sku: string;
+      name: string | null;
+      quantity: number;
+      isKitComponent: boolean;
+      parentSku: string | null;
+    }
+    const itemsToProcess: ItemToProcess[] = [];
     
     for (const item of items) {
       if (!item.sku) continue;
@@ -342,75 +350,77 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
       const sku = item.sku;
       const quantity = item.quantity || 1;
       
-      // Check if this is a kit
       if (isKit(sku)) {
         const components = getKitComponents(sku);
         if (components && components.length > 0) {
-          // Explode kit into components
           for (const comp of components) {
-            const product = getProduct(comp.componentSku);
             const totalQty = quantity * comp.componentQuantity;
-            
-            allSkus.push(comp.componentSku);
-            qcItemsToInsert.push({
-              shipmentId,
+            skusToLookup.push(comp.componentSku);
+            itemsToProcess.push({
               sku: comp.componentSku,
-              barcode: product?.barcode || null,
-              description: product?.description || null,
-              quantityExpected: totalQty,
-              quantityScanned: 0,
-              collectionId: null, // Will be filled in batch
-              syncedToSkuvault: false,
+              name: null,
+              quantity: totalQty,
               isKitComponent: true,
               parentSku: sku,
             });
           }
         } else {
-          // Kit but no components found - treat as regular item
-          const product = getProduct(sku);
-          allSkus.push(sku);
-          qcItemsToInsert.push({
-            shipmentId,
+          skusToLookup.push(sku);
+          itemsToProcess.push({
             sku,
-            barcode: product?.barcode || null,
-            description: product?.description || item.name || null,
-            quantityExpected: quantity,
-            quantityScanned: 0,
-            collectionId: null,
-            syncedToSkuvault: false,
+            name: item.name,
+            quantity,
             isKitComponent: false,
             parentSku: null,
           });
         }
       } else {
-        // Regular product
-        const product = getProduct(sku);
-        allSkus.push(sku);
-        qcItemsToInsert.push({
-          shipmentId,
+        skusToLookup.push(sku);
+        itemsToProcess.push({
           sku,
-          barcode: product?.barcode || null,
-          description: product?.description || item.name || null,
-          quantityExpected: quantity,
-          quantityScanned: 0,
-          collectionId: null,
-          syncedToSkuvault: false,
+          name: item.name,
+          quantity,
           isKitComponent: false,
           parentSku: null,
         });
       }
     }
     
-    if (qcItemsToInsert.length === 0) {
+    if (itemsToProcess.length === 0) {
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No items to insert after processing' };
     }
     
-    // Batch fetch collection mappings
+    // Phase 2: Batch fetch product info from local skuvault_products table
+    const productCache = await getProductsBatch(skusToLookup);
+    
+    // Phase 3: Build QC items with product info
+    const qcItemsToInsert: InsertShipmentQcItem[] = [];
+    const allSkus: string[] = [];
+    
+    for (const item of itemsToProcess) {
+      const product = productCache.get(item.sku);
+      allSkus.push(item.sku);
+      
+      qcItemsToInsert.push({
+        shipmentId,
+        sku: item.sku,
+        barcode: product?.barcode || null,
+        description: product?.description || item.name || null,
+        quantityExpected: item.quantity,
+        quantityScanned: 0,
+        collectionId: null, // Will be filled in batch
+        syncedToSkuvault: false,
+        isKitComponent: item.isKitComponent,
+        parentSku: item.parentSku,
+      });
+    }
+    
+    // Phase 4: Batch fetch collection mappings
     const collectionCache = await buildCollectionCache(allSkus);
     
     // Fill in collection IDs
-    for (const item of qcItemsToInsert) {
-      item.collectionId = collectionCache.get(item.sku) || null;
+    for (const qcItem of qcItemsToInsert) {
+      qcItem.collectionId = collectionCache.get(qcItem.sku) || null;
     }
     
     // Insert all QC items
@@ -451,15 +461,15 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
   };
   
   try {
-    // Ensure caches are fresh before processing
-    const cacheRefreshed = await ensureCacheFresh();
+    // Ensure kit mappings cache is fresh before processing
+    const cacheRefreshed = await ensureKitMappingsFresh();
     if (cacheRefreshed) {
-      log('Cache was refreshed with new data');
+      log('Kit mappings cache was refreshed with new data');
     }
     
-    const cacheStats = getCacheStats();
-    if (cacheStats.productCount === 0) {
-      log('Warning: Product catalog cache is empty');
+    const cacheStats = getKitCacheStats();
+    if (cacheStats.kitCount === 0) {
+      log('Warning: Kit mappings cache is empty');
     }
     
     // Find shipments needing hydration
@@ -511,12 +521,12 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
  */
 export async function getHydrationStatus(): Promise<{
   pendingCount: number;
-  cacheStats: ReturnType<typeof getCacheStats>;
+  kitCacheStats: ReturnType<typeof getKitCacheStats>;
 }> {
   const pending = await findShipmentsNeedingHydration(1000);
   return {
     pendingCount: pending.length,
-    cacheStats: getCacheStats(),
+    kitCacheStats: getKitCacheStats(),
   };
 }
 

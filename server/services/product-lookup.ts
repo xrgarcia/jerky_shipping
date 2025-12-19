@@ -55,7 +55,7 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
 export async function getProductsBatch(skus: string[]): Promise<Map<string, ProductInfo>> {
   if (skus.length === 0) return new Map();
   
-  const uniqueSkus = [...new Set(skus)];
+  const uniqueSkus = Array.from(new Set(skus));
   
   const results = await db
     .select({
