@@ -222,6 +222,7 @@ export default function Footprints() {
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetailResponse>>({});
   const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<UncategorizedProduct | null>(null);
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -727,16 +728,16 @@ export default function Footprints() {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="h-[500px]">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <ScrollArea className="h-[600px]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {uncategorizedProducts.map((product, index) => (
                       <div
                         key={`${product.sku}-${index}`}
                         className="flex flex-col p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                         data-testid={`row-uncategorized-${product.sku}`}
                       >
-                        <div className="flex gap-3 mb-3">
-                          <div className="flex-shrink-0 w-16 h-16 rounded-md bg-muted overflow-hidden border">
+                        <div className="flex gap-4 mb-3">
+                          <div className="flex-shrink-0 w-24 h-24 rounded-md bg-muted overflow-hidden border">
                             {product.imageUrl ? (
                               <img
                                 src={product.imageUrl}
@@ -750,18 +751,30 @@ export default function Footprints() {
                               />
                             ) : null}
                             <div className={`w-full h-full flex items-center justify-center ${product.imageUrl ? 'hidden' : ''}`}>
-                              <Package className="h-8 w-8 text-muted-foreground" />
+                              <Package className="h-10 w-10 text-muted-foreground" />
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm leading-tight line-clamp-2">
+                            <h4 className="font-medium text-sm leading-snug">
                               {product.productTitle || product.description || 'Unknown Product'}
                             </h4>
                             <p className="font-mono text-xs text-muted-foreground mt-1">{product.sku}</p>
-                            <Badge variant="secondary" className="mt-2 text-xs">
-                              <Truck className="h-3 w-3 mr-1" />
-                              {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
-                            </Badge>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <Badge variant="secondary" className="text-xs">
+                                <Truck className="h-3 w-3 mr-1" />
+                                {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => setSelectedProduct(product)}
+                                data-testid={`button-view-${product.sku}`}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
@@ -795,6 +808,88 @@ export default function Footprints() {
                   </div>
                 </ScrollArea>
               )}
+
+              {/* Product Details Modal */}
+              <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Product Details</DialogTitle>
+                    <DialogDescription>
+                      Review product information before assigning to a collection
+                    </DialogDescription>
+                  </DialogHeader>
+                  {selectedProduct && (
+                    <div className="space-y-4">
+                      <div className="flex justify-center">
+                        <div className="w-48 h-48 rounded-lg bg-muted overflow-hidden border">
+                          {selectedProduct.imageUrl ? (
+                            <img
+                              src={selectedProduct.imageUrl}
+                              alt={selectedProduct.productTitle || selectedProduct.sku}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="h-16 w-16 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Product Title</Label>
+                          <p className="font-medium">
+                            {selectedProduct.productTitle || selectedProduct.description || 'Unknown Product'}
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs text-muted-foreground">SKU</Label>
+                          <p className="font-mono text-sm">{selectedProduct.sku}</p>
+                        </div>
+                        
+                        {selectedProduct.description && selectedProduct.productTitle !== selectedProduct.description && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Description</Label>
+                            <p className="text-sm">{selectedProduct.description}</p>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Affected Shipments</Label>
+                          <Badge variant="secondary" className="mt-1">
+                            <Truck className="h-3 w-3 mr-1" />
+                            {selectedProduct.shipmentCount} shipment{selectedProduct.shipmentCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Select
+                      onValueChange={(value) => {
+                        if (selectedProduct) {
+                          handleCategorize(selectedProduct.sku, value);
+                          setSelectedProduct(null);
+                        }
+                      }}
+                      disabled={selectedProduct ? !!inlineStatus[`cat-${selectedProduct.sku}`] : false}
+                    >
+                      <SelectTrigger className="w-full" data-testid="modal-select-collection">
+                        <SelectValue placeholder="Assign to collection..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {collections.map((col) => (
+                          <SelectItem key={col.id} value={col.id}>
+                            {col.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>
