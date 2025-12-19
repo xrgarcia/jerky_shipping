@@ -9686,6 +9686,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // SkuVault Products API (Centralized Product Catalog)
+  // ========================================
+
+  // Get paginated skuvault products with filtering and search
+  app.get("/api/skuvault-products", requireAuth, async (req, res) => {
+    try {
+      const { skuvaultProducts } = await import("@shared/schema");
+      
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
+      const search = (req.query.search as string || "").trim().toLowerCase();
+      const category = req.query.category as string;
+      const isAssembled = req.query.isAssembled as string;
+      
+      // Build where conditions
+      const conditions = [];
+      
+      if (search) {
+        conditions.push(
+          or(
+            sql`LOWER(${skuvaultProducts.sku}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.productTitle}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.barcode}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.productCategory}) LIKE ${`%${search}%`}`
+          )
+        );
+      }
+      
+      if (category && category !== "all") {
+        conditions.push(eq(skuvaultProducts.productCategory, category));
+      }
+      
+      if (isAssembled === "true") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, true));
+      } else if (isAssembled === "false") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, false));
+      }
+      
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      // Get total count
+      const countResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(skuvaultProducts)
+        .where(whereClause);
+      
+      const total = countResult[0]?.count || 0;
+      const totalPages = Math.ceil(total / pageSize);
+      
+      // Get paginated products
+      const products = await db
+        .select()
+        .from(skuvaultProducts)
+        .where(whereClause)
+        .orderBy(skuvaultProducts.sku)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+      
+      // Get distinct categories for filter dropdown
+      const categoriesResult = await db
+        .selectDistinct({ category: skuvaultProducts.productCategory })
+        .from(skuvaultProducts)
+        .where(sql`${skuvaultProducts.productCategory} IS NOT NULL`)
+        .orderBy(skuvaultProducts.productCategory);
+      
+      const categories = categoriesResult
+        .map(r => r.category)
+        .filter((c): c is string => c !== null);
+      
+      res.json({
+        products,
+        total,
+        page,
+        pageSize,
+        totalPages,
+        categories,
+      });
+    } catch (error: any) {
+      console.error("[SkuVault Products] Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products" });
+    }
+  });
+
+  // ========================================
   // Footprints API (Smart Shipping Engine)
   // ========================================
 

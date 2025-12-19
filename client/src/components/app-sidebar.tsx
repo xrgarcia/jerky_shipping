@@ -110,8 +110,13 @@ export function AppSidebar() {
     },
     {
       title: "Fulfillment Prep",
-      url: "/footprints",
+      url: "/fulfillment-prep",
       icon: Layers,
+    },
+    {
+      title: "SkuVault Products",
+      url: "/skuvault-products",
+      icon: Package,
     },
     {
       title: "Customer Service",
