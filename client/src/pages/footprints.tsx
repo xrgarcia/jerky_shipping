@@ -756,7 +756,7 @@ export default function Footprints() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-sm leading-snug">
-                              {product.productTitle || product.description || 'Unknown Product'}
+                              {product.description || product.productTitle || 'Unknown Product'}
                             </h4>
                             <p className="font-mono text-xs text-muted-foreground mt-1">{product.sku}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -838,9 +838,9 @@ export default function Footprints() {
                       
                       <div className="space-y-3">
                         <div>
-                          <Label className="text-xs text-muted-foreground">Product Title</Label>
+                          <Label className="text-xs text-muted-foreground">Product Name</Label>
                           <p className="font-medium">
-                            {selectedProduct.productTitle || selectedProduct.description || 'Unknown Product'}
+                            {selectedProduct.description || selectedProduct.productTitle || 'Unknown Product'}
                           </p>
                         </div>
                         
@@ -849,10 +849,10 @@ export default function Footprints() {
                           <p className="font-mono text-sm">{selectedProduct.sku}</p>
                         </div>
                         
-                        {selectedProduct.description && selectedProduct.productTitle !== selectedProduct.description && (
+                        {selectedProduct.productTitle && selectedProduct.productTitle !== selectedProduct.description && (
                           <div>
-                            <Label className="text-xs text-muted-foreground">Description</Label>
-                            <p className="text-sm">{selectedProduct.description}</p>
+                            <Label className="text-xs text-muted-foreground">Variant</Label>
+                            <p className="text-sm">{selectedProduct.productTitle}</p>
                           </div>
                         )}
                         
