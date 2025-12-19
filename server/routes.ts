@@ -9462,29 +9462,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get distinct filter options for product catalog
+  // Get distinct filter options for product catalog (from local skuvault_products table)
   app.get("/api/product-catalog/filters", requireAuth, async (req, res) => {
     try {
-      const [categories, suppliers] = await Promise.all([
-        reportingSql`
-          SELECT DISTINCT product_category 
-          FROM inventory_forecasts_daily 
-          WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
-            AND product_category IS NOT NULL AND product_category != ''
-          ORDER BY product_category
-        `,
-        reportingSql`
-          SELECT DISTINCT supplier 
-          FROM inventory_forecasts_daily 
-          WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
-            AND supplier IS NOT NULL AND supplier != ''
-          ORDER BY supplier
-        `
-      ]);
+      const { skuvaultProducts } = await import("@shared/schema");
+      
+      const categories = await db
+        .selectDistinct({ productCategory: skuvaultProducts.productCategory })
+        .from(skuvaultProducts)
+        .where(sql`${skuvaultProducts.productCategory} IS NOT NULL AND ${skuvaultProducts.productCategory} != ''`)
+        .orderBy(skuvaultProducts.productCategory);
 
       res.json({
-        categories: categories.map((r: any) => r.product_category),
-        suppliers: suppliers.map((r: any) => r.supplier)
+        categories: categories.map((r) => r.productCategory).filter(Boolean)
       });
     } catch (error: any) {
       console.error("[Product Catalog] Error fetching filters:", error);
@@ -9492,42 +9482,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Search product catalog from reporting database
+  // Search product catalog from local skuvault_products table
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
-      const { search, category, supplier, isKit, loadAll } = req.query;
+      const { search, category, isKit, loadAll } = req.query;
+      const { skuvaultProducts } = await import("@shared/schema");
       
-      const searchTerm = search ? `%${String(search)}%` : null;
+      const searchTerm = search ? String(search).trim() : null;
       const categoryFilter = category && category !== "all" ? String(category) : null;
-      const supplierFilter = supplier && supplier !== "all" ? String(supplier) : null;
       const shouldLoadAll = loadAll === "true";
       
       // Need at least a search term, one filter, or explicit loadAll flag
-      const hasFilters = categoryFilter || supplierFilter || isKit === "yes" || isKit === "no";
+      const hasFilters = categoryFilter || isKit === "yes" || isKit === "no";
       if (!searchTerm && !hasFilters && !shouldLoadAll) {
         return res.json({ products: [], total: 0 });
       }
       
-      // Determine kit filter value (null = either, true = yes, false = no)
-      const kitFilterValue = isKit === "yes" ? true : isKit === "no" ? false : null;
+      // Build conditions array
+      const conditions = [];
       
-      const products = await reportingSql`
-        SELECT DISTINCT ON (sku) 
-          sku, description, supplier, product_category, quantity_available, is_assembled_product
-        FROM inventory_forecasts_daily
-        WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM inventory_forecasts_daily)
-          AND (${searchTerm}::text IS NULL OR (
-            sku ILIKE ${searchTerm} 
-            OR description ILIKE ${searchTerm}
-            OR product_category ILIKE ${searchTerm}
-            OR supplier ILIKE ${searchTerm}
-          ))
-          AND (${categoryFilter}::text IS NULL OR product_category = ${categoryFilter})
-          AND (${supplierFilter}::text IS NULL OR supplier = ${supplierFilter})
-          AND (${kitFilterValue}::boolean IS NULL OR is_assembled_product = ${kitFilterValue})
-        ORDER BY sku
-        LIMIT 500
-      `;
+      if (searchTerm) {
+        const searchPattern = `%${searchTerm}%`;
+        conditions.push(sql`(
+          ${skuvaultProducts.sku} ILIKE ${searchPattern} 
+          OR ${skuvaultProducts.productTitle} ILIKE ${searchPattern}
+          OR ${skuvaultProducts.barcode} ILIKE ${searchPattern}
+          OR ${skuvaultProducts.productCategory} ILIKE ${searchPattern}
+        )`);
+      }
+      
+      if (categoryFilter) {
+        conditions.push(eq(skuvaultProducts.productCategory, categoryFilter));
+      }
+      
+      if (isKit === "yes") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, true));
+      } else if (isKit === "no") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, false));
+      }
+      
+      const products = await db
+        .select({
+          sku: skuvaultProducts.sku,
+          productTitle: skuvaultProducts.productTitle,
+          barcode: skuvaultProducts.barcode,
+          productCategory: skuvaultProducts.productCategory,
+          isAssembledProduct: skuvaultProducts.isAssembledProduct,
+          unitCost: skuvaultProducts.unitCost,
+          productImageUrl: skuvaultProducts.productImageUrl,
+        })
+        .from(skuvaultProducts)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(skuvaultProducts.sku)
+        .limit(500);
 
       res.json({ products, total: products.length });
     } catch (error: any) {
