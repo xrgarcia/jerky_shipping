@@ -139,10 +139,10 @@ export default function SkuvaultProducts() {
               </div>
             </div>
 
-            <div className="w-[180px]">
-              <label className="text-sm font-medium mb-1.5 block">Category</label>
+            <div className="w-[200px]">
+              <label className="text-sm font-medium mb-1.5 block">Product Category</label>
               <Select value={categoryFilter} onValueChange={handleCategoryChange}>
-                <SelectTrigger data-testid="select-category">
+                <SelectTrigger data-testid="select-product-category">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,16 +156,16 @@ export default function SkuvaultProducts() {
               </Select>
             </div>
 
-            <div className="w-[160px]">
-              <label className="text-sm font-medium mb-1.5 block">Product Type</label>
+            <div className="w-[220px]">
+              <label className="text-sm font-medium mb-1.5 block">Is Assembled Product</label>
               <Select value={assembledFilter} onValueChange={handleAssembledChange}>
-                <SelectTrigger data-testid="select-assembled">
-                  <SelectValue placeholder="All types" />
+                <SelectTrigger data-testid="select-is-assembled-product">
+                  <SelectValue placeholder="All products" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  <SelectItem value="true">Assembled (Kits)</SelectItem>
-                  <SelectItem value="false">Individual</SelectItem>
+                  <SelectItem value="all">All products</SelectItem>
+                  <SelectItem value="true">Yes (Kits/APs)</SelectItem>
+                  <SelectItem value="false">No (Individual SKUs)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -229,8 +229,8 @@ export default function SkuvaultProducts() {
                     <TableHead className="w-[150px]">SKU</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead className="w-[150px]">Barcode</TableHead>
-                    <TableHead className="w-[120px]">Category</TableHead>
-                    <TableHead className="w-[80px] text-center">Type</TableHead>
+                    <TableHead className="w-[140px]">Product Category</TableHead>
+                    <TableHead className="w-[120px] text-center">Is Assembled</TableHead>
                     <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -273,9 +273,9 @@ export default function SkuvaultProducts() {
                       </TableCell>
                       <TableCell className="text-center">
                         {product.isAssembledProduct ? (
-                          <Badge variant="default" className="text-xs">Kit</Badge>
+                          <Badge variant="default" className="text-xs">Yes</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-xs">Individual</Badge>
+                          <Badge variant="outline" className="text-xs">No</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
