@@ -46,11 +46,12 @@ import type { ProductCollection } from "@shared/schema";
 
 interface ProductCatalogItem {
   sku: string;
-  description: string;
-  supplier: string | null;
-  product_category: string | null;
-  quantity_available: number | null;
-  is_assembled_product: boolean;
+  productTitle: string | null;
+  barcode: string | null;
+  productCategory: string | null;
+  isAssembledProduct: boolean;
+  unitCost: string | null;
+  productImageUrl: string | null;
 }
 
 interface CollectionWithCount extends ProductCollection {
@@ -80,7 +81,6 @@ interface CollectionProductsResponse {
 
 interface FiltersResponse {
   categories: string[];
-  suppliers: string[];
 }
 
 interface UncategorizedProduct {
@@ -117,7 +117,6 @@ export default function Collections() {
   const [productSearch, setProductSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [supplierFilter, setSupplierFilter] = useState("all");
   const [kitFilter, setKitFilter] = useState("either");
   const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
@@ -137,7 +136,6 @@ export default function Collections() {
       setProductSearch("");
       setDebouncedSearch("");
       setCategoryFilter("all");
-      setSupplierFilter("all");
       setKitFilter("either");
       setSelectedSkus(new Set());
     }
@@ -169,7 +167,7 @@ export default function Collections() {
   }, [assignedSkusData]);
 
   // Check if we have any active filters
-  const hasActiveFilters = categoryFilter !== "all" || supplierFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
+  const hasActiveFilters = categoryFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
   // Auto-load products when a collection is selected, or when searching/filtering
   const shouldQuery = !!selectedCollectionId || debouncedSearch.length >= 2 || hasActiveFilters;
 
@@ -177,7 +175,6 @@ export default function Collections() {
     queryKey: ["/api/product-catalog", { 
       search: debouncedSearch, 
       category: categoryFilter, 
-      supplier: supplierFilter, 
       isKit: kitFilter,
       loadAll: showUncategorizedOnly || !!selectedCollectionId
     }],
@@ -185,7 +182,6 @@ export default function Collections() {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (categoryFilter !== "all") params.set("category", categoryFilter);
-      if (supplierFilter !== "all") params.set("supplier", supplierFilter);
       if (kitFilter !== "either") params.set("isKit", kitFilter);
       // Load all products when showing uncategorized or when a collection is selected
       if (showUncategorizedOnly || selectedCollectionId) params.set("loadAll", "true");
@@ -590,13 +586,13 @@ export default function Collections() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-sm font-medium">{mapping.sku}</span>
-                                {mapping.product?.is_assembled_product && (
-                                  <Badge variant="secondary" className="text-xs">Kit/AP</Badge>
+                                {mapping.product?.isAssembledProduct && (
+                                  <Badge variant="secondary" className="text-xs">AP</Badge>
                                 )}
                               </div>
-                              {mapping.product?.description && (
+                              {mapping.product?.productTitle && (
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {mapping.product.description}
+                                  {mapping.product.productTitle}
                                 </p>
                               )}
                             </div>
@@ -645,7 +641,7 @@ export default function Collections() {
                 <div className="relative mb-3">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by SKU, description, category, or supplier..."
+                    placeholder="Search by SKU, title, barcode, or category..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     className="pl-9"
@@ -654,10 +650,10 @@ export default function Collections() {
                 </div>
 
                 {/* Filter Dropdowns */}
-                <div className="grid grid-cols-4 gap-2 mb-3 items-center">
+                <div className="grid grid-cols-3 gap-2 mb-3 items-center">
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger className="h-8 text-xs" data-testid="select-category-filter">
-                      <SelectValue placeholder="Category" />
+                      <SelectValue placeholder="Product Category" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
@@ -667,26 +663,14 @@ export default function Collections() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="select-supplier-filter">
-                      <SelectValue placeholder="Supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Suppliers</SelectItem>
-                      {filtersData?.suppliers.map((sup) => (
-                        <SelectItem key={sup} value={sup}>{sup}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
                   <Select value={kitFilter} onValueChange={setKitFilter}>
                     <SelectTrigger className="h-8 text-xs" data-testid="select-kit-filter">
-                      <SelectValue placeholder="Kit/AP" />
+                      <SelectValue placeholder="Is Assembled Product" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="either">Either</SelectItem>
-                      <SelectItem value="yes">Kit/AP Only</SelectItem>
-                      <SelectItem value="no">Non-Kit Only</SelectItem>
+                      <SelectItem value="yes">AP Only</SelectItem>
+                      <SelectItem value="no">Non-AP Only</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -763,11 +747,18 @@ export default function Collections() {
                               onCheckedChange={() => toggleSkuSelection(product.sku)}
                               data-testid={`checkbox-product-${product.sku}`}
                             />
+                            {product.productImageUrl && (
+                              <img 
+                                src={product.productImageUrl} 
+                                alt={product.sku}
+                                className="w-10 h-10 object-cover rounded shrink-0"
+                              />
+                            )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-sm font-medium">{product.sku}</span>
-                                {product.is_assembled_product && (
-                                  <Badge variant="secondary" className="text-xs">Kit/AP</Badge>
+                                {product.isAssembledProduct && (
+                                  <Badge variant="secondary" className="text-xs">AP</Badge>
                                 )}
                                 {isInCollection && (
                                   <Badge variant="outline" className="text-xs text-[#6B8E23]">
@@ -777,19 +768,14 @@ export default function Collections() {
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground truncate">
-                                {product.description}
+                                {product.productTitle}
                               </p>
                             </div>
-                            <div className="text-right shrink-0">
-                              {product.supplier && (
-                                <p className="text-xs text-muted-foreground">{product.supplier}</p>
-                              )}
-                              {product.quantity_available !== null && (
-                                <p className="text-xs font-medium">
-                                  Stock: {product.quantity_available.toLocaleString()}
-                                </p>
-                              )}
-                            </div>
+                            {product.productCategory && (
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {product.productCategory}
+                              </Badge>
+                            )}
                           </div>
                         );
                       })}
