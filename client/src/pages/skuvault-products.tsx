@@ -406,9 +406,8 @@ export default function SkuvaultProducts() {
                       <TableHead className="w-[80px]">Image</TableHead>
                       <TableHead className="w-[150px]">SKU</TableHead>
                       <TableHead>Title</TableHead>
-                      <TableHead className="w-[150px]">Barcode</TableHead>
                       <TableHead className="w-[140px]">Product Category</TableHead>
-                      <TableHead className="w-[120px] text-center">Is Assembled</TableHead>
+                      <TableHead className="w-[60px] text-center">AP</TableHead>
                       <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -437,13 +436,8 @@ export default function SkuvaultProducts() {
                           </button>
                         </TableCell>
                         <TableCell>
-                          <span className="line-clamp-2" title={product.productTitle || ""}>
+                          <span title={product.productTitle || ""}>
                             {product.productTitle || "-"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-sm text-muted-foreground">
-                            {product.barcode || "-"}
                           </span>
                         </TableCell>
                         <TableCell>
