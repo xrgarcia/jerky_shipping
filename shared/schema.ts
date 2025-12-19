@@ -1325,3 +1325,48 @@ export const insertFulfillmentSessionSchema = createInsertSchema(fulfillmentSess
 
 export type InsertFulfillmentSession = z.infer<typeof insertFulfillmentSessionSchema>;
 export type FulfillmentSession = typeof fulfillmentSessions.$inferSelect;
+
+// ============================================================================
+// SKUVAULT PRODUCTS (Centralized product catalog from SkuVault/reporting DB)
+// ============================================================================
+
+/**
+ * SkuVault Products - Centralized product catalog synced hourly from reporting database
+ * 
+ * Data sources (union of two queries):
+ * 1. Individual products: inventory_forecasts_daily JOIN internal_inventory
+ * 2. Kit products: internal_kit_inventory
+ * 
+ * Primary key is SKU - duplicates between individual and kit are deduplicated.
+ * 
+ * Image URL resolution priority:
+ * 1. productVariants table (Shopify catalog)
+ * 2. shipmentItems table (most recent order)
+ * 3. orderItems → related shipment (if available)
+ * 4. null (fallback to default image)
+ */
+export const skuvaultProducts = pgTable("skuvault_products", {
+  sku: text("sku").primaryKey(), // SkuVault SKU - unique identifier
+  stockCheckDate: timestamp("stock_check_date").notNull(), // Date of the data snapshot
+  productTitle: text("product_title"), // Product description/name from SkuVault
+  barcode: text("barcode"), // Scannable barcode (internal_inventory.code)
+  productCategory: text("product_category"), // Category from inventory_forecasts_daily (or 'kit')
+  isAssembledProduct: boolean("is_assembled_product").notNull().default(false), // True for kits/APs
+  unitCost: text("unit_cost"), // Cost per unit (stored as text for precision)
+  productImageUrl: text("product_image_url"), // Resolved from products/shipments/orders
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stockCheckDateIdx: index("skuvault_products_stock_check_date_idx").on(table.stockCheckDate),
+  productCategoryIdx: index("skuvault_products_product_category_idx").on(table.productCategory).where(sql`${table.productCategory} IS NOT NULL`),
+  isAssembledProductIdx: index("skuvault_products_is_assembled_product_idx").on(table.isAssembledProduct),
+  barcodeIdx: index("skuvault_products_barcode_idx").on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
+}));
+
+export const insertSkuvaultProductSchema = createInsertSchema(skuvaultProducts).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSkuvaultProduct = z.infer<typeof insertSkuvaultProductSchema>;
+export type SkuvaultProduct = typeof skuvaultProducts.$inferSelect;
