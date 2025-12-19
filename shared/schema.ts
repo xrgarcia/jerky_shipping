@@ -1257,6 +1257,7 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   sku: text("sku").notNull(), // Individual product SKU (post-explosion)
   barcode: text("barcode"), // Scannable barcode (from internal_inventory.code)
   description: text("description"), // Product name for display
+  imageUrl: text("image_url"), // Product image from skuvault_products
   quantityExpected: integer("quantity_expected").notNull().default(1), // How many we need to scan
   quantityScanned: integer("quantity_scanned").notNull().default(0), // How many we've scanned so far
   collectionId: varchar("collection_id").references(() => productCollections.id), // For footprint calculation

@@ -18,6 +18,7 @@ export interface ProductInfo {
   sku: string;
   barcode: string | null;
   description: string | null;
+  imageUrl: string | null;
   isAssembledProduct: boolean;
 }
 
@@ -30,6 +31,7 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
       sku: skuvaultProducts.sku,
       barcode: skuvaultProducts.barcode,
       description: skuvaultProducts.productTitle,
+      imageUrl: skuvaultProducts.productImageUrl,
       isAssembledProduct: skuvaultProducts.isAssembledProduct,
     })
     .from(skuvaultProducts)
@@ -44,6 +46,7 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
     sku: result[0].sku,
     barcode: result[0].barcode,
     description: result[0].description,
+    imageUrl: result[0].imageUrl,
     isAssembledProduct: result[0].isAssembledProduct,
   };
 }
@@ -62,6 +65,7 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       sku: skuvaultProducts.sku,
       barcode: skuvaultProducts.barcode,
       description: skuvaultProducts.productTitle,
+      imageUrl: skuvaultProducts.productImageUrl,
       isAssembledProduct: skuvaultProducts.isAssembledProduct,
     })
     .from(skuvaultProducts)
@@ -73,6 +77,7 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       sku: row.sku,
       barcode: row.barcode,
       description: row.description,
+      imageUrl: row.imageUrl,
       isAssembledProduct: row.isAssembledProduct,
     });
   }

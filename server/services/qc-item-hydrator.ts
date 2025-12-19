@@ -406,6 +406,7 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
         sku: item.sku,
         barcode: product?.barcode || null,
         description: product?.description || item.name || null,
+        imageUrl: product?.imageUrl || null,
         quantityExpected: item.quantity,
         quantityScanned: 0,
         collectionId: null, // Will be filled in batch
