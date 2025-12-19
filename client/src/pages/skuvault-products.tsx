@@ -64,7 +64,7 @@ export default function SkuvaultProducts() {
   }, [page, pageSize, debouncedSearch, categoryFilter, assembledFilter]);
 
   const { data, isLoading } = useQuery<SkuvaultProductsResponse>({
-    queryKey: ["/api/skuvault-products", queryParams],
+    queryKey: [`/api/skuvault-products?${queryParams}`],
   });
 
   const handlePageChange = (newPage: number) => {
