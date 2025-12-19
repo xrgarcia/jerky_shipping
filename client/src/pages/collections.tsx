@@ -560,8 +560,8 @@ export default function Collections() {
 
             {/* Products in Collection */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 border-b bg-muted/30">
-                <h3 className="text-sm font-medium mb-2">Products in this Collection</h3>
+              <div className="p-4 border-b bg-muted/20">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Products in this Collection</h3>
                 {collectionProductsLoading ? (
                   <div className="space-y-2">
                     {[...Array(3)].map((_, i) => (
@@ -578,20 +578,20 @@ export default function Collections() {
                       {collectionProducts.map((mapping) => (
                         <div
                           key={mapping.id}
-                          className="flex items-center justify-between gap-2 p-2 rounded bg-background border"
+                          className="flex items-center justify-between gap-2 p-3 rounded-md bg-card border border-border"
                           data-testid={`product-in-collection-${mapping.sku}`}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <Package className="h-4 w-4 text-[#6B8E23] shrink-0" />
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm font-medium">{mapping.sku}</span>
+                                <span className="font-mono text-sm font-semibold text-foreground">{mapping.sku}</span>
                                 {mapping.product?.isAssembledProduct && (
                                   <Badge variant="secondary" className="text-xs">AP</Badge>
                                 )}
                               </div>
                               {mapping.product?.productTitle && (
-                                <p className="text-xs text-muted-foreground truncate">
+                                <p className="text-sm text-foreground/70 truncate">
                                   {mapping.product.productTitle}
                                 </p>
                               )}
@@ -622,7 +622,7 @@ export default function Collections() {
               {/* Product Search & Add */}
               <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0">
                 <div className="flex items-center justify-between gap-4 mb-3">
-                  <h3 className="text-sm font-medium">Add Products from Catalog</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Add Products from Catalog</h3>
                   {selectedSkus.size > 0 && (
                     <Button
                       size="sm"
@@ -707,7 +707,7 @@ export default function Collections() {
                       {/* Select All Row */}
                       {selectableProducts.length > 0 && (
                         <div 
-                          className="flex items-center gap-3 p-2 rounded border bg-card mb-2 sticky top-0 z-10"
+                          className="flex items-center gap-3 p-3 rounded-md border border-border bg-muted/30 mb-2 sticky top-0 z-10"
                           data-testid="select-all-row"
                         >
                           <Checkbox
@@ -720,7 +720,7 @@ export default function Collections() {
                             onCheckedChange={handleSelectAll}
                             data-testid="checkbox-select-all"
                           />
-                          <span className="text-sm font-medium">
+                          <span className="text-sm font-semibold text-foreground">
                             Select All ({selectableProducts.length} available)
                           </span>
                         </div>
@@ -732,12 +732,12 @@ export default function Collections() {
                         return (
                           <div
                             key={product.sku}
-                            className={`flex items-center gap-3 p-2 rounded border transition-all ${
+                            className={`flex items-center gap-3 p-3 rounded-md border transition-all ${
                               isInCollection
-                                ? "bg-muted/50 opacity-60"
+                                ? "bg-muted/40 opacity-50 border-border/50"
                                 : isSelected
-                                  ? "bg-[#6B8E23]/10 border-[#6B8E23]/30"
-                                  : "hover:bg-muted/30"
+                                  ? "bg-[#6B8E23]/10 border-[#6B8E23]/40"
+                                  : "bg-card border-border hover:bg-muted/20"
                             }`}
                             data-testid={`catalog-product-${product.sku}`}
                           >
@@ -751,28 +751,28 @@ export default function Collections() {
                               <img 
                                 src={product.productImageUrl} 
                                 alt={product.sku}
-                                className="w-10 h-10 object-cover rounded shrink-0"
+                                className="w-10 h-10 object-cover rounded border shrink-0"
                               />
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm font-medium">{product.sku}</span>
+                                <span className="font-mono text-sm font-semibold text-foreground">{product.sku}</span>
                                 {product.isAssembledProduct && (
                                   <Badge variant="secondary" className="text-xs">AP</Badge>
                                 )}
                                 {isInCollection && (
-                                  <Badge variant="outline" className="text-xs text-[#6B8E23]">
+                                  <Badge variant="outline" className="text-xs text-[#6B8E23] border-[#6B8E23]/40">
                                     <Check className="h-3 w-3 mr-0.5" />
                                     In Collection
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">
+                              <p className="text-sm text-foreground/70 truncate">
                                 {product.productTitle}
                               </p>
                             </div>
                             {product.productCategory && (
-                              <Badge variant="outline" className="text-xs shrink-0">
+                              <Badge variant="outline" className="text-xs shrink-0 bg-muted/50">
                                 {product.productCategory}
                               </Badge>
                             )}
