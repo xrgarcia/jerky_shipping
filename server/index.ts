@@ -232,6 +232,10 @@ async function initializeAfterListen(storage: any) {
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours
     
+    // Start SkuVault products sync worker (syncs product catalog from reporting DB hourly)
+    const { startSkuvaultProductsSyncWorker } = await import("./skuvault-products-sync-worker");
+    startSkuvaultProductsSyncWorker(3600000); // Sync products every 1 hour
+    
     // Start QC item hydrator worker (populates shipment_qc_items for Ready to Fulfill orders)
     const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
     startQCHydratorWorker(60000); // Hydrate QC items every 1 minute
