@@ -10043,7 +10043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
       const search = (req.query.search as string || "").trim().toLowerCase();
-      const categories = req.query.categories as string; // comma-separated list
+      const categoriesParam = req.query.categories as string; // comma-separated list
       const isAssembled = req.query.isAssembled as string;
       
       // Build where conditions
@@ -10061,8 +10061,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Multi-select categories filter (comma-separated)
-      if (categories && categories.trim()) {
-        const categoryList = categories.split(",").map(c => c.trim()).filter(Boolean);
+      if (categoriesParam && categoriesParam.trim()) {
+        const categoryList = categoriesParam.split(",").map(c => c.trim()).filter(Boolean);
         if (categoryList.length > 0) {
           conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
         }
@@ -10101,7 +10101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(sql`${skuvaultProducts.productCategory} IS NOT NULL`)
         .orderBy(skuvaultProducts.productCategory);
       
-      const categories = categoriesResult
+      const allCategories = categoriesResult
         .map(r => r.category)
         .filter((c): c is string => c !== null);
       
@@ -10111,7 +10111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         page,
         pageSize,
         totalPages,
-        categories,
+        categories: allCategories,
       });
     } catch (error: any) {
       console.error("[SkuVault Products] Error fetching products:", error);
@@ -10125,7 +10125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { skuvaultProducts } = await import("@shared/schema");
       
       const search = (req.query.search as string || "").trim().toLowerCase();
-      const categories = req.query.categories as string; // comma-separated list
+      const categoriesParam = req.query.categories as string; // comma-separated list
       const isAssembled = req.query.isAssembled as string;
       
       // Build where conditions (same as list endpoint)
@@ -10143,8 +10143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Multi-select categories filter (comma-separated)
-      if (categories && categories.trim()) {
-        const categoryList = categories.split(",").map(c => c.trim()).filter(Boolean);
+      if (categoriesParam && categoriesParam.trim()) {
+        const categoryList = categoriesParam.split(",").map(c => c.trim()).filter(Boolean);
         if (categoryList.length > 0) {
           conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
         }
