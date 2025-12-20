@@ -10051,12 +10051,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .orderBy(desc(sql`COUNT(DISTINCT ${shipmentsTable.id})`));
       
+      // Filter out orphan footprints (0 shipments) - these are stale entries
+      const activeFootprints = footprintsWithStats.filter(fp => fp.shipmentCount > 0);
+      
       // Parse signatures and build human-readable names with collection names
       const collectionsMap = new Map<string, string>();
       const allCollections = await db.select().from(productCollections);
       allCollections.forEach(c => collectionsMap.set(c.id, c.name));
       
-      const footprintsWithNames = footprintsWithStats.map(fp => {
+      const footprintsWithNames = activeFootprints.map(fp => {
         let humanReadableName = fp.displayName;
         
         if (!humanReadableName && fp.signature) {
