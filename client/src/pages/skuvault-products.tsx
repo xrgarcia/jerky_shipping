@@ -20,13 +20,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2 } from "lucide-react";
+import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2, ChevronDown, Check, CheckSquare, Square } from "lucide-react";
 import type { SkuvaultProduct } from "@shared/schema";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -187,9 +194,10 @@ export default function SkuvaultProducts() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [assembledFilter, setAssembledFilter] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<SkuvaultProduct | null>(null);
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -205,10 +213,10 @@ export default function SkuvaultProducts() {
     params.set("page", page.toString());
     params.set("pageSize", pageSize.toString());
     if (debouncedSearch) params.set("search", debouncedSearch);
-    if (categoryFilter !== "all") params.set("category", categoryFilter);
+    if (selectedCategories.length > 0) params.set("categories", selectedCategories.join(","));
     if (assembledFilter !== "all") params.set("isAssembled", assembledFilter);
     return params.toString();
-  }, [page, pageSize, debouncedSearch, categoryFilter, assembledFilter]);
+  }, [page, pageSize, debouncedSearch, selectedCategories, assembledFilter]);
 
   const { data, isLoading } = useQuery<SkuvaultProductsResponse>({
     queryKey: [`/api/skuvault-products?${queryParams}`],
@@ -223,8 +231,22 @@ export default function SkuvaultProducts() {
     setPage(1);
   };
 
-  const handleCategoryChange = (value: string) => {
-    setCategoryFilter(value);
+  const toggleCategory = (category: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+    setPage(1);
+  };
+
+  const selectAllCategories = () => {
+    setSelectedCategories([...categories]);
+    setPage(1);
+  };
+
+  const clearAllCategories = () => {
+    setSelectedCategories([]);
     setPage(1);
   };
 
@@ -236,12 +258,12 @@ export default function SkuvaultProducts() {
   const clearFilters = () => {
     setSearch("");
     setDebouncedSearch("");
-    setCategoryFilter("all");
+    setSelectedCategories([]);
     setAssembledFilter("all");
     setPage(1);
   };
 
-  const hasActiveFilters = search || categoryFilter !== "all" || assembledFilter !== "all";
+  const hasActiveFilters = search || selectedCategories.length > 0 || assembledFilter !== "all";
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -250,7 +272,7 @@ export default function SkuvaultProducts() {
     try {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);
-      if (categoryFilter !== "all") params.set("category", categoryFilter);
+      if (selectedCategories.length > 0) params.set("categories", selectedCategories.join(","));
       if (assembledFilter !== "all") params.set("isAssembled", assembledFilter);
       
       const response = await fetch(`/api/skuvault-products/export?${params.toString()}`, {
@@ -351,20 +373,67 @@ export default function SkuvaultProducts() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Product Category</label>
-              <Select value={categoryFilter} onValueChange={handleCategoryChange}>
-                <SelectTrigger data-testid="select-product-category">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="text-sm font-medium mb-1.5 block">Product Categories</label>
+              <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between font-normal"
+                    data-testid="button-category-filter"
+                  >
+                    <span className="truncate">
+                      {selectedCategories.length === 0
+                        ? "All categories"
+                        : selectedCategories.length === categories.length
+                        ? "All categories selected"
+                        : `${selectedCategories.length} selected`}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="p-2 border-b flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllCategories}
+                      className="flex-1 h-8"
+                      data-testid="button-select-all-categories"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-1" />
+                      Check All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllCategories}
+                      className="flex-1 h-8"
+                      data-testid="button-uncheck-all-categories"
+                    >
+                      <Square className="w-4 h-4 mr-1" />
+                      Uncheck All
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-1">
+                      {categories.map((cat) => (
+                        <div
+                          key={cat}
+                          className="flex items-center space-x-2 hover-elevate rounded px-2 py-1.5 cursor-pointer"
+                          onClick={() => toggleCategory(cat)}
+                          data-testid={`checkbox-category-${cat}`}
+                        >
+                          <Checkbox
+                            checked={selectedCategories.includes(cat)}
+                            onCheckedChange={() => toggleCategory(cat)}
+                          />
+                          <span className="text-sm truncate flex-1">{cat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>
@@ -406,9 +475,11 @@ export default function SkuvaultProducts() {
                   Search: "{search}"
                 </Badge>
               )}
-              {categoryFilter !== "all" && (
+              {selectedCategories.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  Category: {categoryFilter}
+                  {selectedCategories.length === 1
+                    ? `Category: ${selectedCategories[0]}`
+                    : `Categories: ${selectedCategories.length} selected`}
                 </Badge>
               )}
               {assembledFilter !== "all" && (
