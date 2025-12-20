@@ -9346,6 +9346,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product Collections API
   // ========================================
 
+  // Get distinct product categories from skuvault_products for dropdown
+  app.get("/api/collections/categories", requireAuth, async (req, res) => {
+    try {
+      const { skuvaultProducts } = await import("@shared/schema");
+      const categories = await db
+        .selectDistinct({ category: skuvaultProducts.productCategory })
+        .from(skuvaultProducts)
+        .where(sql`${skuvaultProducts.productCategory} IS NOT NULL AND ${skuvaultProducts.productCategory} != ''`)
+        .orderBy(skuvaultProducts.productCategory);
+      
+      res.json({ categories: categories.map(c => c.category).filter(Boolean) });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
   // Get all collections with product counts
   app.get("/api/collections", requireAuth, async (req, res) => {
     try {
@@ -9377,13 +9394,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/collections", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
-      const { name, description } = req.body;
+      const { name, description, weightValue, weightUnit, incrementalQuantity, productCategory } = req.body;
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ error: "Collection name is required" });
+      }
+      // Validate weightUnit if provided
+      if (weightUnit && !['lbs', 'oz'].includes(weightUnit)) {
+        return res.status(400).json({ error: "Weight unit must be 'lbs' or 'oz'" });
       }
       const collection = await storage.createProductCollection({
         name: name.trim(),
         description: description?.trim() || null,
+        weightValue: weightValue != null ? parseFloat(weightValue) : null,
+        weightUnit: weightUnit || null,
+        incrementalQuantity: incrementalQuantity != null ? parseInt(incrementalQuantity, 10) : null,
+        productCategory: productCategory?.trim() || null,
         createdBy: userId,
         updatedBy: userId,
       });
@@ -9399,12 +9424,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
-      const { name, description } = req.body;
-      const collection = await storage.updateProductCollection(id, {
-        name: name?.trim(),
-        description: description?.trim(),
-        updatedBy: userId,
-      });
+      const { name, description, weightValue, weightUnit, incrementalQuantity, productCategory } = req.body;
+      // Validate weightUnit if provided
+      if (weightUnit && !['lbs', 'oz'].includes(weightUnit)) {
+        return res.status(400).json({ error: "Weight unit must be 'lbs' or 'oz'" });
+      }
+      const updateData: any = { updatedBy: userId };
+      if (name !== undefined) updateData.name = name?.trim();
+      if (description !== undefined) updateData.description = description?.trim() || null;
+      if (weightValue !== undefined) updateData.weightValue = weightValue != null ? parseFloat(weightValue) : null;
+      if (weightUnit !== undefined) updateData.weightUnit = weightUnit || null;
+      if (incrementalQuantity !== undefined) updateData.incrementalQuantity = incrementalQuantity != null ? parseInt(incrementalQuantity, 10) : null;
+      if (productCategory !== undefined) updateData.productCategory = productCategory?.trim() || null;
+      
+      const collection = await storage.updateProductCollection(id, updateData);
       if (!collection) {
         return res.status(404).json({ error: "Collection not found" });
       }
