@@ -39,7 +39,9 @@ import {
   Package,
   Check,
   X,
-  Boxes
+  Boxes,
+  Upload,
+  FileSpreadsheet
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ProductCollection } from "@shared/schema";
@@ -111,6 +113,21 @@ export default function Collections() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    summary?: {
+      totalRows: number;
+      collectionsCreated: number;
+      collectionsExisting: number;
+      mappingsCreated: number;
+      mappingsSkipped: number;
+      errors: number;
+    };
+    collectionsCreated?: string[];
+    errors?: string[];
+  } | null>(null);
   const [editingCollection, setEditingCollection] = useState<ProductCollection | null>(null);
   const [formData, setFormData] = useState({ 
     name: "", 
@@ -360,6 +377,44 @@ export default function Collections() {
     },
   });
 
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/collections/bulk-import", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Import failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/assigned-skus"] });
+      toast({ 
+        title: "Import completed", 
+        description: `Created ${data.summary.collectionsCreated} collections, ${data.summary.mappingsCreated} mappings` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImport = () => {
+    if (!importFile) return;
+    importMutation.mutate(importFile);
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
@@ -467,18 +522,33 @@ export default function Collections() {
         <div className="p-4 border-b">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="text-lg font-semibold font-serif">Geometry Collections</h2>
-            <Button
-              size="sm"
-              onClick={() => {
-                setFormData(defaultFormData);
-                setShowCreateDialog(true);
-              }}
-              className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
-              data-testid="button-create-collection"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setImportFile(null);
+                  setImportResult(null);
+                  setShowImportDialog(true);
+                }}
+                data-testid="button-import-collections"
+              >
+                <Upload className="h-4 w-4 mr-1" />
+                Import
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setFormData(defaultFormData);
+                  setShowCreateDialog(true);
+                }}
+                className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
+                data-testid="button-create-collection"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New
+              </Button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             Group products with similar physical characteristics
@@ -1113,6 +1183,156 @@ export default function Collections() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={(open) => {
+        setShowImportDialog(open);
+        if (!open) {
+          setImportFile(null);
+          setImportResult(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-serif flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Collections from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to bulk create geometry collections and product mappings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!importResult ? (
+            <div className="space-y-4">
+              <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="csv-upload"
+                  data-testid="input-csv-upload"
+                />
+                <label 
+                  htmlFor="csv-upload" 
+                  className="cursor-pointer block"
+                >
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  {importFile ? (
+                    <p className="font-medium">{importFile.name}</p>
+                  ) : (
+                    <>
+                      <p className="font-medium">Click to select CSV file</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        or drag and drop
+                      </p>
+                    </>
+                  )}
+                </label>
+              </div>
+              
+              <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                <p className="font-medium mb-1">Expected CSV columns:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>Collection Name (required)</li>
+                  <li>SKU (required)</li>
+                  <li>Weight Value</li>
+                  <li>Weight Unit (lbs/oz)</li>
+                  <li>Incremental Quantity</li>
+                  <li>Classification/Category</li>
+                </ul>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowImportDialog(false)}
+                  data-testid="button-cancel-import"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleImport}
+                  disabled={!importFile || importMutation.isPending}
+                  className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
+                  data-testid="button-submit-import"
+                >
+                  {importMutation.isPending ? "Importing..." : "Import"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 dark:text-green-200 mb-2 flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  Import Complete
+                </h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Total Rows:</span>
+                    <span className="ml-2 font-medium">{importResult.summary?.totalRows}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Collections Created:</span>
+                    <span className="ml-2 font-medium">{importResult.summary?.collectionsCreated}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Collections Existing:</span>
+                    <span className="ml-2 font-medium">{importResult.summary?.collectionsExisting}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Mappings Created:</span>
+                    <span className="ml-2 font-medium">{importResult.summary?.mappingsCreated}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Mappings Skipped:</span>
+                    <span className="ml-2 font-medium">{importResult.summary?.mappingsSkipped}</span>
+                  </div>
+                  {importResult.summary?.errors && importResult.summary.errors > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">Errors:</span>
+                      <span className="ml-2 font-medium text-destructive">{importResult.summary.errors}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {importResult.collectionsCreated && importResult.collectionsCreated.length > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium mb-1">New Collections:</p>
+                  <div className="max-h-24 overflow-y-auto bg-muted/50 rounded p-2 text-xs">
+                    {importResult.collectionsCreated.join(", ")}
+                  </div>
+                </div>
+              )}
+
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium mb-1 text-destructive">Errors:</p>
+                  <div className="max-h-24 overflow-y-auto bg-destructive/10 rounded p-2 text-xs">
+                    {importResult.errors.map((err, i) => (
+                      <div key={i}>{err}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button 
+                  onClick={() => setShowImportDialog(false)}
+                  className="bg-[#6B8E23] hover:bg-[#5a7a1e] text-white"
+                  data-testid="button-close-import"
+                >
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
