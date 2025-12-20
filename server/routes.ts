@@ -9476,15 +9476,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete a collection
+  // Delete a collection - cascades to invalidate related footprints and reset shipments
   app.delete("/api/collections/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      const { footprints, footprintModels, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Step 1: Find all footprints that reference this collection ID in their signature
+      // Footprint signatures are JSON objects like {"collectionId": count, ...}
+      const affectedFootprints = await db
+        .select({ id: footprints.id })
+        .from(footprints)
+        .where(sql`${footprints.signature}::text LIKE ${'%"' + id + '"%'}`);
+      
+      const affectedFootprintIds = affectedFootprints.map(f => f.id);
+      
+      if (affectedFootprintIds.length > 0) {
+        // Step 2: Reset shipments linked to affected footprints to pending_categorization
+        const resetResult = await db
+          .update(shipmentsTable)
+          .set({ 
+            footprintStatus: 'pending_categorization',
+            footprintId: null 
+          })
+          .where(sql`${shipmentsTable.footprintId} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+        
+        // Step 3: Delete footprint_models for affected footprints
+        await db
+          .delete(footprintModels)
+          .where(sql`${footprintModels.footprintId} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+        
+        // Step 4: Delete the affected footprints
+        await db
+          .delete(footprints)
+          .where(sql`${footprints.id} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+        
+        console.log(`[Collections] Cascade delete: invalidated ${affectedFootprintIds.length} footprints for collection ${id}`);
+      }
+      
+      // Step 5: Delete the collection itself
       const deleted = await storage.deleteProductCollection(id);
       if (!deleted) {
         return res.status(404).json({ error: "Collection not found" });
       }
-      res.json({ success: true });
+      
+      res.json({ 
+        success: true, 
+        cascade: {
+          footprintsInvalidated: affectedFootprintIds.length
+        }
+      });
     } catch (error: any) {
       console.error("[Collections] Error deleting collection:", error);
       res.status(500).json({ error: "Failed to delete collection" });
