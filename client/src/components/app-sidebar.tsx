@@ -104,8 +104,8 @@ export function AppSidebar() {
       icon: Layers,
     },
     {
-      title: "Packing Decisions",
-      url: "/packing-decisions",
+      title: "Packaging Types",
+      url: "/packaging-types",
       icon: Boxes,
     },
     {

@@ -10100,16 +10100,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all packaging types for dropdown
+  // Get all packaging types for dropdown or management
   app.get("/api/packaging-types", requireAuth, async (req, res) => {
     try {
       const { packagingTypes } = await import("@shared/schema");
+      const includeInactive = req.query.includeInactive === 'true';
       
-      const types = await db
-        .select()
-        .from(packagingTypes)
-        .where(eq(packagingTypes.isActive, true))
-        .orderBy(packagingTypes.name);
+      let query = db.select().from(packagingTypes);
+      
+      if (!includeInactive) {
+        query = query.where(eq(packagingTypes.isActive, true)) as typeof query;
+      }
+      
+      const types = await query.orderBy(packagingTypes.name);
       
       res.json({ packagingTypes: types });
     } catch (error: any) {

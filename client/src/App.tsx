@@ -33,7 +33,7 @@ import Downloads from "@/pages/downloads";
 import Stations from "@/pages/stations";
 import DesktopConfig from "@/pages/desktop-config";
 import Collections from "@/pages/collections";
-import PackingDecisions from "@/pages/packing-decisions";
+import PackagingTypes from "@/pages/packaging-types";
 import FulfillmentPrep from "@/pages/footprints";
 import SkuvaultProducts from "@/pages/skuvault-products";
 import type { User } from "@shared/schema";
@@ -110,7 +110,7 @@ function AppContent() {
       <Route path="/stations" component={Stations} />
       <Route path="/desktop-config" component={DesktopConfig} />
       <Route path="/collections" component={Collections} />
-      <Route path="/packing-decisions" component={PackingDecisions} />
+      <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep" component={FulfillmentPrep} />
       <Route path="/skuvault-products" component={SkuvaultProducts} />
       <Route path="/profile" component={Profile} />
