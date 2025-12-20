@@ -9564,6 +9564,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending footprint count for recalculation status
+  app.get("/api/collections/pending-footprints", requireAuth, async (req, res) => {
+    try {
+      const { shipments: shipmentsTable } = await import("@shared/schema");
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.footprintStatus, 'pending_categorization'));
+      
+      res.json({ pendingCount: Number(result[0]?.count || 0) });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching pending footprint count:", error);
+      res.status(500).json({ error: "Failed to fetch pending count" });
+    }
+  });
+
+  // Bulk recalculate footprints for all pending shipments
+  app.post("/api/collections/recalculate-footprints", requireAuth, async (req, res) => {
+    try {
+      const { shipments: shipmentsTable } = await import("@shared/schema");
+      const { calculateFootprint } = await import('./services/qc-item-hydrator');
+      
+      // Get all shipments with pending_categorization status
+      const pendingShipments = await db
+        .select({ id: shipmentsTable.id })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.footprintStatus, 'pending_categorization'))
+        .limit(1000); // Process in batches to avoid timeout
+      
+      let processed = 0;
+      let completed = 0;
+      let stillPending = 0;
+      let errors = 0;
+      
+      for (const shipment of pendingShipments) {
+        try {
+          const result = await calculateFootprint(shipment.id);
+          processed++;
+          if (result.status === 'complete') {
+            completed++;
+          } else if (result.status === 'pending_categorization') {
+            stillPending++;
+          }
+        } catch (err) {
+          console.error(`[Collections] Error recalculating footprint for shipment ${shipment.id}:`, err);
+          errors++;
+        }
+      }
+      
+      console.log(`[Collections] Bulk recalculation: processed ${processed}, completed ${completed}, still pending ${stillPending}, errors ${errors}`);
+      
+      res.json({
+        success: true,
+        processed,
+        completed,
+        stillPending,
+        errors,
+        hasMore: pendingShipments.length === 1000
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error bulk recalculating footprints:", error);
+      res.status(500).json({ error: "Failed to recalculate footprints" });
+    }
+  });
+
   // Bulk import collections from CSV
   app.post("/api/collections/bulk-import", requireAuth, upload.single("file"), async (req, res) => {
     try {

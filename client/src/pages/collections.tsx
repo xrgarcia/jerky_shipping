@@ -415,6 +415,48 @@ export default function Collections() {
     importMutation.mutate(importFile);
   };
 
+  // Query for pending footprint count
+  const { data: pendingData, refetch: refetchPending } = useQuery<{ pendingCount: number }>({
+    queryKey: ["/api/collections/pending-footprints"],
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Mutation for bulk recalculate footprints
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/collections/recalculate-footprints");
+      return res.json();
+    },
+    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; hasMore: boolean }) => {
+      refetchPending();
+      if (data.completed > 0) {
+        toast({
+          title: "Footprints recalculated",
+          description: `${data.completed} shipments completed, ${data.stillPending} still pending (need product assignments)`,
+        });
+      } else if (data.stillPending > 0) {
+        toast({
+          title: "Products need assignment",
+          description: `${data.stillPending} shipments have uncategorized products. Assign products to collections first.`,
+          variant: "destructive",
+        });
+      }
+      if (data.hasMore) {
+        toast({
+          title: "More to process",
+          description: "Click recalculate again to process more shipments.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Recalculation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
@@ -554,6 +596,40 @@ export default function Collections() {
             Group products with similar physical characteristics
           </p>
         </div>
+        
+        {/* Pending Footprints Banner */}
+        {pendingData && pendingData.pendingCount > 0 && (
+          <div className="px-4 py-2 border-b bg-amber-50 dark:bg-amber-950/30">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <RefreshCw className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="text-sm text-amber-800 dark:text-amber-200 truncate">
+                  {pendingData.pendingCount.toLocaleString()} shipments pending
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => recalculateMutation.mutate()}
+                disabled={recalculateMutation.isPending}
+                className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
+                data-testid="button-recalculate-footprints"
+              >
+                {recalculateMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Recalculate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
         
         <ScrollArea className="flex-1">
           {collectionsLoading ? (
