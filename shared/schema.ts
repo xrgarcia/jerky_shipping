@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1128,6 +1128,10 @@ export const productCollections = pgTable("product_collections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  weightValue: doublePrecision("weight_value"), // Weight of the collection item
+  weightUnit: text("weight_unit"), // "lbs" or "oz"
+  incrementalQuantity: integer("incremental_quantity"), // Quantity increment for packaging calculations
+  productCategory: text("product_category"), // Category from skuvault_products
   createdBy: varchar("created_by").notNull().references(() => users.id),
   updatedBy: varchar("updated_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
