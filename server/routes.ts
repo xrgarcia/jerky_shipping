@@ -10043,7 +10043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
       const search = (req.query.search as string || "").trim().toLowerCase();
-      const category = req.query.category as string;
+      const categories = req.query.categories as string; // comma-separated list
       const isAssembled = req.query.isAssembled as string;
       
       // Build where conditions
@@ -10060,8 +10060,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
       
-      if (category && category !== "all") {
-        conditions.push(eq(skuvaultProducts.productCategory, category));
+      // Multi-select categories filter (comma-separated)
+      if (categories && categories.trim()) {
+        const categoryList = categories.split(",").map(c => c.trim()).filter(Boolean);
+        if (categoryList.length > 0) {
+          conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
+        }
       }
       
       if (isAssembled === "true") {
@@ -10121,7 +10125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { skuvaultProducts } = await import("@shared/schema");
       
       const search = (req.query.search as string || "").trim().toLowerCase();
-      const category = req.query.category as string;
+      const categories = req.query.categories as string; // comma-separated list
       const isAssembled = req.query.isAssembled as string;
       
       // Build where conditions (same as list endpoint)
@@ -10138,8 +10142,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
       
-      if (category && category !== "all") {
-        conditions.push(eq(skuvaultProducts.productCategory, category));
+      // Multi-select categories filter (comma-separated)
+      if (categories && categories.trim()) {
+        const categoryList = categories.split(",").map(c => c.trim()).filter(Boolean);
+        if (categoryList.length > 0) {
+          conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
+        }
       }
       
       if (isAssembled === "true") {
