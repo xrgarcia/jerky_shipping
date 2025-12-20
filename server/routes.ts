@@ -10115,6 +10115,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export skuvault products to CSV with filtering
+  app.get("/api/skuvault-products/export", requireAuth, async (req, res) => {
+    try {
+      const { skuvaultProducts } = await import("@shared/schema");
+      
+      const search = (req.query.search as string || "").trim().toLowerCase();
+      const category = req.query.category as string;
+      const isAssembled = req.query.isAssembled as string;
+      
+      // Build where conditions (same as list endpoint)
+      const conditions = [];
+      
+      if (search) {
+        conditions.push(
+          or(
+            sql`LOWER(${skuvaultProducts.sku}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.productTitle}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.barcode}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.productCategory}) LIKE ${`%${search}%`}`
+          )
+        );
+      }
+      
+      if (category && category !== "all") {
+        conditions.push(eq(skuvaultProducts.productCategory, category));
+      }
+      
+      if (isAssembled === "true") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, true));
+      } else if (isAssembled === "false") {
+        conditions.push(eq(skuvaultProducts.isAssembledProduct, false));
+      }
+      
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      // Get all matching products (no pagination for export)
+      const products = await db
+        .select()
+        .from(skuvaultProducts)
+        .where(whereClause)
+        .orderBy(skuvaultProducts.sku);
+      
+      // Build CSV content
+      const headers = ["SKU", "Product Title", "Barcode", "Category", "Is Assembled Product", "Unit Cost", "Image URL", "Stock Check Date"];
+      const escapeCSV = (value: string | null | undefined): string => {
+        if (value == null) return "";
+        const str = String(value);
+        if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+      
+      const rows = products.map(p => [
+        escapeCSV(p.sku),
+        escapeCSV(p.productTitle),
+        escapeCSV(p.barcode),
+        escapeCSV(p.productCategory),
+        p.isAssembledProduct ? "Yes" : "No",
+        escapeCSV(p.unitCost),
+        escapeCSV(p.productImageUrl),
+        escapeCSV(p.stockCheckDate),
+      ].join(","));
+      
+      const csv = [headers.join(","), ...rows].join("\n");
+      
+      // Set headers for CSV download
+      const filename = `skuvault-products-${new Date().toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
+      
+      console.log(`[SkuVault Products] Exported ${products.length} products to CSV`);
+    } catch (error: any) {
+      console.error("[SkuVault Products] Error exporting products:", error);
+      res.status(500).json({ error: "Failed to export products" });
+    }
+  });
+
   // ========================================
   // Footprints API (Smart Shipping Engine)
   // ========================================

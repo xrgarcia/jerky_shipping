@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Package, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2 } from "lucide-react";
 import type { SkuvaultProduct } from "@shared/schema";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -243,6 +243,49 @@ export default function SkuvaultProducts() {
 
   const hasActiveFilters = search || categoryFilter !== "all" || assembledFilter !== "all";
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (categoryFilter !== "all") params.set("category", categoryFilter);
+      if (assembledFilter !== "all") params.set("isAssembled", assembledFilter);
+      
+      const response = await fetch(`/api/skuvault-products/export?${params.toString()}`, {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      
+      // Get the filename from the Content-Disposition header or use default
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = `skuvault-products-${new Date().toISOString().slice(0, 10)}.csv`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      // Download the CSV
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export failed:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const products = data?.products || [];
   const totalProducts = data?.total || 0;
   const totalPages = data?.totalPages || 1;
@@ -257,10 +300,31 @@ export default function SkuvaultProducts() {
             Centralized product catalog synced hourly from SkuVault
           </p>
         </div>
-        <Badge variant="outline" className="text-sm self-start sm:self-auto" data-testid="badge-total-products">
-          <Package className="w-4 h-4 mr-1" />
-          {totalProducts.toLocaleString()} products
-        </Badge>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Badge variant="outline" className="text-sm" data-testid="badge-total-products">
+            <Package className="w-4 h-4 mr-1" />
+            {totalProducts.toLocaleString()} products
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting || totalProducts === 0}
+            data-testid="button-export-csv"
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-1" />
+                Export CSV
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <Card>
