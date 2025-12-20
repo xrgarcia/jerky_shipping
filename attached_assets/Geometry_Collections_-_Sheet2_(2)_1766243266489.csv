@@ -1,0 +1,516 @@
+Collection Name,SKU,Title,Weight Value,Weight Unit,Incremental Quantity,Classification
+Coaster,JCB-MER-COASTER,Jerky.com - Coaster,0,lbs,1,General
+DeepFriedPeanuts,JCB-DFP-62-5,Jerky.com - Old Bay Seasoned Deep Fried Peanuts - 10 oz.,10,oz,24,Peanuts
+DeepFriedPeanuts,JCB-DFP-13-5,Jerky.com - Roasted Garlic Deep Fried Peanuts - 10 oz.,10,oz,24,Peanuts
+DeepFriedPeanuts,JCB-DFP-14-5,Jerky.com - Simply Salted Deep Fried Peanuts - 10 oz.,10,oz,24,Peanuts
+DeepFriedPeanuts,JCB-DFP-11-5,Jerky.com - Spicy Hot Deep Fried Peanuts - 10 oz.,10,oz,24,Peanuts
+DFP3pack,JCB-DFP-14-5-X3,Simply Salted Deep Fried Peanuts - 3 Pack,30,oz,1,Peanuts
+DFP3pack,JCB-DFP-13-5-X3,Roasted Garlic Deep Fried Peanuts - 3 Pack,30,oz,1,Peanuts
+DFP3pack,JCB-DFP-5-5-X3,Spicy Hot Deep Fried Peanuts - 3 Pack,30,oz,1,Peanuts
+DFPAssortment30oz,JCB-DFP-A3-5,Deep Fried Peanut Sampler,30,oz,1,Peanuts
+DiversionBag,JCB-MER-DB-1,Diversion Bag - A-Tips,1,oz,1,General
+DiversionBag,JCB-MER-DB-2,Diversion Bag - Super Colon Scrub,1,oz,1,General
+DiversionBag,JCB-MER-DB-3,Diversion Bag - Veggie Pops,1,oz,1,General
+GiftContainer8x8x6,JCB-GFT-C-BOX-MED,Medium Fully Printed Gift Box (8 x 8 x 6),0.9,oz,1,Supplies
+GiftContainer8x8x8,BUILDBOX,Build Your Own Jerky Gift Box,0,lbs,1,Gift
+GiftContainer8x8x8,JCB-GFT-C-BOX-WHITE,White Fully Printed Gift Box (8 x 8 x 8) - DROPBOX,0,lbs,1,Supplies
+GiftContainerBagBurlap,BUILDBAG,Build Your Own Jerky Gift Bag,0,lbs,1,Gift
+GiftContainerBagBurlapBag,JCB-GFT-C-BURLAPBAG,"10"" x 12"" Burlap Gift Bag",0.5,oz,1,Supplies
+GiftContainerBagBurlapBag,JCB-GFT-C-BURLAPBAG-E,"10"" x 12"" Burlap Gift Bag - Embroidered",0.5,oz,1,Supplies
+GiftContainerBagCanvas,JCB-GFTBAG-CANVAS,"8"" X 15"" Canvas Gift Bag",0,lbs,1,Gift Container
+GiftContainerBagCanvas,JCB-GFTBAG-CANVAS-E,"8"" X 15"" Canvas Gift Bag - Embroidered",0,lbs,1,Gift Container
+GiftContainerBagCanvas,KLM-GFT-MS-VS-10X+2,12 Piece Meat Stick Gift Bag,0,lbs,1,General
+GiftContainerBagCanvas,KLM-GFT-MS-VS-25X+5,30 Piece Meat Stick Gift Bag,0,lbs,1,General
+GiftContainerBagCanvas,JCB-GFTBAG-CANVAS-GOLD,Test Kitchen - Gold Embroidered Canvas Bag,0,lbs,1,Gift Container
+GiftContainerBagCanvas,JCB-GFTBAG-CANVAS-SILVER,Test Kitchen - Silver Embroidered Canvas Bag,0,lbs,1,Gift Container
+GiftContainerBagCanvas,JCB-GFTBAG-CANVAS-BRONZE,Test Kitchen - Bronze Embroidered Canvas Bag,0,lbs,1,Gift Container
+GiftContainerBagCanvas,JCB-GFT-BJV-MS-12PC,Beef Jerky & Meat Sticks Variety Pack Gift Bag - 12 Pieces,10.8,oz,1,Gift
+GiftContainerBagCanvas,JCB-GFT-BJV-14PC,Beef Jerky Variety Pack Sampler Gift Bag 14 bags,15,oz,1,Gift
+GiftContainerBagCanvas,JCB-GB-WGJSSGB-RS,Exotic Jerky Gift Basket - 12 exotic sticks,15.99,oz,1,Gift
+GiftContainerBagCanvas,JCB1042-K,Extra Mile Gift Bag,18,oz,1,Gift
+GiftContainerBagCanvas,JCB-GFT-BJV-MS-28PC,Beef Jerky & Meat Sticks Variety Pack Gift Bag - 28 Pieces,25.2,oz,1,Gift
+GiftContainerBagCanvas,JCB-GB-WGJSSGB-RS-X2-FBANew,Exotic Jerky Gift Basket - Double the Meat,31.98,oz,1,Gift
+GiftContainerBagCanvasOverfilled,JCB1042-K-X2,Extra Mile Gift Bag - 2X The Meat (52 Sticks),36,oz,1,Gift
+GiftContainerBox8x8x3,JCB-GFT-C-BOX-SM,Small Fully Printed Gift Box (8 x 8 x 3),0.6,oz,1,Supplies
+GiftContainerBox8x8x3,JCB-GFT-EJSGB,Exotic Jerky Snacks Gift Box - 8 Items,16,oz,1,Gift
+GiftContainerBox8x8x3,BTJ-STS-GFT-STBJGB,Soft and Tender Style Beef Jerky Gift Box - 5 bags,22,oz,1,Gift
+GiftContainerBox8x8x3,JCB-GFT-BJSGB,Beef Jerky Snacks Gift Box - 10 Items,23,oz,1,Gift
+GiftContainerBox8x8x8,JCB1035-K,Ultimate Jerky Gift Box - 11 Bags,40,oz,1,Gift
+GiftContainerBox9x9x7,JCB-GFT-C-BOX-LRG,Large Fully Printed Gift Box (9 x 9 x 7),0.7,oz,1,Supplies
+GiftContainerBoxBeefCase,JCB-GFT-BCGB,The Beef Case,0,lbs,1,Gift
+GiftContainerBoxBeefCase,JCB-GFC-BFCS,Beef Case Box (Container Only),2,lbs,1,Gift Container
+GiftContainerCanvas,JCB-GFT-BJV-10PC,Beef Jerky Variety Pack Sampler Gift Bag 10 bags,11,oz,1,Gift
+GiftContainerStockingLarge,JCB-GFTBAG-XSTOCK-BLACK,"Jerky.com Christmas Stocking - Black (19.5"" x 8"")",4,oz,1,Gift Container
+GiftContainerStockingLarge,JCB-GFTBAG-XSTOCK-WHITE,"Jerky.com Christmas Stocking - White (19.5"" x 8"")",4,oz,1,Gift Container
+GiftContainerStockingLarge,JCB-GFTBAG-XSTOCK-RED,"Jerky.com Christmas Stocking - Red (19.5"" x 8"")",4,oz,1,Gift Container
+GiftContainerStockingLarge,JCB-GFTBAG-XSTOCK-GREEN,"Jerky.com Christmas Stocking - Green (19.5"" x 8"")",4,oz,1,Gift Container
+GiftContainerStockingLarge,JCB-GFT-BEEF-S-BSTOCKING,Beef Jerky Stocking Bundle,22,oz,1,Gift
+GiftContainerStockingLarge,JCB-GFT-EXOTIC-S-BSTOCKING,Exotic Jerky Stocking Bundle,22,oz,1,Gift
+GiftContainerStockingLarge,JCB-GFT-HOT-S-BSTOCKING,Hot Jerky Stocking Bundle,22,oz,1,Gift
+GiftContainerStockingSmall,JCB-GFT-A12-XSTOCK,12 pc. Snack Stick Gift Stocking,0,lbs,1,General
+GiftContainerStockingSmall,JCB-GFTBAG-XSTOCK-RED-SM,Jerky.com Christmas Stocking - Red,2,oz,1,Gift Container
+Insert,JCB-FD-BALLOT,Test Kitchen - Flavor Drop Ballot,0,lbs,1,Supplies
+Insert,JCB-WHBJ-INSERT,World's Hottest Beef Jerky - Ballot Insert,0,oz,1,Supplies
+Insert,JCB-WHBJ-INSERT-2,World's Hottest Beef Jerky - Coin Insert,0,lbs,1,Supplies
+Insert,JCB-QZ-BALLOT-CB,Quiz Follow-Up Ballot - Chipotle Bourbon,0,oz,1,General
+Insert,JCB-QZ-BALLOT-GP,Quiz Follow-Up Ballot - Ghost Pepper,0,oz,1,General
+Insert,JCB-QZ-BALLOT-HP,Quiz Follow-Up Ballot - Soft & Tender Honey Pepper,0,oz,1,General
+Insert,JCB-CUSTOM-GC,Jerky.com Gift Card - Custom Amount,0,lbs,1,Gift
+Insert,JCB-MER-KZ-WHITE,Jerky.com White Koozie,0,lbs,1,General
+Insert,JCB-MER-KZ-GREEN,Jerky.com Green Koozie,0,lbs,1,General
+Insert,JCB-MER-KZ-YELLOW,Jerky.com Yellow Koozie,0,lbs,1,General
+Insert,JCB-MER-KZ-BLUE,Jerky.com Blue Koozie,0,lbs,1,General
+Insert,JCB-THANK-YOU-INSERT-TT,"TikTok Thank You Insert 4"" X 6""",0,lbs,1,Supplies
+Insert,JCB-DISCOUNT-INSERT-AMZ,"Amazon Discount Insert 4"" X 6""",0,lbs,1,Supplies
+Insert,JCB-FD-COIN,Test Kitchen - Flavor Drop Coin,0.5,oz,1,Supplies
+Insert,JCB-FD-MEMBER-COIN,Test Kitchen - Flavor Drop Membership Coin,0.5,oz,1,Supplies
+Insert,JCB-WHBJ-CAC,World's Hottest Beef Jerky - Challenge Accepted Coin,0.5,oz,1,Supplies
+Insert,JCB-WHBJ-CABDC,World's Hottest Beef Jerky - Challenge Accepted Black Diamond Coin,0.5,oz,1,Supplies
+Insert,JCB-WHBJ-CDC,World's Hottest Beef Jerky - Challenge Defeated Coin,0.5,oz,1,General
+Insert,JCB-ANNIV-COIN,Test Kitchen - Anniversary Drop Coin,0.5,oz,1,Gift
+Insert,JCB-WHBJ-GLOVES,World's Hottest Beef Jerky - Gloves,1,oz,1,Supplies
+Insert,O2-AB-X5,Taste Makers - Oxygen Absorber 5 Pack,1,oz,1,Supplies
+Insert,JCB-TK-EG-DB-C,Evergreen Drop Box - Worcestershire Coin,1,oz,1,General
+Insert,JCB-MER-KZ,Jerky.com Black Koozie,1,oz,1,General
+Insert,JCB-MER-KZ-TY,Jerky.com Black Koozie w/ Thank You Card,1,oz,1,General
+Insert,JCB-BEJ-92-13-BD,World's Hottest Beef Jerky - Black Diamond,3.5,oz,1,General
+JerkyAssortment25oz,JCB-CMB-VP-10B,Beef Jerky Variety Pack - 10 bags,25,oz,1,Beef Jerky
+Jerky 1.75x3,JCB-ELJ-1-1-X3,Original Elk - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-VEJ-1-1-X3,Original Venison - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-BUJ-3-1-X3,Original Buffalo - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-ELJ-A3-1,Elk Jerky Sampler,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-LAJ-1-1-X3,Lamb 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-ELJ-2-1-X3,Teriyaki Elk 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-BUJ-A3-1,Jerky.com's Buffalo Jerky Sampler - TESTER 3 PACK,5.25,oz,1,Combos and Samplers
+Jerky 1.75x3,JCB-BAC-6-1-X3,Maple Bacon - 3 Pack,5.25,oz,1,Bacon Jerky
+Jerky 1.75x3,JCB-FIJ-1-A3,All Natural Fish Jerky Sampler - TESTER 3 PACK,5.25,oz,1,Fish Jerky
+Jerky 1.75x3,JCB-BUJ-2-1-X3,Teriyaki Buffalo - 3 Pack,5.25,oz,1,Combos and Samplers
+Jerky 1.75x3,JCB-ALJ-1-X3,Original Alligator - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-VEJ-A3-1,Jerky.com's Venison Jerky Sampler - TESTER 3 PACK,5.25,oz,1,Combos and Samplers
+Jerky 1.75x3,JCB-ALJ-28-1-X3,Cajun Alligator - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-VEJ-5-1-X3,Hot Venison - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-VEJ-2-1-X3,Teriyaki Venison - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-WBJ-1-1-X3,Original Wild Boar - 3 Pack,5.25,oz,1,Exotic Jerky
+Jerky 1.75x3,JCB-SAJ-1-X3,Original Salmon 3 Pack,5.25,oz,1,Fish Jerky
+Jerky1.75oz,JCB-ANJ-1-17,Jerky.com - Original Antelope Jerky - 1.75 oz.,1.5,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BUJ-30-4,Test Kitchen - Chipotle Bourbon Buffalo Jerky - 1.5oz,1.5,oz,1,Exotic Jerky
+Jerky1.75oz,JCB-FIJ-AHT-1-17,Jerky.com - Original Ahi Tuna Jerky - 1.75 oz.,1.75,oz,100,Fish Jerky
+Jerky1.75oz,JCB-ALJ-28-17,Jerky.com - Cajun Alligator Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-ALJ-20-17,Jerky.com - Hickory Alligator Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-ALJ-1-17,Jerky.com - Original Alligator Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-WBJ-10-17,Jerky.com - BBQ Boar Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-WBJ-6-17,Jerky.com - Maple Boar Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-WBJ-1-17,Jerky.com - Original Boar Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BUJ-5-17,Jerky.com - Hot Buffalo Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BUJ-1-17,Jerky.com - Original Buffalo Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BUJ-2-17,Jerky.com - Teriyaki Buffalo Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-ELJ-5-17,Jerky.com - Hot Elk Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-ELJ-1-17,Jerky.com - Original Elk Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-ELJ-2-17,Jerky.com - Teriyaki Elk Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-KAJ-1-17,Jerky.com - Original Kangaroo Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-LAJ-1-17,Jerky.com - Original Lamb Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-RTJ-1-17,Jerky.com - Original Rainbow Trout Jerky - 1.75 oz.,1.75,oz,100,Fish Jerky
+Jerky1.75oz,JCB-SAJ-1-17,Jerky.com - Original Salmon Jerky - 1.75 oz.,1.75,oz,100,Fish Jerky
+Jerky1.75oz,JCB-VEJ-5-17,Jerky.com - Hot Venison Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-VEJ-1-17,Jerky.com - Original Venison Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-VEJ-2-17,Jerky.com - Teriyaki Venison Jerky - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BAJ-1-17,Jerky.com - Original Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-BAJ-10-17,Jerky.com - Barbecue Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-BAJ-12-17,Jerky.com - Honey Pepper Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-BAJ-38-17,Jerky.com - Jalapeno Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-BAJ-42-17,Jerky.com - Sriracha Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-BAJ-6-17,Jerky.com - Maple Bacon Jerky - 1.75 oz.,1.75,oz,100,Bacon Jerky
+Jerky1.75oz,JCB-OSJ-1-17,Jerky.com - Original Ostrich - 1.75 oz.,1.75,oz,100,Exotic Jerky
+Jerky1.75oz,JCB-BAJ-163-17,Test Kitchen - Maple Sriracha Bacon Jerky1.75oz,1.75,oz,1,Bacon Jerky
+Jerky1oz,JCB-BEJ-3-13,Jerky.com - Black Pepper Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-5-13,Jerky.com - Hot Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-1-13,Jerky.com - Original Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-4-13,Jerky.com - Sweet and Spicy Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-2-13,Jerky.com - Teriyaki Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-WBJ-1-13,Jerky.com - Original Boar Jerky - 1 oz.,1,oz,100,Exotic Jerky
+Jerky1oz,JCB-BUJ-1-13,Jerky.com - Original Buffalo Jerky - 1 oz.,1,oz,100,Exotic Jerky
+Jerky1oz,JCB-ELJ-1-13,Jerky.com - Original Elk Jerky - 1 oz.,1,oz,100,Exotic Jerky
+Jerky1oz,JCB-VEJ-1-13,Jerky.com - Original Venison Jerky - 1 oz.,1,oz,100,Exotic Jerky
+Jerky1oz,JCB-BEJ-92-13-SINGLE,Jerky.com - World's Hottest Beef Jerky - 1 piece,1,oz,1,Beef Jerky
+Jerky1oz,JCB-BEJ-74-13,Jerky.com - Blackened Cajun Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-26-13,Jerky.com - Habanero Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-8-13,Jerky.com - Honey Teriyaki Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-30-13,Jerky.com - Chipotle Bourbon Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-27-13,Jerky.com - Ghost Pepper Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-50-13,Jerky.com - Carolina Reaper Beef Jerky - 1 oz.,1,oz,100,Beef Jerky
+Jerky1oz,JCB-BEJ-157-13,Jerky.com - Honey Bourbon Beef Jerky - 1 oz.,1,oz,400,Beef Jerky
+Jerky1oz,JCB-BEJ-18-13,Jerky.com - Whiskey BBQ Beef Jerky - 1 oz.,1,oz,400,Beef Jerky
+Jerky1oz,JCB-BEJ-41-13,Jerky.com - Red Wine Beef Jerky - 1 oz.,1,oz,400,Beef Jerky
+Jerky1oz,OJC-BEJ-13-13,Oklahoma Jerky Company - Garlic Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,OJC-BEJ-20-13,Oklahoma Jerky Company - Hickory Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,OJC-BEJ-3-13,Oklahoma Jerky Company - Peppered Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,OJC-BEJ-38-13,Oklahoma Jerky Company - Jalapeno Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,OJC-BEJ-5-13,Oklahoma Jerky Company - Hot Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-BEJ-130-13,Test Kitchen - Prime Rib Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-TRI-30-13,Test Kitchen - Chipotle Bourbon Tri-Tip Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-TRI-1-13,Test Kitchen - Original Tri-Tip Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-TRI-8-13,Test Kitchen - Honey Teriyaki Tri-Tip Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-BSJ-2-13,Test Kitchen - Teriyaki Brisket Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-BSJ-3-13,Test Kitchen - Black Pepper Brisket Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky1oz,JCB-BSJ-4-13,Test Kitchen - Sweet & Spicy Brisket Beef Jerky - 1 oz.,1,oz,1,Beef Jerky
+Jerky2.5oz,JCB-JOTW-1BAG,The Jerky of the Week Club - 1 bag,0,lbs,1,Subscription
+Jerky2.5oz,LIVE-MYSTERY-BAG-2,Mystery Bag,0,lbs,1,Beef Jerky
+Jerky2.5oz,JERKY-FOM,Flavor of the Month,2,oz,1,Beef Jerky
+Jerky2.5oz,GRAB-BAG-X1,Grab Bag Sale - 1 Mystery Bag,2,oz,1,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-13-16,Bricktown Jerky - Soft & Tender Garlic Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-12-16,Bricktown Jerky - Soft & Tender Honey Pepper Beef Jerky - 2.5 oz.,2.5,oz,36,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-72-16,Bricktown Jerky - Soft & Tender Mango Jalapeno Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-1-16,Bricktown Jerky - Soft & Tender Original Beef Jerky - 2.5 oz.,2.5,oz,36,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-70-16,Bricktown Jerky - Soft & Tender Pale Ale Beer Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-41-16,Bricktown Jerky - Soft & Tender Red Wine Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-69-16,Bricktown Jerky - Soft & Tender Scorpion Pepper Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-71-16,Bricktown Jerky - Soft & Tender Sea Salt & Pepper Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-11-16,Bricktown Jerky - Soft & Tender Spicy Beef Jerky - 2.5 oz.,2.5,oz,36,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-10-16,Bricktown Jerky - Soft & Tender Sweet BBQ Beef Jerky - 2.5 oz.,2.5,oz,36,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-68-16,Bricktown Jerky - Soft & Tender Tequila Lime Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-2-16,Bricktown Jerky - Soft & Tender Teriyaki Beef Jerky - 2.5 oz.,2.5,oz,36,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-35-16,Bricktown Jerky - Soft & Tender Whiskey Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-37-16,Bricktown Jerky - Soft & Tender Sweet Picante Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-38-16,Bricktown Jerky - Soft & Tender Hot Jalapeno Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-39-16,Bricktown Jerky - Soft & Tender Mesquite BBQ Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-47-16,Bricktown Jerky - Soft & Tender Fajita Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-64-16,Jerky.com - Au Jus Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-3-16,Jerky.com - Black Pepper Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-74-16,Jerky.com - Blackened Cajun Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-44-16,Jerky.com - Cajun Boil Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-50-16,Jerky.com - Carolina Reaper Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-30-16,Jerky.com - Chipotle Bourbon Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-27-16,Jerky.com - Ghost Pepper Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-46-16,Jerky.com - Green Chile Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-26-16,Jerky.com - Habanero Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-20-16,Jerky.com - Hickory Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-8-16,Jerky.com - Honey Teriyaki Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-5-16,Jerky.com - Hot Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-38-16,Jerky.com - Jalapeno Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-65-16,Jerky.com - Jalapeno Garlic Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-45-16,Jerky.com - Montreal Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-1-16,Jerky.com - Original Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-51-16,Jerky.com - Pastrami Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-49-16,Jerky.com - Raspberry Jalapeno Beef Jerky - 2.5 oz.,2.5,oz,20,Beef Jerky
+Jerky2.5oz,JCB-BEJ-4-16,Jerky.com - Sweet & Spicy Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-2-16,Jerky.com - Teriyaki Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-18-16,Jerky.com - Whiskey BBQ Beef Jerky - 2.5 oz.,2.5,oz,320,Beef Jerky
+Jerky2.5oz,JCB-CHJ-31-16,Jerky.com - Buffalo Wing Chicken Jerky - 2.5 oz.,2.5,oz,100,Chicken Jerky
+Jerky2.5oz,JCB-CHJ-55-16,Jerky.com - Jamaican Jerk Chicken Jerky - 2.5 oz.,2.5,oz,100,Chicken Jerky
+Jerky2.5oz,JCB-CHJ-66-16,Jerky.com - Lemon Pepper Chicken Jerky - 2.5 oz.,2.5,oz,100,Chicken Jerky
+Jerky2.5oz,JCB-INC-ALDER-X1,Wood Burning Logs - Alder - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-CEDAR-X1,Wood Burning Logs - Cedar - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-FIRBALSAM-X1,Wood Burning Logs - Fir Balsam - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-HICKORY-X1,Wood Burning Logs - Hickory - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-JUNIPER-X1,Wood Burning Logs - Juniper - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-MESQUITE-X1,Wood Burning Logs - Mesquite - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-INC-PINON-X1,Wood Burning Logs - Pinon - 40 count,2.5,oz,1,Incense
+Jerky2.5oz,JCB-POJ-10-16,Jerky.com - BBQ Pork Jerky - 2.5 oz.,2.5,oz,100,Pork Jerky
+Jerky2.5oz,JCB-POJ-6-16,Jerky.com - Maple Pork Jerky - 2.5 oz.,2.5,oz,100,Pork Jerky
+Jerky2.5oz,JCB-TUJ-3-16,Jerky.com - Black Pepper Turkey Jerky - 2.5 oz.,2.5,oz,100,Turkey Jerky
+Jerky2.5oz,JCB-TUJ-1-16,Jerky.com - Original Turkey Jerky - 2.5 oz.,2.5,oz,100,Turkey Jerky
+Jerky2.5oz,JCB-TUJ-2-16,Jerky.com - Teriyaki Turkey Jerky - 2.5 oz.,2.5,oz,100,Turkey Jerky
+Jerky2.5oz,JCB-BEJ-99-16,Jerky.com - Sweet Chipotle Adobo Beef Jerky - 2.5 oz,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-66-16,Jerky.com - Lemon Pepper Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-101-16,Jerky.com - Maple Bourbon Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-109-16,Jerky.com - Rosemary Garlic Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BEJ-110-16,Jerky.com - Black Truffle & Sea Salt Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-40-16,Bricktown Jerky - Soft & Tender Hot Habanero Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,1,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-36-16,Bricktown Jerky - Soft & Tender Citrus Fusion Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,1,Beef Jerky
+Jerky2.5oz,BTJ-BEJ-4-16,Bricktown Jerky - Soft & Tender Sweet & Spicy Beef Jerky - 2.5 oz. - DISCONTINUED,2.5,oz,1,Beef Jerky
+Jerky2.5oz,JCB-BEJ-41-16,Jerky.com - Red Wine Beef Jerky - 2.5 oz.,2.5,oz,320,Beef Jerky
+Jerky2.5oz,JCB-BEJ-157-16,Jerky.com - Honey Bourbon Beef Jerky - 2.5 oz.,2.5,oz,320,Beef Jerky
+Jerky2.5oz,TK-GHDB-CPSM,Chicken Piccata Snack Mix 2.5 oz,2.5,oz,1,General
+Jerky2.5oz,TK-WHDB24-BECC,Bird's Eye Chili Crispies 2.5oz,2.5,oz,1,General
+Jerky2.5oz,JCB-BEJ-130-16,Limited Edition - Prime Rib Beef Jerky - 2.5 oz.,2.5,oz,1,Beef Jerky
+Jerky2.5oz,JCB-TRI-1-16,Limited Edition - Original Tri-Tip Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-TRI-8-16,Test Kitchen - Honey Teriyaki Tri-Tip Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-TRI-30-16,Test Kitchen - Chipotle Bourbon Tri-Tip Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BSJ-3-16,Test Kitchen - Black Pepper Brisket Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BSJ-2-16,Test Kitchen - Teriyaki Brisket Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-BSJ-4-16,Test Kitchen - Sweet & Spicy Brisket Beef Jerky - 2.5 oz.,2.5,oz,100,Beef Jerky
+Jerky2.5oz,JCB-CHJ-147-16,Limited Edition - Pineapple Teriyaki Chicken Jerky - 2.5 oz.,2.5,oz,1,Chicken Jerky
+Jerky2.5oz,JCB-BEJ-145-16,Test Kitchen - Garlic Black Pepper Beef Jerky 2.5 oz.,2.5,oz,1,Beef Jerky
+Jerky2.5oz,JCB-POJ-148-16,Test Kitchen - Al Pastor Pork Jerky - 2.5 oz.,2.5,oz,1,Pork Jerky
+Jerky2.5oz,JCB-BEF-53-16,Test Kitchen - Dill Pickle Beef Jerky - 2.5 oz.,2.5,oz,1,Beef Jerky
+Jerky2.5oz,JCB-BEJ-92-13,World's Hottest Beef Jerky,3.5,oz,1,Beef Jerky
+Jerky2oz,OJC-BEJ-3-1,Oklahoma Jerky Company - Peppered Beef Jerky - 2 oz.,2,oz,48,Beef Jerky
+Jerky2oz,OJC-BEJ-5-1,Oklahoma Jerky Company - Hot Beef Jerky - 2 oz.,2,oz,48,Beef Jerky
+Jerky2oz,OJC-BEJ-13-1,Oklahoma Jerky Company - Garlic Beef Jerky - 2 oz.,2,oz,48,Beef Jerky
+Jerky2oz,OJC-BEJ-20-1,Oklahoma Jerky Company - Hickory Beef Jerky - 2 oz.,2,oz,48,Beef Jerky
+Jerky2oz,OJC-BEJ-38-1,Oklahoma Jerky Company - Jalapeno Beef Jerky - 2 oz.,2,oz,48,Beef Jerky
+Jerky2oz,JCB-BEF-66-1,Test Kitchen - Jerky.com - Lemon Pepper Beef Jerky - 2 oz. - SEASONAL,2,oz,100,Beef Jerky
+Jerky2oz,JCB-BEJ-100-1,Test Kitchen - Chile Limon Beef Jerky - 2 oz. - DISCONTINUED,2,oz,100,Beef Jerky
+Jerky2oz,JCB-TK-BTSS-1,Test Kitchen Batch #7 - Black Truffle & Sea Salt Beef Jerky - 2 oz. - DISCONTINUED,2,oz,100,Beef Jerky
+Jerky2oz,JCB-BEJ-120-1,Test Kitchen Batch #8 - Honey Mustard BBQ Beef Jerky - 2 oz - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-122-1,Test Kitchen Batch #9 - Chamoy Beef Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-94-1,Test Kitchen - Sweet Garlic Beef Jerky - 2 oz.,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-124-1,Test Kitchen - Apple Cider Beef Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-126-1,Test Kitchen - Butter & Garlic Ribeye Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-127-1,Test Kitchen - Butter & Sea Salt Sirloin Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-128-1,Test Kitchen - Butter & Cracked Pepper NY Strip Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-129-1,Test Kitchen - Butter & Herbs Filet Mignon Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,BTJ-BEJ-37-1,Bricktown Jerky - Soft & Tender Sweet Picante Beef Jerky - 2 oz. - DISCONTINUED,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-72-1,Bricktown Jerky - Soft & Tender Mango Jalapeno Beef Jerky - 2 oz.. - DISCONTINUED,2,oz,1,Beef Jerky
+Jerky2oz,JCB-TRI-4-1,Test Kitchen - Sweet and Spicy Tri-Tip Beef Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-130-1,Test Kitchen - Prime Rib Beef Jerky - 2 oz. - SEASONAL,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-132-1,Evergreen Drop Box - Worcestershire Sauce Beef Jerky - 2 oz.,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-133-1,Test Kitchen - Sweet Thai Chili Beef Jerky - 2oz.,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-137-1,Test Kitchen - Orange Thai Chili Chicken Jerky - 2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BEJ-138-1,Test Kitchen - Taco Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-138-1,Test Kitchen - Taco Chicken Jerky - 2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-SB-133-1,Test Kitchen - Sweet Thai Chili Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-SB-8-1,Test Kitchen - Honey Teriyaki Beef Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-SB-4-1,Test Kitchen - Sweet & Spicy Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-SB-3-1,Test Kitchen - Black Pepper Beef Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-SB-120-1,Test Kitchen - Honey Mustard BBQ Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-SB-122-1,Test Kitchen - Sweet & Spicy Chamoy Steak Bites - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-TRI-8-1,Test Kitchen - Honey Teriyaki Tri-Tip Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-TRI-30-1,Test Kitchen - Chipotle Bourbon Tri-Tip Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-TRI-3-1,Test Kitchen - Black Pepper Tri-Tip Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-139-1,Test Kitchen - French Onion Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-140-1,Test Kitchen - 7 Herbs Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-139-1,Test Kitchen - French Onion Chicken Jerky - 2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BEJ-143-1,Test Kitchen - Pizza Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-143-1,Test Kitchen - Chicken Pizza Jerky - 2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BAJ-144-1,Test Kitchen - Candied Bacon Jerky - 2oz,2,oz,1,Bacon Jerky
+Jerky2oz,JCB-BEJ-145-1,Test Kitchen - Garlic Black Pepper - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-146-1,Test Kitchen - Mango Habanero Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-147-1,Test Kitchen - Pineapple Teriyaki Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-POJ-148-1,Test Kitchen - Al Pastor Pork Jerky - 2oz,2,oz,1,Pork Jerky
+Jerky2oz,JCB-CHJ-147-1,Test Kitchen - Pineapple Teriyaki Chicken Jerky - 2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BC-6-1,Test Kitchen - Sweet Maple Bacon Chunks 2oz,2,oz,1,Bacon Jerky
+Jerky2oz,JCB-BC-146-1,Test Kitchen - Mango Habanero Bacon Chunks 2oz,2,oz,1,Bacon Jerky
+Jerky2oz,JCB-BC-147-1,Test Kitchen - Pineapple Teriyaki Bacon Chunks 2oz,2,oz,1,Bacon Jerky
+Jerky2oz,JCB-BC-151-1,Test Kitchen - Smoky Bourbon Bacon Chunks 2oz,2,oz,1,Bacon Jerky
+Jerky2oz,JCB-BEJ-152-1,Test Kitchen - Nashville Rub Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-153-1,Test Kitchen - Fajita Lime Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-153-1,Test Kitchen - Fajita Lime Chicken Jerky2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-CHJ-154-1,Test Kitchen - Middle Eastern Chicken Jerky2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-CHJ-155-1,Test Kitchen - Mexican Chicken Jerky2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-CHJ-156-1,Test Kitchen - Mandarin Chicken Jerky2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BEJ-157-1,Test Kitchen - Honey Bourbon Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-158-1,Test Kitchen - Everything Bagel Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-159-1,Test Kitchen - BBQ Ranch Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-POJ-159-1,Test Kitchen - BBQ Ranch Pork Jerky2oz,2,oz,1,Pork Jerky
+Jerky2oz,JCB-TK-SBPS,4 Strawberry Black Pepper Suckers 2oz,2,oz,1,General
+Jerky2oz,JCB-BEJ-160-1,Test Kitchen - Garlic Parmesan Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-CHJ-160-1,Test Kitchen - Garlic Parmesan Chicken Jerky2oz,2,oz,1,Chicken Jerky
+Jerky2oz,JCB-BEJ-161-1,Test Kitchen - Honey Chipotle Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-TRI-1-1,Test Kitchen - Original Tri-Tip Beef Jerky2oz,2,oz,1,General
+Jerky2oz,JCB-TUJ-123-1,Test Kitchen - Cranberry Turkey Jerky - 2oz. - SEASONAL,2,oz,1,Turkey Jerky
+Jerky2oz,JCB-BEJ-162-1,Test Kitchen - Bleu Cheese Steak Beef Jerky - 2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-43-1,Test Kitchen - Honey Sriracha Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-164-1,Test Kitchen - Orange Teriyaki Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-165-1,Test Kitchen - Hot Honey Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-166-1,Test Kitchen - Garlic AF Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-167-1,Test Kitchen - Chimichurri Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-168-1,Test Kitchen - Cherryaki Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-169-1,Test Kitchen - Dill Pickle Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEF-167-1,Test Kitchen - Pina Colada Beef Jerky - 2 oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEF-168-1,Test Kitchen - Orange Liqueur Beef Jerky - 2 oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEF-169-1,Test Kitchen - Yellow Mustard Beef Jerky - 2 oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEF-171-1,Test Kitchen Batch #45 - Black Garlic Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-POJ-174-1,Test Kitchen Batch #46 - Apple Moonshine Pork Jerky2oz,2,oz,1,Pork Jerky
+Jerky2oz,JCB-BEJ-175-1,Test Kitchen Batch #47 - Garmato Beef Jerky2oz,2,oz,1,Beef Jerky
+Jerky2oz,JCB-BEJ-6638-1,Test Kitchen Batch #48 - Lemon Pepper Jalapeno Beef Jerky2oz,2,oz,1,Beef Jerky
+JerkyAssortment10oz,JCB-JOTW-4BAGS,The Jerky of the Week Club - 4 bags,0,lbs,1,Subscription
+JerkyAssortment10oz,GRAB-BAG-4,Grab Bag Sale - Mystery Bag 4,2,oz,1,Beef Jerky
+JerkyAssortment10oz,OKJ-BEJ-19-2-X5,Old Fashioned Hickory - 5 Pack,10,oz,1,Beef Jerky
+JerkyAssortment10oz,OKJ-BEJ-13-2-X5,Old Fashioned Style Garlic Beef Jerky - 5 PACK,10,oz,1,Beef Jerky
+JerkyAssortment10oz,OKJ-BEJ-5-2-X5,Old Fashioned Hot Beef Jerky - 5 Pack,10,oz,1,Beef Jerky
+JerkyAssortment10oz,OKJ-BEJ-3-2-X5,Old Fashioned Peppered Beef Jerky - 5 Pack,10,oz,1,Beef Jerky
+JerkyAssortment10oz,JCB-DFP-62-5-X3,Old Bay Deep Fried Peanuts - 3 Pack,10,oz,1,Peanuts
+JerkyAssortment10oz,JCB-CMB-VSP-10B,Beef Jerky Variety Sampler Pack - 10 bags,10,oz,1,Beef Jerky
+JerkyAssortment12.5oz,GRAB-BAG-5,Grab Bag Sale - Mystery Bag 5,2,oz,1,Beef Jerky
+JerkyAssortment12.5oz,JCB-TUJ-1-2-X5,Original Turkey Jerky - 5 PACK,12.5,oz,1,Turkey Jerky
+JerkyAssortment15oz,JCB-JOTW-6BAGS,The Jerky of the Week Club - 6 bags,0,lbs,1,Subscription
+JerkyAssortment15oz,JCB-CMB-VSP-14B,Beef Jerky Variety Sampler Pack - 14 bags,14,oz,1,Beef Jerky
+JerkyAssortment15oz,JCB-CMB-VP-6B,Beef Jerky Variety Pack - 6 bags,15,oz,1,Beef Jerky
+JerkyAssortment20oz,JCB-JOTW-8BAGS,The Jerky of the Week Club - 8 bags,0,lbs,1,Subscription
+JerkyAssortment25oz,JCB1031-K-RS,Jerky Lover's Combo,24.5,oz,1,Combos and Samplers
+JerkyAssortment30oz,JCB-JOTW-12BAGS,The Jerky of the Week Club - 12 bags,0,lbs,1,Subscription
+JerkyAssortment33oz,JCB-CMB-VP-14B,Beef Jerky Variety Pack - 14 bags,32.75,oz,1,Beef Jerky
+JerkyAssortment4oz,JCB-CMB-VSP-3B,Beef Jerky Variety Sampler Pack - 3 bags,3,oz,1,Beef Jerky
+JerkyAssortment4oz,JCB-CMB-SEP-R,SPECIALTY Exotic Jerky Sampler Pack (Kangaroo & Alligator),3.5,oz,1,Combos and Samplers
+JerkyAssortment4oz,JCB-ALJ-A2-1,Alligator Jerky Sampler - TESTER 2 PACK,3.5,oz,1,Combos and Samplers
+JerkyAssortment4oz,JCB-CMB-EJP-TP,Exotic Jerky Sampler Pack,4,oz,1,Combos and Samplers
+JerkyAssortment4oz,JCB-CMB-EJP-TT,Exotic Jerky Starter 4 Pack - 4 oz.,4,oz,1,Combos and Samplers
+JerkyAssortment4oz,JCB-GFT-BJV-3PC,Beef Jerky Variety Pack Sampler Gift Bag 3 bags,4,oz,1,Gift
+JerkyAssortment4oz,JCB-BEJ-HTP-A4S,Hot Jerky Sampler Pack - 4 Flavors,4,oz,1,Combos and Samplers
+JerkyAssortment5oz,JCB-JOTW-2BAGS,The Jerky of the Week Club - 2 bags,0,lbs,1,Subscription
+JerkyAssortment5oz,GRAB-BAG-2,Grab Bag Sale - Mystery Bag 2,2,oz,1,Beef Jerky
+JerkyAssortment5oz,JCB-POJ-A2-1,Jerky.com's Pork Jerky Sampler - TESTER 2 PACK,5,oz,1,Pork Jerky
+JerkyAssortment5oz,JCB-TK-MHSDB,Mango Habanero Beef Jerky Surprise Drop Bundle,5,oz,1,Beef Jerky
+JerkyAssortment5oz,JCB-CMB-BOJS,Booze Jerky Sampler Pack - 4 Flavors,5,oz,1,Combos and Samplers
+JerkyAssortment5oz,JCB-CMB-BBJS-TT,Beef Jerky Starter 5 Pack - 5 oz.,5,oz,1,Combos and Samplers
+JerkyAssortment5oz,JCB-CMB-TCSP,Tougher to Chew Sampler Pack - 5 Flavors,5,oz,1,Combos and Samplers
+JerkyAssortment5oz,JCB-CMB-ECSP,Easier to Chew Sampler Pack - 5 Flavors,5,oz,1,Combos and Samplers
+JerkyAssortment6oz,OKJ-BEJ-19-2-X3,Old Fashioned Hickory - 3 Pack,6,oz,1,Beef Jerky
+JerkyAssortment6oz,OKJ-BEJ-3-2-X3,Old Fashioned Peppered - 3 Pack,6,oz,1,Beef Jerky
+JerkyAssortment6oz,OKJ-BEJ-13-2-X3,Old Fashioned Garlic - 3 Pack,6,oz,1,Beef Jerky
+JerkyAssortment6oz,OKJ-BEJ-5-2-X3,Old Fashioned Hot Beef - 3 Pack,6,oz,1,Beef Jerky
+JerkyAssortment6oz,OKJ-BEJ-38-2-X3,Old Fashioned Jalapeno Beef - 3 Pack,6,oz,1,Beef Jerky
+JerkyAssortment6oz,JCB-CMB-VSP-6B,Beef Jerky Variety Sampler Pack - 6 bags,6,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-TUJ-A3-2,Jerky.com's Turkey Jerky Sampler - TESTER 3 PACK,0,lbs,1,Combos and Samplers
+JerkyAssortment7.5oz,BTJ-BEJ-12-16-X3,Honey Pepper Beef Jerky - 3 Pack,0,lbs,1,General
+JerkyAssortment7.5oz,JCB-BRISK-SD-3PK,Test Kitchen - Brisket Beef Jerky 3 Pack Bundle - 7.5oz.,0,lbs,1,General
+JerkyAssortment7.5oz,GRAB-BAG-3,Grab Bag Sale - Mystery Bag 3,2,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-GFT-BJV-6PC,Beef Jerky Variety Pack Sampler Gift Bag 6 bags,7,oz,1,Gift
+JerkyAssortment7.5oz,JCB-KIKI-MEM-EG,Keep It or Kill It Monthly Membership - Recurring,7,oz,1,Subscription
+JerkyAssortment7.5oz,JCB-CHJ-31-2-X3,Buffalo Wing Chicken - 3 Pack,7.5,oz,1,Chicken Jerky
+JerkyAssortment7.5oz,JCB-TUJ-3-2-X3,Black Pepper Turkey Jerky - 3 PACK,7.5,oz,1,Turkey Jerky
+JerkyAssortment7.5oz,JCB-BEJ-50-2-X3,Carolina Reaper Beef 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,CIS-BEJ-39-2-X3,Bricktown Mesquite BBQ Beef Jerky - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,CIS-BEJ-1-2-X3,Bricktown Original - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BEJ-26-2-X3,Habanero Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BEJ-27-2-X3,Ghost Pepper Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BEJ-1-2-X3,Original Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BEJ-64-2-X3,Au Jus Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,CIS-BEJ-10-2-X3,Soft & Tender Sweet BBQ - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BEJ-65-2-X3,Jalapeno Garlic Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-BSJ-8-2-X3,Honey Teriyaki Beef - 3 Pack,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,CIS-BEJ-38-2-X3,Bricktown Hot Jalapeno Beef Jerky - 3 PACK,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-TRI-SD-3PK,Test Kitchen - Tri-Tip 3 Pack Bundle - 7.5oz.,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-CMB-VP-3B,Beef Jerky Variety Pack - 3 bags,7.5,oz,1,Beef Jerky
+JerkyAssortment7.5oz,JCB-TUJ-3FLV-BNDL,Turkey Jerky 3 Flavor Bundle,7.5,oz,1,Turkey Jerky
+JerkyAssortment8oz,JCB-TK-SHBJS,4 pc. Steakhouse Beef Jerky Sampler,0,lbs,1,General
+JerkyAssortment9oz,JCB-CMB-BBJS-TP8,Beef Jerky Sampler Pack - 8 Flavors,9,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-BBJS-TP,Beef Jerky Sampler Pack,7,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-EXJC,Exotic Jerky Combo,9,oz,1,Combos and Samplers
+JerkyCombo,JCB-VP-8PESS,Exotic Snack Sticks Variety Pack - 8 Pieces,9,oz,1,Combos and Samplers
+JerkyCombo,JCB-VP-8PSS,Snack Sticks Variety Pack - 8 Pieces,9,oz,1,Meat Sticks
+JerkyCombo,JCB-CMB-BAJC,Bacon Jerky Combo,10,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-TCJC,Tougher-to-Chew Combo,10,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-HJC,Hot Jerky Combo,12,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-BOJC,Booze Infused Jerky Combo,13,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-BJC,Beef Jerky Combo,15,oz,1,Combos and Samplers
+JerkyCombo,JCB-CMB-EJC,Easier to Chew Jerky Combo,15.99,oz,1,Combos and Samplers
+JerkyCombo,JCB-VP-20PSS,The Complete Meat Stick Combo Variety Pack,21,oz,1,Combos and Samplers
+JerkyCombo6oz,JCB-BUJ-1-17-X3,Original Buffalo Jerky - 3 Pack,0,lbs,1,General
+JerkyCombo6oz,JCB-KAJ-1-17-X3,Kangaroo 3 Pack,0,lbs,1,Exotic Jerky
+JerkyComboLarge,JCB-BEJ-12DOJ,12 Days of Jerky Combo,22,oz,1,Gift
+KIOKIBundle,JCB-KIOKIPPB-1,Keep It Or Kill It Pre-Paid Bundle - 1st Shipment with Bonus!,6,oz,1,Subscription
+Licorice 8oz,BTC-FTCB-3,Bricktown Confectionary - Unlabeled Classic Black Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTBRT-3,Bricktown Confectionary - Unlabeled Blue Raspberry Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTCHERT-3,Bricktown Confectionary - Unlabeled Cherry Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTCINT-3,Bricktown Confectionary - Unlabeled Cinnamon Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTGAT-3,Bricktown Confectionary - Unlabeled Green Apple Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTRRT-3,Bricktown Confectionary - Unlabeled Red Raspberry Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTST-3,Bricktown Confectionary - Unlabeled Strawberry Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTWT-3,Bricktown Confectionary - Unlabeled Watermelon Licorice - 8 oz.,8,oz,12,Licorice
+Licorice 8oz,BTC-FTCR-3,Bricktown Confectionary - Unlabeled Classic Red Licorice - 8 oz.,8,oz,12,Licorice
+Licorice3pack,BTC-FTCB-5-X3,Classic Black Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,0,lbs,1,Licorice
+Licorice3pack,BTC-FTCR-5-X3,Classic Red Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,0,lbs,1,Licorice
+Licorice3pack,BTC-FTST-3-X3,Strawberry Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,0,lbs,1,Licorice
+Licorice3pack,BTC-FTCHERT-3-X3,Cherry Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,0,lbs,1,Licorice
+Licorice3pack,BTC-FTCINT-3-X3,Cinnamon Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,24,oz,1,Licorice
+Licorice3pack,BTC-FTGAT-3-X3,Green Apple Licorice - 3 Pack - Fat Free Old Fashioned Gourmet Licorice Twists - A Must Try Quality Licorice Candy with Unique Flavor Unlike Any Other - 3-8 oz. Bags,24,oz,1,Licorice
+Licorice3pack,BTC-FTBRT-3-X3,Blue Raspberry Licorice - 3 Pack,24,oz,1,Licorice
+Licorice3pack,BTC-FTWT-3-X3,Watermelon Licorice - 3 Pack,24,oz,1,Licorice
+Licorice3pack,BTC-FTRRT-3-X3,Red Raspberry Licorice - 3 Pack,24,oz,1,Licorice
+Licorice3pack,BTG-SFS-59-5-X3,Cinnamon and Sugar Sunflower Seeds - 3 PACK,24,oz,1,Sunflower Seeds
+MeatSlicingKnife,JCB-JME-1-2,"10""  Professional Jerky Meat Slicing Knife",6,oz,1,Jerky Making Equipment
+MeatSlicingKnife,JCB-JME-1-4,"12 "" Professional Jerky Meat Slicing Knife",6,oz,1,Jerky Making Equipment
+MeatSlicingKnife,JCB-JME-1-8,"14""  Professional Jerky Meat Slicing Knife",6,oz,1,Jerky Making Equipment
+MeatSlicingKnife,JCB-JME-1-BOTH,"Professional 10"" and 12"" Meat Cutting Knife Set",12,oz,1,Jerky Making Equipment
+MeatStick0.5oz,JCB-EEXS-94-23,Shaffers - Formed Sweet Garlic Elk Jerky Stick .5 oz.,0.5,oz,600,Meat Sticks
+MeatStick0.5oz,JCB-VEXS-1-23,Shaffers - Formed Venison Jerky Stick .5 oz.,0.5,oz,600,Meat Sticks
+MeatStick0.5oz,JCB-VEXS-5-23,Shaffers - Formed Hot Venison Jerky Stick .5 oz.,0.5,oz,600,Meat Sticks
+MeatStick0.8oz,JCB-SS-1-26,Klement's Beef Snack Stick - .8 oz.,0.8,oz,100,Meat Sticks
+MeatStick0.8oz,JCB-SS-21-26,Klement's Honey Ham Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick0.8oz,JCB-SS-5-26,Klement's Hot Snack Stick - .8 oz.,0.8,oz,100,Meat Sticks
+MeatStick0.8oz,JCB-SS-42-26,Klement's Sriracha Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick0.8oz,JCB-SS-3-26,Klement's Cracked Pepper Turkey Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick0.8oz,3054,Klement's Original Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick0.8oz,JCB-SS-170-26,Klement's Pepper Jack Turkey Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick0.8oz,JCB-SS-2-26,Klement's Teriyaki Snack Stick - .8 oz.,0.8,oz,52,Meat Sticks
+MeatStick1oz,JCB-SS-96-26,Klement's Original and Cheddar Cheese Snack Stick - 1 oz.,1,oz,75,Meat Sticks
+MeatStick1oz,JCB-VEXS-1-13,Shaffers - Original Venison Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-VEXS-5-13,Shaffers - Hot Venison Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-vEXS-93-13,Shaffers - Sweet and Smokie Venison Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-VEXS-2-13,Shaffers - Teriyaki Venison Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-VEXS-3-13,Shaffers - Pepper Venison Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-EEXS-1-13,Shaffers - Elk Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-EEXS-91-13,Shaffers - Elk w/ Cheddar Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-BEXS-1-13,Shaffers - Water Buffalo Snack Stick 1 oz. - DISCONTINUED,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-WBEXS-1-13,Shaffers - Wild Boar Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-VEXS-6-13,Shaffers - Venison Cheddar Snack Stick 1 oz.,1,oz,400,Meat Sticks
+MeatStick1oz,JCB-SS-172-13,Spiced Apple Snack Stick - 1 oz.,1,oz,1,Meat Sticks
+MeatStick1oz,JCB-SS-173-13,Garlic Butter & Herb Snack Stick - 1 oz.,1,oz,1,Meat Sticks
+MeatStick1oz,JCB-SS-CMMS-01,Cyber Monday Mystery Stick,1,oz,1,Meat Sticks
+MeatStickAssortment10oz,KLM-MS-VS-10X+2-TT,Tiktok - Klement's 12 Stick Variety Pack,0,lbs,1,General
+MeatStickAssortment10oz,KLM-MS-VS-10X+2,Klement's 12 Stick Variety Pack,9.6,oz,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-TURKEY-26X,Klement's Turkey Sticks - 26 Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-SRIRACHA-26X,Klement's Sriracha Sticks - 26 Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-HOT-26X,Klement's Hot Sticks - 26 Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-HAM-26X,Klement's Ham Sticks - 26 Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-EM-NBAG,Klement's Meat and Cheese Bundle Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-BEEF-26X,Klement's Beef Sticks - 26 Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment21oz,KLM-MS-BEEF-24X+2-TT,Tiktok - Klement's Beef Sticks - 26 Pack,0,lbs,1,General
+MeatStickAssortment21oz,KLM-MS-HOT-24X+2-TT,Tiktok - Klement's Hot Sticks - 26 Pack,0,lbs,1,General
+MeatStickAssortment21oz,KLM-MS-HAM-24X+2-TT,Tiktok - Klement's Ham Sticks - 26 Pack,0,lbs,1,General
+MeatStickAssortment21oz,KLM-MS-TURKEY-24X+2-TT,Tiktok - Klement's CP Turkey Sticks - 26 Pack,0,lbs,1,General
+MeatStickAssortment21oz,KLM-MS-SRIRACHA-24X+2-TT,Tiktok - Klement's Sriracha Sticks - 26 Pack,0,lbs,1,General
+MeatStickAssortment21oz,JCB-SS-1-26-BUNDLE26,.8 oz. Beef Meat Sticks - 26 Count Bundle,20.8,oz,1,Meat Sticks
+MeatStickAssortment21oz,JCB-SS-3-26-BUNDLE26,.8 oz. Cracked Pepper Turkey Meat Sticks - 26 Count Bundle,20.8,oz,1,Meat Sticks
+MeatStickAssortment21oz,JCB-SS-42-26-BUNDLE26,.8 oz. Sriracha Meat Sticks - 26 Count Bundle,20.8,oz,1,Meat Sticks
+MeatStickAssortment21oz,JCB-SS-5-26-BUNDLE26,.8 oz. Hot Meat Sticks - 26 Count Bundle,20.8,oz,1,Meat Sticks
+MeatStickAssortment24oz,KLM-MS-VS-25X+5-TT,Tiktok - Klement's 30 Stick Variety Pack,0,lbs,1,General
+MeatStickAssortment24oz,KLM-MS-VS-25X+5,Klement's 30 Stick Variety Pack,24,oz,1,Meat Sticks
+MeatStickAssortment4oz,JCB-SS-96+3-4PC,4pc Meat Stick Assortment,0,lbs,1,General
+MeatStickAssortment6oz,JCB-MSP,Meat Snack Pack - 7 Pieces,5.4,oz,1,Combos and Samplers
+MeatStickAssortment6oz,JCB-SS-172-13-X6,Spiced Apple Snack Stick - 6 Pack,6,oz,1,Meat Sticks
+MeatStickAssortment6oz,JCB-SS-173-13-X6,Garlic Butter & Herb Snack Stick - 6 Pack,6,oz,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-VS-10X,Klement's 10 Stick Variety Pack,0,lbs,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-CBPTURKEY-10X-TT,Tiktok - Klement's CP Turkey Sticks - 10 Pack,0,lbs,1,General
+MeatStickAssortment8oz,KLM-MS-SPICYSRIRACHA-10X-TT,Tiktok - Klement's Sriracha Sticks - 10 Pack,0,lbs,1,General
+MeatStickAssortment8oz,KLM-MS-HOT-10X-TT,Tiktok - Klement's Hot Sticks - 10 Pack,0,lbs,1,General
+MeatStickAssortment8oz,KLM-MS-HAM-10X-TT,Tiktok - Klement's Ham Sticks - 10 Pack,0,lbs,1,General
+MeatStickAssortment8oz,KLM-MS-BEEF-10X-TT,Tiktok - Klement's Beef Sticks - 10 Pack,0,lbs,1,General
+MeatStickAssortment8oz,KLM-MS-CBPTURKEY-10X,Klement's Turkey Sticks - 10 Pack,8,oz,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-SPICYSRIRACHA-10X,Klement's Sriracha Sticks - 10 Pack,8,oz,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-HOT-10X,Klement's Hot Sticks - 10 Pack,8,oz,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-HAM-10X,Klement's Ham Sticks - 10 Pack,8,oz,1,Meat Sticks
+MeatStickAssortment8oz,KLM-MS-BEEF-10X,Klement's Beef Sticks - 10 Pack,8,oz,1,Meat Sticks
+MeatSticksAssortment,JCB-SS-21-26-BUNDLE26,.8 oz. Honey Ham Meat Sticks - 26 Count Bundle,20.8,oz,1,Meat Sticks
+MeatSticksAssortment11oz,KLM-MS-BEEF-10X-TT+MC,Klement's Beef Sticks - 10 Pack w/ Meat & Cheese,11,oz,1,Meat Sticks
+MeatSticksAssortment11oz,KLM-MS-HAM-10X-TT+MC,Klement's Ham Sticks - 10 Pack w/ Meat & Cheese,11,oz,1,Meat Sticks
+MeatSticksAssortment11oz,KLM-MS-CBPTURKEY-10X-TT+MC,Klement's Cracked Black Pepper Turkey Sticks - 10 Pack w/ Meat & Cheese,11,oz,1,Meat Sticks
+MeatSticksAssortment11oz,KLM-MS-VS-10X-TT+MC,Klement's 10 Stick Variety Pack w/ Meat & Cheese,11,oz,1,Meat Sticks
+MeatSticksAssortment11oz,KLM-MS-VS-10X+3MC,Klement's 10 Stick Variety Pack + 3 Bonuses,11,oz,1,General
+MeatSticksAssortment12oz,JCB-EXS-A12,12 pc Exotic Stick Variety Pack,12,oz,1,Meat Sticks
+MeatSticksAssortment12oz,JCB-EXS-A12-FBM,12 pc Exotic Stick Variety Pack,12,oz,1,Meat Sticks
+Mug,JCB-MERCH-MUG,Jerky.com Coffee Mug,16,oz,1,General
+Pretzels3Pack,BTG-PRT-53-18-X3,Bricktown Goods - Pretzels - Dill Pickle - 5.5 oz. - 3 Pack,0,lbs,1,General
+Pretzels5.5oz,BTG-PRT-84-18,Bricktown Goods - Pretzels - Bacon Cheddar - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,BTG-PRT-83-18,Bricktown Goods - Pretzels - Barbecue - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,BTG-PRT-82-18,Bricktown Goods - Pretzels - Chili Ranch - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,BTG-PRT-86-18,Bricktown Goods - Pretzels - Cinnamon Toast - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,BTG-PRT-53-18,Bricktown Goods - Pretzels - Dill Pickle - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,BTG-PRT-85-18,Bricktown Goods - Pretzels - Sugar Cookie - 5.5 oz.,5.5,oz,18,Pretzels
+Pretzels5.5oz,JCB-GFT-BSP,Bacon Snack Pack - 4 Pieces,5.6,oz,1,Combos and Samplers
+Seeds3pack,BTG-SFS-56-5-X3,Salt and Balsamic Vinegar Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-38-5-X3,Smoked Jalapeno Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-26-5-X3,Smoked Habanero Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-52-5-X3,BBQ Pit Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-61-5-X3,Salt & Pepper Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-57-5-X3,Cajun Honey Mustard Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-60-5-X3,Roasted Garlic Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-53-5-X3,Dill Pickle Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-54-5-X3,Bloody Mary Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-31-5-X3,Buffalo Wing Sunflower Seeds - 3 Pack,24,oz,1,Sunflower Seeds
+Seeds3pack,BTG-SFS-55-5-X3,Jamaican Jerk Flavored Sunflower Seeds - 3 Pack - Seasoned and Roasted in Shell for a Bold Taste - 30 Total oz.,30,oz,1,Sunflower Seeds
+SiliconeBag,JCB-B-10,Jerky.com - 1 Gallon Resealable Silicone Bags,12,oz,1,General
+SunflowerSeeds8oz,BTG-SFS-52-5,Bricktown Goods - Sunflower Seeds - BBQ Pit,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-54-5,Bricktown Goods - Sunflower Seeds - Bloody Mary,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-31-5,Bricktown Goods - Sunflower Seeds - Buffalo Wing,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-57-5,Bricktown Goods - Sunflower Seeds - Cajun Honey Mustard,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-59-5,Bricktown Goods - Sunflower Seeds - Cinnamon & Sugar,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-53-5,Bricktown Goods - Sunflower Seeds - Dill Pickle,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-55-5,Bricktown Goods - Sunflower Seeds - Jamaican Jerk,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-60-5,Bricktown Goods - Sunflower Seeds - Roasted Garlic,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-56-5,Bricktown Goods - Sunflower Seeds - Salt & Balsamic Vinegar,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-61-5,Bricktown Goods - Sunflower Seeds - Salt & Pepper,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-26-5,Bricktown Goods - Sunflower Seeds - Smoked Habanero,8,oz,30,Sunflower Seeds
+SunflowerSeeds8oz,BTG-SFS-38-5,Bricktown Goods - Sunflower Seeds - Smoked Jalapeno,8,oz,30,Sunflower Seeds

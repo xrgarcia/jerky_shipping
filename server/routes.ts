@@ -71,6 +71,34 @@ function getBaseUrl(req: Request): string {
   return `${protocol}://${host}`;
 }
 
+// Helper to parse CSV line handling quoted fields with commas
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current); // Push last field
+  return result;
+}
+
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -9492,6 +9520,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Collections] Error removing product from collection:", error);
       res.status(500).json({ error: "Failed to remove product from collection" });
+    }
+  });
+
+  // Bulk import collections from CSV
+  app.post("/api/collections/bulk-import", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({ error: "No CSV file uploaded" });
+      }
+
+      // Read and parse CSV
+      const csvContent = fs.readFileSync(file.path, "utf-8");
+      const lines = csvContent.split("\n").filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        fs.unlinkSync(file.path); // Clean up
+        return res.status(400).json({ error: "CSV file must have a header and at least one data row" });
+      }
+
+      // Parse header to find column indices
+      const headerLine = lines[0];
+      const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
+      
+      const colMap = {
+        collectionName: headers.findIndex(h => h.includes("collection") && h.includes("name")),
+        sku: headers.findIndex(h => h === "sku"),
+        weightValue: headers.findIndex(h => h.includes("weight") && h.includes("value")),
+        weightUnit: headers.findIndex(h => h.includes("weight") && h.includes("unit")),
+        incrementalQuantity: headers.findIndex(h => h.includes("incremental") || h.includes("quantity")),
+        classification: headers.findIndex(h => h.includes("classification") || h.includes("category")),
+      };
+
+      if (colMap.collectionName === -1 || colMap.sku === -1) {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({ error: "CSV must have 'Collection Name' and 'SKU' columns" });
+      }
+
+      // Track collections to create (first occurrence defines properties)
+      const collectionDefinitions: Map<string, {
+        name: string;
+        weightValue: number | null;
+        weightUnit: string | null;
+        incrementalQuantity: number | null;
+        productCategory: string | null;
+      }> = new Map();
+      
+      // Track SKU assignments
+      const skuAssignments: { collectionName: string; sku: string }[] = [];
+      const errors: string[] = [];
+
+      // Parse data rows
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = parseCSVLine(line);
+        const collectionName = values[colMap.collectionName]?.trim();
+        const sku = values[colMap.sku]?.trim();
+
+        if (!collectionName || !sku) {
+          errors.push(`Row ${i + 1}: Missing collection name or SKU`);
+          continue;
+        }
+
+        // Store collection definition (first occurrence wins)
+        if (!collectionDefinitions.has(collectionName)) {
+          const weightValueStr = colMap.weightValue >= 0 ? values[colMap.weightValue]?.trim() : null;
+          const weightUnit = colMap.weightUnit >= 0 ? values[colMap.weightUnit]?.trim()?.toLowerCase() : null;
+          const incQtyStr = colMap.incrementalQuantity >= 0 ? values[colMap.incrementalQuantity]?.trim() : null;
+          const classification = colMap.classification >= 0 ? values[colMap.classification]?.trim() : null;
+
+          collectionDefinitions.set(collectionName, {
+            name: collectionName,
+            weightValue: weightValueStr ? parseFloat(weightValueStr) : null,
+            weightUnit: weightUnit && ['lbs', 'oz'].includes(weightUnit) ? weightUnit : null,
+            incrementalQuantity: incQtyStr ? parseInt(incQtyStr, 10) : null,
+            productCategory: classification || null,
+          });
+        }
+
+        skuAssignments.push({ collectionName, sku });
+      }
+
+      // Get existing collections
+      const { productCollections, productCollectionMappings } = await import("@shared/schema");
+      const existingCollections = await db.select().from(productCollections);
+      const existingCollectionMap = new Map(existingCollections.map(c => [c.name, c]));
+
+      // Get existing mappings to check for duplicates
+      const existingMappings = await db.select().from(productCollectionMappings);
+      const existingMappingSet = new Set(existingMappings.map(m => `${m.productCollectionId}:${m.sku}`));
+
+      // Create new collections
+      const collectionsCreated: string[] = [];
+      const collectionsUpdated: string[] = [];
+      const collectionIdMap: Map<string, string> = new Map();
+
+      for (const [name, def] of collectionDefinitions) {
+        const existing = existingCollectionMap.get(name);
+        if (existing) {
+          collectionIdMap.set(name, existing.id);
+          // Optionally update existing collection properties if needed
+        } else {
+          // Create new collection
+          const newCollection = await storage.createProductCollection({
+            name: def.name,
+            description: null,
+            weightValue: def.weightValue,
+            weightUnit: def.weightUnit,
+            incrementalQuantity: def.incrementalQuantity,
+            productCategory: def.productCategory,
+            createdBy: userId,
+            updatedBy: userId,
+          });
+          collectionIdMap.set(name, newCollection.id);
+          collectionsCreated.push(name);
+        }
+      }
+
+      // Create product mappings
+      let mappingsCreated = 0;
+      let mappingsSkipped = 0;
+
+      for (const { collectionName, sku } of skuAssignments) {
+        const collectionId = collectionIdMap.get(collectionName);
+        if (!collectionId) {
+          errors.push(`Collection not found for SKU ${sku}: ${collectionName}`);
+          continue;
+        }
+
+        const mappingKey = `${collectionId}:${sku}`;
+        if (existingMappingSet.has(mappingKey)) {
+          mappingsSkipped++;
+          continue;
+        }
+
+        try {
+          await db.insert(productCollectionMappings).values({
+            productCollectionId: collectionId,
+            sku,
+            createdBy: userId,
+            updatedBy: userId,
+          });
+          existingMappingSet.add(mappingKey); // Track to avoid duplicates within CSV
+          mappingsCreated++;
+        } catch (err: any) {
+          errors.push(`Failed to add SKU ${sku} to ${collectionName}: ${err.message}`);
+        }
+      }
+
+      // Clean up uploaded file
+      fs.unlinkSync(file.path);
+
+      res.json({
+        success: true,
+        summary: {
+          totalRows: skuAssignments.length,
+          collectionsCreated: collectionsCreated.length,
+          collectionsExisting: collectionDefinitions.size - collectionsCreated.length,
+          mappingsCreated,
+          mappingsSkipped,
+          errors: errors.length,
+        },
+        collectionsCreated,
+        errors: errors.slice(0, 50), // Limit error output
+      });
+    } catch (error: any) {
+      console.error("[Collections] Bulk import error:", error);
+      res.status(500).json({ error: "Failed to process bulk import", details: error.message });
     }
   });
 
