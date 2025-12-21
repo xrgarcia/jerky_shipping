@@ -5,9 +5,12 @@
  * to the local skuvault_products table. Runs hourly and detects new data by
  * comparing stock_check_date values.
  * 
- * Data sources:
- * 1. Individual products: inventory_forecasts_daily + internal_inventory
- * 2. Kit products: internal_kit_inventory
+ * Data sources (merged in order):
+ * 1. Kit products: internal_kit_inventory (kits with cost/barcode)
+ * 2. Parent products: internal_inventory WHERE sku = primary_sku (individual products with weight)
+ * 3. Variant products: internal_inventory WHERE sku != primary_sku (variants with parent_sku)
+ * 
+ * Merge logic: Later queries fill missing fields, conflicts are logged.
  * 
  * Image URL resolution priority (waterfall):
  * 1. productVariants.imageUrl (variant-specific image)
@@ -36,6 +39,53 @@ interface ReportingProduct {
   unit_cost: string | null;
   weight_value: number | null; // Decimal value (e.g., 2.5 for 2.5oz)
   weight_unit: string | null;
+  parent_sku: string | null; // For variants: the parent SKU (null for parents/kits)
+}
+
+/**
+ * Merge two product records, filling missing fields from the source.
+ * Logs conflicts when non-null values differ.
+ */
+function mergeProducts(
+  existing: ReportingProduct,
+  incoming: ReportingProduct,
+  sourceLabel: string
+): ReportingProduct {
+  const conflicts: string[] = [];
+  
+  const merged: ReportingProduct = { ...existing };
+  
+  // Helper to merge a field
+  const mergeField = <K extends keyof ReportingProduct>(field: K) => {
+    const existingVal = existing[field];
+    const incomingVal = incoming[field];
+    
+    if (existingVal == null && incomingVal != null) {
+      // Fill missing field from incoming
+      (merged as any)[field] = incomingVal;
+    } else if (existingVal != null && incomingVal != null && existingVal !== incomingVal) {
+      // Conflict: both have values that differ
+      conflicts.push(`${field}: existing="${existingVal}" vs ${sourceLabel}="${incomingVal}"`);
+    }
+    // If existing has value and incoming is null, keep existing (no action needed)
+  };
+  
+  // Merge all fields except sku (primary key)
+  mergeField('stock_check_date');
+  mergeField('product_title');
+  mergeField('barcode');
+  mergeField('product_category');
+  mergeField('is_assembled_product');
+  mergeField('unit_cost');
+  mergeField('weight_value');
+  mergeField('weight_unit');
+  mergeField('parent_sku');
+  
+  if (conflicts.length > 0) {
+    log(`CONFLICT [${existing.sku}] from ${sourceLabel}: ${conflicts.join(', ')}`);
+  }
+  
+  return merged;
 }
 
 /**
@@ -71,12 +121,19 @@ async function setLastSyncedDate(dateStr: string): Promise<void> {
 }
 
 /**
- * Fetch products from reporting database (union of individual products and kits)
+ * Fetch products from reporting database (3-way merge)
+ * 
+ * Order of queries:
+ * 1. Kits: internal_kit_inventory (is_assembled_product=true, cost)
+ * 2. Parents: internal_inventory WHERE sku = primary_sku (weight, barcode)
+ * 3. Variants: internal_inventory WHERE sku != primary_sku (weight, barcode, parent_sku)
+ * 
+ * Later queries fill missing fields, conflicts are logged.
  */
 async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
-  log('Fetching products from reporting database...');
+  log('Fetching products from reporting database (3-way merge)...');
   
-  // Fetch kit products first (no weight data)
+  // 1. Fetch kit products (no weight data, but have cost and is_assembled_product=true)
   const kitProducts = await reportingSql<ReportingProduct[]>`
     SELECT 
       sku,
@@ -87,7 +144,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       true as is_assembled_product, 
       cost::text as unit_cost,
       NULL::real as weight_value,
-      NULL::text as weight_unit
+      NULL::text as weight_unit,
+      NULL::text as parent_sku
     FROM 
       public.internal_kit_inventory 
     WHERE snapshot_timestamp = (
@@ -96,53 +154,118 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
     )
   `;
   
-  log(`Fetched ${kitProducts.length} kit products`);
+  log(`[1/3] Fetched ${kitProducts.length} kit products`);
   
-  // Fetch individual products with weight data (preserve decimal precision)
-  const individualProducts = await reportingSql<ReportingProduct[]>`
+  // 2. Fetch parent products (sku = primary_sku) with weight data
+  const parentProducts = await reportingSql<ReportingProduct[]>`
     SELECT
-      inventory_forecasts_daily.sku,
-      stock_check_date,
-      inventory_forecasts_daily.description AS product_title,
-      code as barcode,
-      product_category,
-      is_assembled_product,
-      unit_cost::text as unit_cost,
+      sku,
+      snapshot_timestamp AS stock_check_date,
+      description AS product_title,
+      code AS barcode,
+      classification AS product_category,
+      weight_unit,
       weight_value::real as weight_value,
-      weight_unit
+      COST::text AS unit_cost,
+      (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
+      NULL::text as parent_sku
     FROM
-      public.inventory_forecasts_daily 
-    RIGHT OUTER JOIN 
-      public.internal_inventory ON internal_inventory.sku = inventory_forecasts_daily.sku 
-        AND stock_check_date = snapshot_timestamp
+      public.internal_inventory 
+    LEFT JOIN 
+      public.internal_inventory_statuses 
+    ON 
+      internal_inventory.snapshot_timestamp = internal_inventory_statuses.inventory_snapshot_timestamp 
+      AND internal_inventory.sku = internal_inventory_statuses.inventory_sku
+      AND status = 'Assembled Product'
     WHERE
-      stock_check_date = (
-        SELECT MAX(i.stock_check_date)
-        FROM public.inventory_forecasts_daily i
+      snapshot_timestamp = (
+        SELECT MAX(i.snapshot_timestamp)
+        FROM public.internal_inventory i
       )
+      AND sku = primary_sku
   `;
   
-  log(`Fetched ${individualProducts.length} individual products`);
+  log(`[2/3] Fetched ${parentProducts.length} parent products`);
   
-  // Merge with deduplication: kits first, then individual products overwrite (with weight data)
+  // 3. Fetch variant products (sku != primary_sku) with parent_sku
+  const variantProducts = await reportingSql<ReportingProduct[]>`
+    SELECT
+      sku,
+      snapshot_timestamp AS stock_check_date,
+      description AS product_title,
+      code AS barcode,
+      classification AS product_category,
+      weight_unit,
+      weight_value::real as weight_value,
+      COST::text AS unit_cost,
+      primary_sku as parent_sku,
+      (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product
+    FROM
+      public.internal_inventory 
+    LEFT JOIN 
+      public.internal_inventory_statuses 
+    ON 
+      internal_inventory.snapshot_timestamp = internal_inventory_statuses.inventory_snapshot_timestamp 
+      AND internal_inventory.sku = internal_inventory_statuses.inventory_sku
+      AND status = 'Assembled Product'
+    WHERE
+      snapshot_timestamp = (
+        SELECT MAX(i.snapshot_timestamp)
+        FROM public.internal_inventory i
+      )
+      AND sku != primary_sku
+  `;
+  
+  log(`[3/3] Fetched ${variantProducts.length} variant products`);
+  
+  // 3-way merge: kits → parents → variants
+  // Later sources fill missing fields, conflicts are logged
   const productMap = new Map<string, ReportingProduct>();
   
-  // Add kit products first
+  // Add kit products first (baseline)
   for (const product of kitProducts) {
     if (product.sku) {
       productMap.set(product.sku, product);
     }
   }
+  log(`After kits: ${productMap.size} products`);
   
-  // Individual products overwrite kits (they have weight data and accurate categories)
-  for (const product of individualProducts) {
+  // Merge parent products (fills missing fields, especially weight)
+  let parentMerges = 0;
+  let parentNew = 0;
+  for (const product of parentProducts) {
     if (product.sku) {
-      productMap.set(product.sku, product);
+      const existing = productMap.get(product.sku);
+      if (existing) {
+        productMap.set(product.sku, mergeProducts(existing, product, 'parent'));
+        parentMerges++;
+      } else {
+        productMap.set(product.sku, product);
+        parentNew++;
+      }
     }
   }
+  log(`After parents: ${productMap.size} products (${parentNew} new, ${parentMerges} merged)`);
+  
+  // Merge variant products (fills parent_sku for variants)
+  let variantMerges = 0;
+  let variantNew = 0;
+  for (const product of variantProducts) {
+    if (product.sku) {
+      const existing = productMap.get(product.sku);
+      if (existing) {
+        productMap.set(product.sku, mergeProducts(existing, product, 'variant'));
+        variantMerges++;
+      } else {
+        productMap.set(product.sku, product);
+        variantNew++;
+      }
+    }
+  }
+  log(`After variants: ${productMap.size} products (${variantNew} new, ${variantMerges} merged)`);
   
   const merged = Array.from(productMap.values());
-  log(`Merged to ${merged.length} unique products (deduplicated)`);
+  log(`Final: ${merged.length} unique products`);
   
   return merged;
 }
@@ -324,6 +447,7 @@ export async function syncSkuvaultProducts(): Promise<{
         productImageUrl: imageMap.get(p.sku) || null,
         weightValue: p.weight_value,
         weightUnit: p.weight_unit,
+        parentSku: p.parent_sku,
       }));
       
       await db.insert(skuvaultProducts).values(insertData);
