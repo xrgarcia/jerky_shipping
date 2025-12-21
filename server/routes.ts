@@ -10207,6 +10207,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force sync skuvault products (clears cache and re-syncs from reporting database)
+  app.post("/api/skuvault-products/force-sync", requireAuth, async (req, res) => {
+    try {
+      const { syncSkuvaultProducts } = await import("./services/skuvault-products-sync-service");
+      
+      console.log("[SkuVault Products] Force sync requested");
+      const result = await syncSkuvaultProducts();
+      
+      res.json({
+        success: result.success,
+        productCount: result.productCount,
+        stockCheckDate: result.stockCheckDate,
+        duration: result.duration,
+      });
+    } catch (error: any) {
+      console.error("[SkuVault Products] Force sync failed:", error);
+      res.status(500).json({ error: "Failed to force sync products" });
+    }
+  });
+
   // ========================================
   // Fingerprints API (Smart Shipping Engine)
   // ========================================

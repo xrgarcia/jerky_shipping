@@ -108,7 +108,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       product_category,
       is_assembled_product,
       unit_cost::text as unit_cost,
-      weight_value::integer as weight_value,
+      ROUND(weight_value::numeric)::integer as weight_value,
       weight_unit
     FROM
       public.inventory_forecasts_daily 
