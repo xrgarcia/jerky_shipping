@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -238,14 +239,41 @@ function getStationTypeLabel(stationType: string): string {
 }
 
 type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
-type FilterOption = 'all' | 'needs_mapping' | 'mapped';
+type FilterOption = 'all' | 'needs-mapping' | 'mapped';
 type WorkflowTab = 'categorize' | 'packaging' | 'sessions' | 'live';
+
+const VALID_TABS: WorkflowTab[] = ['categorize', 'packaging', 'sessions', 'live'];
+const VALID_SUB_TABS: FilterOption[] = ['all', 'needs-mapping', 'mapped'];
 
 export default function Fingerprints() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<WorkflowTab>('categorize');
+  const params = useParams<{ tab?: string; subTab?: string }>();
+  const [, navigate] = useLocation();
+  
+  // Derive activeTab from URL params with validation
+  const activeTab: WorkflowTab = VALID_TABS.includes(params.tab as WorkflowTab) 
+    ? (params.tab as WorkflowTab) 
+    : 'categorize';
+  
+  // Derive filter from URL params (only relevant for packaging tab)
+  const filter: FilterOption = activeTab === 'packaging' && VALID_SUB_TABS.includes(params.subTab as FilterOption)
+    ? (params.subTab as FilterOption)
+    : 'all';
+  
+  // Navigation helpers
+  const setActiveTab = (tab: WorkflowTab) => {
+    if (tab === 'packaging') {
+      navigate(`/fulfillment-prep/${tab}/all`);
+    } else {
+      navigate(`/fulfillment-prep/${tab}`);
+    }
+  };
+  
+  const setFilter = (subTab: FilterOption) => {
+    navigate(`/fulfillment-prep/packaging/${subTab}`);
+  };
+  
   const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
-  const [filter, setFilter] = useState<FilterOption>('all');
   const [showPackagingSection, setShowPackagingSection] = useState(false);
   const [showCreatePackagingDialog, setShowCreatePackagingDialog] = useState(false);
   const [editingPackaging, setEditingPackaging] = useState<PackagingType | null>(null);
@@ -479,7 +507,7 @@ export default function Fingerprints() {
   );
 
   const filteredFingerprints = fingerprints.filter((fp) => {
-    if (filter === 'needs_mapping') return !fp.hasPackaging;
+    if (filter === 'needs-mapping') return !fp.hasPackaging;
     if (filter === 'mapped') return fp.hasPackaging;
     return true;
   });
@@ -969,10 +997,10 @@ export default function Fingerprints() {
                       All ({fingerprints.length})
                     </Button>
                     <Button
-                      variant={filter === 'needs_mapping' ? 'secondary' : 'ghost'}
+                      variant={filter === 'needs-mapping' ? 'secondary' : 'ghost'}
                       size="sm"
-                      onClick={() => setFilter('needs_mapping')}
-                      className={filter !== 'needs_mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
+                      onClick={() => setFilter('needs-mapping')}
+                      className={filter !== 'needs-mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
                       data-testid="button-filter-needs-mapping"
                     >
                       Needs Mapping ({stats?.needsDecision || 0})

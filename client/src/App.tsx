@@ -111,7 +111,7 @@ function AppContent() {
       <Route path="/desktop-config" component={DesktopConfig} />
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />
-      <Route path="/fulfillment-prep" component={FulfillmentPrep} />
+      <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
       <Route path="/skuvault-products" component={SkuvaultProducts} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
