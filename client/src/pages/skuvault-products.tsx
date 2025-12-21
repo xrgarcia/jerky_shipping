@@ -195,9 +195,18 @@ export default function SkuvaultProducts() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [pendingCategories, setPendingCategories] = useState<string[]>([]);
   const [assembledFilter, setAssembledFilter] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<SkuvaultProduct | null>(null);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+
+  // Sync pending state when popover opens
+  const handleCategoryPopoverChange = (open: boolean) => {
+    if (open) {
+      setPendingCategories([...selectedCategories]);
+    }
+    setCategoryPopoverOpen(open);
+  };
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -231,23 +240,30 @@ export default function SkuvaultProducts() {
     setPage(1);
   };
 
-  const toggleCategory = (category: string) => {
-    setSelectedCategories(prev => 
+  // Toggle a category in pending state (doesn't apply yet)
+  const togglePendingCategory = (category: string) => {
+    setPendingCategories(prev => 
       prev.includes(category)
         ? prev.filter(c => c !== category)
         : [...prev, category]
     );
-    setPage(1);
   };
 
-  const selectAllCategories = () => {
-    setSelectedCategories([...categories]);
-    setPage(1);
+  // Select all in pending state
+  const selectAllPendingCategories = () => {
+    setPendingCategories([...categories]);
   };
 
-  const clearAllCategories = () => {
-    setSelectedCategories([]);
+  // Clear all in pending state
+  const clearAllPendingCategories = () => {
+    setPendingCategories([]);
+  };
+
+  // Apply pending categories to actual filter
+  const applyCategories = () => {
+    setSelectedCategories([...pendingCategories]);
     setPage(1);
+    setCategoryPopoverOpen(false);
   };
 
   const handleAssembledChange = (value: string) => {
@@ -374,7 +390,7 @@ export default function SkuvaultProducts() {
 
             <div>
               <label className="text-sm font-medium mb-1.5 block">Product Categories</label>
-              <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+              <Popover open={categoryPopoverOpen} onOpenChange={handleCategoryPopoverChange}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -396,7 +412,7 @@ export default function SkuvaultProducts() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={selectAllCategories}
+                      onClick={selectAllPendingCategories}
                       className="flex-1 h-8"
                       data-testid="button-select-all-categories"
                     >
@@ -406,7 +422,7 @@ export default function SkuvaultProducts() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={clearAllCategories}
+                      onClick={clearAllPendingCategories}
                       className="flex-1 h-8"
                       data-testid="button-uncheck-all-categories"
                     >
@@ -420,18 +436,28 @@ export default function SkuvaultProducts() {
                         <div
                           key={cat}
                           className="flex items-center space-x-2 hover-elevate rounded px-2 py-1.5 cursor-pointer"
-                          onClick={() => toggleCategory(cat)}
+                          onClick={() => togglePendingCategory(cat)}
                           data-testid={`checkbox-category-${cat}`}
                         >
                           <Checkbox
-                            checked={selectedCategories.includes(cat)}
-                            onCheckedChange={() => toggleCategory(cat)}
+                            checked={pendingCategories.includes(cat)}
+                            onCheckedChange={() => togglePendingCategory(cat)}
                           />
                           <span className="text-sm truncate flex-1">{cat}</span>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
+                  <div className="p-2 border-t">
+                    <Button
+                      onClick={applyCategories}
+                      className="w-full"
+                      data-testid="button-apply-categories"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Apply ({pendingCategories.length} selected)
+                    </Button>
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
