@@ -9476,42 +9476,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete a collection - cascades to invalidate related footprints and reset shipments
+  // Delete a collection - cascades to invalidate related fingerprints and reset shipments
   app.delete("/api/collections/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const { footprints, footprintModels, shipments: shipmentsTable } = await import("@shared/schema");
+      const { fingerprints, fingerprintModels, shipments: shipmentsTable } = await import("@shared/schema");
       
-      // Step 1: Find all footprints that reference this collection ID in their signature
-      // Footprint signatures are JSON objects like {"collectionId": count, ...}
-      const affectedFootprints = await db
-        .select({ id: footprints.id })
-        .from(footprints)
-        .where(sql`${footprints.signature}::text LIKE ${'%"' + id + '"%'}`);
+      // Step 1: Find all fingerprints that reference this collection ID in their signature
+      // Fingerprint signatures are JSON objects like {"collectionId": count, ...}
+      const affectedFingerprints = await db
+        .select({ id: fingerprints.id })
+        .from(fingerprints)
+        .where(sql`${fingerprints.signature}::text LIKE ${'%"' + id + '"%'}`);
       
-      const affectedFootprintIds = affectedFootprints.map(f => f.id);
+      const affectedFingerprintIds = affectedFingerprints.map(f => f.id);
       
-      if (affectedFootprintIds.length > 0) {
-        // Step 2: Reset shipments linked to affected footprints to pending_categorization
+      if (affectedFingerprintIds.length > 0) {
+        // Step 2: Reset shipments linked to affected fingerprints to pending_categorization
         const resetResult = await db
           .update(shipmentsTable)
           .set({ 
-            footprintStatus: 'pending_categorization',
-            footprintId: null 
+            fingerprintStatus: 'pending_categorization',
+            fingerprintId: null 
           })
-          .where(sql`${shipmentsTable.footprintId} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+          .where(sql`${shipmentsTable.fingerprintId} IN (${sql.raw(affectedFingerprintIds.map(id => `'${id}'`).join(','))})`);
         
-        // Step 3: Delete footprint_models for affected footprints
+        // Step 3: Delete fingerprint_models for affected fingerprints
         await db
-          .delete(footprintModels)
-          .where(sql`${footprintModels.footprintId} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+          .delete(fingerprintModels)
+          .where(sql`${fingerprintModels.fingerprintId} IN (${sql.raw(affectedFingerprintIds.map(id => `'${id}'`).join(','))})`);
         
-        // Step 4: Delete the affected footprints
+        // Step 4: Delete the affected fingerprints
         await db
-          .delete(footprints)
-          .where(sql`${footprints.id} IN (${sql.raw(affectedFootprintIds.map(id => `'${id}'`).join(','))})`);
+          .delete(fingerprints)
+          .where(sql`${fingerprints.id} IN (${sql.raw(affectedFingerprintIds.map(id => `'${id}'`).join(','))})`);
         
-        console.log(`[Collections] Cascade delete: invalidated ${affectedFootprintIds.length} footprints for collection ${id}`);
+        console.log(`[Collections] Cascade delete: invalidated ${affectedFingerprintIds.length} fingerprints for collection ${id}`);
       }
       
       // Step 5: Delete the collection itself
@@ -9523,7 +9523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         success: true, 
         cascade: {
-          footprintsInvalidated: affectedFootprintIds.length
+          fingerprintsInvalidated: affectedFingerprintIds.length
         }
       });
     } catch (error: any) {
@@ -9564,33 +9564,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pending footprint count for recalculation status
-  app.get("/api/collections/pending-footprints", requireAuth, async (req, res) => {
+  // Get pending fingerprint count for recalculation status
+  app.get("/api/collections/pending-fingerprints", requireAuth, async (req, res) => {
     try {
       const { shipments: shipmentsTable } = await import("@shared/schema");
       const result = await db
         .select({ count: sql<number>`count(*)` })
         .from(shipmentsTable)
-        .where(eq(shipmentsTable.footprintStatus, 'pending_categorization'));
+        .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'));
       
       res.json({ pendingCount: Number(result[0]?.count || 0) });
     } catch (error: any) {
-      console.error("[Collections] Error fetching pending footprint count:", error);
+      console.error("[Collections] Error fetching pending fingerprint count:", error);
       res.status(500).json({ error: "Failed to fetch pending count" });
     }
   });
 
-  // Bulk recalculate footprints for all pending shipments
-  app.post("/api/collections/recalculate-footprints", requireAuth, async (req, res) => {
+  // Bulk recalculate fingerprints for all pending shipments
+  app.post("/api/collections/recalculate-fingerprints", requireAuth, async (req, res) => {
     try {
       const { shipments: shipmentsTable } = await import("@shared/schema");
-      const { calculateFootprint } = await import('./services/qc-item-hydrator');
+      const { calculateFingerprint } = await import('./services/qc-item-hydrator');
       
       // Get all shipments with pending_categorization status
       const pendingShipments = await db
         .select({ id: shipmentsTable.id })
         .from(shipmentsTable)
-        .where(eq(shipmentsTable.footprintStatus, 'pending_categorization'))
+        .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'))
         .limit(1000); // Process in batches to avoid timeout
       
       let processed = 0;
@@ -9600,7 +9600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const shipment of pendingShipments) {
         try {
-          const result = await calculateFootprint(shipment.id);
+          const result = await calculateFingerprint(shipment.id);
           processed++;
           if (result.status === 'complete') {
             completed++;
@@ -9608,7 +9608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stillPending++;
           }
         } catch (err) {
-          console.error(`[Collections] Error recalculating footprint for shipment ${shipment.id}:`, err);
+          console.error(`[Collections] Error recalculating fingerprint for shipment ${shipment.id}:`, err);
           errors++;
         }
       }
@@ -9624,8 +9624,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasMore: pendingShipments.length === 1000
       });
     } catch (error: any) {
-      console.error("[Collections] Error bulk recalculating footprints:", error);
-      res.status(500).json({ error: "Failed to recalculate footprints" });
+      console.error("[Collections] Error bulk recalculating fingerprints:", error);
+      res.status(500).json({ error: "Failed to recalculate fingerprints" });
     }
   });
 
@@ -9912,7 +9912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             // SKU has no mapping in product_collection_mappings
             sql`${productCollectionMappings.id} IS NULL`,
-            eq(shipmentsTable.footprintStatus, 'pending_categorization')
+            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
           )
         )
         .groupBy(shipmentQcItems.sku, shipmentQcItems.description, productVariants.title, productVariants.imageUrl)
@@ -9931,13 +9931,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku));
       
-      const [footprintStats] = await db
+      const [fingerprintStats] = await db
         .select({
-          complete: sql<number>`COUNT(*) FILTER (WHERE footprint_status = 'complete')`,
-          pending: sql<number>`COUNT(*) FILTER (WHERE footprint_status = 'pending_categorization')`,
+          complete: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'complete')`,
+          pending: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'pending_categorization')`,
         })
         .from(shipmentsTable)
-        .where(sql`footprint_status IS NOT NULL`);
+        .where(sql`fingerprint_status IS NOT NULL`);
 
       res.json({
         uncategorizedProducts,
@@ -9945,8 +9945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalProducts: coverageStats?.totalProducts || 0,
           categorizedProducts: coverageStats?.categorizedProducts || 0,
           totalShipments: coverageStats?.totalShipments || 0,
-          shipmentsComplete: footprintStats?.complete || 0,
-          shipmentsPending: footprintStats?.pending || 0,
+          shipmentsComplete: fingerprintStats?.complete || 0,
+          shipmentsPending: fingerprintStats?.pending || 0,
           oldestOrderDate: coverageStats?.oldestOrderDate || null,
         }
       });
@@ -9973,7 +9973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Quick-assign a product to a collection and recalculate footprints
+  // Quick-assign a product to a collection and recalculate fingerprints
   // Uses product_collection_mappings as source of truth - no need to update QC items
   app.post("/api/packing-decisions/assign", requireAuth, async (req, res) => {
     try {
@@ -9997,33 +9997,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(shipmentQcItems.sku, sku),
-            eq(shipmentsTable.footprintStatus, 'pending_categorization')
+            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
           )
         );
       
-      // Recalculate footprints for affected shipments
-      // calculateFootprint now uses product_collection_mappings as source of truth
-      const { calculateFootprint } = await import('./services/qc-item-hydrator');
-      let footprintsUpdated = 0;
+      // Recalculate fingerprints for affected shipments
+      // calculateFingerprint now uses product_collection_mappings as source of truth
+      const { calculateFingerprint } = await import('./services/qc-item-hydrator');
+      let fingerprintsUpdated = 0;
       
       for (const { shipmentId } of affectedShipments) {
         try {
-          const result = await calculateFootprint(shipmentId);
+          const result = await calculateFingerprint(shipmentId);
           if (result.status === 'complete') {
-            footprintsUpdated++;
+            fingerprintsUpdated++;
           }
         } catch (err) {
-          console.error(`[Packing Decisions] Error recalculating footprint for ${shipmentId}:`, err);
+          console.error(`[Packing Decisions] Error recalculating fingerprint for ${shipmentId}:`, err);
         }
       }
       
-      console.log(`[Packing Decisions] Assigned ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${footprintsUpdated} now complete`);
+      console.log(`[Packing Decisions] Assigned ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${fingerprintsUpdated} now complete`);
       
       res.json({
         success: true,
         mapping: mappings[0],
         shipmentsAffected: affectedShipments.length,
-        footprintsCompleted: footprintsUpdated,
+        fingerprintsCompleted: fingerprintsUpdated,
       });
     } catch (error: any) {
       console.error("[Packing Decisions] Error assigning product:", error);
@@ -10208,56 +10208,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // Footprints API (Smart Shipping Engine)
+  // Fingerprints API (Smart Shipping Engine)
   // ========================================
 
-  // Get all footprints with shipment counts and packaging status
-  app.get("/api/footprints", requireAuth, async (req, res) => {
+  // Get all fingerprints with shipment counts and packaging status
+  app.get("/api/fingerprints", requireAuth, async (req, res) => {
     try {
-      const { footprints: footprintsTable, footprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
+      const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
       
-      // Get all footprints with shipment count and packaging assignment
-      const footprintsWithStats = await db
+      // Get all fingerprints with shipment count and packaging assignment
+      const fingerprintsWithStats = await db
         .select({
-          id: footprintsTable.id,
-          signature: footprintsTable.signature,
-          signatureHash: footprintsTable.signatureHash,
-          displayName: footprintsTable.displayName,
-          totalItems: footprintsTable.totalItems,
-          collectionCount: footprintsTable.collectionCount,
-          createdAt: footprintsTable.createdAt,
+          id: fingerprintsTable.id,
+          signature: fingerprintsTable.signature,
+          signatureHash: fingerprintsTable.signatureHash,
+          displayName: fingerprintsTable.displayName,
+          totalItems: fingerprintsTable.totalItems,
+          collectionCount: fingerprintsTable.collectionCount,
+          createdAt: fingerprintsTable.createdAt,
           shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('shipment_count'),
-          packagingTypeId: footprintModels.packagingTypeId,
+          packagingTypeId: fingerprintModels.packagingTypeId,
           packagingTypeName: packagingTypes.name,
           stationType: packagingTypes.stationType,
         })
-        .from(footprintsTable)
-        .leftJoin(shipmentsTable, eq(shipmentsTable.footprintId, footprintsTable.id))
-        .leftJoin(footprintModels, eq(footprintModels.footprintId, footprintsTable.id))
-        .leftJoin(packagingTypes, eq(packagingTypes.id, footprintModels.packagingTypeId))
+        .from(fingerprintsTable)
+        .leftJoin(shipmentsTable, eq(shipmentsTable.fingerprintId, fingerprintsTable.id))
+        .leftJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
+        .leftJoin(packagingTypes, eq(packagingTypes.id, fingerprintModels.packagingTypeId))
         .groupBy(
-          footprintsTable.id,
-          footprintsTable.signature,
-          footprintsTable.signatureHash,
-          footprintsTable.displayName,
-          footprintsTable.totalItems,
-          footprintsTable.collectionCount,
-          footprintsTable.createdAt,
-          footprintModels.packagingTypeId,
+          fingerprintsTable.id,
+          fingerprintsTable.signature,
+          fingerprintsTable.signatureHash,
+          fingerprintsTable.displayName,
+          fingerprintsTable.totalItems,
+          fingerprintsTable.collectionCount,
+          fingerprintsTable.createdAt,
+          fingerprintModels.packagingTypeId,
           packagingTypes.name,
           packagingTypes.stationType
         )
         .orderBy(desc(sql`COUNT(DISTINCT ${shipmentsTable.id})`));
       
-      // Filter out orphan footprints (0 shipments) - these are stale entries
-      const activeFootprints = footprintsWithStats.filter(fp => fp.shipmentCount > 0);
+      // Filter out orphan fingerprints (0 shipments) - these are stale entries
+      const activeFingerprints = fingerprintsWithStats.filter(fp => fp.shipmentCount > 0);
       
       // Parse signatures and build human-readable names with collection names
       const collectionsMap = new Map<string, string>();
       const allCollections = await db.select().from(productCollections);
       allCollections.forEach(c => collectionsMap.set(c.id, c.name));
       
-      const footprintsWithNames = activeFootprints.map(fp => {
+      const fingerprintsWithNames = activeFingerprints.map(fp => {
         let humanReadableName = fp.displayName;
         
         if (!humanReadableName && fp.signature) {
@@ -10283,21 +10283,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Get stats
-      const totalFootprints = footprintsWithNames.length;
-      const assignedFootprints = footprintsWithNames.filter(fp => fp.hasPackaging).length;
-      const needsDecision = totalFootprints - assignedFootprints;
+      const totalFingerprints = fingerprintsWithNames.length;
+      const assignedFingerprints = fingerprintsWithNames.filter(fp => fp.hasPackaging).length;
+      const needsDecision = totalFingerprints - assignedFingerprints;
       
       res.json({
-        footprints: footprintsWithNames,
+        fingerprints: fingerprintsWithNames,
         stats: {
-          total: totalFootprints,
-          assigned: assignedFootprints,
+          total: totalFingerprints,
+          assigned: assignedFingerprints,
           needsDecision,
         }
       });
     } catch (error: any) {
-      console.error("[Footprints] Error fetching footprints:", error);
-      res.status(500).json({ error: "Failed to fetch footprints" });
+      console.error("[Fingerprints] Error fetching fingerprints:", error);
+      res.status(500).json({ error: "Failed to fetch fingerprints" });
     }
   });
 
@@ -10394,23 +10394,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign packaging type to footprint
-  app.post("/api/footprints/:footprintId/assign", requireAuth, async (req, res) => {
+  // Assign packaging type to fingerprint
+  app.post("/api/fingerprints/:fingerprintId/assign", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
-      const { footprintId } = req.params;
+      const { fingerprintId } = req.params;
       const { packagingTypeId, notes } = req.body;
       
       if (!packagingTypeId) {
         return res.status(400).json({ error: "packagingTypeId is required" });
       }
       
-      const { footprintModels, footprints: footprintsTable, packagingTypes, shipments: shipmentsTable, stations } = await import("@shared/schema");
+      const { fingerprintModels, fingerprints: fingerprintsTable, packagingTypes, shipments: shipmentsTable, stations } = await import("@shared/schema");
       
-      // Check if footprint exists
-      const [footprint] = await db.select().from(footprintsTable).where(eq(footprintsTable.id, footprintId));
-      if (!footprint) {
-        return res.status(404).json({ error: "Footprint not found" });
+      // Check if fingerprint exists
+      const [fingerprint] = await db.select().from(fingerprintsTable).where(eq(fingerprintsTable.id, fingerprintId));
+      if (!fingerprint) {
+        return res.status(404).json({ error: "Fingerprint not found" });
       }
       
       // Check if packaging type exists
@@ -10439,27 +10439,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Upsert the footprint model (one model per footprint)
-      const existingModel = await db.select().from(footprintModels).where(eq(footprintModels.footprintId, footprintId));
+      // Upsert the fingerprint model (one model per fingerprint)
+      const existingModel = await db.select().from(fingerprintModels).where(eq(fingerprintModels.fingerprintId, fingerprintId));
       
       let model;
       if (existingModel.length > 0) {
         // Update existing
         [model] = await db
-          .update(footprintModels)
+          .update(fingerprintModels)
           .set({
             packagingTypeId,
             notes: notes || null,
             updatedAt: new Date(),
           })
-          .where(eq(footprintModels.footprintId, footprintId))
+          .where(eq(fingerprintModels.fingerprintId, fingerprintId))
           .returning();
       } else {
         // Create new
         [model] = await db
-          .insert(footprintModels)
+          .insert(fingerprintModels)
           .values({
-            footprintId,
+            fingerprintId,
             packagingTypeId,
             createdBy: userId,
             notes: notes || null,
@@ -10468,7 +10468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
       }
       
-      // Update all shipments with this footprint to have the packaging type and assigned station
+      // Update all shipments with this fingerprint to have the packaging type and assigned station
       const updateData: Record<string, any> = {
         packagingTypeId,
         packagingDecisionType: 'auto',
@@ -10481,7 +10481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedShipments = await db
         .update(shipmentsTable)
         .set(updateData)
-        .where(eq(shipmentsTable.footprintId, footprintId))
+        .where(eq(shipmentsTable.fingerprintId, fingerprintId))
         .returning({ id: shipmentsTable.id });
       
       // Update lifecycle phase for all affected shipments (they may move from needs_packaging to needs_session)
@@ -10490,7 +10490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await updateShipmentLifecycleBatch(shipmentIds);
       }
       
-      console.log(`[Footprints] Assigned packaging ${packagingType.name} to footprint ${footprintId}, updated ${updatedShipments.length} shipments${assignedStationId ? ` (station: ${assignedStationId})` : ''}`);
+      console.log(`[Fingerprints] Assigned packaging ${packagingType.name} to fingerprint ${fingerprintId}, updated ${updatedShipments.length} shipments${assignedStationId ? ` (station: ${assignedStationId})` : ''}`);
       
       res.json({
         success: true,
@@ -10500,8 +10500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedStationId,
       });
     } catch (error: any) {
-      console.error("[Footprints] Error assigning packaging:", error);
-      res.status(500).json({ error: "Failed to assign packaging to footprint" });
+      console.error("[Fingerprints] Error assigning packaging:", error);
+      res.status(500).json({ error: "Failed to assign packaging to fingerprint" });
     }
   });
 
@@ -10600,7 +10600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: shipmentsTable.id,
           orderNumber: shipmentsTable.orderNumber,
-          footprintId: shipmentsTable.footprintId,
+          fingerprintId: shipmentsTable.fingerprintId,
           trackingNumber: shipmentsTable.trackingNumber,
           lifecyclePhase: shipmentsTable.lifecyclePhase,
         })
