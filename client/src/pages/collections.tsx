@@ -463,12 +463,12 @@ export default function Collections() {
       const res = await apiRequest("POST", "/api/collections/recalculate-all-fingerprints");
       return res.json();
     },
-    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; hasMore: boolean }) => {
+    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; itemsUpdated: number; hasMore: boolean }) => {
       refetchPending();
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       toast({
         title: "All fingerprints recalculated",
-        description: `${data.processed} shipments processed, ${data.completed} completed with weights`,
+        description: `${data.processed} shipments, ${data.completed} completed, ${data.itemsUpdated} items got weight data`,
       });
       if (data.hasMore) {
         toast({

@@ -9632,8 +9632,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Recalculate ALL fingerprints (including already completed ones) - useful after weight integration
   app.post("/api/collections/recalculate-all-fingerprints", requireAuth, async (req, res) => {
     try {
-      const { shipments: shipmentsTable, fingerprints: fingerprintsTable } = await import("@shared/schema");
+      const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const { calculateFingerprint } = await import('./services/qc-item-hydrator');
+      const { getProductsBatch } = await import('./services/product-lookup');
       
       // Get all shipments that have fingerprints (completed or pending)
       const allShipments = await db
@@ -9651,9 +9652,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let completed = 0;
       let stillPending = 0;
       let errors = 0;
+      let itemsUpdated = 0;
       
       for (const shipment of allShipments) {
         try {
+          // Step 1: Update QC items with weight data from skuvault_products
+          const qcItems = await db
+            .select({ id: shipmentQcItems.id, sku: shipmentQcItems.sku, weightValue: shipmentQcItems.weightValue })
+            .from(shipmentQcItems)
+            .where(eq(shipmentQcItems.shipmentId, shipment.id));
+          
+          // Get items missing weight data
+          const itemsMissingWeight = qcItems.filter(item => item.weightValue === null);
+          if (itemsMissingWeight.length > 0) {
+            const skus = itemsMissingWeight.map(item => item.sku);
+            const products = await getProductsBatch(skus);
+            
+            for (const item of itemsMissingWeight) {
+              const product = products.get(item.sku);
+              if (product && product.weightValue !== undefined && product.weightValue !== null) {
+                await db
+                  .update(shipmentQcItems)
+                  .set({ 
+                    weightValue: product.weightValue, 
+                    weightUnit: product.weightUnit || 'oz',
+                    updatedAt: new Date()
+                  })
+                  .where(eq(shipmentQcItems.id, item.id));
+                itemsUpdated++;
+              }
+            }
+          }
+          
+          // Step 2: Recalculate fingerprint with updated weight data
           const result = await calculateFingerprint(shipment.id);
           processed++;
           if (result.status === 'complete') {
@@ -9667,7 +9698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log(`[Collections] Full recalculation: processed ${processed}, completed ${completed}, still pending ${stillPending}, errors ${errors}`);
+      console.log(`[Collections] Full recalculation: processed ${processed}, completed ${completed}, still pending ${stillPending}, errors ${errors}, items updated with weight: ${itemsUpdated}`);
       
       res.json({
         success: true,
@@ -9675,6 +9706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completed,
         stillPending,
         errors,
+        itemsUpdated,
         hasMore: allShipments.length === 500
       });
     } catch (error: any) {
