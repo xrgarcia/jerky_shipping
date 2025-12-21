@@ -1340,11 +1340,12 @@ export type FulfillmentSession = typeof fulfillmentSessions.$inferSelect;
 /**
  * SkuVault Products - Centralized product catalog synced hourly from reporting database
  * 
- * Data sources (union of two queries):
- * 1. Individual products: inventory_forecasts_daily JOIN internal_inventory
- * 2. Kit products: internal_kit_inventory
+ * Data sources (three queries merged in order):
+ * 1. Kit products: internal_kit_inventory (kits with cost/barcode)
+ * 2. Parent products: internal_inventory WHERE sku = primary_sku (individual products with weight)
+ * 3. Variant products: internal_inventory WHERE sku != primary_sku (variants with parent_sku)
  * 
- * Primary key is SKU - duplicates between individual and kit are deduplicated.
+ * Primary key is SKU - duplicates are merged with later queries filling missing fields.
  * 
  * Image URL resolution priority:
  * 1. productVariants table (Shopify catalog)
@@ -1361,8 +1362,9 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   isAssembledProduct: boolean("is_assembled_product").notNull().default(false), // True for kits/APs
   unitCost: text("unit_cost"), // Cost per unit (stored as text for precision)
   productImageUrl: text("product_image_url"), // Resolved from products/shipments/orders
-  weightValue: real("weight_value"), // Weight value as decimal (from inventory_forecasts_daily) - preserves precision
-  weightUnit: text("weight_unit"), // Weight unit (e.g., "ounce", "pound")
+  weightValue: real("weight_value"), // Weight value as decimal (from internal_inventory) - preserves precision
+  weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
+  parentSku: text("parent_sku"), // For variants: the parent SKU this variant belongs to (null for parents/kits)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -1370,6 +1372,7 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   productCategoryIdx: index("skuvault_products_product_category_idx").on(table.productCategory).where(sql`${table.productCategory} IS NOT NULL`),
   isAssembledProductIdx: index("skuvault_products_is_assembled_product_idx").on(table.isAssembledProduct),
   barcodeIdx: index("skuvault_products_barcode_idx").on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
+  parentSkuIdx: index("skuvault_products_parent_sku_idx").on(table.parentSku).where(sql`${table.parentSku} IS NOT NULL`),
 }));
 
 export const insertSkuvaultProductSchema = createInsertSchema(skuvaultProducts).omit({
