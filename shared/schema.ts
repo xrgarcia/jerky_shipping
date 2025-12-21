@@ -31,12 +31,12 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * 
  * The progression of packing decisions before orders can be sessioned:
  * 
- * needs_categorization → needs_footprint → needs_packaging → needs_session → ready_for_skuvault
+ * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
  */
 export const DECISION_SUBPHASES = {
   NEEDS_CATEGORIZATION: 'needs_categorization',  // SKUs not yet assigned to collections
-  NEEDS_FOOTPRINT: 'needs_footprint',            // Footprint not yet calculated
-  NEEDS_PACKAGING: 'needs_packaging',            // Footprint has no packaging type mapping
+  NEEDS_FINGERPRINT: 'needs_fingerprint',            // Fingerprint not yet calculated
+  NEEDS_PACKAGING: 'needs_packaging',            // Fingerprint has no packaging type mapping
   NEEDS_SESSION: 'needs_session',                // Ready for sessioning but not yet grouped
   READY_FOR_SKUVAULT: 'ready_for_skuvault',      // In session, ready to push to SkuVault
 } as const;
@@ -59,8 +59,8 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
  * Valid state transitions for decision subphases (within AWAITING_DECISIONS)
  */
 export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> = {
-  [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: [DECISION_SUBPHASES.NEEDS_FOOTPRINT],
-  [DECISION_SUBPHASES.NEEDS_FOOTPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
+  [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: [DECISION_SUBPHASES.NEEDS_FINGERPRINT],
+  [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
   [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_SESSION],
   [DECISION_SUBPHASES.NEEDS_SESSION]: [DECISION_SUBPHASES.READY_FOR_SKUVAULT],
   [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits AWAITING_DECISIONS phase
@@ -340,14 +340,14 @@ export const shipments = pgTable("shipments", {
   qcCompletedAt: timestamp("qc_completed_at"), // When QC was completed (null = not completed)
   // Smart Shipping Engine fields (Phase 3)
   qcStationId: varchar("qc_station_id"), // FK to stations table - where this order was packed (set during QC)
-  footprintId: varchar("footprint_id"), // FK to footprints table - calculated collection composition
+  fingerprintId: varchar("fingerprint_id"), // FK to fingerprints table - calculated collection composition
   packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
   assignedStationId: varchar("assigned_station_id"), // FK to stations table - where this order should be routed for packing (auto-assigned from packagingType.stationType)
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
-  footprintStatus: text("footprint_status"), // 'complete' (footprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
+  fingerprintStatus: text("fingerprint_status"), // 'complete' (fingerprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
   lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
-  decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_footprint, needs_packaging, needs_session, ready_for_skuvault
+  decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
   fulfillmentSessionId: varchar("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -395,11 +395,11 @@ export const shipments = pgTable("shipments", {
   qcCompletedAtIdx: index("shipments_qc_completed_at_idx").on(table.qcCompletedAt.desc().nullsLast()).where(sql`${table.qcCompletedAt} IS NOT NULL`),
   // Smart Shipping Engine indexes (Phase 3)
   qcStationIdIdx: index("shipments_qc_station_id_idx").on(table.qcStationId).where(sql`${table.qcStationId} IS NOT NULL`),
-  footprintIdIdx: index("shipments_footprint_id_idx").on(table.footprintId).where(sql`${table.footprintId} IS NOT NULL`),
+  fingerprintIdIdx: index("shipments_fingerprint_id_idx").on(table.fingerprintId).where(sql`${table.fingerprintId} IS NOT NULL`),
   packagingTypeIdIdx: index("shipments_packaging_type_id_idx").on(table.packagingTypeId).where(sql`${table.packagingTypeId} IS NOT NULL`),
   assignedStationIdIdx: index("shipments_assigned_station_id_idx").on(table.assignedStationId).where(sql`${table.assignedStationId} IS NOT NULL`),
   packagingDecisionTypeIdx: index("shipments_packaging_decision_type_idx").on(table.packagingDecisionType).where(sql`${table.packagingDecisionType} IS NOT NULL`),
-  footprintStatusIdx: index("shipments_footprint_status_idx").on(table.footprintStatus).where(sql`${table.footprintStatus} IS NOT NULL`),
+  fingerprintStatusIdx: index("shipments_fingerprint_status_idx").on(table.fingerprintStatus).where(sql`${table.fingerprintStatus} IS NOT NULL`),
   // Lifecycle tracking indexes (Phase 6)
   lifecyclePhaseIdx: index("shipments_lifecycle_phase_idx").on(table.lifecyclePhase).where(sql`${table.lifecyclePhase} IS NOT NULL`),
   decisionSubphaseIdx: index("shipments_decision_subphase_idx").on(table.decisionSubphase).where(sql`${table.decisionSubphase} IS NOT NULL`),
@@ -480,7 +480,7 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   cacheWarmedAt: z.coerce.date().optional().or(z.null()),
   // Smart Shipping Engine fields (Phase 3)
   qcStationId: z.string().nullish(),
-  footprintId: z.string().nullish(),
+  fingerprintId: z.string().nullish(),
   packagingTypeId: z.string().nullish(),
   assignedStationId: z.string().nullish(),
   packagingDecisionType: z.string().nullish(),
@@ -1174,7 +1174,7 @@ export type InsertProductCollectionMapping = z.infer<typeof insertProductCollect
 export type ProductCollectionMapping = typeof productCollectionMappings.$inferSelect;
 
 // ============================================================================
-// PHASE 3: SMART SHIPPING ENGINE - FOOTPRINT DETECTION & LEARNING
+// PHASE 3: SMART SHIPPING ENGINE - FINGERPRINT DETECTION & LEARNING
 // ============================================================================
 
 // Packaging Types - Discrete set of packaging options used by jerky.com
@@ -1205,9 +1205,9 @@ export const insertPackagingTypeSchema = createInsertSchema(packagingTypes).omit
 export type InsertPackagingType = z.infer<typeof insertPackagingTypeSchema>;
 export type PackagingType = typeof packagingTypes.$inferSelect;
 
-// Footprints - Unique "shape signatures" based on collection composition
-// A footprint represents a specific combination of collections + quantities
-export const footprints = pgTable("footprints", {
+// Fingerprints - Unique "shape signatures" based on collection composition
+// A fingerprint represents a specific combination of collections + quantities
+export const fingerprints = pgTable("fingerprints", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   signature: text("signature").notNull().unique(), // Canonical JSON string, e.g., '{"GiftBox":2,"SmallJerky":5}'
   signatureHash: text("signature_hash").notNull().unique(), // Hash for fast lookup
@@ -1216,23 +1216,23 @@ export const footprints = pgTable("footprints", {
   collectionCount: integer("collection_count").notNull(), // Number of distinct collections
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
-  signatureHashIdx: index("footprints_signature_hash_idx").on(table.signatureHash),
-  totalItemsIdx: index("footprints_total_items_idx").on(table.totalItems),
+  signatureHashIdx: index("fingerprints_signature_hash_idx").on(table.signatureHash),
+  totalItemsIdx: index("fingerprints_total_items_idx").on(table.totalItems),
 }));
 
-export const insertFootprintSchema = createInsertSchema(footprints).omit({
+export const insertFingerprintSchema = createInsertSchema(fingerprints).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertFootprint = z.infer<typeof insertFootprintSchema>;
-export type Footprint = typeof footprints.$inferSelect;
+export type InsertFingerprint = z.infer<typeof insertFingerprintSchema>;
+export type Fingerprint = typeof fingerprints.$inferSelect;
 
-// Footprint Models - Learned rules mapping footprint → packaging type
-// When a manager decides packaging for an unknown footprint, it becomes a permanent rule
-export const footprintModels = pgTable("footprint_models", {
+// Fingerprint Models - Learned rules mapping fingerprint → packaging type
+// When a manager decides packaging for an unknown fingerprint, it becomes a permanent rule
+export const fingerprintModels = pgTable("fingerprint_models", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  footprintId: varchar("footprint_id").notNull().references(() => footprints.id),
+  fingerprintId: varchar("fingerprint_id").notNull().references(() => fingerprints.id),
   packagingTypeId: varchar("packaging_type_id").notNull().references(() => packagingTypes.id),
   confidence: text("confidence").default("manual"), // 'manual', 'high', 'medium', 'low' (for future ML)
   createdBy: varchar("created_by").notNull().references(() => users.id),
@@ -1240,18 +1240,18 @@ export const footprintModels = pgTable("footprint_models", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-  footprintIdIdx: uniqueIndex("footprint_models_footprint_id_idx").on(table.footprintId), // One model per footprint
-  packagingTypeIdIdx: index("footprint_models_packaging_type_id_idx").on(table.packagingTypeId),
+  fingerprintIdIdx: uniqueIndex("fingerprint_models_fingerprint_id_idx").on(table.fingerprintId), // One model per fingerprint
+  packagingTypeIdIdx: index("fingerprint_models_packaging_type_id_idx").on(table.packagingTypeId),
 }));
 
-export const insertFootprintModelSchema = createInsertSchema(footprintModels).omit({
+export const insertFingerprintModelSchema = createInsertSchema(fingerprintModels).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertFootprintModel = z.infer<typeof insertFootprintModelSchema>;
-export type FootprintModel = typeof footprintModels.$inferSelect;
+export type InsertFingerprintModel = z.infer<typeof insertFingerprintModelSchema>;
+export type FingerprintModel = typeof fingerprintModels.$inferSelect;
 
 // Shipment QC Items - Exploded line items for each shipment with QC tracking
 // Each row represents one SKU (post-explosion) that needs to be scanned during packing
@@ -1264,7 +1264,7 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   imageUrl: text("image_url"), // Product image from skuvault_products
   quantityExpected: integer("quantity_expected").notNull().default(1), // How many we need to scan
   quantityScanned: integer("quantity_scanned").notNull().default(0), // How many we've scanned so far
-  collectionId: varchar("collection_id").references(() => productCollections.id), // For footprint calculation
+  collectionId: varchar("collection_id").references(() => productCollections.id), // For fingerprint calculation
   syncedToSkuvault: boolean("synced_to_skuvault").notNull().default(false), // Have we pushed passQCitem
   isKitComponent: boolean("is_kit_component").notNull().default(false), // True if this is an exploded kit component
   parentSku: text("parent_sku"), // If kit component, the parent kit SKU
