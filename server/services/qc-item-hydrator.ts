@@ -406,15 +406,23 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
           });
         }
       } else {
-        // Not a kit or no kit category - don't explode
-        skusToLookup.push(sku);
+        // Not a kit - check if it's a variant that should fulfill the parent SKU
+        // Variant products (category != 'kit' but have parentSku) should fulfill the parent
+        const fulfillSku = productInfo?.parentSku || sku;
+        const isVariant = !!productInfo?.parentSku;
+        
+        skusToLookup.push(fulfillSku);
         itemsToProcess.push({
-          sku,
+          sku: fulfillSku,  // Use parent SKU for variants, original SKU otherwise
           name: item.name,
           quantity,
           isKitComponent: false,
-          parentSku: null,
+          parentSku: isVariant ? sku : null,  // Track original variant SKU for audit
         });
+        
+        if (isVariant) {
+          log(`Variant substitution: ${sku} → ${fulfillSku} (qty: ${quantity})`);
+        }
       }
     }
     
