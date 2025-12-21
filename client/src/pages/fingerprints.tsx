@@ -200,7 +200,7 @@ interface FingerprintShipmentProduct {
 interface FingerprintShipmentInfo {
   id: string;
   orderNumber: string;
-  recipientName: string | null;
+  shipToName: string | null;
   createdAt: string;
 }
 
@@ -1803,8 +1803,8 @@ export default function Fingerprints() {
                       >
                         <div className="flex-1">
                           <div className="text-sm font-medium">{shipment.orderNumber}</div>
-                          {shipment.recipientName && (
-                            <div className="text-xs text-muted-foreground">{shipment.recipientName}</div>
+                          {shipment.shipToName && (
+                            <div className="text-xs text-muted-foreground">{shipment.shipToName}</div>
                           )}
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />

@@ -10663,7 +10663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: shipments.id,
           orderNumber: shipments.orderNumber,
           shopifyOrderId: shipments.shopifyOrderId,
-          recipientName: shipments.recipientName,
+          shipToName: shipments.shipToName,
           createdAt: shipments.createdAt,
         })
         .from(shipments)
@@ -10713,7 +10713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipments: shipmentsWithOrders.map(s => ({
           id: s.id,
           orderNumber: s.orderNumber,
-          recipientName: s.recipientName,
+          shipToName: s.shipToName,
           createdAt: s.createdAt,
         })),
         products: aggregatedProducts,
