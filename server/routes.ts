@@ -10662,7 +10662,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: shipments.id,
           orderNumber: shipments.orderNumber,
-          shopifyOrderId: shipments.shopifyOrderId,
           shipToName: shipments.shipToName,
           createdAt: shipments.createdAt,
         })
