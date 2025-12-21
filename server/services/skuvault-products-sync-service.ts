@@ -43,16 +43,20 @@ interface ReportingProduct {
 }
 
 /**
- * Merge two product records, filling missing fields from the source.
- * Logs conflicts when non-null values differ.
+ * Merge two product records.
+ * 
+ * @param existing - The existing product record
+ * @param incoming - The incoming product record to merge
+ * @param sourceLabel - Label for logging (e.g., 'parent', 'variant')
+ * @param override - If true, incoming values override existing values (for parent merge).
+ *                   If false, only fills missing fields (for variant merge).
  */
 function mergeProducts(
   existing: ReportingProduct,
   incoming: ReportingProduct,
-  sourceLabel: string
+  sourceLabel: string,
+  override: boolean = false
 ): ReportingProduct {
-  const conflicts: string[] = [];
-  
   const merged: ReportingProduct = { ...existing };
   
   // Helper to merge a field
@@ -60,12 +64,12 @@ function mergeProducts(
     const existingVal = existing[field];
     const incomingVal = incoming[field];
     
-    if (existingVal == null && incomingVal != null) {
-      // Fill missing field from incoming
+    if (override && incomingVal != null) {
+      // Override mode: incoming value takes precedence when non-null
       (merged as any)[field] = incomingVal;
-    } else if (existingVal != null && incomingVal != null && existingVal !== incomingVal) {
-      // Conflict: both have values that differ
-      conflicts.push(`${field}: existing="${existingVal}" vs ${sourceLabel}="${incomingVal}"`);
+    } else if (existingVal == null && incomingVal != null) {
+      // Fill mode: only fill missing fields from incoming
+      (merged as any)[field] = incomingVal;
     }
     // If existing has value and incoming is null, keep existing (no action needed)
   };
@@ -80,10 +84,6 @@ function mergeProducts(
   mergeField('weight_value');
   mergeField('weight_unit');
   mergeField('parent_sku');
-  
-  if (conflicts.length > 0) {
-    log(`CONFLICT [${existing.sku}] from ${sourceLabel}: ${conflicts.join(', ')}`);
-  }
   
   return merged;
 }
@@ -230,14 +230,15 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   }
   log(`After kits: ${productMap.size} products`);
   
-  // Merge parent products (fills missing fields, especially weight)
+  // Merge parent products (OVERRIDE all fields from kit import - parent has real data)
   let parentMerges = 0;
   let parentNew = 0;
   for (const product of parentProducts) {
     if (product.sku) {
       const existing = productMap.get(product.sku);
       if (existing) {
-        productMap.set(product.sku, mergeProducts(existing, product, 'parent'));
+        // Override mode: parent values take precedence over kit placeholder values
+        productMap.set(product.sku, mergeProducts(existing, product, 'parent', true));
         parentMerges++;
       } else {
         productMap.set(product.sku, product);
@@ -245,7 +246,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       }
     }
   }
-  log(`After parents: ${productMap.size} products (${parentNew} new, ${parentMerges} merged)`);
+  log(`After parents: ${productMap.size} products (${parentNew} new, ${parentMerges} merged/overridden)`);
   
   // Merge variant products (fills parent_sku for variants)
   let variantMerges = 0;
