@@ -10344,6 +10344,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fingerprints API (Smart Shipping Engine)
   // ========================================
 
+  // Trigger manual hydration of shipments (re-creates QC items and fingerprints)
+  app.post("/api/fingerprints/trigger-hydration", requireAuth, async (req, res) => {
+    try {
+      const { runHydration } = await import("./services/qc-item-hydrator");
+      const { batchSize = 500 } = req.body;
+      
+      console.log(`[Fingerprints] Manual hydration triggered (batch size: ${batchSize})`);
+      const stats = await runHydration(batchSize);
+      
+      res.json({
+        success: true,
+        stats,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Manual hydration failed:", error);
+      res.status(500).json({ error: "Failed to run hydration" });
+    }
+  });
+
   // Get all fingerprints with shipment counts and packaging status
   app.get("/api/fingerprints", requireAuth, async (req, res) => {
     try {
