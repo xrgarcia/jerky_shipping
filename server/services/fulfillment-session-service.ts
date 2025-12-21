@@ -17,6 +17,7 @@ import {
   fulfillmentSessions, 
   stations,
   fingerprints,
+  shipmentQcItems,
   DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
@@ -64,9 +65,10 @@ export interface SessionBuildResult {
   errors: string[];
 }
 
-/** Session with joined station data */
+/** Session with joined station data and calculated weight */
 export interface FulfillmentSessionWithStation extends FulfillmentSession {
   stationName: string | null;
+  totalWeightOz: number | null;
 }
 
 /** Preview of what a session will contain */
@@ -308,12 +310,12 @@ export class FulfillmentSessionService {
   }
 
   /**
-   * Get all sessions with optional status filter, including station name
+   * Get all sessions with optional status filter, including station name and total weight
    */
   async getSessions(status?: FulfillmentSessionStatus): Promise<FulfillmentSessionWithStation[]> {
     const conditions = status ? [eq(fulfillmentSessions.status, status)] : [];
 
-    const results = await db
+    const sessions = await db
       .select({
         id: fulfillmentSessions.id,
         name: fulfillmentSessions.name,
@@ -337,7 +339,36 @@ export class FulfillmentSessionService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(fulfillmentSessions.createdAt));
 
-    return results;
+    // Calculate total weight for each session from QC items
+    const sessionIds = sessions.map(s => s.id);
+    if (sessionIds.length === 0) {
+      return sessions.map(s => ({ ...s, totalWeightOz: null }));
+    }
+
+    // Get total weight per session (sum of weight_value * quantity_expected for all items)
+    const weightResults = await db
+      .select({
+        sessionId: shipments.fulfillmentSessionId,
+        totalWeight: sql<number>`COALESCE(SUM(${shipmentQcItems.weightValue} * ${shipmentQcItems.quantityExpected}), 0)`.as('total_weight'),
+      })
+      .from(shipments)
+      .innerJoin(shipmentQcItems, eq(shipmentQcItems.shipmentId, shipments.id))
+      .where(inArray(shipments.fulfillmentSessionId, sessionIds))
+      .groupBy(shipments.fulfillmentSessionId);
+
+    // Create a map of session ID to weight
+    const weightMap = new Map<string, number>();
+    for (const row of weightResults) {
+      if (row.sessionId) {
+        weightMap.set(row.sessionId, Number(row.totalWeight) || 0);
+      }
+    }
+
+    // Merge weight data into sessions
+    return sessions.map(session => ({
+      ...session,
+      totalWeightOz: weightMap.get(session.id) || null,
+    }));
   }
 
   /**
