@@ -168,12 +168,20 @@ interface FulfillmentSession {
   createdBy: string | null;
 }
 
+interface SessionShipmentItem {
+  sku: string | null;
+  name: string;
+  quantity: number;
+  imageUrl: string | null;
+}
+
 interface SessionShipment {
   id: string;
   orderNumber: string;
   footprintId: string | null;
   trackingNumber: string | null;
   lifecyclePhase: string | null;
+  items: SessionShipmentItem[];
 }
 
 interface SessionDetailResponse extends FulfillmentSession {
