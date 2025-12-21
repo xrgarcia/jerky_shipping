@@ -1426,22 +1426,22 @@ export default function Footprints() {
                                             Delete Session
                                           </Button>
                                         </div>
-                                        <div className="grid gap-3 max-h-96 overflow-y-auto">
+                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                                           {details.shipments.map((shipment, idx) => (
                                             <div
                                               key={shipment.id}
-                                              className="rounded bg-background border overflow-hidden"
+                                              className="rounded-lg border-2 border-primary/20 bg-background overflow-hidden shadow-sm"
                                               data-testid={`shipment-row-${shipment.id}`}
                                             >
-                                              <div className="flex items-center justify-between p-3 border-b bg-muted/20">
+                                              <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-primary/10">
                                                 <div className="flex items-center gap-3">
-                                                  <span className="text-xs text-muted-foreground w-6 font-medium">
-                                                    {idx + 1}.
+                                                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold">
+                                                    {idx + 1}
                                                   </span>
-                                                  <span className="font-mono text-sm font-bold">
+                                                  <span className="font-mono text-base font-bold text-foreground">
                                                     {shipment.orderNumber}
                                                   </span>
-                                                  <Badge variant="outline" className="text-xs">
+                                                  <Badge variant="secondary" className="text-xs">
                                                     {shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}
                                                   </Badge>
                                                 </div>
@@ -1455,14 +1455,14 @@ export default function Footprints() {
                                                 </div>
                                               </div>
                                               {shipment.items && shipment.items.length > 0 && (
-                                                <div className="p-2 space-y-2">
+                                                <div className="divide-y divide-border">
                                                   {shipment.items.map((item, itemIdx) => (
                                                     <div
                                                       key={`${shipment.id}-item-${itemIdx}`}
-                                                      className="flex items-center gap-3 p-2 rounded bg-muted/30"
+                                                      className="flex items-center gap-4 px-4 py-3 bg-background hover:bg-muted/20 transition-colors"
                                                       data-testid={`shipment-item-${shipment.id}-${itemIdx}`}
                                                     >
-                                                      <div className="flex-shrink-0 w-12 h-12 rounded border bg-background overflow-hidden flex items-center justify-center">
+                                                      <div className="flex-shrink-0 w-14 h-14 rounded-md border-2 border-muted bg-white overflow-hidden flex items-center justify-center shadow-sm">
                                                         {item.imageUrl ? (
                                                           <img
                                                             src={item.imageUrl}
@@ -1477,19 +1477,19 @@ export default function Footprints() {
                                                         <Package className={`h-6 w-6 text-muted-foreground ${item.imageUrl ? 'hidden' : ''}`} />
                                                       </div>
                                                       <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium truncate" title={item.name}>
+                                                        <p className="text-sm font-medium text-foreground leading-snug" title={item.name}>
                                                           {item.name}
                                                         </p>
                                                         {item.sku && (
-                                                          <p className="text-xs text-muted-foreground font-mono">
+                                                          <p className="text-xs text-muted-foreground font-mono mt-0.5">
                                                             {item.sku}
                                                           </p>
                                                         )}
                                                       </div>
                                                       <div className="flex-shrink-0">
-                                                        <Badge variant="secondary" className="text-sm font-bold">
+                                                        <span className="inline-flex items-center justify-center min-w-[2.5rem] h-8 px-2 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm font-bold">
                                                           x{item.quantity}
-                                                        </Badge>
+                                                        </span>
                                                       </div>
                                                     </div>
                                                   ))}
