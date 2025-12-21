@@ -54,6 +54,7 @@ import {
   Eye,
   Trash2,
   MapPin,
+  Scale,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -160,6 +161,7 @@ interface FulfillmentSession {
   stationId: string | null;
   stationType: string;
   stationName: string | null;
+  totalWeightOz: number | null;
   orderCount: number;
   maxOrders: number;
   status: 'draft' | 'ready' | 'picking' | 'packing' | 'completed' | 'cancelled';
@@ -177,6 +179,8 @@ interface SessionShipmentItem {
   name: string;
   quantity: number;
   imageUrl: string | null;
+  weightValue: number | null;
+  weightUnit: string | null;
 }
 
 interface SessionShipment {
@@ -185,6 +189,7 @@ interface SessionShipment {
   fingerprintId: string | null;
   trackingNumber: string | null;
   lifecyclePhase: string | null;
+  totalWeightOz: number | null;
   items: SessionShipmentItem[];
 }
 
@@ -1411,6 +1416,14 @@ export default function Fingerprints() {
                                         <Package className="h-4 w-4" />
                                         {session.orderCount} orders
                                       </span>
+                                      {session.totalWeightOz != null && session.totalWeightOz > 0 && (
+                                        <span className="flex items-center gap-1">
+                                          <Scale className="h-4 w-4" />
+                                          {session.totalWeightOz >= 16 
+                                            ? `${(session.totalWeightOz / 16).toFixed(1)} lbs`
+                                            : `${session.totalWeightOz} oz`}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                   
@@ -1480,6 +1493,14 @@ export default function Fingerprints() {
                                                   <Badge variant="secondary" className="text-xs">
                                                     {shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}
                                                   </Badge>
+                                                  {shipment.totalWeightOz != null && shipment.totalWeightOz > 0 && (
+                                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                      <Scale className="h-3 w-3" />
+                                                      {shipment.totalWeightOz >= 16 
+                                                        ? `${(shipment.totalWeightOz / 16).toFixed(1)} lbs`
+                                                        : `${shipment.totalWeightOz} oz`}
+                                                    </Badge>
+                                                  )}
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                   {shipment.trackingNumber && (
@@ -1516,11 +1537,18 @@ export default function Fingerprints() {
                                                         <p className="text-sm font-medium text-foreground leading-snug" title={item.name}>
                                                           {item.name}
                                                         </p>
-                                                        {item.sku && (
-                                                          <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                                                            {item.sku}
-                                                          </p>
-                                                        )}
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                          {item.sku && (
+                                                            <span className="text-xs text-muted-foreground font-mono">
+                                                              {item.sku}
+                                                            </span>
+                                                          )}
+                                                          {item.weightValue != null && item.weightValue > 0 && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                              • {item.weightValue} {item.weightUnit || 'oz'}
+                                                            </span>
+                                                          )}
+                                                        </div>
                                                       </div>
                                                       <div className="flex-shrink-0">
                                                         <span className="inline-flex items-center justify-center min-w-[2.5rem] h-8 px-2 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm font-bold">
