@@ -95,6 +95,15 @@ function ProductDetailDialog({
               </div>
             </div>
 
+            {product.parentSku && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Parent SKU</label>
+                <p className="text-sm font-mono" data-testid="detail-parent-sku">
+                  <Badge variant="outline" className="font-mono">{product.parentSku}</Badge>
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Product Category</label>
