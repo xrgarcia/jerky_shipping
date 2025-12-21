@@ -34,7 +34,7 @@ import Stations from "@/pages/stations";
 import DesktopConfig from "@/pages/desktop-config";
 import Collections from "@/pages/collections";
 import PackagingTypes from "@/pages/packaging-types";
-import FulfillmentPrep from "@/pages/footprints";
+import FulfillmentPrep from "@/pages/fingerprints";
 import SkuvaultProducts from "@/pages/skuvault-products";
 import type { User } from "@shared/schema";
 

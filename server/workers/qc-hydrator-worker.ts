@@ -7,7 +7,7 @@
  * One-time hydration per shipment - once QC items exist, the shipment is skipped.
  */
 
-import { runHydration, getHydrationStatus, backfillFootprints } from '../services/qc-item-hydrator';
+import { runHydration, getHydrationStatus, backfillFingerprints } from '../services/qc-item-hydrator';
 
 const log = (message: string) => console.log(`[qc-hydrator-worker] ${message}`);
 
@@ -23,9 +23,9 @@ let workerStats = {
     shipmentsProcessed: number;
     shipmentsSkipped: number;
     totalItemsCreated: number;
-    footprintsComplete: number;
-    footprintsNew: number;
-    footprintsPendingCategorization: number;
+    fingerprintsComplete: number;
+    fingerprintsNew: number;
+    fingerprintsPendingCategorization: number;
     errors: string[];
   } | null,
   workerStartedAt: new Date(),
@@ -97,10 +97,10 @@ export function startQCHydratorWorker(intervalMs: number = 60000): void {
   log(`Worker started (interval: ${intervalMs}ms = ${intervalMs / 1000} seconds)`);
   workerStats.workerStartedAt = new Date();
   
-  // Run backfill for shipments missing footprints (one-time on startup)
+  // Run backfill for shipments missing fingerprints (one-time on startup)
   setImmediate(async () => {
-    log('Running footprint backfill on startup...');
-    await backfillFootprints(500); // Process up to 500 shipments
+    log('Running fingerprint backfill on startup...');
+    await backfillFingerprints(500); // Process up to 500 shipments
     // Then run normal hydration tick
     await workerTick();
   });
@@ -127,9 +127,9 @@ export async function triggerManualHydration(batchSize: number = 50): Promise<{
   shipmentsProcessed: number;
   shipmentsSkipped: number;
   totalItemsCreated: number;
-  footprintsComplete: number;
-  footprintsNew: number;
-  footprintsPendingCategorization: number;
+  fingerprintsComplete: number;
+  fingerprintsNew: number;
+  fingerprintsPendingCategorization: number;
   errors: string[];
 }> {
   log('Manual hydration triggered');

@@ -4,8 +4,8 @@
  * Populates shipment_qc_items table for "Ready to Fulfill" shipments.
  * - Explodes kits into component SKUs using cached kit mappings
  * - Gets barcodes from cached product catalog
- * - Maps SKUs to collections for footprint calculation
- * - Calculates footprint signature and creates/matches footprints
+ * - Maps SKUs to collections for fingerprint calculation
+ * - Calculates fingerprint signature and creates/matches fingerprints
  * 
  * Trigger: Shipments with status='on_hold' AND 'MOVE OVER' tag AND no existing QC items
  */
@@ -19,9 +19,9 @@ import {
   shipmentQcItems,
   productCollectionMappings,
   productCollections,
-  footprints,
+  fingerprints,
   type InsertShipmentQcItem,
-  type InsertFootprint,
+  type InsertFingerprint,
 } from '@shared/schema';
 import { eq, and, exists, sql, notExists, inArray } from 'drizzle-orm';
 import { 
@@ -38,8 +38,8 @@ interface HydrationResult {
   shipmentId: string;
   orderNumber: string;
   itemsCreated: number;
-  footprintStatus?: 'complete' | 'pending_categorization';
-  footprintIsNew?: boolean;
+  fingerprintStatus?: 'complete' | 'pending_categorization';
+  fingerprintIsNew?: boolean;
   uncategorizedSkuCount?: number;
   error?: string;
 }
@@ -48,9 +48,9 @@ interface HydrationStats {
   shipmentsProcessed: number;
   shipmentsSkipped: number;
   totalItemsCreated: number;
-  footprintsComplete: number;
-  footprintsNew: number;
-  footprintsPendingCategorization: number;
+  fingerprintsComplete: number;
+  fingerprintsNew: number;
+  fingerprintsPendingCategorization: number;
   errors: string[];
 }
 
@@ -197,19 +197,19 @@ function generateDisplayName(
   return parts.join(' + ');
 }
 
-interface FootprintResult {
+interface FingerprintResult {
   status: 'complete' | 'pending_categorization';
-  footprintId?: string;
+  fingerprintId?: string;
   isNew?: boolean;
   uncategorizedSkus?: string[];
 }
 
 /**
- * Calculate and assign footprint for a shipment after QC items are hydrated
+ * Calculate and assign fingerprint for a shipment after QC items are hydrated
  * Uses product_collection_mappings as the source of truth for collection membership
  * Exported so it can be called from routes when products are assigned to collections
  */
-export async function calculateFootprint(shipmentId: string): Promise<FootprintResult> {
+export async function calculateFingerprint(shipmentId: string): Promise<FingerprintResult> {
   // Get all QC items for this shipment (SKU and quantity only)
   const qcItems = await db
     .select({
@@ -239,7 +239,7 @@ export async function calculateFootprint(shipmentId: string): Promise<FootprintR
     // Mark shipment as pending categorization
     await db
       .update(shipments)
-      .set({ footprintStatus: 'pending_categorization' })
+      .set({ fingerprintStatus: 'pending_categorization' })
       .where(eq(shipments.id, shipmentId));
     
     return { 
@@ -260,21 +260,21 @@ export async function calculateFootprint(shipmentId: string): Promise<FootprintR
   const signature = generateSignature(collectionQuantities);
   const signatureHash = generateSignatureHash(signature);
   
-  // Try to find existing footprint
-  const existingFootprint = await db
-    .select({ id: footprints.id })
-    .from(footprints)
-    .where(eq(footprints.signatureHash, signatureHash))
+  // Try to find existing fingerprint
+  const existingFingerprint = await db
+    .select({ id: fingerprints.id })
+    .from(fingerprints)
+    .where(eq(fingerprints.signatureHash, signatureHash))
     .limit(1);
   
-  let footprintId: string;
+  let fingerprintId: string;
   let isNew = false;
   
-  if (existingFootprint.length > 0) {
-    // Use existing footprint
-    footprintId = existingFootprint[0].id;
+  if (existingFingerprint.length > 0) {
+    // Use existing fingerprint
+    fingerprintId = existingFingerprint[0].id;
   } else {
-    // Create new footprint
+    // Create new fingerprint
     const collectionIds = Array.from(collectionQuantities.keys());
     const collectionNameCache = await buildCollectionNameCache(collectionIds);
     const displayName = generateDisplayName(collectionQuantities, collectionNameCache);
@@ -282,7 +282,7 @@ export async function calculateFootprint(shipmentId: string): Promise<FootprintR
     const totalItems = Array.from(collectionQuantities.values()).reduce((a, b) => a + b, 0);
     const collectionCount = collectionQuantities.size;
     
-    const newFootprint: InsertFootprint = {
+    const newFingerprint: InsertFingerprint = {
       signature,
       signatureHash,
       displayName,
@@ -291,26 +291,26 @@ export async function calculateFootprint(shipmentId: string): Promise<FootprintR
     };
     
     const inserted = await db
-      .insert(footprints)
-      .values(newFootprint)
-      .returning({ id: footprints.id });
+      .insert(fingerprints)
+      .values(newFingerprint)
+      .returning({ id: fingerprints.id });
     
-    footprintId = inserted[0].id;
+    fingerprintId = inserted[0].id;
     isNew = true;
     
-    log(`Created new footprint: ${displayName} (${collectionCount} collections, ${totalItems} items)`);
+    log(`Created new fingerprint: ${displayName} (${collectionCount} collections, ${totalItems} items)`);
   }
   
-  // Update shipment with footprint
+  // Update shipment with fingerprint
   await db
     .update(shipments)
     .set({ 
-      footprintId,
-      footprintStatus: 'complete',
+      fingerprintId,
+      fingerprintStatus: 'complete',
     })
     .where(eq(shipments.id, shipmentId));
   
-  return { status: 'complete', footprintId, isNew };
+  return { status: 'complete', fingerprintId, isNew };
 }
 
 /**
@@ -427,16 +427,16 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
     // Insert all QC items
     await db.insert(shipmentQcItems).values(qcItemsToInsert);
     
-    // Calculate and assign footprint
-    const footprintResult = await calculateFootprint(shipmentId);
+    // Calculate and assign fingerprint
+    const fingerprintResult = await calculateFingerprint(shipmentId);
     
     return { 
       shipmentId, 
       orderNumber, 
       itemsCreated: qcItemsToInsert.length,
-      footprintStatus: footprintResult.status,
-      footprintIsNew: footprintResult.isNew,
-      uncategorizedSkuCount: footprintResult.uncategorizedSkus?.length,
+      fingerprintStatus: fingerprintResult.status,
+      fingerprintIsNew: fingerprintResult.isNew,
+      uncategorizedSkuCount: fingerprintResult.uncategorizedSkus?.length,
     };
     
   } catch (error) {
@@ -455,9 +455,9 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
     shipmentsProcessed: 0,
     shipmentsSkipped: 0,
     totalItemsCreated: 0,
-    footprintsComplete: 0,
-    footprintsNew: 0,
-    footprintsPendingCategorization: 0,
+    fingerprintsComplete: 0,
+    fingerprintsNew: 0,
+    fingerprintsPendingCategorization: 0,
     errors: [],
   };
   
@@ -493,20 +493,20 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
         stats.shipmentsProcessed++;
         stats.totalItemsCreated += result.itemsCreated;
         
-        // Track footprint stats
-        if (result.footprintStatus === 'complete') {
-          stats.footprintsComplete++;
-          if (result.footprintIsNew) {
-            stats.footprintsNew++;
+        // Track fingerprint stats
+        if (result.fingerprintStatus === 'complete') {
+          stats.fingerprintsComplete++;
+          if (result.fingerprintIsNew) {
+            stats.fingerprintsNew++;
           }
-        } else if (result.footprintStatus === 'pending_categorization') {
-          stats.footprintsPendingCategorization++;
+        } else if (result.fingerprintStatus === 'pending_categorization') {
+          stats.fingerprintsPendingCategorization++;
         }
       }
     }
     
     log(`Hydration complete: ${stats.shipmentsProcessed} processed, ${stats.totalItemsCreated} items created`);
-    log(`Footprints: ${stats.footprintsComplete} complete (${stats.footprintsNew} new), ${stats.footprintsPendingCategorization} pending categorization`);
+    log(`Fingerprints: ${stats.fingerprintsComplete} complete (${stats.fingerprintsNew} new), ${stats.fingerprintsPendingCategorization} pending categorization`);
     
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -532,26 +532,26 @@ export async function getHydrationStatus(): Promise<{
 }
 
 /**
- * Backfill footprints for shipments that have QC items but no footprint
- * Used for shipments hydrated before footprint calculation was added
+ * Backfill fingerprints for shipments that have QC items but no fingerprint
+ * Used for shipments hydrated before fingerprint calculation was added
  */
-export async function backfillFootprints(limit: number = 100): Promise<{
+export async function backfillFingerprints(limit: number = 100): Promise<{
   processed: number;
   complete: number;
   pendingCategorization: number;
-  newFootprints: number;
+  newFingerprints: number;
   errors: string[];
 }> {
   const result = {
     processed: 0,
     complete: 0,
     pendingCategorization: 0,
-    newFootprints: 0,
+    newFingerprints: 0,
     errors: [] as string[],
   };
   
   try {
-    // Find shipments with QC items but no footprint_status
+    // Find shipments with QC items but no fingerprint_status
     const shipmentsToProcess = await db
       .select({
         id: shipments.id,
@@ -566,28 +566,28 @@ export async function backfillFootprints(limit: number = 100): Promise<{
               .from(shipmentQcItems)
               .where(eq(shipmentQcItems.shipmentId, shipments.id))
           ),
-          // No footprint_status yet
-          sql`${shipments.footprintStatus} IS NULL`
+          // No fingerprint_status yet
+          sql`${shipments.fingerprintStatus} IS NULL`
         )
       )
       .limit(limit);
     
     if (shipmentsToProcess.length === 0) {
-      log('Backfill: No shipments need footprint calculation');
+      log('Backfill: No shipments need fingerprint calculation');
       return result;
     }
     
-    log(`Backfill: Found ${shipmentsToProcess.length} shipments needing footprint calculation`);
+    log(`Backfill: Found ${shipmentsToProcess.length} shipments needing fingerprint calculation`);
     
     for (const shipment of shipmentsToProcess) {
       try {
-        const footprintResult = await calculateFootprint(shipment.id);
+        const fingerprintResult = await calculateFingerprint(shipment.id);
         result.processed++;
         
-        if (footprintResult.status === 'complete') {
+        if (fingerprintResult.status === 'complete') {
           result.complete++;
-          if (footprintResult.isNew) {
-            result.newFootprints++;
+          if (fingerprintResult.isNew) {
+            result.newFingerprints++;
           }
         } else {
           result.pendingCategorization++;
@@ -598,7 +598,7 @@ export async function backfillFootprints(limit: number = 100): Promise<{
       }
     }
     
-    log(`Backfill complete: ${result.processed} processed, ${result.complete} complete (${result.newFootprints} new), ${result.pendingCategorization} pending categorization`);
+    log(`Backfill complete: ${result.processed} processed, ${result.complete} complete (${result.newFingerprints} new), ${result.pendingCategorization} pending categorization`);
     
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

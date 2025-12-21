@@ -415,23 +415,23 @@ export default function Collections() {
     importMutation.mutate(importFile);
   };
 
-  // Query for pending footprint count
+  // Query for pending fingerprint count
   const { data: pendingData, refetch: refetchPending } = useQuery<{ pendingCount: number }>({
-    queryKey: ["/api/collections/pending-footprints"],
+    queryKey: ["/api/collections/pending-fingerprints"],
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Mutation for bulk recalculate footprints
+  // Mutation for bulk recalculate fingerprints
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/collections/recalculate-footprints");
+      const res = await apiRequest("POST", "/api/collections/recalculate-fingerprints");
       return res.json();
     },
     onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; hasMore: boolean }) => {
       refetchPending();
       if (data.completed > 0) {
         toast({
-          title: "Footprints recalculated",
+          title: "Fingerprints recalculated",
           description: `${data.completed} shipments completed, ${data.stillPending} still pending (need product assignments)`,
         });
       } else if (data.stillPending > 0) {
@@ -597,7 +597,7 @@ export default function Collections() {
           </p>
         </div>
         
-        {/* Pending Footprints Banner */}
+        {/* Pending Fingerprints Banner */}
         {pendingData && pendingData.pendingCount > 0 && (
           <div className="px-4 py-2 border-b bg-amber-50 dark:bg-amber-950/30">
             <div className="flex items-center justify-between gap-2">
@@ -613,7 +613,7 @@ export default function Collections() {
                 onClick={() => recalculateMutation.mutate()}
                 disabled={recalculateMutation.isPending}
                 className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
-                data-testid="button-recalculate-footprints"
+                data-testid="button-recalculate-fingerprints"
               >
                 {recalculateMutation.isPending ? (
                   <>

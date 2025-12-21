@@ -16,7 +16,7 @@ import {
   shipments, 
   fulfillmentSessions, 
   stations,
-  footprints,
+  fingerprints,
   DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
@@ -42,7 +42,7 @@ export interface SessionableShipmentCriteria {
 export interface ShipmentGroup {
   stationType: string;
   stationId: string | null;
-  footprintId: string | null;
+  fingerprintId: string | null;
   shipments: SessionableShipment[];
 }
 
@@ -50,7 +50,7 @@ export interface ShipmentGroup {
 export interface SessionableShipment {
   id: string;
   orderNumber: string;
-  footprintId: string | null;
+  fingerprintId: string | null;
   assignedStationId: string | null;
   packagingTypeId: string | null;
 }
@@ -69,7 +69,7 @@ export interface SessionPreview {
   stationType: string;
   stationName: string | null;
   orderCount: number;
-  footprintGroups: { footprintId: string | null; count: number }[];
+  fingerprintGroups: { fingerprintId: string | null; count: number }[];
 }
 
 // ============================================================================
@@ -95,7 +95,7 @@ export class FulfillmentSessionService {
    * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
    * 
    * Uses the lifecycle state machine to ensure only orders that have completed
-   * all prior decision steps (categorization, footprint, packaging) are included.
+   * all prior decision steps (categorization, fingerprint, packaging) are included.
    */
   async findSessionableShipments(
     stationType?: string
@@ -120,7 +120,7 @@ export class FulfillmentSessionService {
       .select({
         id: shipments.id,
         orderNumber: shipments.orderNumber,
-        footprintId: shipments.footprintId,
+        fingerprintId: shipments.fingerprintId,
         assignedStationId: shipments.assignedStationId,
         packagingTypeId: shipments.packagingTypeId,
       })
@@ -128,7 +128,7 @@ export class FulfillmentSessionService {
       .where(and(...conditions))
       .orderBy(
         asc(shipments.assignedStationId),
-        asc(shipments.footprintId),
+        asc(shipments.fingerprintId),
         asc(shipments.orderNumber)
       );
 
@@ -136,11 +136,11 @@ export class FulfillmentSessionService {
   }
 
   /**
-   * Group shipments by station type and footprint for optimal batching
+   * Group shipments by station type and fingerprint for optimal batching
    * 
    * Sorting strategy:
    * 1. Station type (boxing_machine → poly_bag → hand_pack)
-   * 2. Footprint (same footprint = same products = efficient picking)
+   * 2. Fingerprint (same fingerprint = same products = efficient picking)
    * 3. Order number (for consistent ordering)
    */
   async groupShipmentsForBatching(
@@ -150,7 +150,7 @@ export class FulfillmentSessionService {
     const stationIds = Array.from(new Set(shipmentList.map(s => s.assignedStationId).filter(Boolean))) as string[];
     const stationMap = await this.getStationMap(stationIds);
 
-    // Group by stationType → footprint
+    // Group by stationType → fingerprint
     const groups = new Map<string, ShipmentGroup>();
 
     for (const shipment of shipmentList) {
@@ -159,13 +159,13 @@ export class FulfillmentSessionService {
       const station = stationMap.get(shipment.assignedStationId);
       if (!station) continue;
 
-      const groupKey = `${station.stationType}:${shipment.footprintId || 'null'}`;
+      const groupKey = `${station.stationType}:${shipment.fingerprintId || 'null'}`;
 
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
           stationType: station.stationType || 'unknown',
           stationId: shipment.assignedStationId,
-          footprintId: shipment.footprintId,
+          fingerprintId: shipment.fingerprintId,
           shipments: [],
         });
       }
@@ -173,12 +173,12 @@ export class FulfillmentSessionService {
       groups.get(groupKey)!.shipments.push(shipment);
     }
 
-    // Sort groups by station type priority, then footprint
+    // Sort groups by station type priority, then fingerprint
     const sortedGroups = Array.from(groups.values()).sort((a, b) => {
       const priorityA = STATION_TYPE_PRIORITY[a.stationType] ?? 99;
       const priorityB = STATION_TYPE_PRIORITY[b.stationType] ?? 99;
       if (priorityA !== priorityB) return priorityA - priorityB;
-      return (a.footprintId || '').localeCompare(b.footprintId || '');
+      return (a.fingerprintId || '').localeCompare(b.fingerprintId || '');
     });
 
     return sortedGroups;
@@ -188,7 +188,7 @@ export class FulfillmentSessionService {
    * Build sessions from grouped shipments
    * 
    * Each session contains up to MAX_ORDERS_PER_SESSION orders
-   * Sessions are created per station type, preserving footprint grouping
+   * Sessions are created per station type, preserving fingerprint grouping
    */
   async buildSessions(
     userId: string,
@@ -215,7 +215,7 @@ export class FulfillmentSessionService {
 
       console.log(`[FulfillmentSession] Found ${sessionableShipments.length} sessionable shipments`);
 
-      // 2. Group by station type and footprint
+      // 2. Group by station type and fingerprint
       const groups = await this.groupShipmentsForBatching(sessionableShipments);
 
       // 3. Batch into sessions (max 28 per session)
@@ -274,14 +274,14 @@ export class FulfillmentSessionService {
           stationType,
           stationName: station?.name || null,
           orderCount: 0,
-          footprintGroups: [],
+          fingerprintGroups: [],
         });
       }
 
       const preview = previewMap.get(stationType)!;
       preview.orderCount += group.shipments.length;
-      preview.footprintGroups.push({
-        footprintId: group.footprintId,
+      preview.fingerprintGroups.push({
+        fingerprintId: group.fingerprintId,
         count: group.shipments.length,
       });
     }

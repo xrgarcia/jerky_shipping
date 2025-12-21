@@ -3564,19 +3564,19 @@ export class DatabaseStorage implements IStorage {
       .set({ collectionId: null, updatedAt: new Date() })
       .where(eq(shipmentQcItems.collectionId, id));
     
-    // Step 3: Reset footprintId on affected shipments so they get recalculated
+    // Step 3: Reset fingerprintId on affected shipments so they get recalculated
     if (affectedShipmentIds.length > 0) {
       const shipmentIds = affectedShipmentIds.map(s => s.shipmentId);
       await db
         .update(shipments)
         .set({ 
-          footprintId: null, 
+          fingerprintId: null, 
           decisionSubphase: 'needs_categorization',
           updatedAt: new Date() 
         })
         .where(inArray(shipments.id, shipmentIds));
       
-      console.log(`[Collections] Reset ${shipmentIds.length} shipments for footprint recalculation`);
+      console.log(`[Collections] Reset ${shipmentIds.length} shipments for fingerprint recalculation`);
     }
     
     // Step 4: Delete all product mappings

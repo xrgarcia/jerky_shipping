@@ -57,7 +57,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-interface FootprintData {
+interface FingerprintData {
   id: string;
   signature: string;
   signatureHash: string;
@@ -73,8 +73,8 @@ interface FootprintData {
   hasPackaging: boolean;
 }
 
-interface FootprintsResponse {
-  footprints: FootprintData[];
+interface FingerprintsResponse {
+  fingerprints: FingerprintData[];
   stats: {
     total: number;
     assigned: number;
@@ -128,7 +128,7 @@ interface SessionPreview {
   stationType: string;
   stationName: string | null;
   orderCount: number;
-  footprintGroups: { footprintId: string | null; count: number }[];
+  fingerprintGroups: { fingerprintId: string | null; count: number }[];
 }
 
 interface SessionPreviewResponse {
@@ -178,7 +178,7 @@ interface SessionShipmentItem {
 interface SessionShipment {
   id: string;
   orderNumber: string;
-  footprintId: string | null;
+  fingerprintId: string | null;
   trackingNumber: string | null;
   lifecyclePhase: string | null;
   items: SessionShipmentItem[];
@@ -214,7 +214,7 @@ type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } |
 type FilterOption = 'all' | 'needs_mapping' | 'mapped';
 type WorkflowTab = 'categorize' | 'packaging' | 'sessions' | 'live';
 
-export default function Footprints() {
+export default function Fingerprints() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<WorkflowTab>('categorize');
   const [inlineStatus, setInlineStatus] = useState<Record<string, InlineStatus>>({});
@@ -248,13 +248,13 @@ export default function Footprints() {
     return () => timeouts.forEach(clearTimeout);
   }, [inlineStatus]);
 
-  // Footprints data
+  // Fingerprints data
   const {
-    data: footprintsData,
-    isLoading: footprintsLoading,
-    refetch: refetchFootprints,
-  } = useQuery<FootprintsResponse>({
-    queryKey: ["/api/footprints"],
+    data: fingerprintsData,
+    isLoading: fingerprintsLoading,
+    refetch: refetchFingerprints,
+  } = useQuery<FingerprintsResponse>({
+    queryKey: ["/api/fingerprints"],
   });
 
   // Packaging types
@@ -297,30 +297,30 @@ export default function Footprints() {
   // Mutations
   const assignMutation = useMutation({
     mutationFn: async ({
-      footprintId,
+      fingerprintId,
       packagingTypeId,
     }: {
-      footprintId: string;
+      fingerprintId: string;
       packagingTypeId: string;
     }) => {
-      setInlineStatus(prev => ({ ...prev, [footprintId]: { type: 'loading' } }));
-      const res = await apiRequest("POST", `/api/footprints/${footprintId}/assign`, {
+      setInlineStatus(prev => ({ ...prev, [fingerprintId]: { type: 'loading' } }));
+      const res = await apiRequest("POST", `/api/fingerprints/${fingerprintId}/assign`, {
         packagingTypeId,
       });
-      return { ...(await res.json()), footprintId };
+      return { ...(await res.json()), fingerprintId };
     },
     onSuccess: (result) => {
       setInlineStatus(prev => ({
         ...prev,
-        [result.footprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
+        [result.fingerprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
       }));
-      queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
     },
     onError: (error: Error, variables) => {
       setInlineStatus(prev => ({
         ...prev,
-        [variables.footprintId]: { type: 'error', message: 'Failed' }
+        [variables.fingerprintId]: { type: 'error', message: 'Failed' }
       }));
     },
   });
@@ -340,7 +340,7 @@ export default function Footprints() {
         [`cat-${result.sku}`]: { type: 'success', message: 'Categorized' }
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
     },
     onError: (error: Error, variables) => {
       setInlineStatus(prev => ({
@@ -406,7 +406,7 @@ export default function Footprints() {
     onSuccess: () => {
       toast({ title: "Packaging type updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/footprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       setEditingPackaging(null);
       setPackagingForm({ name: "", stationType: "" });
     },
@@ -433,8 +433,8 @@ export default function Footprints() {
     },
   });
 
-  const footprints = footprintsData?.footprints || [];
-  const stats = footprintsData?.stats;
+  const fingerprints = fingerprintsData?.fingerprints || [];
+  const stats = fingerprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
   const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
   const collections = collectionsData?.collections || [];
@@ -444,7 +444,7 @@ export default function Footprints() {
     s => s.status !== 'completed' && s.status !== 'cancelled'
   );
 
-  const filteredFootprints = footprints.filter((fp) => {
+  const filteredFingerprints = fingerprints.filter((fp) => {
     if (filter === 'needs_mapping') return !fp.hasPackaging;
     if (filter === 'mapped') return fp.hasPackaging;
     return true;
@@ -454,8 +454,8 @@ export default function Footprints() {
     ? Math.round((stats.assigned / Math.max(stats.total, 1)) * 100)
     : 0;
 
-  const handleAssign = (footprintId: string, packagingTypeId: string) => {
-    assignMutation.mutate({ footprintId, packagingTypeId });
+  const handleAssign = (fingerprintId: string, packagingTypeId: string) => {
+    assignMutation.mutate({ fingerprintId, packagingTypeId });
   };
 
   const handleCategorize = (sku: string, collectionId: string) => {
@@ -488,7 +488,7 @@ export default function Footprints() {
 
   const handleRefreshAll = () => {
     refetchUncategorized();
-    refetchFootprints();
+    refetchFingerprints();
     refetchSessionPreview();
     refetchLiveSessions();
   };
@@ -530,7 +530,7 @@ export default function Footprints() {
     }
   };
 
-  const isLoading = footprintsLoading || uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
+  const isLoading = fingerprintsLoading || uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
 
   if (isLoading) {
     return (
@@ -723,7 +723,7 @@ export default function Footprints() {
                 Uncategorized Products
               </CardTitle>
               <CardDescription>
-                Assign products to collections so footprints can be calculated
+                Assign products to collections so fingerprints can be calculated
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -732,7 +732,7 @@ export default function Footprints() {
                   <CheckCircle2 className="h-12 w-12 mx-auto text-green-500 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">All Products Categorized</h3>
                   <p className="text-muted-foreground">
-                    No products need categorization. Footprints can be calculated.
+                    No products need categorization. Fingerprints can be calculated.
                   </p>
                 </div>
               ) : (
@@ -904,12 +904,12 @@ export default function Footprints() {
 
         {/* Assign Packaging Tab */}
         <TabsContent value="packaging" className="mt-6 space-y-6">
-          {footprints.length === 0 ? (
+          {fingerprints.length === 0 ? (
             <Card className="p-12 text-center">
               <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No footprints yet</h2>
+              <h2 className="text-xl font-semibold mb-2">No fingerprints yet</h2>
               <p className="text-muted-foreground">
-                Footprints are discovered when orders are processed. Make sure all SKUs are categorized first.
+                Fingerprints are discovered when orders are processed. Make sure all SKUs are categorized first.
               </p>
             </Card>
           ) : (
@@ -932,7 +932,7 @@ export default function Footprints() {
                       onClick={() => setFilter('all')}
                       data-testid="button-filter-all"
                     >
-                      All ({footprints.length})
+                      All ({fingerprints.length})
                     </Button>
                     <Button
                       variant={filter === 'needs_mapping' ? 'secondary' : 'ghost'}
@@ -954,77 +954,77 @@ export default function Footprints() {
                     </Button>
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    Showing {filteredFootprints.length} of {footprints.length}
+                    Showing {filteredFingerprints.length} of {fingerprints.length}
                   </span>
                 </div>
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-2">
-                    {filteredFootprints.length === 0 ? (
+                    {filteredFingerprints.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        No footprints match this filter
+                        No fingerprints match this filter
                       </div>
                     ) : null}
-                    {filteredFootprints.map((footprint) => (
+                    {filteredFingerprints.map((fingerprint) => (
                       <div
-                        key={footprint.id}
+                        key={fingerprint.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border ${
-                          footprint.hasPackaging
+                          fingerprint.hasPackaging
                             ? "bg-card border-border"
                             : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                         }`}
-                        data-testid={`row-footprint-${footprint.id}`}
+                        data-testid={`row-fingerprint-${fingerprint.id}`}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            {footprint.hasPackaging ? (
+                            {fingerprint.hasPackaging ? (
                               <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
                             ) : (
                               <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
                             )}
                             <span
                               className="font-medium"
-                              data-testid={`text-footprint-name-${footprint.id}`}
+                              data-testid={`text-fingerprint-name-${fingerprint.id}`}
                             >
-                              {footprint.humanReadableName}
+                              {fingerprint.humanReadableName}
                             </span>
-                            {footprint.hasPackaging && getStationBadge(footprint.stationType)}
+                            {fingerprint.hasPackaging && getStationBadge(fingerprint.stationType)}
                           </div>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Package className="h-3 w-3" />
-                              {footprint.totalItems} items
+                              {fingerprint.totalItems} items
                             </span>
                             <span className="flex items-center gap-1">
                               <Layers className="h-3 w-3" />
-                              {footprint.collectionCount} collection{footprint.collectionCount !== 1 ? 's' : ''}
+                              {fingerprint.collectionCount} collection{fingerprint.collectionCount !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>
 
                         <Badge
-                          variant={footprint.hasPackaging ? "secondary" : "default"}
+                          variant={fingerprint.hasPackaging ? "secondary" : "default"}
                           className="flex-shrink-0"
-                          data-testid={`badge-shipments-${footprint.id}`}
+                          data-testid={`badge-shipments-${fingerprint.id}`}
                         >
                           <Truck className="h-3 w-3 mr-1" />
-                          {footprint.shipmentCount} shipment{footprint.shipmentCount !== 1 ? 's' : ''}
+                          {fingerprint.shipmentCount} shipment{fingerprint.shipmentCount !== 1 ? 's' : ''}
                         </Badge>
 
                         <div className="flex items-center gap-2 flex-shrink-0 min-w-[280px] justify-end">
-                          {getStatusIndicator(footprint.id)}
-                          {footprint.hasPackaging ? (
+                          {getStatusIndicator(fingerprint.id)}
+                          {fingerprint.hasPackaging ? (
                             <div className="flex items-center gap-2">
                               <Box className="h-4 w-4 text-muted-foreground" />
                               <span className="text-sm font-medium">
-                                {footprint.packagingTypeName}
+                                {fingerprint.packagingTypeName}
                               </span>
                               <Select
-                                onValueChange={(value) => handleAssign(footprint.id, value)}
-                                disabled={!!inlineStatus[footprint.id]}
+                                onValueChange={(value) => handleAssign(fingerprint.id, value)}
+                                disabled={!!inlineStatus[fingerprint.id]}
                               >
                                 <SelectTrigger
                                   className="w-[140px]"
-                                  data-testid={`select-change-${footprint.id}`}
+                                  data-testid={`select-change-${fingerprint.id}`}
                                 >
                                   <SelectValue placeholder="Change..." />
                                 </SelectTrigger>
@@ -1043,12 +1043,12 @@ export default function Footprints() {
                             </div>
                           ) : (
                             <Select
-                              onValueChange={(value) => handleAssign(footprint.id, value)}
-                              disabled={!!inlineStatus[footprint.id]}
+                              onValueChange={(value) => handleAssign(fingerprint.id, value)}
+                              disabled={!!inlineStatus[fingerprint.id]}
                             >
                               <SelectTrigger
                                 className="w-[220px]"
-                                data-testid={`select-packaging-${footprint.id}`}
+                                data-testid={`select-packaging-${fingerprint.id}`}
                               >
                                 <SelectValue placeholder="Assign packaging..." />
                               </SelectTrigger>
@@ -1237,7 +1237,7 @@ export default function Footprints() {
                       <div className="text-sm text-muted-foreground">
                         {Math.ceil(station.orderCount / 28)} session{Math.ceil(station.orderCount / 28) !== 1 ? 's' : ''} will be created
                         <span className="mx-2">·</span>
-                        {station.footprintGroups.length} unique footprint{station.footprintGroups.length !== 1 ? 's' : ''}
+                        {station.fingerprintGroups.length} unique fingerprint{station.fingerprintGroups.length !== 1 ? 's' : ''}
                       </div>
                     </div>
                   ))}

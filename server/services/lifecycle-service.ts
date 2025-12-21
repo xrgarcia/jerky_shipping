@@ -76,10 +76,10 @@ export async function updateShipmentLifecycleFromData(
     trackingNumber: shipmentData?.trackingNumber ?? shipment.trackingNumber,
     status: shipmentData?.status ?? shipment.status,
     shipmentStatus: shipmentData?.shipmentStatus ?? shipment.shipmentStatus,
-    footprintStatus: shipmentData?.footprintStatus ?? shipment.footprintStatus,
+    fingerprintStatus: shipmentData?.fingerprintStatus ?? shipment.fingerprintStatus,
     packagingTypeId: shipmentData?.packagingTypeId ?? shipment.packagingTypeId,
     fulfillmentSessionId: shipmentData?.fulfillmentSessionId ?? shipment.fulfillmentSessionId,
-    footprintId: shipmentData?.footprintId ?? shipment.footprintId,
+    fingerprintId: shipmentData?.fingerprintId ?? shipment.fingerprintId,
   };
 
   // Derive the correct lifecycle state
@@ -129,7 +129,7 @@ export async function updateShipmentLifecycleFromData(
 /**
  * Update lifecycle for multiple shipments in batch
  * 
- * Useful for bulk operations like packaging assignment to footprints.
+ * Useful for bulk operations like packaging assignment to fingerprints.
  * 
  * @param shipmentIds - Array of shipment IDs to update
  * @returns Array of update results

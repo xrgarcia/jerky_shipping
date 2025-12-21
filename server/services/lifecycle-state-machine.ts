@@ -6,7 +6,7 @@
  *                                            ↘ picking_issues (exception path)
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
- * needs_categorization → needs_footprint → needs_packaging → needs_session → ready_for_skuvault
+ * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
  */
 
 import {
@@ -60,10 +60,10 @@ export interface ShipmentLifecycleData {
   trackingNumber?: string | null;
   status?: string | null;           // ShipStation fulfillment status (e.g., 'AC' = accepted by carrier)
   shipmentStatus?: string | null;   // ShipStation shipment lifecycle status (on_hold, pending, etc.)
-  footprintStatus?: string | null;
+  fingerprintStatus?: string | null;
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
-  footprintId?: string | null;
+  fingerprintId?: string | null;
 }
 
 // Status codes that indicate package is on the dock (at the facility)
@@ -81,7 +81,7 @@ const ON_DOCK_STATUSES = ['NY', 'AC'];
  * 3. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
  * 4. PICKING - Session is 'active'
  * 5. READY_TO_PICK - Session is 'new'
- * 6. AWAITING_DECISIONS - Default, with subphase based on categorization/footprint/packaging
+ * 6. AWAITING_DECISIONS - Default, with subphase based on categorization/fingerprint/packaging
  * 
  * Note: Status codes for tracking:
  * - NY = Not Yet in System (label created, waiting for carrier pickup)
@@ -139,8 +139,8 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
  * Determine the decision subphase based on shipment data
  */
 export function deriveDecisionSubphase(shipment: {
-  footprintStatus?: string | null;
-  footprintId?: string | null;
+  fingerprintStatus?: string | null;
+  fingerprintId?: string | null;
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
   sessionStatus?: string | null;
@@ -155,14 +155,14 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_SESSION;
   }
 
-  // NEEDS_PACKAGING: Has footprint but no packaging assigned
-  if (shipment.footprintId && !shipment.packagingTypeId) {
+  // NEEDS_PACKAGING: Has fingerprint but no packaging assigned
+  if (shipment.fingerprintId && !shipment.packagingTypeId) {
     return DECISION_SUBPHASES.NEEDS_PACKAGING;
   }
 
-  // NEEDS_FOOTPRINT: All SKUs categorized but no footprint yet
-  if (shipment.footprintStatus === 'complete' && !shipment.footprintId) {
-    return DECISION_SUBPHASES.NEEDS_FOOTPRINT;
+  // NEEDS_FINGERPRINT: All SKUs categorized but no fingerprint yet
+  if (shipment.fingerprintStatus === 'complete' && !shipment.fingerprintId) {
+    return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
   // NEEDS_CATEGORIZATION: SKUs need collection assignment
@@ -190,7 +190,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
 export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
   const displayNames: Record<DecisionSubphase, string> = {
     [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 'Needs Categorization',
-    [DECISION_SUBPHASES.NEEDS_FOOTPRINT]: 'Needs Footprint',
+    [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 'Needs Fingerprint',
     [DECISION_SUBPHASES.NEEDS_PACKAGING]: 'Needs Packaging',
     [DECISION_SUBPHASES.NEEDS_SESSION]: 'Needs Session',
     [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 'Ready for SkuVault',
@@ -231,7 +231,7 @@ export function getNextPhase(phase: LifecyclePhase): LifecyclePhase | null {
 export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | null {
   const happyPath: DecisionSubphase[] = [
     DECISION_SUBPHASES.NEEDS_CATEGORIZATION,
-    DECISION_SUBPHASES.NEEDS_FOOTPRINT,
+    DECISION_SUBPHASES.NEEDS_FINGERPRINT,
     DECISION_SUBPHASES.NEEDS_PACKAGING,
     DECISION_SUBPHASES.NEEDS_SESSION,
     DECISION_SUBPHASES.READY_FOR_SKUVAULT,
@@ -266,7 +266,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
   if (phase === LIFECYCLE_PHASES.AWAITING_DECISIONS && subphase) {
     const subphaseWeights: Record<DecisionSubphase, number> = {
       [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 0,
-      [DECISION_SUBPHASES.NEEDS_FOOTPRINT]: 5,
+      [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 5,
       [DECISION_SUBPHASES.NEEDS_PACKAGING]: 10,
       [DECISION_SUBPHASES.NEEDS_SESSION]: 15,
       [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 20,
