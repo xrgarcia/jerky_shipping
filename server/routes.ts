@@ -9630,84 +9630,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Recalculate ALL fingerprints (including already completed ones) - useful after weight integration
+  // Processes ALL shipments in one request, looping through batches until done
   app.post("/api/collections/recalculate-all-fingerprints", requireAuth, async (req, res) => {
     try {
       const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const { calculateFingerprint } = await import('./services/qc-item-hydrator');
       const { getProductsBatch } = await import('./services/product-lookup');
       
-      // Get all shipments that have fingerprints (completed or pending)
-      const allShipments = await db
-        .select({ id: shipmentsTable.id, fingerprintStatus: shipmentsTable.fingerprintStatus })
-        .from(shipmentsTable)
-        .where(
-          or(
-            eq(shipmentsTable.fingerprintStatus, 'complete'),
-            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+      let totalProcessed = 0;
+      let totalCompleted = 0;
+      let totalStillPending = 0;
+      let totalErrors = 0;
+      let totalItemsUpdated = 0;
+      let batchNumber = 0;
+      const BATCH_SIZE = 500;
+      
+      console.log(`[Collections] Starting FULL recalculation of all fingerprints with weight backfill...`);
+      
+      // Loop until we've processed everything
+      while (true) {
+        batchNumber++;
+        
+        // Get next batch of shipments
+        const batchShipments = await db
+          .select({ id: shipmentsTable.id, fingerprintStatus: shipmentsTable.fingerprintStatus })
+          .from(shipmentsTable)
+          .where(
+            or(
+              eq(shipmentsTable.fingerprintStatus, 'complete'),
+              eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+            )
           )
-        )
-        .limit(500); // Process in batches to avoid timeout
-      
-      let processed = 0;
-      let completed = 0;
-      let stillPending = 0;
-      let errors = 0;
-      let itemsUpdated = 0;
-      
-      for (const shipment of allShipments) {
-        try {
-          // Step 1: Update QC items with weight data from skuvault_products
-          const qcItems = await db
-            .select({ id: shipmentQcItems.id, sku: shipmentQcItems.sku, weightValue: shipmentQcItems.weightValue })
-            .from(shipmentQcItems)
-            .where(eq(shipmentQcItems.shipmentId, shipment.id));
-          
-          // Get items missing weight data
-          const itemsMissingWeight = qcItems.filter(item => item.weightValue === null);
-          if (itemsMissingWeight.length > 0) {
-            const skus = itemsMissingWeight.map(item => item.sku);
-            const products = await getProductsBatch(skus);
+          .limit(BATCH_SIZE)
+          .offset(totalProcessed);
+        
+        if (batchShipments.length === 0) {
+          console.log(`[Collections] No more shipments to process. Done!`);
+          break;
+        }
+        
+        console.log(`[Collections] Batch ${batchNumber}: Processing ${batchShipments.length} shipments (total so far: ${totalProcessed})...`);
+        
+        for (const shipment of batchShipments) {
+          try {
+            // Step 1: Update QC items with weight data from skuvault_products
+            const qcItems = await db
+              .select({ id: shipmentQcItems.id, sku: shipmentQcItems.sku, weightValue: shipmentQcItems.weightValue })
+              .from(shipmentQcItems)
+              .where(eq(shipmentQcItems.shipmentId, shipment.id));
             
-            for (const item of itemsMissingWeight) {
-              const product = products.get(item.sku);
-              if (product && product.weightValue !== undefined && product.weightValue !== null) {
-                await db
-                  .update(shipmentQcItems)
-                  .set({ 
-                    weightValue: product.weightValue, 
-                    weightUnit: product.weightUnit || 'oz',
-                    updatedAt: new Date()
-                  })
-                  .where(eq(shipmentQcItems.id, item.id));
-                itemsUpdated++;
+            // Get items missing weight data
+            const itemsMissingWeight = qcItems.filter(item => item.weightValue === null);
+            if (itemsMissingWeight.length > 0) {
+              const skus = itemsMissingWeight.map(item => item.sku);
+              const products = await getProductsBatch(skus);
+              
+              for (const item of itemsMissingWeight) {
+                const product = products.get(item.sku);
+                if (product && product.weightValue !== undefined && product.weightValue !== null) {
+                  await db
+                    .update(shipmentQcItems)
+                    .set({ 
+                      weightValue: product.weightValue, 
+                      weightUnit: product.weightUnit || 'oz',
+                      updatedAt: new Date()
+                    })
+                    .where(eq(shipmentQcItems.id, item.id));
+                  totalItemsUpdated++;
+                }
               }
             }
+            
+            // Step 2: Recalculate fingerprint with updated weight data
+            const result = await calculateFingerprint(shipment.id);
+            totalProcessed++;
+            if (result.status === 'complete') {
+              totalCompleted++;
+            } else if (result.status === 'pending_categorization') {
+              totalStillPending++;
+            }
+          } catch (err) {
+            console.error(`[Collections] Error recalculating fingerprint for shipment ${shipment.id}:`, err);
+            totalErrors++;
+            totalProcessed++;
           }
-          
-          // Step 2: Recalculate fingerprint with updated weight data
-          const result = await calculateFingerprint(shipment.id);
-          processed++;
-          if (result.status === 'complete') {
-            completed++;
-          } else if (result.status === 'pending_categorization') {
-            stillPending++;
-          }
-        } catch (err) {
-          console.error(`[Collections] Error recalculating fingerprint for shipment ${shipment.id}:`, err);
-          errors++;
+        }
+        
+        console.log(`[Collections] Batch ${batchNumber} complete. Running totals: ${totalProcessed} processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} items updated with weight`);
+        
+        // If we got fewer than BATCH_SIZE, we're done
+        if (batchShipments.length < BATCH_SIZE) {
+          console.log(`[Collections] Last batch was partial (${batchShipments.length} < ${BATCH_SIZE}). Done!`);
+          break;
         }
       }
       
-      console.log(`[Collections] Full recalculation: processed ${processed}, completed ${completed}, still pending ${stillPending}, errors ${errors}, items updated with weight: ${itemsUpdated}`);
+      console.log(`[Collections] FULL RECALCULATION COMPLETE: ${totalProcessed} shipments processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} QC items updated with weight`);
       
       res.json({
         success: true,
-        processed,
-        completed,
-        stillPending,
-        errors,
-        itemsUpdated,
-        hasMore: allShipments.length === 500
+        processed: totalProcessed,
+        completed: totalCompleted,
+        stillPending: totalStillPending,
+        errors: totalErrors,
+        itemsUpdated: totalItemsUpdated,
+        batches: batchNumber
       });
     } catch (error: any) {
       console.error("[Collections] Error recalculating all fingerprints:", error);
