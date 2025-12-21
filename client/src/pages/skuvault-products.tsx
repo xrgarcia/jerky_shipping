@@ -433,10 +433,9 @@ export default function SkuvaultProducts() {
                   <ScrollArea className="h-64">
                     <div className="p-2 space-y-1">
                       {categories.map((cat) => (
-                        <div
+                        <label
                           key={cat}
                           className="flex items-center space-x-2 hover-elevate rounded px-2 py-1.5 cursor-pointer"
-                          onClick={() => togglePendingCategory(cat)}
                           data-testid={`checkbox-category-${cat}`}
                         >
                           <Checkbox
@@ -444,7 +443,7 @@ export default function SkuvaultProducts() {
                             onCheckedChange={() => togglePendingCategory(cat)}
                           />
                           <span className="text-sm truncate flex-1">{cat}</span>
-                        </div>
+                        </label>
                       ))}
                     </div>
                   </ScrollArea>
