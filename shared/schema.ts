@@ -1212,7 +1212,7 @@ export const fingerprints = pgTable("fingerprints", {
   displayName: text("display_name"), // Human-readable, e.g., "2 Gift Boxes + 5 Small Jerky | 42oz"
   totalItems: integer("total_items").notNull(), // Sum of all quantities
   collectionCount: integer("collection_count").notNull(), // Number of distinct collections
-  totalWeight: integer("total_weight"), // Total order weight in weightUnit (sum of item weights)
+  totalWeight: real("total_weight"), // Total order weight in weightUnit (sum of item weights) - decimal for precision
   weightUnit: text("weight_unit"), // Weight unit (e.g., "oz")
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
