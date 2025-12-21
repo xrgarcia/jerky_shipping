@@ -23,7 +23,7 @@ import {
   type InsertShipmentQcItem,
   type InsertFingerprint,
 } from '@shared/schema';
-import { eq, and, exists, sql, notExists, inArray } from 'drizzle-orm';
+import { eq, and, or, exists, sql, notExists, inArray } from 'drizzle-orm';
 import { 
   ensureKitMappingsFresh, 
   isKit, 
@@ -586,7 +586,8 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
   };
   
   try {
-    // Find shipments with QC items but no fingerprint_status
+    // Find shipments with QC items that need fingerprint calculation
+    // This includes: no fingerprint_status yet, OR pending_categorization status
     const shipmentsToProcess = await db
       .select({
         id: shipments.id,
@@ -601,8 +602,11 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
               .from(shipmentQcItems)
               .where(eq(shipmentQcItems.shipmentId, shipments.id))
           ),
-          // No fingerprint_status yet
-          sql`${shipments.fingerprintStatus} IS NULL`
+          // Either no fingerprint_status yet, or pending_categorization
+          or(
+            sql`${shipments.fingerprintStatus} IS NULL`,
+            eq(shipments.fingerprintStatus, 'pending_categorization')
+          )
         )
       )
       .limit(limit);
