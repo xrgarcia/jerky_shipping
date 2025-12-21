@@ -9660,11 +9660,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Collections] Reset ${resetCount?.count || 0} shipments to pending_categorization with cleared packaging/station`);
       
-      // Step 1b: Delete all fingerprint models
+      // Step 1b: Delete all shipment_qc_items (so they get re-hydrated with fresh data)
+      const deletedQcItems = await db.delete(shipmentQcItems);
+      console.log(`[Collections] Deleted all shipment_qc_items`);
+      
+      // Step 1c: Delete all fingerprint models
       const deletedModels = await db.delete(fingerprintModels);
       console.log(`[Collections] Deleted all fingerprint_models`);
       
-      // Step 1c: Delete all fingerprints
+      // Step 1d: Delete all fingerprints
       const deletedFingerprints = await db.delete(fingerprints);
       console.log(`[Collections] Deleted all fingerprints`);
       
