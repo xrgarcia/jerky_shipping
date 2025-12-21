@@ -64,6 +64,11 @@ export interface SessionBuildResult {
   errors: string[];
 }
 
+/** Session with joined station data */
+export interface FulfillmentSessionWithStation extends FulfillmentSession {
+  stationName: string | null;
+}
+
 /** Preview of what a session will contain */
 export interface SessionPreview {
   stationType: string;
@@ -303,16 +308,36 @@ export class FulfillmentSessionService {
   }
 
   /**
-   * Get all sessions with optional status filter
+   * Get all sessions with optional status filter, including station name
    */
-  async getSessions(status?: FulfillmentSessionStatus): Promise<FulfillmentSession[]> {
+  async getSessions(status?: FulfillmentSessionStatus): Promise<FulfillmentSessionWithStation[]> {
     const conditions = status ? [eq(fulfillmentSessions.status, status)] : [];
 
-    return db
-      .select()
+    const results = await db
+      .select({
+        id: fulfillmentSessions.id,
+        name: fulfillmentSessions.name,
+        sequenceNumber: fulfillmentSessions.sequenceNumber,
+        stationId: fulfillmentSessions.stationId,
+        stationType: fulfillmentSessions.stationType,
+        orderCount: fulfillmentSessions.orderCount,
+        maxOrders: fulfillmentSessions.maxOrders,
+        status: fulfillmentSessions.status,
+        createdAt: fulfillmentSessions.createdAt,
+        updatedAt: fulfillmentSessions.updatedAt,
+        readyAt: fulfillmentSessions.readyAt,
+        pickingStartedAt: fulfillmentSessions.pickingStartedAt,
+        packingStartedAt: fulfillmentSessions.packingStartedAt,
+        completedAt: fulfillmentSessions.completedAt,
+        createdBy: fulfillmentSessions.createdBy,
+        stationName: stations.name,
+      })
       .from(fulfillmentSessions)
+      .leftJoin(stations, eq(fulfillmentSessions.stationId, stations.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(fulfillmentSessions.createdAt));
+
+    return results;
   }
 
   /**
