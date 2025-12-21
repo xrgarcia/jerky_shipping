@@ -200,8 +200,6 @@ interface FingerprintShipmentProduct {
 interface FingerprintShipmentInfo {
   id: string;
   orderNumber: string;
-  shipToName: string | null;
-  createdAt: string;
 }
 
 interface FingerprintShipmentsResponse {
@@ -1744,74 +1742,54 @@ export default function Fingerprints() {
           {fingerprintShipmentsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              Loading shipments...
+              Loading...
             </div>
           ) : fingerprintShipmentsData ? (
-            <div className="grid grid-cols-2 gap-6">
-              {/* Products Column */}
+            <div className="space-y-4">
+              {/* Items */}
               <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Products ({fingerprintShipmentsData.uniqueProducts})
+                <h4 className="font-medium mb-2 text-sm text-muted-foreground">
+                  Items ({fingerprintShipmentsData.uniqueProducts})
                 </h4>
-                <ScrollArea className="h-[400px] border rounded-lg p-3">
-                  <div className="space-y-2">
-                    {fingerprintShipmentsData.products.map((product) => (
-                      <div
-                        key={product.sku}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
-                      >
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.sku}
-                            className="w-10 h-10 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                            <Package className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{product.sku}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {product.description || "No description"}
-                          </div>
-                        </div>
-                        <Badge variant="secondary">
-                          {product.totalQuantity} total
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+                <div className="flex flex-wrap gap-2">
+                  {fingerprintShipmentsData.products.map((product) => (
+                    <div
+                      key={product.sku}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border"
+                    >
+                      {product.imageUrl && (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.sku}
+                          className="w-6 h-6 rounded object-cover"
+                        />
+                      )}
+                      <span className="text-sm font-medium">{product.sku}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        x{product.totalQuantity}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Orders Column */}
+              {/* Orders */}
               <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
+                <h4 className="font-medium mb-2 text-sm text-muted-foreground">
                   Orders ({fingerprintShipmentsData.totalShipments})
                 </h4>
-                <ScrollArea className="h-[400px] border rounded-lg p-3">
-                  <div className="space-y-1">
-                    {fingerprintShipmentsData.shipments.map((shipment) => (
-                      <div
-                        key={shipment.id}
-                        className="flex items-center justify-between p-2 rounded-lg hover-elevate cursor-pointer"
-                        onClick={() => window.open(`/order/${shipment.orderNumber}`, '_blank')}
-                      >
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">{shipment.orderNumber}</div>
-                          {shipment.shipToName && (
-                            <div className="text-xs text-muted-foreground">{shipment.shipToName}</div>
-                          )}
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+                <div className="flex flex-wrap gap-1">
+                  {fingerprintShipmentsData.shipments.map((shipment) => (
+                    <Badge
+                      key={shipment.id}
+                      variant="outline"
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => window.open(`/order/${shipment.orderNumber}`, '_blank')}
+                    >
+                      {shipment.orderNumber}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
           ) : null}

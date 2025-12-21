@@ -10662,8 +10662,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: shipments.id,
           orderNumber: shipments.orderNumber,
-          shipToName: shipments.shipToName,
-          createdAt: shipments.createdAt,
         })
         .from(shipments)
         .where(eq(shipments.fingerprintId, fingerprintId))
@@ -10712,8 +10710,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipments: shipmentsWithOrders.map(s => ({
           id: s.id,
           orderNumber: s.orderNumber,
-          shipToName: s.shipToName,
-          createdAt: s.createdAt,
         })),
         products: aggregatedProducts,
         totalShipments: shipmentsWithOrders.length,
