@@ -352,8 +352,12 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found' };
     }
     
-    // Phase 1: Build list of all SKUs we need (including exploded kit components)
-    // This is a pre-pass to collect all SKUs for batch lookup
+    // Phase 1: Pre-fetch product info to check product categories before explosion
+    // We need productCategory to determine if a SKU should be exploded
+    const rawSkus = items.map(item => item.sku).filter((sku): sku is string => !!sku);
+    const preProductCache = await getProductsBatch(rawSkus);
+    
+    // Phase 2: Build list of all SKUs we need (exploding only products with category 'kit')
     const skusToLookup: string[] = [];
     interface ItemToProcess {
       sku: string;
@@ -370,7 +374,13 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
       const sku = item.sku;
       const quantity = item.quantity || 1;
       
-      if (isKit(sku)) {
+      // Only explode if product has category 'kit' AND has component mappings
+      const productInfo = preProductCache.get(sku);
+      const isKitCategory = productInfo?.productCategory?.toLowerCase() === 'kit';
+      const hasKitComponents = isKit(sku);
+      const shouldExplode = isKitCategory && hasKitComponents;
+      
+      if (shouldExplode) {
         const components = getKitComponents(sku);
         if (components && components.length > 0) {
           for (const comp of components) {
@@ -385,6 +395,7 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
             });
           }
         } else {
+          // Kit category but no components found - treat as regular item
           skusToLookup.push(sku);
           itemsToProcess.push({
             sku,
@@ -395,6 +406,7 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
           });
         }
       } else {
+        // Not a kit or no kit category - don't explode
         skusToLookup.push(sku);
         itemsToProcess.push({
           sku,
@@ -410,10 +422,11 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No items to insert after processing' };
     }
     
-    // Phase 2: Batch fetch product info from local skuvault_products table
+    // Phase 3: Batch fetch product info for all SKUs (including kit components)
+    // This may include new SKUs from kit explosion that weren't in preProductCache
     const productCache = await getProductsBatch(skusToLookup);
     
-    // Phase 3: Build QC items with product info
+    // Phase 4: Build QC items with product info
     const qcItemsToInsert: InsertShipmentQcItem[] = [];
     const allSkus: string[] = [];
     
