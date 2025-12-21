@@ -132,8 +132,6 @@ export default function Collections() {
   const [formData, setFormData] = useState({ 
     name: "", 
     description: "",
-    weightValue: "",
-    weightUnit: "oz" as "lbs" | "oz",
     incrementalQuantity: "",
     productCategory: "",
   });
@@ -249,8 +247,6 @@ export default function Collections() {
   const defaultFormData = { 
     name: "", 
     description: "",
-    weightValue: "",
-    weightUnit: "oz" as "lbs" | "oz",
     incrementalQuantity: "",
     productCategory: "",
   };
@@ -259,8 +255,6 @@ export default function Collections() {
     mutationFn: async (data: { 
       name: string; 
       description?: string;
-      weightValue?: number | null;
-      weightUnit?: string;
       incrementalQuantity?: number | null;
       productCategory?: string;
     }) => {
@@ -289,8 +283,6 @@ export default function Collections() {
       data: { 
         name?: string; 
         description?: string;
-        weightValue?: number | null;
-        weightUnit?: string;
         incrementalQuantity?: number | null;
         productCategory?: string;
       } 
@@ -486,8 +478,6 @@ export default function Collections() {
     createMutation.mutate({
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
-      weightValue: formData.weightValue ? parseFloat(formData.weightValue) : null,
-      weightUnit: formData.weightUnit || undefined,
       incrementalQuantity: formData.incrementalQuantity ? parseInt(formData.incrementalQuantity, 10) : null,
       productCategory: formData.productCategory.trim() || undefined,
     });
@@ -501,8 +491,6 @@ export default function Collections() {
       data: {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
-        weightValue: formData.weightValue ? parseFloat(formData.weightValue) : null,
-        weightUnit: formData.weightUnit || undefined,
         incrementalQuantity: formData.incrementalQuantity ? parseInt(formData.incrementalQuantity, 10) : null,
         productCategory: formData.productCategory.trim() || undefined,
       },
@@ -519,8 +507,6 @@ export default function Collections() {
     setFormData({
       name: collection.name,
       description: collection.description || "",
-      weightValue: collection.weightValue != null ? String(collection.weightValue) : "",
-      weightUnit: (collection.weightUnit as "lbs" | "oz") || "oz",
       incrementalQuantity: collection.incrementalQuantity != null ? String(collection.incrementalQuantity) : "",
       productCategory: collection.productCategory || "",
     });
@@ -1068,53 +1054,21 @@ export default function Collections() {
                   data-testid="input-collection-description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="create-weight" className="text-sm font-medium">
-                    Weight
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="create-weight"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={formData.weightValue}
-                      onChange={(e) => setFormData(prev => ({ ...prev, weightValue: e.target.value }))}
-                      className="h-11 flex-1"
-                      data-testid="input-collection-weight"
-                    />
-                    <Select 
-                      value={formData.weightUnit} 
-                      onValueChange={(value: "lbs" | "oz") => setFormData(prev => ({ ...prev, weightUnit: value }))}
-                    >
-                      <SelectTrigger className="w-20 h-11" data-testid="select-collection-weight-unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="oz">oz</SelectItem>
-                        <SelectItem value="lbs">lbs</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-incremental-qty" className="text-sm font-medium">
-                    Incremental Qty
-                  </Label>
-                  <Input
-                    id="create-incremental-qty"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="1"
-                    value={formData.incrementalQuantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, incrementalQuantity: e.target.value }))}
-                    className="h-11"
-                    data-testid="input-collection-incremental-qty"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-incremental-qty" className="text-sm font-medium">
+                  Incremental Qty
+                </Label>
+                <Input
+                  id="create-incremental-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="1"
+                  value={formData.incrementalQuantity}
+                  onChange={(e) => setFormData(prev => ({ ...prev, incrementalQuantity: e.target.value }))}
+                  className="h-11"
+                  data-testid="input-collection-incremental-qty"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="create-category" className="text-sm font-medium">
@@ -1194,53 +1148,21 @@ export default function Collections() {
                   data-testid="input-edit-collection-description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-weight" className="text-sm font-medium">
-                    Weight
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="edit-weight"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={formData.weightValue}
-                      onChange={(e) => setFormData(prev => ({ ...prev, weightValue: e.target.value }))}
-                      className="h-11 flex-1"
-                      data-testid="input-edit-collection-weight"
-                    />
-                    <Select 
-                      value={formData.weightUnit} 
-                      onValueChange={(value: "lbs" | "oz") => setFormData(prev => ({ ...prev, weightUnit: value }))}
-                    >
-                      <SelectTrigger className="w-20 h-11" data-testid="select-edit-collection-weight-unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="oz">oz</SelectItem>
-                        <SelectItem value="lbs">lbs</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-incremental-qty" className="text-sm font-medium">
-                    Incremental Qty
-                  </Label>
-                  <Input
-                    id="edit-incremental-qty"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="1"
-                    value={formData.incrementalQuantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, incrementalQuantity: e.target.value }))}
-                    className="h-11"
-                    data-testid="input-edit-collection-incremental-qty"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-incremental-qty" className="text-sm font-medium">
+                  Incremental Qty
+                </Label>
+                <Input
+                  id="edit-incremental-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="1"
+                  value={formData.incrementalQuantity}
+                  onChange={(e) => setFormData(prev => ({ ...prev, incrementalQuantity: e.target.value }))}
+                  className="h-11"
+                  data-testid="input-edit-collection-incremental-qty"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-category" className="text-sm font-medium">
@@ -1358,8 +1280,6 @@ export default function Collections() {
                 <ul className="list-disc list-inside space-y-0.5">
                   <li>Collection Name (required)</li>
                   <li>SKU (required)</li>
-                  <li>Weight Value</li>
-                  <li>Weight Unit (lbs/oz)</li>
                   <li>Incremental Quantity</li>
                   <li>Classification/Category</li>
                 </ul>

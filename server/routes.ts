@@ -9422,19 +9422,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/collections", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
-      const { name, description, weightValue, weightUnit, incrementalQuantity, productCategory } = req.body;
+      const { name, description, incrementalQuantity, productCategory } = req.body;
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ error: "Collection name is required" });
-      }
-      // Validate weightUnit if provided
-      if (weightUnit && !['lbs', 'oz'].includes(weightUnit)) {
-        return res.status(400).json({ error: "Weight unit must be 'lbs' or 'oz'" });
       }
       const collection = await storage.createProductCollection({
         name: name.trim(),
         description: description?.trim() || null,
-        weightValue: weightValue != null ? parseFloat(weightValue) : null,
-        weightUnit: weightUnit || null,
         incrementalQuantity: incrementalQuantity != null ? parseInt(incrementalQuantity, 10) : null,
         productCategory: productCategory?.trim() || null,
         createdBy: userId,
@@ -9452,16 +9446,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
-      const { name, description, weightValue, weightUnit, incrementalQuantity, productCategory } = req.body;
-      // Validate weightUnit if provided
-      if (weightUnit && !['lbs', 'oz'].includes(weightUnit)) {
-        return res.status(400).json({ error: "Weight unit must be 'lbs' or 'oz'" });
-      }
+      const { name, description, incrementalQuantity, productCategory } = req.body;
       const updateData: any = { updatedBy: userId };
       if (name !== undefined) updateData.name = name?.trim();
       if (description !== undefined) updateData.description = description?.trim() || null;
-      if (weightValue !== undefined) updateData.weightValue = weightValue != null ? parseFloat(weightValue) : null;
-      if (weightUnit !== undefined) updateData.weightUnit = weightUnit || null;
       if (incrementalQuantity !== undefined) updateData.incrementalQuantity = incrementalQuantity != null ? parseInt(incrementalQuantity, 10) : null;
       if (productCategory !== undefined) updateData.productCategory = productCategory?.trim() || null;
       
@@ -9768,8 +9756,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colMap = {
         collectionName: headers.findIndex(h => h.includes("collection") && h.includes("name")),
         sku: headers.findIndex(h => h === "sku"),
-        weightValue: headers.findIndex(h => h.includes("weight") && h.includes("value")),
-        weightUnit: headers.findIndex(h => h.includes("weight") && h.includes("unit")),
         incrementalQuantity: headers.findIndex(h => h.includes("incremental") || h.includes("quantity")),
         classification: headers.findIndex(h => h.includes("classification") || h.includes("category")),
       };
@@ -9782,8 +9768,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track collections to create (first occurrence defines properties)
       const collectionDefinitions: Map<string, {
         name: string;
-        weightValue: number | null;
-        weightUnit: string | null;
         incrementalQuantity: number | null;
         productCategory: string | null;
       }> = new Map();
@@ -9808,15 +9792,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Store collection definition (first occurrence wins)
         if (!collectionDefinitions.has(collectionName)) {
-          const weightValueStr = colMap.weightValue >= 0 ? values[colMap.weightValue]?.trim() : null;
-          const weightUnit = colMap.weightUnit >= 0 ? values[colMap.weightUnit]?.trim()?.toLowerCase() : null;
           const incQtyStr = colMap.incrementalQuantity >= 0 ? values[colMap.incrementalQuantity]?.trim() : null;
           const classification = colMap.classification >= 0 ? values[colMap.classification]?.trim() : null;
 
           collectionDefinitions.set(collectionName, {
             name: collectionName,
-            weightValue: weightValueStr ? parseFloat(weightValueStr) : null,
-            weightUnit: weightUnit && ['lbs', 'oz'].includes(weightUnit) ? weightUnit : null,
             incrementalQuantity: incQtyStr ? parseInt(incQtyStr, 10) : null,
             productCategory: classification || null,
           });
@@ -9849,8 +9829,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const newCollection = await storage.createProductCollection({
             name: def.name,
             description: null,
-            weightValue: def.weightValue,
-            weightUnit: def.weightUnit,
             incrementalQuantity: def.incrementalQuantity,
             productCategory: def.productCategory,
             createdBy: userId,
