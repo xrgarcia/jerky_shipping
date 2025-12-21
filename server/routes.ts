@@ -9617,13 +9617,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Recalculate ALL fingerprints (including already completed ones) - useful after weight integration
-  // Processes ALL shipments in one request, looping through batches until done
+  // Complete reset and recalculate ALL fingerprints
+  // This performs a FULL RESET of the fulfillment prep workflow:
+  // 1. Clears all fingerprint/packaging/station assignments from shipments
+  // 2. Deletes all fingerprints and fingerprint_models
+  // 3. Recalculates fingerprints based on existing product_collection_mappings
   app.post("/api/collections/recalculate-all-fingerprints", requireAuth, async (req, res) => {
     try {
-      const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
+      const { shipments: shipmentsTable, shipmentQcItems, fingerprints, fingerprintModels } = await import("@shared/schema");
       const { calculateFingerprint } = await import('./services/qc-item-hydrator');
       const { getProductsBatch } = await import('./services/product-lookup');
+      
+      console.log(`[Collections] Starting COMPLETE RESET of fulfillment prep workflow...`);
+      
+      // ========== PHASE 1: COMPLETE RESET ==========
+      
+      // Step 1a: Reset all shipments that have any fulfillment prep data
+      // This includes shipments with fingerprint_status, decision_subphase, packaging, or station assignments
+      const resetResult = await db
+        .update(shipmentsTable)
+        .set({
+          fingerprintStatus: 'pending_categorization',
+          fingerprintId: null,
+          decisionSubphase: 'needs_categorization',
+          packagingTypeId: null,
+          assignedStationId: null,
+        })
+        .where(
+          or(
+            isNotNull(shipmentsTable.fingerprintStatus),
+            isNotNull(shipmentsTable.decisionSubphase),
+            isNotNull(shipmentsTable.packagingTypeId),
+            isNotNull(shipmentsTable.assignedStationId)
+          )
+        );
+      
+      // Count how many shipments were reset
+      const [resetCount] = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'));
+      
+      console.log(`[Collections] Reset ${resetCount?.count || 0} shipments to pending_categorization with cleared packaging/station`);
+      
+      // Step 1b: Delete all fingerprint models
+      const deletedModels = await db.delete(fingerprintModels);
+      console.log(`[Collections] Deleted all fingerprint_models`);
+      
+      // Step 1c: Delete all fingerprints
+      const deletedFingerprints = await db.delete(fingerprints);
+      console.log(`[Collections] Deleted all fingerprints`);
+      
+      // ========== PHASE 2: RECALCULATE ==========
       
       let totalProcessed = 0;
       let totalCompleted = 0;
@@ -9633,31 +9678,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let batchNumber = 0;
       const BATCH_SIZE = 500;
       
-      console.log(`[Collections] Starting FULL recalculation of all fingerprints with weight backfill...`);
+      console.log(`[Collections] Starting fingerprint recalculation...`);
       
       // Loop until we've processed everything
       while (true) {
         batchNumber++;
         
-        // Get next batch of shipments
+        // Get next batch of shipments that need processing
+        // Using a subquery approach to avoid offset issues with updates
         const batchShipments = await db
-          .select({ id: shipmentsTable.id, fingerprintStatus: shipmentsTable.fingerprintStatus })
+          .select({ id: shipmentsTable.id })
           .from(shipmentsTable)
-          .where(
-            or(
-              eq(shipmentsTable.fingerprintStatus, 'complete'),
-              eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
-            )
-          )
-          .limit(BATCH_SIZE)
-          .offset(totalProcessed);
+          .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'))
+          .limit(BATCH_SIZE);
         
         if (batchShipments.length === 0) {
           console.log(`[Collections] No more shipments to process. Done!`);
           break;
         }
         
-        console.log(`[Collections] Batch ${batchNumber}: Processing ${batchShipments.length} shipments (total so far: ${totalProcessed})...`);
+        console.log(`[Collections] Batch ${batchNumber}: Processing ${batchShipments.length} shipments...`);
         
         for (const shipment of batchShipments) {
           try {
@@ -9704,19 +9744,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log(`[Collections] Batch ${batchNumber} complete. Running totals: ${totalProcessed} processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} items updated with weight`);
-        
-        // If we got fewer than BATCH_SIZE, we're done
-        if (batchShipments.length < BATCH_SIZE) {
-          console.log(`[Collections] Last batch was partial (${batchShipments.length} < ${BATCH_SIZE}). Done!`);
-          break;
-        }
+        console.log(`[Collections] Batch ${batchNumber} complete. Running totals: ${totalProcessed} processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors`);
       }
       
-      console.log(`[Collections] FULL RECALCULATION COMPLETE: ${totalProcessed} shipments processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} QC items updated with weight`);
+      console.log(`[Collections] COMPLETE RESET AND RECALCULATION DONE: ${totalProcessed} shipments processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} QC items updated with weight`);
       
       res.json({
         success: true,
+        shipmentsReset: resetCount?.count || 0,
         processed: totalProcessed,
         completed: totalCompleted,
         stillPending: totalStillPending,
@@ -9725,8 +9760,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batches: batchNumber
       });
     } catch (error: any) {
-      console.error("[Collections] Error recalculating all fingerprints:", error);
-      res.status(500).json({ error: "Failed to recalculate fingerprints" });
+      console.error("[Collections] Error in complete reset:", error);
+      res.status(500).json({ error: "Failed to reset and recalculate fingerprints" });
     }
   });
 
