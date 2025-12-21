@@ -64,6 +64,8 @@ interface FingerprintData {
   displayName: string | null;
   totalItems: number;
   collectionCount: number;
+  totalWeight: number | null;
+  weightUnit: string | null;
   createdAt: string;
   shipmentCount: number;
   packagingTypeId: string | null;
