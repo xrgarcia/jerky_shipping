@@ -1359,6 +1359,8 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   isAssembledProduct: boolean("is_assembled_product").notNull().default(false), // True for kits/APs
   unitCost: text("unit_cost"), // Cost per unit (stored as text for precision)
   productImageUrl: text("product_image_url"), // Resolved from products/shipments/orders
+  weightValue: integer("weight_value"), // Weight value as integer (from inventory_forecasts_daily)
+  weightUnit: text("weight_unit"), // Weight unit (e.g., "ounce", "pound")
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

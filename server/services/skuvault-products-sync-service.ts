@@ -34,6 +34,8 @@ interface ReportingProduct {
   product_category: string | null;
   is_assembled_product: boolean;
   unit_cost: string | null;
+  weight_value: number | null;
+  weight_unit: string | null;
 }
 
 /**
@@ -74,6 +76,29 @@ async function setLastSyncedDate(dateStr: string): Promise<void> {
 async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   log('Fetching products from reporting database...');
   
+  // Fetch kit products first (no weight data)
+  const kitProducts = await reportingSql<ReportingProduct[]>`
+    SELECT 
+      sku,
+      snapshot_timestamp as stock_check_date,
+      description as product_title,
+      code as barcode,
+      'kit' as product_category,
+      true as is_assembled_product, 
+      cost::text as unit_cost,
+      NULL::integer as weight_value,
+      NULL::text as weight_unit
+    FROM 
+      public.internal_kit_inventory 
+    WHERE snapshot_timestamp = (
+      SELECT MAX(i.snapshot_timestamp) 
+      FROM public.internal_kit_inventory i
+    )
+  `;
+  
+  log(`Fetched ${kitProducts.length} kit products`);
+  
+  // Fetch individual products with weight data
   const individualProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       inventory_forecasts_daily.sku,
@@ -82,7 +107,9 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       code as barcode,
       product_category,
       is_assembled_product,
-      unit_cost::text as unit_cost
+      unit_cost::text as unit_cost,
+      weight_value::integer as weight_value,
+      weight_unit
     FROM
       public.inventory_forecasts_daily 
     RIGHT OUTER JOIN 
@@ -97,38 +124,19 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   
   log(`Fetched ${individualProducts.length} individual products`);
   
-  const kitProducts = await reportingSql<ReportingProduct[]>`
-    SELECT 
-      sku,
-      snapshot_timestamp as stock_check_date,
-      description as product_title,
-      code as barcode,
-      'kit' as product_category,
-      true as is_assembled_product, 
-      cost::text as unit_cost
-    FROM 
-      public.internal_kit_inventory 
-    WHERE snapshot_timestamp = (
-      SELECT MAX(i.snapshot_timestamp) 
-      FROM public.internal_kit_inventory i
-    )
-  `;
-  
-  log(`Fetched ${kitProducts.length} kit products`);
-  
-  // Merge with deduplication (individual products take precedence to preserve category)
+  // Merge with deduplication: kits first, then individual products overwrite (with weight data)
   const productMap = new Map<string, ReportingProduct>();
   
-  // Add individual products first
-  for (const product of individualProducts) {
+  // Add kit products first
+  for (const product of kitProducts) {
     if (product.sku) {
       productMap.set(product.sku, product);
     }
   }
   
-  // Add kit products only if not already present
-  for (const product of kitProducts) {
-    if (product.sku && !productMap.has(product.sku)) {
+  // Individual products overwrite kits (they have weight data and accurate categories)
+  for (const product of individualProducts) {
+    if (product.sku) {
       productMap.set(product.sku, product);
     }
   }
@@ -314,6 +322,8 @@ export async function syncSkuvaultProducts(): Promise<{
         isAssembledProduct: p.is_assembled_product || false,
         unitCost: p.unit_cost,
         productImageUrl: imageMap.get(p.sku) || null,
+        weightValue: p.weight_value,
+        weightUnit: p.weight_unit,
       }));
       
       await db.insert(skuvaultProducts).values(insertData);
