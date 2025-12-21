@@ -1426,29 +1426,75 @@ export default function Footprints() {
                                             Delete Session
                                           </Button>
                                         </div>
-                                        <div className="grid gap-2 max-h-64 overflow-y-auto">
+                                        <div className="grid gap-3 max-h-96 overflow-y-auto">
                                           {details.shipments.map((shipment, idx) => (
                                             <div
                                               key={shipment.id}
-                                              className="flex items-center justify-between p-2 rounded bg-background border"
+                                              className="rounded bg-background border overflow-hidden"
                                               data-testid={`shipment-row-${shipment.id}`}
                                             >
-                                              <div className="flex items-center gap-3">
-                                                <span className="text-xs text-muted-foreground w-6">
-                                                  {idx + 1}.
-                                                </span>
-                                                <span className="font-mono text-sm font-medium">
-                                                  {shipment.orderNumber}
-                                                </span>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                {shipment.trackingNumber && (
-                                                  <span className="text-xs text-muted-foreground font-mono">
-                                                    {shipment.trackingNumber.slice(0, 12)}...
+                                              <div className="flex items-center justify-between p-3 border-b bg-muted/20">
+                                                <div className="flex items-center gap-3">
+                                                  <span className="text-xs text-muted-foreground w-6 font-medium">
+                                                    {idx + 1}.
                                                   </span>
-                                                )}
-                                                {getLifecycleBadge(shipment.lifecyclePhase)}
+                                                  <span className="font-mono text-sm font-bold">
+                                                    {shipment.orderNumber}
+                                                  </span>
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}
+                                                  </Badge>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  {shipment.trackingNumber && (
+                                                    <span className="text-xs text-muted-foreground font-mono">
+                                                      {shipment.trackingNumber.slice(0, 12)}...
+                                                    </span>
+                                                  )}
+                                                  {getLifecycleBadge(shipment.lifecyclePhase)}
+                                                </div>
                                               </div>
+                                              {shipment.items && shipment.items.length > 0 && (
+                                                <div className="p-2 space-y-2">
+                                                  {shipment.items.map((item, itemIdx) => (
+                                                    <div
+                                                      key={`${shipment.id}-item-${itemIdx}`}
+                                                      className="flex items-center gap-3 p-2 rounded bg-muted/30"
+                                                      data-testid={`shipment-item-${shipment.id}-${itemIdx}`}
+                                                    >
+                                                      <div className="flex-shrink-0 w-12 h-12 rounded border bg-background overflow-hidden flex items-center justify-center">
+                                                        {item.imageUrl ? (
+                                                          <img
+                                                            src={item.imageUrl}
+                                                            alt={item.name}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => {
+                                                              (e.target as HTMLImageElement).style.display = 'none';
+                                                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                            }}
+                                                          />
+                                                        ) : null}
+                                                        <Package className={`h-6 w-6 text-muted-foreground ${item.imageUrl ? 'hidden' : ''}`} />
+                                                      </div>
+                                                      <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate" title={item.name}>
+                                                          {item.name}
+                                                        </p>
+                                                        {item.sku && (
+                                                          <p className="text-xs text-muted-foreground font-mono">
+                                                            {item.sku}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                      <div className="flex-shrink-0">
+                                                        <Badge variant="secondary" className="text-sm font-bold">
+                                                          x{item.quantity}
+                                                        </Badge>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
