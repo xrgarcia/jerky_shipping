@@ -53,6 +53,7 @@ import {
   Info,
   Eye,
   Trash2,
+  MapPin,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -158,6 +159,7 @@ interface FulfillmentSession {
   sequenceNumber: number | null;
   stationId: string | null;
   stationType: string;
+  stationName: string | null;
   orderCount: number;
   maxOrders: number;
   status: 'draft' | 'ready' | 'picking' | 'packing' | 'completed' | 'cancelled';
@@ -1413,6 +1415,12 @@ export default function Fingerprints() {
                                   </div>
                                   
                                   <div className="flex items-center gap-4 text-sm text-muted-foreground ml-7">
+                                    {session.stationName && (
+                                      <span className="flex items-center gap-1 font-medium text-foreground">
+                                        <MapPin className="h-3 w-3" />
+                                        {session.stationName}
+                                      </span>
+                                    )}
                                     <span className="flex items-center gap-1">
                                       <Clock className="h-3 w-3" />
                                       Created {new Date(session.createdAt).toLocaleString()}
