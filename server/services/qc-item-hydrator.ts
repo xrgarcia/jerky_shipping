@@ -152,10 +152,10 @@ async function buildCollectionNameCache(collectionIds: string[]): Promise<Map<st
 }
 
 /**
- * Generate a canonical signature from collection quantities
- * Format: Sorted JSON object with collection IDs as keys
+ * Generate a canonical signature from collection quantities and total weight
+ * Format: Sorted JSON object with collection IDs as keys, plus weight field
  */
-function generateSignature(collectionQuantities: Map<string, number>): string {
+function generateSignature(collectionQuantities: Map<string, number>, totalWeight: number): string {
   // Sort by collection ID for deterministic ordering
   const sortedEntries = Array.from(collectionQuantities.entries())
     .sort((a, b) => a[0].localeCompare(b[0]));
@@ -164,6 +164,8 @@ function generateSignature(collectionQuantities: Map<string, number>): string {
   for (const [collectionId, quantity] of sortedEntries) {
     signatureObj[collectionId] = quantity;
   }
+  // Include weight in signature - this makes fingerprints weight-sensitive
+  signatureObj['weight'] = totalWeight;
   
   return JSON.stringify(signatureObj);
 }
@@ -176,12 +178,14 @@ function generateSignatureHash(signature: string): string {
 }
 
 /**
- * Generate human-readable display name from collection quantities
- * Example: "2 Gift Boxes + 5 Small Jerky"
+ * Generate human-readable display name from collection quantities and weight
+ * Example: "2 Gift Boxes + 5 Small Jerky | 42oz"
  */
 function generateDisplayName(
   collectionQuantities: Map<string, number>, 
-  collectionNames: Map<string, string>
+  collectionNames: Map<string, string>,
+  totalWeight: number,
+  weightUnit: string
 ): string {
   const parts: string[] = [];
   
@@ -194,7 +198,8 @@ function generateDisplayName(
     parts.push(`${qty} ${name}`);
   }
   
-  return parts.join(' + ');
+  const collectionsPart = parts.join(' + ');
+  return `${collectionsPart} | ${totalWeight}${weightUnit}`;
 }
 
 interface FingerprintResult {
@@ -210,11 +215,13 @@ interface FingerprintResult {
  * Exported so it can be called from routes when products are assigned to collections
  */
 export async function calculateFingerprint(shipmentId: string): Promise<FingerprintResult> {
-  // Get all QC items for this shipment (SKU and quantity only)
+  // Get all QC items for this shipment including weight data
   const qcItems = await db
     .select({
       sku: shipmentQcItems.sku,
       quantityExpected: shipmentQcItems.quantityExpected,
+      weightValue: shipmentQcItems.weightValue,
+      weightUnit: shipmentQcItems.weightUnit,
     })
     .from(shipmentQcItems)
     .where(eq(shipmentQcItems.shipmentId, shipmentId));
@@ -248,16 +255,27 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     };
   }
   
-  // All items have collections - aggregate by collection using mappings table
+  // All items have collections - aggregate by collection and calculate total weight
   const collectionQuantities = new Map<string, number>();
+  let totalWeight = 0;
+  let weightUnit = 'oz'; // Default weight unit
+  
   for (const item of qcItems) {
     const collectionId = collectionCache.get(item.sku)!;
     const current = collectionQuantities.get(collectionId) || 0;
     collectionQuantities.set(collectionId, current + item.quantityExpected);
+    
+    // Calculate weight: weightValue × quantity (default to 0 if no weight)
+    if (item.weightValue) {
+      totalWeight += item.weightValue * item.quantityExpected;
+      if (item.weightUnit) {
+        weightUnit = item.weightUnit; // Use the weight unit from items
+      }
+    }
   }
   
-  // Generate signature and hash
-  const signature = generateSignature(collectionQuantities);
+  // Generate signature and hash (now includes weight)
+  const signature = generateSignature(collectionQuantities, totalWeight);
   const signatureHash = generateSignatureHash(signature);
   
   // Try to find existing fingerprint
@@ -277,7 +295,7 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     // Create new fingerprint
     const collectionIds = Array.from(collectionQuantities.keys());
     const collectionNameCache = await buildCollectionNameCache(collectionIds);
-    const displayName = generateDisplayName(collectionQuantities, collectionNameCache);
+    const displayName = generateDisplayName(collectionQuantities, collectionNameCache, totalWeight, weightUnit);
     
     const totalItems = Array.from(collectionQuantities.values()).reduce((a, b) => a + b, 0);
     const collectionCount = collectionQuantities.size;
@@ -288,6 +306,8 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
       displayName,
       totalItems,
       collectionCount,
+      totalWeight,
+      weightUnit,
     };
     
     const inserted = await db
@@ -298,7 +318,7 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     fingerprintId = inserted[0].id;
     isNew = true;
     
-    log(`Created new fingerprint: ${displayName} (${collectionCount} collections, ${totalItems} items)`);
+    log(`Created new fingerprint: ${displayName} (${collectionCount} collections, ${totalItems} items, ${totalWeight}${weightUnit})`);
   }
   
   // Update shipment with fingerprint
@@ -413,6 +433,8 @@ async function hydrateShipment(shipmentId: string, orderNumber: string): Promise
         syncedToSkuvault: false,
         isKitComponent: item.isKitComponent,
         parentSku: item.parentSku,
+        weightValue: product?.weightValue || null,
+        weightUnit: product?.weightUnit || null,
       });
     }
     

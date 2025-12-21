@@ -20,6 +20,8 @@ export interface ProductInfo {
   description: string | null;
   imageUrl: string | null;
   isAssembledProduct: boolean;
+  weightValue: number | null;
+  weightUnit: string | null;
 }
 
 /**
@@ -33,6 +35,8 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
       description: skuvaultProducts.productTitle,
       imageUrl: skuvaultProducts.productImageUrl,
       isAssembledProduct: skuvaultProducts.isAssembledProduct,
+      weightValue: skuvaultProducts.weightValue,
+      weightUnit: skuvaultProducts.weightUnit,
     })
     .from(skuvaultProducts)
     .where(eq(skuvaultProducts.sku, sku))
@@ -48,6 +52,8 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
     description: result[0].description,
     imageUrl: result[0].imageUrl,
     isAssembledProduct: result[0].isAssembledProduct,
+    weightValue: result[0].weightValue,
+    weightUnit: result[0].weightUnit,
   };
 }
 
@@ -67,6 +73,8 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       description: skuvaultProducts.productTitle,
       imageUrl: skuvaultProducts.productImageUrl,
       isAssembledProduct: skuvaultProducts.isAssembledProduct,
+      weightValue: skuvaultProducts.weightValue,
+      weightUnit: skuvaultProducts.weightUnit,
     })
     .from(skuvaultProducts)
     .where(inArray(skuvaultProducts.sku, uniqueSkus));
@@ -79,6 +87,8 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       description: row.description,
       imageUrl: row.imageUrl,
       isAssembledProduct: row.isAssembledProduct,
+      weightValue: row.weightValue,
+      weightUnit: row.weightUnit,
     });
   }
   

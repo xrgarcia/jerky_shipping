@@ -1209,11 +1209,13 @@ export type PackagingType = typeof packagingTypes.$inferSelect;
 // A fingerprint represents a specific combination of collections + quantities
 export const fingerprints = pgTable("fingerprints", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  signature: text("signature").notNull().unique(), // Canonical JSON string, e.g., '{"GiftBox":2,"SmallJerky":5}'
+  signature: text("signature").notNull().unique(), // Canonical JSON string, e.g., '{"GiftBox":2,"SmallJerky":5,"weight":42}'
   signatureHash: text("signature_hash").notNull().unique(), // Hash for fast lookup
-  displayName: text("display_name"), // Human-readable, e.g., "2 Gift Boxes + 5 Small Jerky"
+  displayName: text("display_name"), // Human-readable, e.g., "2 Gift Boxes + 5 Small Jerky | 42oz"
   totalItems: integer("total_items").notNull(), // Sum of all quantities
   collectionCount: integer("collection_count").notNull(), // Number of distinct collections
+  totalWeight: integer("total_weight"), // Total order weight in weightUnit (sum of item weights)
+  weightUnit: text("weight_unit"), // Weight unit (e.g., "oz")
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   signatureHashIdx: index("fingerprints_signature_hash_idx").on(table.signatureHash),
@@ -1268,6 +1270,8 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   syncedToSkuvault: boolean("synced_to_skuvault").notNull().default(false), // Have we pushed passQCitem
   isKitComponent: boolean("is_kit_component").notNull().default(false), // True if this is an exploded kit component
   parentSku: text("parent_sku"), // If kit component, the parent kit SKU
+  weightValue: integer("weight_value"), // Weight per unit in weightUnit (from skuvault_products)
+  weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
