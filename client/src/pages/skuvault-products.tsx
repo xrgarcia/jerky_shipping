@@ -124,11 +124,20 @@ function ProductDetailDialog({
                 </p>
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Stock Check Date</label>
-                <p className="text-sm" data-testid="detail-stock-date">
-                  {product.stockCheckDate ? new Date(product.stockCheckDate).toLocaleDateString() : "-"}
+                <label className="text-sm font-medium text-muted-foreground">Weight</label>
+                <p className="text-sm font-mono" data-testid="detail-weight">
+                  {product.weightValue && product.weightUnit 
+                    ? `${product.weightValue} ${product.weightUnit}` 
+                    : "-"}
                 </p>
               </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Stock Check Date</label>
+              <p className="text-sm" data-testid="detail-stock-date">
+                {product.stockCheckDate ? new Date(product.stockCheckDate).toLocaleDateString() : "-"}
+              </p>
             </div>
           </div>
         </div>
