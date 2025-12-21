@@ -10642,6 +10642,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipments and products for a fingerprint (for the shipment count modal)
+  app.get("/api/fingerprints/:fingerprintId/shipments", requireAuth, async (req, res) => {
+    try {
+      const { fingerprintId } = req.params;
+      const { fingerprints: fingerprintsTable, shipments: shipmentsTable, shipmentQcItems, orders } = await import("@shared/schema");
+      
+      // Check if fingerprint exists
+      const [fingerprint] = await db
+        .select()
+        .from(fingerprintsTable)
+        .where(eq(fingerprintsTable.id, fingerprintId));
+      
+      if (!fingerprint) {
+        return res.status(404).json({ error: "Fingerprint not found" });
+      }
+      
+      // Get all shipments with this fingerprint
+      const shipmentsWithOrders = await db
+        .select({
+          id: shipmentsTable.id,
+          orderNumber: shipmentsTable.orderNumber,
+          shopifyOrderId: shipmentsTable.shopifyOrderId,
+          recipientName: shipmentsTable.recipientName,
+          createdAt: shipmentsTable.createdAt,
+        })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.fingerprintId, fingerprintId))
+        .orderBy(shipmentsTable.createdAt);
+      
+      // Get aggregated products across all shipments with this fingerprint
+      const shipmentIds = shipmentsWithOrders.map(s => s.id);
+      
+      let aggregatedProducts: { sku: string; description: string | null; imageUrl: string | null; totalQuantity: number }[] = [];
+      
+      if (shipmentIds.length > 0) {
+        const qcItemsRaw = await db
+          .select({
+            sku: shipmentQcItems.sku,
+            description: shipmentQcItems.description,
+            imageUrl: shipmentQcItems.imageUrl,
+            quantityExpected: shipmentQcItems.quantityExpected,
+          })
+          .from(shipmentQcItems)
+          .where(inArray(shipmentQcItems.shipmentId, shipmentIds));
+        
+        // Aggregate by SKU
+        const productMap = new Map<string, { sku: string; description: string | null; imageUrl: string | null; totalQuantity: number }>();
+        for (const item of qcItemsRaw) {
+          const existing = productMap.get(item.sku);
+          if (existing) {
+            existing.totalQuantity += item.quantityExpected;
+          } else {
+            productMap.set(item.sku, {
+              sku: item.sku,
+              description: item.description,
+              imageUrl: item.imageUrl,
+              totalQuantity: item.quantityExpected,
+            });
+          }
+        }
+        aggregatedProducts = Array.from(productMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+      }
+      
+      res.json({
+        fingerprint: {
+          id: fingerprint.id,
+          displayName: fingerprint.displayName,
+          signature: fingerprint.signature,
+        },
+        shipments: shipmentsWithOrders.map(s => ({
+          id: s.id,
+          orderNumber: s.orderNumber,
+          recipientName: s.recipientName,
+          createdAt: s.createdAt,
+        })),
+        products: aggregatedProducts,
+        totalShipments: shipmentsWithOrders.length,
+        uniqueProducts: aggregatedProducts.length,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error getting shipments:", error);
+      res.status(500).json({ error: "Failed to get fingerprint shipments" });
+    }
+  });
+
   // ============================================================================
   // Fulfillment Sessions API - Smart Shipping Engine (Phase 6 Step 3)
   // ============================================================================
