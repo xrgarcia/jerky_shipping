@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -10646,13 +10646,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fingerprints/:fingerprintId/shipments", requireAuth, async (req, res) => {
     try {
       const { fingerprintId } = req.params;
-      const { fingerprints: fingerprintsTable, shipments: shipmentsTable, shipmentQcItems, orders } = await import("@shared/schema");
       
       // Check if fingerprint exists
       const [fingerprint] = await db
         .select()
-        .from(fingerprintsTable)
-        .where(eq(fingerprintsTable.id, fingerprintId));
+        .from(fingerprints)
+        .where(eq(fingerprints.id, fingerprintId));
       
       if (!fingerprint) {
         return res.status(404).json({ error: "Fingerprint not found" });
@@ -10661,15 +10660,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all shipments with this fingerprint
       const shipmentsWithOrders = await db
         .select({
-          id: shipmentsTable.id,
-          orderNumber: shipmentsTable.orderNumber,
-          shopifyOrderId: shipmentsTable.shopifyOrderId,
-          recipientName: shipmentsTable.recipientName,
-          createdAt: shipmentsTable.createdAt,
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          shopifyOrderId: shipments.shopifyOrderId,
+          recipientName: shipments.recipientName,
+          createdAt: shipments.createdAt,
         })
-        .from(shipmentsTable)
-        .where(eq(shipmentsTable.fingerprintId, fingerprintId))
-        .orderBy(shipmentsTable.createdAt);
+        .from(shipments)
+        .where(eq(shipments.fingerprintId, fingerprintId))
+        .orderBy(shipments.createdAt);
       
       // Get aggregated products across all shipments with this fingerprint
       const shipmentIds = shipmentsWithOrders.map(s => s.id);
