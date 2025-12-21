@@ -10595,7 +10595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get shipments in this session
-      const { shipments: shipmentsTable } = await import("@shared/schema");
+      const { shipments: shipmentsTable, shipmentItems: shipmentItemsTable, skuvaultProducts } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
           id: shipmentsTable.id,
@@ -10607,9 +10607,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(shipmentsTable)
         .where(eq(shipmentsTable.fulfillmentSessionId, id));
       
+      // Fetch items for each shipment with product images from skuvault_products
+      const shipmentIds = sessionShipments.map(s => s.id);
+      const allItems = shipmentIds.length > 0 
+        ? await db
+            .select({
+              shipmentId: shipmentItemsTable.shipmentId,
+              sku: shipmentItemsTable.sku,
+              name: shipmentItemsTable.name,
+              quantity: shipmentItemsTable.quantity,
+              imageUrl: shipmentItemsTable.imageUrl,
+              productImageUrl: skuvaultProducts.productImageUrl,
+              productTitle: skuvaultProducts.productTitle,
+            })
+            .from(shipmentItemsTable)
+            .leftJoin(skuvaultProducts, eq(shipmentItemsTable.sku, skuvaultProducts.sku))
+            .where(inArray(shipmentItemsTable.shipmentId, shipmentIds))
+        : [];
+      
+      // Group items by shipment ID
+      const itemsByShipment: Record<string, typeof allItems> = {};
+      for (const item of allItems) {
+        if (!itemsByShipment[item.shipmentId]) {
+          itemsByShipment[item.shipmentId] = [];
+        }
+        itemsByShipment[item.shipmentId].push(item);
+      }
+      
+      // Attach items to each shipment, preferring skuvault image/title over shipment item data
+      const shipmentsWithItems = sessionShipments.map(s => ({
+        ...s,
+        items: (itemsByShipment[s.id] || []).map(item => ({
+          sku: item.sku,
+          name: item.productTitle || item.name,
+          quantity: item.quantity,
+          imageUrl: item.productImageUrl || item.imageUrl,
+        })),
+      }));
+      
       res.json({
         ...session,
-        shipments: sessionShipments,
+        shipments: shipmentsWithItems,
       });
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error getting session:", error);
