@@ -10836,7 +10836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get shipments in this session
-      const { shipments: shipmentsTable, shipmentItems: shipmentItemsTable, skuvaultProducts } = await import("@shared/schema");
+      const { shipments: shipmentsTable, shipmentItems: shipmentItemsTable, shipmentQcItems, skuvaultProducts } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
           id: shipmentsTable.id,
@@ -10860,11 +10860,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               imageUrl: shipmentItemsTable.imageUrl,
               productImageUrl: skuvaultProducts.productImageUrl,
               productTitle: skuvaultProducts.productTitle,
+              weightValue: skuvaultProducts.weightValue,
+              weightUnit: skuvaultProducts.weightUnit,
             })
             .from(shipmentItemsTable)
             .leftJoin(skuvaultProducts, eq(shipmentItemsTable.sku, skuvaultProducts.sku))
             .where(inArray(shipmentItemsTable.shipmentId, shipmentIds))
         : [];
+      
+      // Fetch per-order weights from QC items (more accurate as it includes kit expansion)
+      const orderWeights = shipmentIds.length > 0
+        ? await db
+            .select({
+              shipmentId: shipmentQcItems.shipmentId,
+              totalWeight: sql<number>`COALESCE(SUM(${shipmentQcItems.weightValue} * ${shipmentQcItems.quantityExpected}), 0)`.as('total_weight'),
+            })
+            .from(shipmentQcItems)
+            .where(inArray(shipmentQcItems.shipmentId, shipmentIds))
+            .groupBy(shipmentQcItems.shipmentId)
+        : [];
+      
+      // Create weight map by shipment ID
+      const weightByShipment = new Map<string, number>();
+      for (const row of orderWeights) {
+        weightByShipment.set(row.shipmentId, Number(row.totalWeight) || 0);
+      }
       
       // Group items by shipment ID
       const itemsByShipment: Record<string, typeof allItems> = {};
@@ -10875,14 +10895,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemsByShipment[item.shipmentId].push(item);
       }
       
-      // Attach items to each shipment, preferring skuvault image/title over shipment item data
+      // Attach items and weight to each shipment
       const shipmentsWithItems = sessionShipments.map(s => ({
         ...s,
+        totalWeightOz: weightByShipment.get(s.id) || null,
         items: (itemsByShipment[s.id] || []).map(item => ({
           sku: item.sku,
           name: item.productTitle || item.name,
           quantity: item.quantity,
           imageUrl: item.productImageUrl || item.imageUrl,
+          weightValue: item.weightValue,
+          weightUnit: item.weightUnit,
         })),
       }));
       
