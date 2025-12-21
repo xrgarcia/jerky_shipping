@@ -88,21 +88,30 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 ### SkuVault Products (Centralized Product Catalog)
 The `skuvault_products` table is the local single source of truth for product catalog data, synced hourly from the GCP reporting database.
 
-**Data Sources:**
-- `inventory_forecasts_daily` — Individual products (~701 SKUs)
-- `internal_kit_inventory` — Kit/AP products (~1662 SKUs)
-- Union query merges both sources, deduplicates by SKU (individual products take precedence)
+**Data Sources (3-way merge):**
+1. `internal_kit_inventory` — Kit/AP products (~1662 SKUs) - imported first
+2. `inventory_forecasts_daily` — Parent/individual products (~701 SKUs) - merged second, fills gaps
+3. `product_variants` — Variant products where sku != primary_sku (~372 SKUs) - added third
+
+**Merge Strategy:**
+- Kits are imported first as the base layer
+- Parent products fill in missing fields without overwriting existing values
+- Variants are added as new products with `parent_sku` referencing their parent
+- Conflicts are logged (when non-null values differ between sources)
 
 **Key Fields:**
 - `sku` (PK), `product_title`, `barcode`, `product_category`, `is_assembled_product`, `unit_cost`
+- `parent_sku` — For variant products, references the parent SKU (null for kits/parents)
+- `weight_value` (real/decimal), `weight_unit` — Product weight with decimal precision
 - `product_image_url` — Resolved via waterfall: productVariants → shipmentItems → null
 - `stock_check_date` — Date of the data snapshot from reporting database
 
 **Sync Worker:**
 - `server/skuvault-products-sync-worker.ts` — Runs hourly, checks for new `stock_check_date`
+- `server/services/skuvault-products-sync-service.ts` — 3-way merge logic with conflict logging
 - Truncate-and-reload strategy (fast, no incremental complexity)
 - Redis tracks last synced date to avoid redundant syncs
-- ~2167 products synced in ~2 seconds
+- ~2539 products synced in ~2 seconds (1662 kits + 505 new parents + 372 variants)
 
 **Product Lookup Services:**
 - `server/services/product-lookup.ts` — Direct database queries to `skuvault_products` table
