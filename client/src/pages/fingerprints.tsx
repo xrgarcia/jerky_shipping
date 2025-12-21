@@ -190,16 +190,11 @@ interface SessionDetailResponse extends FulfillmentSession {
   shipments: SessionShipment[];
 }
 
-interface FingerprintShipmentProduct {
+interface FingerprintProduct {
   sku: string;
-  description: string | null;
-  imageUrl: string | null;
-  totalQuantity: number;
-}
-
-interface FingerprintShipmentInfo {
-  id: string;
-  orderNumber: string;
+  title: string | null;
+  weight: string | null;
+  orderNumbers: string[];
 }
 
 interface FingerprintShipmentsResponse {
@@ -208,8 +203,7 @@ interface FingerprintShipmentsResponse {
     displayName: string | null;
     signature: string;
   };
-  shipments: FingerprintShipmentInfo[];
-  products: FingerprintShipmentProduct[];
+  products: FingerprintProduct[];
   totalShipments: number;
   uniqueProducts: number;
 }
@@ -1745,53 +1739,40 @@ export default function Fingerprints() {
               Loading...
             </div>
           ) : fingerprintShipmentsData ? (
-            <div className="space-y-4">
-              {/* Items */}
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground">
-                  Items ({fingerprintShipmentsData.uniqueProducts})
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {fingerprintShipmentsData.products.map((product) => (
-                    <div
-                      key={product.sku}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border"
-                    >
-                      {product.imageUrl && (
-                        <img
-                          src={product.imageUrl}
-                          alt={product.sku}
-                          className="w-6 h-6 rounded object-cover"
-                        />
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-3 pr-4">
+                {fingerprintShipmentsData.products.map((product) => (
+                  <div
+                    key={product.sku}
+                    className="p-3 rounded-lg border bg-card"
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div>
+                        <div className="font-medium">{product.sku}</div>
+                        {product.title && (
+                          <div className="text-sm text-muted-foreground">{product.title}</div>
+                        )}
+                      </div>
+                      {product.weight && (
+                        <Badge variant="secondary">{product.weight}</Badge>
                       )}
-                      <span className="text-sm font-medium">{product.sku}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        x{product.totalQuantity}
-                      </Badge>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex flex-wrap gap-1">
+                      {product.orderNumbers.map((orderNumber) => (
+                        <Badge
+                          key={orderNumber}
+                          variant="outline"
+                          className="cursor-pointer hover-elevate text-xs"
+                          onClick={() => window.open(`/order/${orderNumber}`, '_blank')}
+                        >
+                          {orderNumber}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              {/* Orders */}
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground">
-                  Orders ({fingerprintShipmentsData.totalShipments})
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {fingerprintShipmentsData.shipments.map((shipment) => (
-                    <Badge
-                      key={shipment.id}
-                      variant="outline"
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => window.open(`/order/${shipment.orderNumber}`, '_blank')}
-                    >
-                      {shipment.orderNumber}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
+            </ScrollArea>
           ) : null}
 
           <DialogFooter>

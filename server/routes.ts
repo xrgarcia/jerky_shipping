@@ -10667,38 +10667,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(shipments.fingerprintId, fingerprintId))
         .orderBy(shipments.createdAt);
       
-      // Get aggregated products across all shipments with this fingerprint
+      // Get products with their associated order numbers
       const shipmentIds = shipmentsWithOrders.map(s => s.id);
+      const shipmentIdToOrderNumber = new Map(shipmentsWithOrders.map(s => [s.id, s.orderNumber]));
       
-      let aggregatedProducts: { sku: string; description: string | null; imageUrl: string | null; totalQuantity: number }[] = [];
+      let products: { sku: string; title: string | null; weight: string | null; orderNumbers: string[] }[] = [];
       
       if (shipmentIds.length > 0) {
         const qcItemsRaw = await db
           .select({
+            shipmentId: shipmentQcItems.shipmentId,
             sku: shipmentQcItems.sku,
             description: shipmentQcItems.description,
-            imageUrl: shipmentQcItems.imageUrl,
-            quantityExpected: shipmentQcItems.quantityExpected,
+            weightValue: shipmentQcItems.weightValue,
+            weightUnit: shipmentQcItems.weightUnit,
           })
           .from(shipmentQcItems)
           .where(inArray(shipmentQcItems.shipmentId, shipmentIds));
         
-        // Aggregate by SKU
-        const productMap = new Map<string, { sku: string; description: string | null; imageUrl: string | null; totalQuantity: number }>();
+        // Group by SKU with list of order numbers
+        const productMap = new Map<string, { sku: string; title: string | null; weight: string | null; orderNumbers: Set<string> }>();
         for (const item of qcItemsRaw) {
+          const orderNumber = shipmentIdToOrderNumber.get(item.shipmentId);
+          if (!orderNumber) continue;
+          
           const existing = productMap.get(item.sku);
           if (existing) {
-            existing.totalQuantity += item.quantityExpected;
+            existing.orderNumbers.add(orderNumber);
           } else {
+            const weight = item.weightValue && item.weightUnit 
+              ? `${item.weightValue}${item.weightUnit}` 
+              : null;
             productMap.set(item.sku, {
               sku: item.sku,
-              description: item.description,
-              imageUrl: item.imageUrl,
-              totalQuantity: item.quantityExpected,
+              title: item.description,
+              weight,
+              orderNumbers: new Set([orderNumber]),
             });
           }
         }
-        aggregatedProducts = Array.from(productMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+        products = Array.from(productMap.values())
+          .map(p => ({ ...p, orderNumbers: Array.from(p.orderNumbers).sort() }))
+          .sort((a, b) => a.sku.localeCompare(b.sku));
       }
       
       res.json({
@@ -10707,13 +10717,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           displayName: fingerprint.displayName,
           signature: fingerprint.signature,
         },
-        shipments: shipmentsWithOrders.map(s => ({
-          id: s.id,
-          orderNumber: s.orderNumber,
-        })),
-        products: aggregatedProducts,
+        products,
         totalShipments: shipmentsWithOrders.length,
-        uniqueProducts: aggregatedProducts.length,
+        uniqueProducts: products.length,
       });
     } catch (error: any) {
       console.error("[Fingerprints] Error getting shipments:", error);
