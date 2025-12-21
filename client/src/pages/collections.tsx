@@ -421,7 +421,7 @@ export default function Collections() {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Mutation for bulk recalculate fingerprints
+  // Mutation for bulk recalculate fingerprints (pending only)
   const recalculateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/collections/recalculate-fingerprints");
@@ -445,6 +445,35 @@ export default function Collections() {
         toast({
           title: "More to process",
           description: "Click recalculate again to process more shipments.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Recalculation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for recalculate ALL fingerprints (including already completed ones)
+  const recalculateAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/collections/recalculate-all-fingerprints");
+      return res.json();
+    },
+    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; hasMore: boolean }) => {
+      refetchPending();
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      toast({
+        title: "All fingerprints recalculated",
+        description: `${data.processed} shipments processed, ${data.completed} completed with weights`,
+      });
+      if (data.hasMore) {
+        toast({
+          title: "More to process",
+          description: "Click 'Recalculate All' again to process more shipments.",
         });
       }
     },
@@ -592,9 +621,31 @@ export default function Collections() {
               </Button>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Group products with similar physical characteristics
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Group products with similar physical characteristics
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => recalculateAllMutation.mutate()}
+              disabled={recalculateAllMutation.isPending}
+              className="text-xs h-6"
+              data-testid="button-recalculate-all-fingerprints"
+            >
+              {recalculateAllMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Recalculate All
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         
         {/* Pending Fingerprints Banner */}

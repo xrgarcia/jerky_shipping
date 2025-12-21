@@ -9629,6 +9629,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recalculate ALL fingerprints (including already completed ones) - useful after weight integration
+  app.post("/api/collections/recalculate-all-fingerprints", requireAuth, async (req, res) => {
+    try {
+      const { shipments: shipmentsTable, fingerprints: fingerprintsTable } = await import("@shared/schema");
+      const { calculateFingerprint } = await import('./services/qc-item-hydrator');
+      
+      // Get all shipments that have fingerprints (completed or pending)
+      const allShipments = await db
+        .select({ id: shipmentsTable.id, fingerprintStatus: shipmentsTable.fingerprintStatus })
+        .from(shipmentsTable)
+        .where(
+          or(
+            eq(shipmentsTable.fingerprintStatus, 'complete'),
+            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+          )
+        )
+        .limit(500); // Process in batches to avoid timeout
+      
+      let processed = 0;
+      let completed = 0;
+      let stillPending = 0;
+      let errors = 0;
+      
+      for (const shipment of allShipments) {
+        try {
+          const result = await calculateFingerprint(shipment.id);
+          processed++;
+          if (result.status === 'complete') {
+            completed++;
+          } else if (result.status === 'pending_categorization') {
+            stillPending++;
+          }
+        } catch (err) {
+          console.error(`[Collections] Error recalculating fingerprint for shipment ${shipment.id}:`, err);
+          errors++;
+        }
+      }
+      
+      console.log(`[Collections] Full recalculation: processed ${processed}, completed ${completed}, still pending ${stillPending}, errors ${errors}`);
+      
+      res.json({
+        success: true,
+        processed,
+        completed,
+        stillPending,
+        errors,
+        hasMore: allShipments.length === 500
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error recalculating all fingerprints:", error);
+      res.status(500).json({ error: "Failed to recalculate fingerprints" });
+    }
+  });
+
   // Bulk import collections from CSV
   app.post("/api/collections/bulk-import", requireAuth, upload.single("file"), async (req, res) => {
     try {
