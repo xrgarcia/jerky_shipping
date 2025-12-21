@@ -34,7 +34,7 @@ interface ReportingProduct {
   product_category: string | null;
   is_assembled_product: boolean;
   unit_cost: string | null;
-  weight_value: number | null;
+  weight_value: number | null; // Decimal value (e.g., 2.5 for 2.5oz)
   weight_unit: string | null;
 }
 
@@ -86,7 +86,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       'kit' as product_category,
       true as is_assembled_product, 
       cost::text as unit_cost,
-      NULL::integer as weight_value,
+      NULL::real as weight_value,
       NULL::text as weight_unit
     FROM 
       public.internal_kit_inventory 
@@ -98,7 +98,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   
   log(`Fetched ${kitProducts.length} kit products`);
   
-  // Fetch individual products with weight data
+  // Fetch individual products with weight data (preserve decimal precision)
   const individualProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       inventory_forecasts_daily.sku,
@@ -108,7 +108,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       product_category,
       is_assembled_product,
       unit_cost::text as unit_cost,
-      ROUND(weight_value::numeric)::integer as weight_value,
+      weight_value::real as weight_value,
       weight_unit
     FROM
       public.inventory_forecasts_daily 

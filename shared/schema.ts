@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1268,7 +1268,7 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   syncedToSkuvault: boolean("synced_to_skuvault").notNull().default(false), // Have we pushed passQCitem
   isKitComponent: boolean("is_kit_component").notNull().default(false), // True if this is an exploded kit component
   parentSku: text("parent_sku"), // If kit component, the parent kit SKU
-  weightValue: integer("weight_value"), // Weight per unit in weightUnit (from skuvault_products)
+  weightValue: real("weight_value"), // Weight per unit in weightUnit (from skuvault_products) - decimal for precision
   weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1361,7 +1361,7 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   isAssembledProduct: boolean("is_assembled_product").notNull().default(false), // True for kits/APs
   unitCost: text("unit_cost"), // Cost per unit (stored as text for precision)
   productImageUrl: text("product_image_url"), // Resolved from products/shipments/orders
-  weightValue: integer("weight_value"), // Weight value as integer (from inventory_forecasts_daily)
+  weightValue: real("weight_value"), // Weight value as decimal (from inventory_forecasts_daily) - preserves precision
   weightUnit: text("weight_unit"), // Weight unit (e.g., "ounce", "pound")
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
