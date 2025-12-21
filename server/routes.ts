@@ -10046,6 +10046,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categoriesParam = req.query.categories as string; // comma-separated list
       const isAssembled = req.query.isAssembled as string;
       
+      console.log(`[SkuVault Products] Query params: page=${page}, pageSize=${pageSize}, search="${search}", categories="${categoriesParam || 'none'}", isAssembled="${isAssembled || 'all'}"`);
+      
       // Build where conditions
       const conditions = [];
       
@@ -10063,6 +10065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Multi-select categories filter (comma-separated)
       if (categoriesParam && categoriesParam.trim()) {
         const categoryList = categoriesParam.split(",").map(c => c.trim()).filter(Boolean);
+        console.log(`[SkuVault Products] Categories filter: ${categoryList.length} categories selected:`, categoryList.slice(0, 3).join(", "), categoryList.length > 3 ? "..." : "");
         if (categoryList.length > 0) {
           conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
         }
@@ -10084,6 +10087,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const total = countResult[0]?.count || 0;
       const totalPages = Math.ceil(total / pageSize);
+      
+      console.log(`[SkuVault Products] Query result: ${total} total products matching filters`);
       
       // Get paginated products
       const products = await db
