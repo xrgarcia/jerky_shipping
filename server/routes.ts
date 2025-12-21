@@ -9979,26 +9979,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get uncategorized products with shipment counts
   // Uses product_collection_mappings as the source of truth for categorization
+  // Uses skuvault_products as source of truth for product catalog (title, image, weight)
   app.get("/api/packing-decisions/uncategorized", requireAuth, async (req, res) => {
     try {
-      const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable, productVariants } = await import("@shared/schema");
+      const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable, skuvaultProducts } = await import("@shared/schema");
       
       // Get products from QC items that have NO mapping in product_collection_mappings
       // AND count how many "pending_categorization" shipments they appear in
       // LEFT JOIN to mappings table and filter where mapping doesn't exist
-      // LEFT JOIN to productVariants to get imageUrl and title from Shopify
+      // LEFT JOIN to skuvault_products to get product catalog data
       const uncategorizedProducts = await db
         .select({
           sku: shipmentQcItems.sku,
           description: shipmentQcItems.description,
-          productTitle: productVariants.title,
-          imageUrl: productVariants.imageUrl,
+          productTitle: skuvaultProducts.productTitle,
+          imageUrl: skuvaultProducts.productImageUrl,
+          inSkuvaultCatalog: sql<boolean>`${skuvaultProducts.sku} IS NOT NULL`.as('in_skuvault_catalog'),
           shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`.as('shipment_count'),
         })
         .from(shipmentQcItems)
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku))
-        .leftJoin(productVariants, eq(shipmentQcItems.sku, productVariants.sku))
+        .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
         .where(
           and(
             // SKU has no mapping in product_collection_mappings
@@ -10006,7 +10008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
           )
         )
-        .groupBy(shipmentQcItems.sku, shipmentQcItems.description, productVariants.title, productVariants.imageUrl)
+        .groupBy(shipmentQcItems.sku, shipmentQcItems.description, skuvaultProducts.productTitle, skuvaultProducts.productImageUrl, skuvaultProducts.sku)
         .orderBy(desc(sql`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`));
       
       // Get coverage stats using mappings table as source of truth

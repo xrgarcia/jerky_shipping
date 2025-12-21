@@ -104,6 +104,7 @@ interface UncategorizedProduct {
   description: string | null;
   productTitle: string | null;
   imageUrl: string | null;
+  inSkuvaultCatalog: boolean;
   shipmentCount: number;
 }
 
@@ -834,6 +835,11 @@ export default function Fingerprints() {
                                 <Truck className="h-3 w-3 mr-1" />
                                 {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
                               </Badge>
+                              {!product.inSkuvaultCatalog && (
+                                <Badge variant="destructive" className="text-xs" data-testid={`badge-not-in-catalog-${product.sku}`}>
+                                  Not in Catalog
+                                </Badge>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -850,28 +856,34 @@ export default function Fingerprints() {
 
                         <div className="flex items-center gap-2 mt-auto">
                           {getStatusIndicator(`cat-${product.sku}`)}
-                          <Select
-                            onValueChange={(value) => handleCategorize(product.sku, value)}
-                            disabled={!!inlineStatus[`cat-${product.sku}`]}
-                          >
-                            <SelectTrigger
-                              className="w-full"
-                              data-testid={`select-collection-${product.sku}`}
+                          {product.inSkuvaultCatalog ? (
+                            <Select
+                              onValueChange={(value) => handleCategorize(product.sku, value)}
+                              disabled={!!inlineStatus[`cat-${product.sku}`]}
                             >
-                              <SelectValue placeholder="Assign to collection..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {collections.map((col) => (
-                                <SelectItem
-                                  key={col.id}
-                                  value={col.id}
-                                  data-testid={`option-collection-${col.id}`}
-                                >
-                                  {col.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              <SelectTrigger
+                                className="w-full"
+                                data-testid={`select-collection-${product.sku}`}
+                              >
+                                <SelectValue placeholder="Assign to collection..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {collections.map((col) => (
+                                  <SelectItem
+                                    key={col.id}
+                                    value={col.id}
+                                    data-testid={`option-collection-${col.id}`}
+                                  >
+                                    {col.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">
+                              Cannot assign — product missing from SkuVault catalog
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -933,30 +945,45 @@ export default function Fingerprints() {
                             {selectedProduct.shipmentCount} shipment{selectedProduct.shipmentCount !== 1 ? 's' : ''}
                           </Badge>
                         </div>
+                        
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Catalog Status</Label>
+                          {selectedProduct.inSkuvaultCatalog ? (
+                            <Badge variant="secondary" className="mt-1">In Catalog</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="mt-1">Not in Catalog</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
                   <DialogFooter>
-                    <Select
-                      onValueChange={(value) => {
-                        if (selectedProduct) {
-                          handleCategorize(selectedProduct.sku, value);
-                          setSelectedProduct(null);
-                        }
-                      }}
-                      disabled={selectedProduct ? !!inlineStatus[`cat-${selectedProduct.sku}`] : false}
-                    >
-                      <SelectTrigger className="w-full" data-testid="modal-select-collection">
-                        <SelectValue placeholder="Assign to collection..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {collections.map((col) => (
-                          <SelectItem key={col.id} value={col.id}>
-                            {col.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {selectedProduct?.inSkuvaultCatalog ? (
+                      <Select
+                        onValueChange={(value) => {
+                          if (selectedProduct) {
+                            handleCategorize(selectedProduct.sku, value);
+                            setSelectedProduct(null);
+                          }
+                        }}
+                        disabled={selectedProduct ? !!inlineStatus[`cat-${selectedProduct.sku}`] : false}
+                      >
+                        <SelectTrigger className="w-full" data-testid="modal-select-collection">
+                          <SelectValue placeholder="Assign to collection..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {collections.map((col) => (
+                            <SelectItem key={col.id} value={col.id}>
+                              {col.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic text-center w-full">
+                        Cannot assign — product missing from SkuVault catalog
+                      </p>
+                    )}
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
