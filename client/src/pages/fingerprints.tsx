@@ -226,7 +226,7 @@ interface SkuShipment {
   id: string;
   orderNumber: string;
   orderDate: string;
-  lifecycleStatus: string | null;
+  shipmentStatus: string | null;
   fingerprintStatus: string | null;
 }
 
