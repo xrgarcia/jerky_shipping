@@ -1,0 +1,48 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825357027
+Shipment ID: f1f95f5d-4671-4630-bd00-c8ffd3f410b2
+
+--- SUMMARY ---
+Total Differences: 4
+Missing in Local (ship.): 3
+Missing in SkuVault: 1
+Quantity Mismatches: 0
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-TRI-SD-3PK | 4000003550 | Test Kitchen - Tri-Tip 3 Pack Bundle - 7.5oz. | 1
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+JCB-TRI-30-16 | 850073089064 | Test Kitchen - Chipotle Bourbon Tri-Tip Beef Jerky - 2.5 oz. | 1
+JCB-TRI-8-16 | 850073089057 | Test Kitchen - Honey Teriyaki Tri-Tip Beef Jerky - 2.5 oz. | 1
+JCB-TRI-1-16 | 850073089040 | Limited Edition - Original Tri-Tip Beef Jerky - 2.5 oz. | 1
+
+--- DETAILED DIFFERENCES ---
+SKU | Field | Local Value | SkuVault Value
+JCB-TRI-30-16 | item | (missing) | qty: 1
+JCB-TRI-8-16 | item | (missing) | qty: 1
+JCB-TRI-1-16 | item | (missing) | qty: 1
+JCB-TRI-SD-3PK | item | qty: 1 | (missing)
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components
+JCB-TRI-SD-3PK | Beef Jerky | YES | null | yes | JCB-TRI-1-16x1, JCB-TRI-30-16x1, JCB-TRI-8-16x1
+JCB-TRI-30-16 | Beef Jerky | no | null | yes | none
+JCB-TRI-8-16 | Beef Jerky | no | null | yes | none
+JCB-TRI-1-16 | Beef Jerky | no | null | yes | none
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- Kit products should be exploded into components by SkuVault when IsKit=true
+- 'Is AP' = isAssembledProduct flag from SkuVault (should be true for kits)
+- 'Category' = product_category (typically 'kit' for kits that should explode)
+- Kit Components = Expected components from our kit_mappings_cache (from GCP vw_internal_kit_component_inventory_latest)
+
+ANALYSIS QUESTION: Why is there a discrepancy?
+- If local has a kit SKU but SkuVault returns components → Check if SkuVault correctly marked it as a kit (IsKit=true)
+- If local has a kit SKU and SkuVault also returns the same kit SKU → SkuVault is NOT exploding this kit (possible config issue)
