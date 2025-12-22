@@ -1135,7 +1135,7 @@ export default function Fingerprints() {
                           placeholder="Min oz"
                           value={minWeight}
                           onChange={(e) => setMinWeight(e.target.value)}
-                          className="w-20 h-8"
+                          className="w-24 h-8"
                           data-testid="input-min-weight"
                         />
                         <span className="text-muted-foreground">-</span>
@@ -1144,7 +1144,7 @@ export default function Fingerprints() {
                           placeholder="Max oz"
                           value={maxWeight}
                           onChange={(e) => setMaxWeight(e.target.value)}
-                          className="w-20 h-8"
+                          className="w-24 h-8"
                           data-testid="input-max-weight"
                         />
                       </div>
