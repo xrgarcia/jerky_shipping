@@ -274,6 +274,9 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     }
   }
   
+  // Round to 1 decimal place to fix floating point precision (e.g., 1815.6000000000001 → 1815.6)
+  totalWeight = Math.round(totalWeight * 10) / 10;
+  
   // Generate signature and hash (now includes weight)
   const signature = generateSignature(collectionQuantities, totalWeight);
   const signatureHash = generateSignatureHash(signature);
