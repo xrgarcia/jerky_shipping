@@ -60,6 +60,7 @@ import {
   Filter,
   CheckSquare,
   Square,
+  Copy,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2149,14 +2150,29 @@ export default function Fingerprints() {
                       >
                         {shipment.orderNumber}
                       </Badge>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          navigator.clipboard.writeText(shipment.orderNumber);
+                          toast({
+                            title: "Copied",
+                            description: `Order ${shipment.orderNumber} copied to clipboard`,
+                          });
+                        }}
+                        data-testid={`button-copy-order-${shipment.id}`}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
                       <span className="text-sm text-muted-foreground">
                         {new Date(shipment.orderDate).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {shipment.lifecycleStatus && (
+                      {shipment.shipmentStatus && (
                         <Badge variant="secondary" className="text-xs">
-                          {shipment.lifecycleStatus}
+                          {shipment.shipmentStatus}
                         </Badge>
                       )}
                     </div>
