@@ -664,9 +664,9 @@ export default function Shipments() {
   const [isInitialized, setIsInitialized] = useState(false);
   const lastSyncedSearchRef = useRef<string>('');
 
-  // View mode and tab state
-  const [viewMode, setViewMode] = useState<ViewMode>('lifecycle');
-  const [activeTab, setActiveTab] = useState<WorkflowTab>('in_progress');
+  // View mode and tab state - Default to "All" view (workflow mode with tab=all)
+  const [viewMode, setViewMode] = useState<ViewMode>('workflow');
+  const [activeTab, setActiveTab] = useState<WorkflowTab>('all');
   const [activeLifecycleTab, setActiveLifecycleTab] = useState<LifecycleTab>('ready_to_pick');
 
   // Filter states
@@ -724,9 +724,9 @@ export default function Shipments() {
         ? urlTab 
         : 'in_progress';
     } else {
-      // Default to lifecycle mode
-      hydratedViewMode = 'lifecycle';
-      hydratedTab = 'in_progress'; // Default workflow tab when switching to workflow later
+      // Default to "All" view (workflow mode with tab=all)
+      hydratedViewMode = 'workflow';
+      hydratedTab = 'all';
     }
     
     setViewMode(hydratedViewMode);
@@ -783,18 +783,22 @@ export default function Shipments() {
     
     const params = new URLSearchParams();
     
-    // Include viewMode only when not lifecycle (the default)
-    if (viewMode !== 'lifecycle') params.set('viewMode', viewMode);
+    // Include viewMode only when not the default "All" view (workflow with tab=all)
+    // "All" view is the default, so we only add params for lifecycle or non-all workflow tabs
+    const isDefaultAllView = viewMode === 'workflow' && activeTab === 'all';
     
-    // Include tab only for workflow mode (lifecycle mode ignores workflow tabs)
-    if (viewMode === 'workflow' && activeTab !== 'in_progress') {
+    if (viewMode === 'lifecycle') {
+      params.set('viewMode', 'lifecycle');
+      // Include lifecycleTab only when not the default
+      if (activeLifecycleTab !== 'ready_to_pick') {
+        params.set('lifecycleTab', activeLifecycleTab);
+      }
+    } else if (viewMode === 'workflow' && activeTab !== 'all') {
+      // Workflow mode but not "all" tab
+      params.set('viewMode', 'workflow');
       params.set('tab', activeTab);
     }
-    
-    // Include lifecycleTab only for lifecycle mode
-    if (viewMode === 'lifecycle' && activeLifecycleTab !== 'ready_to_pick') {
-      params.set('lifecycleTab', activeLifecycleTab);
-    }
+    // If isDefaultAllView, we don't add viewMode or tab params (clean URL)
     if (search) params.set('search', search);
     if (status) params.set('status', status); // Single status value
     if (statusDescription) params.set('statusDescription', statusDescription);
@@ -1213,6 +1217,21 @@ export default function Shipments() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Button
+              variant={activeTab === 'all' && viewMode === 'workflow' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setViewMode('workflow');
+                setActiveTab('all');
+                setActiveLifecycleTab('ready_to_pick'); // Reset lifecycle tab to prevent stale state
+                setPage(1);
+              }}
+              className="gap-2"
+              data-testid="button-view-all"
+            >
+              <Package className="h-4 w-4" />
+              All
+            </Button>
+            <Button
               variant={viewMode === 'lifecycle' ? 'default' : 'outline'}
               size="sm"
               onClick={() => {
@@ -1241,21 +1260,6 @@ export default function Shipments() {
             >
               <Boxes className="h-4 w-4" />
               Workflow View
-            </Button>
-            <Button
-              variant={activeTab === 'all' && viewMode === 'workflow' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setViewMode('workflow');
-                setActiveTab('all');
-                setActiveLifecycleTab('ready_to_pick'); // Reset lifecycle tab to prevent stale state
-                setPage(1);
-              }}
-              className="gap-2"
-              data-testid="button-view-all"
-            >
-              <Package className="h-4 w-4" />
-              All
             </Button>
           </div>
           <p className="text-xs text-muted-foreground hidden md:block">
