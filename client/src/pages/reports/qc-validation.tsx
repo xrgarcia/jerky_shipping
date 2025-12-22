@@ -694,7 +694,72 @@ export default function QcValidationReport() {
             </>
           )}
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!selectedResult) return;
+                
+                // Build comprehensive analysis context
+                const lines: string[] = [];
+                lines.push("=== QC DATA COMPARISON ANALYSIS REQUEST ===");
+                lines.push("");
+                lines.push(`Order Number: ${selectedResult.orderNumber}`);
+                lines.push(`Shipment ID: ${selectedResult.shipmentId}`);
+                lines.push("");
+                lines.push("--- SUMMARY ---");
+                lines.push(`Total Differences: ${selectedResult.totalDifferences}`);
+                lines.push(`Missing in Local (ship.): ${selectedResult.missingInLocal}`);
+                lines.push(`Missing in SkuVault: ${selectedResult.missingInSkuvault}`);
+                lines.push(`Quantity Mismatches: ${selectedResult.fieldMismatches}`);
+                lines.push("");
+                
+                lines.push("--- LOCAL DATA (shipment_qc_items table) ---");
+                lines.push("SKU | Barcode | Description | Qty");
+                selectedResult.localItems.forEach(item => {
+                  lines.push(`${item.sku} | ${item.barcode || 'null'} | ${item.description || 'null'} | ${item.quantityExpected}`);
+                });
+                lines.push("");
+                
+                lines.push("--- SKUVAULT LIVE DATA (QC Sale API) ---");
+                lines.push("SKU | Barcode | Title | Qty");
+                selectedResult.skuvaultItems.forEach(item => {
+                  lines.push(`${item.sku} | ${item.barcode || 'null'} | ${item.title || 'null'} | ${item.quantity}`);
+                });
+                lines.push("");
+                
+                lines.push("--- DETAILED DIFFERENCES ---");
+                if (selectedResult.differences.length === 0) {
+                  lines.push("No field-level differences detected.");
+                } else {
+                  lines.push("SKU | Field | Local Value | SkuVault Value");
+                  selectedResult.differences.forEach(diff => {
+                    lines.push(`${diff.sku} | ${diff.field} | ${diff.localValue === null ? '(missing)' : diff.localValue} | ${diff.skuvaultValue === null ? '(missing)' : diff.skuvaultValue}`);
+                  });
+                }
+                lines.push("");
+                
+                lines.push("--- CONTEXT ---");
+                lines.push("- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)");
+                lines.push("- 'SkuVault' = Live data from SkuVault QC Sale API");
+                lines.push("- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items");
+                lines.push("- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them");
+                lines.push("- Kit products are exploded into components by SkuVault");
+                lines.push("");
+                lines.push("Please analyze why there is a discrepancy and what might have caused it.");
+                
+                const text = lines.join("\n");
+                navigator.clipboard.writeText(text);
+                toast({
+                  title: "Copied to clipboard",
+                  description: "Analysis context ready to paste",
+                });
+              }}
+              data-testid="button-copy-for-ai"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy for AI Analysis
+            </Button>
             <Button variant="outline" onClick={() => setSelectedResult(null)}>
               Close
             </Button>
