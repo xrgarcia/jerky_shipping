@@ -10719,6 +10719,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk assign packaging type to multiple fingerprints
+  app.post("/api/fingerprints/bulk-assign", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { fingerprintIds, packagingTypeId } = req.body;
+      
+      if (!fingerprintIds || !Array.isArray(fingerprintIds) || fingerprintIds.length === 0) {
+        return res.status(400).json({ error: "fingerprintIds array is required" });
+      }
+      if (!packagingTypeId) {
+        return res.status(400).json({ error: "packagingTypeId is required" });
+      }
+      
+      const { fingerprintModels, fingerprints: fingerprintsTable, packagingTypes, shipments: shipmentsTable, stations } = await import("@shared/schema");
+      
+      // Check if packaging type exists
+      const [packagingType] = await db.select().from(packagingTypes).where(eq(packagingTypes.id, packagingTypeId));
+      if (!packagingType) {
+        return res.status(404).json({ error: "Packaging type not found" });
+      }
+      
+      // Look up station by stationType (auto station assignment)
+      let assignedStationId: string | null = null;
+      if (packagingType.stationType) {
+        const [station] = await db
+          .select()
+          .from(stations)
+          .where(and(
+            eq(stations.stationType, packagingType.stationType),
+            eq(stations.isActive, true)
+          ))
+          .limit(1);
+        
+        if (station) {
+          assignedStationId = station.id;
+          console.log(`[Bulk Assign] Found station ${station.name} (${station.stationType}) for packaging ${packagingType.name}`);
+        }
+      }
+      
+      let totalFingerprintsAssigned = 0;
+      let totalShipmentsUpdated = 0;
+      const allShipmentIds: string[] = [];
+      
+      // Process each fingerprint
+      for (const fingerprintId of fingerprintIds) {
+        // Check if fingerprint exists
+        const [fingerprint] = await db.select().from(fingerprintsTable).where(eq(fingerprintsTable.id, fingerprintId));
+        if (!fingerprint) {
+          console.warn(`[Bulk Assign] Fingerprint ${fingerprintId} not found, skipping`);
+          continue;
+        }
+        
+        // Upsert the fingerprint model
+        const existingModel = await db.select().from(fingerprintModels).where(eq(fingerprintModels.fingerprintId, fingerprintId));
+        
+        if (existingModel.length > 0) {
+          await db
+            .update(fingerprintModels)
+            .set({
+              packagingTypeId,
+              updatedAt: new Date(),
+            })
+            .where(eq(fingerprintModels.fingerprintId, fingerprintId));
+        } else {
+          await db
+            .insert(fingerprintModels)
+            .values({
+              fingerprintId,
+              packagingTypeId,
+              createdBy: userId,
+              confidence: 'manual',
+            });
+        }
+        
+        totalFingerprintsAssigned++;
+        
+        // Update all shipments with this fingerprint
+        const updateData: Record<string, any> = {
+          packagingTypeId,
+          packagingDecisionType: 'auto',
+          updatedAt: new Date(),
+        };
+        if (assignedStationId) {
+          updateData.assignedStationId = assignedStationId;
+        }
+        
+        const updatedShipments = await db
+          .update(shipmentsTable)
+          .set(updateData)
+          .where(eq(shipmentsTable.fingerprintId, fingerprintId))
+          .returning({ id: shipmentsTable.id });
+        
+        totalShipmentsUpdated += updatedShipments.length;
+        allShipmentIds.push(...updatedShipments.map(s => s.id));
+      }
+      
+      // Update lifecycle phase for all affected shipments
+      if (allShipmentIds.length > 0) {
+        await updateShipmentLifecycleBatch(allShipmentIds);
+      }
+      
+      console.log(`[Bulk Assign] Assigned packaging ${packagingType.name} to ${totalFingerprintsAssigned} fingerprints, updated ${totalShipmentsUpdated} shipments`);
+      
+      res.json({
+        success: true,
+        fingerprintsAssigned: totalFingerprintsAssigned,
+        shipmentsUpdated: totalShipmentsUpdated,
+        packagingTypeName: packagingType.name,
+        assignedStationId,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error bulk assigning packaging:", error);
+      res.status(500).json({ error: "Failed to bulk assign packaging" });
+    }
+  });
+
   // Get shipments and products for a fingerprint (for the shipment count modal)
   app.get("/api/fingerprints/:fingerprintId/shipments", requireAuth, async (req, res) => {
     try {
