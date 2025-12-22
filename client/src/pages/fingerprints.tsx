@@ -933,8 +933,13 @@ export default function Fingerprints() {
                             </h4>
                             <p className="font-mono text-xs text-muted-foreground mt-1">{product.sku}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              <Badge variant="secondary" className="text-xs">
-                                <Truck className="h-3 w-3 mr-1" />
+                              <Badge 
+                                variant="secondary" 
+                                className="text-xs cursor-pointer hover-elevate"
+                                onClick={() => setSelectedSkuForShipments(product.sku)}
+                                data-testid={`badge-shipments-${product.sku}`}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
                                 {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
                               </Badge>
                               {!product.inSkuvaultCatalog && (
@@ -2101,6 +2106,73 @@ export default function Fingerprints() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedFingerprintForShipments(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SKU Shipments Modal (for uncategorized products) */}
+      <Dialog open={!!selectedSkuForShipments} onOpenChange={(open) => !open && setSelectedSkuForShipments(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Shipments for SKU
+            </DialogTitle>
+            <DialogDescription className="font-mono">
+              {selectedSkuForShipments || "Loading..."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {skuShipmentsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading...
+            </div>
+          ) : skuShipmentsData ? (
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-2 pr-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Found {skuShipmentsData.totalCount} shipment{skuShipmentsData.totalCount !== 1 ? 's' : ''} with pending categorization containing this SKU
+                </p>
+                {skuShipmentsData.shipments.map((shipment) => (
+                  <div
+                    key={shipment.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        variant="outline"
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => window.open(`/order/${shipment.orderNumber}`, '_blank')}
+                      >
+                        {shipment.orderNumber}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(shipment.orderDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {shipment.lifecycleStatus && (
+                        <Badge variant="secondary" className="text-xs">
+                          {shipment.lifecycleStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {skuShipmentsData.shipments.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No shipments found with this SKU
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedSkuForShipments(null)}>
               Close
             </Button>
           </DialogFooter>
