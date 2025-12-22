@@ -11199,6 +11199,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====================================================================================
+  // QC VALIDATION REPORT ENDPOINTS
+  // ====================================================================================
+  
+  // Get shipments with QC items for validation
+  app.get("/api/reports/qc-validation/shipments", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate, search, shipmentStatus, page = '1', pageSize = '20' } = req.query;
+      
+      const pageNum = parseInt(page as string, 10) || 1;
+      const pageSizeNum = parseInt(pageSize as string, 10) || 20;
+      const offset = (pageNum - 1) * pageSizeNum;
+      
+      // Build query conditions
+      const conditions: any[] = [];
+      
+      if (startDate) {
+        conditions.push(sql`${shipments.orderDate} >= ${new Date(startDate as string)}`);
+      }
+      if (endDate) {
+        // Add 1 day to include the end date fully
+        const endDatePlusOne = new Date(endDate as string);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        conditions.push(sql`${shipments.orderDate} < ${endDatePlusOne}`);
+      }
+      if (search) {
+        conditions.push(ilike(shipments.orderNumber, `%${search}%`));
+      }
+      if (shipmentStatus && shipmentStatus !== 'all') {
+        conditions.push(eq(shipments.shipmentStatus, shipmentStatus as string));
+      }
+      
+      // Only include shipments that have QC items
+      const shipmentsWithQcItems = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          orderDate: shipments.orderDate,
+          shipmentStatus: shipments.shipmentStatus,
+          qcItemCount: sql<number>`COALESCE((SELECT COUNT(*) FROM shipment_qc_items WHERE shipment_id = ${shipments.id}), 0)`,
+        })
+        .from(shipments)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .having(sql`COALESCE((SELECT COUNT(*) FROM shipment_qc_items WHERE shipment_id = ${shipments.id}), 0) > 0`)
+        .orderBy(desc(shipments.orderDate))
+        .limit(pageSizeNum)
+        .offset(offset);
+      
+      // Get total count
+      const countResult = await db
+        .select({
+          count: sql<number>`COUNT(DISTINCT ${shipments.id})`,
+        })
+        .from(shipments)
+        .innerJoin(shipmentQcItems, eq(shipmentQcItems.shipmentId, shipments.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      
+      const totalCount = countResult[0]?.count || 0;
+      const totalPages = Math.ceil(totalCount / pageSizeNum);
+      
+      res.json({
+        shipments: shipmentsWithQcItems,
+        totalCount,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        totalPages,
+      });
+    } catch (error: any) {
+      console.error("[QC Validation] Error fetching shipments:", error);
+      res.status(500).json({ error: "Failed to fetch shipments" });
+    }
+  });
+  
+  // Analyze shipments against SkuVault QC data
+  app.post("/api/reports/qc-validation/analyze", requireAuth, async (req, res) => {
+    try {
+      const { shipmentIds } = req.body;
+      
+      if (!shipmentIds || !Array.isArray(shipmentIds) || shipmentIds.length === 0) {
+        return res.status(400).json({ error: "shipmentIds array is required" });
+      }
+      
+      // Import SkuVault service
+      const { skuVaultService } = await import("./services/skuvault-service");
+      
+      const results: Array<{
+        shipmentId: string;
+        orderNumber: string;
+        totalDifferences: number;
+        missingInLocal: number;
+        missingInSkuvault: number;
+        fieldMismatches: number;
+        differences: Array<{
+          sku: string;
+          field: string;
+          localValue: string | number | null;
+          skuvaultValue: string | number | null;
+        }>;
+        localItems: Array<{
+          sku: string;
+          barcode: string | null;
+          description: string | null;
+          quantityExpected: number;
+        }>;
+        skuvaultItems: Array<{
+          sku: string;
+          barcode: string | null;
+          title: string | null;
+          quantity: number;
+        }>;
+        error?: string;
+      }> = [];
+      
+      // Fetch shipments with their QC items
+      const shipmentsWithItems = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          shipmentId: shipments.shipmentId,
+        })
+        .from(shipments)
+        .where(inArray(shipments.id, shipmentIds));
+      
+      for (const shipment of shipmentsWithItems) {
+        try {
+          // Get local QC items
+          const localItems = await db
+            .select({
+              sku: shipmentQcItems.sku,
+              barcode: shipmentQcItems.barcode,
+              description: shipmentQcItems.description,
+              quantityExpected: shipmentQcItems.quantityExpected,
+            })
+            .from(shipmentQcItems)
+            .where(eq(shipmentQcItems.shipmentId, shipment.id));
+          
+          // Get SkuVault QC data
+          const qcSale = await skuVaultService.getQCSalesByOrderNumber(
+            shipment.orderNumber,
+            shipment.shipmentId
+          );
+          
+          // Extract items from SkuVault response
+          const skuvaultItems: Array<{
+            sku: string;
+            barcode: string | null;
+            title: string | null;
+            quantity: number;
+          }> = [];
+          
+          if (qcSale && qcSale.Items) {
+            for (const item of qcSale.Items) {
+              // Handle kit products - add components instead of parent kit
+              if (item.IsKit && item.KitProducts && item.KitProducts.length > 0) {
+                for (const component of item.KitProducts) {
+                  skuvaultItems.push({
+                    sku: component.Sku || '',
+                    barcode: component.Code || null,
+                    title: component.Title || null,
+                    quantity: (component.Quantity || 1) * (item.Quantity || 1),
+                  });
+                }
+              } else {
+                skuvaultItems.push({
+                  sku: item.Sku || '',
+                  barcode: item.Code || null,
+                  title: item.Title || null,
+                  quantity: item.Quantity || 0,
+                });
+              }
+            }
+          }
+          
+          // Compare items
+          const differences: Array<{
+            sku: string;
+            field: string;
+            localValue: string | number | null;
+            skuvaultValue: string | number | null;
+          }> = [];
+          
+          let missingInLocal = 0;
+          let missingInSkuvault = 0;
+          let fieldMismatches = 0;
+          
+          // Create lookup maps
+          const localBySku = new Map<string, typeof localItems[0]>();
+          for (const item of localItems) {
+            const existing = localBySku.get(item.sku);
+            if (existing) {
+              // Sum quantities for same SKU
+              existing.quantityExpected += item.quantityExpected;
+            } else {
+              localBySku.set(item.sku, { ...item });
+            }
+          }
+          
+          const skuvaultBySku = new Map<string, typeof skuvaultItems[0]>();
+          for (const item of skuvaultItems) {
+            const existing = skuvaultBySku.get(item.sku);
+            if (existing) {
+              existing.quantity += item.quantity;
+            } else {
+              skuvaultBySku.set(item.sku, { ...item });
+            }
+          }
+          
+          // Check items in SkuVault against local
+          for (const [sku, svItem] of skuvaultBySku) {
+            const localItem = localBySku.get(sku);
+            
+            if (!localItem) {
+              missingInLocal++;
+              differences.push({
+                sku,
+                field: 'item',
+                localValue: null,
+                skuvaultValue: `qty: ${svItem.quantity}`,
+              });
+            } else {
+              // Compare quantity
+              if (localItem.quantityExpected !== svItem.quantity) {
+                fieldMismatches++;
+                differences.push({
+                  sku,
+                  field: 'quantity',
+                  localValue: localItem.quantityExpected,
+                  skuvaultValue: svItem.quantity,
+                });
+              }
+              
+              // Compare barcode (only if both have values)
+              if (svItem.barcode && localItem.barcode && svItem.barcode !== localItem.barcode) {
+                fieldMismatches++;
+                differences.push({
+                  sku,
+                  field: 'barcode',
+                  localValue: localItem.barcode,
+                  skuvaultValue: svItem.barcode,
+                });
+              }
+            }
+          }
+          
+          // Check items in local that aren't in SkuVault
+          for (const [sku, localItem] of localBySku) {
+            if (!skuvaultBySku.has(sku)) {
+              missingInSkuvault++;
+              differences.push({
+                sku,
+                field: 'item',
+                localValue: `qty: ${localItem.quantityExpected}`,
+                skuvaultValue: null,
+              });
+            }
+          }
+          
+          results.push({
+            shipmentId: shipment.id,
+            orderNumber: shipment.orderNumber,
+            totalDifferences: differences.length,
+            missingInLocal,
+            missingInSkuvault,
+            fieldMismatches,
+            differences,
+            localItems: Array.from(localBySku.values()),
+            skuvaultItems: Array.from(skuvaultBySku.values()),
+          });
+          
+        } catch (error: any) {
+          console.error(`[QC Validation] Error analyzing shipment ${shipment.orderNumber}:`, error);
+          results.push({
+            shipmentId: shipment.id,
+            orderNumber: shipment.orderNumber,
+            totalDifferences: 0,
+            missingInLocal: 0,
+            missingInSkuvault: 0,
+            fieldMismatches: 0,
+            differences: [],
+            localItems: [],
+            skuvaultItems: [],
+            error: error.message || 'Unknown error',
+          });
+        }
+      }
+      
+      const totalWithDifferences = results.filter(r => r.totalDifferences > 0 && !r.error).length;
+      const totalDifferences = results.reduce((sum, r) => sum + r.totalDifferences, 0);
+      
+      res.json({
+        results,
+        totalAnalyzed: results.length,
+        totalWithDifferences,
+        totalDifferences,
+      });
+      
+    } catch (error: any) {
+      console.error("[QC Validation] Error analyzing shipments:", error);
+      res.status(500).json({ error: "Failed to analyze shipments" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
