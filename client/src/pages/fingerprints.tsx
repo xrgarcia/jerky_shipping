@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,9 @@ import {
   Trash2,
   MapPin,
   Scale,
+  Filter,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -288,6 +292,12 @@ export default function Fingerprints() {
   const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<UncategorizedProduct | null>(null);
   const [selectedFingerprintForShipments, setSelectedFingerprintForShipments] = useState<string | null>(null);
+  
+  // Weight filter and bulk selection state for packaging tab
+  const [minWeight, setMinWeight] = useState<string>("");
+  const [maxWeight, setMaxWeight] = useState<string>("");
+  const [selectedFingerprintIds, setSelectedFingerprintIds] = useState<Set<string>>(new Set());
+  const [bulkPackagingTypeId, setBulkPackagingTypeId] = useState<string>("");
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -496,6 +506,34 @@ export default function Fingerprints() {
     },
   });
 
+  // Bulk assign mutation for packaging tab
+  const bulkAssignMutation = useMutation({
+    mutationFn: async ({ fingerprintIds, packagingTypeId }: { fingerprintIds: string[]; packagingTypeId: string }) => {
+      const res = await apiRequest("POST", "/api/fingerprints/bulk-assign", {
+        fingerprintIds,
+        packagingTypeId,
+      });
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Bulk assignment complete",
+        description: `Assigned ${result.packagingTypeName} to ${result.fingerprintsAssigned} fingerprints (${result.shipmentsUpdated} shipments updated)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      setSelectedFingerprintIds(new Set());
+      setBulkPackagingTypeId("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Bulk assignment failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const fingerprints = fingerprintsData?.fingerprints || [];
   const stats = fingerprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
@@ -507,11 +545,54 @@ export default function Fingerprints() {
     s => s.status !== 'completed' && s.status !== 'cancelled'
   );
 
+  // Apply both status filter and weight filters
   const filteredFingerprints = fingerprints.filter((fp) => {
-    if (filter === 'needs-mapping') return !fp.hasPackaging;
-    if (filter === 'mapped') return fp.hasPackaging;
+    // Status filter
+    if (filter === 'needs-mapping' && fp.hasPackaging) return false;
+    if (filter === 'mapped' && !fp.hasPackaging) return false;
+    
+    // Weight filters (only apply if values are set)
+    const fpWeight = fp.totalWeight ?? 0;
+    const minW = minWeight ? parseFloat(minWeight) : null;
+    const maxW = maxWeight ? parseFloat(maxWeight) : null;
+    
+    if (minW !== null && !isNaN(minW) && fpWeight < minW) return false;
+    if (maxW !== null && !isNaN(maxW) && fpWeight > maxW) return false;
+    
     return true;
   });
+  
+  // Helper functions for bulk selection
+  const toggleSelection = (id: string) => {
+    setSelectedFingerprintIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+  
+  const selectAllVisible = () => {
+    const needsMappingIds = filteredFingerprints
+      .filter(fp => !fp.hasPackaging)
+      .map(fp => fp.id);
+    setSelectedFingerprintIds(new Set(needsMappingIds));
+  };
+  
+  const clearSelection = () => {
+    setSelectedFingerprintIds(new Set());
+  };
+  
+  const handleBulkAssign = () => {
+    if (selectedFingerprintIds.size === 0 || !bulkPackagingTypeId) return;
+    bulkAssignMutation.mutate({
+      fingerprintIds: Array.from(selectedFingerprintIds),
+      packagingTypeId: bulkPackagingTypeId,
+    });
+  };
 
   const assignedPercent = stats
     ? Math.round((stats.assigned / Math.max(stats.total, 1)) * 100)
@@ -1013,39 +1094,153 @@ export default function Fingerprints() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                    <Button
-                      variant={filter === 'all' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setFilter('all')}
-                      data-testid="button-filter-all"
-                    >
-                      All ({fingerprints.length})
-                    </Button>
-                    <Button
-                      variant={filter === 'needs-mapping' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setFilter('needs-mapping')}
-                      className={filter !== 'needs-mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
-                      data-testid="button-filter-needs-mapping"
-                    >
-                      Needs Mapping ({stats?.needsDecision || 0})
-                    </Button>
-                    <Button
-                      variant={filter === 'mapped' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setFilter('mapped')}
-                      className={filter !== 'mapped' ? 'text-green-600 hover:text-green-700' : ''}
-                      data-testid="button-filter-mapped"
-                    >
-                      Mapped ({stats?.assigned || 0})
-                    </Button>
+                {/* Filter bar with status and weight filters */}
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                      <Button
+                        variant={filter === 'all' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilter('all')}
+                        data-testid="button-filter-all"
+                      >
+                        All ({fingerprints.length})
+                      </Button>
+                      <Button
+                        variant={filter === 'needs-mapping' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilter('needs-mapping')}
+                        className={filter !== 'needs-mapping' ? 'text-amber-600 hover:text-amber-700' : ''}
+                        data-testid="button-filter-needs-mapping"
+                      >
+                        Needs Mapping ({stats?.needsDecision || 0})
+                      </Button>
+                      <Button
+                        variant={filter === 'mapped' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilter('mapped')}
+                        className={filter !== 'mapped' ? 'text-green-600 hover:text-green-700' : ''}
+                        data-testid="button-filter-mapped"
+                      >
+                        Mapped ({stats?.assigned || 0})
+                      </Button>
+                    </div>
+                    
+                    {/* Weight filter inputs */}
+                    <div className="flex items-center gap-2">
+                      <Scale className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          placeholder="Min oz"
+                          value={minWeight}
+                          onChange={(e) => setMinWeight(e.target.value)}
+                          className="w-20 h-8"
+                          data-testid="input-min-weight"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <Input
+                          type="number"
+                          placeholder="Max oz"
+                          value={maxWeight}
+                          onChange={(e) => setMaxWeight(e.target.value)}
+                          className="w-20 h-8"
+                          data-testid="input-max-weight"
+                        />
+                      </div>
+                      {(minWeight || maxWeight) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setMinWeight(""); setMaxWeight(""); }}
+                          className="h-8 px-2"
+                          data-testid="button-clear-weight-filter"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
+                  
                   <span className="text-sm text-muted-foreground">
                     Showing {filteredFingerprints.length} of {fingerprints.length}
                   </span>
                 </div>
+                
+                {/* Bulk action bar - appears when items are selected */}
+                {selectedFingerprintIds.size > 0 && (
+                  <div className="flex items-center justify-between gap-4 p-3 mb-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                      <span className="font-medium">
+                        {selectedFingerprintIds.size} fingerprint{selectedFingerprintIds.size !== 1 ? 's' : ''} selected
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearSelection}
+                        className="h-7"
+                        data-testid="button-clear-selection"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={bulkPackagingTypeId}
+                        onValueChange={setBulkPackagingTypeId}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-bulk-packaging">
+                          <SelectValue placeholder="Select packaging..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {packagingTypes.map((pt) => (
+                            <SelectItem key={pt.id} value={pt.id}>
+                              {pt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={handleBulkAssign}
+                        disabled={!bulkPackagingTypeId || bulkAssignMutation.isPending}
+                        data-testid="button-bulk-assign"
+                      >
+                        {bulkAssignMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Box className="h-4 w-4 mr-2" />
+                        )}
+                        Assign to Selected
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Select all visible needs-mapping checkbox */}
+                {filteredFingerprints.filter(fp => !fp.hasPackaging).length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Checkbox
+                      id="select-all-visible"
+                      checked={
+                        filteredFingerprints.filter(fp => !fp.hasPackaging).every(fp => selectedFingerprintIds.has(fp.id)) &&
+                        filteredFingerprints.filter(fp => !fp.hasPackaging).length > 0
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          selectAllVisible();
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                      data-testid="checkbox-select-all"
+                    />
+                    <Label htmlFor="select-all-visible" className="text-sm text-muted-foreground cursor-pointer">
+                      Select all {filteredFingerprints.filter(fp => !fp.hasPackaging).length} unassigned fingerprints
+                    </Label>
+                  </div>
+                )}
+                
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-2">
                     {filteredFingerprints.length === 0 ? (
@@ -1057,12 +1252,23 @@ export default function Fingerprints() {
                       <div
                         key={fingerprint.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border ${
-                          fingerprint.hasPackaging
+                          selectedFingerprintIds.has(fingerprint.id)
+                            ? "bg-primary/5 border-primary/30"
+                            : fingerprint.hasPackaging
                             ? "bg-card border-border"
                             : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
                         }`}
                         data-testid={`row-fingerprint-${fingerprint.id}`}
                       >
+                        {/* Checkbox for bulk selection (only for needs-mapping) */}
+                        {!fingerprint.hasPackaging && (
+                          <Checkbox
+                            checked={selectedFingerprintIds.has(fingerprint.id)}
+                            onCheckedChange={() => toggleSelection(fingerprint.id)}
+                            data-testid={`checkbox-fingerprint-${fingerprint.id}`}
+                          />
+                        )}
+                        
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             {fingerprint.hasPackaging ? (
@@ -1087,6 +1293,12 @@ export default function Fingerprints() {
                               <Layers className="h-3 w-3" />
                               {fingerprint.collectionCount} collection{fingerprint.collectionCount !== 1 ? 's' : ''}
                             </span>
+                            {fingerprint.totalWeight !== null && (
+                              <span className="flex items-center gap-1">
+                                <Scale className="h-3 w-3" />
+                                {fingerprint.totalWeight.toFixed(1)} oz
+                              </span>
+                            )}
                           </div>
                         </div>
 
