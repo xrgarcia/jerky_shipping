@@ -221,6 +221,20 @@ interface FingerprintShipmentsResponse {
   uniqueProducts: number;
 }
 
+interface SkuShipment {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  lifecycleStatus: string | null;
+  fingerprintStatus: string | null;
+}
+
+interface SkuShipmentsResponse {
+  sku: string;
+  shipments: SkuShipment[];
+  totalCount: number;
+}
+
 function getStationBadge(stationType: string | null) {
   switch (stationType) {
     case 'boxing_machine':
@@ -292,6 +306,7 @@ export default function Fingerprints() {
   const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<UncategorizedProduct | null>(null);
   const [selectedFingerprintForShipments, setSelectedFingerprintForShipments] = useState<string | null>(null);
+  const [selectedSkuForShipments, setSelectedSkuForShipments] = useState<string | null>(null);
   
   // Weight filter and bulk selection state for packaging tab
   const [minWeight, setMinWeight] = useState<string>("");
@@ -347,6 +362,12 @@ export default function Fingerprints() {
   const { data: fingerprintShipmentsData, isLoading: fingerprintShipmentsLoading } = useQuery<FingerprintShipmentsResponse>({
     queryKey: ["/api/fingerprints", selectedFingerprintForShipments, "shipments"],
     enabled: !!selectedFingerprintForShipments,
+  });
+
+  // SKU shipments (for uncategorized product shipment count modal)
+  const { data: skuShipmentsData, isLoading: skuShipmentsLoading } = useQuery<SkuShipmentsResponse>({
+    queryKey: ["/api/uncategorized-products", selectedSkuForShipments, "shipments"],
+    enabled: !!selectedSkuForShipments,
   });
 
   // Session preview
