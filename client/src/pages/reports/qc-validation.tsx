@@ -75,6 +75,15 @@ interface QcItemDifference {
   skuvaultValue: string | number | null;
 }
 
+interface ProductInfoItem {
+  sku: string;
+  productCategory: string | null;
+  isAssembledProduct: boolean;
+  parentSku: string | null;
+  kitComponents: Array<{ componentSku: string; componentQuantity: number }> | null;
+  foundInCatalog: boolean;
+}
+
 interface ComparisonResult {
   shipmentId: string;
   orderNumber: string;
@@ -95,6 +104,7 @@ interface ComparisonResult {
     title: string | null;
     quantity: number;
   }>;
+  productInfo: ProductInfoItem[];
   error?: string;
 }
 
@@ -739,14 +749,33 @@ export default function QcValidationReport() {
                 }
                 lines.push("");
                 
+                lines.push("--- PRODUCT CATALOG INFO (from skuvault_products table) ---");
+                lines.push("SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components");
+                if (selectedResult.productInfo && selectedResult.productInfo.length > 0) {
+                  selectedResult.productInfo.forEach(info => {
+                    const kitComps = info.kitComponents 
+                      ? info.kitComponents.map(c => `${c.componentSku}x${c.componentQuantity}`).join(', ')
+                      : 'none';
+                    lines.push(`${info.sku} | ${info.productCategory || 'null'} | ${info.isAssembledProduct ? 'YES' : 'no'} | ${info.parentSku || 'null'} | ${info.foundInCatalog ? 'yes' : 'NO'} | ${kitComps}`);
+                  });
+                } else {
+                  lines.push("(No product info available)");
+                }
+                lines.push("");
+                
                 lines.push("--- CONTEXT ---");
                 lines.push("- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)");
                 lines.push("- 'SkuVault' = Live data from SkuVault QC Sale API");
                 lines.push("- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items");
                 lines.push("- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them");
-                lines.push("- Kit products are exploded into components by SkuVault");
+                lines.push("- Kit products should be exploded into components by SkuVault when IsKit=true");
+                lines.push("- 'Is AP' = isAssembledProduct flag from SkuVault (should be true for kits)");
+                lines.push("- 'Category' = product_category (typically 'kit' for kits that should explode)");
+                lines.push("- Kit Components = Expected components from our kit_mappings_cache (from GCP vw_internal_kit_component_inventory_latest)");
                 lines.push("");
-                lines.push("Please analyze why there is a discrepancy and what might have caused it.");
+                lines.push("ANALYSIS QUESTION: Why is there a discrepancy?");
+                lines.push("- If local has a kit SKU but SkuVault returns components → Check if SkuVault correctly marked it as a kit (IsKit=true)");
+                lines.push("- If local has a kit SKU and SkuVault also returns the same kit SKU → SkuVault is NOT exploding this kit (possible config issue)");
                 
                 const text = lines.join("\n");
                 navigator.clipboard.writeText(text);

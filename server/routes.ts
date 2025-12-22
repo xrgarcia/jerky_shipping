@@ -11283,8 +11283,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "shipmentIds array is required" });
       }
       
-      // Import SkuVault service
+      // Import SkuVault service and product lookup
       const { skuVaultService } = await import("./services/skuvault-service");
+      const { getProductsBatch } = await import("./services/product-lookup");
+      const { getKitComponents } = await import("./services/kit-mappings-cache");
       
       const results: Array<{
         shipmentId: string;
@@ -11310,6 +11312,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           barcode: string | null;
           title: string | null;
           quantity: number;
+        }>;
+        productInfo: Array<{
+          sku: string;
+          productCategory: string | null;
+          isAssembledProduct: boolean;
+          parentSku: string | null;
+          kitComponents: Array<{ componentSku: string; componentQuantity: number }> | null;
+          foundInCatalog: boolean;
         }>;
         error?: string;
       }> = [];
@@ -11458,6 +11468,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
+          // Get product info for all unique SKUs (local + skuvault)
+          const allSkus = new Set<string>();
+          for (const sku of localBySku.keys()) allSkus.add(sku);
+          for (const sku of skuvaultBySku.keys()) allSkus.add(sku);
+          
+          const productMap = await getProductsBatch(Array.from(allSkus));
+          
+          // Build product info array with kit components
+          const productInfo: Array<{
+            sku: string;
+            productCategory: string | null;
+            isAssembledProduct: boolean;
+            parentSku: string | null;
+            kitComponents: Array<{ componentSku: string; componentQuantity: number }> | null;
+            foundInCatalog: boolean;
+          }> = [];
+          
+          for (const sku of allSkus) {
+            const product = productMap.get(sku);
+            let kitComponents = null;
+            
+            // Try to get kit components if this might be a kit/AP
+            try {
+              const components = await getKitComponents(sku);
+              if (components && components.length > 0) {
+                kitComponents = components;
+              }
+            } catch (e) {
+              // Kit components not available, that's ok
+            }
+            
+            productInfo.push({
+              sku,
+              productCategory: product?.productCategory || null,
+              isAssembledProduct: product?.isAssembledProduct || false,
+              parentSku: product?.parentSku || null,
+              kitComponents,
+              foundInCatalog: !!product,
+            });
+          }
+          
           results.push({
             shipmentId: shipment.id,
             orderNumber: shipment.orderNumber,
@@ -11468,6 +11519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             differences,
             localItems: Array.from(localBySku.values()),
             skuvaultItems: Array.from(skuvaultBySku.values()),
+            productInfo,
           });
           
         } catch (error: any) {
@@ -11482,6 +11534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             differences: [],
             localItems: [],
             skuvaultItems: [],
+            productInfo: [],
             error: error.message || 'Unknown error',
           });
         }
