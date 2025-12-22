@@ -10075,26 +10075,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/uncategorized-products/:sku/shipments", requireAuth, async (req, res) => {
     try {
       const { sku } = req.params;
-      const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
+      const { shipmentQcItems, shipments } = await import("@shared/schema");
       
       // Get all shipments that contain this SKU (pending_categorization only)
       const shipmentsWithSku = await db
-        .selectDistinct({
-          id: shipmentsTable.id,
-          orderNumber: shipmentsTable.orderNumber,
-          orderDate: shipmentsTable.orderDate,
-          lifecycleStatus: shipmentsTable.lifecycleStatus,
-          fingerprintStatus: shipmentsTable.fingerprintStatus,
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          orderDate: shipments.orderDate,
+          lifecycleStatus: shipments.lifecycleStatus,
+          fingerprintStatus: shipments.fingerprintStatus,
         })
-        .from(shipmentQcItems)
-        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
+        .from(shipments)
+        .innerJoin(shipmentQcItems, eq(shipmentQcItems.shipmentId, shipments.id))
         .where(
           and(
             eq(shipmentQcItems.sku, sku),
-            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+            eq(shipments.fingerprintStatus, 'pending_categorization')
           )
         )
-        .orderBy(desc(shipmentsTable.orderDate))
+        .groupBy(shipments.id, shipments.orderNumber, shipments.orderDate, shipments.lifecycleStatus, shipments.fingerprintStatus)
+        .orderBy(desc(shipments.orderDate))
         .limit(100);
       
       res.json({
