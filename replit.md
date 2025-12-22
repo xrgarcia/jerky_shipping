@@ -85,6 +85,23 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 -   **Neon Database**: Serverless PostgreSQL database for primary data storage.
 -   **GCP PostgreSQL**: Separate reporting database for purchase order recommendations and inventory forecasting analytics.
 
+### Kits vs Assembled Products (APs) - Critical Distinction
+
+**Kits** = Products built at fulfillment time by the picker. They are **EXPLODED** into individual components in SkuVault's QC Sale API. The picker grabs each component separately.
+- Should have `product_category = 'kit'`
+- SkuVault returns the individual components (not the parent kit SKU)
+
+**Assembled Products (APs)** = Pre-built products that ship as-is. They are **NOT exploded**.
+- Have `is_assembled_product = true`
+- SkuVault returns the parent SKU (not components)
+- Example: JCB1042-K (a pre-assembled gift box)
+
+**Common Data Quality Issue:** A product may be miscategorized - marked as an AP (`is_assembled_product = true`) but SkuVault is exploding it like a kit. This indicates a SkuVault configuration error where the product should either:
+1. Be recategorized as a kit (`product_category = 'kit'`), OR
+2. Have SkuVault stop exploding it if it's truly pre-built
+
+The QC Validation Report (`/reports/qc-validation`) helps identify these miscategorized products by comparing local data against SkuVault's live QC Sale API response.
+
 ### SkuVault Products (Centralized Product Catalog)
 The `skuvault_products` table is the local single source of truth for product catalog data, synced hourly from the GCP reporting database.
 

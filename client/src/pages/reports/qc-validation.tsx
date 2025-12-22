@@ -763,19 +763,25 @@ export default function QcValidationReport() {
                 }
                 lines.push("");
                 
+                lines.push("--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---");
+                lines.push("KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.");
+                lines.push("APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.");
+                lines.push("");
                 lines.push("--- CONTEXT ---");
                 lines.push("- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)");
                 lines.push("- 'SkuVault' = Live data from SkuVault QC Sale API");
                 lines.push("- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items");
                 lines.push("- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them");
-                lines.push("- Kit products should be exploded into components by SkuVault when IsKit=true");
-                lines.push("- 'Is AP' = isAssembledProduct flag from SkuVault (should be true for kits)");
-                lines.push("- 'Category' = product_category (typically 'kit' for kits that should explode)");
-                lines.push("- Kit Components = Expected components from our kit_mappings_cache (from GCP vw_internal_kit_component_inventory_latest)");
+                lines.push("- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)");
+                lines.push("- 'Category' = product_category ('kit' = should be exploded at fulfillment)");
+                lines.push("- Kit Components = Expected components from kit_mappings_cache");
                 lines.push("");
-                lines.push("ANALYSIS QUESTION: Why is there a discrepancy?");
-                lines.push("- If local has a kit SKU but SkuVault returns components → Check if SkuVault correctly marked it as a kit (IsKit=true)");
-                lines.push("- If local has a kit SKU and SkuVault also returns the same kit SKU → SkuVault is NOT exploding this kit (possible config issue)");
+                lines.push("--- COMMON ISSUES ---");
+                lines.push("1. MISCATEGORIZED PRODUCT: If Is AP=YES but SkuVault exploded it → Product is mislabeled.");
+                lines.push("   - Should be category='kit' if it needs to be exploded at fulfillment");
+                lines.push("   - OR should NOT be exploded if it's truly pre-built");
+                lines.push("2. If local has parent SKU but SkuVault returns components → Kit explosion working, but local data wasn't exploded");
+                lines.push("3. If components don't match kit_mappings → Kit definition changed or mapping out of sync");
                 
                 const text = lines.join("\n");
                 navigator.clipboard.writeText(text);
