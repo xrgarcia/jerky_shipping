@@ -49,6 +49,17 @@ interface SkuvaultProductsResponse {
   categories: string[];
 }
 
+interface KitComponent {
+  componentSku: string;
+  componentQuantity: number;
+}
+
+interface KitComponentsResponse {
+  sku: string;
+  components: KitComponent[];
+  hasComponents: boolean;
+}
+
 function ProductDetailDialog({
   product,
   open,
@@ -58,6 +69,19 @@ function ProductDetailDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { data: kitData, isLoading: kitLoading } = useQuery<KitComponentsResponse>({
+    queryKey: ['/api/skuvault-products', product?.sku, 'kit-components'],
+    queryFn: async () => {
+      if (!product?.sku) return { sku: '', components: [], hasComponents: false };
+      const res = await fetch(`/api/skuvault-products/${encodeURIComponent(product.sku)}/kit-components`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch kit components');
+      return res.json();
+    },
+    enabled: open && !!product?.sku,
+  });
+
   if (!product) return null;
 
   return (
@@ -148,6 +172,31 @@ function ProductDetailDialog({
                 {product.stockCheckDate ? new Date(product.stockCheckDate).toLocaleDateString() : "-"}
               </p>
             </div>
+
+            {kitLoading ? (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Kit Components</label>
+                <Skeleton className="h-8 w-full mt-1" />
+              </div>
+            ) : kitData?.hasComponents ? (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Kit Components ({kitData.components.length})
+                </label>
+                <div className="mt-1 space-y-1 border rounded-md p-2 bg-muted/30" data-testid="detail-kit-components">
+                  {kitData.components.map((comp) => (
+                    <div key={comp.componentSku} className="flex items-center justify-between text-sm">
+                      <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {comp.componentSku}
+                      </code>
+                      <Badge variant="outline" className="text-xs">
+                        x{comp.componentQuantity}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </DialogContent>

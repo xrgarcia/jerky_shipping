@@ -10442,6 +10442,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/skuvault-products/:sku/kit-components", requireAuth, async (req, res) => {
+    try {
+      const { sku } = req.params;
+      const { getKitComponents } = await import("./services/kit-mappings-cache");
+      
+      const components = await getKitComponents(sku);
+      
+      res.json({
+        sku,
+        components: components || [],
+        hasComponents: components !== null && components.length > 0,
+      });
+    } catch (error: any) {
+      console.error(`[SkuVault Products] Error fetching kit components for ${req.params.sku}:`, error);
+      res.status(500).json({ error: "Failed to fetch kit components" });
+    }
+  });
+
   // ========================================
   // Fingerprints API (Smart Shipping Engine)
   // ========================================
