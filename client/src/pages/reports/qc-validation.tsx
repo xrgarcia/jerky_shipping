@@ -527,9 +527,9 @@ export default function QcValidationReport() {
         </CardContent>
       </Card>
 
-      {/* Details Modal */}
+      {/* Details Modal - Unified Diff Style */}
       <Dialog open={!!selectedResult} onOpenChange={(open) => !open && setSelectedResult(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -540,133 +540,137 @@ export default function QcValidationReport() {
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1">
-            {selectedResult && (
-              <div className="space-y-6 pr-4">
-                {/* Summary */}
-                <div className="grid grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-lg font-semibold text-red-600">{selectedResult.missingInLocal}</p>
-                      <p className="text-sm text-muted-foreground">Missing in Local</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-lg font-semibold text-orange-600">{selectedResult.missingInSkuvault}</p>
-                      <p className="text-sm text-muted-foreground">Missing in SkuVault</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-lg font-semibold text-yellow-600">{selectedResult.fieldMismatches}</p>
-                      <p className="text-sm text-muted-foreground">Field Mismatches</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Side by Side Comparison */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Local Data */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Local (shipment_qc_items)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">SKU</TableHead>
-                            <TableHead className="text-xs">Barcode</TableHead>
-                            <TableHead className="text-xs text-right">Qty</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedResult.localItems.map((item, idx) => {
-                            const hasDiff = selectedResult.differences.some(d => d.sku === item.sku);
-                            return (
-                              <TableRow key={idx} className={hasDiff ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
-                                <TableCell className="text-xs font-mono">{item.sku}</TableCell>
-                                <TableCell className="text-xs">{item.barcode || '-'}</TableCell>
-                                <TableCell className="text-xs text-right">{item.quantityExpected}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-
-                  {/* SkuVault Data */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">SkuVault (Live)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">SKU</TableHead>
-                            <TableHead className="text-xs">Barcode</TableHead>
-                            <TableHead className="text-xs text-right">Qty</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedResult.skuvaultItems.map((item, idx) => {
-                            const hasDiff = selectedResult.differences.some(d => d.sku === item.sku);
-                            return (
-                              <TableRow key={idx} className={hasDiff ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''}>
-                                <TableCell className="text-xs font-mono">{item.sku}</TableCell>
-                                <TableCell className="text-xs">{item.barcode || '-'}</TableCell>
-                                <TableCell className="text-xs text-right">{item.quantity}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Difference Details */}
-                {selectedResult.differences.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Detailed Differences</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">SKU</TableHead>
-                            <TableHead className="text-xs">Field</TableHead>
-                            <TableHead className="text-xs">Local Value</TableHead>
-                            <TableHead className="text-xs">SkuVault Value</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedResult.differences.map((diff, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="text-xs font-mono">{diff.sku}</TableCell>
-                              <TableCell className="text-xs">{diff.field}</TableCell>
-                              <TableCell className="text-xs text-red-600">
-                                {diff.localValue === null ? '(missing)' : String(diff.localValue)}
-                              </TableCell>
-                              <TableCell className="text-xs text-green-600">
-                                {diff.skuvaultValue === null ? '(missing)' : String(diff.skuvaultValue)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                )}
+          {selectedResult && (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-3 gap-3">
+                <Card className={selectedResult.missingInLocal > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : ''}>
+                  <CardContent className="pt-3 pb-3">
+                    <p className="text-xl font-bold text-red-600">{selectedResult.missingInLocal}</p>
+                    <p className="text-xs text-muted-foreground">Missing in Local</p>
+                  </CardContent>
+                </Card>
+                <Card className={selectedResult.missingInSkuvault > 0 ? 'border-orange-300 bg-orange-50 dark:bg-orange-900/20' : ''}>
+                  <CardContent className="pt-3 pb-3">
+                    <p className="text-xl font-bold text-orange-600">{selectedResult.missingInSkuvault}</p>
+                    <p className="text-xs text-muted-foreground">Missing in SkuVault</p>
+                  </CardContent>
+                </Card>
+                <Card className={selectedResult.fieldMismatches > 0 ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20' : ''}>
+                  <CardContent className="pt-3 pb-3">
+                    <p className="text-xl font-bold text-yellow-600">{selectedResult.fieldMismatches}</p>
+                    <p className="text-xs text-muted-foreground">Qty Mismatches</p>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-          </ScrollArea>
 
-          <DialogFooter>
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-xs border rounded-md p-2 bg-muted/30">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-100 border border-green-400" />
+                  <span>Match</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-100 border border-red-400" />
+                  <span>Missing in Local (in SkuVault only)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-orange-100 border border-orange-400" />
+                  <span>Missing in SkuVault (in Local only)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-yellow-100 border border-yellow-400" />
+                  <span>Qty Mismatch</span>
+                </div>
+              </div>
+
+              {/* Unified Diff Table */}
+              <div className="flex-1 overflow-auto border rounded-md">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="text-xs w-[200px]">SKU</TableHead>
+                      <TableHead className="text-xs text-center w-[100px]">Local Qty</TableHead>
+                      <TableHead className="text-xs text-center w-[100px]">SkuVault Qty</TableHead>
+                      <TableHead className="text-xs w-[140px]">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      // Build unified diff rows
+                      const allSkus = new Set<string>();
+                      const localBySku = new Map<string, number>();
+                      const skuvaultBySku = new Map<string, number>();
+                      
+                      selectedResult.localItems.forEach(item => {
+                        allSkus.add(item.sku);
+                        localBySku.set(item.sku, (localBySku.get(item.sku) || 0) + item.quantityExpected);
+                      });
+                      
+                      selectedResult.skuvaultItems.forEach(item => {
+                        allSkus.add(item.sku);
+                        skuvaultBySku.set(item.sku, (skuvaultBySku.get(item.sku) || 0) + item.quantity);
+                      });
+                      
+                      // Sort SKUs alphabetically
+                      const sortedSkus = Array.from(allSkus).sort();
+                      
+                      return sortedSkus.map((sku, idx) => {
+                        const localQty = localBySku.get(sku);
+                        const svQty = skuvaultBySku.get(sku);
+                        
+                        let status: 'match' | 'missing_local' | 'missing_sv' | 'mismatch';
+                        let rowClass = '';
+                        let statusLabel = '';
+                        let statusBadgeClass = '';
+                        
+                        if (localQty === undefined) {
+                          status = 'missing_local';
+                          rowClass = 'bg-red-50 dark:bg-red-900/20';
+                          statusLabel = 'Missing in Local';
+                          statusBadgeClass = 'bg-red-100 text-red-800 border-red-300';
+                        } else if (svQty === undefined) {
+                          status = 'missing_sv';
+                          rowClass = 'bg-orange-50 dark:bg-orange-900/20';
+                          statusLabel = 'Missing in SkuVault';
+                          statusBadgeClass = 'bg-orange-100 text-orange-800 border-orange-300';
+                        } else if (localQty !== svQty) {
+                          status = 'mismatch';
+                          rowClass = 'bg-yellow-50 dark:bg-yellow-900/20';
+                          statusLabel = 'Qty Mismatch';
+                          statusBadgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                        } else {
+                          status = 'match';
+                          rowClass = 'bg-green-50/50 dark:bg-green-900/10';
+                          statusLabel = 'Match';
+                          statusBadgeClass = 'bg-green-100 text-green-800 border-green-300';
+                        }
+                        
+                        return (
+                          <TableRow key={idx} className={rowClass}>
+                            <TableCell className="text-xs font-mono py-2">{sku}</TableCell>
+                            <TableCell className={`text-xs text-center py-2 ${status === 'missing_local' ? 'text-muted-foreground' : ''}`}>
+                              {localQty !== undefined ? localQty : '-'}
+                            </TableCell>
+                            <TableCell className={`text-xs text-center py-2 ${status === 'missing_sv' ? 'text-muted-foreground' : ''}`}>
+                              {svQty !== undefined ? svQty : '-'}
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusBadgeClass}`}>
+                                {statusLabel}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setSelectedResult(null)}>
               Close
             </Button>
