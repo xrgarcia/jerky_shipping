@@ -10071,6 +10071,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipments containing a specific uncategorized SKU (for troubleshooting)
+  app.get("/api/uncategorized-products/:sku/shipments", requireAuth, async (req, res) => {
+    try {
+      const { sku } = req.params;
+      const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Get all shipments that contain this SKU (pending_categorization only)
+      const shipmentsWithSku = await db
+        .selectDistinct({
+          id: shipmentsTable.id,
+          orderNumber: shipmentsTable.orderNumber,
+          orderDate: shipmentsTable.orderDate,
+          lifecycleStatus: shipmentsTable.lifecycleStatus,
+          fingerprintStatus: shipmentsTable.fingerprintStatus,
+        })
+        .from(shipmentQcItems)
+        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
+        .where(
+          and(
+            eq(shipmentQcItems.sku, sku),
+            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+          )
+        )
+        .orderBy(desc(shipmentsTable.orderDate))
+        .limit(100);
+      
+      res.json({
+        sku,
+        shipments: shipmentsWithSku.map(s => ({
+          id: s.id,
+          orderNumber: s.orderNumber,
+          orderDate: s.orderDate,
+          lifecycleStatus: s.lifecycleStatus,
+          fingerprintStatus: s.fingerprintStatus,
+        })),
+        totalCount: shipmentsWithSku.length,
+      });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error fetching shipments for SKU:", error);
+      res.status(500).json({ error: "Failed to fetch shipments for SKU" });
+    }
+  });
+
   // Get all SKUs that have collection assignments (for filtering uncategorized in catalog)
   app.get("/api/collections/assigned-skus", requireAuth, async (req, res) => {
     try {
