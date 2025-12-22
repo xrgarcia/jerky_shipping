@@ -10075,7 +10075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/uncategorized-products/:sku/shipments", requireAuth, async (req, res) => {
     try {
       const { sku } = req.params;
-      const { shipmentQcItems, shipments } = await import("@shared/schema");
+      // Note: shipments and shipmentQcItems are already imported at top of file
       
       // Get all shipments that contain this SKU (pending_categorization only)
       const shipmentsWithSku = await db
