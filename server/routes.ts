@@ -9620,20 +9620,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Complete reset and recalculate ALL fingerprints
   // This performs a FULL RESET of the fulfillment prep workflow:
   // 1. Clears all fingerprint/packaging/station assignments from shipments
-  // 2. Deletes all fingerprints and fingerprint_models
-  // 3. Recalculates fingerprints based on existing product_collection_mappings
+  // 2. Deletes all fingerprints, fingerprint_models, and shipment_qc_items
+  // 3. Re-hydrates QC items from shipment_items (with kit explosion)
+  // 4. Recalculates fingerprints based on existing product_collection_mappings
   app.post("/api/collections/recalculate-all-fingerprints", requireAuth, async (req, res) => {
     try {
       const { shipments: shipmentsTable, shipmentQcItems, fingerprints, fingerprintModels } = await import("@shared/schema");
-      const { calculateFingerprint } = await import('./services/qc-item-hydrator');
-      const { getProductsBatch } = await import('./services/product-lookup');
+      const { hydrateShipment } = await import('./services/qc-item-hydrator');
+      const { ensureKitMappingsFresh } = await import('./services/kit-mappings-cache');
       
       console.log(`[Collections] Starting COMPLETE RESET of fulfillment prep workflow...`);
       
+      // Ensure kit mappings cache is fresh before processing
+      await ensureKitMappingsFresh();
+      console.log(`[Collections] Kit mappings cache refreshed`);
+      
       // ========== PHASE 1: COMPLETE RESET ==========
       
-      // Step 1a: Reset all shipments that have any fulfillment prep data
-      // This includes shipments with fingerprint_status, decision_subphase, packaging, or station assignments
+      // Step 1a: Reset all shipments to pending state
       const resetResult = await db
         .update(shipmentsTable)
         .set({
@@ -9658,40 +9662,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(shipmentsTable)
         .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'));
       
-      console.log(`[Collections] Reset ${resetCount?.count || 0} shipments to pending_categorization with cleared packaging/station`);
+      console.log(`[Collections] Reset ${resetCount?.count || 0} shipments to pending_categorization`);
       
-      // Step 1b: Delete all shipment_qc_items (so they get re-hydrated with fresh data)
-      const deletedQcItems = await db.delete(shipmentQcItems);
+      // Step 1b: Delete all shipment_qc_items (will be re-hydrated)
+      await db.delete(shipmentQcItems);
       console.log(`[Collections] Deleted all shipment_qc_items`);
       
       // Step 1c: Delete all fingerprint models
-      const deletedModels = await db.delete(fingerprintModels);
+      await db.delete(fingerprintModels);
       console.log(`[Collections] Deleted all fingerprint_models`);
       
       // Step 1d: Delete all fingerprints
-      const deletedFingerprints = await db.delete(fingerprints);
+      await db.delete(fingerprints);
       console.log(`[Collections] Deleted all fingerprints`);
       
-      // ========== PHASE 2: RECALCULATE ==========
+      // ========== PHASE 2: HYDRATE AND RECALCULATE ==========
       
       let totalProcessed = 0;
       let totalCompleted = 0;
       let totalStillPending = 0;
       let totalErrors = 0;
-      let totalItemsUpdated = 0;
+      let totalItemsCreated = 0;
       let batchNumber = 0;
       const BATCH_SIZE = 500;
       
-      console.log(`[Collections] Starting fingerprint recalculation...`);
+      console.log(`[Collections] Starting QC item hydration and fingerprint calculation...`);
       
       // Loop until we've processed everything
       while (true) {
         batchNumber++;
         
-        // Get next batch of shipments that need processing
-        // Using a subquery approach to avoid offset issues with updates
+        // Get next batch of shipments that need processing (include orderNumber for hydrateShipment)
         const batchShipments = await db
-          .select({ id: shipmentsTable.id })
+          .select({ id: shipmentsTable.id, orderNumber: shipmentsTable.orderNumber })
           .from(shipmentsTable)
           .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'))
           .limit(BATCH_SIZE);
@@ -9705,44 +9708,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         for (const shipment of batchShipments) {
           try {
-            // Step 1: Update QC items with weight data from skuvault_products
-            const qcItems = await db
-              .select({ id: shipmentQcItems.id, sku: shipmentQcItems.sku, weightValue: shipmentQcItems.weightValue })
-              .from(shipmentQcItems)
-              .where(eq(shipmentQcItems.shipmentId, shipment.id));
-            
-            // Get items missing weight data
-            const itemsMissingWeight = qcItems.filter(item => item.weightValue === null);
-            if (itemsMissingWeight.length > 0) {
-              const skus = itemsMissingWeight.map(item => item.sku);
-              const products = await getProductsBatch(skus);
-              
-              for (const item of itemsMissingWeight) {
-                const product = products.get(item.sku);
-                if (product && product.weightValue !== undefined && product.weightValue !== null) {
-                  await db
-                    .update(shipmentQcItems)
-                    .set({ 
-                      weightValue: product.weightValue, 
-                      weightUnit: product.weightUnit || 'oz',
-                      updatedAt: new Date()
-                    })
-                    .where(eq(shipmentQcItems.id, item.id));
-                  totalItemsUpdated++;
-                }
-              }
-            }
-            
-            // Step 2: Recalculate fingerprint with updated weight data
-            const result = await calculateFingerprint(shipment.id);
+            // hydrateShipment creates QC items AND calculates fingerprint in one call
+            const result = await hydrateShipment(shipment.id, shipment.orderNumber || 'unknown');
             totalProcessed++;
-            if (result.status === 'complete') {
+            totalItemsCreated += result.itemsCreated;
+            
+            if (result.error) {
+              // Shipment had an issue but wasn't a complete failure
+              totalStillPending++;
+            } else if (result.fingerprintStatus === 'complete') {
               totalCompleted++;
-            } else if (result.status === 'pending_categorization') {
+            } else if (result.fingerprintStatus === 'pending_categorization') {
+              totalStillPending++;
+            } else {
+              // No items found or other reason
               totalStillPending++;
             }
           } catch (err) {
-            console.error(`[Collections] Error recalculating fingerprint for shipment ${shipment.id}:`, err);
+            console.error(`[Collections] Error hydrating shipment ${shipment.id}:`, err);
             totalErrors++;
             totalProcessed++;
           }
@@ -9751,7 +9734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[Collections] Batch ${batchNumber} complete. Running totals: ${totalProcessed} processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors`);
       }
       
-      console.log(`[Collections] COMPLETE RESET AND RECALCULATION DONE: ${totalProcessed} shipments processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsUpdated} QC items updated with weight`);
+      console.log(`[Collections] COMPLETE RESET AND RECALCULATION DONE: ${totalProcessed} shipments processed, ${totalCompleted} completed, ${totalStillPending} pending, ${totalErrors} errors, ${totalItemsCreated} QC items created`);
       
       res.json({
         success: true,
@@ -9760,7 +9743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completed: totalCompleted,
         stillPending: totalStillPending,
         errors: totalErrors,
-        itemsUpdated: totalItemsUpdated,
+        itemsCreated: totalItemsCreated,
         batches: batchNumber
       });
     } catch (error: any) {

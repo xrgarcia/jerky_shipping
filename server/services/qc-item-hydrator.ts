@@ -335,8 +335,9 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
 
 /**
  * Hydrate QC items for a single shipment
+ * Exported for use in recalculate-all route
  */
-async function hydrateShipment(shipmentId: string, orderNumber: string): Promise<HydrationResult> {
+export async function hydrateShipment(shipmentId: string, orderNumber: string): Promise<HydrationResult> {
   try {
     // Get shipment items (non-exploded)
     const items = await db
