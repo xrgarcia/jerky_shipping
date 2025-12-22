@@ -162,25 +162,18 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
       log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
     }
 
-    // CACHE WARMING: When session becomes 'closed', proactively warm the QCSale cache
-    // This dramatically reduces SkuVault API calls during active packing operations
-    // See replit.md "Warehouse Session Lifecycle" for critical system knowledge
-    // Normalize to lowercase - Firestore stores "Closed" with capital C
-    if (session.session_status?.toLowerCase() === 'closed') {
-      // Use buildShipmentContext to ensure all required fields are included
-      // Override sessionStatus to 'closed' since we know the session is closed from Firestore
-      const shipmentContext = buildShipmentContext({
-        ...shipment,
-        sessionId: shipment.sessionId || session.session_id.toString(),
-      }, 'closed');
-      const readyResult = isPackingReadyWithReason(shipmentContext);
-      const action = shipment.trackingNumber ? 'invalidation' : (readyResult.ready ? 'warming' : `skip (${readyResult.reason})`);
-      log(`Session ${session.session_id} is closed, triggering cache ${action} for order ${session.order_number}`);
-      // Fire and forget - don't block session sync on cache warming
-      onSessionClosed(session.order_number, shipmentContext).catch(err => {
-        log(`Cache warming error for order ${session.order_number}: ${err.message}`);
-      });
-    }
+    // CACHE WARMING DISABLED: Bypassing cache entirely - packing pages go direct to SkuVault API
+    // When session becomes 'closed', we used to warm the QCSale cache here.
+    // Keeping the session sync logic but removing cache warming.
+    // if (session.session_status?.toLowerCase() === 'closed') {
+    //   const shipmentContext = buildShipmentContext({
+    //     ...shipment,
+    //     sessionId: shipment.sessionId || session.session_id.toString(),
+    //   }, 'closed');
+    //   onSessionClosed(session.order_number, shipmentContext).catch(err => {
+    //     log(`Cache warming error for order ${session.order_number}: ${err.message}`);
+    //   });
+    // }
 
     return true;
   } catch (error: any) {
@@ -267,20 +260,13 @@ async function detectClosedSessionTransitions(
         shipmentData: { sessionStatus: 'closed' }
       });
 
-      // Trigger cache warming (only if we have a valid order number)
-      if (orderNumber) {
-        // Use buildShipmentContext to ensure all required fields are included
-        // Override sessionStatus to 'closed' since we just confirmed the session is closed
-        const shipmentContext = buildShipmentContext(shipment, 'closed');
-        const readyResult = isPackingReadyWithReason(shipmentContext);
-        const action = shipment.trackingNumber ? 'invalidation' : (readyResult.ready ? 'warming' : `skip (${readyResult.reason})`);
-        log(`Triggering cache ${action} for closed session ${session.session_id}`);
-        onSessionClosed(orderNumber, shipmentContext).catch(err => {
-          log(`Cache warming error for order ${orderNumber}: ${err.message}`);
-        });
-      } else {
-        log(`Skipping cache warming for session ${session.session_id} - no order number available`);
-      }
+      // CACHE WARMING DISABLED: Bypassing cache entirely - packing pages go direct to SkuVault API
+      // if (orderNumber) {
+      //   const shipmentContext = buildShipmentContext(shipment, 'closed');
+      //   onSessionClosed(orderNumber, shipmentContext).catch(err => {
+      //     log(`Cache warming error for order ${orderNumber}: ${err.message}`);
+      //   });
+      // }
 
       closedCount++;
     }
@@ -465,10 +451,10 @@ export async function syncFirestoreSessions(): Promise<number> {
     const closedCount = await detectClosedSessionTransitions(nonClosedSessionIds);
     syncedCount += closedCount;
 
-    // CACHE WARMING SAFETY NET: Ensure any packing-ready shipments with missing
-    // cacheWarmedAt get warmed (catches failed warmings, worker restarts, etc.)
-    // Also validates Redis actually has entries for those with cacheWarmedAt set
-    const ensuredCount = await ensureClosedSessionsWarmed();
+    // CACHE WARMING DISABLED: Bypassing cache entirely - packing pages go direct to SkuVault API
+    // The safety net that warmed packing-ready shipments is no longer needed.
+    // const ensuredCount = await ensureClosedSessionsWarmed();
+    const ensuredCount = 0;
 
     // Update stats
     workerStats.totalSynced += syncedCount;
