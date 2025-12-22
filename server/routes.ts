@@ -10083,7 +10083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: shipments.id,
           orderNumber: shipments.orderNumber,
           orderDate: shipments.orderDate,
-          lifecycleStatus: shipments.lifecycleStatus,
+          shipmentStatus: shipments.shipmentStatus,
           fingerprintStatus: shipments.fingerprintStatus,
         })
         .from(shipments)
@@ -10094,7 +10094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(shipments.fingerprintStatus, 'pending_categorization')
           )
         )
-        .groupBy(shipments.id, shipments.orderNumber, shipments.orderDate, shipments.lifecycleStatus, shipments.fingerprintStatus)
+        .groupBy(shipments.id, shipments.orderNumber, shipments.orderDate, shipments.shipmentStatus, shipments.fingerprintStatus)
         .orderBy(desc(shipments.orderDate))
         .limit(100);
       
@@ -10104,7 +10104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: s.id,
           orderNumber: s.orderNumber,
           orderDate: s.orderDate,
-          lifecycleStatus: s.lifecycleStatus,
+          shipmentStatus: s.shipmentStatus,
           fingerprintStatus: s.fingerprintStatus,
         })),
         totalCount: shipmentsWithSku.length,
