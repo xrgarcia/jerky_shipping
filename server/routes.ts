@@ -11231,18 +11231,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(shipments.shipmentStatus, shipmentStatus as string));
       }
       
-      // Only include shipments that have QC items
+      // Only include shipments that have QC items - use EXISTS subquery for efficiency
+      const hasQcItemsCondition = sql`EXISTS (SELECT 1 FROM shipment_qc_items WHERE shipment_id = ${shipments.id})`;
+      conditions.push(hasQcItemsCondition);
+      
       const shipmentsWithQcItems = await db
         .select({
           id: shipments.id,
           orderNumber: shipments.orderNumber,
           orderDate: shipments.orderDate,
           shipmentStatus: shipments.shipmentStatus,
-          qcItemCount: sql<number>`COALESCE((SELECT COUNT(*) FROM shipment_qc_items WHERE shipment_id = ${shipments.id}), 0)`,
+          qcItemCount: sql<number>`(SELECT COUNT(*) FROM shipment_qc_items WHERE shipment_id = ${shipments.id})`,
         })
         .from(shipments)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .having(sql`COALESCE((SELECT COUNT(*) FROM shipment_qc_items WHERE shipment_id = ${shipments.id}), 0) > 0`)
+        .where(and(...conditions))
         .orderBy(desc(shipments.orderDate))
         .limit(pageSizeNum)
         .offset(offset);
