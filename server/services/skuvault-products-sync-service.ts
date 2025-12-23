@@ -40,6 +40,7 @@ interface ReportingProduct {
   weight_value: number | null; // Decimal value (e.g., 2.5 for 2.5oz)
   weight_unit: string | null;
   parent_sku: string | null; // For variants: the parent SKU (null for parents/kits)
+  quantity_on_hand: number | null; // Current stock quantity from SkuVault
 }
 
 /**
@@ -84,6 +85,7 @@ function mergeProducts(
   mergeField('weight_value');
   mergeField('weight_unit');
   mergeField('parent_sku');
+  mergeField('quantity_on_hand');
   
   return merged;
 }
