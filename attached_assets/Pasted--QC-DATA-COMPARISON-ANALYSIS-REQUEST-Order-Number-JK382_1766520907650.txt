@@ -1,0 +1,60 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825353323-PR
+Shipment ID: 090895aa-903d-4419-8538-c32e0bd8fb29
+
+--- SUMMARY ---
+Total Differences: 4
+Missing in Local (ship.): 3
+Missing in SkuVault: 1
+Quantity Mismatches: 0
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-TRI-SD-3PK | 4000003550 | Test Kitchen - Tri-Tip 3 Pack Bundle - 7.5oz. | 1
+BTJ-BEJ-12-16 | 811007027187 | Bricktown Jerky - Soft & Tender Honey Pepper Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+BTJ-BEJ-12-16 | 811007027187 | Bricktown Jerky - Soft & Tender Honey Pepper Beef Jerky - 2.5 oz. | 1
+JCB-TRI-30-16 | 850073089064 | Test Kitchen - Chipotle Bourbon Tri-Tip Beef Jerky - 2.5 oz. | 1
+JCB-TRI-8-16 | 850073089057 | Test Kitchen - Honey Teriyaki Tri-Tip Beef Jerky - 2.5 oz. | 1
+JCB-TRI-1-16 | 850073089040 | Limited Edition - Original Tri-Tip Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+
+--- DETAILED DIFFERENCES ---
+SKU | Field | Local Value | SkuVault Value
+JCB-TRI-30-16 | item | (missing) | qty: 1
+JCB-TRI-8-16 | item | (missing) | qty: 1
+JCB-TRI-1-16 | item | (missing) | qty: 1
+JCB-TRI-SD-3PK | item | qty: 1 | (missing)
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components
+JCB-TRI-SD-3PK | Beef Jerky | YES | null | yes | JCB-TRI-1-16x1, JCB-TRI-30-16x1, JCB-TRI-8-16x1
+BTJ-BEJ-12-16 | Beef Jerky | no | null | yes | none
+JCB-VEJ-1-17 | Exotic Jerky | no | null | yes | none
+JCB-TRI-30-16 | Beef Jerky | no | null | yes | none
+JCB-TRI-8-16 | Beef Jerky | no | null | yes | none
+JCB-TRI-1-16 | Beef Jerky | no | null | yes | none
+
+--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---
+KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.
+APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)
+- 'Category' = product_category ('kit' = should be exploded at fulfillment)
+- Kit Components = Expected components from kit_mappings_cache
+
+--- COMMON ISSUES ---
+1. MISCATEGORIZED PRODUCT: If Is AP=YES but SkuVault exploded it → Product is mislabeled.
+   - Should be category='kit' if it needs to be exploded at fulfillment
+   - OR should NOT be exploded if it's truly pre-built
+2. If local has parent SKU but SkuVault returns components → Kit explosion working, but local data wasn't exploded
+3. If components don't match kit_mappings → Kit definition changed or mapping out of sync
