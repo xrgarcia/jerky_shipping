@@ -147,7 +147,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       cost::text as unit_cost,
       NULL::real as weight_value,
       NULL::text as weight_unit,
-      NULL::text as parent_sku
+      NULL::text as parent_sku,
+      available_quantity as quantity_on_hand
     FROM 
       public.internal_kit_inventory 
     WHERE snapshot_timestamp = (
@@ -170,7 +171,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       weight_value::real as weight_value,
       COST::text AS unit_cost,
       (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
-      NULL::text as parent_sku
+      NULL::text as parent_sku,
+      quantity_on_hand
     FROM
       public.internal_inventory 
     LEFT JOIN 
@@ -201,7 +203,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       weight_value::real as weight_value,
       COST::text AS unit_cost,
       primary_sku as parent_sku,
-      (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product
+      (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
+      quantity_on_hand
     FROM
       public.internal_inventory 
     LEFT JOIN 
@@ -451,6 +454,7 @@ export async function syncSkuvaultProducts(): Promise<{
         weightValue: p.weight_value,
         weightUnit: p.weight_unit,
         parentSku: p.parent_sku,
+        quantityOnHand: p.quantity_on_hand ?? 0,
       }));
       
       await db.insert(skuvaultProducts).values(insertData);
