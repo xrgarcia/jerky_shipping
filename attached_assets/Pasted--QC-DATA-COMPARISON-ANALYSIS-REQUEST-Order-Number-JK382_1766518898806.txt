@@ -1,0 +1,52 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825351948-EV
+Shipment ID: 45ca21ea-0d84-4d91-b7a0-4a1b81a030e8
+
+--- SUMMARY ---
+Total Differences: 1
+Missing in Local (ship.): 0
+Missing in SkuVault: 0
+Quantity Mismatches: 1
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-CMB-EXJC | 811007028542 | Exotic Jerky Combo | 2
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 4
+JCB-BEJ-145-16 | 850073089149 | Test Kitchen - Garlic Black Pepper Beef Jerky 2.5 oz. | 2
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+JCB-CMB-EXJC | 811007028542 | Exotic Jerky Combo | 2
+JCB-BEJ-145-16 | 850073089149 | Test Kitchen - Garlic Black Pepper Beef Jerky 2.5 oz. | 2
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 8
+
+--- DETAILED DIFFERENCES ---
+SKU | Field | Local Value | SkuVault Value
+JCB-VEJ-5-17 | quantity | 4 | 8
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components
+JCB-CMB-EXJC | Combos and Samplers | YES | null | yes | JCB-BUJ-1-17x1, JCB-CMB-EXJC-POUCHx1, JCB-ELJ-1-17x1, JCB-VEJ-1-17x1, JCB-WBJ-1-17x1
+JCB-VEJ-5-17 | Exotic Jerky | no | null | yes | none
+JCB-BEJ-145-16 | Beef Jerky | no | null | yes | none
+
+--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---
+KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.
+APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)
+- 'Category' = product_category ('kit' = should be exploded at fulfillment)
+- Kit Components = Expected components from kit_mappings_cache
+
+--- COMMON ISSUES ---
+1. MISCATEGORIZED PRODUCT: If Is AP=YES but SkuVault exploded it → Product is mislabeled.
+   - Should be category='kit' if it needs to be exploded at fulfillment
+   - OR should NOT be exploded if it's truly pre-built
+2. If local has parent SKU but SkuVault returns components → Kit explosion working, but local data wasn't exploded
+3. If components don't match kit_mappings → Kit definition changed or mapping out of sync
