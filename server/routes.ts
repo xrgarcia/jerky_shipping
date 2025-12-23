@@ -11384,11 +11384,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Handle kit products - add components instead of parent kit
               if (item.IsKit && item.KitProducts && item.KitProducts.length > 0) {
                 for (const component of item.KitProducts) {
+                  // IMPORTANT: SkuVault's component.Quantity is already the TOTAL needed
+                  // (pre-multiplied by kit quantity ordered). Do NOT multiply by item.Quantity again.
+                  // Example: Kit ordered x2 with 2 components each → component.Quantity = 4 (already multiplied)
                   skuvaultItems.push({
                     sku: component.Sku || '',
                     barcode: component.Code || null,
                     title: component.Title || null,
-                    quantity: (component.Quantity || 1) * (item.Quantity || 1),
+                    quantity: component.Quantity || 1,
                   });
                 }
               } else {
