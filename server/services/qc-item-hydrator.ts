@@ -378,11 +378,24 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       const sku = item.sku;
       const quantity = item.quantity || 1;
       
-      // Only explode if product has category 'kit' AND has component mappings
+      // Determine if product should be exploded into components
       const productInfo = preProductCache.get(sku);
       const isKitCategory = productInfo?.productCategory?.toLowerCase() === 'kit';
+      const isAssembledProduct = productInfo?.isAssembledProduct ?? false;
+      const quantityOnHand = productInfo?.quantityOnHand ?? 0;
       const hasKitComponents = isKit(sku);
-      const shouldExplode = isKitCategory && hasKitComponents;
+      
+      // Explode if:
+      // 1. Product category is 'kit' AND has component mappings, OR
+      // 2. Product is an AP (Assembled Product) with zero stock AND has component mappings
+      //    (APs with zero stock need to be built at fulfillment time like kits)
+      const shouldExplodeAsKit = isKitCategory && hasKitComponents;
+      const shouldExplodeAsOutOfStockAP = isAssembledProduct && quantityOnHand === 0 && hasKitComponents;
+      const shouldExplode = shouldExplodeAsKit || shouldExplodeAsOutOfStockAP;
+      
+      if (shouldExplodeAsOutOfStockAP && !shouldExplodeAsKit) {
+        log(`AP explosion (zero stock): ${sku} has qty=${quantityOnHand}, exploding into components`);
+      }
       
       if (shouldExplode) {
         const components = getKitComponents(sku);

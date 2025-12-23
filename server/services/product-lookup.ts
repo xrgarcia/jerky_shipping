@@ -24,6 +24,7 @@ export interface ProductInfo {
   weightUnit: string | null;
   productCategory: string | null;
   parentSku: string | null;
+  quantityOnHand: number;
 }
 
 /**
@@ -41,6 +42,7 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
       weightUnit: skuvaultProducts.weightUnit,
       productCategory: skuvaultProducts.productCategory,
       parentSku: skuvaultProducts.parentSku,
+      quantityOnHand: skuvaultProducts.quantityOnHand,
     })
     .from(skuvaultProducts)
     .where(eq(skuvaultProducts.sku, sku))
@@ -60,6 +62,7 @@ export async function getProduct(sku: string): Promise<ProductInfo | undefined> 
     weightUnit: result[0].weightUnit,
     productCategory: result[0].productCategory,
     parentSku: result[0].parentSku,
+    quantityOnHand: result[0].quantityOnHand ?? 0,
   };
 }
 
@@ -83,6 +86,7 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       weightUnit: skuvaultProducts.weightUnit,
       productCategory: skuvaultProducts.productCategory,
       parentSku: skuvaultProducts.parentSku,
+      quantityOnHand: skuvaultProducts.quantityOnHand,
     })
     .from(skuvaultProducts)
     .where(inArray(skuvaultProducts.sku, uniqueSkus));
@@ -99,6 +103,7 @@ export async function getProductsBatch(skus: string[]): Promise<Map<string, Prod
       weightUnit: row.weightUnit,
       productCategory: row.productCategory,
       parentSku: row.parentSku,
+      quantityOnHand: row.quantityOnHand ?? 0,
     });
   }
   
