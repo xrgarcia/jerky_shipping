@@ -157,6 +157,15 @@ function ProductDetailDialog({
                 </p>
               </div>
               <div>
+                <label className="text-sm font-medium text-muted-foreground">Qty On Hand</label>
+                <p className="text-sm font-mono" data-testid="detail-qty">
+                  {product.quantityOnHand?.toLocaleString() ?? "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="text-sm font-medium text-muted-foreground">Weight</label>
                 <p className="text-sm font-mono" data-testid="detail-weight">
                   {product.weightValue && product.weightUnit 
@@ -636,6 +645,7 @@ export default function SkuvaultProducts() {
                       <TableHead className="w-[140px]">Product Category</TableHead>
                       <TableHead className="w-[60px] text-center">AP</TableHead>
                       <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
+                      <TableHead className="w-[100px] text-right">Qty On Hand</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -685,6 +695,9 @@ export default function SkuvaultProducts() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {product.unitCost ? `$${parseFloat(product.unitCost).toFixed(2)}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`qty-${product.sku}`}>
+                          {product.quantityOnHand?.toLocaleString() ?? "-"}
                         </TableCell>
                       </TableRow>
                     ))}
