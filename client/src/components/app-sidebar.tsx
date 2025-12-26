@@ -114,7 +114,7 @@ export function AppSidebar() {
       icon: Layers,
     },
     {
-      title: "SkuVault Products",
+      title: "Products",
       url: "/skuvault-products",
       icon: Package,
     },
