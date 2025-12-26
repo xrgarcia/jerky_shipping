@@ -135,7 +135,9 @@ async function setLastSyncedDate(dateStr: string): Promise<void> {
 async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   log('Fetching products from reporting database (3-way merge)...');
   
-  // 1. Fetch kit products (no weight data, but have cost and is_assembled_product=true)
+  // 1. Fetch kit products (no weight data, but have cost)
+  // NOTE: is_assembled_product=false because kits are EXPLODED at fulfillment time
+  // APs (pre-built products) have is_assembled_product=true and are NOT exploded
   const kitProducts = await reportingSql<ReportingProduct[]>`
     SELECT 
       sku,
@@ -143,7 +145,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       description as product_title,
       code as barcode,
       'kit' as product_category,
-      true as is_assembled_product, 
+      false as is_assembled_product, 
       cost::text as unit_cost,
       NULL::real as weight_value,
       NULL::text as weight_unit,
