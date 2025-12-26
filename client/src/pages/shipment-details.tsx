@@ -4,9 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
+import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -38,6 +39,11 @@ export default function ShipmentDetails() {
 
   const { data: packages } = useQuery<ShipmentPackage[]>({
     queryKey: ['/api/shipments', shipmentId, 'packages'],
+    enabled: !!shipmentId,
+  });
+
+  const { data: qcItems } = useQuery<ShipmentQcItem[]>({
+    queryKey: ['/api/shipments', shipmentId, 'qc-items'],
     enabled: !!shipmentId,
   });
 
@@ -653,14 +659,14 @@ export default function ShipmentDetails() {
         </Card>
       )}
 
-      {/* Items */}
-      {items && items.length > 0 && (
+      {/* Items - with tabs for Purchased vs Fulfilled */}
+      {((items && items.length > 0) || (qcItems && qcItems.length > 0)) && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Items ({items.length})
+                Items
               </CardTitle>
               {tags && tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -674,49 +680,138 @@ export default function ShipmentDetails() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left px-6 py-4 font-semibold">SKU</th>
-                    <th className="text-left px-6 py-4 font-semibold">Product</th>
-                    <th className="text-center px-6 py-4 font-semibold">Quantity</th>
-                    <th className="text-right px-6 py-4 font-semibold">Unit Price</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {items.map((item, index) => (
-                    <tr key={index} className="hover-elevate">
-                      <td className="px-6 py-4">
-                        <code className="text-sm font-mono bg-muted px-3 py-1.5 rounded">
-                          {item.sku || 'N/A'}
-                        </code>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {item.imageUrl && (
-                            <img 
-                              src={item.imageUrl} 
-                              alt={item.name || 'Product'}
-                              className="w-16 h-16 object-cover rounded border"
-                            />
-                          )}
-                          <span className="text-base font-medium">{item.name || 'Unknown Product'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xl font-bold">{item.quantity}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="text-lg">
-                          {item.unitPrice ? `$${parseFloat(item.unitPrice).toFixed(2)}` : 'N/A'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Tabs defaultValue="purchased" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="purchased" className="flex items-center gap-2" data-testid="tab-purchased-items">
+                  <ShoppingCart className="h-4 w-4" />
+                  Purchased Items ({items?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="fulfilled" className="flex items-center gap-2" data-testid="tab-fulfilled-items">
+                  <PackageCheck className="h-4 w-4" />
+                  Fulfilled Items ({qcItems?.length || 0})
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Purchased Items Tab */}
+              <TabsContent value="purchased">
+                {items && items.length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left px-6 py-4 font-semibold">SKU</th>
+                          <th className="text-left px-6 py-4 font-semibold">Product</th>
+                          <th className="text-center px-6 py-4 font-semibold">Quantity</th>
+                          <th className="text-right px-6 py-4 font-semibold">Unit Price</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {items.map((item, index) => (
+                          <tr key={index} className="hover-elevate" data-testid={`row-purchased-item-${index}`}>
+                            <td className="px-6 py-4">
+                              <code className="text-sm font-mono bg-muted px-3 py-1.5 rounded">
+                                {item.sku || 'N/A'}
+                              </code>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                {item.imageUrl && (
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.name || 'Product'}
+                                    className="w-16 h-16 object-cover rounded border"
+                                  />
+                                )}
+                                <span className="text-base font-medium">{item.name || 'Unknown Product'}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-xl font-bold">{item.quantity}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-lg">
+                                {item.unitPrice ? `$${parseFloat(item.unitPrice).toFixed(2)}` : 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No purchased items found
+                  </div>
+                )}
+              </TabsContent>
+              
+              {/* Fulfilled Items Tab (QC Items - exploded kits) */}
+              <TabsContent value="fulfilled">
+                {qcItems && qcItems.length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left px-6 py-4 font-semibold">SKU</th>
+                          <th className="text-left px-6 py-4 font-semibold">Barcode</th>
+                          <th className="text-left px-6 py-4 font-semibold">Product</th>
+                          <th className="text-center px-6 py-4 font-semibold">Qty Expected</th>
+                          <th className="text-right px-6 py-4 font-semibold">Weight</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {qcItems.map((qcItem, index) => (
+                          <tr key={qcItem.id || index} className="hover-elevate" data-testid={`row-fulfilled-item-${index}`}>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1">
+                                <code className="text-sm font-mono bg-muted px-3 py-1.5 rounded">
+                                  {qcItem.sku || 'N/A'}
+                                </code>
+                                {qcItem.isKitComponent && qcItem.parentSku && (
+                                  <span className="text-xs text-muted-foreground">
+                                    from kit: {qcItem.parentSku}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <code className="text-sm font-mono text-muted-foreground">
+                                {qcItem.barcode || 'N/A'}
+                              </code>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                {qcItem.imageUrl && (
+                                  <img 
+                                    src={qcItem.imageUrl} 
+                                    alt={qcItem.description || 'Product'}
+                                    className="w-16 h-16 object-cover rounded border"
+                                  />
+                                )}
+                                <span className="text-base font-medium">{qcItem.description || 'Unknown Product'}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-xl font-bold">{qcItem.quantityExpected}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-lg">
+                                {qcItem.weightValue ? `${qcItem.weightValue} ${qcItem.weightUnit || 'oz'}` : 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No fulfilled items found</p>
+                    <p className="text-sm mt-1">QC items are hydrated when the order reaches "Ready to Fulfill" status</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}
