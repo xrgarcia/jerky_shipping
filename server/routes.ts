@@ -1013,36 +1013,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all products with variants
-  app.get("/api/products", requireAuth, async (req, res) => {
+  // Get all Shopify products with variants
+  app.get("/api/shopify-products", requireAuth, async (req, res) => {
     try {
-      const productsWithVariants = await storage.getAllProductsWithVariants();
+      const productsWithVariants = await storage.getAllShopifyProductsWithVariants();
       res.json({ productsWithVariants });
     } catch (error) {
-      console.error("Error fetching products:", error);
-      res.status(500).json({ error: "Failed to fetch products" });
+      console.error("Error fetching Shopify products:", error);
+      res.status(500).json({ error: "Failed to fetch Shopify products" });
     }
   });
 
-  // Get product by ID with variants
-  app.get("/api/products/:id", requireAuth, async (req, res) => {
+  // Get Shopify product by ID with variants
+  app.get("/api/shopify-products/:id", requireAuth, async (req, res) => {
     try {
-      const product = await storage.getProduct(req.params.id);
+      const product = await storage.getShopifyProduct(req.params.id);
       
       if (!product) {
-        return res.status(404).json({ error: "Product not found" });
+        return res.status(404).json({ error: "Shopify product not found" });
       }
 
-      const variants = await storage.getProductVariants(product.id);
+      const variants = await storage.getShopifyProductVariants(product.id);
       res.json({ product, variants });
     } catch (error) {
-      console.error("Error fetching product:", error);
-      res.status(500).json({ error: "Failed to fetch product" });
+      console.error("Error fetching Shopify product:", error);
+      res.status(500).json({ error: "Failed to fetch Shopify product" });
     }
   });
 
-  // Search products by barcode or SKU
-  app.get("/api/products/search", requireAuth, async (req, res) => {
+  // Search Shopify products by barcode or SKU
+  app.get("/api/shopify-products/search", requireAuth, async (req, res) => {
     try {
       const barcode = req.query.barcode as string;
       const sku = req.query.sku as string;
@@ -1054,21 +1054,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let variant = null;
 
       if (barcode) {
-        variant = await storage.getVariantByBarcode(barcode);
+        variant = await storage.getShopifyVariantByBarcode(barcode);
       } else if (sku) {
-        variant = await storage.getVariantBySku(sku);
+        variant = await storage.getShopifyVariantBySku(sku);
       }
 
       if (!variant) {
-        return res.status(404).json({ error: "Product variant not found" });
+        return res.status(404).json({ error: "Shopify product variant not found" });
       }
 
-      const product = await storage.getProduct(variant.productId);
+      const product = await storage.getShopifyProduct(variant.productId);
 
       res.json({ variant, product });
     } catch (error) {
-      console.error("Error searching products:", error);
-      res.status(500).json({ error: "Failed to search products" });
+      console.error("Error searching Shopify products:", error);
+      res.status(500).json({ error: "Failed to search Shopify products" });
     }
   });
 

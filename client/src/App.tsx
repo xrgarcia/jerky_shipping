@@ -12,7 +12,7 @@ import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Shipments from "@/pages/shipments";
 import ShipmentDetails from "@/pages/shipment-details";
-import Products from "@/pages/products";
+import ShopifyProducts from "@/pages/shopify-products";
 import Packing from "@/pages/packing";
 import Bagging from "@/pages/bagging";
 import PackingReady from "@/pages/packing-ready";
@@ -91,7 +91,7 @@ function AppContent() {
       <Route path="/packing" component={Packing} />
       <Route path="/bagging" component={Bagging} />
       <Route path="/packing-ready" component={PackingReady} />
-      <Route path="/products" component={Products} />
+      <Route path="/shopify-products" component={ShopifyProducts} />
       <Route path="/sessions" component={Sessions} />
       <Route path="/tools/backfill" component={Backfill} />
       <Route path="/tools/operations" component={Operations} />

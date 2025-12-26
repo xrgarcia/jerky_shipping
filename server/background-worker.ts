@@ -109,11 +109,11 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
 
         // Handle product deletion
         if (topic === 'products/delete') {
-          await storage.softDeleteProduct(shopifyProduct.id.toString());
+          await storage.softDeleteShopifyProduct(shopifyProduct.id.toString());
           // Soft delete all variants (including already deleted ones)
-          const allVariants = await storage.getProductVariants(shopifyProduct.id.toString());
+          const allVariants = await storage.getShopifyProductVariants(shopifyProduct.id.toString());
           for (const variant of allVariants) {
-            await storage.softDeleteProductVariant(variant.id);
+            await storage.softDeleteShopifyProductVariant(variant.id);
           }
           console.log(`Soft deleted product ${shopifyProduct.id} and its variants`);
         } else {
@@ -128,7 +128,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
             deletedAt: null, // Resurrect product if previously deleted
           };
 
-          await storage.upsertProduct(productData);
+          await storage.upsertShopifyProduct(productData);
 
           // Get current variant IDs from Shopify
           const shopifyVariants = shopifyProduct.variants || [];
@@ -136,17 +136,17 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
 
           // Get existing variants (including soft-deleted ones for reconciliation)
           const db = await import("./db").then(m => m.db);
-          const { productVariants } = await import("@shared/schema");
+          const { shopifyProductVariants } = await import("@shared/schema");
           const { eq } = await import("drizzle-orm");
           const existingVariants = await db
             .select()
-            .from(productVariants)
-            .where(eq(productVariants.productId, shopifyProduct.id.toString()));
+            .from(shopifyProductVariants)
+            .where(eq(shopifyProductVariants.productId, shopifyProduct.id.toString()));
 
           // Soft-delete variants that are no longer in Shopify payload
           for (const existingVariant of existingVariants) {
             if (!shopifyVariantIds.has(existingVariant.id) && !existingVariant.deletedAt) {
-              await storage.softDeleteProductVariant(existingVariant.id);
+              await storage.softDeleteShopifyProductVariant(existingVariant.id);
             }
           }
 
@@ -168,7 +168,7 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
               deletedAt: null, // Resurrect variant if previously deleted
             };
 
-            await storage.upsertProductVariant(variantData);
+            await storage.upsertShopifyProductVariant(variantData);
           }
 
           console.log(`Upserted product ${shopifyProduct.id} with ${shopifyVariants.length} variants`);

@@ -86,12 +86,12 @@ export async function bootstrapProductsFromShopify(): Promise<void> {
       try {
         // Check if product exists (including soft-deleted) to determine create vs update
         const db = await import("../db").then(m => m.db);
-        const { products: productsTable } = await import("@shared/schema");
+        const { shopifyProducts: shopifyProductsTable } = await import("@shared/schema");
         const { eq } = await import("drizzle-orm");
         const existingProducts = await db
           .select()
-          .from(productsTable)
-          .where(eq(productsTable.id, shopifyProduct.id.toString()));
+          .from(shopifyProductsTable)
+          .where(eq(shopifyProductsTable.id, shopifyProduct.id.toString()));
         const existing = existingProducts[0];
 
         const productData = {
@@ -104,7 +104,7 @@ export async function bootstrapProductsFromShopify(): Promise<void> {
           deletedAt: null, // Resurrect if previously deleted
         };
 
-        await storage.upsertProduct(productData);
+        await storage.upsertShopifyProduct(productData);
 
         if (existing) {
           productsUpdated++;
@@ -117,16 +117,16 @@ export async function bootstrapProductsFromShopify(): Promise<void> {
         const shopifyVariantIds = new Set(shopifyVariants.map((v: any) => v.id.toString()));
 
         // Get existing variants (including soft-deleted ones for reconciliation)
-        const { productVariants } = await import("@shared/schema");
+        const { shopifyProductVariants } = await import("@shared/schema");
         const existingVariants = await db
           .select()
-          .from(productVariants)
-          .where(eq(productVariants.productId, shopifyProduct.id.toString()));
+          .from(shopifyProductVariants)
+          .where(eq(shopifyProductVariants.productId, shopifyProduct.id.toString()));
 
         // Soft-delete variants that are no longer in Shopify payload
         for (const existingVariant of existingVariants) {
           if (!shopifyVariantIds.has(existingVariant.id) && !existingVariant.deletedAt) {
-            await storage.softDeleteProductVariant(existingVariant.id);
+            await storage.softDeleteShopifyProductVariant(existingVariant.id);
           }
         }
 
@@ -148,7 +148,7 @@ export async function bootstrapProductsFromShopify(): Promise<void> {
             deletedAt: null, // Resurrect if previously deleted
           };
 
-          await storage.upsertProductVariant(variantData);
+          await storage.upsertShopifyProductVariant(variantData);
           variantsCreated++;
         }
       } catch (productError: any) {

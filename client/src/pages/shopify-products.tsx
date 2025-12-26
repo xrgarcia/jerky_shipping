@@ -7,19 +7,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Search, Package2, Box } from "lucide-react";
-import type { Product, ProductVariant } from "@shared/schema";
+import type { ShopifyProduct, ShopifyProductVariant } from "@shared/schema";
 
 interface ProductDetail {
-  product: Product;
-  variants: ProductVariant[];
+  product: ShopifyProduct;
+  variants: ShopifyProductVariant[];
 }
 
-export default function Products() {
+export default function ShopifyProducts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
 
   const { data: productsData, isLoading } = useQuery<{ productsWithVariants: ProductDetail[] }>({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/shopify-products"],
   });
 
   const productsWithVariants = productsData?.productsWithVariants || [];
