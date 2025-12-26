@@ -1886,19 +1886,19 @@ export default function Fingerprints() {
                                             Delete Session
                                           </Button>
                                         </div>
-                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                                        <div className="space-y-5 max-h-[500px] overflow-y-auto pr-1">
                                           {details.shipments.map((shipment, idx) => (
                                             <div
                                               key={shipment.id}
-                                              className="rounded-lg border-2 border-primary/20 bg-background overflow-hidden shadow-sm"
+                                              className="rounded-lg border-2 border-primary/30 bg-background overflow-hidden shadow-md"
                                               data-testid={`shipment-row-${shipment.id}`}
                                             >
-                                              <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-primary/10">
+                                              <div className="flex items-center justify-between px-4 py-3 bg-primary/10 border-b-2 border-primary/20">
                                                 <div className="flex items-center gap-3">
-                                                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold">
+                                                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-base font-bold shadow-sm">
                                                     {idx + 1}
                                                   </span>
-                                                  <span className="font-mono text-base font-bold text-foreground">
+                                                  <span className="font-mono text-lg font-bold text-foreground">
                                                     {shipment.orderNumber}
                                                   </span>
                                                   <Badge variant="secondary" className="text-xs">
