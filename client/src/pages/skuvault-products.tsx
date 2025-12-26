@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,7 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2, ChevronDown, Check, CheckSquare, Square } from "lucide-react";
+import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2, ChevronDown, Check, CheckSquare, Square, Folder, Plus, Trash2 } from "lucide-react";
 import type { SkuvaultProduct } from "@shared/schema";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -60,6 +62,25 @@ interface KitComponentsResponse {
   hasComponents: boolean;
 }
 
+interface CollectionAssignment {
+  mappingId: string;
+  collectionId: string;
+  collectionName: string;
+  collectionDescription: string | null;
+}
+
+interface CollectionAssignmentsResponse {
+  sku: string;
+  collections: CollectionAssignment[];
+  hasCollections: boolean;
+}
+
+interface ProductCollection {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 function ProductDetailDialog({
   product,
   open,
@@ -69,6 +90,9 @@ function ProductDetailDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { toast } = useToast();
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+
   const { data: kitData, isLoading: kitLoading } = useQuery<KitComponentsResponse>({
     queryKey: ['/api/skuvault-products', product?.sku, 'kit-components'],
     queryFn: async () => {
@@ -81,6 +105,77 @@ function ProductDetailDialog({
     },
     enabled: open && !!product?.sku,
   });
+
+  const { data: collectionsData, isLoading: collectionsLoading } = useQuery<CollectionAssignmentsResponse>({
+    queryKey: ['/api/skuvault-products', product?.sku, 'collections'],
+    queryFn: async () => {
+      if (!product?.sku) return { sku: '', collections: [], hasCollections: false };
+      const res = await fetch(`/api/skuvault-products/${encodeURIComponent(product.sku)}/collections`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch collections');
+      return res.json();
+    },
+    enabled: open && !!product?.sku,
+  });
+
+  const { data: allCollections } = useQuery<ProductCollection[]>({
+    queryKey: ['/api/collections'],
+    enabled: open,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (collectionId: string) => {
+      if (!product?.sku) throw new Error('No product selected');
+      return apiRequest(`/api/skuvault-products/${encodeURIComponent(product.sku)}/collections`, {
+        method: 'POST',
+        body: JSON.stringify({ collectionId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/skuvault-products', product?.sku, 'collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/assigned-skus'] });
+      setSelectedCollectionId("");
+      toast({
+        title: "Collection assigned",
+        description: "Product has been assigned to the collection.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to assign",
+        description: error.message || "Could not assign product to collection.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (collectionId: string) => {
+      if (!product?.sku) throw new Error('No product selected');
+      return apiRequest(`/api/skuvault-products/${encodeURIComponent(product.sku)}/collections/${collectionId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/skuvault-products', product?.sku, 'collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections/assigned-skus'] });
+      toast({
+        title: "Collection removed",
+        description: "Product has been removed from the collection.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to remove",
+        description: error.message || "Could not remove product from collection.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignedCollectionIds = new Set(collectionsData?.collections.map(c => c.collectionId) || []);
+  const availableCollections = allCollections?.filter(c => !assignedCollectionIds.has(c.id)) || [];
 
   if (!product) return null;
 
@@ -180,6 +275,86 @@ function ProductDetailDialog({
               <p className="text-sm" data-testid="detail-stock-date">
                 {product.stockCheckDate ? new Date(product.stockCheckDate).toLocaleDateString() : "-"}
               </p>
+            </div>
+
+            <div className="border-t pt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Folder className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium text-muted-foreground">Geometry Collections</label>
+              </div>
+              
+              {collectionsLoading ? (
+                <Skeleton className="h-8 w-full" />
+              ) : (
+                <div className="space-y-2" data-testid="detail-collections">
+                  {collectionsData?.collections && collectionsData.collections.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {collectionsData.collections.map((col) => (
+                        <Badge 
+                          key={col.collectionId} 
+                          variant="secondary" 
+                          className="flex items-center gap-1 pr-1"
+                        >
+                          {col.collectionName}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-4 w-4 p-0 hover:bg-destructive/20"
+                            onClick={() => removeMutation.mutate(col.collectionId)}
+                            disabled={removeMutation.isPending}
+                            data-testid={`btn-remove-collection-${col.collectionId}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No collections assigned</p>
+                  )}
+
+                  {availableCollections.length > 0 && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <Select value={selectedCollectionId} onValueChange={setSelectedCollectionId}>
+                        <SelectTrigger className="flex-1" data-testid="select-collection">
+                          <SelectValue placeholder="Select a collection to add..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableCollections.map((col) => (
+                            <SelectItem key={col.id} value={col.id}>
+                              {col.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="icon"
+                        onClick={() => selectedCollectionId && assignMutation.mutate(selectedCollectionId)}
+                        disabled={!selectedCollectionId || assignMutation.isPending}
+                        data-testid="btn-add-collection"
+                      >
+                        {assignMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  {availableCollections.length === 0 && allCollections && allCollections.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      All available collections have been assigned.
+                    </p>
+                  )}
+
+                  {(!allCollections || allCollections.length === 0) && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      No collections exist yet. Create collections in the Fingerprints page.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {kitLoading ? (
