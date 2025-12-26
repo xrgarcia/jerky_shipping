@@ -806,8 +806,8 @@ export default function ShipmentDetails() {
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p>No fulfilled items found</p>
-                    <p className="text-sm mt-1">QC items are hydrated when the order reaches "Ready to Fulfill" status</p>
+                    <p>No fulfilled items yet</p>
+                    <p className="text-sm mt-1">Fulfilled items appear once the order is tagged "MOVE OVER" and ready for picking</p>
                   </div>
                 )}
               </TabsContent>
