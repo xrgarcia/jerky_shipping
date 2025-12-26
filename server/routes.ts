@@ -11189,6 +11189,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update session status (e.g., release multiple draft sessions to floor)
+  app.post("/api/fulfillment-sessions/bulk-status", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+      const { FULFILLMENT_SESSION_STATUSES } = await import("@shared/schema");
+      const { sessionIds, status } = req.body;
+      
+      if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+        return res.status(400).json({ error: "sessionIds must be a non-empty array" });
+      }
+      
+      if (!status || !FULFILLMENT_SESSION_STATUSES.includes(status)) {
+        return res.status(400).json({ 
+          error: `Invalid status. Must be one of: ${FULFILLMENT_SESSION_STATUSES.join(', ')}` 
+        });
+      }
+      
+      const result = await fulfillmentSessionService.bulkUpdateSessionStatus(sessionIds, status);
+      
+      console.log(`[FulfillmentSessions] Bulk updated ${result.updated} sessions to status: ${status}`);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error bulk updating session status:", error);
+      res.status(500).json({ error: "Failed to bulk update session status" });
+    }
+  });
+
   // Delete a fulfillment session (unlinks shipments and deletes session)
   app.delete("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {

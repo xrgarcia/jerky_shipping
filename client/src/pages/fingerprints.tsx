@@ -172,6 +172,7 @@ interface FulfillmentSession {
   orderCount: number;
   maxOrders: number;
   status: 'draft' | 'ready' | 'picking' | 'packing' | 'completed' | 'cancelled';
+  packedCount: number; // Number of orders that have been packed
   createdAt: string;
   updatedAt: string;
   readyAt: string | null;
@@ -314,6 +315,9 @@ export default function Fingerprints() {
   const [maxWeight, setMaxWeight] = useState<string>("");
   const [selectedFingerprintIds, setSelectedFingerprintIds] = useState<Set<string>>(new Set());
   const [bulkPackagingTypeId, setBulkPackagingTypeId] = useState<string>("");
+  
+  // Session selection state for bulk release
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -525,6 +529,43 @@ export default function Fingerprints() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete session", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Release session to floor (draft -> ready)
+  const releaseSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await apiRequest("PATCH", `/api/fulfillment-sessions/${sessionId}/status`, { status: 'ready' });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Session released", description: "Session is now ready for picking" });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to release session", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Bulk release sessions to floor
+  const bulkReleaseSessionsMutation = useMutation({
+    mutationFn: async (sessionIds: string[]) => {
+      const res = await apiRequest("POST", "/api/fulfillment-sessions/bulk-status", { 
+        sessionIds, 
+        status: 'ready' 
+      });
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({ 
+        title: "Sessions released", 
+        description: `${result.updated} session${result.updated !== 1 ? 's' : ''} released to floor` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      setSelectedSessionIds(new Set());
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to release sessions", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1657,6 +1698,42 @@ export default function Fingerprints() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Bulk release controls for draft sessions */}
+                  {(() => {
+                    const draftSessions = liveSessions.filter(s => s.status === 'draft');
+                    if (draftSessions.length === 0) return null;
+                    return (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-medium">
+                            {draftSessions.length} draft session{draftSessions.length !== 1 ? 's' : ''} waiting to be released
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => bulkReleaseSessionsMutation.mutate(draftSessions.map(s => s.id))}
+                          disabled={bulkReleaseSessionsMutation.isPending}
+                          data-testid="button-release-all-drafts"
+                        >
+                          {bulkReleaseSessionsMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Releasing...
+                            </>
+                          ) : (
+                            <>
+                              <ArrowRight className="h-4 w-4 mr-1" />
+                              Release All to Floor
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })()}
+                  
                   {['boxing_machine', 'poly_bag', 'hand_pack'].map((stationType) => {
                     const stationSessions = liveSessions.filter(s => s.stationType === stationType);
                     if (stationSessions.length === 0) return null;
@@ -1697,17 +1774,25 @@ export default function Fingerprints() {
                                       <Badge 
                                         variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
                                         className={
+                                          session.status === 'draft' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' :
+                                          session.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                                           session.status === 'picking' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                                           session.status === 'packing' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                                          session.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                                           ''
                                         }
                                       >
-                                        {session.status === 'ready' ? 'Ready to Pick' : 
+                                        {session.status === 'draft' ? 'Draft' :
+                                         session.status === 'ready' ? 'Ready to Pick' : 
                                          session.status === 'picking' ? 'Picking' : 
                                          session.status === 'packing' ? 'Packing' :
                                          session.status.charAt(0).toUpperCase() + session.status.slice(1)}
                                       </Badge>
+                                      {/* Progress indicator for active sessions */}
+                                      {(session.status === 'picking' || session.status === 'packing') && session.packedCount > 0 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {session.packedCount}/{session.orderCount} packed
+                                        </Badge>
+                                      )}
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                       <span className="flex items-center gap-1">
@@ -1721,6 +1806,23 @@ export default function Fingerprints() {
                                             ? `${(session.totalWeightOz / 16).toFixed(1)} lbs`
                                             : `${session.totalWeightOz} oz`}
                                         </span>
+                                      )}
+                                      {/* Release to Floor button for draft sessions */}
+                                      {session.status === 'draft' && (
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          className="bg-green-600 hover:bg-green-700 text-white"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            releaseSessionMutation.mutate(session.id);
+                                          }}
+                                          disabled={releaseSessionMutation.isPending}
+                                          data-testid={`button-release-session-${session.id}`}
+                                        >
+                                          <ArrowRight className="h-4 w-4 mr-1" />
+                                          Release to Floor
+                                        </Button>
                                       )}
                                     </div>
                                   </div>

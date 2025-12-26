@@ -69,6 +69,7 @@ export interface SessionBuildResult {
 export interface FulfillmentSessionWithStation extends FulfillmentSession {
   stationName: string | null;
   totalWeightOz: number | null;
+  packedCount: number; // Number of orders that have been packed (have tracking or qcCompleted)
 }
 
 /** Preview of what a session will contain */
@@ -342,32 +343,54 @@ export class FulfillmentSessionService {
     // Calculate total weight for each session from QC items
     const sessionIds = sessions.map(s => s.id);
     if (sessionIds.length === 0) {
-      return sessions.map(s => ({ ...s, totalWeightOz: null }));
+      return sessions.map(s => ({ ...s, totalWeightOz: null, packedCount: 0 }));
     }
 
-    // Get total weight per session (sum of weight_value * quantity_expected for all items)
-    const weightResults = await db
-      .select({
-        sessionId: shipments.fulfillmentSessionId,
-        totalWeight: sql<number>`COALESCE(SUM(${shipmentQcItems.weightValue} * ${shipmentQcItems.quantityExpected}), 0)`.as('total_weight'),
-      })
-      .from(shipments)
-      .innerJoin(shipmentQcItems, eq(shipmentQcItems.shipmentId, shipments.id))
-      .where(inArray(shipments.fulfillmentSessionId, sessionIds))
-      .groupBy(shipments.fulfillmentSessionId);
+    // Get total weight and packed count per session
+    // Packed = has tracking number OR qcCompleted
+    const [weightResults, packedResults] = await Promise.all([
+      // Weight per session (sum of weight_value * quantity_expected for all items)
+      db
+        .select({
+          sessionId: shipments.fulfillmentSessionId,
+          totalWeight: sql<number>`COALESCE(SUM(${shipmentQcItems.weightValue} * ${shipmentQcItems.quantityExpected}), 0)`.as('total_weight'),
+        })
+        .from(shipments)
+        .innerJoin(shipmentQcItems, eq(shipmentQcItems.shipmentId, shipments.id))
+        .where(inArray(shipments.fulfillmentSessionId, sessionIds))
+        .groupBy(shipments.fulfillmentSessionId),
+      
+      // Packed count per session (orders with tracking or qcCompleted)
+      db
+        .select({
+          sessionId: shipments.fulfillmentSessionId,
+          packedCount: sql<number>`COUNT(*) FILTER (WHERE ${shipments.trackingNumber} IS NOT NULL OR ${shipments.qcCompleted} = true)`.as('packed_count'),
+        })
+        .from(shipments)
+        .where(inArray(shipments.fulfillmentSessionId, sessionIds))
+        .groupBy(shipments.fulfillmentSessionId),
+    ]);
 
-    // Create a map of session ID to weight
+    // Create maps of session ID to weight and packed count
     const weightMap = new Map<string, number>();
     for (const row of weightResults) {
       if (row.sessionId) {
         weightMap.set(row.sessionId, Number(row.totalWeight) || 0);
       }
     }
+    
+    const packedMap = new Map<string, number>();
+    for (const row of packedResults) {
+      if (row.sessionId) {
+        packedMap.set(row.sessionId, Number(row.packedCount) || 0);
+      }
+    }
 
-    // Merge weight data into sessions
+    // Merge weight and packed data into sessions
     return sessions.map(session => ({
       ...session,
       totalWeightOz: weightMap.get(session.id) || null,
+      packedCount: packedMap.get(session.id) || 0,
     }));
   }
 
@@ -406,6 +429,50 @@ export class FulfillmentSessionService {
       .returning();
 
     return updated || null;
+  }
+
+  /**
+   * Bulk update session status for multiple sessions at once
+   */
+  async bulkUpdateSessionStatus(
+    sessionIds: string[], 
+    newStatus: FulfillmentSessionStatus
+  ): Promise<{ updated: number; errors: string[] }> {
+    if (sessionIds.length === 0) {
+      return { updated: 0, errors: [] };
+    }
+
+    const updateData: Partial<FulfillmentSession> = {
+      status: newStatus,
+      updatedAt: new Date(),
+    };
+
+    // Set appropriate timestamp based on status
+    switch (newStatus) {
+      case 'ready':
+        updateData.readyAt = new Date();
+        break;
+      case 'picking':
+        updateData.pickingStartedAt = new Date();
+        break;
+      case 'packing':
+        updateData.packingStartedAt = new Date();
+        break;
+      case 'completed':
+        updateData.completedAt = new Date();
+        break;
+    }
+
+    const results = await db
+      .update(fulfillmentSessions)
+      .set(updateData)
+      .where(inArray(fulfillmentSessions.id, sessionIds))
+      .returning({ id: fulfillmentSessions.id });
+
+    return { 
+      updated: results.length, 
+      errors: [] 
+    };
   }
 
   // ============================================================================
