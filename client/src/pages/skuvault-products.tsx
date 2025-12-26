@@ -119,18 +119,16 @@ function ProductDetailDialog({
     enabled: open && !!product?.sku,
   });
 
-  const { data: allCollections } = useQuery<ProductCollection[]>({
+  const { data: collectionsResponse } = useQuery<{ collections: ProductCollection[] }>({
     queryKey: ['/api/collections'],
     enabled: open,
   });
+  const allCollections = collectionsResponse?.collections;
 
   const assignMutation = useMutation({
     mutationFn: async (collectionId: string) => {
       if (!product?.sku) throw new Error('No product selected');
-      return apiRequest(`/api/skuvault-products/${encodeURIComponent(product.sku)}/collections`, {
-        method: 'POST',
-        body: JSON.stringify({ collectionId }),
-      });
+      return apiRequest('POST', `/api/skuvault-products/${encodeURIComponent(product.sku)}/collections`, { collectionId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/skuvault-products', product?.sku, 'collections'] });
@@ -153,9 +151,7 @@ function ProductDetailDialog({
   const removeMutation = useMutation({
     mutationFn: async (collectionId: string) => {
       if (!product?.sku) throw new Error('No product selected');
-      return apiRequest(`/api/skuvault-products/${encodeURIComponent(product.sku)}/collections/${collectionId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/skuvault-products/${encodeURIComponent(product.sku)}/collections/${collectionId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/skuvault-products', product?.sku, 'collections'] });
