@@ -1,0 +1,116 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825357453
+Shipment ID: e2b1a028-9d63-4497-8e05-92bd39084b20
+
+--- SUMMARY ---
+Total Differences: 3
+Missing in Local (ship.): 0
+Missing in SkuVault: 3
+Quantity Mismatches: 0
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-VEJ-2-17 | 811007027163 | Jerky.com - Teriyaki Venison Jerky - 1.75 oz. | 2
+JCB-SS-172-13-X6 | 4000003681 | Spiced Apple Snack Stick - 6 Pack | 2
+JCB-WBJ-1-17 | 811007027057 | Jerky.com - Original Boar Jerky - 1.75 oz. | 1
+JCB-VP-20PSS | 811007029297 | The Complete Meat Stick Combo Variety Pack | 1
+JCB-BAJ-10-17 | 811007027781 | Jerky.com - Barbecue Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-1-17 | 811007027828 | Jerky.com - Original Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-12-17 | 811007027798 | Jerky.com - Honey Pepper Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-6-17 | 811007027811 | Jerky.com - Maple Bacon Jerky - 1.75 oz. | 1
+BUILDJAS | 4000002774 | Build Your Own Jerky Assortment | 1
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 2
+JCB-VP-8PESS | 811007029280 | Exotic Snack Sticks Variety Pack - 8 Pieces | 1
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+JCB-CMB-BBJS-TP | 811007029259 | Beef Jerky Sampler Pack | 1
+JCB-BEJ-30-16 | 811007026951 | Jerky.com - Chipotle Bourbon Beef Jerky - 2.5 oz. | 1
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+JCB-WBJ-1-17 | 811007027057 | Jerky.com - Original Boar Jerky - 1.75 oz. | 1
+JCB-VP-20PSS | 811007029297 | The Complete Meat Stick Combo Variety Pack | 1
+BUILDJAS | 4000002774 | Build Your Own Jerky Assortment | 1
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-VP-8PESS | 811007029280 | Exotic Snack Sticks Variety Pack - 8 Pieces | 1
+JCB-CMB-BBJS-TP | 811007029259 | Beef Jerky Sampler Pack | 1
+JCB-BEJ-30-16 | 811007026951 | Jerky.com - Chipotle Bourbon Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-2-17 | 811007027163 | Jerky.com - Teriyaki Venison Jerky - 1.75 oz. | 2
+JCB-SS-172-13-X6 | 4000003681 | Spiced Apple Snack Stick - 6 Pack | 2
+JCB-BAJ-1-17 | 811007027828 | Jerky.com - Original Bacon Jerky - 1.75 oz. | 1
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 2
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+
+--- SKUVAULT RAW ITEMS (with inventory levels) ---
+SKU | Is Kit? | Qty On Hand | Kit Components
+JCB-WBJ-1-17 | no | N/A | none
+JCB-VP-20PSS | no | N/A | none
+BUILDJAS | no | N/A | none
+JCB-BEJ-130-16 | no | N/A | none
+JCB-VP-8PESS | no | N/A | none
+JCB-CMB-BBJS-TP | no | N/A | none
+JCB-BEJ-30-16 | no | N/A | none
+JCB-VEJ-2-17-X2 | YES | N/A | JCB-VEJ-2-17x2
+JCB-SS-172-13-X12 | YES | N/A | JCB-SS-172-13-X6x2
+BACON-X1 | YES | N/A | JCB-BAJ-1-17x1
+JCB-VEJ-5-17-X2 | YES | N/A | JCB-VEJ-5-17x2
+JCB-VEJ-1-17-X4 | YES | N/A | JCB-VEJ-1-17x4
+
+--- DETAILED DIFFERENCES WITH DIAGNOSIS ---
+SKU | Field | Local Value | SkuVault Value | Diagnosis Category | Diagnosis Reason
+JCB-BAJ-10-17 | item | qty: 1 | (missing) | INDIVIDUAL_MISSING_SKUVAULT | Individual product in local but not in SkuVault QC response. May have been removed from order in SkuVault.
+JCB-BAJ-12-17 | item | qty: 1 | (missing) | INDIVIDUAL_MISSING_SKUVAULT | Individual product in local but not in SkuVault QC response. May have been removed from order in SkuVault.
+JCB-BAJ-6-17 | item | qty: 1 | (missing) | INDIVIDUAL_MISSING_SKUVAULT | Individual product in local but not in SkuVault QC response. May have been removed from order in SkuVault.
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components
+JCB-VEJ-2-17 | Exotic Jerky | no | null | yes | none
+JCB-SS-172-13-X6 | Meat Sticks | no | null | yes | JCB-SS-172-13x6
+JCB-WBJ-1-17 | Exotic Jerky | no | null | yes | none
+JCB-VP-20PSS | Combos and Samplers | YES | null | yes | JCB-EEXS-1-13x1, JCB-EEXS-91-13x1, JCB-EEXS-94-23x1, JCB-SS-1-26x1, JCB-SS-21-26x1, JCB-SS-3-26x1, JCB-SS-42-26x1, JCB-SS-5-26x1, JCB-SS-96-26x3, JCB-VEXS-1-13x1, JCB-VEXS-1-23x1, JCB-VEXS-2-13x1, JCB-VEXS-3-13x1, JCB-VEXS-5-13x1, JCB-VEXS-5-23x1, JCB-VEXS-6-13x1, JCB-vEXS-93-13x1, JCB-VP-20PSS-POUCHx1, JCB-WBEXS-1-13x1
+JCB-BAJ-10-17 | Bacon Jerky | no | null | yes | none
+JCB-BAJ-1-17 | Bacon Jerky | no | null | yes | none
+JCB-BAJ-12-17 | Bacon Jerky | no | null | yes | none
+JCB-BAJ-6-17 | Bacon Jerky | no | null | yes | none
+BUILDJAS | Gift | no | null | yes | none
+JCB-BEJ-130-16 | Beef Jerky | no | null | yes | none
+JCB-VEJ-5-17 | Exotic Jerky | no | null | yes | none
+JCB-VP-8PESS | Combos and Samplers | YES | null | yes | JCB-EEXS-1-13x1, JCB-EEXS-94-23x1, JCB-VEXS-1-13x1, JCB-VEXS-1-23x1, JCB-VEXS-2-13x1, JCB-VEXS-5-13x1, JCB-VEXS-6-13x1, JCB-VP-8PESS-POUCHx1, JCB-WBEXS-1-13x1
+JCB-VEJ-1-17 | Exotic Jerky | no | null | yes | none
+JCB-CMB-BBJS-TP | Combos and Samplers | YES | null | yes | JCB-BEJ-1-13x1, JCB-BEJ-2-13x1, JCB-BEJ-3-13x1, JCB-BEJ-4-13x1, JCB-BEJ-5-13x1, JCB-CMB-BBJS-TP-POLYx1
+JCB-BEJ-30-16 | Beef Jerky | no | null | yes | none
+
+--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---
+KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.
+APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.
+
+--- HOW shipment_qc_items GETS POPULATED ---
+When orders sync to ship., the QC item hydrator populates shipment_qc_items:
+1. Products with product_category='kit' → EXPLODED into component SKUs using kit_mappings_cache
+2. Variants (where sku != parent_sku) → Stored as-is (the variant SKU)
+3. Regular products → Stored as-is
+4. Products with is_assembled_product=true but category != 'kit' → NOT exploded (stored as parent SKU)
+
+SkuVault (golden source) determines what actually gets exploded at fulfillment time.
+If SkuVault explodes a product but ship. didn't, the product is miscategorized in the catalog.
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API (GOLDEN SOURCE for what picker scans)
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)
+- 'Category' = product_category ('kit' = should be exploded at fulfillment)
+- Kit Components = Expected components from kit_mappings_cache (sourced from GCP reporting DB)
+
+--- COMMON ISSUES ---
+1. MISCATEGORIZED PRODUCT: Local has parent SKU, SkuVault has components
+   - Product has is_assembled_product=true but category != 'kit'
+   - SkuVault exploded it (treating as kit) but ship. didn't
+   - FIX: Update product to have product_category='kit' in the source catalog
+2. MISSING KIT MAPPING: Product is category='kit' but no components in kit_mappings_cache
+   - The kit definition may not exist in GCP vw_internal_kit_component_inventory_latest view
+3. STALE KIT MAPPING: Components don't match between local and SkuVault
+   - Kit definition changed in SkuVault but kit_mappings_cache has old data
+   - Cache refreshes hourly from GCP reporting database
