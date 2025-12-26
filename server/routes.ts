@@ -10508,6 +10508,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get collections assigned to a specific SKU
+  app.get("/api/skuvault-products/:sku/collections", requireAuth, async (req, res) => {
+    try {
+      const { sku } = req.params;
+      
+      const assignments = await db
+        .select({
+          mappingId: productCollectionMappings.id,
+          collectionId: productCollections.id,
+          collectionName: productCollections.name,
+          collectionDescription: productCollections.description,
+        })
+        .from(productCollectionMappings)
+        .innerJoin(productCollections, eq(productCollections.id, productCollectionMappings.productCollectionId))
+        .where(eq(productCollectionMappings.sku, sku));
+      
+      res.json({
+        sku,
+        collections: assignments,
+        hasCollections: assignments.length > 0,
+      });
+    } catch (error: any) {
+      console.error(`[SkuVault Products] Error fetching collections for ${req.params.sku}:`, error);
+      res.status(500).json({ error: "Failed to fetch collections for SKU" });
+    }
+  });
+
+  // Assign a SKU to a collection
+  app.post("/api/skuvault-products/:sku/collections", requireAuth, async (req, res) => {
+    try {
+      const { sku } = req.params;
+      const { collectionId } = req.body;
+      
+      if (!collectionId) {
+        return res.status(400).json({ error: "collectionId is required" });
+      }
+      
+      // Check if collection exists
+      const collection = await db
+        .select()
+        .from(productCollections)
+        .where(eq(productCollections.id, collectionId))
+        .limit(1);
+      
+      if (collection.length === 0) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      
+      // Check if mapping already exists
+      const existingMapping = await db
+        .select()
+        .from(productCollectionMappings)
+        .where(
+          and(
+            eq(productCollectionMappings.sku, sku),
+            eq(productCollectionMappings.productCollectionId, collectionId)
+          )
+        )
+        .limit(1);
+      
+      if (existingMapping.length > 0) {
+        return res.status(409).json({ error: "SKU is already assigned to this collection" });
+      }
+      
+      // Create the mapping
+      const [newMapping] = await db
+        .insert(productCollectionMappings)
+        .values({
+          sku,
+          productCollectionId: collectionId,
+        })
+        .returning();
+      
+      console.log(`[SkuVault Products] Assigned SKU ${sku} to collection ${collectionId}`);
+      
+      res.json({
+        success: true,
+        mapping: newMapping,
+      });
+    } catch (error: any) {
+      console.error(`[SkuVault Products] Error assigning ${req.params.sku} to collection:`, error);
+      res.status(500).json({ error: "Failed to assign SKU to collection" });
+    }
+  });
+
+  // Remove a SKU from a collection
+  app.delete("/api/skuvault-products/:sku/collections/:collectionId", requireAuth, async (req, res) => {
+    try {
+      const { sku, collectionId } = req.params;
+      
+      const deleted = await db
+        .delete(productCollectionMappings)
+        .where(
+          and(
+            eq(productCollectionMappings.sku, sku),
+            eq(productCollectionMappings.productCollectionId, collectionId)
+          )
+        )
+        .returning();
+      
+      if (deleted.length === 0) {
+        return res.status(404).json({ error: "Mapping not found" });
+      }
+      
+      console.log(`[SkuVault Products] Removed SKU ${sku} from collection ${collectionId}`);
+      
+      res.json({
+        success: true,
+        deleted: deleted[0],
+      });
+    } catch (error: any) {
+      console.error(`[SkuVault Products] Error removing ${req.params.sku} from collection:`, error);
+      res.status(500).json({ error: "Failed to remove SKU from collection" });
+    }
+  });
+
   // ========================================
   // Fingerprints API (Smart Shipping Engine)
   // ========================================
