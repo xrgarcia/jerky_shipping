@@ -1320,11 +1320,15 @@ export default function Fingerprints() {
                               <Layers className="h-3 w-3" />
                               {fingerprint.collectionCount} collection{fingerprint.collectionCount !== 1 ? 's' : ''}
                             </span>
-                            {fingerprint.totalWeight !== null && (
+                            {fingerprint.totalWeight !== null && fingerprint.totalWeight > 0 ? (
                               <span className="flex items-center gap-1">
                                 <Scale className="h-3 w-3" />
                                 {fingerprint.totalWeight.toFixed(1)} oz
                               </span>
+                            ) : (
+                              <Badge variant="destructive" className="text-xs">
+                                Missing Weight
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -2058,8 +2062,13 @@ export default function Fingerprints() {
               <Truck className="h-5 w-5" />
               Shipments for Fingerprint
             </DialogTitle>
-            <DialogDescription>
-              {fingerprintShipmentsData?.fingerprint.displayName || "Loading..."}
+            <DialogDescription className="flex items-center gap-2 flex-wrap">
+              <span>{fingerprintShipmentsData?.fingerprint.displayName || "Loading..."}</span>
+              {fingerprintShipmentsData?.fingerprint.displayName?.endsWith("| 0oz") && (
+                <Badge variant="destructive" className="text-xs">
+                  Missing Weight
+                </Badge>
+              )}
             </DialogDescription>
           </DialogHeader>
           
