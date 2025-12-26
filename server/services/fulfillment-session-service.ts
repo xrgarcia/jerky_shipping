@@ -197,6 +197,8 @@ export class FulfillmentSessionService {
    * 
    * Each session contains up to MAX_ORDERS_PER_SESSION orders
    * Sessions are created per station type, preserving fingerprint grouping
+   * 
+   * NEW: First fills existing draft sessions before creating new ones
    */
   async buildSessions(
     userId: string,
@@ -226,20 +228,38 @@ export class FulfillmentSessionService {
       // 2. Group by station type and fingerprint
       const groups = await this.groupShipmentsForBatching(sessionableShipments);
 
-      // 3. Batch into sessions (max 28 per session)
-      const batches = this.createBatches(groups, MAX_ORDERS_PER_SESSION);
+      // 3. Find existing draft sessions with available capacity
+      const draftSessions = await this.getDraftSessionsWithCapacity();
+      console.log(`[FulfillmentSession] Found ${draftSessions.length} existing draft sessions with capacity`);
 
-      console.log(`[FulfillmentSession] Created ${batches.length} session batches`);
+      // 4. First fill existing draft sessions, then create new batches for remainder
+      const { filledSessions, newBatches, shipmentsAddedToDrafts } = 
+        await this.distributeToExistingAndNew(groups, draftSessions, MAX_ORDERS_PER_SESSION);
+
+      console.log(`[FulfillmentSession] Adding ${shipmentsAddedToDrafts} shipments to existing drafts, creating ${newBatches.length} new sessions`);
 
       if (dryRun) {
         // Return preview without creating sessions
-        result.sessionsCreated = batches.length;
+        result.sessionsCreated = newBatches.length;
         result.shipmentsAssigned = sessionableShipments.length;
         return result;
       }
 
-      // 4. Create sessions and link shipments
-      for (const batch of batches) {
+      // 5. Add shipments to existing draft sessions
+      for (const filled of filledSessions) {
+        if (filled.shipmentIds.length > 0) {
+          await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
+          result.shipmentsAssigned += filled.shipmentIds.length;
+          // Fetch updated session to return
+          const updatedSession = await this.getSessionById(filled.sessionId);
+          if (updatedSession) {
+            result.sessions.push(updatedSession);
+          }
+        }
+      }
+
+      // 6. Create new sessions for remaining shipments
+      for (const batch of newBatches) {
         const session = await this.createSessionWithShipments(batch, userId);
         if (session) {
           result.sessions.push(session);
@@ -248,7 +268,7 @@ export class FulfillmentSessionService {
         }
       }
 
-      console.log(`[FulfillmentSession] Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} shipments`);
+      console.log(`[FulfillmentSession] Created ${result.sessionsCreated} new sessions, filled ${filledSessions.filter(f => f.shipmentIds.length > 0).length} existing drafts with ${result.shipmentsAssigned} total shipments`);
 
     } catch (error: any) {
       result.success = false;
@@ -257,6 +277,137 @@ export class FulfillmentSessionService {
     }
 
     return result;
+  }
+
+  /**
+   * Get all draft sessions that have capacity for more orders
+   */
+  private async getDraftSessionsWithCapacity(): Promise<{ id: string; stationType: string | null; orderCount: number; maxOrders: number }[]> {
+    const sessions = await db
+      .select({
+        id: fulfillmentSessions.id,
+        stationType: fulfillmentSessions.stationType,
+        orderCount: fulfillmentSessions.orderCount,
+        maxOrders: fulfillmentSessions.maxOrders,
+      })
+      .from(fulfillmentSessions)
+      .where(
+        and(
+          eq(fulfillmentSessions.status, 'draft'),
+          sql`${fulfillmentSessions.orderCount} < ${fulfillmentSessions.maxOrders}`
+        )
+      )
+      .orderBy(asc(fulfillmentSessions.createdAt));
+
+    return sessions;
+  }
+
+  /**
+   * Distribute shipments to existing draft sessions first, then create new batches
+   */
+  private async distributeToExistingAndNew(
+    groups: ShipmentGroup[],
+    draftSessions: { id: string; stationType: string | null; orderCount: number; maxOrders: number }[],
+    maxPerBatch: number
+  ): Promise<{
+    filledSessions: { sessionId: string; shipmentIds: string[] }[];
+    newBatches: SessionBatch[];
+    shipmentsAddedToDrafts: number;
+  }> {
+    const filledSessions: { sessionId: string; shipmentIds: string[] }[] = [];
+    const newBatches: SessionBatch[] = [];
+    let shipmentsAddedToDrafts = 0;
+
+    // Group draft sessions by station type
+    const draftsByStation = new Map<string, { id: string; capacity: number }[]>();
+    for (const draft of draftSessions) {
+      const stationType = draft.stationType || 'unknown';
+      if (!draftsByStation.has(stationType)) {
+        draftsByStation.set(stationType, []);
+      }
+      draftsByStation.get(stationType)!.push({
+        id: draft.id,
+        capacity: draft.maxOrders - draft.orderCount,
+      });
+    }
+
+    // Group shipments by station type
+    const byStationType = new Map<string, ShipmentGroup[]>();
+    for (const group of groups) {
+      if (!byStationType.has(group.stationType)) {
+        byStationType.set(group.stationType, []);
+      }
+      byStationType.get(group.stationType)!.push(group);
+    }
+
+    // Process each station type
+    for (const [stationType, stationGroups] of Array.from(byStationType.entries())) {
+      // Flatten all shipments for this station type
+      const allShipments = stationGroups.flatMap(g => g.shipments);
+      let shipmentIndex = 0;
+
+      // First, fill existing draft sessions for this station type
+      const draftsForStation = draftsByStation.get(stationType) || [];
+      for (const draft of draftsForStation) {
+        if (shipmentIndex >= allShipments.length) break;
+        
+        const toAdd: string[] = [];
+        while (toAdd.length < draft.capacity && shipmentIndex < allShipments.length) {
+          toAdd.push(allShipments[shipmentIndex].id);
+          shipmentIndex++;
+        }
+
+        if (toAdd.length > 0) {
+          filledSessions.push({ sessionId: draft.id, shipmentIds: toAdd });
+          shipmentsAddedToDrafts += toAdd.length;
+        }
+      }
+
+      // Remaining shipments go to new batches
+      let currentBatch: SessionBatch | null = null;
+      while (shipmentIndex < allShipments.length) {
+        if (!currentBatch || currentBatch.shipmentIds.length >= maxPerBatch) {
+          currentBatch = {
+            stationType,
+            stationId: stationGroups[0]?.stationId || null,
+            shipmentIds: [],
+          };
+          newBatches.push(currentBatch);
+        }
+        currentBatch.shipmentIds.push(allShipments[shipmentIndex].id);
+        shipmentIndex++;
+      }
+    }
+
+    return { filledSessions, newBatches, shipmentsAddedToDrafts };
+  }
+
+  /**
+   * Add shipments to an existing session
+   */
+  private async addShipmentsToSession(sessionId: string, shipmentIds: string[]): Promise<void> {
+    // Link shipments to session
+    await db
+      .update(shipments)
+      .set({
+        fulfillmentSessionId: sessionId,
+        updatedAt: new Date(),
+      })
+      .where(inArray(shipments.id, shipmentIds));
+
+    // Update order count on session
+    await db
+      .update(fulfillmentSessions)
+      .set({
+        orderCount: sql`${fulfillmentSessions.orderCount} + ${shipmentIds.length}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(fulfillmentSessions.id, sessionId));
+
+    // Update lifecycle phase for linked shipments
+    await updateShipmentLifecycleBatch(shipmentIds);
+
+    console.log(`[FulfillmentSession] Added ${shipmentIds.length} shipments to existing session ${sessionId}`);
   }
 
   /**
