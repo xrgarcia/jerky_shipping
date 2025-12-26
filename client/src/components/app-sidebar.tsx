@@ -209,9 +209,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <div 
-        className={`flex items-center justify-center border-b border-sidebar-border transition-all duration-200 ${
-          isCollapsed ? 'px-2 h-[56px]' : 'px-4 h-[72px]'
-        }`}
+        className="flex items-center justify-center border-b border-sidebar-border h-[72px] px-2"
         style={{ background: '#1a1a1a' }}
       >
         <img 
