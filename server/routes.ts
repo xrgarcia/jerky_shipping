@@ -11337,7 +11337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import SkuVault service and product lookup
       const { skuVaultService } = await import("./services/skuvault-service");
       const { getProductsBatch } = await import("./services/product-lookup");
-      const { getKitComponents } = await import("./services/kit-mappings-cache");
+      const { getKitComponents, getParentKitsForComponent } = await import("./services/kit-mappings-cache");
       const { diagnoseShipmentMismatches } = await import("./services/qc-diagnosis-service");
       
       const results: Array<{
@@ -11384,6 +11384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isAssembledProduct: boolean;
           parentSku: string | null;
           kitComponents: Array<{ componentSku: string; componentQuantity: number }> | null;
+          parentKits: string[] | null;
           foundInCatalog: boolean;
         }>;
         error?: string;
@@ -11574,19 +11575,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             diagnosis: diagnosisMap.get(diff.sku),
           }));
           
-          // Build product info array with kit components
+          // Build product info array with kit components and parent kits
           const productInfo: Array<{
             sku: string;
             productCategory: string | null;
             isAssembledProduct: boolean;
             parentSku: string | null;
             kitComponents: Array<{ componentSku: string; componentQuantity: number }> | null;
+            parentKits: string[] | null;
             foundInCatalog: boolean;
           }> = [];
           
           for (const sku of Array.from(allSkus)) {
             const product = productMap.get(sku);
             let kitComponents = null;
+            let parentKits: string[] | null = null;
             
             // Try to get kit components if this might be a kit/AP
             try {
@@ -11598,12 +11601,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Kit components not available, that's ok
             }
             
+            // Get parent kits this SKU belongs to (reverse lookup)
+            try {
+              const parents = getParentKitsForComponent(sku);
+              if (parents && parents.length > 0) {
+                parentKits = parents;
+              }
+            } catch (e) {
+              // Parent kits not available, that's ok
+            }
+            
             productInfo.push({
               sku,
               productCategory: product?.productCategory || null,
               isAssembledProduct: product?.isAssembledProduct || false,
               parentSku: product?.parentSku || null,
               kitComponents,
+              parentKits,
               foundInCatalog: !!product,
             });
           }

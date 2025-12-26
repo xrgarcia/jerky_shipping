@@ -878,13 +878,16 @@ export default function QcValidationReport() {
                 lines.push("");
                 
                 lines.push("--- PRODUCT CATALOG INFO (from skuvault_products table) ---");
-                lines.push("SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components");
+                lines.push("SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components | Member of Kits");
                 if (selectedResult.productInfo && selectedResult.productInfo.length > 0) {
-                  selectedResult.productInfo.forEach(info => {
+                  selectedResult.productInfo.forEach((info: any) => {
                     const kitComps = info.kitComponents 
-                      ? info.kitComponents.map(c => `${c.componentSku}x${c.componentQuantity}`).join(', ')
+                      ? info.kitComponents.map((c: any) => `${c.componentSku}x${c.componentQuantity}`).join(', ')
                       : 'none';
-                    lines.push(`${info.sku} | ${info.productCategory || 'null'} | ${info.isAssembledProduct ? 'YES' : 'no'} | ${info.parentSku || 'null'} | ${info.foundInCatalog ? 'yes' : 'NO'} | ${kitComps}`);
+                    const parentKits = info.parentKits 
+                      ? info.parentKits.join(', ')
+                      : 'none';
+                    lines.push(`${info.sku} | ${info.productCategory || 'null'} | ${info.isAssembledProduct ? 'YES' : 'no'} | ${info.parentSku || 'null'} | ${info.foundInCatalog ? 'yes' : 'NO'} | ${kitComps} | ${parentKits}`);
                   });
                 } else {
                   lines.push("(No product info available)");
