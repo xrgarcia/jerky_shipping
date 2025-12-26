@@ -2089,14 +2089,31 @@ export default function Fingerprints() {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {product.orderNumbers.map((orderNumber) => (
-                        <Badge
-                          key={orderNumber}
-                          variant="outline"
-                          className="cursor-pointer hover-elevate text-xs"
-                          onClick={() => window.open(`/order/${orderNumber}`, '_blank')}
-                        >
-                          {orderNumber}
-                        </Badge>
+                        <div key={orderNumber} className="flex items-center gap-0.5">
+                          <Badge
+                            variant="outline"
+                            className="cursor-pointer hover-elevate text-xs"
+                            onClick={() => window.open(`/order/${orderNumber}`, '_blank')}
+                          >
+                            {orderNumber}
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => {
+                              const url = `${window.location.origin}/shipments/${orderNumber}`;
+                              navigator.clipboard.writeText(url);
+                              toast({
+                                title: "Link copied",
+                                description: `Shipments link for ${orderNumber} copied to clipboard`,
+                              });
+                            }}
+                            data-testid={`button-copy-shipment-link-${orderNumber}`}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       ))}
                     </div>
                   </div>
