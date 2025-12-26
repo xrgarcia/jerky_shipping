@@ -3,6 +3,7 @@
  * 
  * Analyzes QC mismatches to determine root cause of failures.
  * Categories:
+ * - DUAL_FLAG_CONFLICT: Product has BOTH product_category='kit' AND is_assembled_product=true (invalid state)
  * - AP_EXPLODED_SKUVAULT: Assembled Product exploded in SkuVault (inventory=0) but not locally
  * - AP_EXPLODED_LOCAL: Assembled Product exploded locally but not in SkuVault
  * - KIT_MAPPING_MISMATCH: Kit components don't match between local and SkuVault
@@ -15,6 +16,7 @@ import { getKitComponents, getParentKitsForComponent, KitComponent } from './kit
 import { getProductsBatch } from './product-lookup';
 
 export type DiagnosisCategory = 
+  | 'DUAL_FLAG_CONFLICT'
   | 'AP_EXPLODED_SKUVAULT'
   | 'AP_EXPLODED_LOCAL'
   | 'KIT_MAPPING_MISMATCH'
@@ -83,6 +85,20 @@ export async function diagnoseMismatch(
 ): Promise<Diagnosis> {
   const product = productMap.get(sku);
   const parentInfo = componentToParent.get(sku);
+  
+  // First check: Is this a component of a dual-flagged product (both kit AND AP)?
+  if (parentInfo && parentInfo.isKit && parentInfo.isAP) {
+    const parentProduct = productMap.get(parentInfo.parentSku);
+    const localComponents = getKitComponents(parentInfo.parentSku);
+    return {
+      category: 'DUAL_FLAG_CONFLICT',
+      reason: `Component of "${parentInfo.parentSku}" which has BOTH product_category='kit' AND is_assembled_product=true. This is invalid - a product should be EITHER a kit (exploded) OR an AP (not exploded), never both. SkuVault may treat it differently than local. FIX: Remove one of the flags.`,
+      parentSku: parentInfo.parentSku,
+      productCategory: parentProduct?.productCategory || 'kit',
+      isAssembledProduct: true,
+      kitComponentsLocal: localComponents || undefined,
+    };
+  }
   
   // Case 1: Missing in Local (SkuVault has it, we don't)
   if (mismatchType === 'missing_local') {

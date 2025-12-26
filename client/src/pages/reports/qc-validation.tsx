@@ -878,7 +878,7 @@ export default function QcValidationReport() {
                 lines.push("");
                 
                 lines.push("--- PRODUCT CATALOG INFO (from skuvault_products table) ---");
-                lines.push("SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components | Member of Kits");
+                lines.push("SKU | Category | Is AP? | DUAL FLAG? | Parent SKU | In Catalog? | Kit Components | Member of Kits");
                 if (selectedResult.productInfo && selectedResult.productInfo.length > 0) {
                   selectedResult.productInfo.forEach((info: any) => {
                     const kitComps = info.kitComponents 
@@ -887,7 +887,10 @@ export default function QcValidationReport() {
                     const parentKits = info.parentKits 
                       ? info.parentKits.join(', ')
                       : 'none';
-                    lines.push(`${info.sku} | ${info.productCategory || 'null'} | ${info.isAssembledProduct ? 'YES' : 'no'} | ${info.parentSku || 'null'} | ${info.foundInCatalog ? 'yes' : 'NO'} | ${kitComps} | ${parentKits}`);
+                    // Dual flag = has BOTH product_category='kit' AND is_assembled_product=true (invalid state)
+                    const isDualFlag = info.productCategory === 'kit' && info.isAssembledProduct;
+                    const dualFlagStr = isDualFlag ? '**CONFLICT**' : 'ok';
+                    lines.push(`${info.sku} | ${info.productCategory || 'null'} | ${info.isAssembledProduct ? 'YES' : 'no'} | ${dualFlagStr} | ${info.parentSku || 'null'} | ${info.foundInCatalog ? 'yes' : 'NO'} | ${kitComps} | ${parentKits}`);
                   });
                 } else {
                   lines.push("(No product info available)");
@@ -918,13 +921,18 @@ export default function QcValidationReport() {
                 lines.push("- Kit Components = Expected components from kit_mappings_cache (sourced from GCP reporting DB)");
                 lines.push("");
                 lines.push("--- COMMON ISSUES ---");
-                lines.push("1. MISCATEGORIZED PRODUCT: Local has parent SKU, SkuVault has components");
+                lines.push("1. **DUAL FLAG CONFLICT**: Product has BOTH product_category='kit' AND is_assembled_product=true");
+                lines.push("   - This is INVALID - a product must be EITHER a kit (exploded) OR an AP (not exploded)");
+                lines.push("   - Causes unpredictable behavior: ship. may explode using kit mappings while SkuVault treats as AP");
+                lines.push("   - FIX: Remove one flag. If it should be exploded, keep category='kit' and set is_assembled_product=false");
+                lines.push("   - FIX: If it should ship as-is, set category to something else and keep is_assembled_product=true");
+                lines.push("2. MISCATEGORIZED PRODUCT: Local has parent SKU, SkuVault has components");
                 lines.push("   - Product has is_assembled_product=true but category != 'kit'");
                 lines.push("   - SkuVault exploded it (treating as kit) but ship. didn't");
                 lines.push("   - FIX: Update product to have product_category='kit' in the source catalog");
-                lines.push("2. MISSING KIT MAPPING: Product is category='kit' but no components in kit_mappings_cache");
+                lines.push("3. MISSING KIT MAPPING: Product is category='kit' but no components in kit_mappings_cache");
                 lines.push("   - The kit definition may not exist in GCP vw_internal_kit_component_inventory_latest view");
-                lines.push("3. STALE KIT MAPPING: Components don't match between local and SkuVault");
+                lines.push("4. STALE KIT MAPPING: Components don't match between local and SkuVault");
                 lines.push("   - Kit definition changed in SkuVault but kit_mappings_cache has old data");
                 lines.push("   - Cache refreshes hourly from GCP reporting database");
                 
