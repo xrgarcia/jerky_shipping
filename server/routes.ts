@@ -8141,7 +8141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const steps = await reportingStorage.getPORecommendationSteps(
         sku, 
-        new Date(stockCheckDate)
+        stockCheckDate
       );
       res.json(steps);
     } catch (error: any) {

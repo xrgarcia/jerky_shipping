@@ -27,7 +27,7 @@ export interface IReportingStorage {
   getAvailableDates(): Promise<string[]>;
   getDateBounds(): Promise<DateBounds | null>;
   getRecommendationsByDate(date: string): Promise<PORecommendation[]>;
-  getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]>;
+  getPORecommendationSteps(sku: string, stockCheckDateStr: string): Promise<PORecommendationStep[]>;
   getUniqueSuppliers(): Promise<string[]>;
   invalidateCache(): Promise<void>;
   warmCache(): Promise<{ recordCount: number; stockCheckDate: string; datesCount: number }>;
@@ -322,12 +322,13 @@ export class ReportingStorage implements IReportingStorage {
     return { recordCount: recommendations.length, stockCheckDate: latestDateStr, datesCount: dates.length };
   }
 
-  async getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]> {
-    // Format date in CST timezone to match database storage (dates are stored in CST)
-    const dateStr = formatInTimeZone(stockCheckDate, CST_TIMEZONE, 'yyyy-MM-dd');
+  async getPORecommendationSteps(sku: string, stockCheckDateStr: string): Promise<PORecommendationStep[]> {
+    // Use the date string directly - it's already in YYYY-MM-DD format representing CST date
+    // Don't convert through Date object to avoid UTC/CST timezone shift
+    const dateStr = stockCheckDateStr;
     const cacheKey = `${CACHE_PREFIX}steps:${sku}:${dateStr}`;
     
-    console.log(`[ReportingStorage] getPORecommendationSteps called for sku=${sku}, inputDate=${stockCheckDate.toISOString()}, cstDateStr=${dateStr}, cacheKey=${cacheKey}`);
+    console.log(`[ReportingStorage] getPORecommendationSteps called for sku=${sku}, dateStr=${dateStr}, cacheKey=${cacheKey}`);
     
     try {
       const redis = getRedisClient();
