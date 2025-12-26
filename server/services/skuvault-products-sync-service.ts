@@ -13,15 +13,15 @@
  * Merge logic: Later queries fill missing fields, conflicts are logged.
  * 
  * Image URL resolution priority (waterfall):
- * 1. productVariants.imageUrl (variant-specific image)
- * 2. products.imageUrl (parent product image - Shopify often stores images here)
+ * 1. shopifyProductVariants.imageUrl (variant-specific image)
+ * 2. shopifyProducts.imageUrl (parent product image - Shopify often stores images here)
  * 3. shipmentItems.imageUrl (most recent order)
  * 4. null (fallback)
  */
 
 import { reportingSql } from '../reporting-db';
 import { db } from '../db';
-import { skuvaultProducts, productVariants, products, shipmentItems, shipments } from '@shared/schema';
+import { skuvaultProducts, shopifyProductVariants, shopifyProducts, shipmentItems, shipments } from '@shared/schema';
 import { eq, sql, desc, isNull } from 'drizzle-orm';
 import { getRedisClient } from '../utils/queue';
 
@@ -280,20 +280,20 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
 
 /**
  * Resolve product image URL using waterfall logic:
- * 1. productVariants.imageUrl (variant-specific image)
- * 2. products.imageUrl (parent product image - Shopify often stores images here)
+ * 1. shopifyProductVariants.imageUrl (variant-specific image)
+ * 2. shopifyProducts.imageUrl (parent product image - Shopify often stores images here)
  * 3. shipmentItems (most recent) - by SKU
  * 4. null (fallback)
  */
 async function resolveImageUrl(sku: string): Promise<string | null> {
-  // 1. Check productVariants (variant-specific image)
+  // 1. Check shopifyProductVariants (variant-specific image)
   const variant = await db
     .select({ 
-      variantImageUrl: productVariants.imageUrl,
-      productId: productVariants.productId,
+      variantImageUrl: shopifyProductVariants.imageUrl,
+      productId: shopifyProductVariants.productId,
     })
-    .from(productVariants)
-    .where(eq(productVariants.sku, sku))
+    .from(shopifyProductVariants)
+    .where(eq(shopifyProductVariants.sku, sku))
     .limit(1);
   
   if (variant[0]?.variantImageUrl) {
@@ -303,9 +303,9 @@ async function resolveImageUrl(sku: string): Promise<string | null> {
   // 2. Check parent product if variant exists but has no image
   if (variant[0]?.productId) {
     const parentProduct = await db
-      .select({ imageUrl: products.imageUrl })
-      .from(products)
-      .where(eq(products.id, variant[0].productId))
+      .select({ imageUrl: shopifyProducts.imageUrl })
+      .from(shopifyProducts)
+      .where(eq(shopifyProducts.id, variant[0].productId))
       .limit(1);
     
     if (parentProduct[0]?.imageUrl) {
@@ -341,16 +341,16 @@ async function batchResolveImageUrls(skus: string[]): Promise<Map<string, string
   
   log(`Resolving image URLs for ${skus.length} SKUs...`);
   
-  // Step 1: Batch fetch from productVariants (with parent product join for fallback)
+  // Step 1: Batch fetch from shopifyProductVariants (with parent product join for fallback)
   const variantsWithParent = await db
     .select({ 
-      sku: productVariants.sku, 
-      variantImageUrl: productVariants.imageUrl,
-      parentImageUrl: products.imageUrl,
+      sku: shopifyProductVariants.sku, 
+      variantImageUrl: shopifyProductVariants.imageUrl,
+      parentImageUrl: shopifyProducts.imageUrl,
     })
-    .from(productVariants)
-    .leftJoin(products, eq(productVariants.productId, products.id))
-    .where(sql`${productVariants.sku} IN ${skus}`);
+    .from(shopifyProductVariants)
+    .leftJoin(shopifyProducts, eq(shopifyProductVariants.productId, shopifyProducts.id))
+    .where(sql`${shopifyProductVariants.sku} IN ${skus}`);
   
   for (const v of variantsWithParent) {
     if (v.sku) {
