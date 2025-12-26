@@ -8098,7 +8098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all available stock check dates for the date picker
+  // Get all available stock check dates for the date picker (cached)
   app.get("/api/reporting/po-recommendations/available-dates", requireAuth, async (req, res) => {
     try {
       const dates = await reportingStorage.getAvailableDates();
@@ -8106,6 +8106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[Reporting] Error fetching available dates:", error);
       res.status(500).json({ error: "Failed to fetch available dates" });
+    }
+  });
+
+  // Get date bounds (earliest and latest available dates) for validation
+  app.get("/api/reporting/po-recommendations/date-bounds", requireAuth, async (req, res) => {
+    try {
+      const bounds = await reportingStorage.getDateBounds();
+      res.json(bounds);
+    } catch (error: any) {
+      console.error("[Reporting] Error fetching date bounds:", error);
+      res.status(500).json({ error: "Failed to fetch date bounds" });
     }
   });
 

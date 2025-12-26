@@ -66,9 +66,9 @@ async function warmCache(): Promise<void> {
     
     log('Warming cache...');
     
-    // Warm the main snapshot (single Redis entry for all recommendations)
-    const { recordCount, stockCheckDate } = await reportingStorage.warmCache();
-    log(`Warmed snapshot: ${recordCount} recommendations for ${stockCheckDate}`);
+    // Warm the main snapshot, available dates, and date bounds
+    const { recordCount, stockCheckDate, datesCount } = await reportingStorage.warmCache();
+    log(`Warmed snapshot: ${recordCount} recommendations for ${stockCheckDate}, ${datesCount} available dates`);
     
     // Pre-warm steps for top SKUs by recommended quantity
     const snapshot = await reportingStorage.getFullSnapshot();
