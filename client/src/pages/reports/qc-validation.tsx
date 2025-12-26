@@ -624,9 +624,10 @@ export default function QcValidationReport() {
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="text-xs w-[160px]">SKU</TableHead>
-                      <TableHead className="text-xs text-center w-[80px]">Local Qty</TableHead>
-                      <TableHead className="text-xs text-center w-[80px]">SkuVault Qty</TableHead>
-                      <TableHead className="text-xs w-[120px]">Status</TableHead>
+                      <TableHead className="text-xs text-center w-[70px]">Local Qty</TableHead>
+                      <TableHead className="text-xs text-center w-[70px]">SV Qty</TableHead>
+                      <TableHead className="text-xs text-center w-[70px]">SV On Hand</TableHead>
+                      <TableHead className="text-xs w-[100px]">Status</TableHead>
                       <TableHead className="text-xs">Diagnosis</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -647,8 +648,13 @@ export default function QcValidationReport() {
                         skuvaultBySku.set(item.sku, (skuvaultBySku.get(item.sku) || 0) + item.quantity);
                       });
                       
-                      // Sort SKUs alphabetically
-                      const sortedSkus = Array.from(allSkus).sort();
+                      // Build quantity on hand map from skuvaultRawItems
+                      const qtyOnHandBySku = new Map<string, number>();
+                      (selectedResult.skuvaultRawItems || []).forEach((item: any) => {
+                        if (item.Sku && item.QuantityOnHand !== undefined) {
+                          qtyOnHandBySku.set(item.Sku, item.QuantityOnHand);
+                        }
+                      });
                       
                       // Build a map from SKU to diagnosis
                       const diagnosisBySku = new Map<string, { category: string; reason: string; parentSku?: string; quantityOnHand?: number }>();
@@ -658,10 +664,58 @@ export default function QcValidationReport() {
                         }
                       });
                       
+                      // Group SKUs: parent products first, then their components together
+                      // Build parent-to-children map from diagnosis data
+                      const parentToChildren = new Map<string, string[]>();
+                      const childToParent = new Map<string, string>();
+                      
+                      diagnosisBySku.forEach((diag, sku) => {
+                        if (diag.parentSku) {
+                          childToParent.set(sku, diag.parentSku);
+                          const children = parentToChildren.get(diag.parentSku) || [];
+                          children.push(sku);
+                          parentToChildren.set(diag.parentSku, children);
+                        }
+                      });
+                      
+                      // Sort SKUs: parents first with their children, then orphan SKUs alphabetically
+                      const sortedSkus: string[] = [];
+                      const processedSkus = new Set<string>();
+                      
+                      // Get all parent SKUs (sorted alphabetically)
+                      const parentSkus = Array.from(parentToChildren.keys()).sort();
+                      
+                      // Add each parent followed by its children
+                      for (const parentSku of parentSkus) {
+                        // Add parent if it exists in allSkus and not processed
+                        if (allSkus.has(parentSku) && !processedSkus.has(parentSku)) {
+                          sortedSkus.push(parentSku);
+                          processedSkus.add(parentSku);
+                        }
+                        // Add children (sorted alphabetically)
+                        const children = parentToChildren.get(parentSku) || [];
+                        children.sort().forEach(child => {
+                          if (allSkus.has(child) && !processedSkus.has(child)) {
+                            sortedSkus.push(child);
+                            processedSkus.add(child);
+                          }
+                        });
+                      }
+                      
+                      // Add remaining SKUs that aren't part of parent-child groups (sorted alphabetically)
+                      Array.from(allSkus).sort().forEach(sku => {
+                        if (!processedSkus.has(sku)) {
+                          sortedSkus.push(sku);
+                        }
+                      });
+                      
                       return sortedSkus.map((sku, idx) => {
                         const localQty = localBySku.get(sku);
                         const svQty = skuvaultBySku.get(sku);
                         const diagnosis = diagnosisBySku.get(sku);
+                        const qtyOnHand = qtyOnHandBySku.get(sku);
+                        const parentSku = childToParent.get(sku);
+                        const isChild = !!parentSku;
                         
                         let status: 'match' | 'missing_local' | 'missing_sv' | 'mismatch';
                         let rowClass = '';
@@ -712,12 +766,18 @@ export default function QcValidationReport() {
                         
                         return (
                           <TableRow key={idx} className={rowClass}>
-                            <TableCell className="text-xs font-mono py-2">{sku}</TableCell>
+                            <TableCell className="text-xs font-mono py-2">
+                              {isChild && <span className="text-muted-foreground mr-1">└</span>}
+                              {sku}
+                            </TableCell>
                             <TableCell className={`text-xs text-center py-2 ${status === 'missing_local' ? 'text-muted-foreground' : ''}`}>
                               {localQty !== undefined ? localQty : '-'}
                             </TableCell>
                             <TableCell className={`text-xs text-center py-2 ${status === 'missing_sv' ? 'text-muted-foreground' : ''}`}>
                               {svQty !== undefined ? svQty : '-'}
+                            </TableCell>
+                            <TableCell className={`text-xs text-center py-2 ${qtyOnHand === 0 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
+                              {qtyOnHand !== undefined ? qtyOnHand : '-'}
                             </TableCell>
                             <TableCell className="py-2">
                               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusBadgeClass}`}>
