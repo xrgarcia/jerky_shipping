@@ -248,9 +248,9 @@ export function AppSidebar() {
               
               {/* Reports Section - Popover when collapsed, Collapsible when expanded */}
               {isCollapsed ? (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <SidebarMenuItem>
+                <SidebarMenuItem>
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button 
                         className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
                           isReportsPage
@@ -262,27 +262,27 @@ export function AppSidebar() {
                       >
                         <BarChart3 className="h-4 w-4 shrink-0" />
                       </button>
-                    </SidebarMenuItem>
-                  </PopoverTrigger>
-                  <PopoverContent side="right" align="start" className="w-56 p-2">
-                    <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Reports</div>
-                    {reportsItems.map((item) => (
-                      <Link 
-                        key={item.title}
-                        href={item.url}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                          location === item.url 
-                            ? 'bg-accent text-accent-foreground font-semibold' 
-                            : 'text-foreground'
-                        }`}
-                        data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.title}</span>
-                      </Link>
-                    ))}
-                  </PopoverContent>
-                </Popover>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start" className="w-56 p-2">
+                      <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Reports</div>
+                      {reportsItems.map((item) => (
+                        <Link 
+                          key={item.title}
+                          href={item.url}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                            location === item.url 
+                              ? 'bg-accent text-accent-foreground font-semibold' 
+                              : 'text-foreground'
+                          }`}
+                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </Link>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </SidebarMenuItem>
               ) : (
                 <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
                   <SidebarMenuItem>
@@ -343,9 +343,9 @@ export function AppSidebar() {
               
               {/* Settings Section - Popover when collapsed, Collapsible when expanded */}
               {isCollapsed ? (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <SidebarMenuItem>
+                <SidebarMenuItem>
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button 
                         className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
                           isSettingsPage
@@ -357,27 +357,27 @@ export function AppSidebar() {
                       >
                         <Settings className="h-4 w-4 shrink-0" />
                       </button>
-                    </SidebarMenuItem>
-                  </PopoverTrigger>
-                  <PopoverContent side="right" align="start" className="w-56 p-2">
-                    <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Settings</div>
-                    {settingsItems.map((item) => (
-                      <Link 
-                        key={item.title}
-                        href={item.url}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                          location === item.url 
-                            ? 'bg-accent text-accent-foreground font-semibold' 
-                            : 'text-foreground'
-                        }`}
-                        data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.title}</span>
-                      </Link>
-                    ))}
-                  </PopoverContent>
-                </Popover>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start" className="w-56 p-2">
+                      <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Settings</div>
+                      {settingsItems.map((item) => (
+                        <Link 
+                          key={item.title}
+                          href={item.url}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                            location === item.url 
+                              ? 'bg-accent text-accent-foreground font-semibold' 
+                              : 'text-foreground'
+                          }`}
+                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </Link>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </SidebarMenuItem>
               ) : (
                 <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
                   <SidebarMenuItem>
