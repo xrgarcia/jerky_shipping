@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -34,6 +35,8 @@ import type { User } from "@shared/schema";
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
   
   // Auto-expand Reports section if on a reports page
   const isReportsPage = location.startsWith('/reports');
@@ -204,15 +207,17 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <div 
-        className="flex items-center justify-center px-4 border-b border-sidebar-border h-[72px]"
+        className={`flex items-center justify-center border-b border-sidebar-border transition-all duration-200 ${
+          isCollapsed ? 'px-2 h-[56px]' : 'px-4 h-[72px]'
+        }`}
         style={{ background: '#1a1a1a' }}
       >
         <img 
           src={jerkyLogo} 
           alt="Jerky.com" 
-          className="h-12 w-auto"
+          className={`w-auto transition-all duration-200 ${isCollapsed ? 'h-6' : 'h-12'}`}
           data-testid="img-jerky-logo"
         />
       </div>
@@ -228,51 +233,55 @@ export function AppSidebar() {
                       location === item.url 
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
                         : 'text-sidebar-foreground'
-                    }`}
+                    } ${isCollapsed ? 'justify-center' : ''}`}
                     data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    title={isCollapsed ? item.title : undefined}
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {!isCollapsed && <span>{item.title}</span>}
                   </Link>
                 </SidebarMenuItem>
               ))}
               
               {/* Collapsible Reports Section */}
-              <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
+              <Collapsible open={reportsOpen && !isCollapsed} onOpenChange={setReportsOpen}>
                 <SidebarMenuItem>
                   <CollapsibleTrigger 
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
                       isReportsPage
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
                         : 'text-sidebar-foreground'
-                    }`}
+                    } ${isCollapsed ? 'justify-center' : ''}`}
                     data-testid="link-reports"
+                    title={isCollapsed ? "Reports" : undefined}
                   >
-                    <BarChart3 className="h-4 w-4" />
-                    <span className="flex-1 text-left">Reports</span>
-                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${reportsOpen ? 'rotate-90' : ''}`} />
+                    <BarChart3 className="h-4 w-4 shrink-0" />
+                    {!isCollapsed && <span className="flex-1 text-left">Reports</span>}
+                    {!isCollapsed && <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${reportsOpen ? 'rotate-90' : ''}`} />}
                   </CollapsibleTrigger>
                 </SidebarMenuItem>
-                <CollapsibleContent>
-                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
-                    {reportsItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <Link 
-                          href={item.url}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                            location === item.url 
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                              : 'text-sidebar-foreground'
-                          }`}
-                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuItem>
-                    ))}
-                  </div>
-                </CollapsibleContent>
+                {!isCollapsed && (
+                  <CollapsibleContent>
+                    <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
+                      {reportsItems.map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <Link 
+                            href={item.url}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                              location === item.url 
+                                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                                : 'text-sidebar-foreground'
+                            }`}
+                            data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuItem>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                )}
               </Collapsible>
               
               {/* Remaining items after Reports */}
@@ -284,51 +293,55 @@ export function AppSidebar() {
                       location === item.url 
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
                         : 'text-sidebar-foreground'
-                    }`}
+                    } ${isCollapsed ? 'justify-center' : ''}`}
                     data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    title={isCollapsed ? item.title : undefined}
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {!isCollapsed && <span>{item.title}</span>}
                   </Link>
                 </SidebarMenuItem>
               ))}
               
               {/* Collapsible Settings Section */}
-              <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <Collapsible open={settingsOpen && !isCollapsed} onOpenChange={setSettingsOpen}>
                 <SidebarMenuItem>
                   <CollapsibleTrigger 
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
                       isSettingsPage
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
                         : 'text-sidebar-foreground'
-                    }`}
+                    } ${isCollapsed ? 'justify-center' : ''}`}
                     data-testid="link-settings"
+                    title={isCollapsed ? "Settings" : undefined}
                   >
-                    <Settings className="h-4 w-4" />
-                    <span className="flex-1 text-left">Settings</span>
-                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? 'rotate-90' : ''}`} />
+                    <Settings className="h-4 w-4 shrink-0" />
+                    {!isCollapsed && <span className="flex-1 text-left">Settings</span>}
+                    {!isCollapsed && <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? 'rotate-90' : ''}`} />}
                   </CollapsibleTrigger>
                 </SidebarMenuItem>
-                <CollapsibleContent>
-                  <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
-                    {settingsItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <Link 
-                          href={item.url}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
-                            location === item.url 
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                              : 'text-sidebar-foreground'
-                          }`}
-                          data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuItem>
-                    ))}
-                  </div>
-                </CollapsibleContent>
+                {!isCollapsed && (
+                  <CollapsibleContent>
+                    <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
+                      {settingsItems.map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <Link 
+                            href={item.url}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                              location === item.url 
+                                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                                : 'text-sidebar-foreground'
+                            }`}
+                            data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuItem>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                )}
               </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
@@ -339,22 +352,25 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all hover-elevate active-elevate-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground`}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-all hover-elevate active-elevate-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${isCollapsed ? 'justify-center' : ''}`}
                 style={user?.profileBackgroundColor ? { backgroundColor: user.profileBackgroundColor } : undefined}
                 data-testid="button-user-menu"
+                title={isCollapsed ? (user?.handle ? `@${user.handle}` : user?.email || 'User') : undefined}
               >
-                <Avatar className={`h-8 w-8 ${user?.profileBackgroundColor ? "border border-white/20" : ""}`}>
+                <Avatar className={`transition-all duration-200 ${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} ${user?.profileBackgroundColor ? "border border-white/20" : ""}`}>
                   <AvatarImage src={user?.avatarUrl || undefined} />
-                  <AvatarFallback className={user?.profileBackgroundColor ? "bg-white/20 text-white" : "bg-primary text-primary-foreground"}>
+                  <AvatarFallback className={`${isCollapsed ? 'text-xs' : ''} ${user?.profileBackgroundColor ? "bg-white/20 text-white" : "bg-primary text-primary-foreground"}`}>
                     {user?.email?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <div className={`flex flex-col items-start text-sm flex-1 min-w-0 ${user?.profileBackgroundColor ? "text-white" : ""}`}>
-                  <span className="font-semibold truncate max-w-32">
-                    {user?.handle ? `@${user.handle}` : user?.email}
-                  </span>
-                </div>
-                <ChevronUp className={`h-4 w-4 ${user?.profileBackgroundColor ? "text-white" : ""}`} />
+                {!isCollapsed && (
+                  <div className={`flex flex-col items-start text-sm flex-1 min-w-0 ${user?.profileBackgroundColor ? "text-white" : ""}`}>
+                    <span className="font-semibold truncate max-w-32">
+                      {user?.handle ? `@${user.handle}` : user?.email}
+                    </span>
+                  </div>
+                )}
+                {!isCollapsed && <ChevronUp className={`h-4 w-4 ${user?.profileBackgroundColor ? "text-white" : ""}`} />}
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
