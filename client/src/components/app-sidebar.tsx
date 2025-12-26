@@ -162,6 +162,11 @@ export function AppSidebar() {
       icon: Package,
     },
     {
+      title: "Shopify Products",
+      url: "/shopify-products",
+      icon: Store,
+    },
+    {
       title: "Shopify Sales",
       url: "/reports/shopify-sales",
       icon: Store,
