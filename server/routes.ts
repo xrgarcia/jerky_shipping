@@ -1755,6 +1755,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get shipment QC items (fulfilled items) for a specific shipment (accepts shipmentId or UUID)
+  app.get("/api/shipments/:shipmentId/qc-items", requireAuth, async (req, res) => {
+    try {
+      const idParam = req.params.shipmentId;
+      
+      // Try lookup by ShipStation shipmentId first
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      
+      // Fall back to database UUID
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      // Fetch QC items using the database ID
+      const qcItems = await db
+        .select()
+        .from(shipmentQcItems)
+        .where(eq(shipmentQcItems.shipmentId, shipment.id))
+        .orderBy(shipmentQcItems.sku);
+      
+      res.json(qcItems);
+    } catch (error: any) {
+      console.error(`Error fetching shipment QC items for ${req.params.shipmentId}:`, error);
+      res.status(500).json({ error: "Failed to fetch shipment QC items" });
+    }
+  });
+
   // Batch fetch shipment packages - reduces N+1 queries on shipments list page
   app.post("/api/shipments/packages/batch", requireAuth, async (req, res) => {
     try {
