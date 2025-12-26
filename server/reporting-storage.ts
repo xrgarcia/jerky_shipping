@@ -323,19 +323,25 @@ export class ReportingStorage implements IReportingStorage {
   }
 
   async getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]> {
-    // Try cache first
-    const cacheKey = `${CACHE_PREFIX}steps:${sku}:${stockCheckDate.toISOString().split('T')[0]}`;
+    // Try cache first - use local date format to avoid timezone issues
+    const dateStr = stockCheckDate.toISOString().split('T')[0];
+    const cacheKey = `${CACHE_PREFIX}steps:${sku}:${dateStr}`;
+    
+    console.log(`[ReportingStorage] getPORecommendationSteps called for sku=${sku}, date=${stockCheckDate.toISOString()}, dateStr=${dateStr}, cacheKey=${cacheKey}`);
     
     try {
       const redis = getRedisClient();
       const cached = await redis.get<PORecommendationStep[]>(cacheKey);
       if (cached) {
+        console.log(`[ReportingStorage] Cache HIT for ${cacheKey}: ${cached.length} steps, step_names: ${cached.map(s => s.step_name).join(', ')}`);
         return cached;
       }
+      console.log(`[ReportingStorage] Cache MISS for ${cacheKey}`);
     } catch (error) {
       console.error('[ReportingStorage] Redis error fetching steps:', error);
     }
     
+    console.log(`[ReportingStorage] Querying DB for steps: sku=${sku}, date=${stockCheckDate.toISOString()}`);
     const results = await reportingSql`
       SELECT 
         sku,
@@ -351,11 +357,13 @@ export class ReportingStorage implements IReportingStorage {
     `;
 
     const steps = results as unknown as PORecommendationStep[];
+    console.log(`[ReportingStorage] DB returned ${steps.length} steps for ${sku}: ${steps.map(s => s.step_name).join(', ')}`);
     
     // Cache the steps with 24-hour TTL to prevent stale data
     try {
       const redis = getRedisClient();
       await redis.set(cacheKey, steps, { ex: 86400 }); // 24 hours
+      console.log(`[ReportingStorage] Cached ${steps.length} steps for ${cacheKey}`);
     } catch (error) {
       console.error('[ReportingStorage] Redis error caching steps:', error);
     }
@@ -393,10 +401,11 @@ export class ReportingStorage implements IReportingStorage {
     try {
       const redis = getRedisClient();
       const keys = await redis.keys(`${CACHE_PREFIX}*`);
+      console.log(`[ReportingStorage] Invalidating cache - found ${keys?.length || 0} keys: ${keys?.join(', ') || 'none'}`);
       if (keys && keys.length > 0) {
         await redis.del(...keys);
       }
-      console.log(`[ReportingStorage] Invalidated ${keys?.length || 0} cache keys`);
+      console.log(`[ReportingStorage] Cache invalidation complete - deleted ${keys?.length || 0} keys`);
     } catch (error) {
       console.error('[ReportingStorage] Redis error invalidating cache:', error);
     }
