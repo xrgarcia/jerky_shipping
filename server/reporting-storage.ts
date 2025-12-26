@@ -323,11 +323,11 @@ export class ReportingStorage implements IReportingStorage {
   }
 
   async getPORecommendationSteps(sku: string, stockCheckDate: Date): Promise<PORecommendationStep[]> {
-    // Try cache first - use local date format to avoid timezone issues
-    const dateStr = stockCheckDate.toISOString().split('T')[0];
+    // Format date in CST timezone to match database storage (dates are stored in CST)
+    const dateStr = formatInTimeZone(stockCheckDate, CST_TIMEZONE, 'yyyy-MM-dd');
     const cacheKey = `${CACHE_PREFIX}steps:${sku}:${dateStr}`;
     
-    console.log(`[ReportingStorage] getPORecommendationSteps called for sku=${sku}, date=${stockCheckDate.toISOString()}, dateStr=${dateStr}, cacheKey=${cacheKey}`);
+    console.log(`[ReportingStorage] getPORecommendationSteps called for sku=${sku}, inputDate=${stockCheckDate.toISOString()}, cstDateStr=${dateStr}, cacheKey=${cacheKey}`);
     
     try {
       const redis = getRedisClient();
@@ -341,7 +341,9 @@ export class ReportingStorage implements IReportingStorage {
       console.error('[ReportingStorage] Redis error fetching steps:', error);
     }
     
-    console.log(`[ReportingStorage] Querying DB for steps: sku=${sku}, date=${stockCheckDate.toISOString()}`);
+    // Query using date string comparison to avoid timezone issues
+    // The database stores stock_check_date in CST, so we compare the date portion
+    console.log(`[ReportingStorage] Querying DB for steps: sku=${sku}, dateStr=${dateStr}`);
     const results = await reportingSql`
       SELECT 
         sku,
@@ -352,7 +354,7 @@ export class ReportingStorage implements IReportingStorage {
         final_value
       FROM vw_po_recommendations_steps
       WHERE sku = ${sku} 
-        AND stock_check_date = ${stockCheckDate}
+        AND stock_check_date::date = ${dateStr}::date
       ORDER BY step_name
     `;
 
