@@ -849,6 +849,20 @@ export default function QcValidationReport() {
                 });
                 lines.push("");
                 
+                lines.push("--- SKUVAULT RAW ITEMS (with inventory levels) ---");
+                lines.push("SKU | Is Kit? | Qty On Hand | Kit Components");
+                if (selectedResult.skuvaultRawItems && selectedResult.skuvaultRawItems.length > 0) {
+                  (selectedResult.skuvaultRawItems as any[]).forEach((item: any) => {
+                    const kitComps = item.KitProducts && item.KitProducts.length > 0 
+                      ? item.KitProducts.map((kp: any) => `${kp.Sku}x${kp.Quantity}`).join(', ')
+                      : 'none';
+                    lines.push(`${item.Sku} | ${item.IsKit ? 'YES' : 'no'} | ${item.QuantityOnHand !== undefined ? item.QuantityOnHand : 'N/A'} | ${kitComps}`);
+                  });
+                } else {
+                  lines.push("(No raw items data available)");
+                }
+                lines.push("");
+                
                 lines.push("--- DETAILED DIFFERENCES WITH DIAGNOSIS ---");
                 if (selectedResult.differences.length === 0) {
                   lines.push("No field-level differences detected.");
