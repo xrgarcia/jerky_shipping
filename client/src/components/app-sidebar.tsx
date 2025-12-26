@@ -27,6 +27,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
@@ -241,24 +246,59 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               
-              {/* Collapsible Reports Section */}
-              <Collapsible open={reportsOpen && !isCollapsed} onOpenChange={setReportsOpen}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger 
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
-                      isReportsPage
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                        : 'text-sidebar-foreground'
-                    } ${isCollapsed ? 'justify-center' : ''}`}
-                    data-testid="link-reports"
-                    title={isCollapsed ? "Reports" : undefined}
-                  >
-                    <BarChart3 className="h-4 w-4 shrink-0" />
-                    {!isCollapsed && <span className="flex-1 text-left">Reports</span>}
-                    {!isCollapsed && <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${reportsOpen ? 'rotate-90' : ''}`} />}
-                  </CollapsibleTrigger>
-                </SidebarMenuItem>
-                {!isCollapsed && (
+              {/* Reports Section - Popover when collapsed, Collapsible when expanded */}
+              {isCollapsed ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <SidebarMenuItem>
+                      <button 
+                        className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                          isReportsPage
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                            : 'text-sidebar-foreground'
+                        }`}
+                        data-testid="link-reports"
+                        title="Reports"
+                      >
+                        <BarChart3 className="h-4 w-4 shrink-0" />
+                      </button>
+                    </SidebarMenuItem>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="start" className="w-56 p-2">
+                    <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Reports</div>
+                    {reportsItems.map((item) => (
+                      <Link 
+                        key={item.title}
+                        href={item.url}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                          location === item.url 
+                            ? 'bg-accent text-accent-foreground font-semibold' 
+                            : 'text-foreground'
+                        }`}
+                        data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span>{item.title}</span>
+                      </Link>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger 
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                        isReportsPage
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                          : 'text-sidebar-foreground'
+                      }`}
+                      data-testid="link-reports"
+                    >
+                      <BarChart3 className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 text-left">Reports</span>
+                      <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${reportsOpen ? 'rotate-90' : ''}`} />
+                    </CollapsibleTrigger>
+                  </SidebarMenuItem>
                   <CollapsibleContent>
                     <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
                       {reportsItems.map((item) => (
@@ -279,8 +319,8 @@ export function AppSidebar() {
                       ))}
                     </div>
                   </CollapsibleContent>
-                )}
-              </Collapsible>
+                </Collapsible>
+              )}
               
               {/* Remaining items after Reports */}
               {menuItems.slice(9).map((item) => (
@@ -301,24 +341,59 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               
-              {/* Collapsible Settings Section */}
-              <Collapsible open={settingsOpen && !isCollapsed} onOpenChange={setSettingsOpen}>
-                <SidebarMenuItem>
-                  <CollapsibleTrigger 
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
-                      isSettingsPage
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
-                        : 'text-sidebar-foreground'
-                    } ${isCollapsed ? 'justify-center' : ''}`}
-                    data-testid="link-settings"
-                    title={isCollapsed ? "Settings" : undefined}
-                  >
-                    <Settings className="h-4 w-4 shrink-0" />
-                    {!isCollapsed && <span className="flex-1 text-left">Settings</span>}
-                    {!isCollapsed && <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? 'rotate-90' : ''}`} />}
-                  </CollapsibleTrigger>
-                </SidebarMenuItem>
-                {!isCollapsed && (
+              {/* Settings Section - Popover when collapsed, Collapsible when expanded */}
+              {isCollapsed ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <SidebarMenuItem>
+                      <button 
+                        className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                          isSettingsPage
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                            : 'text-sidebar-foreground'
+                        }`}
+                        data-testid="link-settings"
+                        title="Settings"
+                      >
+                        <Settings className="h-4 w-4 shrink-0" />
+                      </button>
+                    </SidebarMenuItem>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="start" className="w-56 p-2">
+                    <div className="text-sm font-semibold mb-2 px-2 text-muted-foreground">Settings</div>
+                    {settingsItems.map((item) => (
+                      <Link 
+                        key={item.title}
+                        href={item.url}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 ${
+                          location === item.url 
+                            ? 'bg-accent text-accent-foreground font-semibold' 
+                            : 'text-foreground'
+                        }`}
+                        data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span>{item.title}</span>
+                      </Link>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger 
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover-elevate active-elevate-2 w-full ${
+                        isSettingsPage
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold' 
+                          : 'text-sidebar-foreground'
+                      }`}
+                      data-testid="link-settings"
+                    >
+                      <Settings className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 text-left">Settings</span>
+                      <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${settingsOpen ? 'rotate-90' : ''}`} />
+                    </CollapsibleTrigger>
+                  </SidebarMenuItem>
                   <CollapsibleContent>
                     <div className="ml-4 border-l border-sidebar-border pl-2 mt-1">
                       {settingsItems.map((item) => (
@@ -339,8 +414,8 @@ export function AppSidebar() {
                       ))}
                     </div>
                   </CollapsibleContent>
-                )}
-              </Collapsible>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
