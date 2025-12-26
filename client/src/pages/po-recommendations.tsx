@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation, useSearch } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, X, Calendar, ChevronLeft, ChevronRight, ChevronDown, RefreshCw } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { parseISO, format } from "date-fns";
@@ -262,6 +263,19 @@ export default function PORecommendations() {
     staleTime: STALE_TIME,
     gcTime: STALE_TIME,
     enabled: selectedDate !== null || availableDates.length === 0, // Fetch once date is selected, or if no dates available
+  });
+
+  // Cache refresh mutation
+  const refreshCacheMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/reporting/invalidate-cache');
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate all PO recommendation queries to force refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/reporting/po-recommendations'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reporting/po-recommendations/available-dates'] });
+    },
   });
 
   // Get unique suppliers from the data (computed locally)
@@ -540,6 +554,16 @@ export default function PORecommendations() {
                 )}
               </PopoverContent>
             </Popover>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refreshCacheMutation.mutate()}
+              disabled={refreshCacheMutation.isPending}
+              title="Refresh data from database"
+              data-testid="button-refresh-cache"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshCacheMutation.isPending ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
         
@@ -710,7 +734,7 @@ export default function PORecommendations() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openStepsModal(rec.sku, rec.stock_check_date)}
+                        onClick={() => selectedDate && openStepsModal(rec.sku, new Date(selectedDate))}
                         data-testid={`button-steps-${rec.sku}`}
                       >
                         Steps

@@ -352,10 +352,10 @@ export class ReportingStorage implements IReportingStorage {
 
     const steps = results as unknown as PORecommendationStep[];
     
-    // Cache the steps
+    // Cache the steps with 24-hour TTL to prevent stale data
     try {
       const redis = getRedisClient();
-      await redis.set(cacheKey, steps);
+      await redis.set(cacheKey, steps, { ex: 86400 }); // 24 hours
     } catch (error) {
       console.error('[ReportingStorage] Redis error caching steps:', error);
     }
