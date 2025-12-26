@@ -1,0 +1,116 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825357453
+Shipment ID: e2b1a028-9d63-4497-8e05-92bd39084b20
+
+--- SUMMARY ---
+Total Differences: 3
+Missing in Local (ship.): 0
+Missing in SkuVault: 3
+Quantity Mismatches: 0
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-VEJ-2-17 | 811007027163 | Jerky.com - Teriyaki Venison Jerky - 1.75 oz. | 2
+JCB-SS-172-13-X6 | 4000003681 | Spiced Apple Snack Stick - 6 Pack | 2
+JCB-WBJ-1-17 | 811007027057 | Jerky.com - Original Boar Jerky - 1.75 oz. | 1
+JCB-VP-20PSS | 811007029297 | The Complete Meat Stick Combo Variety Pack | 1
+JCB-BAJ-10-17 | 811007027781 | Jerky.com - Barbecue Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-1-17 | 811007027828 | Jerky.com - Original Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-12-17 | 811007027798 | Jerky.com - Honey Pepper Bacon Jerky - 1.75 oz. | 1
+JCB-BAJ-6-17 | 811007027811 | Jerky.com - Maple Bacon Jerky - 1.75 oz. | 1
+BUILDJAS | 4000002774 | Build Your Own Jerky Assortment | 1
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 2
+JCB-VP-8PESS | 811007029280 | Exotic Snack Sticks Variety Pack - 8 Pieces | 1
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+JCB-CMB-BBJS-TP | 811007029259 | Beef Jerky Sampler Pack | 1
+JCB-BEJ-30-16 | 811007026951 | Jerky.com - Chipotle Bourbon Beef Jerky - 2.5 oz. | 1
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+JCB-WBJ-1-17 | 811007027057 | Jerky.com - Original Boar Jerky - 1.75 oz. | 1
+JCB-VP-20PSS | 811007029297 | The Complete Meat Stick Combo Variety Pack | 1
+BUILDJAS | 4000002774 | Build Your Own Jerky Assortment | 1
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-VP-8PESS | 811007029280 | Exotic Snack Sticks Variety Pack - 8 Pieces | 1
+JCB-CMB-BBJS-TP | 811007029259 | Beef Jerky Sampler Pack | 1
+JCB-BEJ-30-16 | 811007026951 | Jerky.com - Chipotle Bourbon Beef Jerky - 2.5 oz. | 1
+JCB-VEJ-2-17 | 811007027163 | Jerky.com - Teriyaki Venison Jerky - 1.75 oz. | 2
+JCB-SS-172-13-X6 | 4000003681 | Spiced Apple Snack Stick - 6 Pack | 2
+JCB-BAJ-1-17 | 811007027828 | Jerky.com - Original Bacon Jerky - 1.75 oz. | 1
+JCB-VEJ-5-17 | 811007027026 | Jerky.com - Hot Venison Jerky - 1.75 oz. | 2
+JCB-VEJ-1-17 | 811007027101 | Jerky.com - Original Venison Jerky - 1.75 oz. | 4
+
+--- SKUVAULT RAW ITEMS (with inventory levels) ---
+SKU | Is Kit? | Qty On Hand | Kit Components
+JCB-WBJ-1-17 | no | N/A | none
+JCB-VP-20PSS | no | N/A | none
+BUILDJAS | no | N/A | none
+JCB-BEJ-130-16 | no | N/A | none
+JCB-VP-8PESS | no | N/A | none
+JCB-CMB-BBJS-TP | no | N/A | none
+JCB-BEJ-30-16 | no | N/A | none
+JCB-VEJ-2-17-X2 | YES | N/A | JCB-VEJ-2-17x2
+JCB-SS-172-13-X12 | YES | N/A | JCB-SS-172-13-X6x2
+BACON-X1 | YES | N/A | JCB-BAJ-1-17x1
+JCB-VEJ-5-17-X2 | YES | N/A | JCB-VEJ-5-17x2
+JCB-VEJ-1-17-X4 | YES | N/A | JCB-VEJ-1-17x4
+
+--- DETAILED DIFFERENCES WITH DIAGNOSIS ---
+SKU | Field | Local Value | SkuVault Value | Diagnosis Category | Diagnosis Reason
+JCB-BAJ-10-17 | item | qty: 1 | (missing) | KIT_MAPPING_MISMATCH | This SKU is a component of kit(s): [BACON-X1, BACON-X2, BACON-X3 + 26 more]. Local kit_mappings_cache has this as a component but SkuVault QC response doesn't include it. Kit definition may differ between systems. (Parent: BACON-X1)
+JCB-BAJ-12-17 | item | qty: 1 | (missing) | KIT_MAPPING_MISMATCH | This SKU is a component of kit(s): [BACON-X1, BACON-X2, BACON-X3 + 24 more]. Local kit_mappings_cache has this as a component but SkuVault QC response doesn't include it. Kit definition may differ between systems. (Parent: BACON-X1)
+JCB-BAJ-6-17 | item | qty: 1 | (missing) | KIT_MAPPING_MISMATCH | This SKU is a component of kit(s): [BACON-X1, BACON-X2, JCB-BAC-6-1-X3 + 21 more]. Local kit_mappings_cache has this as a component but SkuVault QC response doesn't include it. Kit definition may differ between systems. (Parent: BACON-X1)
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components | Member of Kits
+JCB-VEJ-2-17 | Exotic Jerky | no | null | yes | none | ced_48029632911, ced_48029632975, EXOTIC-X4, EXOTIC-X8, JCB-CMB-SMEJB+3FB, JCB-VEJ-2-17-X12, JCB-VEJ-2-17-X2, JCB-VEJ-2-17-X4, JCB-VEJ-2-1-X12, JCB-VEJ-2-1-X3, JCB-VEJ-3-17-SAMPLER, JCB-VEJ-3-17-SAMPLER-X2, JCB-VEJ-3-17-SAMPLER-X4, JCB-VEJ-A3-1, JCB-VEJ-FPSB
+JCB-SS-172-13-X6 | Meat Sticks | no | null | yes | JCB-SS-172-13x6 | JCB-BEJ-APL-BNDL, JCB-SS-172-13-X12, JCB-SS-172-13-X24, JCB-SS-172–173-13-X12
+JCB-WBJ-1-17 | Exotic Jerky | no | null | yes | none | EXOTIC-X4, EXOTIC-X6, EXOTIC-X8, JCB-CMB-EXJC, JCB-CMB-EXJC-X2, JCB-CMB-EXJC-X4, JCB-CMB-JLC, JCB-CMB-JLC-X2, JCB-CMB-JLC-X4, JCB-GFT-BCGB, JCB-GFT-BCGB-X2, JCB-SP-GJ-BASIC, JCB-WBJ-1-1-X3, JCB-WBJ-1-17-X12, JCB-WBJ-1-17-X2, JCB-WBJ-1-17-X4, JCB-WBJ-1-17X12, JCB-WBJ-A3-1, JCB-WBJ-SAMPLER, JCB-WBJ-SAMPLER-X2, JCB-WBJ-SAMPLER-X4, JCB1031-K-RS, JCB1035-K, TSKU-13, TSO-JCB-WBJ-1-17-X4, ced_12842027679832, ced_12842027712600, ced_12842027745368, ced_48029639951, ced_48029640015
+JCB-VP-20PSS | Combos and Samplers | YES | null | yes | JCB-EEXS-1-13x1, JCB-EEXS-91-13x1, JCB-EEXS-94-23x1, JCB-SS-1-26x1, JCB-SS-21-26x1, JCB-SS-3-26x1, JCB-SS-42-26x1, JCB-SS-5-26x1, JCB-SS-96-26x3, JCB-VEXS-1-13x1, JCB-VEXS-1-23x1, JCB-VEXS-2-13x1, JCB-VEXS-3-13x1, JCB-VEXS-5-13x1, JCB-VEXS-5-23x1, JCB-VEXS-6-13x1, JCB-vEXS-93-13x1, JCB-VP-20PSS-POUCHx1, JCB-WBEXS-1-13x1 | JCB-BFD-52PCB, PBF2021-Offer3
+JCB-BAJ-10-17 | Bacon Jerky | no | null | yes | none | BACON-X1, BACON-X2, BACON-X3, BACON-X4, JCB-BAJ-10-1-X3, JCB-BAJ-10-17-X12, JCB-BAJ-10-17-X2, JCB-BAJ-10-17-X4, JCB-BAJ-10-2-X12, JCB-BAJ-10-2-X2, JCB-BAJ-10-2-X4, JCB-BAJ-NBDB, JCB-BAJ-SUB-6BAG, JCB-BAJ-SUB-6BAG+MSP, JCB-BAJ-TSO-3FB, JCB-CMB-BAJC, JCB-CMB-BAJC-X2, JCB-CMB-BAJC-X4, JCB-CMB-SMBJB+3FB, JCB-EJSB-4BAGS, JCB-EJSB-4BAGS-NS, JCB-EJSB-8BAGS, JCB-EJSB-8BAGS-NS, JCB-TTK-DRPBB20, JCB-TTK-DRPBB8, TSO-JCB-BMCB, ced_12124842983492, ced_12124843016260, ced_12124843049028
+JCB-BAJ-1-17 | Bacon Jerky | no | null | yes | none | BACON-X1, BACON-X2, BACON-X3, BACON-X4, ced_200140554255, ced_48029720591, ced_48029720655, JCB-3BS-MTB, JCB-BAC-1-1-X3, JCB-BAJ-1-17-X12, JCB-BAJ-1-17-X2, JCB-BAJ-1-17-X4, JCB-BAJ-1-17-X4-O, JCB-BAJ-SAMPLER, JCB-BAJ-SAMPLER-X2, JCB-BAJ-SAMPLER-X4, JCB-BAJ-SUB-6BAG, JCB-BAJ-SUB-6BAG+MSP, JCB-BAJ-TSO-3FB, JCB-CMB-BAJC, JCB-CMB-BAJC-X2, JCB-CMB-BAJC-X4, JCB-CMB-SMBJB+3FB, JCB-TTK-DRPBB20, TSO-JCB-BMCB
+JCB-BAJ-12-17 | Bacon Jerky | no | null | yes | none | BACON-X1, BACON-X2, BACON-X3, BACON-X4, JCB-BAJ-12-1-X3, JCB-BAJ-12-17-X12, JCB-BAJ-12-17-X2, JCB-BAJ-12-17-X4, JCB-BAJ-12-2-X12, JCB-BAJ-12-2-X2, JCB-BAJ-12-2-X4, JCB-BAJ-163-17+PB, JCB-BAJ-NBDB, JCB-BAJ-SAMPLER, JCB-BAJ-SAMPLER-X2, JCB-BAJ-SAMPLER-X4, JCB-BAJ-SUB-6BAG, JCB-BAJ-SUB-6BAG+MSP, JCB-BAJ-TSO-3FB, JCB-CMB-SMBJB+3FB, JCB-OCU-BGFUB, JCB-TT-KK-03, TSO-JCB-BAJ-12-17-X4, TSO-JCB-BMCB, ced_12124842721348, ced_12124842754116, ced_12124842786884
+JCB-BAJ-6-17 | Bacon Jerky | no | null | yes | none | BACON-X1, BACON-X2, JCB-BAC-6-1-X3, JCB-BAJ-163-17+PB, JCB-BAJ-6-17-X12, JCB-BAJ-6-17-X2, JCB-BAJ-6-17-X4, JCB-BAJ-NBD2PB, JCB-BEJ-SBWT-3PK, JCB-CMB-BAJC, JCB-CMB-BAJC-X2, JCB-CMB-BAJC-X4, JCB-CMB-SMBJB+3FB, JCB-SP-GJ-BASIC, JCB-TT-KF-01, JCB-TT-KFKOOZIE-01, JCB-TT-KKBGBUNDLE-01, JCB-TTK-DRPBB20, JCB-TTK-DRPBB4, TSO-JCB-8PCBB-OTO, TSO-JCB-BMCB, ced_200140488719, ced_48029720847, ced_48029720911
+BUILDJAS | Gift | no | null | yes | none | none
+JCB-BEJ-130-16 | Beef Jerky | no | null | yes | none | JCB-BEJ-130-16-2X, JCB-BEJ-130-16-5X, JCB-BSBB-OBPT+PRO, JCB-TK-3YAB, JCB-TK-3YAB-2
+JCB-VEJ-5-17 | Exotic Jerky | no | null | yes | none | ced_48029633295, ced_48029633359, JCB-CMB-SMEJB+3FB, JCB-VEJ-3-17-SAMPLER, JCB-VEJ-5-17-X12, JCB-VEJ-5-17-X2, JCB-VEJ-5-17-X4, JCB-VEJ-5-1-X12, JCB-VEJ-5-1-X3, JCB-VEJ-A3-1
+JCB-VP-8PESS | Combos and Samplers | YES | null | yes | JCB-EEXS-1-13x1, JCB-EEXS-94-23x1, JCB-VEXS-1-13x1, JCB-VEXS-1-23x1, JCB-VEXS-2-13x1, JCB-VEXS-5-13x1, JCB-VEXS-6-13x1, JCB-VP-8PESS-POUCHx1, JCB-WBEXS-1-13x1 | JCB-BFD-28PCB, JCB-CMB-SMEJB+3FB, TSO-JCB-13PCEJB+F
+JCB-VEJ-1-17 | Exotic Jerky | no | null | yes | none | EXOTIC-X4, EXOTIC-X6, EXOTIC-X8, JCB-3BS-MTB, JCB-BTJ-EXBFSAMP-02, JCB-CF-COMBO, JCB-CF-EXOTIC3PACK, JCB-CMB-EXJC, JCB-CMB-EXJC-X2, JCB-CMB-EXJC-X4, JCB-CMB-JLC, JCB-CMB-JLC-X2, JCB-CMB-JLC-X4, JCB-CMB-SMEJB+3FB, JCB-CMB-VP-14B, JCB-EJGB-8P, JCB-EXB-B3G2S, JCB-GFT-BCGB, JCB-GFT-BCGB-X2, JCB-GFT-ESGB, JCB-JKY-VEN-B3G2, JCB-SP-GJ-BASIC, JCB-UJSB-LARGE-NS, JCB-UJSB-LARGE-NS-BS, JCB-UJSB-REG, JCB-UJSB-REG-BS, JCB-UJSB-REG-NS, JCB-UJSB-REG-NS-BS, JCB-VEJ-1-1-X2, JCB-VEJ-1-1-X3, JCB-VEJ-1-1-X4, JCB-VEJ-1-17-X12, JCB-VEJ-1-17-X2, JCB-VEJ-1-17-X4, JCB-VEJ-3-17-SAMPLER, JCB-VEJ-3-17-SAMPLER-X2, JCB-VEJ-3-17-SAMPLER-X4, JCB-VEJ-A3-1, JCB-VEJ-FPSB, JCB-VEJX3-ELJX3-BUJX3, JCB1031-K-RS, JCB1035-K, TSKU-13, TSO-JCB-16PEJCB, TSO-JCB-VEJ-1-17-X4, ced_12842027679832, ced_12842027712600, ced_12842027745368, ced_200148025359, ced_48029632655, ced_48029632719
+JCB-CMB-BBJS-TP | Combos and Samplers | YES | null | yes | JCB-BEJ-1-13x1, JCB-BEJ-2-13x1, JCB-BEJ-3-13x1, JCB-BEJ-4-13x1, JCB-BEJ-5-13x1, JCB-CMB-BBJS-TP-POLYx1 | BF-9PJ&BGB+B, JCB-BFD-16PCB, JCB-BFD-28PCB, JCB-BFD-52PCB, JCB-CMB-BBJSO+FB, JCB-TT-CFBGBUNDLE-01, JCB-TT-CFBGBUNDLE-02, JCB-TT-DFBGBUNDLE-01, JCB-TT-DFBGBUNDLE-02, JCB-TT-JFBGBUNDLE-01, JCB-TT-JFBGBUNDLE-02, JCB-TT-KENBGBUNDLE-01, JCB-TT-KKBGBUNDLE-01, JCB-TT-KKBGBUNDLE-02, JCB-TT-TFBGBUNDLE-01, JCB-TT-TFBGBUNDLE-02
+JCB-BEJ-30-16 | Beef Jerky | no | null | yes | none | ATSO-JCB-15pcSJSB, BEEF-X10, BEEF-X15, ced_200141668367, ced_48029697487, ced_48029697551, CF-JCB-BEJ-SCHHT, JCB-BEJ-165-1-PB, JCB-BEJ-30-11, JCB-BEJ-30-11-X2, JCB-BEJ-30-11-X4, JCB-BEJ-30-16-X10, JCB-BEJ-30-16-X12, JCB-BEJ-30-16-X12-TT, JCB-BEJ-30-16-X15, JCB-BEJ-30-16-X2, JCB-BEJ-30-16-X25, JCB-BEJ-30-16-X2-TT, JCB-BEJ-30-16-X4, JCB-BEJ-30-16-X4-TT, JCB-BEJ-30-16-X5, JCB-BEJ-30-2-X10, JCB-BEJ-30-2-X15, JCB-BEJ-30-2-X25, JCB-BEJ-30-2-X3, JCB-BEJ-30-2-X5, JCB-BEJ-4FB, JCB-BEJ-BCBO+CB, JCB-BTJ-BFSAMP-01, JCB-BTJ-EXBFSAMP-02, JCB-BTJ-SP-BASIC, JCB-CMB-BOJC, JCB-CMB-VP-10B, JCB-CMB-VP-14B, JCB-CMB-VP-6B, JCB-OCU-2BFB, JCB-OCU-3BFB, JCB-SP-GJ-BASIC, JCB-STAFF-TT-02, JCB-STPTTY-3FB, JCB-TTK-DFF, JCB-TTK-DRPBB11, JCB-TTK-DRPBB2, JCB-TT-KF-01, JCB-TT-KK-03, JERKY-LARGE, JERKY-MEDIUM, QF-JCB-BEJ-30-16X9
+
+--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---
+KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.
+APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.
+
+--- HOW shipment_qc_items GETS POPULATED ---
+When orders sync to ship., the QC item hydrator populates shipment_qc_items:
+1. Products with product_category='kit' → EXPLODED into component SKUs using kit_mappings_cache
+2. Variants (where sku != parent_sku) → Stored as-is (the variant SKU)
+3. Regular products → Stored as-is
+4. Products with is_assembled_product=true but category != 'kit' → NOT exploded (stored as parent SKU)
+
+SkuVault (golden source) determines what actually gets exploded at fulfillment time.
+If SkuVault explodes a product but ship. didn't, the product is miscategorized in the catalog.
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API (GOLDEN SOURCE for what picker scans)
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)
+- 'Category' = product_category ('kit' = should be exploded at fulfillment)
+- Kit Components = Expected components from kit_mappings_cache (sourced from GCP reporting DB)
+
+--- COMMON ISSUES ---
+1. MISCATEGORIZED PRODUCT: Local has parent SKU, SkuVault has components
+   - Product has is_assembled_product=true but category != 'kit'
+   - SkuVault exploded it (treating as kit) but ship. didn't
+   - FIX: Update product to have product_category='kit' in the source catalog
+2. MISSING KIT MAPPING: Product is category='kit' but no components in kit_mappings_cache
+   - The kit definition may not exist in GCP vw_internal_kit_component_inventory_latest view
+3. STALE KIT MAPPING: Components don't match between local and SkuVault
+   - Kit definition changed in SkuVault but kit_mappings_cache has old data
+   - Cache refreshes hourly from GCP reporting database
