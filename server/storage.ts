@@ -22,12 +22,12 @@ import {
   shipmentTags,
   type ShipmentPackage,
   shipmentPackages,
-  type Product,
-  type InsertProduct,
-  products,
-  type ProductVariant,
-  type InsertProductVariant,
-  productVariants,
+  type ShopifyProduct,
+  type InsertShopifyProduct,
+  shopifyProducts,
+  type ShopifyProductVariant,
+  type InsertShopifyProductVariant,
+  shopifyProductVariants,
   type BackfillJob,
   type InsertBackfillJob,
   backfillJobs,
@@ -199,21 +199,21 @@ export interface IStorage {
   getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
 
-  // Products
-  upsertProduct(product: InsertProduct): Promise<Product>;
-  softDeleteProduct(id: string): Promise<void>;
-  getProduct(id: string): Promise<Product | undefined>;
-  getAllProducts(includeDeleted?: boolean): Promise<Product[]>;
-  getAllProductsWithVariants(includeDeleted?: boolean): Promise<Array<{ product: Product; variants: ProductVariant[] }>>;
+  // Shopify Products
+  upsertShopifyProduct(product: InsertShopifyProduct): Promise<ShopifyProduct>;
+  softDeleteShopifyProduct(id: string): Promise<void>;
+  getShopifyProduct(id: string): Promise<ShopifyProduct | undefined>;
+  getAllShopifyProducts(includeDeleted?: boolean): Promise<ShopifyProduct[]>;
+  getAllShopifyProductsWithVariants(includeDeleted?: boolean): Promise<Array<{ product: ShopifyProduct; variants: ShopifyProductVariant[] }>>;
 
-  // Product Variants
-  upsertProductVariant(variant: InsertProductVariant): Promise<ProductVariant>;
-  softDeleteProductVariant(id: string): Promise<void>;
-  getProductVariant(id: string): Promise<ProductVariant | undefined>;
-  getProductVariants(productId: string): Promise<ProductVariant[]>;
-  getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined>;
-  getVariantBySku(sku: string): Promise<ProductVariant | undefined>;
-  getProductVariantsBySKUs(skus: string[]): Promise<ProductVariant[]>;
+  // Shopify Product Variants
+  upsertShopifyProductVariant(variant: InsertShopifyProductVariant): Promise<ShopifyProductVariant>;
+  softDeleteShopifyProductVariant(id: string): Promise<void>;
+  getShopifyProductVariant(id: string): Promise<ShopifyProductVariant | undefined>;
+  getShopifyProductVariants(productId: string): Promise<ShopifyProductVariant[]>;
+  getShopifyVariantByBarcode(barcode: string): Promise<ShopifyProductVariant | undefined>;
+  getShopifyVariantBySku(sku: string): Promise<ShopifyProductVariant | undefined>;
+  getShopifyProductVariantsBySKUs(skus: string[]): Promise<ShopifyProductVariant[]>;
 
   // Backfill Jobs
   createBackfillJob(job: InsertBackfillJob): Promise<BackfillJob>;
@@ -1892,17 +1892,17 @@ export class DatabaseStorage implements IStorage {
     return this.getUser(id);
   }
 
-  // Products
-  async upsertProduct(product: InsertProduct): Promise<Product> {
+  // Shopify Products
+  async upsertShopifyProduct(product: InsertShopifyProduct): Promise<ShopifyProduct> {
     const result = await db
-      .insert(products)
+      .insert(shopifyProducts)
       .values({
         ...product,
         updatedAt: new Date(),
         lastSyncedAt: new Date(),
       })
       .onConflictDoUpdate({
-        target: products.id,
+        target: shopifyProducts.id,
         set: {
           ...product,
           updatedAt: new Date(),
@@ -1913,44 +1913,44 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async softDeleteProduct(id: string): Promise<void> {
+  async softDeleteShopifyProduct(id: string): Promise<void> {
     await db
-      .update(products)
+      .update(shopifyProducts)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(eq(products.id, id));
+      .where(eq(shopifyProducts.id, id));
   }
 
-  async getProduct(id: string): Promise<Product | undefined> {
+  async getShopifyProduct(id: string): Promise<ShopifyProduct | undefined> {
     const result = await db
       .select()
-      .from(products)
-      .where(and(eq(products.id, id), isNull(products.deletedAt)));
+      .from(shopifyProducts)
+      .where(and(eq(shopifyProducts.id, id), isNull(shopifyProducts.deletedAt)));
     return result[0];
   }
 
-  async getAllProducts(includeDeleted: boolean = false): Promise<Product[]> {
+  async getAllShopifyProducts(includeDeleted: boolean = false): Promise<ShopifyProduct[]> {
     let query = db
       .select()
-      .from(products);
+      .from(shopifyProducts);
     
     if (!includeDeleted) {
-      query = query.where(isNull(products.deletedAt));
+      query = query.where(isNull(shopifyProducts.deletedAt));
     }
     
-    const result = await query.orderBy(desc(products.createdAt));
+    const result = await query.orderBy(desc(shopifyProducts.createdAt));
     return result;
   }
 
-  async getAllProductsWithVariants(includeDeleted: boolean = false): Promise<Array<{ product: Product; variants: ProductVariant[] }>> {
-    const allProducts = await this.getAllProducts(includeDeleted);
+  async getAllShopifyProductsWithVariants(includeDeleted: boolean = false): Promise<Array<{ product: ShopifyProduct; variants: ShopifyProductVariant[] }>> {
+    const allProducts = await this.getAllShopifyProducts(includeDeleted);
     
     const allVariants = await db
       .select()
-      .from(productVariants)
-      .where(isNull(productVariants.deletedAt))
-      .orderBy(productVariants.title);
+      .from(shopifyProductVariants)
+      .where(isNull(shopifyProductVariants.deletedAt))
+      .orderBy(shopifyProductVariants.title);
     
-    const variantsByProduct = new Map<string, ProductVariant[]>();
+    const variantsByProduct = new Map<string, ShopifyProductVariant[]>();
     for (const variant of allVariants) {
       if (!variantsByProduct.has(variant.productId)) {
         variantsByProduct.set(variant.productId, []);
@@ -1964,16 +1964,16 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  // Product Variants
-  async upsertProductVariant(variant: InsertProductVariant): Promise<ProductVariant> {
+  // Shopify Product Variants
+  async upsertShopifyProductVariant(variant: InsertShopifyProductVariant): Promise<ShopifyProductVariant> {
     const result = await db
-      .insert(productVariants)
+      .insert(shopifyProductVariants)
       .values({
         ...variant,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
-        target: productVariants.id,
+        target: shopifyProductVariants.id,
         set: {
           ...variant,
           updatedAt: new Date(),
@@ -1983,56 +1983,56 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async softDeleteProductVariant(id: string): Promise<void> {
+  async softDeleteShopifyProductVariant(id: string): Promise<void> {
     await db
-      .update(productVariants)
+      .update(shopifyProductVariants)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(eq(productVariants.id, id));
+      .where(eq(shopifyProductVariants.id, id));
   }
 
-  async getProductVariant(id: string): Promise<ProductVariant | undefined> {
+  async getShopifyProductVariant(id: string): Promise<ShopifyProductVariant | undefined> {
     const result = await db
       .select()
-      .from(productVariants)
-      .where(and(eq(productVariants.id, id), isNull(productVariants.deletedAt)));
+      .from(shopifyProductVariants)
+      .where(and(eq(shopifyProductVariants.id, id), isNull(shopifyProductVariants.deletedAt)));
     return result[0];
   }
 
-  async getProductVariants(productId: string): Promise<ProductVariant[]> {
+  async getShopifyProductVariants(productId: string): Promise<ShopifyProductVariant[]> {
     const result = await db
       .select()
-      .from(productVariants)
-      .where(and(eq(productVariants.productId, productId), isNull(productVariants.deletedAt)))
-      .orderBy(productVariants.title);
+      .from(shopifyProductVariants)
+      .where(and(eq(shopifyProductVariants.productId, productId), isNull(shopifyProductVariants.deletedAt)))
+      .orderBy(shopifyProductVariants.title);
     return result;
   }
 
-  async getVariantByBarcode(barcode: string): Promise<ProductVariant | undefined> {
+  async getShopifyVariantByBarcode(barcode: string): Promise<ShopifyProductVariant | undefined> {
     const result = await db
       .select()
-      .from(productVariants)
-      .where(and(eq(productVariants.barCode, barcode), isNull(productVariants.deletedAt)));
+      .from(shopifyProductVariants)
+      .where(and(eq(shopifyProductVariants.barCode, barcode), isNull(shopifyProductVariants.deletedAt)));
     return result[0];
   }
 
-  async getVariantBySku(sku: string): Promise<ProductVariant | undefined> {
+  async getShopifyVariantBySku(sku: string): Promise<ShopifyProductVariant | undefined> {
     const result = await db
       .select()
-      .from(productVariants)
-      .where(and(eq(productVariants.sku, sku), isNull(productVariants.deletedAt)));
+      .from(shopifyProductVariants)
+      .where(and(eq(shopifyProductVariants.sku, sku), isNull(shopifyProductVariants.deletedAt)));
     return result[0];
   }
 
-  async getProductVariantsBySKUs(skus: string[]): Promise<ProductVariant[]> {
+  async getShopifyProductVariantsBySKUs(skus: string[]): Promise<ShopifyProductVariant[]> {
     if (skus.length === 0) return [];
     
     const result = await db
       .select()
-      .from(productVariants)
+      .from(shopifyProductVariants)
       .where(
         and(
-          inArray(productVariants.sku, skus),
-          isNull(productVariants.deletedAt)
+          inArray(shopifyProductVariants.sku, skus),
+          isNull(shopifyProductVariants.deletedAt)
         )
       );
     return result;

@@ -660,8 +660,8 @@ export const insertShipmentEventSchema = createInsertSchema(shipmentEvents).omit
 export type InsertShipmentEvent = z.infer<typeof insertShipmentEventSchema>;
 export type ShipmentEvent = typeof shipmentEvents.$inferSelect;
 
-// Products table for Shopify products
-export const products = pgTable("products", {
+// Shopify Products table - synced from Shopify Admin API
+export const shopifyProducts = pgTable("shopify_products", {
   id: varchar("id").primaryKey(), // Shopify product ID
   title: text("title").notNull(),
   imageUrl: text("image_url"),
@@ -674,19 +674,19 @@ export const products = pgTable("products", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertProductSchema = createInsertSchema(products).omit({
+export const insertShopifyProductSchema = createInsertSchema(shopifyProducts).omit({
   createdAt: true,
   updatedAt: true,
   lastSyncedAt: true,
 });
 
-export type InsertProduct = z.infer<typeof insertProductSchema>;
-export type Product = typeof products.$inferSelect;
+export type InsertShopifyProduct = z.infer<typeof insertShopifyProductSchema>;
+export type ShopifyProduct = typeof shopifyProducts.$inferSelect;
 
-// Product variants table for Shopify product variants
-export const productVariants = pgTable("product_variants", {
+// Shopify Product Variants table - synced from Shopify Admin API
+export const shopifyProductVariants = pgTable("shopify_product_variants", {
   id: varchar("id").primaryKey(), // Shopify variant ID
-  productId: varchar("product_id").notNull().references(() => products.id),
+  productId: varchar("product_id").notNull().references(() => shopifyProducts.id),
   sku: text("sku"), // Indexed for fast lookups
   barCode: text("bar_code"), // Indexed for barcode scanning
   title: text("title").notNull(),
@@ -699,17 +699,17 @@ export const productVariants = pgTable("product_variants", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 }, (table) => ({
-  skuIdx: index("product_variants_sku_idx").on(table.sku).where(sql`${table.deletedAt} IS NULL`),
-  barCodeIdx: index("product_variants_bar_code_idx").on(table.barCode).where(sql`${table.deletedAt} IS NULL`),
+  skuIdx: index("shopify_product_variants_sku_idx").on(table.sku).where(sql`${table.deletedAt} IS NULL`),
+  barCodeIdx: index("shopify_product_variants_bar_code_idx").on(table.barCode).where(sql`${table.deletedAt} IS NULL`),
 }));
 
-export const insertProductVariantSchema = createInsertSchema(productVariants).omit({
+export const insertShopifyProductVariantSchema = createInsertSchema(shopifyProductVariants).omit({
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
-export type ProductVariant = typeof productVariants.$inferSelect;
+export type InsertShopifyProductVariant = z.infer<typeof insertShopifyProductVariantSchema>;
+export type ShopifyProductVariant = typeof shopifyProductVariants.$inferSelect;
 
 // Backfill jobs table for order backfill operations
 export const backfillJobs = pgTable("backfill_jobs", {
