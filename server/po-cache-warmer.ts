@@ -115,9 +115,9 @@ async function warmCache(): Promise<void> {
 
 /**
  * Start the PO cache warmer worker
- * @param intervalMs Interval in milliseconds (default: 6 hours = 21600000ms)
+ * @param intervalMs Interval in milliseconds (default: 1 hour = 3600000ms)
  */
-export function startPOCacheWarmer(intervalMs: number = 21600000): void {
+export function startPOCacheWarmer(intervalMs: number = 3600000): void {
   log(`Worker started (interval: ${intervalMs}ms = ${intervalMs / 3600000} hours)`);
   
   // Run immediately on startup
