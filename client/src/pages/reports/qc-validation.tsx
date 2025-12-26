@@ -623,10 +623,11 @@ export default function QcValidationReport() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead className="text-xs w-[200px]">SKU</TableHead>
-                      <TableHead className="text-xs text-center w-[100px]">Local Qty</TableHead>
-                      <TableHead className="text-xs text-center w-[100px]">SkuVault Qty</TableHead>
-                      <TableHead className="text-xs w-[140px]">Status</TableHead>
+                      <TableHead className="text-xs w-[160px]">SKU</TableHead>
+                      <TableHead className="text-xs text-center w-[80px]">Local Qty</TableHead>
+                      <TableHead className="text-xs text-center w-[80px]">SkuVault Qty</TableHead>
+                      <TableHead className="text-xs w-[120px]">Status</TableHead>
+                      <TableHead className="text-xs">Diagnosis</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -649,9 +650,18 @@ export default function QcValidationReport() {
                       // Sort SKUs alphabetically
                       const sortedSkus = Array.from(allSkus).sort();
                       
+                      // Build a map from SKU to diagnosis
+                      const diagnosisBySku = new Map<string, { category: string; reason: string; parentSku?: string; quantityOnHand?: number }>();
+                      selectedResult.differences?.forEach(diff => {
+                        if (diff.diagnosis) {
+                          diagnosisBySku.set(diff.sku, diff.diagnosis);
+                        }
+                      });
+                      
                       return sortedSkus.map((sku, idx) => {
                         const localQty = localBySku.get(sku);
                         const svQty = skuvaultBySku.get(sku);
+                        const diagnosis = diagnosisBySku.get(sku);
                         
                         let status: 'match' | 'missing_local' | 'missing_sv' | 'mismatch';
                         let rowClass = '';
@@ -680,6 +690,26 @@ export default function QcValidationReport() {
                           statusBadgeClass = 'bg-green-100 text-green-800 border-green-300';
                         }
                         
+                        // Determine diagnosis category badge color
+                        const getCategoryBadge = (cat: string) => {
+                          switch (cat) {
+                            case 'AP_EXPLODED_SKUVAULT':
+                              return { label: 'AP Exploded (SV)', class: 'bg-purple-100 text-purple-800 border-purple-300' };
+                            case 'AP_EXPLODED_LOCAL':
+                              return { label: 'AP Exploded (Local)', class: 'bg-purple-100 text-purple-800 border-purple-300' };
+                            case 'KIT_MAPPING_MISMATCH':
+                              return { label: 'Kit Mapping', class: 'bg-blue-100 text-blue-800 border-blue-300' };
+                            case 'INDIVIDUAL_MISSING_LOCAL':
+                              return { label: 'Missing SKU', class: 'bg-gray-100 text-gray-800 border-gray-300' };
+                            case 'INDIVIDUAL_MISSING_SKUVAULT':
+                              return { label: 'Not in SV', class: 'bg-gray-100 text-gray-800 border-gray-300' };
+                            case 'QUANTITY_MISMATCH':
+                              return { label: 'Qty Issue', class: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+                            default:
+                              return { label: 'Unknown', class: 'bg-gray-100 text-gray-600 border-gray-300' };
+                          }
+                        };
+                        
                         return (
                           <TableRow key={idx} className={rowClass}>
                             <TableCell className="text-xs font-mono py-2">{sku}</TableCell>
@@ -693,6 +723,27 @@ export default function QcValidationReport() {
                               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusBadgeClass}`}>
                                 {statusLabel}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="py-2 text-xs">
+                              {diagnosis ? (
+                                <div className="space-y-1">
+                                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getCategoryBadge(diagnosis.category).class}`}>
+                                    {getCategoryBadge(diagnosis.category).label}
+                                  </Badge>
+                                  <p className="text-[10px] text-muted-foreground leading-tight">
+                                    {diagnosis.reason}
+                                  </p>
+                                  {diagnosis.parentSku && (
+                                    <p className="text-[10px] font-mono text-blue-600">
+                                      Parent: {diagnosis.parentSku}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : status === 'match' ? (
+                                <span className="text-muted-foreground">-</span>
+                              ) : (
+                                <span className="text-muted-foreground italic">Analyzing...</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -738,13 +789,16 @@ export default function QcValidationReport() {
                 });
                 lines.push("");
                 
-                lines.push("--- DETAILED DIFFERENCES ---");
+                lines.push("--- DETAILED DIFFERENCES WITH DIAGNOSIS ---");
                 if (selectedResult.differences.length === 0) {
                   lines.push("No field-level differences detected.");
                 } else {
-                  lines.push("SKU | Field | Local Value | SkuVault Value");
-                  selectedResult.differences.forEach(diff => {
-                    lines.push(`${diff.sku} | ${diff.field} | ${diff.localValue === null ? '(missing)' : diff.localValue} | ${diff.skuvaultValue === null ? '(missing)' : diff.skuvaultValue}`);
+                  lines.push("SKU | Field | Local Value | SkuVault Value | Diagnosis Category | Diagnosis Reason");
+                  selectedResult.differences.forEach((diff: any) => {
+                    const diagCat = diff.diagnosis?.category || 'N/A';
+                    const diagReason = diff.diagnosis?.reason || 'N/A';
+                    const parentSku = diff.diagnosis?.parentSku ? ` (Parent: ${diff.diagnosis.parentSku})` : '';
+                    lines.push(`${diff.sku} | ${diff.field} | ${diff.localValue === null ? '(missing)' : diff.localValue} | ${diff.skuvaultValue === null ? '(missing)' : diff.skuvaultValue} | ${diagCat} | ${diagReason}${parentSku}`);
                   });
                 }
                 lines.push("");

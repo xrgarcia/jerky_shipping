@@ -11338,6 +11338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { skuVaultService } = await import("./services/skuvault-service");
       const { getProductsBatch } = await import("./services/product-lookup");
       const { getKitComponents } = await import("./services/kit-mappings-cache");
+      const { diagnoseShipmentMismatches } = await import("./services/qc-diagnosis-service");
       
       const results: Array<{
         shipmentId: string;
@@ -11351,6 +11352,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           field: string;
           localValue: string | number | null;
           skuvaultValue: string | number | null;
+          diagnosis?: {
+            category: string;
+            reason: string;
+            parentSku?: string;
+            productCategory?: string | null;
+            isAssembledProduct?: boolean;
+            quantityOnHand?: number;
+          };
         }>;
         localItems: Array<{
           sku: string;
@@ -11363,6 +11372,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           barcode: string | null;
           title: string | null;
           quantity: number;
+        }>;
+        skuvaultRawItems?: Array<{
+          Sku: string;
+          IsKit: boolean;
+          QuantityOnHand?: number;
         }>;
         productInfo: Array<{
           sku: string;
@@ -11412,8 +11426,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: number;
           }> = [];
           
+          // Also keep raw items for diagnosis (to get QuantityOnHand, IsKit etc)
+          const skuvaultRawItems: Array<{
+            Sku: string;
+            IsKit: boolean;
+            QuantityOnHand?: number;
+            KitProducts?: Array<{ Sku: string; Quantity: number }>;
+          }> = [];
+          
           if (qcSale && qcSale.Items) {
             for (const item of qcSale.Items) {
+              // Capture raw item for diagnosis
+              skuvaultRawItems.push({
+                Sku: item.Sku || '',
+                IsKit: item.IsKit || false,
+                QuantityOnHand: item.QuantityOnHand,
+                KitProducts: item.KitProducts?.map((kp: any) => ({ Sku: kp.Sku || '', Quantity: kp.Quantity || 0 })),
+              });
+              
               // Handle kit products - add components instead of parent kit
               if (item.IsKit && item.KitProducts && item.KitProducts.length > 0) {
                 for (const component of item.KitProducts) {
@@ -11529,6 +11559,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const productMap = await getProductsBatch(Array.from(allSkus));
           
+          // Run diagnosis on all differences to determine root cause
+          const diagnosisMap = await diagnoseShipmentMismatches(
+            differences,
+            localBySku as Map<string, { sku: string; quantityExpected: number }>,
+            skuvaultBySku as Map<string, { sku: string; quantity: number }>,
+            allSkus,
+            skuvaultRawItems
+          );
+          
+          // Add diagnosis to each difference
+          const differencesWithDiagnosis = differences.map(diff => ({
+            ...diff,
+            diagnosis: diagnosisMap.get(diff.sku),
+          }));
+          
           // Build product info array with kit components
           const productInfo: Array<{
             sku: string;
@@ -11539,13 +11584,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             foundInCatalog: boolean;
           }> = [];
           
-          for (const sku of allSkus) {
+          for (const sku of Array.from(allSkus)) {
             const product = productMap.get(sku);
             let kitComponents = null;
             
             // Try to get kit components if this might be a kit/AP
             try {
-              const components = await getKitComponents(sku);
+              const components = getKitComponents(sku);
               if (components && components.length > 0) {
                 kitComponents = components;
               }
@@ -11570,9 +11615,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             missingInLocal,
             missingInSkuvault,
             fieldMismatches,
-            differences,
+            differences: differencesWithDiagnosis,
             localItems: Array.from(localBySku.values()),
             skuvaultItems: Array.from(skuvaultBySku.values()),
+            skuvaultRawItems,
             productInfo,
           });
           
