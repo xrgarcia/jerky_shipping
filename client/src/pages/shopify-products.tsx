@@ -55,7 +55,7 @@ export default function ShopifyProducts() {
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center gap-2">
             <Box className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold font-serif">Products</h1>
+            <h1 className="text-4xl font-bold font-serif">Shopify Products</h1>
           </div>
           
           <Skeleton className="h-14 w-full" data-testid="skeleton-search" />
@@ -112,7 +112,7 @@ export default function ShopifyProducts() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center gap-2">
           <Box className="h-8 w-8 text-primary" />
-          <h1 className="text-4xl font-bold font-serif">Products</h1>
+          <h1 className="text-4xl font-bold font-serif">Shopify Products</h1>
         </div>
         
         <div className="space-y-4">
