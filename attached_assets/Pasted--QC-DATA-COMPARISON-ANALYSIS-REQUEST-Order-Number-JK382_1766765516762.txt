@@ -1,0 +1,95 @@
+=== QC DATA COMPARISON ANALYSIS REQUEST ===
+
+Order Number: JK3825357510
+Shipment ID: 58b00a39-36cc-4dfb-a2e9-5bbebafab385
+
+--- SUMMARY ---
+Total Differences: 10
+Missing in Local (ship.): 9
+Missing in SkuVault: 1
+Quantity Mismatches: 0
+
+--- LOCAL DATA (shipment_qc_items table) ---
+SKU | Barcode | Description | Qty
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-GFT-A12-XSTOCK | 4000003673 | 12 pc. Snack Stick Gift Stocking | 1
+JCB-GFT-EJSGB | 811007029150 | Exotic Jerky Snacks Gift Box - 8 Items | 1
+JCB-BEJ-8-16 | 811007026982 | Jerky.com - Honey Teriyaki Beef Jerky - 2.5 oz. | 1
+
+--- SKUVAULT LIVE DATA (QC Sale API) ---
+SKU | Barcode | Title | Qty
+JCB-BEJ-130-16 | 811007029976 | Limited Edition - Prime Rib Beef Jerky - 2.5 oz. | 1
+JCB-GFT-A12-XSTOCK | 4000003673 | 12 pc. Snack Stick Gift Stocking | 1
+JCB-BEJ-8-16 | 811007026982 | Jerky.com - Honey Teriyaki Beef Jerky - 2.5 oz. | 1
+JCB-WBJ-1-13 | 811007027729 | Jerky.com - Original Boar Jerky - 1 oz. | 1
+JCB-BUJ-1-13 | 811007027712 | Jerky.com - Original Buffalo Jerky - 1 oz. | 1
+JCB-ELJ-1-13 | 811007027705 | Jerky.com - Original Elk Jerky - 1 oz. | 1
+JCB-VEJ-1-13 | 811007027699 | Jerky.com - Original Venison Jerky - 1 oz. | 1
+JCB-GFT-C-BOX-SM | 123456 | Small Fully Printed Gift Box (8 x 8 x 3) | 1
+JCB-EEXS-1-13 | 655166000779 | Shaffers - Elk Snack Stick 1 oz. | 1
+JCB-VEXS-1-13 | 655166313138 | Shaffers - Original Venison Snack Stick 1 oz. | 1
+JCB-WBEXS-1-13 | 655166000748 | Shaffers - Wild Boar Snack Stick 1 oz. | 1
+JCB-VEXS-6-13 | 655166000755 | Shaffers - Venison Cheddar Snack Stick 1 oz. | 1
+
+--- DETAILED DIFFERENCES WITH DIAGNOSIS ---
+SKU | Field | Local Value | SkuVault Value | Diagnosis Category | Diagnosis Reason
+JCB-WBJ-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-BUJ-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-ELJ-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-VEJ-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-GFT-C-BOX-SM | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-EEXS-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-VEXS-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-WBEXS-1-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-VEXS-6-13 | item | (missing) | qty: 1 | AP_EXPLODED_SKUVAULT | Component of AP "JCB-GFT-EJSGB" which was exploded by SkuVault. APs explode when inventory=0. (Parent: JCB-GFT-EJSGB)
+JCB-GFT-EJSGB | item | qty: 1 | (missing) | AP_EXPLODED_LOCAL | This AP was kept as parent in local but SkuVault exploded it. Check is_assembled_product flag and SkuVault inventory.
+
+--- PRODUCT CATALOG INFO (from skuvault_products table) ---
+SKU | Category | Is AP? | Parent SKU | In Catalog? | Kit Components
+JCB-BEJ-130-16 | Beef Jerky | no | null | yes | none
+JCB-GFT-A12-XSTOCK | General | no | null | yes | JCB-GFTBAG-XSTOCK-RED-SMx1, JCB-SS-1-26x2, JCB-SS-170-26x2, JCB-SS-21-26x2, JCB-SS-3-26x2, JCB-SS-42-26x2, JCB-SS-5-26x2
+JCB-GFT-EJSGB | Gift | YES | null | yes | JCB-BUJ-1-13x1, JCB-EEXS-1-13x1, JCB-ELJ-1-13x1, JCB-GFT-C-BOX-SMx1, JCB-VEJ-1-13x1, JCB-VEXS-1-13x1, JCB-VEXS-6-13x1, JCB-WBEXS-1-13x1, JCB-WBJ-1-13x1
+JCB-BEJ-8-16 | Beef Jerky | no | null | yes | none
+JCB-WBJ-1-13 | Exotic Jerky | no | null | yes | none
+JCB-BUJ-1-13 | Exotic Jerky | no | null | yes | none
+JCB-ELJ-1-13 | Exotic Jerky | no | null | yes | none
+JCB-VEJ-1-13 | Exotic Jerky | no | null | yes | none
+JCB-GFT-C-BOX-SM | Supplies | no | null | yes | none
+JCB-EEXS-1-13 | Meat Sticks | no | null | yes | none
+JCB-VEXS-1-13 | Meat Sticks | no | null | yes | none
+JCB-WBEXS-1-13 | Meat Sticks | no | null | yes | none
+JCB-VEXS-6-13 | Meat Sticks | no | null | yes | none
+
+--- BUSINESS RULES: KITS vs ASSEMBLED PRODUCTS (APs) ---
+KITS = Built at fulfillment time by picker. EXPLODED into components. Should have category='kit'.
+APs = Pre-built products, ship as-is. NOT exploded. Have is_assembled_product=true.
+
+--- HOW shipment_qc_items GETS POPULATED ---
+When orders sync to ship., the QC item hydrator populates shipment_qc_items:
+1. Products with product_category='kit' → EXPLODED into component SKUs using kit_mappings_cache
+2. Variants (where sku != parent_sku) → Stored as-is (the variant SKU)
+3. Regular products → Stored as-is
+4. Products with is_assembled_product=true but category != 'kit' → NOT exploded (stored as parent SKU)
+
+SkuVault (golden source) determines what actually gets exploded at fulfillment time.
+If SkuVault explodes a product but ship. didn't, the product is miscategorized in the catalog.
+
+--- CONTEXT ---
+- 'Local' = ship. database (shipment_qc_items table, populated when orders are synced)
+- 'SkuVault' = Live data from SkuVault QC Sale API (GOLDEN SOURCE for what picker scans)
+- 'Missing in Local' = SKUs exist in SkuVault but not in our shipment_qc_items
+- 'Missing in SkuVault' = SKUs exist in local but SkuVault QC API doesn't return them
+- 'Is AP' = isAssembledProduct flag (pre-built products, should NOT be exploded)
+- 'Category' = product_category ('kit' = should be exploded at fulfillment)
+- Kit Components = Expected components from kit_mappings_cache (sourced from GCP reporting DB)
+
+--- COMMON ISSUES ---
+1. MISCATEGORIZED PRODUCT: Local has parent SKU, SkuVault has components
+   - Product has is_assembled_product=true but category != 'kit'
+   - SkuVault exploded it (treating as kit) but ship. didn't
+   - FIX: Update product to have product_category='kit' in the source catalog
+2. MISSING KIT MAPPING: Product is category='kit' but no components in kit_mappings_cache
+   - The kit definition may not exist in GCP vw_internal_kit_component_inventory_latest view
+3. STALE KIT MAPPING: Components don't match between local and SkuVault
+   - Kit definition changed in SkuVault but kit_mappings_cache has old data
+   - Cache refreshes hourly from GCP reporting database
