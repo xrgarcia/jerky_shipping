@@ -23,6 +23,7 @@ export interface KitComponent {
 }
 
 let kitMappingsCache: Map<string, KitComponent[]> | null = null;
+let reverseComponentCache: Map<string, string[]> | null = null; // component SKU → parent kit SKUs
 let cachedSnapshotTimestamp: string | null = null;
 
 /**
@@ -59,20 +60,35 @@ async function refreshKitMappings(snapshotTimestamp: string): Promise<Map<string
   `;
   
   const mappings = new Map<string, KitComponent[]>();
+  const reverseMap = new Map<string, string[]>();
+  
   for (const row of results) {
     const parentSku = row.parent_sku;
+    const componentSku = row.component_sku;
     const component: KitComponent = {
-      componentSku: row.component_sku,
+      componentSku,
       componentQuantity: row.component_quantity || 1,
     };
     
+    // Forward mapping: parent → components
     if (!mappings.has(parentSku)) {
       mappings.set(parentSku, []);
     }
     mappings.get(parentSku)!.push(component);
+    
+    // Reverse mapping: component → parent kits
+    if (!reverseMap.has(componentSku)) {
+      reverseMap.set(componentSku, []);
+    }
+    if (!reverseMap.get(componentSku)!.includes(parentSku)) {
+      reverseMap.get(componentSku)!.push(parentSku);
+    }
   }
   
-  log(`Cached ${mappings.size} kit mappings`);
+  // Update reverse cache
+  reverseComponentCache = reverseMap;
+  
+  log(`Cached ${mappings.size} kit mappings, ${reverseMap.size} component→kit reverse mappings`);
   
   const redis = getRedisClient();
   await redis.set(KIT_MAPPINGS_KEY, Array.from(mappings.entries()));
@@ -81,7 +97,7 @@ async function refreshKitMappings(snapshotTimestamp: string): Promise<Map<string
 }
 
 /**
- * Load kit mappings from Redis into memory
+ * Load kit mappings from Redis into memory and rebuild reverse cache
  */
 async function loadFromRedis(): Promise<void> {
   const redis = getRedisClient();
@@ -89,7 +105,21 @@ async function loadFromRedis(): Promise<void> {
   const mappingsData = await redis.get<[string, KitComponent[]][]>(KIT_MAPPINGS_KEY);
   if (mappingsData) {
     kitMappingsCache = new Map(mappingsData);
-    log(`Loaded ${kitMappingsCache.size} kit mappings from Redis`);
+    
+    // Rebuild reverse cache from forward mappings
+    reverseComponentCache = new Map();
+    for (const [parentSku, components] of kitMappingsCache) {
+      for (const component of components) {
+        if (!reverseComponentCache.has(component.componentSku)) {
+          reverseComponentCache.set(component.componentSku, []);
+        }
+        if (!reverseComponentCache.get(component.componentSku)!.includes(parentSku)) {
+          reverseComponentCache.get(component.componentSku)!.push(parentSku);
+        }
+      }
+    }
+    
+    log(`Loaded ${kitMappingsCache.size} kit mappings, rebuilt ${reverseComponentCache.size} reverse mappings from Redis`);
   }
   
   const timestamp = await redis.get<string>(SNAPSHOT_TIMESTAMP_KEY);
@@ -141,6 +171,21 @@ export function isKit(sku: string): boolean {
  */
 export function getKitComponents(sku: string): KitComponent[] | undefined {
   return kitMappingsCache?.get(sku);
+}
+
+/**
+ * Get parent kit SKUs that contain this component SKU (reverse lookup)
+ * Returns an array of parent kit SKUs, or undefined if not found
+ */
+export function getParentKitsForComponent(componentSku: string): string[] | undefined {
+  return reverseComponentCache?.get(componentSku);
+}
+
+/**
+ * Get all kit mappings (for bulk analysis)
+ */
+export function getAllKitMappings(): Map<string, KitComponent[]> | null {
+  return kitMappingsCache;
 }
 
 /**

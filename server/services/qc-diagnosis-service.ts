@@ -11,7 +11,7 @@
  * - UNKNOWN: Unable to determine root cause
  */
 
-import { getKitComponents, KitComponent } from './kit-mappings-cache';
+import { getKitComponents, getParentKitsForComponent, KitComponent } from './kit-mappings-cache';
 import { getProductsBatch } from './product-lookup';
 
 export type DiagnosisCategory = 
@@ -129,7 +129,7 @@ export async function diagnoseMismatch(
   
   // Case 2: Missing in SkuVault (we have it, SkuVault doesn't)
   if (mismatchType === 'missing_skuvault') {
-    // Check if this is a component we exploded locally
+    // Check if this is a component we exploded locally (using local order info)
     if (parentInfo) {
       const parentProduct = productMap.get(parentInfo.parentSku);
       
@@ -155,6 +155,24 @@ export async function diagnoseMismatch(
           kitComponentsLocal: getKitComponents(parentInfo.parentSku) || undefined,
         };
       }
+    }
+    
+    // Also check global reverse lookup - this SKU might be a component of a kit not in this order
+    const globalParentKits = getParentKitsForComponent(sku);
+    if (globalParentKits && globalParentKits.length > 0) {
+      // This SKU is a component of one or more kits in our global mapping
+      // Find the most likely parent by checking which kits might be in the order
+      const parentKitsSorted = globalParentKits.sort().slice(0, 3); // Show first 3
+      const parentKitsStr = parentKitsSorted.join(', ') + (globalParentKits.length > 3 ? ` + ${globalParentKits.length - 3} more` : '');
+      
+      return {
+        category: 'KIT_MAPPING_MISMATCH',
+        reason: `This SKU is a component of kit(s): [${parentKitsStr}]. Local kit_mappings_cache has this as a component but SkuVault QC response doesn't include it. Kit definition may differ between systems.`,
+        parentSku: parentKitsSorted[0], // Use first as primary
+        productCategory: product?.productCategory || null,
+        isAssembledProduct: product?.isAssembledProduct || false,
+        kitComponentsLocal: getKitComponents(parentKitsSorted[0]) || undefined,
+      };
     }
     
     // Check if this SKU itself is a kit/AP that should have been exploded
