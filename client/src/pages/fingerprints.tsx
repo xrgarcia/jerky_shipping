@@ -1734,17 +1734,28 @@ export default function Fingerprints() {
                     );
                   })()}
                   
-                  {['boxing_machine', 'poly_bag', 'hand_pack'].map((stationType) => {
+                  {['boxing_machine', 'poly_bag', 'hand_pack'].map((stationType, index) => {
                     const stationSessions = liveSessions.filter(s => s.stationType === stationType);
                     if (stationSessions.length === 0) return null;
                     
                     return (
-                      <div key={stationType} className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getStationBadge(stationType)}
-                          <span className="text-sm text-muted-foreground">
+                      <div key={stationType} className={`space-y-3 ${index > 0 ? 'mt-8 pt-6 border-t' : ''}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          {stationType === 'boxing_machine' && (
+                            <Box className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                          )}
+                          {stationType === 'poly_bag' && (
+                            <Package className="h-6 w-6 text-green-600 dark:text-green-400" />
+                          )}
+                          {stationType === 'hand_pack' && (
+                            <Hand className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                          )}
+                          <h3 className="text-lg font-semibold">
+                            {getStationTypeLabel(stationType)}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">
                             {stationSessions.length} session{stationSessions.length !== 1 ? 's' : ''}
-                          </span>
+                          </Badge>
                         </div>
                         
                         <div className="grid gap-3">
