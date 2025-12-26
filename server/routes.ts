@@ -10002,66 +10002,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get uncategorized products with shipment counts
   // Uses product_collection_mappings as the source of truth for categorization
   // Uses skuvault_products as source of truth for product catalog (title, image, weight)
+  // OPTIMIZED: Filter by pending_categorization shipments FIRST (small set), then join QC items
   app.get("/api/packing-decisions/uncategorized", requireAuth, async (req, res) => {
     try {
       const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable, skuvaultProducts } = await import("@shared/schema");
       
-      // Get products from QC items that have NO mapping in product_collection_mappings
-      // AND count how many "pending_categorization" shipments they appear in
-      // LEFT JOIN to mappings table and filter where mapping doesn't exist
-      // LEFT JOIN to skuvault_products to get product catalog data
-      const uncategorizedProducts = await db
-        .select({
-          sku: shipmentQcItems.sku,
-          description: shipmentQcItems.description,
-          productTitle: skuvaultProducts.productTitle,
-          imageUrl: skuvaultProducts.productImageUrl,
-          inSkuvaultCatalog: sql<boolean>`${skuvaultProducts.sku} IS NOT NULL`.as('in_skuvault_catalog'),
-          shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`.as('shipment_count'),
-        })
-        .from(shipmentQcItems)
-        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
-        .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku))
-        .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
-        .where(
-          and(
-            // SKU has no mapping in product_collection_mappings
-            sql`${productCollectionMappings.id} IS NULL`,
-            eq(shipmentsTable.fingerprintStatus, 'pending_categorization')
+      // Run all 3 queries in parallel for better performance
+      const [uncategorizedProducts, coverageStatsResult, fingerprintStatsResult] = await Promise.all([
+        // Query 1: Get uncategorized products - OPTIMIZED to filter shipments first
+        // Uses subquery to get pending_categorization shipment IDs first (small set ~30 rows)
+        // Then only scans QC items for those shipments, not all 1M+ rows
+        db.execute(sql`
+          WITH pending_shipments AS (
+            SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
           )
-        )
-        .groupBy(shipmentQcItems.sku, shipmentQcItems.description, skuvaultProducts.productTitle, skuvaultProducts.productImageUrl, skuvaultProducts.sku)
-        .orderBy(desc(sql`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`));
+          SELECT 
+            qc.sku,
+            qc.description,
+            sv.product_title as "productTitle",
+            sv.product_image_url as "imageUrl",
+            sv.sku IS NOT NULL as "inSkuvaultCatalog",
+            COUNT(DISTINCT qc.shipment_id) as "shipmentCount"
+          FROM shipment_qc_items qc
+          INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
+          LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+          LEFT JOIN skuvault_products sv ON qc.sku = sv.sku
+          WHERE pcm.id IS NULL
+          GROUP BY qc.sku, qc.description, sv.product_title, sv.product_image_url, sv.sku
+          ORDER BY COUNT(DISTINCT qc.shipment_id) DESC
+        `),
+        
+        // Query 2: Coverage stats - OPTIMIZED with same approach
+        db.execute(sql`
+          WITH pending_shipments AS (
+            SELECT id, order_date FROM shipments WHERE fingerprint_status = 'pending_categorization'
+          )
+          SELECT 
+            COUNT(DISTINCT qc.sku) as "totalProducts",
+            COUNT(DISTINCT CASE WHEN pcm.id IS NOT NULL THEN qc.sku END) as "categorizedProducts",
+            COUNT(DISTINCT qc.shipment_id) as "totalShipments",
+            MIN(ps.order_date) as "oldestOrderDate"
+          FROM shipment_qc_items qc
+          INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
+          LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+        `),
+        
+        // Query 3: Fingerprint stats - already efficient (just counting shipments)
+        db
+          .select({
+            complete: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'complete')`,
+            pending: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'pending_categorization')`,
+          })
+          .from(shipmentsTable)
+          .where(sql`fingerprint_status IS NOT NULL`)
+      ]);
       
-      // Get coverage stats using mappings table as source of truth
-      // Total unique SKUs in QC items vs those that have mappings
-      const [coverageStats] = await db
-        .select({
-          totalProducts: sql<number>`COUNT(DISTINCT ${shipmentQcItems.sku})`,
-          categorizedProducts: sql<number>`COUNT(DISTINCT CASE WHEN ${productCollectionMappings.id} IS NOT NULL THEN ${shipmentQcItems.sku} END)`,
-          totalShipments: sql<number>`COUNT(DISTINCT ${shipmentQcItems.shipmentId})`,
-          oldestOrderDate: sql<string>`MIN(${shipmentsTable.orderDate})`,
-        })
-        .from(shipmentQcItems)
-        .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
-        .leftJoin(productCollectionMappings, eq(shipmentQcItems.sku, productCollectionMappings.sku));
-      
-      const [fingerprintStats] = await db
-        .select({
-          complete: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'complete')`,
-          pending: sql<number>`COUNT(*) FILTER (WHERE fingerprint_status = 'pending_categorization')`,
-        })
-        .from(shipmentsTable)
-        .where(sql`fingerprint_status IS NOT NULL`);
+      const coverageStats = (coverageStatsResult.rows?.[0] || {}) as Record<string, any>;
+      const fingerprintStats = fingerprintStatsResult[0] || {};
 
       res.json({
-        uncategorizedProducts,
+        uncategorizedProducts: uncategorizedProducts.rows || [],
         stats: {
-          totalProducts: coverageStats?.totalProducts || 0,
-          categorizedProducts: coverageStats?.categorizedProducts || 0,
-          totalShipments: coverageStats?.totalShipments || 0,
-          shipmentsComplete: fingerprintStats?.complete || 0,
-          shipmentsPending: fingerprintStats?.pending || 0,
+          totalProducts: Number(coverageStats?.totalProducts) || 0,
+          categorizedProducts: Number(coverageStats?.categorizedProducts) || 0,
+          totalShipments: Number(coverageStats?.totalShipments) || 0,
+          shipmentsComplete: Number(fingerprintStats?.complete) || 0,
+          shipmentsPending: Number(fingerprintStats?.pending) || 0,
           oldestOrderDate: coverageStats?.oldestOrderDate || null,
         }
       });
