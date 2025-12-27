@@ -8,7 +8,7 @@ packages = ["gh", "unzip"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "npx drizzle-kit push --force && npm run build"]
+build = ["sh", "-c", "npm run build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
