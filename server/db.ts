@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import { sql } from 'drizzle-orm';
 import ws from "ws";
 import * as schema from "@shared/schema";
+import { toZonedTime } from 'date-fns-tz';
 
 neonConfig.webSocketConstructor = ws;
 
@@ -49,8 +50,25 @@ export async function initializeDatabase() {
 // Heartbeat interval reference for cleanup
 let heartbeatInterval: NodeJS.Timeout | null = null;
 
+// Track last state to only log on state changes
+let lastHeartbeatActive: boolean | null = null;
+
+// Operating hours configuration (Central Time - automatically handles CST/CDT)
+const WAREHOUSE_TIMEZONE = 'America/Chicago';
+const OPERATING_HOURS_START = 6;  // 6:00 AM
+const OPERATING_HOURS_END = 18;   // 6:00 PM
+
+// Check if current time is within warehouse operating hours (6am-6pm Central)
+function isWithinOperatingHours(): boolean {
+  const now = new Date();
+  const centralTime = toZonedTime(now, WAREHOUSE_TIMEZONE);
+  const hour = centralTime.getHours();
+  return hour >= OPERATING_HOURS_START && hour < OPERATING_HOURS_END;
+}
+
 // Start database heartbeat to prevent Neon compute from suspending
 // Also pings the public endpoint to prevent container hibernation
+// Only runs during warehouse operating hours (6am-6pm Central)
 export function startDatabaseHeartbeat() {
   // Clear any existing heartbeat
   if (heartbeatInterval) {
@@ -68,12 +86,29 @@ export function startDatabaseHeartbeat() {
       ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
       : null;
   
-  console.log('[Heartbeat] Starting heartbeat (every 3 minutes)');
+  console.log('[Heartbeat] Starting heartbeat (every 3 minutes, 6am-6pm Central only)');
   if (publicUrl) {
     console.log(`[Heartbeat] Container keep-alive URL: ${publicUrl}/api/health/heart-beat`);
   }
   
   heartbeatInterval = setInterval(async () => {
+    const isActive = isWithinOperatingHours();
+    
+    // Log state changes only
+    if (lastHeartbeatActive !== isActive) {
+      if (isActive) {
+        console.log('[Heartbeat] Entering operating hours - heartbeats active');
+      } else {
+        console.log('[Heartbeat] Outside operating hours (6am-6pm Central) - heartbeats paused');
+      }
+      lastHeartbeatActive = isActive;
+    }
+    
+    // Skip heartbeat if outside operating hours
+    if (!isActive) {
+      return;
+    }
+    
     // Database heartbeat
     try {
       const dbStart = Date.now();
