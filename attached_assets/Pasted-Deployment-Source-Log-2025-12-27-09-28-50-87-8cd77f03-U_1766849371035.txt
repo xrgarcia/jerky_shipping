@@ -1,0 +1,263 @@
+Deployment
+Source
+Log
+2025-12-27 09:28:50.87
+8cd77f03
+User
+position: '1530',
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-27 09:28:55.89
+8cd77f03
+User
+schema: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+length: 115,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+detail: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+column: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+}
+2025-12-27 09:28:55.89
+8cd77f03
+User
+constraint: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+routine: 'errorMissingColumn'
+2025-12-27 09:28:55.89
+8cd77f03
+User
+position: '1530',
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at async DatabaseStorage.getShipmentByShipmentId (file:///home/runner/workspace/dist/index.js:1952:24)
+2025-12-27 09:28:55.89
+8cd77f03
+User
+dataType: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at async ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:9987:22)
+2025-12-27 09:28:55.89
+8cd77f03
+User
+file: 'parse_relation.c',
+2025-12-27 09:28:55.89
+8cd77f03
+User
+severity: 'ERROR',
+2025-12-27 09:28:55.89
+8cd77f03
+User
+table: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+internalPosition: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2025-12-27 09:28:55.89
+8cd77f03
+User
+hint: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+where: undefined,
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:10592:24)
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+2025-12-27 09:28:55.89
+8cd77f03
+User
+code: '42703',
+2025-12-27 09:28:55.89
+8cd77f03
+User
+[UnifiedSync] Error syncing shipment se-940560671: error: column "qc_station_id" does not exist
+2025-12-27 09:28:55.89
+8cd77f03
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:10819:11)
+2025-12-27 09:28:55.91
+8cd77f03
+User
+Error processing product 11821165071: relation "shopify_products" does not exist
+2025-12-27 09:28:56.02
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 14023: column "qc_station_id" does not exist
+2025-12-27 09:28:56.10
+8cd77f03
+User
+Error processing product 11821164431: relation "shopify_products" does not exist
+2025-12-27 09:28:56.21
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 13906: column "qc_station_id" does not exist
+2025-12-27 09:28:56.28
+8cd77f03
+User
+Error processing product 11821164559: relation "shopify_products" does not exist
+2025-12-27 09:28:56.31
+8cd77f03
+User
+[UnifiedSync] Shipment se-940560671 failed (attempt 2/3)
+2025-12-27 09:28:56.38
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 13904: column "qc_station_id" does not exist
+2025-12-27 09:28:56.46
+8cd77f03
+User
+Error processing product 11821187791: relation "shopify_products" does not exist
+2025-12-27 09:28:56.55
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 13937: column "qc_station_id" does not exist
+2025-12-27 09:28:56.63
+8cd77f03
+User
+Error processing product 11821188111: relation "shopify_products" does not exist
+2025-12-27 09:28:56.69
+8cd77f03
+User
+code: '42703',
+2025-12-27 09:28:56.69
+8cd77f03
+User
+line: '3722',
+2025-12-27 09:28:56.69
+8cd77f03
+User
+severity: 'ERROR',
+2025-12-27 09:28:56.69
+8cd77f03
+User
+}
+2025-12-27 09:28:56.69
+8cd77f03
+User
+where: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+length: 115,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+detail: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+[UnifiedSync] Error syncing shipment se-939207201: error: column "qc_station_id" does not exist
+2025-12-27 09:28:56.69
+8cd77f03
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:10592:24)
+2025-12-27 09:28:56.69
+8cd77f03
+User
+column: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+internalPosition: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+2025-12-27 09:28:56.69
+8cd77f03
+User
+internalQuery: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+table: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+constraint: undefined,
+2025-12-27 09:28:56.69
+8cd77f03
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2025-12-27 09:28:56.69
+8cd77f03
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-12-27 09:28:56.72
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 13730: column "qc_station_id" does not exist
+2025-12-27 09:28:56.98
+8cd77f03
+User
+Error processing product 11821167247: relation "shopify_products" does not exist
+2025-12-27 09:28:57.24
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 14021: column "qc_station_id" does not exist
+2025-12-27 09:28:57.40
+8cd77f03
+User
+[firestore-session-sync] Error syncing session 14023: column "qc_station_id" does not exist
+2025-12-27 09:28:57.50
+8cd77f03
+User
+[UnifiedSync] Error syncing shipment se-938723101: error: column "qc_station_id" does not exist
+2025-12-27 09:29:01.30
+8cd77f03
+User
+at async ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:9987:22)
+2025-12-27 09:29:01.30
+8cd77f03
+User
+position: '1530',
+2025-12-27 09:29:01.30
+8cd77f03
+User
+routine: 'errorMissingColumn'
+2025-12-27 09:29:01.30
+8cd77f03
+User
+[UnifiedSync] Error syncing shipment se-940570814: error: column "qc_station_id" does not exist
+2025-12-27 09:29:01.30
+8cd77f03
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:10939:20) {
+2025-12-27 09:29:01.30
+8cd77f03
+User
+length: 115,
+2025-12-27 09:29:01.30
+8cd77f03
+User
+hint: undefined,
+2025-12-27 09:29:01.30
+8cd77f03
+User
+internalPosition: undefined,
