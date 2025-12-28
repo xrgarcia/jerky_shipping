@@ -205,6 +205,11 @@ export function AppSidebar() {
       icon: FileSearch,
     },
     {
+      title: "Validate Orders",
+      url: "/reports/validate-orders",
+      icon: FileSearch,
+    },
+    {
       title: "Packing Ready (Debug)",
       url: "/packing-ready",
       icon: Database,

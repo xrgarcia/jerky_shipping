@@ -11828,6 +11828,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate Order Details Report - Compare main Shopify DB with reporting DB
+  app.get("/api/reports/validate-orders", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      
+      // Parse dates as CST midnight timestamps
+      const startStr = startDate as string;
+      const endStr = endDate as string;
+      
+      // Convert CST date strings to UTC timestamps for database queries
+      const startCst = fromZonedTime(`${startStr} 00:00:00`, CST_TIMEZONE);
+      const endCst = fromZonedTime(`${endStr} 23:59:59`, CST_TIMEZONE);
+      
+      // Query main Shopify database
+      const shopifyOrders = await db
+        .select({
+          orderNumber: orders.orderNumber,
+          createdAt: orders.createdAt,
+          subtotalPrice: orders.subtotalPrice,
+        })
+        .from(orders)
+        .where(
+          and(
+            gte(orders.createdAt, startCst),
+            lte(orders.createdAt, endCst)
+          )
+        );
+      
+      // Query reporting database
+      const reportingOrders = await reportingSql`
+        SELECT
+          order_number,
+          order_date,
+          order_total as subtotal_price
+        FROM orders
+        WHERE 
+          order_date >= ${startStr}
+          AND order_date <= ${endStr}
+          AND sales_channel IN ('etsy', 'jerky.com', 'ebay', 'walmart', 'tiktok')
+      `;
+      
+      // Create maps for comparison
+      const shopifyMap = new Map<string, { orderNumber: string; createdAt: Date | null; subtotalPrice: string }>();
+      for (const order of shopifyOrders) {
+        shopifyMap.set(order.orderNumber, order);
+      }
+      
+      const reportingMap = new Map<string, { order_number: string; order_date: Date; subtotal_price: string }>();
+      for (const order of reportingOrders) {
+        reportingMap.set(order.order_number, order);
+      }
+      
+      // Find differences
+      const missingInReporting: Array<{ orderNumber: string; createdAt: string | null; subtotalPrice: string }> = [];
+      const missingInShopify: Array<{ orderNumber: string; orderDate: string; subtotalPrice: string }> = [];
+      const subtotalMismatches: Array<{
+        orderNumber: string;
+        shopifySubtotal: string;
+        reportingSubtotal: string;
+        difference: string;
+        createdAt: string | null;
+      }> = [];
+      
+      // Check for orders missing in reporting DB and subtotal mismatches
+      for (const [orderNumber, shopifyOrder] of shopifyMap) {
+        const reportingOrder = reportingMap.get(orderNumber);
+        
+        if (!reportingOrder) {
+          missingInReporting.push({
+            orderNumber,
+            createdAt: shopifyOrder.createdAt ? formatInTimeZone(shopifyOrder.createdAt, CST_TIMEZONE, 'yyyy-MM-dd HH:mm:ss') : null,
+            subtotalPrice: shopifyOrder.subtotalPrice,
+          });
+        } else {
+          // Compare subtotals (handle numeric comparison)
+          const shopifySubtotal = parseFloat(shopifyOrder.subtotalPrice) || 0;
+          const reportingSubtotal = parseFloat(reportingOrder.subtotal_price) || 0;
+          
+          // Check if difference is significant (more than 1 cent)
+          if (Math.abs(shopifySubtotal - reportingSubtotal) > 0.01) {
+            subtotalMismatches.push({
+              orderNumber,
+              shopifySubtotal: shopifyOrder.subtotalPrice,
+              reportingSubtotal: reportingOrder.subtotal_price,
+              difference: (shopifySubtotal - reportingSubtotal).toFixed(2),
+              createdAt: shopifyOrder.createdAt ? formatInTimeZone(shopifyOrder.createdAt, CST_TIMEZONE, 'yyyy-MM-dd HH:mm:ss') : null,
+            });
+          }
+        }
+      }
+      
+      // Check for orders missing in Shopify DB
+      for (const [orderNumber, reportingOrder] of reportingMap) {
+        if (!shopifyMap.has(orderNumber)) {
+          missingInShopify.push({
+            orderNumber,
+            orderDate: reportingOrder.order_date instanceof Date 
+              ? formatInTimeZone(reportingOrder.order_date, CST_TIMEZONE, 'yyyy-MM-dd')
+              : String(reportingOrder.order_date),
+            subtotalPrice: reportingOrder.subtotal_price,
+          });
+        }
+      }
+      
+      res.json({
+        summary: {
+          shopifyOrderCount: shopifyOrders.length,
+          reportingOrderCount: reportingOrders.length,
+          missingInReportingCount: missingInReporting.length,
+          missingInShopifyCount: missingInShopify.length,
+          subtotalMismatchCount: subtotalMismatches.length,
+        },
+        missingInReporting,
+        missingInShopify,
+        subtotalMismatches,
+      });
+      
+    } catch (error: any) {
+      console.error("[Validate Orders Report] Error:", error);
+      res.status(500).json({ error: "Failed to validate orders: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
