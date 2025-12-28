@@ -11837,15 +11837,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
       
-      // Parse dates as CST midnight timestamps
+      // Parse dates as CST date strings
       const startStr = startDate as string;
       const endStr = endDate as string;
       
-      // Convert CST date strings to UTC timestamps for database queries
+      // Convert CST date strings to UTC timestamps for Shopify database queries
+      // Shopify stores timestamps in UTC, so we convert CST boundaries to UTC
       const startCst = fromZonedTime(`${startStr} 00:00:00`, CST_TIMEZONE);
       const endCst = fromZonedTime(`${endStr} 23:59:59`, CST_TIMEZONE);
       
-      // Query main Shopify database
+      // Query main Shopify database (uses UTC timestamps internally)
       const shopifyOrders = await db
         .select({
           orderNumber: orders.orderNumber,
@@ -11860,16 +11861,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
-      // Query reporting database
+      // Query reporting database - convert to CST timestamps for consistent comparison
+      // The reporting DB stores order_date as timestamp, so we need to use CST boundaries
       const reportingOrders = await reportingSql`
         SELECT
           order_number,
-          order_date,
+          order_date AT TIME ZONE 'America/Chicago' as order_date_cst,
           order_total as subtotal_price
         FROM orders
         WHERE 
-          order_date >= ${startStr}
-          AND order_date <= ${endStr}
+          order_date AT TIME ZONE 'America/Chicago' >= ${startStr}::date
+          AND order_date AT TIME ZONE 'America/Chicago' < (${endStr}::date + interval '1 day')
           AND sales_channel IN ('etsy', 'jerky.com', 'ebay', 'walmart', 'tiktok')
       `;
       
@@ -11879,7 +11881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopifyMap.set(order.orderNumber, order);
       }
       
-      const reportingMap = new Map<string, { order_number: string; order_date: Date; subtotal_price: string }>();
+      const reportingMap = new Map<string, { order_number: string; order_date_cst: Date; subtotal_price: string }>();
       for (const order of reportingOrders) {
         reportingMap.set(order.order_number, order);
       }
@@ -11928,9 +11930,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!shopifyMap.has(orderNumber)) {
           missingInShopify.push({
             orderNumber,
-            orderDate: reportingOrder.order_date instanceof Date 
-              ? formatInTimeZone(reportingOrder.order_date, CST_TIMEZONE, 'yyyy-MM-dd')
-              : String(reportingOrder.order_date),
+            orderDate: reportingOrder.order_date_cst instanceof Date 
+              ? formatInTimeZone(reportingOrder.order_date_cst, CST_TIMEZONE, 'yyyy-MM-dd')
+              : String(reportingOrder.order_date_cst),
             subtotalPrice: reportingOrder.subtotal_price,
           });
         }
