@@ -11847,11 +11847,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endCst = fromZonedTime(`${endStr} 23:59:59`, CST_TIMEZONE);
       
       // Query main Shopify database (uses UTC timestamps internally)
+      // Using totalLineItemsPrice for comparison with reporting DB's order_total
       const shopifyOrders = await db
         .select({
           orderNumber: orders.orderNumber,
           createdAt: orders.createdAt,
-          subtotalPrice: orders.currentSubtotalPrice,
+          subtotalPrice: orders.totalLineItemsPrice,
         })
         .from(orders)
         .where(
@@ -11867,7 +11868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT
           order_number,
           order_date AT TIME ZONE 'America/Chicago' as order_date_cst,
-          total_line_items_price as subtotal_price
+          order_total as subtotal_price
         FROM orders
         WHERE 
           order_date AT TIME ZONE 'America/Chicago' >= ${startStr}::date
