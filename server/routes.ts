@@ -11847,11 +11847,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endCst = fromZonedTime(`${endStr} 23:59:59`, CST_TIMEZONE);
       
       // Query main Shopify database (uses UTC timestamps internally)
+      // Include current_subtotal_price and current_total_discounts for accurate comparison
+      // Reporting DB doesn't include discounts, so we need: current_subtotal_price - current_total_discounts
       const shopifyOrders = await db
         .select({
           orderNumber: orders.orderNumber,
           createdAt: orders.createdAt,
           subtotalPrice: orders.subtotalPrice,
+          currentSubtotalPrice: orders.currentSubtotalPrice,
+          currentTotalDiscounts: orders.currentTotalDiscounts,
         })
         .from(orders)
         .where(
@@ -11876,7 +11880,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
       
       // Create maps for comparison
-      const shopifyMap = new Map<string, { orderNumber: string; createdAt: Date | null; subtotalPrice: string }>();
+      const shopifyMap = new Map<string, { 
+        orderNumber: string; 
+        createdAt: Date | null; 
+        subtotalPrice: string;
+        currentSubtotalPrice: string | null;
+        currentTotalDiscounts: string | null;
+      }>();
       for (const order of shopifyOrders) {
         shopifyMap.set(order.orderNumber, order);
       }
@@ -11909,16 +11919,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           // Compare subtotals (handle numeric comparison)
-          const shopifySubtotal = parseFloat(shopifyOrder.subtotalPrice) || 0;
+          // Reporting DB doesn't include discounts, so we calculate: current_subtotal_price - current_total_discounts
+          const currentSubtotal = parseFloat(shopifyOrder.currentSubtotalPrice || '0') || 0;
+          const currentDiscounts = parseFloat(shopifyOrder.currentTotalDiscounts || '0') || 0;
+          const shopifyComparableSubtotal = currentSubtotal - currentDiscounts;
           const reportingSubtotal = parseFloat(reportingOrder.subtotal_price) || 0;
           
           // Check if difference is significant (more than 1 cent)
-          if (Math.abs(shopifySubtotal - reportingSubtotal) > 0.01) {
+          if (Math.abs(shopifyComparableSubtotal - reportingSubtotal) > 0.01) {
             subtotalMismatches.push({
               orderNumber,
-              shopifySubtotal: shopifyOrder.subtotalPrice,
+              shopifySubtotal: shopifyComparableSubtotal.toFixed(2),
               reportingSubtotal: reportingOrder.subtotal_price,
-              difference: (shopifySubtotal - reportingSubtotal).toFixed(2),
+              difference: (shopifyComparableSubtotal - reportingSubtotal).toFixed(2),
               createdAt: shopifyOrder.createdAt ? formatInTimeZone(shopifyOrder.createdAt, CST_TIMEZONE, 'yyyy-MM-dd HH:mm:ss') : null,
             });
           }
