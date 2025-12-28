@@ -11851,7 +11851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           orderNumber: orders.orderNumber,
           createdAt: orders.createdAt,
-          subtotalPrice: orders.subtotalPrice,
+          subtotalPrice: orders.currentSubtotalPrice,
         })
         .from(orders)
         .where(
@@ -11867,7 +11867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT
           order_number,
           order_date AT TIME ZONE 'America/Chicago' as order_date_cst,
-          order_total as subtotal_price
+          total_line_items_price as subtotal_price
         FROM orders
         WHERE 
           order_date AT TIME ZONE 'America/Chicago' >= ${startStr}::date
