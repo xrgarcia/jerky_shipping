@@ -795,8 +795,21 @@ export default function Collections() {
 
             {/* Products in Collection */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 border-b bg-muted/20">
-                <h3 className="text-sm font-semibold text-foreground mb-2">Products in this Collection</h3>
+              <div className="p-4 border-b bg-[#6B8E23]/5 border-l-4 border-l-[#6B8E23]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-[#6B8E23]" />
+                    <h3 className="text-sm font-bold text-foreground">Products IN This Collection</h3>
+                  </div>
+                  <Badge className="bg-[#6B8E23] text-white">
+                    {collectionProducts.length} assigned
+                  </Badge>
+                </div>
+                {selectedCollection?.productCategory && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Auto-populated from category: <span className="font-medium">{selectedCollection.productCategory}</span>
+                  </p>
+                )}
                 {collectionProductsLoading ? (
                   <div className="space-y-2">
                     {[...Array(3)].map((_, i) => (
@@ -813,7 +826,7 @@ export default function Collections() {
                       {collectionProducts.map((mapping) => (
                         <div
                           key={mapping.id}
-                          className="flex items-center justify-between gap-2 p-3 rounded-md bg-card border border-border"
+                          className="flex items-center justify-between gap-2 p-3 rounded-md bg-card border border-[#6B8E23]/20"
                           data-testid={`product-in-collection-${mapping.sku}`}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -855,9 +868,15 @@ export default function Collections() {
               <Separator />
 
               {/* Product Search & Add */}
-              <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0 bg-muted/30 border-l-4 border-l-muted-foreground/30">
                 <div className="flex items-center justify-between gap-4 mb-3">
-                  <h3 className="text-sm font-semibold text-foreground">Add Products from Catalog</h3>
+                  <div className="flex items-center gap-2">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-bold text-foreground">Search Catalog to Add More</h3>
+                    <Badge variant="outline" className="text-xs">
+                      Not yet in collection
+                    </Badge>
+                  </div>
                   {selectedSkus.size > 0 && (
                     <Button
                       size="sm"
