@@ -11177,10 +11177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get total count of shipments with this fingerprint
-      const [{ count: totalCount }] = await db
-        .select({ count: sql<number>`COUNT(*)` })
+      const countResult = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
         .from(shipments)
         .where(eq(shipments.fingerprintId, fingerprintId));
+      const totalCount = countResult[0]?.count || 0;
       
       // Get paginated shipments with this fingerprint
       const paginatedShipments = await db
@@ -11260,12 +11261,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         shipments: paginatedShipments,
         products,
-        totalShipments: Number(totalCount),
+        totalShipments: totalCount,
         uniqueProducts: products.length,
         pagination: {
           page,
           limit,
-          totalPages: Math.ceil(Number(totalCount) / limit),
+          totalPages: Math.ceil(totalCount / limit),
         },
       });
     } catch (error: any) {
