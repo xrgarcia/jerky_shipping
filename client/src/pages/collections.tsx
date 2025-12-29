@@ -218,15 +218,23 @@ export default function Collections() {
   const collections = collectionsData?.collections || [];
   const collectionProducts = collectionProductsData?.mappings || [];
   
-  // Filter collections by table search
+  // Filter and sort collections by name
   const filteredCollections = useMemo(() => {
-    if (!tableSearch.trim()) return collections;
-    const search = tableSearch.toLowerCase();
-    return collections.filter(c => 
-      c.name.toLowerCase().includes(search) ||
-      (c.description?.toLowerCase().includes(search)) ||
-      (c.productCategory?.toLowerCase().includes(search))
-    );
+    let result = [...collections];
+    
+    if (tableSearch.trim()) {
+      const search = tableSearch.toLowerCase();
+      result = result.filter(c => 
+        c.name.toLowerCase().includes(search) ||
+        (c.description?.toLowerCase().includes(search)) ||
+        (c.productCategory?.toLowerCase().includes(search))
+      );
+    }
+    
+    // Always sort alphabetically by name
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    
+    return result;
   }, [collections, tableSearch]);
   
   const catalogProducts = useMemo(() => {
