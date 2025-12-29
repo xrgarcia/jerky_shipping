@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2, ChevronDown, Check, CheckSquare, Square, Folder, Plus, Trash2 } from "lucide-react";
+import { Search, Package, ChevronLeft, ChevronRight, Filter, X, Download, Loader2, ChevronDown, Check, CheckSquare, Square, Folder, Plus, Trash2, RefreshCw } from "lucide-react";
 import type { SkuvaultProduct } from "@shared/schema";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -437,6 +437,7 @@ function MobileProductCard({
 }
 
 export default function SkuvaultProducts() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -530,6 +531,26 @@ export default function SkuvaultProducts() {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  const refreshCacheMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/kit-mappings/refresh');
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cache Refreshed",
+        description: `Kit mappings updated: ${data.after?.kitCount || 0} kits loaded from ${data.after?.snapshotTimestamp || 'unknown'}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/skuvault-products'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Refresh Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -585,11 +606,30 @@ export default function SkuvaultProducts() {
             Centralized product catalog synced hourly from SkuVault
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <Badge variant="outline" className="text-sm" data-testid="badge-total-products">
             <Package className="w-4 h-4 mr-1" />
             {totalProducts.toLocaleString()} products
           </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshCacheMutation.mutate()}
+            disabled={refreshCacheMutation.isPending}
+            data-testid="button-refresh-cache"
+          >
+            {refreshCacheMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh Cache
+              </>
+            )}
+          </Button>
           <Button
             variant="outline"
             size="sm"
