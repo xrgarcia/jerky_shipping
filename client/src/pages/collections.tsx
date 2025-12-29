@@ -151,6 +151,12 @@ export default function Collections() {
     return () => clearTimeout(timer);
   }, [productSearch]);
 
+  // Clear selected SKUs when filters change to prevent stale selections
+  // This ensures "Select All" only selects products from the current filtered view
+  useEffect(() => {
+    setSelectedSkus(new Set());
+  }, [categoryFilter, kitFilter, showUncategorizedOnly, debouncedSearch]);
+
   // Auto-enable uncategorized filter and clear search when a collection is selected
   // Note: We intentionally do NOT reset categoryFilter or kitFilter here
   // so users can filter products by category while adding to a collection
