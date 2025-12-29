@@ -152,13 +152,13 @@ export default function Collections() {
   }, [productSearch]);
 
   // Auto-enable uncategorized filter and clear search when a collection is selected
+  // Note: We intentionally do NOT reset categoryFilter or kitFilter here
+  // so users can filter products by category while adding to a collection
   useEffect(() => {
     if (selectedCollectionId) {
       setShowUncategorizedOnly(true);
       setProductSearch("");
       setDebouncedSearch("");
-      setCategoryFilter("all");
-      setKitFilter("either");
       setSelectedSkus(new Set());
     }
   }, [selectedCollectionId]);
