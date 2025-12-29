@@ -28,15 +28,18 @@ let cachedSnapshotTimestamp: string | null = null;
 
 /**
  * Get the latest snapshot_timestamp from vw_internal_kit_component_inventory_latest
+ * Returns the exact timestamp string from the database without any timezone conversion
  */
 async function getLatestSnapshotTimestamp(): Promise<string | null> {
   try {
+    // Get the exact timestamp as a string without any JavaScript Date conversion
     const result = await reportingSql`
-      SELECT MAX(snapshot_timestamp) as latest_timestamp
+      SELECT MAX(snapshot_timestamp)::text as latest_timestamp
       FROM vw_internal_kit_component_inventory_latest
     `;
     if (!result[0]?.latest_timestamp) return null;
-    return new Date(result[0].latest_timestamp).toISOString();
+    // Return the exact string from the database - do NOT convert to Date/ISO
+    return result[0].latest_timestamp;
   } catch (error) {
     log(`Error fetching latest snapshot_timestamp: ${error}`);
     return null;
@@ -45,17 +48,19 @@ async function getLatestSnapshotTimestamp(): Promise<string | null> {
 
 /**
  * Fetch and cache kit mappings from vw_internal_kit_component_inventory_latest
+ * Uses the exact timestamp string from the database for matching
  */
 async function refreshKitMappings(snapshotTimestamp: string): Promise<Map<string, KitComponent[]>> {
-  log(`Refreshing kit mappings for ${snapshotTimestamp}...`);
+  log(`Refreshing kit mappings for snapshot: ${snapshotTimestamp}...`);
   
+  // Use the exact timestamp string for matching - cast to timestamp for proper comparison
   const results = await reportingSql`
     SELECT 
       sku as parent_sku,
       component_sku,
       component_quantity
     FROM vw_internal_kit_component_inventory_latest
-    WHERE snapshot_timestamp = ${snapshotTimestamp}
+    WHERE snapshot_timestamp::text = ${snapshotTimestamp}
     ORDER BY sku, component_sku
   `;
   

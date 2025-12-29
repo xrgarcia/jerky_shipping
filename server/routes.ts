@@ -9794,6 +9794,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual kit mappings cache refresh
+  app.post("/api/kit-mappings/refresh", requireAuth, async (req, res) => {
+    try {
+      const { forceRefreshKitMappings, getKitCacheStats, getKitComponents } = await import('./services/kit-mappings-cache');
+      
+      console.log(`[kit-mappings] Manual refresh triggered by user`);
+      
+      // Get stats before refresh
+      const beforeStats = getKitCacheStats();
+      console.log(`[kit-mappings] Before refresh: ${beforeStats.kitCount} kits, snapshot: ${beforeStats.snapshotTimestamp}`);
+      
+      // Force refresh from GCP
+      await forceRefreshKitMappings();
+      
+      // Get stats after refresh
+      const afterStats = getKitCacheStats();
+      console.log(`[kit-mappings] After refresh: ${afterStats.kitCount} kits, snapshot: ${afterStats.snapshotTimestamp}`);
+      
+      res.json({
+        success: true,
+        before: {
+          kitCount: beforeStats.kitCount,
+          snapshotTimestamp: beforeStats.snapshotTimestamp,
+        },
+        after: {
+          kitCount: afterStats.kitCount,
+          snapshotTimestamp: afterStats.snapshotTimestamp,
+        },
+      });
+    } catch (error: any) {
+      console.error("[kit-mappings] Error refreshing cache:", error);
+      res.status(500).json({ error: "Failed to refresh kit mappings cache" });
+    }
+  });
+
+  // Get kit mappings cache status
+  app.get("/api/kit-mappings/status", requireAuth, async (req, res) => {
+    try {
+      const { getKitCacheStats, getAllKitMappings } = await import('./services/kit-mappings-cache');
+      const stats = getKitCacheStats();
+      const allMappings = getAllKitMappings();
+      
+      res.json({
+        kitCount: stats.kitCount,
+        snapshotTimestamp: stats.snapshotTimestamp,
+        sampleKits: allMappings ? Array.from(allMappings.keys()).slice(0, 10) : [],
+      });
+    } catch (error: any) {
+      console.error("[kit-mappings] Error getting status:", error);
+      res.status(500).json({ error: "Failed to get kit mappings status" });
+    }
+  });
+
+  // Lookup specific kit components
+  app.get("/api/kit-mappings/:sku", requireAuth, async (req, res) => {
+    try {
+      const { getKitComponents, isKit } = await import('./services/kit-mappings-cache');
+      const { sku } = req.params;
+      
+      const isKitResult = isKit(sku);
+      const components = getKitComponents(sku);
+      
+      res.json({
+        sku,
+        isKit: isKitResult,
+        components: components || [],
+      });
+    } catch (error: any) {
+      console.error("[kit-mappings] Error looking up kit:", error);
+      res.status(500).json({ error: "Failed to lookup kit" });
+    }
+  });
+
   // Bulk import collections from CSV
   app.post("/api/collections/bulk-import", requireAuth, upload.single("file"), async (req, res) => {
     try {
