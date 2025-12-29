@@ -19,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Search, 
   Layers, 
@@ -30,7 +36,12 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Truck,
+  Loader2,
 } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
+
+const CST_TIMEZONE = 'America/Chicago';
 
 interface FingerprintData {
   id: string;
@@ -59,6 +70,30 @@ interface FingerprintsResponse {
   };
 }
 
+interface ShipmentData {
+  id: string;
+  orderNumber: string;
+  shipstationShipmentId: string | null;
+  trackingNumber: string | null;
+  status: string | null;
+  createdAt: string;
+}
+
+interface ShipmentsResponse {
+  fingerprint: {
+    id: string;
+    displayName: string | null;
+    signature: string;
+  };
+  shipments: ShipmentData[];
+  totalShipments: number;
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 type SortField = "humanReadableName" | "totalItems" | "shipmentCount" | "packagingTypeName" | "createdAt";
 type SortDir = "asc" | "desc";
 
@@ -69,9 +104,23 @@ export default function FingerprintsReport() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [statusFilter, setStatusFilter] = useState<"all" | "assigned" | "unassigned">("all");
+  
+  const [selectedFingerprint, setSelectedFingerprint] = useState<FingerprintData | null>(null);
+  const [modalPage, setModalPage] = useState(1);
+  const [modalLimit] = useState(10);
 
   const { data, isLoading } = useQuery<FingerprintsResponse>({
     queryKey: ["/api/fingerprints"],
+  });
+
+  const { data: shipmentsData, isLoading: shipmentsLoading } = useQuery<ShipmentsResponse>({
+    queryKey: ["/api/fingerprints", selectedFingerprint?.id, "shipments", { page: modalPage, limit: modalLimit }],
+    queryFn: async () => {
+      const res = await fetch(`/api/fingerprints/${selectedFingerprint?.id}/shipments?page=${modalPage}&limit=${modalLimit}`);
+      if (!res.ok) throw new Error("Failed to fetch shipments");
+      return res.json();
+    },
+    enabled: !!selectedFingerprint,
   });
 
   const fingerprints = data?.fingerprints || [];
@@ -148,6 +197,19 @@ export default function FingerprintsReport() {
     setPage(1);
   };
 
+  const handleShipmentClick = (fp: FingerprintData) => {
+    setSelectedFingerprint(fp);
+    setModalPage(1);
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    try {
+      return formatInTimeZone(new Date(dateStr), CST_TIMEZONE, "MMM d, yyyy h:mm a");
+    } catch {
+      return dateStr;
+    }
+  };
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
@@ -156,6 +218,8 @@ export default function FingerprintsReport() {
       ? <ArrowUp className="h-4 w-4" />
       : <ArrowDown className="h-4 w-4" />;
   };
+
+  const modalTotalPages = shipmentsData?.pagination.totalPages || 1;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -330,7 +394,15 @@ export default function FingerprintsReport() {
                     <Badge variant="secondary">{fp.totalItems}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="outline">{fp.shipmentCount.toLocaleString()}</Badge>
+                    <Badge 
+                      variant="outline" 
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => handleShipmentClick(fp)}
+                      data-testid={`badge-shipments-${fp.id}`}
+                    >
+                      <Truck className="h-3 w-3 mr-1" />
+                      {fp.shipmentCount.toLocaleString()}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {fp.packagingTypeName ? (
@@ -428,6 +500,101 @@ export default function FingerprintsReport() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!selectedFingerprint} onOpenChange={(open) => !open && setSelectedFingerprint(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Shipments for Fingerprint
+            </DialogTitle>
+            {selectedFingerprint && (
+              <p className="text-sm text-muted-foreground truncate">
+                {selectedFingerprint.humanReadableName}
+              </p>
+            )}
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            {shipmentsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : shipmentsData?.shipments.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No shipments found</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order Number</TableHead>
+                    <TableHead>Tracking Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shipmentsData?.shipments.map((shipment) => (
+                    <TableRow key={shipment.id} data-testid={`modal-shipment-row-${shipment.id}`}>
+                      <TableCell className="font-medium">{shipment.orderNumber}</TableCell>
+                      <TableCell>
+                        {shipment.trackingNumber ? (
+                          <span className="font-mono text-sm">{shipment.trackingNumber}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {shipment.status ? (
+                          <Badge variant="secondary">{shipment.status}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDateTime(shipment.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          {shipmentsData && modalTotalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((modalPage - 1) * modalLimit) + 1} to {Math.min(modalPage * modalLimit, shipmentsData.totalShipments)} of {shipmentsData.totalShipments} shipments
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalPage(p => Math.max(1, p - 1))}
+                  disabled={modalPage === 1}
+                  data-testid="modal-button-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm">
+                  Page {modalPage} of {modalTotalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalPage(p => Math.min(modalTotalPages, p + 1))}
+                  disabled={modalPage === modalTotalPages}
+                  data-testid="modal-button-next-page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

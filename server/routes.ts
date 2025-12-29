@@ -11162,6 +11162,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fingerprints/:fingerprintId/shipments", requireAuth, async (req, res) => {
     try {
       const { fingerprintId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const offset = (page - 1) * limit;
       
       // Check if fingerprint exists
       const [fingerprint] = await db
@@ -11173,7 +11176,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Fingerprint not found" });
       }
       
-      // Get all shipments with this fingerprint
+      // Get total count of shipments with this fingerprint
+      const [{ count: totalCount }] = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(shipments)
+        .where(eq(shipments.fingerprintId, fingerprintId));
+      
+      // Get paginated shipments with this fingerprint
+      const paginatedShipments = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          shipstationShipmentId: shipments.shipstationShipmentId,
+          trackingNumber: shipments.trackingNumber,
+          status: shipments.status,
+          createdAt: shipments.createdAt,
+        })
+        .from(shipments)
+        .where(eq(shipments.fingerprintId, fingerprintId))
+        .orderBy(desc(shipments.createdAt))
+        .limit(limit)
+        .offset(offset);
+      
+      // Get all shipments for product grouping (existing logic)
       const shipmentsWithOrders = await db
         .select({
           id: shipments.id,
@@ -11233,9 +11258,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           displayName: fingerprint.displayName,
           signature: fingerprint.signature,
         },
+        shipments: paginatedShipments,
         products,
-        totalShipments: shipmentsWithOrders.length,
+        totalShipments: Number(totalCount),
         uniqueProducts: products.length,
+        pagination: {
+          page,
+          limit,
+          totalPages: Math.ceil(Number(totalCount) / limit),
+        },
       });
     } catch (error: any) {
       console.error("[Fingerprints] Error getting shipments:", error);
