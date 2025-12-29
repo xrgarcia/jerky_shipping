@@ -210,6 +210,11 @@ export function AppSidebar() {
       icon: FileSearch,
     },
     {
+      title: "Fingerprints",
+      url: "/reports/fingerprints",
+      icon: Layers,
+    },
+    {
       title: "Packing Ready (Debug)",
       url: "/packing-ready",
       icon: Database,

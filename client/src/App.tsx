@@ -26,6 +26,7 @@ import ShipmentEventsReport from "@/pages/reports/shipment-events";
 import PackingLogsReport from "@/pages/reports/packing-logs";
 import QcValidationReport from "@/pages/reports/qc-validation";
 import ValidateOrderDetails from "@/pages/reports/validate-order-details";
+import FingerprintsReport from "@/pages/reports/fingerprints";
 import Sessions from "@/pages/sessions";
 import Operations from "@/pages/tools/operations";
 import PORecommendations from "@/pages/po-recommendations";
@@ -104,6 +105,7 @@ function AppContent() {
       <Route path="/reports/packing-logs" component={PackingLogsReport} />
       <Route path="/reports/qc-validation" component={QcValidationReport} />
       <Route path="/reports/validate-orders" component={ValidateOrderDetails} />
+      <Route path="/reports/fingerprints" component={FingerprintsReport} />
       <Route path="/reports">
         <Redirect to="/reports/shopify-sales" />
       </Route>
