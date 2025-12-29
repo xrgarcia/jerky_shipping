@@ -9461,6 +9461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new collection
+  // If productCategory is provided, automatically adds all matching products to the collection
   app.post("/api/collections", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
@@ -9468,14 +9469,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ error: "Collection name is required" });
       }
+      
+      const trimmedCategory = productCategory?.trim() || null;
+      
       const collection = await storage.createProductCollection({
         name: name.trim(),
         description: description?.trim() || null,
         incrementalQuantity: incrementalQuantity != null ? parseInt(incrementalQuantity, 10) : null,
-        productCategory: productCategory?.trim() || null,
+        productCategory: trimmedCategory,
         createdBy: userId,
         updatedBy: userId,
       });
+      
+      // If a productCategory was specified, automatically add all matching products
+      if (trimmedCategory) {
+        const { skuvaultProducts } = await import("@shared/schema");
+        
+        // Find all products matching the category
+        const matchingProducts = await db
+          .select({ sku: skuvaultProducts.sku })
+          .from(skuvaultProducts)
+          .where(eq(skuvaultProducts.productCategory, trimmedCategory));
+        
+        if (matchingProducts.length > 0) {
+          const skus = matchingProducts.map(p => p.sku);
+          console.log(`[Collections] Auto-adding ${skus.length} products with category "${trimmedCategory}" to collection "${name}"`);
+          
+          // Add all matching products to the collection
+          await storage.addProductsToCollection(collection.id, skus, userId);
+        }
+      }
+      
       res.status(201).json(collection);
     } catch (error: any) {
       console.error("[Collections] Error creating collection:", error);
