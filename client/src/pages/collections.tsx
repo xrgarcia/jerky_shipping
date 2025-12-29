@@ -260,10 +260,15 @@ export default function Collections() {
       toast({ title: "Geometry collection created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       setShowCreateDialog(false);
-      setFormData(defaultFormData);
-      // Open the view/edit modal for the new collection
+      // Open the view/edit modal for the new collection with form data populated
       setSelectedCollectionId(newCollection.id);
       setEditingCollection(newCollection);
+      setFormData({
+        name: newCollection.name || "",
+        description: newCollection.description || "",
+        incrementalQuantity: newCollection.incrementalQuantity != null ? String(newCollection.incrementalQuantity) : "",
+        productCategory: newCollection.productCategory || "",
+      });
       setShowViewEditDialog(true);
     },
     onError: (error: Error) => {
