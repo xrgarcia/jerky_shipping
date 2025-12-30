@@ -349,7 +349,7 @@ export const shipments = pgTable("shipments", {
   lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
   decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
-  fulfillmentSessionId: varchar("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
+  fulfillmentSessionId: integer("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -1296,7 +1296,7 @@ export type FulfillmentSessionStatus = typeof FULFILLMENT_SESSION_STATUSES[numbe
 // Fulfillment Sessions - Ship.'s optimized order groupings for warehouse flow
 // Groups orders by station type and similar products for efficient picking/packing
 export const fulfillmentSessions = pgTable("fulfillment_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: serial("id").primaryKey(),
   // Session identification
   name: text("name"), // Optional human-readable name (e.g., "Boxing Session #42")
   sequenceNumber: integer("sequence_number"), // Auto-incrementing session number per day
