@@ -1,0 +1,68 @@
+2025-12-30 11:33:16.98
+a13f5036
+User
+5:33:16 PM [express] Fetching products from Shopify...
+2025-12-30 11:33:39.08
+a13f5036
+User
+at An._connectionCallback (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384:72)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at An._handleErrorEvent (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1291:33)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2025-12-30 11:33:39.08
+a13f5036
+User
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384
+2025-12-30 11:33:39.08
+a13f5036
+User
+Node.js v20.19.3
+2025-12-30 11:33:39.08
+a13f5036
+User
+at An._handleErrorWhileConnecting (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1290:38)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at fn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at v.reportStreamError (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1201:46)
+2025-12-30 11:33:39.08
+a13f5036
+User
+at WebSocket.onError (/home/runner/workspace/node_modules/ws/lib/event-target.js:230:9)
+2025-12-30 11:33:39.08
+a13f5036
+User
+TypeError: Cannot set property message of # which has only a getter
+2025-12-30 11:33:39.08
+a13f5036
+User
+connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(o.message="Connect\
+2025-12-30 11:33:39.08
+a13f5036
+User
+at WebSocket.emit (node:events:524:28)
+2025-12-30 11:33:39.08
+a13f5036
+User
+^
+2025-12-30 11:33:39.08
+a13f5036
+User
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:986:42)
+2025-12-30 11:33:43.78
+a13f5036
+System
+command finished with error [npm run start]: exit status 1
