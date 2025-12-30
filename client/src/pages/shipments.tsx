@@ -29,7 +29,7 @@ interface ShipmentsResponse {
 }
 
 interface TabCounts {
-  readyToFulfill: number;
+  readyToSession: number;
   inProgress: number;
   shipped: number;
   all: number;
@@ -45,7 +45,7 @@ interface LifecycleTabCounts {
   pickingIssues: number;
 }
 
-type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
+type WorkflowTab = 'ready_to_session' | 'in_progress' | 'shipped' | 'all';
 type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
@@ -704,7 +704,7 @@ export default function Shipments() {
   const [sortOrder, setSortOrder] = useState("desc");
 
   // Valid values for URL hydration
-  const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
+  const validWorkflowTabs: WorkflowTab[] = ['ready_to_session', 'in_progress', 'shipped', 'all'];
   const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
   const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
 
@@ -1034,7 +1034,7 @@ export default function Shipments() {
     queryKey: ["/api/shipments/tab-counts"],
   });
 
-  const tabCounts = tabCountsData || { readyToFulfill: 0, inProgress: 0, shipped: 0, all: 0 };
+  const tabCounts = tabCountsData || { readyToSession: 0, inProgress: 0, shipped: 0, all: 0 };
 
   // Fetch lifecycle tab counts
   const { data: lifecycleCountsData } = useQuery<LifecycleTabCounts>({
@@ -1283,7 +1283,7 @@ export default function Shipments() {
   const getTabDescription = () => {
     if (viewMode === 'workflow') {
       switch (activeTab) {
-        case 'ready_to_fulfill':
+        case 'ready_to_session':
           return 'Orders on hold with MOVE OVER tag - ready for warehouse to start processing';
         case 'in_progress':
           return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
@@ -1458,15 +1458,15 @@ export default function Shipments() {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
               <TabsTrigger 
-                value="ready_to_fulfill" 
-                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                data-testid="tab-ready-to-fulfill"
+                value="ready_to_session" 
+                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+                data-testid="tab-ready-to-session"
               >
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <Timer className="h-4 w-4 flex-shrink-0" />
-                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
+                  <Clock className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Session</span>
                 </div>
-                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
+                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToSession} orders</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="in_progress" 
