@@ -134,11 +134,12 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_PICK, subphase: null };
   }
 
-  // READY_TO_SESSION: On hold + MOVE OVER tag + no SkuVault session yet
+  // READY_TO_SESSION: On hold + MOVE OVER tag + no SkuVault session yet + not cancelled
   // This is where fingerprinting and QC item explosion should happen
   if (shipment.shipmentStatus === 'on_hold' && 
       shipment.hasMoveOverTag === true && 
-      !shipment.sessionStatus) {
+      !shipment.sessionStatus &&
+      shipment.status !== 'cancelled') {
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase: null };
   }
 
