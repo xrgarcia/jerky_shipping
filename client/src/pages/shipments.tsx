@@ -658,6 +658,8 @@ export default function Shipments() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [warehouseStatusDropdownOpen, setWarehouseStatusDropdownOpen] = useState(false);
   const warehouseStatusDropdownRef = useRef<HTMLDivElement>(null);
+  const [packageTypeDropdownOpen, setPackageTypeDropdownOpen] = useState(false);
+  const packageTypeDropdownRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
@@ -868,13 +870,16 @@ export default function Shipments() {
       if (warehouseStatusDropdownRef.current && !warehouseStatusDropdownRef.current.contains(event.target as Node)) {
         setWarehouseStatusDropdownOpen(false);
       }
+      if (packageTypeDropdownRef.current && !packageTypeDropdownRef.current.contains(event.target as Node)) {
+        setPackageTypeDropdownOpen(false);
+      }
     };
 
-    if (warehouseStatusDropdownOpen) {
+    if (warehouseStatusDropdownOpen || packageTypeDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [warehouseStatusDropdownOpen]);
+  }, [warehouseStatusDropdownOpen, packageTypeDropdownOpen]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -1551,18 +1556,64 @@ export default function Shipments() {
                 {packageNames.length > 0 && (
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Package Type</label>
-                    <div className="flex flex-wrap gap-2">
-                      {packageNames.map(pkg => (
-                        <Badge
-                          key={pkg}
-                          variant={packageName.includes(pkg) ? "default" : "outline"}
-                          className="cursor-pointer hover-elevate"
-                          onClick={() => toggleArrayFilter(pkg, packageName, setPackageName)}
-                          data-testid={`filter-package-${pkg.replace(/\s+/g, '-').toLowerCase()}`}
-                        >
-                          {pkg}
-                        </Badge>
-                      ))}
+                    <div className="relative" ref={packageTypeDropdownRef}>
+                      <button 
+                        onClick={() => setPackageTypeDropdownOpen(!packageTypeDropdownOpen)}
+                        className="px-3 py-2 border rounded-md text-sm hover-elevate active-elevate-2 flex items-center gap-2 bg-background w-full justify-between"
+                        data-testid="button-package-type-dropdown"
+                      >
+                        <span>{packageName.length > 0 ? `${packageName.length} selected` : "All Package Types"}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${packageTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {packageTypeDropdownOpen && (
+                        <div className="absolute left-0 mt-1 w-64 bg-background border rounded-md shadow-lg z-50 p-2 space-y-2 max-h-64 overflow-y-auto">
+                          {/* Check All / Uncheck All */}
+                          <div className="flex gap-2 pb-2 border-b">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPackageName([...packageNames]);
+                                setPage(1);
+                              }}
+                              data-testid="button-package-check-all"
+                            >
+                              Check All
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPackageName([]);
+                                setPage(1);
+                              }}
+                              data-testid="button-package-uncheck-all"
+                            >
+                              Uncheck All
+                            </Button>
+                          </div>
+                          {packageNames.map(pkg => (
+                            <div key={pkg} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`package-type-${pkg}`}
+                                checked={packageName.includes(pkg)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setPackageName([...packageName, pkg]);
+                                  } else {
+                                    setPackageName(packageName.filter(v => v !== pkg));
+                                  }
+                                  setPage(1);
+                                }}
+                                data-testid={`checkbox-package-${pkg.replace(/\s+/g, '-').toLowerCase()}`}
+                              />
+                              <label htmlFor={`package-type-${pkg}`} className="text-sm cursor-pointer">
+                                {pkg}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
