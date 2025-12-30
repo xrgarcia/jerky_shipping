@@ -350,6 +350,7 @@ export const shipments = pgTable("shipments", {
   decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
   fulfillmentSessionId: integer("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
+  smartSessionSpot: integer("smart_session_spot"), // Cart position (1-28) within the smart session
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
