@@ -569,6 +569,27 @@ export default function Fingerprints() {
     },
   });
 
+  // Bulk complete sessions (mark as on the dock)
+  const bulkCompleteSessionsMutation = useMutation({
+    mutationFn: async (sessionIds: string[]) => {
+      const res = await apiRequest("POST", "/api/fulfillment-sessions/bulk-status", { 
+        sessionIds, 
+        status: 'completed' 
+      });
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({ 
+        title: "Sessions completed", 
+        description: `${result.updated} session${result.updated !== 1 ? 's' : ''} marked as on the dock` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to complete sessions", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Bulk assign mutation for packaging tab
   const bulkAssignMutation = useMutation({
     mutationFn: async ({ fingerprintIds, packagingTypeId }: { fingerprintIds: string[]; packagingTypeId: string }) => {
@@ -1727,6 +1748,42 @@ export default function Fingerprints() {
                             <>
                               <ArrowRight className="h-4 w-4 mr-1" />
                               Release All to Floor
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* Bulk close controls for ready sessions */}
+                  {(() => {
+                    const readySessions = liveSessions.filter(s => s.status === 'ready');
+                    if (readySessions.length === 0) return null;
+                    return (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium">
+                            {readySessions.length} session{readySessions.length !== 1 ? 's' : ''} released to floor
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => bulkCompleteSessionsMutation.mutate(readySessions.map(s => s.id))}
+                          disabled={bulkCompleteSessionsMutation.isPending}
+                          data-testid="button-close-all-released"
+                        >
+                          {bulkCompleteSessionsMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Closing...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Close All Released
                             </>
                           )}
                         </Button>
