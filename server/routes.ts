@@ -11331,18 +11331,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all orders that are in ready_to_session lifecycle phase
       // (on hold + MOVE OVER tag + no session + not cancelled)
+      // Left join with fingerprint_models to check if fingerprint has packaging assigned
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
           orderNumber: shipments.orderNumber,
           fingerprintId: shipments.fingerprintId,
           fingerprintStatus: shipments.fingerprintStatus,
-          packagingTypeId: shipments.packagingTypeId,
           assignedStationId: shipments.assignedStationId,
           decisionSubphase: shipments.decisionSubphase,
+          fingerprintModelId: fingerprintModels.id,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+        .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .where(
           and(
             eq(shipments.shipmentStatus, 'on_hold'),
@@ -11361,7 +11363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!order.fingerprintId) {
           reason = 'Needs fingerprint calculation';
-        } else if (!order.packagingTypeId) {
+        } else if (!order.fingerprintModelId) {
           reason = 'Fingerprint needs package assignment';
         } else if (!order.assignedStationId) {
           reason = 'Needs station assignment';
