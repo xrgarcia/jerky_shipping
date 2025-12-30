@@ -660,6 +660,8 @@ export default function Shipments() {
   const warehouseStatusDropdownRef = useRef<HTMLDivElement>(null);
   const [packageTypeDropdownOpen, setPackageTypeDropdownOpen] = useState(false);
   const packageTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
+  const carrierDropdownRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
@@ -677,6 +679,7 @@ export default function Shipments() {
   const [statusDescription, setStatusDescription] = useState<string>("");
   const [shipmentStatus, setShipmentStatus] = useState<string[]>([]); // Warehouse status filter (multi-select)
   const [carrierCode, setCarrierCode] = useState<string[]>([]);
+  const [serviceCode, setServiceCode] = useState<string[]>([]); // Shipping service filter (multi-select)
   const [packageName, setPackageName] = useState<string[]>([]); // Package type filter (multi-select)
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -755,6 +758,7 @@ export default function Shipments() {
     const shipmentStatusValues = params.getAll('shipmentStatus');
     setShipmentStatus(shipmentStatusValues);
     setCarrierCode(params.getAll('carrierCode'));
+    setServiceCode(params.getAll('serviceCode'));
     setPackageName(params.getAll('packageName'));
     setDateFrom(params.get('dateFrom') || '');
     setDateTo(params.get('dateTo') || '');
@@ -831,6 +835,7 @@ export default function Shipments() {
     if (statusDescription) params.set('statusDescription', statusDescription);
     shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
+    serviceCode.forEach(s => params.append('serviceCode', s));
     packageName.forEach(p => params.append('packageName', p));
     
     if (dateFrom) params.set('dateFrom', dateFrom);
@@ -873,13 +878,16 @@ export default function Shipments() {
       if (packageTypeDropdownRef.current && !packageTypeDropdownRef.current.contains(event.target as Node)) {
         setPackageTypeDropdownOpen(false);
       }
+      if (carrierDropdownRef.current && !carrierDropdownRef.current.contains(event.target as Node)) {
+        setCarrierDropdownOpen(false);
+      }
     };
 
-    if (warehouseStatusDropdownOpen || packageTypeDropdownOpen) {
+    if (warehouseStatusDropdownOpen || packageTypeDropdownOpen || carrierDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [warehouseStatusDropdownOpen, packageTypeDropdownOpen]);
+  }, [warehouseStatusDropdownOpen, packageTypeDropdownOpen, carrierDropdownOpen]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -994,6 +1002,7 @@ export default function Shipments() {
     if (statusDescription) params.append('statusDescription', statusDescription);
     shipmentStatus.forEach(s => params.append('shipmentStatus', s));
     carrierCode.forEach(c => params.append('carrierCode', c));
+    serviceCode.forEach(s => params.append('serviceCode', s));
     packageName.forEach(p => params.append('packageName', p));
     
     if (dateFrom) params.append('dateFrom', dateFrom);
@@ -1078,8 +1087,34 @@ export default function Shipments() {
 
   const packageNames = packageNamesData?.packageNames || [];
 
+  // Fetch distinct service codes for the carrier/shipping method filter dropdown
+  const { data: serviceCodesData } = useQuery<{ serviceCodes: string[] }>({
+    queryKey: ["/api/shipments/service-codes"],
+  });
+
+  const serviceCodes = serviceCodesData?.serviceCodes || [];
+
+  // Utility function to format service codes nicely
+  const formatServiceCode = (code: string): string => {
+    // Extract carrier prefix and format
+    const parts = code.split('_');
+    if (parts.length === 0) return code;
+    
+    // First part is typically the carrier
+    const carrier = parts[0].toUpperCase();
+    const service = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    
+    return `${carrier} ${service}`.trim();
+  };
+
+  // Get carrier from service code for grouping
+  const getCarrierFromServiceCode = (code: string): string => {
+    const carrier = code.split('_')[0]?.toUpperCase() || 'OTHER';
+    return carrier;
+  };
+
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, hasFingerprint, decisionSubphase, hasPackaging, assignedStationId, hasSession, lifecyclePhaseFilter, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, serviceCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, hasFingerprint, decisionSubphase, hasPackaging, assignedStationId, hasSession, lifecyclePhaseFilter, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -1186,6 +1221,7 @@ export default function Shipments() {
     setStatusDescription("");
     setShipmentStatus([]);
     setCarrierCode([]);
+    setServiceCode([]);
     setPackageName([]);
     setDateFrom("");
     setDateTo("");
@@ -1209,6 +1245,7 @@ export default function Shipments() {
     statusDescription,
     shipmentStatus.length > 0,
     carrierCode.length > 0,
+    serviceCode.length > 0,
     packageName.length > 0,
     dateFrom,
     dateTo,
@@ -1534,23 +1571,71 @@ export default function Shipments() {
                   </div>
                 </div>
 
-                {/* Carrier Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Carrier</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['usps', 'fedex', 'ups', 'dhl'].map(carrier => (
-                      <Badge
-                        key={carrier}
-                        variant={carrierCode.includes(carrier) ? "default" : "outline"}
-                        className="cursor-pointer hover-elevate"
-                        onClick={() => toggleArrayFilter(carrier, carrierCode, setCarrierCode)}
-                        data-testid={`filter-carrier-${carrier}`}
+                {/* Shipping Method Filter */}
+                {serviceCodes.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Shipping Method</label>
+                    <div className="relative" ref={carrierDropdownRef}>
+                      <button 
+                        onClick={() => setCarrierDropdownOpen(!carrierDropdownOpen)}
+                        className="px-3 py-2 border rounded-md text-sm hover-elevate active-elevate-2 flex items-center gap-2 bg-background w-full justify-between"
+                        data-testid="button-shipping-method-dropdown"
                       >
-                        {carrier.toUpperCase()}
-                      </Badge>
-                    ))}
+                        <span>{serviceCode.length > 0 ? `${serviceCode.length} selected` : "All Shipping Methods"}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${carrierDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {carrierDropdownOpen && (
+                        <div className="absolute left-0 mt-1 w-80 bg-background border rounded-md shadow-lg z-50 p-2 space-y-2 max-h-80 overflow-y-auto">
+                          {/* Check All / Uncheck All */}
+                          <div className="flex gap-2 pb-2 border-b">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setServiceCode([...serviceCodes]);
+                                setPage(1);
+                              }}
+                              data-testid="button-shipping-check-all"
+                            >
+                              Check All
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setServiceCode([]);
+                                setPage(1);
+                              }}
+                              data-testid="button-shipping-uncheck-all"
+                            >
+                              Uncheck All
+                            </Button>
+                          </div>
+                          {serviceCodes.map(code => (
+                            <div key={code} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`service-code-${code}`}
+                                checked={serviceCode.includes(code)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setServiceCode([...serviceCode, code]);
+                                  } else {
+                                    setServiceCode(serviceCode.filter(v => v !== code));
+                                  }
+                                  setPage(1);
+                                }}
+                                data-testid={`checkbox-service-${code.replace(/\s+/g, '-').toLowerCase()}`}
+                              />
+                              <label htmlFor={`service-code-${code}`} className="text-sm cursor-pointer">
+                                {formatServiceCode(code)}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Package Type Filter */}
                 {packageNames.length > 0 && (

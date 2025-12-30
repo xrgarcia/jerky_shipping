@@ -113,6 +113,7 @@ export interface ShipmentFilters {
   statusDescription?: string;
   shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
   carrierCode?: string[];
+  serviceCode?: string[]; // Shipping service filter (e.g., "usps_ground_advantage", "ups_ground")
   packageName?: string[]; // Package type filter (e.g., "Box #2 (13 x 13 x 13)")
   dateFrom?: Date; // Ship date range
   dateTo?: Date;
@@ -196,6 +197,7 @@ export interface IStorage {
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
   getDistinctPackageNames(): Promise<string[]>;
+  getDistinctServiceCodes(): Promise<string[]>;
   getShipmentItems(shipmentId: string): Promise<ShipmentItem[]>;
   getShipmentTags(shipmentId: string): Promise<ShipmentTag[]>;
   getShipmentTagsBatch(shipmentIds: string[]): Promise<Map<string, ShipmentTag[]>>;
@@ -1198,6 +1200,7 @@ export class DatabaseStorage implements IStorage {
       statusDescription,
       shipmentStatus,
       carrierCode: carrierFilters,
+      serviceCode: serviceCodeFilters,
       packageName: packageNameFilters,
       dateFrom,
       dateTo,
@@ -1380,6 +1383,11 @@ export class DatabaseStorage implements IStorage {
     // Carrier filter
     if (carrierFilters && carrierFilters.length > 0) {
       conditions.push(inArray(shipments.carrierCode, carrierFilters));
+    }
+
+    // Service code filter (shipping method like usps_ground_advantage, ups_ground)
+    if (serviceCodeFilters && serviceCodeFilters.length > 0) {
+      conditions.push(inArray(shipments.serviceCode, serviceCodeFilters));
     }
 
     // Package name filter (uses subquery to find shipments with matching packages)
@@ -1723,12 +1731,23 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => r.packageName).filter((s): s is string => s !== null);
   }
 
+  async getDistinctServiceCodes(): Promise<string[]> {
+    const results = await db
+      .selectDistinct({ serviceCode: shipments.serviceCode })
+      .from(shipments)
+      .where(isNotNull(shipments.serviceCode))
+      .orderBy(shipments.serviceCode);
+    
+    return results.map(r => r.serviceCode).filter((s): s is string => s !== null);
+  }
+
   async getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }> {
     const {
       search,
       status: statusFilters,
       statusDescription,
       carrierCode: carrierFilters,
+      serviceCode: serviceCodeFilters,
       packageName: packageNameFilters,
       dateFrom,
       dateTo,

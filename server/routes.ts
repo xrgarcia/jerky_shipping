@@ -860,6 +860,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get distinct service codes for filtering (shipping methods like usps_ground_advantage, ups_ground)
+  app.get("/api/shipments/service-codes", requireAuth, async (req, res) => {
+    try {
+      const serviceCodes = await storage.getDistinctServiceCodes();
+      res.json({ serviceCodes });
+    } catch (error) {
+      console.error("Error fetching service codes:", error);
+      res.status(500).json({ error: "Failed to fetch service codes" });
+    }
+  });
+
   // Get tab counts for workflow tabs
   app.get("/api/shipments/tab-counts", requireAuth, async (req, res) => {
     try {
@@ -921,6 +932,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.carrierCode = Array.isArray(req.query.carrierCode)
           ? req.query.carrierCode
           : [req.query.carrierCode];
+      }
+      if (req.query.serviceCode) {
+        filters.serviceCode = Array.isArray(req.query.serviceCode)
+          ? req.query.serviceCode
+          : [req.query.serviceCode];
       }
       if (req.query.packageName) {
         filters.packageName = Array.isArray(req.query.packageName)
