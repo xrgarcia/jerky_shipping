@@ -39,6 +39,7 @@ import Collections from "@/pages/collections";
 import PackagingTypes from "@/pages/packaging-types";
 import FulfillmentPrep from "@/pages/fingerprints";
 import SkuvaultProducts from "@/pages/skuvault-products";
+import SmartSessions from "@/pages/smart-sessions";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -118,6 +119,7 @@ function AppContent() {
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
+      <Route path="/smart-sessions" component={SmartSessions} />
       <Route path="/skuvault-products" component={SkuvaultProducts} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />

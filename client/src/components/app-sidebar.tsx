@@ -122,6 +122,11 @@ export function AppSidebar() {
       icon: Layers,
     },
     {
+      title: "Smart Sessions",
+      url: "/smart-sessions",
+      icon: FileSearch,
+    },
+    {
       title: "Products",
       url: "/skuvault-products",
       icon: Package,
