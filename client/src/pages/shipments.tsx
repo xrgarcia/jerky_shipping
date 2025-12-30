@@ -682,6 +682,14 @@ export default function Shipments() {
   const [showWithoutOrders, setShowWithoutOrders] = useState(false);
   const [showShippedWithoutTracking, setShowShippedWithoutTracking] = useState(false);
   const [showDoNotShipOnly, setShowDoNotShipOnly] = useState(false);
+  
+  // Sessioning-related filter states
+  const [hasFingerprint, setHasFingerprint] = useState<string>(""); // "", "true", "false"
+  const [decisionSubphase, setDecisionSubphase] = useState<string>("");
+  const [hasPackaging, setHasPackaging] = useState<string>(""); // "", "true", "false"
+  const [assignedStationId, setAssignedStationId] = useState<string>("");
+  const [hasSession, setHasSession] = useState<string>(""); // "", "true", "false"
+  const [lifecyclePhaseFilter, setLifecyclePhaseFilter] = useState<string>("");
 
   // Pagination and sorting
   const [page, setPage] = useState(1);
@@ -751,6 +759,16 @@ export default function Shipments() {
     setShowOrphanedOnly(params.get('orphaned') === 'true');
     setShowWithoutOrders(params.get('withoutOrders') === 'true');
     setShowShippedWithoutTracking(params.get('shippedWithoutTracking') === 'true');
+    setShowDoNotShipOnly(params.get('doNotShip') === 'true');
+    
+    // Sessioning-related filters
+    setHasFingerprint(params.get('hasFingerprint') || '');
+    setDecisionSubphase(params.get('decisionSubphase') || '');
+    setHasPackaging(params.get('hasPackaging') || '');
+    setAssignedStationId(params.get('assignedStationId') || '');
+    setHasSession(params.get('hasSession') || '');
+    setLifecyclePhaseFilter(params.get('lifecyclePhaseFilter') || '');
+    
     setPage(parseInt(params.get('page') || '1'));
     setPageSize(parseInt(params.get('pageSize') || '50'));
     setSortBy(params.get('sortBy') || 'orderDate');
@@ -767,7 +785,14 @@ export default function Shipments() {
       params.get('dateTo') ||
       params.get('orphaned') === 'true' ||
       params.get('withoutOrders') === 'true' ||
-      params.get('shippedWithoutTracking') === 'true';
+      params.get('shippedWithoutTracking') === 'true' ||
+      params.get('doNotShip') === 'true' ||
+      params.get('hasFingerprint') ||
+      params.get('decisionSubphase') ||
+      params.get('hasPackaging') ||
+      params.get('assignedStationId') ||
+      params.get('hasSession') ||
+      params.get('lifecyclePhaseFilter');
     
     if (hasActiveFilters) {
       setFiltersOpen(true);
@@ -812,6 +837,14 @@ export default function Shipments() {
     if (showWithoutOrders) params.set('withoutOrders', 'true');
     if (showShippedWithoutTracking) params.set('shippedWithoutTracking', 'true');
     if (showDoNotShipOnly) params.set('doNotShip', 'true');
+    
+    // Sessioning-related filters
+    if (hasFingerprint) params.set('hasFingerprint', hasFingerprint);
+    if (decisionSubphase) params.set('decisionSubphase', decisionSubphase);
+    if (hasPackaging) params.set('hasPackaging', hasPackaging);
+    if (assignedStationId) params.set('assignedStationId', assignedStationId);
+    if (hasSession) params.set('hasSession', hasSession);
+    if (lifecyclePhaseFilter) params.set('lifecyclePhaseFilter', lifecyclePhaseFilter);
     
     if (page !== 1) params.set('page', page.toString());
     if (pageSize !== 50) params.set('pageSize', pageSize.toString());
@@ -965,6 +998,14 @@ export default function Shipments() {
     if (showShippedWithoutTracking) params.append('shippedWithoutTracking', 'true');
     if (showDoNotShipOnly) params.append('doNotShip', 'true');
     
+    // Sessioning-related filters
+    if (hasFingerprint) params.append('hasFingerprint', hasFingerprint);
+    if (decisionSubphase) params.append('decisionSubphase', decisionSubphase);
+    if (hasPackaging) params.append('hasPackaging', hasPackaging);
+    if (assignedStationId) params.append('assignedStationId', assignedStationId);
+    if (hasSession) params.append('hasSession', hasSession);
+    if (lifecyclePhaseFilter) params.append('lifecyclePhaseFilter', lifecyclePhaseFilter);
+    
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
     params.append('sortBy', sortBy);
@@ -986,6 +1027,13 @@ export default function Shipments() {
   });
 
   const lifecycleCounts = lifecycleCountsData || { all: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
+
+  // Fetch stations for the station filter dropdown
+  const { data: stationsData } = useQuery<{ id: string; name: string; stationType: string }[]>({
+    queryKey: ["/api/stations"],
+  });
+
+  const stations = stationsData || [];
 
   // Fetch distinct statuses for the status filter dropdown
   const { data: statusesData } = useQuery<{ statuses: string[] }>({
@@ -1026,7 +1074,7 @@ export default function Shipments() {
   const packageNames = packageNamesData?.packageNames || [];
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, hasFingerprint, decisionSubphase, hasPackaging, assignedStationId, hasSession, lifecyclePhaseFilter, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -1139,6 +1187,14 @@ export default function Shipments() {
     setShowOrphanedOnly(false);
     setShowWithoutOrders(false);
     setShowShippedWithoutTracking(false);
+    setShowDoNotShipOnly(false);
+    // Sessioning-related filters
+    setHasFingerprint("");
+    setDecisionSubphase("");
+    setHasPackaging("");
+    setAssignedStationId("");
+    setHasSession("");
+    setLifecyclePhaseFilter("");
     setPage(1);
   };
 
@@ -1155,6 +1211,12 @@ export default function Shipments() {
     showWithoutOrders,
     showShippedWithoutTracking,
     showDoNotShipOnly,
+    hasFingerprint,
+    decisionSubphase,
+    hasPackaging,
+    assignedStationId,
+    hasSession,
+    lifecyclePhaseFilter,
   ].filter(Boolean).length;
 
   const toggleArrayFilter = (value: string, current: string[], setter: (val: string[]) => void) => {
@@ -1598,6 +1660,148 @@ export default function Shipments() {
                           Show DO NOT SHIP only
                         </label>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sessioning Filters */}
+                <div className="space-y-4 pt-4 border-t">
+                  <label className="text-sm font-semibold">Sessioning Filters</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Has Fingerprint */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Has Fingerprint</label>
+                      <Select 
+                        value={hasFingerprint || "all"} 
+                        onValueChange={(val) => { 
+                          setHasFingerprint(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-has-fingerprint">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="false">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Decision Subphase */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Decision Subphase</label>
+                      <Select 
+                        value={decisionSubphase || "all"} 
+                        onValueChange={(val) => { 
+                          setDecisionSubphase(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-decision-subphase">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="needs_categorization">Needs Categorization</SelectItem>
+                          <SelectItem value="needs_fingerprint">Needs Fingerprint</SelectItem>
+                          <SelectItem value="needs_packaging">Needs Packaging</SelectItem>
+                          <SelectItem value="needs_session">Needs Session</SelectItem>
+                          <SelectItem value="ready_for_skuvault">Ready for SkuVault</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Has Packaging */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Has Packaging</label>
+                      <Select 
+                        value={hasPackaging || "all"} 
+                        onValueChange={(val) => { 
+                          setHasPackaging(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-has-packaging">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="false">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Assigned Station */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Assigned Station</label>
+                      <Select 
+                        value={assignedStationId || "all"} 
+                        onValueChange={(val) => { 
+                          setAssignedStationId(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-assigned-station">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Stations</SelectItem>
+                          {stations.map((station) => (
+                            <SelectItem key={station.id} value={station.id}>
+                              {station.name} ({station.stationType})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* In Session */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">In Session</label>
+                      <Select 
+                        value={hasSession || "all"} 
+                        onValueChange={(val) => { 
+                          setHasSession(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-has-session">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="false">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Lifecycle Phase */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Lifecycle Phase</label>
+                      <Select 
+                        value={lifecyclePhaseFilter || "all"} 
+                        onValueChange={(val) => { 
+                          setLifecyclePhaseFilter(val === "all" ? "" : val); 
+                          setPage(1); 
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-lifecycle-phase">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
+                          <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
+                          <SelectItem value="picking">Picking</SelectItem>
+                          <SelectItem value="packing_ready">Packing Ready</SelectItem>
+                          <SelectItem value="on_dock">On Dock</SelectItem>
+                          <SelectItem value="picking_issues">Picking Issues</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

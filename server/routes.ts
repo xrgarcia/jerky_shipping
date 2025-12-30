@@ -966,6 +966,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.doNotShip = true;
       }
 
+      // Parse sessioning-related filters
+      if (req.query.hasFingerprint === 'true') {
+        filters.hasFingerprint = true;
+      } else if (req.query.hasFingerprint === 'false') {
+        filters.hasFingerprint = false;
+      }
+
+      if (req.query.decisionSubphase) {
+        filters.decisionSubphase = req.query.decisionSubphase as string;
+      }
+
+      if (req.query.hasPackaging === 'true') {
+        filters.hasPackaging = true;
+      } else if (req.query.hasPackaging === 'false') {
+        filters.hasPackaging = false;
+      }
+
+      if (req.query.assignedStationId) {
+        filters.assignedStationId = req.query.assignedStationId as string;
+      }
+
+      if (req.query.hasSession === 'true') {
+        filters.hasSession = true;
+      } else if (req.query.hasSession === 'false') {
+        filters.hasSession = false;
+      }
+
+      if (req.query.lifecyclePhaseFilter) {
+        filters.lifecyclePhaseFilter = req.query.lifecyclePhaseFilter as string;
+      }
+
       // Get filtered shipments (no orders table join - all data comes from shipments table)
       const { shipments, total } = await storage.getFilteredShipments(filters);
 

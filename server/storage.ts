@@ -120,6 +120,13 @@ export interface ShipmentFilters {
   withoutOrders?: boolean; // Filter for shipments with no linked order
   shippedWithoutTracking?: boolean; // Filter for shipments with status='shipped' but no tracking number
   doNotShip?: boolean; // Filter for shipments with "**DO NOT SHIP (ALERT MGR)**" package
+  // Sessioning-related filters
+  hasFingerprint?: boolean; // Filter for shipments with/without fingerprint
+  decisionSubphase?: string; // Filter by decision subphase (needs_categorization, needs_fingerprint, etc.)
+  hasPackaging?: boolean; // Filter for shipments with/without packaging type
+  assignedStationId?: string; // Filter by assigned station
+  hasSession?: boolean; // Filter for shipments in/not in a fulfillment session
+  lifecyclePhaseFilter?: string; // Filter by lifecycle phase (awaiting_decisions, ready_to_pick, etc.)
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode' | 'orderDate';
   sortOrder?: 'asc' | 'desc';
   page?: number;
@@ -1426,6 +1433,43 @@ export class DatabaseStorage implements IStorage {
         .from(shipmentPackages)
         .where(eq(shipmentPackages.packageName, doNotShipPackageName));
       conditions.push(inArray(shipments.id, shipmentIdsWithDoNotShip));
+    }
+
+    // Sessioning-related filters
+    // Has fingerprint filter
+    if (filters.hasFingerprint === true) {
+      conditions.push(isNotNull(shipments.fingerprintId));
+    } else if (filters.hasFingerprint === false) {
+      conditions.push(isNull(shipments.fingerprintId));
+    }
+
+    // Decision subphase filter
+    if (filters.decisionSubphase) {
+      conditions.push(eq(shipments.decisionSubphase, filters.decisionSubphase));
+    }
+
+    // Has packaging filter
+    if (filters.hasPackaging === true) {
+      conditions.push(isNotNull(shipments.packagingTypeId));
+    } else if (filters.hasPackaging === false) {
+      conditions.push(isNull(shipments.packagingTypeId));
+    }
+
+    // Assigned station filter
+    if (filters.assignedStationId) {
+      conditions.push(eq(shipments.assignedStationId, filters.assignedStationId));
+    }
+
+    // Has session filter
+    if (filters.hasSession === true) {
+      conditions.push(isNotNull(shipments.fulfillmentSessionId));
+    } else if (filters.hasSession === false) {
+      conditions.push(isNull(shipments.fulfillmentSessionId));
+    }
+
+    // Lifecycle phase filter
+    if (filters.lifecyclePhaseFilter) {
+      conditions.push(eq(shipments.lifecyclePhase, filters.lifecyclePhaseFilter));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
