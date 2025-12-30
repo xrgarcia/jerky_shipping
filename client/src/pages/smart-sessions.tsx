@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Layers,
   Search,
   RefreshCw,
@@ -30,8 +38,11 @@ import {
   Package,
   Hand,
   ArrowUpDown,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 interface SmartSession {
   id: string;
@@ -60,6 +71,29 @@ interface SmartSessionsResponse {
     totalCount: number;
     totalPages: number;
   };
+}
+
+interface SessionShipmentItem {
+  sku: string;
+  name: string | null;
+  quantity: number;
+  imageUrl: string | null;
+  weightValue: number | null;
+  weightUnit: string | null;
+}
+
+interface SessionShipment {
+  id: string;
+  orderNumber: string;
+  fingerprintId: string | null;
+  trackingNumber: string | null;
+  lifecyclePhase: string | null;
+  totalWeightOz: number | null;
+  items: SessionShipmentItem[];
+}
+
+interface SessionDetailsResponse extends SmartSession {
+  shipments: SessionShipment[];
 }
 
 const STATION_TYPES = [
@@ -141,6 +175,7 @@ export default function SmartSessions() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery<SmartSessionsResponse>({
     queryKey: [
@@ -161,6 +196,11 @@ export default function SmartSessions() {
       if (!res.ok) throw new Error("Failed to fetch sessions");
       return res.json();
     },
+  });
+
+  const { data: sessionDetails, isLoading: sessionDetailsLoading } = useQuery<SessionDetailsResponse>({
+    queryKey: ["/api/fulfillment-sessions", selectedSessionId],
+    enabled: !!selectedSessionId,
   });
 
   const handleSearchChange = (value: string) => {
@@ -383,8 +423,14 @@ export default function SmartSessions() {
                           </TableCell>
                           <TableCell>{getStatusBadge(session.status)}</TableCell>
                           <TableCell className="text-right">
-                            <span className="font-medium">{session.orderCount}</span>
-                            <span className="text-muted-foreground">/{session.maxOrders}</span>
+                            <button
+                              className="hover:underline cursor-pointer"
+                              onClick={() => setSelectedSessionId(session.id)}
+                              data-testid={`button-view-orders-${session.id}`}
+                            >
+                              <span className="font-medium text-primary">{session.orderCount}</span>
+                              <span className="text-muted-foreground">/{session.maxOrders}</span>
+                            </button>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {format(new Date(session.createdAt), "MMM d, h:mm a")}
@@ -452,6 +498,78 @@ export default function SmartSessions() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedSessionId} onOpenChange={(open) => !open && setSelectedSessionId(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Session Orders
+              {sessionDetails && (
+                <Badge variant="secondary" className="ml-2">
+                  {sessionDetails.shipments?.length || 0} orders
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {sessionDetails && (
+                <>
+                  {sessionDetails.name || `Session ${sessionDetails.sequenceNumber || sessionDetails.id.slice(0, 8)}`}
+                  {" - "}
+                  {getStationTypeLabel(sessionDetails.stationType)}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {sessionDetailsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : sessionDetails?.shipments?.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No orders in this session
+            </div>
+          ) : (
+            <ScrollArea className="h-[60vh]">
+              <div className="space-y-2 pr-4">
+                {sessionDetails?.shipments?.map((shipment) => (
+                  <div
+                    key={shipment.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    data-testid={`shipment-row-${shipment.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{shipment.orderNumber}</span>
+                        {shipment.trackingNumber && (
+                          <Badge variant="outline" className="text-xs">
+                            {shipment.trackingNumber}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                        <span>{shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}</span>
+                        {shipment.totalWeightOz && (
+                          <>
+                            <span className="mx-1">·</span>
+                            <span>{(shipment.totalWeightOz / 16).toFixed(2)} lbs</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <Link href={`/shipments/${shipment.id}`}>
+                      <Button variant="ghost" size="icon" data-testid={`link-shipment-${shipment.id}`}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
