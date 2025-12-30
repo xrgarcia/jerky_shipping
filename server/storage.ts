@@ -192,7 +192,7 @@ export interface IStorage {
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentTabCounts(): Promise<{ readyToFulfill: number; inProgress: number; packingQueue: number; shipped: number; all: number }>;
-  getLifecycleTabCounts(): Promise<{ all: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
+  getLifecycleTabCounts(): Promise<{ all: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -1477,7 +1477,26 @@ export class DatabaseStorage implements IStorage {
 
     // Lifecycle phase filter
     if (filters.lifecyclePhaseFilter) {
-      conditions.push(eq(shipments.lifecyclePhase, filters.lifecyclePhaseFilter));
+      if (filters.lifecyclePhaseFilter === 'ready_to_session') {
+        // Ready to Session is derived: on_hold + MOVE OVER tag + no session yet
+        conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
+        conditions.push(isNull(shipments.sessionStatus));
+        conditions.push(isNull(shipments.trackingNumber));
+        conditions.push(
+          exists(
+            db.select({ one: sql`1` })
+              .from(shipmentTags)
+              .where(
+                and(
+                  eq(shipmentTags.shipmentId, shipments.id),
+                  eq(shipmentTags.name, 'MOVE OVER')
+                )
+              )
+          )
+        );
+      } else {
+        conditions.push(eq(shipments.lifecyclePhase, filters.lifecyclePhaseFilter));
+      }
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1609,11 +1628,26 @@ export class DatabaseStorage implements IStorage {
    * │   "closed"          │  Has value  │  DE/SP/etc  │  Delivered         │  (excluded)  │
    * └───────────────────────────────────────────────────────────────────────────────────┘
    */
-  async getLifecycleTabCounts(): Promise<{ all: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
+  async getLifecycleTabCounts(): Promise<{ all: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
     // All: Total count
     const allResult = await db
       .select({ count: count() })
       .from(shipments);
+
+    // Ready to Session: On hold + MOVE OVER tag + no session yet
+    // This is where fingerprinting and QC explosion should happen before SkuVault picks up
+    const readyToSessionResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'on_hold'),
+          eq(shipmentTags.name, 'MOVE OVER'),
+          isNull(shipments.sessionStatus),
+          isNull(shipments.trackingNumber)
+        )
+      );
 
     // Ready to Pick: Orders ready to be picked (session_status = 'new')
     const readyToPickResult = await db
@@ -1677,6 +1711,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       all: Number(allResult[0]?.count) || 0,
+      readyToSession: Number(readyToSessionResult[0]?.count) || 0,
       readyToPick: Number(readyToPickResult[0]?.count) || 0,
       picking: Number(pickingResult[0]?.count) || 0,
       packingReady: Number(packingReadyResult[0]?.count) || 0,
