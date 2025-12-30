@@ -108,7 +108,7 @@ export interface OrderFilters {
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
   workflowTab?: 'ready_to_fulfill' | 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
-  lifecycleTab?: 'all' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues'; // Warehouse lifecycle tab filter
+  lifecycleTab?: 'all' | 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues'; // Warehouse lifecycle tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
   shipmentStatus?: string[]; // Warehouse status (on_hold, awaiting_shipment, etc.) - supports "null" for null values
@@ -1287,6 +1287,25 @@ export class DatabaseStorage implements IStorage {
       switch (lifecycleTab) {
         case 'all':
           // All: No additional filter
+          break;
+        case 'ready_to_session':
+          // Ready to Session: On hold + MOVE OVER tag + no session yet
+          // This is where fingerprinting and QC explosion should happen
+          conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
+          conditions.push(sql`${shipments.sessionStatus} IS NULL`);
+          conditions.push(isNull(shipments.trackingNumber));
+          conditions.push(
+            exists(
+              db.select({ one: sql`1` })
+                .from(shipmentTags)
+                .where(
+                  and(
+                    eq(shipmentTags.shipmentId, shipments.id),
+                    eq(shipmentTags.name, 'MOVE OVER')
+                  )
+                )
+            )
+          );
           break;
         case 'ready_to_pick':
           // Ready to Pick: Session status = 'new' (ready to be picked)

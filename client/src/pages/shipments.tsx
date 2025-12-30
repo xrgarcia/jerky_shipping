@@ -37,6 +37,7 @@ interface TabCounts {
 
 interface LifecycleTabCounts {
   all: number;
+  readyToSession: number;
   readyToPick: number;
   picking: number;
   packingReady: number;
@@ -45,7 +46,7 @@ interface LifecycleTabCounts {
 }
 
 type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -704,7 +705,7 @@ export default function Shipments() {
 
   // Valid values for URL hydration
   const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
-  const validLifecycleTabs: LifecycleTab[] = ['ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+  const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
   const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
 
   // Initialize state from URL params (runs when URL changes, including browser navigation)
@@ -1040,7 +1041,7 @@ export default function Shipments() {
     queryKey: ["/api/shipments/lifecycle-counts"],
   });
 
-  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
+  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToSession: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
 
   // Fetch stations for the station filter dropdown
   const { data: stationsData } = useQuery<{ id: string; name: string; stationType: string }[]>({
@@ -1379,7 +1380,18 @@ export default function Shipments() {
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
             <div className="overflow-x-auto scrollbar-thin">
-              <TabsList className="grid grid-cols-5 w-max sm:w-full h-auto p-1 gap-1">
+              <TabsList className="grid grid-cols-6 w-max sm:w-full h-auto p-1 gap-1">
+                <TabsTrigger 
+                  value="ready_to_session" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-ready-to-session"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Clock className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Session</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToSession} orders</span>
+                </TabsTrigger>
                 <TabsTrigger 
                   value="ready_to_pick" 
                   className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[90px] sm:min-w-0 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -1930,6 +1942,7 @@ export default function Shipments() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="ready_to_session">Ready to Session</SelectItem>
                           <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
                           <SelectItem value="picking">Picking</SelectItem>
@@ -2067,7 +2080,9 @@ export default function Shipments() {
                 {activeFiltersCount > 0
                   ? "Try adjusting your filters or clearing them to see more results"
                   : viewMode === 'lifecycle'
-                  ? activeLifecycleTab === 'ready_to_pick'
+                  ? activeLifecycleTab === 'ready_to_session'
+                    ? "No orders are waiting to be processed - all shipments have been fingerprinted"
+                    : activeLifecycleTab === 'ready_to_pick'
                     ? "No orders are waiting to be picked"
                     : activeLifecycleTab === 'picking'
                     ? "No orders are currently being picked"
