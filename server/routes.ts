@@ -5,7 +5,7 @@ import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems } from "@shared/schema";
-import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, inArray } from "drizzle-orm";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
