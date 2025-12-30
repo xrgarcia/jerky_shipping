@@ -236,6 +236,17 @@ async function initializeAfterListen(storage: any) {
     const { startSkuvaultProductsSyncWorker } = await import("./skuvault-products-sync-worker");
     startSkuvaultProductsSyncWorker(3600000); // Sync products every 1 hour
     
+    // Start kit component mappings sync worker (syncs kit mappings from reporting DB hourly)
+    const { syncKitMappingsFromGcp, ensureKitMappingsFresh } = await import("./services/kit-mappings-cache");
+    await syncKitMappingsFromGcp(); // Initial sync on startup
+    setInterval(async () => {
+      try {
+        await syncKitMappingsFromGcp();
+      } catch (error) {
+        console.error("[kit-mappings] Hourly sync failed:", error);
+      }
+    }, 3600000); // Sync kit mappings every 1 hour
+    
     // Start QC item hydrator worker (populates shipment_qc_items for Ready to Fulfill orders)
     const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
     startQCHydratorWorker(60000); // Hydrate QC items every 1 minute

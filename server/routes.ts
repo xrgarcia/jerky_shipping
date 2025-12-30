@@ -9865,38 +9865,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual kit mappings cache refresh
+  // Manual kit mappings sync from GCP (full two-way sync)
   app.post("/api/kit-mappings/refresh", requireAuth, async (req, res) => {
     try {
-      const { forceRefreshKitMappings, getKitCacheStats, getKitComponents } = await import('./services/kit-mappings-cache');
+      const { syncKitMappingsFromGcp, getKitCacheStats } = await import('./services/kit-mappings-cache');
       
-      console.log(`[kit-mappings] Manual refresh triggered by user`);
+      console.log(`[kit-mappings] Manual sync triggered by user`);
       
-      // Get stats before refresh
       const beforeStats = getKitCacheStats();
-      console.log(`[kit-mappings] Before refresh: ${beforeStats.kitCount} kits, snapshot: ${beforeStats.snapshotTimestamp}`);
+      console.log(`[kit-mappings] Before sync: ${beforeStats.kitCount} kits`);
       
-      // Force refresh from GCP
-      await forceRefreshKitMappings();
+      const syncResult = await syncKitMappingsFromGcp();
       
-      // Get stats after refresh
       const afterStats = getKitCacheStats();
-      console.log(`[kit-mappings] After refresh: ${afterStats.kitCount} kits, snapshot: ${afterStats.snapshotTimestamp}`);
+      console.log(`[kit-mappings] After sync: ${afterStats.kitCount} kits`);
       
       res.json({
-        success: true,
-        before: {
-          kitCount: beforeStats.kitCount,
-          snapshotTimestamp: beforeStats.snapshotTimestamp,
-        },
-        after: {
-          kitCount: afterStats.kitCount,
-          snapshotTimestamp: afterStats.snapshotTimestamp,
-        },
+        success: !syncResult.error,
+        syncResult,
+        before: { kitCount: beforeStats.kitCount },
+        after: { kitCount: afterStats.kitCount },
       });
     } catch (error: any) {
-      console.error("[kit-mappings] Error refreshing cache:", error);
-      res.status(500).json({ error: "Failed to refresh kit mappings cache" });
+      console.error("[kit-mappings] Error syncing:", error);
+      res.status(500).json({ error: "Failed to sync kit mappings from GCP" });
     }
   });
 

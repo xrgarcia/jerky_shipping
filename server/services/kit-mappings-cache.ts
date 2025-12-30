@@ -1,21 +1,21 @@
 /**
  * Kit Mappings Cache Service
  * 
- * Caches kit→component mappings from the reporting database (GCP PostgreSQL).
- * Uses Upstash Redis for distributed caching with timestamp-based invalidation.
+ * Manages kit→component mappings with:
+ * 1. Local PostgreSQL table as persistent storage (kit_component_mappings)
+ * 2. Hourly sync from GCP reporting database (full two-way sync with deletes)
+ * 3. In-memory cache for fast lookups during hydration
  * 
- * This is the ONLY data that needs to come from GCP - product catalog data
- * now comes from the local skuvault_products table (synced hourly).
+ * The local table is the source of truth for the hydrator.
+ * GCP is the upstream source, synced hourly.
  */
 
+import { db } from '../db';
+import { kitComponentMappings } from '@shared/schema';
+import { eq, sql, inArray, and } from 'drizzle-orm';
 import { reportingSql } from '../reporting-db';
-import { getRedisClient } from '../utils/queue';
 
 const log = (message: string) => console.log(`[kit-mappings-cache] ${message}`);
-
-const CACHE_PREFIX = 'kit_mappings:';
-const KIT_MAPPINGS_KEY = `${CACHE_PREFIX}data`;
-const SNAPSHOT_TIMESTAMP_KEY = `${CACHE_PREFIX}snapshot_timestamp`;
 
 export interface KitComponent {
   componentSku: string;
@@ -23,145 +23,201 @@ export interface KitComponent {
 }
 
 let kitMappingsCache: Map<string, KitComponent[]> | null = null;
-let reverseComponentCache: Map<string, string[]> | null = null; // component SKU → parent kit SKUs
-let cachedSnapshotTimestamp: string | null = null;
+let reverseComponentCache: Map<string, string[]> | null = null;
+let lastLoadedAt: Date | null = null;
 
 /**
- * Get the latest snapshot_timestamp from vw_internal_kit_component_inventory_latest
- * Returns the exact timestamp string from the database without any timezone conversion
+ * Load kit mappings from local database into memory cache
  */
-async function getLatestSnapshotTimestamp(): Promise<string | null> {
+async function loadFromLocalDb(): Promise<void> {
   try {
-    // Get the exact timestamp as a string without any JavaScript Date conversion
-    const result = await reportingSql`
-      SELECT MAX(snapshot_timestamp)::text as latest_timestamp
-      FROM vw_internal_kit_component_inventory_latest
-    `;
-    if (!result[0]?.latest_timestamp) return null;
-    // Return the exact string from the database - do NOT convert to Date/ISO
-    return result[0].latest_timestamp;
-  } catch (error) {
-    log(`Error fetching latest snapshot_timestamp: ${error}`);
-    return null;
-  }
-}
-
-/**
- * Fetch and cache kit mappings from vw_internal_kit_component_inventory_latest
- * Uses the exact timestamp string from the database for matching
- */
-async function refreshKitMappings(snapshotTimestamp: string): Promise<Map<string, KitComponent[]>> {
-  log(`Refreshing kit mappings for snapshot: ${snapshotTimestamp}...`);
-  
-  // Use the exact timestamp string for matching - cast to timestamp for proper comparison
-  const results = await reportingSql`
-    SELECT 
-      sku as parent_sku,
-      component_sku,
-      component_quantity
-    FROM vw_internal_kit_component_inventory_latest
-    WHERE snapshot_timestamp::text = ${snapshotTimestamp}
-    ORDER BY sku, component_sku
-  `;
-  
-  const mappings = new Map<string, KitComponent[]>();
-  const reverseMap = new Map<string, string[]>();
-  
-  for (const row of results) {
-    const parentSku = row.parent_sku;
-    const componentSku = row.component_sku;
-    const component: KitComponent = {
-      componentSku,
-      componentQuantity: row.component_quantity || 1,
-    };
+    const results = await db
+      .select({
+        kitSku: kitComponentMappings.kitSku,
+        componentSku: kitComponentMappings.componentSku,
+        componentQuantity: kitComponentMappings.componentQuantity,
+      })
+      .from(kitComponentMappings);
     
-    // Forward mapping: parent → components
-    if (!mappings.has(parentSku)) {
-      mappings.set(parentSku, []);
-    }
-    mappings.get(parentSku)!.push(component);
+    const mappings = new Map<string, KitComponent[]>();
+    const reverseMap = new Map<string, string[]>();
     
-    // Reverse mapping: component → parent kits
-    if (!reverseMap.has(componentSku)) {
-      reverseMap.set(componentSku, []);
-    }
-    if (!reverseMap.get(componentSku)!.includes(parentSku)) {
-      reverseMap.get(componentSku)!.push(parentSku);
-    }
-  }
-  
-  // Update reverse cache
-  reverseComponentCache = reverseMap;
-  
-  log(`Cached ${mappings.size} kit mappings, ${reverseMap.size} component→kit reverse mappings`);
-  
-  const redis = getRedisClient();
-  await redis.set(KIT_MAPPINGS_KEY, Array.from(mappings.entries()));
-  
-  return mappings;
-}
-
-/**
- * Load kit mappings from Redis into memory and rebuild reverse cache
- */
-async function loadFromRedis(): Promise<void> {
-  const redis = getRedisClient();
-  
-  const mappingsData = await redis.get<[string, KitComponent[]][]>(KIT_MAPPINGS_KEY);
-  if (mappingsData) {
-    kitMappingsCache = new Map(mappingsData);
-    
-    // Rebuild reverse cache from forward mappings
-    reverseComponentCache = new Map();
-    for (const [parentSku, components] of kitMappingsCache) {
-      for (const component of components) {
-        if (!reverseComponentCache.has(component.componentSku)) {
-          reverseComponentCache.set(component.componentSku, []);
-        }
-        if (!reverseComponentCache.get(component.componentSku)!.includes(parentSku)) {
-          reverseComponentCache.get(component.componentSku)!.push(parentSku);
-        }
+    for (const row of results) {
+      const component: KitComponent = {
+        componentSku: row.componentSku,
+        componentQuantity: row.componentQuantity,
+      };
+      
+      if (!mappings.has(row.kitSku)) {
+        mappings.set(row.kitSku, []);
+      }
+      mappings.get(row.kitSku)!.push(component);
+      
+      if (!reverseMap.has(row.componentSku)) {
+        reverseMap.set(row.componentSku, []);
+      }
+      if (!reverseMap.get(row.componentSku)!.includes(row.kitSku)) {
+        reverseMap.get(row.componentSku)!.push(row.kitSku);
       }
     }
     
-    log(`Loaded ${kitMappingsCache.size} kit mappings, rebuilt ${reverseComponentCache.size} reverse mappings from Redis`);
-  }
-  
-  const timestamp = await redis.get<string>(SNAPSHOT_TIMESTAMP_KEY);
-  if (timestamp) {
-    cachedSnapshotTimestamp = timestamp;
-    log(`Loaded cached snapshot timestamp: ${timestamp}`);
+    kitMappingsCache = mappings;
+    reverseComponentCache = reverseMap;
+    lastLoadedAt = new Date();
+    
+    log(`Loaded ${mappings.size} kit mappings from local DB`);
+  } catch (error) {
+    log(`Error loading from local DB: ${error}`);
+    throw error;
   }
 }
 
 /**
- * Check for new kit mapping data and refresh cache if needed
- * Returns true if cache was refreshed
+ * Sync kit mappings from GCP to local database
+ * Full two-way sync: upserts new/changed records, deletes stale records
+ * Returns stats about what changed
+ */
+export async function syncKitMappingsFromGcp(): Promise<{
+  inserted: number;
+  updated: number;
+  deleted: number;
+  unchanged: number;
+  error?: string;
+}> {
+  const stats = { inserted: 0, updated: 0, deleted: 0, unchanged: 0 };
+  
+  try {
+    log('Starting kit mappings sync from GCP...');
+    
+    const gcpResults = await reportingSql`
+      SELECT DISTINCT
+        sku as kit_sku,
+        component_sku,
+        component_quantity
+      FROM vw_internal_kit_component_inventory_latest
+      ORDER BY sku, component_sku
+    `;
+    
+    log(`Fetched ${gcpResults.length} mappings from GCP`);
+    
+    if (gcpResults.length === 0) {
+      log('Warning: GCP returned 0 mappings, skipping sync to avoid data loss');
+      return { ...stats, error: 'GCP returned 0 mappings' };
+    }
+    
+    const gcpMappings = new Map<string, number>();
+    for (const row of gcpResults) {
+      const key = `${row.kit_sku}|${row.component_sku}`;
+      gcpMappings.set(key, row.component_quantity || 1);
+    }
+    
+    const localResults = await db
+      .select({
+        id: kitComponentMappings.id,
+        kitSku: kitComponentMappings.kitSku,
+        componentSku: kitComponentMappings.componentSku,
+        componentQuantity: kitComponentMappings.componentQuantity,
+      })
+      .from(kitComponentMappings);
+    
+    const localMappings = new Map<string, { id: string; quantity: number }>();
+    for (const row of localResults) {
+      const key = `${row.kitSku}|${row.componentSku}`;
+      localMappings.set(key, { id: row.id, quantity: row.componentQuantity });
+    }
+    
+    const toInsert: { kitSku: string; componentSku: string; componentQuantity: number }[] = [];
+    const toUpdate: { id: string; componentQuantity: number }[] = [];
+    const toDelete: string[] = [];
+    
+    for (const [key, gcpQty] of Array.from(gcpMappings.entries())) {
+      const [kitSku, componentSku] = key.split('|');
+      const local = localMappings.get(key);
+      
+      if (!local) {
+        toInsert.push({ kitSku, componentSku, componentQuantity: gcpQty });
+      } else if (local.quantity !== gcpQty) {
+        toUpdate.push({ id: local.id, componentQuantity: gcpQty });
+      } else {
+        stats.unchanged++;
+      }
+    }
+    
+    for (const [key, local] of Array.from(localMappings.entries())) {
+      if (!gcpMappings.has(key)) {
+        toDelete.push(local.id);
+      }
+    }
+    
+    if (toInsert.length > 0) {
+      const now = new Date();
+      await db.insert(kitComponentMappings).values(
+        toInsert.map(m => ({
+          kitSku: m.kitSku,
+          componentSku: m.componentSku,
+          componentQuantity: m.componentQuantity,
+          syncedAt: now,
+        }))
+      );
+      stats.inserted = toInsert.length;
+      log(`Inserted ${toInsert.length} new mappings`);
+    }
+    
+    if (toUpdate.length > 0) {
+      const now = new Date();
+      for (const update of toUpdate) {
+        await db
+          .update(kitComponentMappings)
+          .set({ componentQuantity: update.componentQuantity, syncedAt: now })
+          .where(eq(kitComponentMappings.id, update.id));
+      }
+      stats.updated = toUpdate.length;
+      log(`Updated ${toUpdate.length} mappings`);
+    }
+    
+    if (toDelete.length > 0) {
+      await db
+        .delete(kitComponentMappings)
+        .where(inArray(kitComponentMappings.id, toDelete));
+      stats.deleted = toDelete.length;
+      log(`Deleted ${toDelete.length} stale mappings`);
+    }
+    
+    await loadFromLocalDb();
+    
+    log(`Sync complete: ${stats.inserted} inserted, ${stats.updated} updated, ${stats.deleted} deleted, ${stats.unchanged} unchanged`);
+    
+    return stats;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`Sync error: ${errorMsg}`);
+    return { ...stats, error: errorMsg };
+  }
+}
+
+/**
+ * Ensure kit mappings are loaded into memory
+ * Called by hydrator before processing shipments
  */
 export async function ensureKitMappingsFresh(): Promise<boolean> {
   try {
-    const latestSnapshot = await getLatestSnapshotTimestamp();
-    
     if (!kitMappingsCache) {
-      await loadFromRedis();
-    }
-    
-    if (latestSnapshot && latestSnapshot !== cachedSnapshotTimestamp) {
-      log(`New snapshot_timestamp detected: ${latestSnapshot} (was: ${cachedSnapshotTimestamp})`);
-      kitMappingsCache = await refreshKitMappings(latestSnapshot);
-      cachedSnapshotTimestamp = latestSnapshot;
-      
-      const redis = getRedisClient();
-      await redis.set(SNAPSHOT_TIMESTAMP_KEY, latestSnapshot);
-      
+      await loadFromLocalDb();
       return true;
     }
-    
     return false;
   } catch (error) {
-    log(`Error checking kit mappings freshness: ${error}`);
+    log(`Error ensuring kit mappings fresh: ${error}`);
     return false;
   }
+}
+
+/**
+ * Force refresh from local DB (for after sync completes)
+ */
+export async function forceRefreshKitMappings(): Promise<void> {
+  await loadFromLocalDb();
+  log('Force refresh from local DB complete');
 }
 
 /**
@@ -180,7 +236,6 @@ export function getKitComponents(sku: string): KitComponent[] | undefined {
 
 /**
  * Get parent kit SKUs that contain this component SKU (reverse lookup)
- * Returns an array of parent kit SKUs, or undefined if not found
  */
 export function getParentKitsForComponent(componentSku: string): string[] | undefined {
   return reverseComponentCache?.get(componentSku);
@@ -199,26 +254,11 @@ export function getAllKitMappings(): Map<string, KitComponent[]> | null {
 export function getKitCacheStats(): {
   kitCount: number;
   snapshotTimestamp: string | null;
+  lastLoadedAt: string | null;
 } {
   return {
     kitCount: kitMappingsCache?.size ?? 0,
-    snapshotTimestamp: cachedSnapshotTimestamp,
+    snapshotTimestamp: null,
+    lastLoadedAt: lastLoadedAt?.toISOString() ?? null,
   };
-}
-
-/**
- * Force refresh kit mappings (for manual trigger)
- */
-export async function forceRefreshKitMappings(): Promise<void> {
-  const latestSnapshot = await getLatestSnapshotTimestamp();
-  
-  if (latestSnapshot) {
-    kitMappingsCache = await refreshKitMappings(latestSnapshot);
-    cachedSnapshotTimestamp = latestSnapshot;
-    
-    const redis = getRedisClient();
-    await redis.set(SNAPSHOT_TIMESTAMP_KEY, latestSnapshot);
-  }
-  
-  log('Force refresh complete');
 }
