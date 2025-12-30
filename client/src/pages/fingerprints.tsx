@@ -237,6 +237,21 @@ interface SkuShipmentsResponse {
   totalCount: number;
 }
 
+interface ReadyToSessionOrder {
+  orderNumber: string;
+  readyToSession: boolean;
+  reason: string;
+}
+
+interface ReadyToSessionOrdersResponse {
+  orders: ReadyToSessionOrder[];
+  stats: {
+    total: number;
+    ready: number;
+    notReady: number;
+  };
+}
+
 function getStationBadge(stationType: string | null) {
   switch (stationType) {
     case 'boxing_machine':
@@ -391,6 +406,15 @@ export default function Fingerprints() {
     refetch: refetchLiveSessions,
   } = useQuery<FulfillmentSession[]>({
     queryKey: ["/api/fulfillment-sessions"],
+  });
+
+  // Ready-to-session orders (for Build Sessions tab table)
+  const {
+    data: readyToSessionOrdersData,
+    isLoading: readyToSessionOrdersLoading,
+    refetch: refetchReadyToSessionOrders,
+  } = useQuery<ReadyToSessionOrdersResponse>({
+    queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"],
   });
 
   // Mutations
@@ -1547,7 +1571,95 @@ export default function Fingerprints() {
         </TabsContent>
 
         {/* Build Sessions Tab */}
-        <TabsContent value="sessions" className="mt-6">
+        <TabsContent value="sessions" className="mt-6 space-y-6">
+          {/* Ready to Session Orders Table */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-5 w-5" />
+                    Orders Ready to Session
+                  </CardTitle>
+                  <CardDescription>
+                    All orders waiting to be assigned to a picking session
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {readyToSessionOrdersData?.stats && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        {readyToSessionOrdersData.stats.ready} Ready
+                      </Badge>
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                        {readyToSessionOrdersData.stats.notReady} Not Ready
+                      </Badge>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchReadyToSessionOrders()}
+                    data-testid="button-refresh-ready-to-session"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {readyToSessionOrdersLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : !readyToSessionOrdersData?.orders.length ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No orders in the ready-to-session phase
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <table className="w-full">
+                    <thead className="sticky top-0 bg-background border-b">
+                      <tr>
+                        <th className="text-left py-2 px-3 font-medium text-sm">Order Number</th>
+                        <th className="text-center py-2 px-3 font-medium text-sm">Ready to Session</th>
+                        <th className="text-left py-2 px-3 font-medium text-sm">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {readyToSessionOrdersData.orders.map((order) => (
+                        <tr 
+                          key={order.orderNumber} 
+                          className="border-b last:border-0 hover-elevate"
+                          data-testid={`row-order-${order.orderNumber}`}
+                        >
+                          <td className="py-2 px-3 font-mono text-sm">
+                            {order.orderNumber}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {order.readyToSession ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                            ) : (
+                              <AlertCircle className="h-5 w-5 text-amber-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-sm">
+                            <span className={order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
+                              {order.reason}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Session Preview Card */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
