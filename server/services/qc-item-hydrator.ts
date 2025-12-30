@@ -24,6 +24,9 @@ import {
   productCollectionMappings,
   productCollections,
   fingerprints,
+  fingerprintModels,
+  packagingTypes,
+  stations,
   type InsertShipmentQcItem,
   type InsertFingerprint,
 } from '@shared/schema';
@@ -333,13 +336,63 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     log(`Created new fingerprint: ${displayName} (${collectionCount} collections, ${totalItems} items, ${totalWeight}${weightUnit})`);
   }
   
-  // Update shipment with fingerprint
+  // Check if this fingerprint already has a packaging model assigned
+  // If so, auto-assign the packaging type and station to the new shipment
+  let packagingTypeId: string | null = null;
+  let assignedStationId: string | null = null;
+  
+  const existingModel = await db
+    .select({
+      packagingTypeId: fingerprintModels.packagingTypeId,
+    })
+    .from(fingerprintModels)
+    .where(eq(fingerprintModels.fingerprintId, fingerprintId))
+    .limit(1);
+  
+  if (existingModel.length > 0 && existingModel[0].packagingTypeId) {
+    packagingTypeId = existingModel[0].packagingTypeId;
+    
+    // Look up station by packaging type's station type
+    const [packagingType] = await db
+      .select({ stationType: packagingTypes.stationType })
+      .from(packagingTypes)
+      .where(eq(packagingTypes.id, packagingTypeId))
+      .limit(1);
+    
+    if (packagingType?.stationType) {
+      const [station] = await db
+        .select({ id: stations.id, name: stations.name })
+        .from(stations)
+        .where(and(
+          eq(stations.stationType, packagingType.stationType),
+          eq(stations.isActive, true)
+        ))
+        .limit(1);
+      
+      if (station) {
+        assignedStationId = station.id;
+        log(`Auto-assigned packaging and station for existing fingerprint: packaging=${packagingTypeId}, station=${station.name}`);
+      }
+    }
+  }
+  
+  // Update shipment with fingerprint and inherited packaging/station
+  const updateData: Record<string, any> = { 
+    fingerprintId,
+    fingerprintStatus: 'complete',
+  };
+  
+  if (packagingTypeId) {
+    updateData.packagingTypeId = packagingTypeId;
+    updateData.packagingDecisionType = 'auto';
+  }
+  if (assignedStationId) {
+    updateData.assignedStationId = assignedStationId;
+  }
+  
   await db
     .update(shipments)
-    .set({ 
-      fingerprintId,
-      fingerprintStatus: 'complete',
-    })
+    .set(updateData)
     .where(eq(shipments.id, shipmentId));
   
   return { status: 'complete', fingerprintId, isNew };
