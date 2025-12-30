@@ -1174,6 +1174,29 @@ export const insertProductCollectionMappingSchema = createInsertSchema(productCo
 export type InsertProductCollectionMapping = z.infer<typeof insertProductCollectionMappingSchema>;
 export type ProductCollectionMapping = typeof productCollectionMappings.$inferSelect;
 
+// Kit Component Mappings - Maps kit SKUs to their component SKUs
+// Synced hourly from GCP reporting database (vw_internal_kit_component_inventory_latest)
+// Used by QC hydrator to explode kits into their components
+export const kitComponentMappings = pgTable("kit_component_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kitSku: text("kit_sku").notNull(),
+  componentSku: text("component_sku").notNull(),
+  componentQuantity: integer("component_quantity").notNull().default(1),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+}, (table) => ({
+  kitSkuIdx: index("kit_component_mappings_kit_sku_idx").on(table.kitSku),
+  componentSkuIdx: index("kit_component_mappings_component_sku_idx").on(table.componentSku),
+  uniqueMapping: index("kit_component_mappings_unique_idx").on(table.kitSku, table.componentSku),
+}));
+
+export const insertKitComponentMappingSchema = createInsertSchema(kitComponentMappings).omit({
+  id: true,
+  syncedAt: true,
+});
+
+export type InsertKitComponentMapping = z.infer<typeof insertKitComponentMappingSchema>;
+export type KitComponentMapping = typeof kitComponentMappings.$inferSelect;
+
 // ============================================================================
 // PHASE 3: SMART SHIPPING ENGINE - FINGERPRINT DETECTION & LEARNING
 // ============================================================================
