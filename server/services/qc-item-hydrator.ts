@@ -1,13 +1,17 @@
 /**
  * QC Item Hydrator Service
  * 
- * Populates shipment_qc_items table for "Ready to Fulfill" shipments.
+ * Populates shipment_qc_items table for shipments in the READY_TO_SESSION lifecycle phase.
  * - Explodes kits into component SKUs using cached kit mappings
  * - Gets barcodes from cached product catalog
  * - Maps SKUs to collections for fingerprint calculation
  * - Calculates fingerprint signature and creates/matches fingerprints
  * 
- * Trigger: Shipments with status='on_hold' AND 'MOVE OVER' tag AND no existing QC items
+ * Trigger: READY_TO_SESSION phase = on_hold + MOVE OVER tag + no session + no QC items
+ * 
+ * This must run BEFORE SkuVault picks up orders for sessioning to ensure:
+ * 1. QC items are exploded and barcodes are available for scanning
+ * 2. Fingerprints are calculated for packaging decisions
  */
 
 import crypto from 'crypto';
@@ -56,7 +60,10 @@ interface HydrationStats {
 
 /**
  * Find shipments that need QC items hydrated
- * Criteria: on_hold status + MOVE OVER tag + no existing shipment_qc_items
+ * Criteria: on_hold status + MOVE OVER tag + no session yet + no existing shipment_qc_items
+ * 
+ * This targets the READY_TO_SESSION lifecycle phase - shipments that need fingerprinting
+ * before they can be picked up by SkuVault sessioning.
  */
 async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: string; orderNumber: string }[]> {
   const results = await db
@@ -67,9 +74,9 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
     .from(shipments)
     .where(
       and(
-        // Status is on_hold
+        // Status is on_hold (READY_TO_SESSION phase criteria)
         eq(shipments.shipmentStatus, 'on_hold'),
-        // Has MOVE OVER tag
+        // Has MOVE OVER tag (READY_TO_SESSION phase criteria)
         exists(
           db.select({ one: sql`1` })
             .from(shipmentTags)
@@ -80,6 +87,8 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
               )
             )
         ),
+        // Not yet picked up by SkuVault (READY_TO_SESSION phase criteria)
+        sql`${shipments.sessionStatus} IS NULL`,
         // Does NOT have any shipment_qc_items yet
         notExists(
           db.select({ one: sql`1` })
