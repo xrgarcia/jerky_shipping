@@ -18,13 +18,14 @@ import {
   stations,
   fingerprints,
   shipmentQcItems,
+  shipmentTags,
   DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
   type Station,
   type FulfillmentSessionStatus,
 } from "@shared/schema";
-import { eq, and, isNull, isNotNull, desc, asc, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
 import { updateShipmentLifecycleBatch } from "./lifecycle-service";
 
 // ============================================================================
@@ -101,6 +102,10 @@ export class FulfillmentSessionService {
    * Find all shipments that are ready to be assigned to a session
    * 
    * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
+   * AND meets lifecycle state machine criteria for READY_TO_SESSION:
+   * - shipmentStatus = 'on_hold' (still waiting in ShipStation)
+   * - has MOVE OVER tag (explicitly flagged for session building)
+   * - status != 'cancelled' (not cancelled in ShipStation)
    * 
    * Uses the lifecycle state machine to ensure only orders that have completed
    * all prior decision steps (categorization, fingerprint, packaging) are included.
@@ -108,6 +113,16 @@ export class FulfillmentSessionService {
   async findSessionableShipments(
     stationType?: string
   ): Promise<SessionableShipment[]> {
+    // Subquery to check for MOVE OVER tag existence
+    const hasMoveOverTag = exists(
+      db.select({ id: shipmentTags.id })
+        .from(shipmentTags)
+        .where(and(
+          eq(shipmentTags.shipmentId, shipments.id),
+          eq(shipmentTags.name, 'MOVE OVER')
+        ))
+    );
+
     const conditions = [
       // Use lifecycle state machine - only orders waiting to be sessioned
       eq(shipments.decisionSubphase, DECISION_SUBPHASES.NEEDS_SESSION),
@@ -115,6 +130,11 @@ export class FulfillmentSessionService {
       isNotNull(shipments.packagingTypeId),
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
+      // Lifecycle state machine criteria for READY_TO_SESSION
+      // These ensure only orders that passed through the correct workflow are included
+      eq(shipments.shipmentStatus, 'on_hold'),
+      hasMoveOverTag,
+      ne(shipments.status, 'cancelled'),
     ];
 
     if (stationType) {
