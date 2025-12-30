@@ -1621,11 +1621,11 @@ export default function Fingerprints() {
               ) : (
                 <ScrollArea className="h-[400px]">
                   <table className="w-full">
-                    <thead className="sticky top-0 bg-background border-b">
+                    <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
                       <tr>
-                        <th className="text-left py-2 px-3 font-medium text-sm">Order Number</th>
-                        <th className="text-center py-2 px-3 font-medium text-sm">Ready to Session</th>
-                        <th className="text-left py-2 px-3 font-medium text-sm">Reason</th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">Order Number</th>
+                        <th className="text-center py-3 px-3 font-medium text-sm bg-card">Ready to Session</th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">Reason</th>
                       </tr>
                     </thead>
                     <tbody>
