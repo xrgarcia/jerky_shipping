@@ -89,6 +89,7 @@ interface SessionShipment {
   trackingNumber: string | null;
   lifecyclePhase: string | null;
   totalWeightOz: number | null;
+  smartSessionSpot: number | null;
   items: SessionShipmentItem[];
 }
 
@@ -539,23 +540,30 @@ export default function SmartSessions() {
                     className="flex items-center justify-between p-3 rounded-lg border bg-card"
                     data-testid={`shipment-row-${shipment.id}`}
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{shipment.orderNumber}</span>
-                        {shipment.trackingNumber && (
-                          <Badge variant="outline" className="text-xs">
-                            {shipment.trackingNumber}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                        <span>{shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}</span>
-                        {shipment.totalWeightOz && (
-                          <>
-                            <span className="mx-1">·</span>
-                            <span>{(shipment.totalWeightOz / 16).toFixed(2)} lbs</span>
-                          </>
-                        )}
+                    <div className="flex items-center gap-3 flex-1">
+                      {shipment.smartSessionSpot && (
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                          {shipment.smartSessionSpot}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{shipment.orderNumber}</span>
+                          {shipment.trackingNumber && (
+                            <Badge variant="outline" className="text-xs">
+                              {shipment.trackingNumber}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                          <span>{shipment.items?.length || 0} item{(shipment.items?.length || 0) !== 1 ? 's' : ''}</span>
+                          {shipment.totalWeightOz && (
+                            <>
+                              <span className="mx-1">·</span>
+                              <span>{(shipment.totalWeightOz / 16).toFixed(2)} lbs</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <Link href={`/shipments/${shipment.id}`}>

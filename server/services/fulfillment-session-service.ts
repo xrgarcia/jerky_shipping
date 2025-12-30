@@ -282,7 +282,7 @@ export class FulfillmentSessionService {
   /**
    * Get all draft sessions that have capacity for more orders
    */
-  private async getDraftSessionsWithCapacity(): Promise<{ id: string; stationType: string | null; orderCount: number; maxOrders: number }[]> {
+  private async getDraftSessionsWithCapacity(): Promise<{ id: number; stationType: string | null; orderCount: number; maxOrders: number }[]> {
     const sessions = await db
       .select({
         id: fulfillmentSessions.id,
@@ -307,19 +307,19 @@ export class FulfillmentSessionService {
    */
   private async distributeToExistingAndNew(
     groups: ShipmentGroup[],
-    draftSessions: { id: string; stationType: string | null; orderCount: number; maxOrders: number }[],
+    draftSessions: { id: number; stationType: string | null; orderCount: number; maxOrders: number }[],
     maxPerBatch: number
   ): Promise<{
-    filledSessions: { sessionId: string; shipmentIds: string[] }[];
+    filledSessions: { sessionId: number; shipmentIds: string[] }[];
     newBatches: SessionBatch[];
     shipmentsAddedToDrafts: number;
   }> {
-    const filledSessions: { sessionId: string; shipmentIds: string[] }[] = [];
+    const filledSessions: { sessionId: number; shipmentIds: string[] }[] = [];
     const newBatches: SessionBatch[] = [];
     let shipmentsAddedToDrafts = 0;
 
     // Group draft sessions by station type
-    const draftsByStation = new Map<string, { id: string; capacity: number }[]>();
+    const draftsByStation = new Map<string, { id: number; capacity: number }[]>();
     for (const draft of draftSessions) {
       const stationType = draft.stationType || 'unknown';
       if (!draftsByStation.has(stationType)) {
@@ -385,15 +385,27 @@ export class FulfillmentSessionService {
   /**
    * Add shipments to an existing session
    */
-  private async addShipmentsToSession(sessionId: string, shipmentIds: string[]): Promise<void> {
-    // Link shipments to session
-    await db
-      .update(shipments)
-      .set({
-        fulfillmentSessionId: sessionId,
-        updatedAt: new Date(),
-      })
-      .where(inArray(shipments.id, shipmentIds));
+  private async addShipmentsToSession(sessionId: number, shipmentIds: string[]): Promise<void> {
+    // Get current max spot for this session to continue numbering
+    const [maxSpotResult] = await db
+      .select({ maxSpot: sql<number>`COALESCE(MAX(${shipments.smartSessionSpot}), 0)` })
+      .from(shipments)
+      .where(eq(shipments.fulfillmentSessionId, sessionId));
+    
+    let nextSpot = (maxSpotResult?.maxSpot || 0) + 1;
+
+    // Link shipments to session with sequential spot numbers
+    for (const shipmentId of shipmentIds) {
+      await db
+        .update(shipments)
+        .set({
+          fulfillmentSessionId: sessionId,
+          smartSessionSpot: nextSpot,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipments.id, shipmentId));
+      nextSpot++;
+    }
 
     // Update order count on session
     await db
@@ -407,7 +419,7 @@ export class FulfillmentSessionService {
     // Update lifecycle phase for linked shipments
     await updateShipmentLifecycleBatch(shipmentIds);
 
-    console.log(`[FulfillmentSession] Added ${shipmentIds.length} shipments to existing session ${sessionId}`);
+    console.log(`[FulfillmentSession] Added ${shipmentIds.length} shipments to existing session ${sessionId} (spots ${(maxSpotResult?.maxSpot || 0) + 1}-${nextSpot - 1})`);
   }
 
   /**
@@ -451,7 +463,7 @@ export class FulfillmentSessionService {
   /**
    * Get a session by ID with related data
    */
-  async getSessionById(sessionId: string): Promise<FulfillmentSession | null> {
+  async getSessionById(sessionId: number): Promise<FulfillmentSession | null> {
     const [session] = await db
       .select()
       .from(fulfillmentSessions)
@@ -523,14 +535,14 @@ export class FulfillmentSessionService {
     ]);
 
     // Create maps of session ID to weight and packed count
-    const weightMap = new Map<string, number>();
+    const weightMap = new Map<number, number>();
     for (const row of weightResults) {
       if (row.sessionId) {
         weightMap.set(row.sessionId, Number(row.totalWeight) || 0);
       }
     }
     
-    const packedMap = new Map<string, number>();
+    const packedMap = new Map<number, number>();
     for (const row of packedResults) {
       if (row.sessionId) {
         packedMap.set(row.sessionId, Number(row.packedCount) || 0);
@@ -549,7 +561,7 @@ export class FulfillmentSessionService {
    * Update session status with proper timestamp tracking
    */
   async updateSessionStatus(
-    sessionId: string, 
+    sessionId: number, 
     newStatus: FulfillmentSessionStatus
   ): Promise<FulfillmentSession | null> {
     const updateData: Partial<FulfillmentSession> = {
@@ -586,7 +598,7 @@ export class FulfillmentSessionService {
    * Bulk update session status for multiple sessions at once
    */
   async bulkUpdateSessionStatus(
-    sessionIds: string[], 
+    sessionIds: number[], 
     newStatus: FulfillmentSessionStatus
   ): Promise<{ updated: number; errors: string[] }> {
     if (sessionIds.length === 0) {
@@ -720,19 +732,24 @@ export class FulfillmentSessionService {
 
       if (!session) return null;
 
-      // Link shipments to session
-      await db
-        .update(shipments)
-        .set({
-          fulfillmentSessionId: session.id,
-          updatedAt: new Date(),
-        })
-        .where(inArray(shipments.id, batch.shipmentIds));
+      // Link shipments to session with sequential spot numbers
+      let spot = 1;
+      for (const shipmentId of batch.shipmentIds) {
+        await db
+          .update(shipments)
+          .set({
+            fulfillmentSessionId: session.id,
+            smartSessionSpot: spot,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, shipmentId));
+        spot++;
+      }
 
       // Update lifecycle phase for linked shipments
       await updateShipmentLifecycleBatch(batch.shipmentIds);
 
-      console.log(`[FulfillmentSession] Created session ${session.id} with ${batch.shipmentIds.length} shipments`);
+      console.log(`[FulfillmentSession] Created session ${session.id} with ${batch.shipmentIds.length} shipments (spots 1-${spot - 1})`);
 
       return session;
     } catch (error) {

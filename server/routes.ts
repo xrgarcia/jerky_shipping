@@ -11453,9 +11453,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {
       const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
-      const { id } = req.params;
+      const sessionId = parseInt(req.params.id, 10);
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
       
-      const session = await fulfillmentSessionService.getSessionById(id);
+      const session = await fulfillmentSessionService.getSessionById(sessionId);
       
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
@@ -11470,9 +11473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintId: shipmentsTable.fingerprintId,
           trackingNumber: shipmentsTable.trackingNumber,
           lifecyclePhase: shipmentsTable.lifecyclePhase,
+          smartSessionSpot: shipmentsTable.smartSessionSpot,
         })
         .from(shipmentsTable)
-        .where(eq(shipmentsTable.fulfillmentSessionId, id));
+        .where(eq(shipmentsTable.fulfillmentSessionId, sessionId))
+        .orderBy(shipmentsTable.smartSessionSpot);
       
       // Fetch items for each shipment with product images from skuvault_products
       const shipmentIds = sessionShipments.map(s => s.id);
@@ -11550,8 +11555,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
       const { FULFILLMENT_SESSION_STATUSES } = await import("@shared/schema");
-      const { id } = req.params;
+      const sessionId = parseInt(req.params.id, 10);
       const { status } = req.body;
+      
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
       
       if (!status || !FULFILLMENT_SESSION_STATUSES.includes(status)) {
         return res.status(400).json({ 
@@ -11559,13 +11568,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const updated = await fulfillmentSessionService.updateSessionStatus(id, status);
+      const updated = await fulfillmentSessionService.updateSessionStatus(sessionId, status);
       
       if (!updated) {
         return res.status(404).json({ error: "Session not found" });
       }
       
-      console.log(`[FulfillmentSessions] Updated session ${id} status to: ${status}`);
+      console.log(`[FulfillmentSessions] Updated session ${sessionId} status to: ${status}`);
       res.json(updated);
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error updating session status:", error);
@@ -11584,13 +11593,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "sessionIds must be a non-empty array" });
       }
       
+      // Parse session IDs as numbers
+      const numericSessionIds = sessionIds.map((id: any) => parseInt(id, 10)).filter((id: number) => !isNaN(id));
+      if (numericSessionIds.length === 0) {
+        return res.status(400).json({ error: "No valid session IDs provided" });
+      }
+      
       if (!status || !FULFILLMENT_SESSION_STATUSES.includes(status)) {
         return res.status(400).json({ 
           error: `Invalid status. Must be one of: ${FULFILLMENT_SESSION_STATUSES.join(', ')}` 
         });
       }
       
-      const result = await fulfillmentSessionService.bulkUpdateSessionStatus(sessionIds, status);
+      const result = await fulfillmentSessionService.bulkUpdateSessionStatus(numericSessionIds, status);
       
       console.log(`[FulfillmentSessions] Bulk updated ${result.updated} sessions to status: ${status}`);
       res.json(result);
@@ -11604,30 +11619,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {
       const { fulfillmentSessions, shipments: shipmentsTable, DECISION_SUBPHASES } = await import("@shared/schema");
-      const { id } = req.params;
+      const sessionId = parseInt(req.params.id, 10);
+      
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ error: "Invalid session ID" });
+      }
       
       // First, unlink all shipments from this session and reset their decision subphase
       await db
         .update(shipmentsTable)
         .set({
           fulfillmentSessionId: null,
+          smartSessionSpot: null,
           decisionSubphase: DECISION_SUBPHASES.NEEDS_SESSION,
           updatedAt: new Date(),
         })
-        .where(eq(shipmentsTable.fulfillmentSessionId, id));
+        .where(eq(shipmentsTable.fulfillmentSessionId, sessionId));
       
       // Then delete the session
       const deleted = await db
         .delete(fulfillmentSessions)
-        .where(eq(fulfillmentSessions.id, id))
+        .where(eq(fulfillmentSessions.id, sessionId))
         .returning();
       
       if (deleted.length === 0) {
         return res.status(404).json({ error: "Session not found" });
       }
       
-      console.log(`[FulfillmentSessions] Deleted session ${id}`);
-      res.json({ success: true, deletedId: id });
+      console.log(`[FulfillmentSessions] Deleted session ${sessionId}`);
+      res.json({ success: true, deletedId: sessionId });
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error deleting session:", error);
       res.status(500).json({ error: "Failed to delete session" });
