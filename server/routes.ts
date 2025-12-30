@@ -11352,6 +11352,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Paginated fulfillment sessions search for Smart Sessions page
+  app.get("/api/smart-sessions", requireAuth, async (req, res) => {
+    try {
+      const { fulfillmentSessions, stations, FULFILLMENT_SESSION_STATUSES } = await import("@shared/schema");
+      
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
+      const offset = (page - 1) * limit;
+      const search = (req.query.search as string || "").trim();
+      const status = req.query.status as string;
+      const stationType = req.query.stationType as string;
+      const sortBy = (req.query.sortBy as string) || "createdAt";
+      const sortOrder = (req.query.sortOrder as string) || "desc";
+      
+      // Build conditions
+      const conditions: any[] = [];
+      
+      if (status && status !== "all" && FULFILLMENT_SESSION_STATUSES.includes(status as any)) {
+        conditions.push(eq(fulfillmentSessions.status, status));
+      }
+      
+      if (stationType && stationType !== "all") {
+        conditions.push(eq(fulfillmentSessions.stationType, stationType));
+      }
+      
+      if (search) {
+        conditions.push(
+          or(
+            ilike(fulfillmentSessions.name, `%${search}%`),
+            ilike(fulfillmentSessions.id, `%${search}%`),
+            sql`CAST(${fulfillmentSessions.sequenceNumber} AS TEXT) ILIKE ${`%${search}%`}`
+          )
+        );
+      }
+      
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      // Get total count
+      const countResult = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(fulfillmentSessions)
+        .where(whereClause);
+      const totalCount = countResult[0]?.count || 0;
+      
+      // Build sort order
+      const sortColumn = {
+        createdAt: fulfillmentSessions.createdAt,
+        orderCount: fulfillmentSessions.orderCount,
+        status: fulfillmentSessions.status,
+        stationType: fulfillmentSessions.stationType,
+        sequenceNumber: fulfillmentSessions.sequenceNumber,
+      }[sortBy] || fulfillmentSessions.createdAt;
+      
+      const orderDirection = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
+      
+      // Get paginated sessions with station info
+      const sessions = await db
+        .select({
+          id: fulfillmentSessions.id,
+          name: fulfillmentSessions.name,
+          sequenceNumber: fulfillmentSessions.sequenceNumber,
+          stationId: fulfillmentSessions.stationId,
+          stationType: fulfillmentSessions.stationType,
+          orderCount: fulfillmentSessions.orderCount,
+          maxOrders: fulfillmentSessions.maxOrders,
+          status: fulfillmentSessions.status,
+          createdAt: fulfillmentSessions.createdAt,
+          updatedAt: fulfillmentSessions.updatedAt,
+          readyAt: fulfillmentSessions.readyAt,
+          pickingStartedAt: fulfillmentSessions.pickingStartedAt,
+          packingStartedAt: fulfillmentSessions.packingStartedAt,
+          completedAt: fulfillmentSessions.completedAt,
+          createdBy: fulfillmentSessions.createdBy,
+          stationName: stations.name,
+        })
+        .from(fulfillmentSessions)
+        .leftJoin(stations, eq(fulfillmentSessions.stationId, stations.id))
+        .where(whereClause)
+        .orderBy(orderDirection)
+        .limit(limit)
+        .offset(offset);
+      
+      res.json({
+        sessions,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+      });
+    } catch (error: any) {
+      console.error("[SmartSessions] Error getting sessions:", error);
+      res.status(500).json({ error: "Failed to get sessions" });
+    }
+  });
+
   // Get a specific fulfillment session by ID
   app.get("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {
