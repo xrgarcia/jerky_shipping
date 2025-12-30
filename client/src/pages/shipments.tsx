@@ -1033,7 +1033,7 @@ export default function Shipments() {
     queryKey: ["/api/stations"],
   });
 
-  const stations = stationsData || [];
+  const stations = Array.isArray(stationsData) ? stationsData : [];
 
   // Fetch distinct statuses for the status filter dropdown
   const { data: statusesData } = useQuery<{ statuses: string[] }>({
