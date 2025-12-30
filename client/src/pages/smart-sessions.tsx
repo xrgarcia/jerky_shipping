@@ -45,7 +45,7 @@ import { format } from "date-fns";
 import { Link } from "wouter";
 
 interface SmartSession {
-  id: string;
+  id: number;
   name: string | null;
   sequenceNumber: number | null;
   stationId: string | null;
@@ -175,7 +175,7 @@ export default function SmartSessions() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const { data, isLoading, refetch } = useQuery<SmartSessionsResponse>({
     queryKey: [
@@ -408,10 +408,10 @@ export default function SmartSessions() {
                           <TableCell>
                             <div>
                               <div className="font-medium">
-                                {session.name || `Session ${session.sequenceNumber || session.id.slice(0, 8)}`}
+                                {session.name || `Session ${session.sequenceNumber || session.id}`}
                               </div>
                               <div className="text-xs text-muted-foreground font-mono">
-                                {session.id.slice(0, 8)}...
+                                #{session.id}
                               </div>
                             </div>
                           </TableCell>
@@ -514,7 +514,7 @@ export default function SmartSessions() {
             <DialogDescription>
               {sessionDetails && (
                 <>
-                  {sessionDetails.name || `Session ${sessionDetails.sequenceNumber || sessionDetails.id.slice(0, 8)}`}
+                  {sessionDetails.name || `Session ${sessionDetails.sequenceNumber || sessionDetails.id}`}
                   {" - "}
                   {getStationTypeLabel(sessionDetails.stationType)}
                 </>
