@@ -2,8 +2,10 @@
  * Shipment Lifecycle State Machine
  * 
  * Manages the progression of shipments through their lifecycle phases:
- * awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
- *                                            ↘ picking_issues (exception path)
+ * ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ *                                                               ↘ picking_issues (exception path)
+ * 
+ * READY_TO_SESSION: On hold + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -64,6 +66,7 @@ export interface ShipmentLifecycleData {
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
   fingerprintId?: string | null;
+  hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
 }
 
 // Status codes that indicate package is on the dock (at the facility)
@@ -81,7 +84,8 @@ const ON_DOCK_STATUSES = ['NY', 'AC'];
  * 3. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
  * 4. PICKING - Session is 'active'
  * 5. READY_TO_PICK - Session is 'new'
- * 6. AWAITING_DECISIONS - Default, with subphase based on categorization/fingerprint/packaging
+ * 6. READY_TO_SESSION - On hold + MOVE OVER tag + no session (fingerprinting happens here)
+ * 7. AWAITING_DECISIONS - Has fingerprint, needs packing decisions
  * 
  * Note: Status codes for tracking:
  * - NY = Not Yet in System (label created, waiting for carrier pickup)
@@ -130,7 +134,15 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_PICK, subphase: null };
   }
 
-  // AWAITING_DECISIONS: Determine which subphase
+  // READY_TO_SESSION: On hold + MOVE OVER tag + no SkuVault session yet
+  // This is where fingerprinting and QC item explosion should happen
+  if (shipment.shipmentStatus === 'on_hold' && 
+      shipment.hasMoveOverTag === true && 
+      !shipment.sessionStatus) {
+    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase: null };
+  }
+
+  // AWAITING_DECISIONS: Has fingerprint, determine which subphase
   const subphase = deriveDecisionSubphase(shipment);
   return { phase: LIFECYCLE_PHASES.AWAITING_DECISIONS, subphase };
 }
@@ -174,6 +186,7 @@ export function deriveDecisionSubphase(shipment: {
  */
 export function getPhaseDisplayName(phase: LifecyclePhase): string {
   const displayNames: Record<LifecyclePhase, string> = {
+    [LIFECYCLE_PHASES.READY_TO_SESSION]: 'Ready to Session',
     [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 'Awaiting Decisions',
     [LIFECYCLE_PHASES.READY_TO_PICK]: 'Ready to Pick',
     [LIFECYCLE_PHASES.PICKING]: 'Picking',
@@ -203,7 +216,8 @@ export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
  * (i.e., not yet in active picking or beyond)
  */
 export function isModifiable(phase: LifecyclePhase): boolean {
-  return phase === LIFECYCLE_PHASES.AWAITING_DECISIONS;
+  return phase === LIFECYCLE_PHASES.READY_TO_SESSION || 
+         phase === LIFECYCLE_PHASES.AWAITING_DECISIONS;
 }
 
 /**
@@ -211,6 +225,7 @@ export function isModifiable(phase: LifecyclePhase): boolean {
  */
 export function getNextPhase(phase: LifecyclePhase): LifecyclePhase | null {
   const happyPath: LifecyclePhase[] = [
+    LIFECYCLE_PHASES.READY_TO_SESSION,
     LIFECYCLE_PHASES.AWAITING_DECISIONS,
     LIFECYCLE_PHASES.READY_TO_PICK,
     LIFECYCLE_PHASES.PICKING,
@@ -250,10 +265,11 @@ export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | 
 export function getLifecycleProgress(state: LifecycleState): number {
   const { phase, subphase } = state;
   
-  // Main phases (5 total, excluding picking_issues)
+  // Main phases (6 total, excluding picking_issues)
   const phaseWeights: Record<LifecyclePhase, number> = {
-    [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 0,
-    [LIFECYCLE_PHASES.READY_TO_PICK]: 25,
+    [LIFECYCLE_PHASES.READY_TO_SESSION]: 0,
+    [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 15,
+    [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,
     [LIFECYCLE_PHASES.PACKING_READY]: 75,
     [LIFECYCLE_PHASES.ON_DOCK]: 100,
