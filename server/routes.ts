@@ -11326,6 +11326,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fulfillment Sessions API - Smart Shipping Engine (Phase 6 Step 3)
   // ============================================================================
 
+  // Get all orders in ready-to-session phase with their session readiness status
+  app.get("/api/fulfillment-sessions/ready-to-session-orders", requireAuth, async (req, res) => {
+    try {
+      // Get all orders that are in ready_to_session lifecycle phase
+      // (on hold + MOVE OVER tag + no session + not cancelled)
+      const readyToSessionOrders = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          fingerprintId: shipments.fingerprintId,
+          fingerprintStatus: shipments.fingerprintStatus,
+          packagingTypeId: shipments.packagingTypeId,
+          assignedStationId: shipments.assignedStationId,
+          decisionSubphase: shipments.decisionSubphase,
+        })
+        .from(shipments)
+        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+        .where(
+          and(
+            eq(shipments.shipmentStatus, 'on_hold'),
+            eq(shipmentTags.name, 'MOVE OVER'),
+            isNull(shipments.sessionStatus),
+            isNull(shipments.trackingNumber),
+            ne(shipments.status, 'cancelled')
+          )
+        )
+        .orderBy(asc(shipments.orderNumber));
+
+      // Evaluate each order's session readiness and provide reason
+      const ordersWithStatus = readyToSessionOrders.map(order => {
+        let readyToSession = false;
+        let reason = '';
+
+        if (!order.fingerprintId) {
+          reason = 'Needs fingerprint calculation';
+        } else if (!order.packagingTypeId) {
+          reason = 'Fingerprint needs package assignment';
+        } else if (!order.assignedStationId) {
+          reason = 'Needs station assignment';
+        } else if (order.decisionSubphase !== 'needs_session') {
+          reason = `In ${order.decisionSubphase || 'processing'} phase`;
+        } else {
+          readyToSession = true;
+          reason = 'Ready for session';
+        }
+
+        return {
+          orderNumber: order.orderNumber,
+          readyToSession,
+          reason,
+        };
+      });
+
+      // Calculate summary stats
+      const readyCount = ordersWithStatus.filter(o => o.readyToSession).length;
+      const notReadyCount = ordersWithStatus.filter(o => !o.readyToSession).length;
+
+      res.json({
+        orders: ordersWithStatus,
+        stats: {
+          total: ordersWithStatus.length,
+          ready: readyCount,
+          notReady: notReadyCount,
+        },
+      });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting ready-to-session orders:", error);
+      res.status(500).json({ error: "Failed to get ready-to-session orders" });
+    }
+  });
+
   // Preview sessionable shipments and potential session groupings
   app.get("/api/fulfillment-sessions/preview", requireAuth, async (req, res) => {
     try {
