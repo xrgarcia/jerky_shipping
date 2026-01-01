@@ -11403,6 +11403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(shipmentTags.name, 'MOVE OVER'),
             isNull(shipments.sessionStatus),
             isNull(shipments.trackingNumber),
+            isNull(shipments.fulfillmentSessionId),
             ne(shipments.status, 'cancelled')
           )
         )
