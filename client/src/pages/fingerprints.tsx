@@ -371,18 +371,25 @@ export default function Fingerprints() {
     enabled: activeTab === 'packaging' || activeTab === 'categorize',
   });
 
-  // Uncategorized products
+  // Uncategorized products count (lightweight - for summary cards)
+  const { data: uncategorizedCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/packing-decisions/uncategorized/count"],
+  });
+
+  // Uncategorized products (heavy - lazy loaded for categorize tab only)
   const {
     data: uncategorizedData,
     isLoading: uncategorizedLoading,
     refetch: refetchUncategorized,
   } = useQuery<UncategorizedResponse>({
     queryKey: ["/api/packing-decisions/uncategorized"],
+    enabled: activeTab === 'categorize',
   });
 
-  // Collections for categorization
+  // Collections for categorization (lazy loaded for categorize tab only)
   const { data: collectionsData } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections"],
+    enabled: activeTab === 'categorize',
   });
 
   // Fingerprint shipments (for shipment count modal)
@@ -397,13 +404,14 @@ export default function Fingerprints() {
     enabled: !!selectedSkuForShipments,
   });
 
-  // Session preview
+  // Session preview (lazy loaded - only fetch when sessions tab is active)
   const {
     data: sessionPreviewData,
     isLoading: sessionPreviewLoading,
     refetch: refetchSessionPreview,
   } = useQuery<SessionPreviewResponse>({
     queryKey: ["/api/fulfillment-sessions/preview"],
+    enabled: activeTab === 'sessions',
   });
 
   // Live sessions (active sessions not yet completed)
@@ -474,6 +482,7 @@ export default function Fingerprints() {
         [`cat-${result.sku}`]: { type: 'success', message: 'Categorized' }
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized/count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
@@ -664,6 +673,8 @@ export default function Fingerprints() {
   const stats = fingerprintStatsData || fingerprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
   const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
+  // Use lightweight count for summary cards, fall back to full data length when available
+  const uncategorizedCount = uncategorizedCountData?.count ?? uncategorizedProducts.length;
   const collections = collectionsData?.collections || [];
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
@@ -855,13 +866,13 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${uncategorizedProducts.length > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                className={`text-2xl font-bold ${uncategorizedCount > 0 ? 'text-amber-600' : 'text-green-600'}`}
                 data-testid="text-uncategorized-count"
               >
-                {uncategorizedProducts.length}
+                {uncategorizedCount}
               </span>
               <span className="text-sm text-muted-foreground">
-                {uncategorizedProducts.length === 0 ? 'all categorized' : 'need categories'}
+                {uncategorizedCount === 0 ? 'all categorized' : 'need categories'}
               </span>
             </div>
           </CardContent>
@@ -949,9 +960,9 @@ export default function Fingerprints() {
           <TabsTrigger value="categorize" className="flex items-center gap-2" data-testid="tab-categorize">
             <Tag className="h-4 w-4" />
             Categorize
-            {uncategorizedProducts.length > 0 && (
+            {uncategorizedCount > 0 && (
               <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                {uncategorizedProducts.length}
+                {uncategorizedCount}
               </Badge>
             )}
           </TabsTrigger>

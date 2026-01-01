@@ -10177,6 +10177,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Packing Decisions API (Smart Shipping Engine)
   // ========================================
 
+  // Get count of uncategorized products only (lightweight for summary cards)
+  app.get("/api/packing-decisions/uncategorized/count", requireAuth, async (req, res) => {
+    try {
+      const { productCollectionMappings } = await import("@shared/schema");
+      
+      // Count distinct uncategorized SKUs in pending_categorization shipments
+      // This is much faster than the full uncategorized query
+      const result = await db.execute(sql`
+        WITH pending_shipments AS (
+          SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
+        )
+        SELECT COUNT(DISTINCT qc.sku) as count
+        FROM shipment_qc_items qc
+        INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
+        LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+        WHERE pcm.id IS NULL
+      `);
+      
+      const count = Number((result.rows?.[0] as any)?.count) || 0;
+      res.json({ count });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error fetching uncategorized count:", error);
+      res.status(500).json({ error: "Failed to fetch uncategorized count" });
+    }
+  });
+
   // Get uncategorized products with shipment counts
   // Uses product_collection_mappings as the source of truth for categorization
   // Uses skuvault_products as source of truth for product catalog (title, image, weight)
