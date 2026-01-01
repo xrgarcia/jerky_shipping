@@ -439,6 +439,7 @@ export default function Fingerprints() {
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
     onError: (error: Error, variables) => {
       setInlineStatus(prev => ({
@@ -464,6 +465,8 @@ export default function Fingerprints() {
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
     onError: (error: Error, variables) => {
       setInlineStatus(prev => ({
@@ -630,6 +633,7 @@ export default function Fingerprints() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
       setSelectedFingerprintIds(new Set());
       setBulkPackagingTypeId("");
     },

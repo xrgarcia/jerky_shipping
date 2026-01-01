@@ -10360,6 +10360,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Update lifecycle phase for all affected shipments
+      if (affectedShipments.length > 0) {
+        const shipmentIds = affectedShipments.map(s => s.shipmentId);
+        await updateShipmentLifecycleBatch(shipmentIds);
+      }
+      
       console.log(`[Packing Decisions] Categorized ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${fingerprintsUpdated} now complete`);
       
       res.json({
