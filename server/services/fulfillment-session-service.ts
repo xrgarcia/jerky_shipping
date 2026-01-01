@@ -62,6 +62,8 @@ export interface SessionBuildResult {
   success: boolean;
   sessionsCreated: number;
   shipmentsAssigned: number;
+  shipmentsSkipped: number;
+  skippedOrders: { orderNumber: string; reason: string }[];
   sessions: FulfillmentSession[];
   errors: string[];
 }
@@ -230,6 +232,8 @@ export class FulfillmentSessionService {
       success: true,
       sessionsCreated: 0,
       shipmentsAssigned: 0,
+      shipmentsSkipped: 0,
+      skippedOrders: [],
       sessions: [],
       errors: [],
     };
@@ -265,11 +269,13 @@ export class FulfillmentSessionService {
         return result;
       }
 
-      // 5. Add shipments to existing draft sessions
+      // 5. Add shipments to existing draft sessions (with validation)
       for (const filled of filledSessions) {
         if (filled.shipmentIds.length > 0) {
-          await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
-          result.shipmentsAssigned += filled.shipmentIds.length;
+          const addResult = await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
+          result.shipmentsAssigned += addResult.added;
+          result.shipmentsSkipped += addResult.skipped.length;
+          result.skippedOrders.push(...addResult.skipped);
           // Fetch updated session to return
           const updatedSession = await this.getSessionById(filled.sessionId);
           if (updatedSession) {
@@ -278,17 +284,19 @@ export class FulfillmentSessionService {
         }
       }
 
-      // 6. Create new sessions for remaining shipments
+      // 6. Create new sessions for remaining shipments (with validation)
       for (const batch of newBatches) {
-        const session = await this.createSessionWithShipments(batch, userId);
-        if (session) {
-          result.sessions.push(session);
+        const createResult = await this.createSessionWithShipments(batch, userId);
+        if (createResult.session) {
+          result.sessions.push(createResult.session);
           result.sessionsCreated++;
-          result.shipmentsAssigned += batch.shipmentIds.length;
+          result.shipmentsAssigned += createResult.added;
         }
+        result.shipmentsSkipped += createResult.skipped.length;
+        result.skippedOrders.push(...createResult.skipped);
       }
 
-      console.log(`[FulfillmentSession] Created ${result.sessionsCreated} new sessions, filled ${filledSessions.filter(f => f.shipmentIds.length > 0).length} existing drafts with ${result.shipmentsAssigned} total shipments`);
+      console.log(`[FulfillmentSession] Created ${result.sessionsCreated} new sessions, filled ${filledSessions.filter(f => f.shipmentIds.length > 0).length} existing drafts with ${result.shipmentsAssigned} total shipments${result.shipmentsSkipped > 0 ? `, skipped ${result.shipmentsSkipped} (not ready)` : ''}`);
 
     } catch (error: any) {
       result.success = false;
@@ -403,9 +411,89 @@ export class FulfillmentSessionService {
   }
 
   /**
-   * Add shipments to an existing session
+   * Validate that shipments are actually in needs_session state before adding
+   * Returns only the IDs that are valid, plus info about skipped ones
    */
-  private async addShipmentsToSession(sessionId: number, shipmentIds: string[]): Promise<void> {
+  private async validateShipmentsForSession(
+    shipmentIds: string[]
+  ): Promise<{ validIds: string[]; skipped: { orderNumber: string; reason: string }[] }> {
+    if (shipmentIds.length === 0) {
+      return { validIds: [], skipped: [] };
+    }
+
+    // Check the actual state of each shipment
+    const shipmentStates = await db
+      .select({
+        id: shipments.id,
+        orderNumber: shipments.orderNumber,
+        decisionSubphase: shipments.decisionSubphase,
+        fulfillmentSessionId: shipments.fulfillmentSessionId,
+        packagingTypeId: shipments.packagingTypeId,
+        assignedStationId: shipments.assignedStationId,
+      })
+      .from(shipments)
+      .where(inArray(shipments.id, shipmentIds));
+
+    const validIds: string[] = [];
+    const skipped: { orderNumber: string; reason: string }[] = [];
+
+    for (const state of shipmentStates) {
+      // Check all requirements for session eligibility
+      if (state.fulfillmentSessionId) {
+        skipped.push({ 
+          orderNumber: state.orderNumber || 'Unknown', 
+          reason: 'Already in a session' 
+        });
+      } else if (state.decisionSubphase !== DECISION_SUBPHASES.NEEDS_SESSION) {
+        skipped.push({ 
+          orderNumber: state.orderNumber || 'Unknown', 
+          reason: `In ${state.decisionSubphase || 'unknown'} subphase (requires needs_session)` 
+        });
+      } else if (!state.packagingTypeId) {
+        skipped.push({ 
+          orderNumber: state.orderNumber || 'Unknown', 
+          reason: 'Missing packaging assignment' 
+        });
+      } else if (!state.assignedStationId) {
+        skipped.push({ 
+          orderNumber: state.orderNumber || 'Unknown', 
+          reason: 'Missing station assignment' 
+        });
+      } else {
+        validIds.push(state.id);
+      }
+    }
+
+    // Check for any IDs that weren't found in DB
+    const foundIds = new Set(shipmentStates.map(s => s.id));
+    for (const id of shipmentIds) {
+      if (!foundIds.has(id)) {
+        skipped.push({ orderNumber: `ID:${id}`, reason: 'Shipment not found' });
+      }
+    }
+
+    if (skipped.length > 0) {
+      console.log(`[FulfillmentSession] Validation skipped ${skipped.length} shipments: ${skipped.map(s => `${s.orderNumber} (${s.reason})`).join(', ')}`);
+    }
+
+    return { validIds, skipped };
+  }
+
+  /**
+   * Add shipments to an existing session
+   * Returns info about which shipments were added vs skipped
+   */
+  private async addShipmentsToSession(
+    sessionId: number, 
+    shipmentIds: string[]
+  ): Promise<{ added: number; skipped: { orderNumber: string; reason: string }[] }> {
+    // Validate shipments before adding
+    const { validIds, skipped } = await this.validateShipmentsForSession(shipmentIds);
+
+    if (validIds.length === 0) {
+      return { added: 0, skipped };
+    }
+
     // Get current max spot for this session to continue numbering
     const [maxSpotResult] = await db
       .select({ maxSpot: sql<number>`COALESCE(MAX(${shipments.smartSessionSpot}), 0)` })
@@ -414,8 +502,8 @@ export class FulfillmentSessionService {
     
     let nextSpot = (maxSpotResult?.maxSpot || 0) + 1;
 
-    // Link shipments to session with sequential spot numbers
-    for (const shipmentId of shipmentIds) {
+    // Link only validated shipments to session with sequential spot numbers
+    for (const shipmentId of validIds) {
       await db
         .update(shipments)
         .set({
@@ -431,15 +519,17 @@ export class FulfillmentSessionService {
     await db
       .update(fulfillmentSessions)
       .set({
-        orderCount: sql`${fulfillmentSessions.orderCount} + ${shipmentIds.length}`,
+        orderCount: sql`${fulfillmentSessions.orderCount} + ${validIds.length}`,
         updatedAt: new Date(),
       })
       .where(eq(fulfillmentSessions.id, sessionId));
 
     // Update lifecycle phase for linked shipments
-    await updateShipmentLifecycleBatch(shipmentIds);
+    await updateShipmentLifecycleBatch(validIds);
 
-    console.log(`[FulfillmentSession] Added ${shipmentIds.length} shipments to existing session ${sessionId} (spots ${(maxSpotResult?.maxSpot || 0) + 1}-${nextSpot - 1})`);
+    console.log(`[FulfillmentSession] Added ${validIds.length} shipments to existing session ${sessionId} (spots ${(maxSpotResult?.maxSpot || 0) + 1}-${nextSpot - 1})`);
+    
+    return { added: validIds.length, skipped };
   }
 
   /**
@@ -728,33 +818,43 @@ export class FulfillmentSessionService {
 
   /**
    * Create a session and link shipments to it
+   * Validates shipments before adding and returns info about skipped ones
    */
   private async createSessionWithShipments(
     batch: SessionBatch,
     userId: string
-  ): Promise<FulfillmentSession | null> {
+  ): Promise<{ session: FulfillmentSession | null; added: number; skipped: { orderNumber: string; reason: string }[] }> {
     try {
+      // Validate shipments before creating session
+      const { validIds, skipped } = await this.validateShipmentsForSession(batch.shipmentIds);
+
+      if (validIds.length === 0) {
+        // No valid shipments - don't create an empty session
+        console.log(`[FulfillmentSession] Skipping session creation - all ${batch.shipmentIds.length} shipments failed validation`);
+        return { session: null, added: 0, skipped };
+      }
+
       // Get next sequence number for today
       const sequenceNumber = await this.getNextSequenceNumber();
 
-      // Create session
+      // Create session with actual valid count
       const [session] = await db
         .insert(fulfillmentSessions)
         .values({
           stationType: batch.stationType,
           stationId: batch.stationId,
-          orderCount: batch.shipmentIds.length,
+          orderCount: validIds.length,
           status: 'draft',
           sequenceNumber,
           createdBy: userId,
         })
         .returning();
 
-      if (!session) return null;
+      if (!session) return { session: null, added: 0, skipped };
 
-      // Link shipments to session with sequential spot numbers
+      // Link only validated shipments to session with sequential spot numbers
       let spot = 1;
-      for (const shipmentId of batch.shipmentIds) {
+      for (const shipmentId of validIds) {
         await db
           .update(shipments)
           .set({
@@ -767,14 +867,14 @@ export class FulfillmentSessionService {
       }
 
       // Update lifecycle phase for linked shipments
-      await updateShipmentLifecycleBatch(batch.shipmentIds);
+      await updateShipmentLifecycleBatch(validIds);
 
-      console.log(`[FulfillmentSession] Created session ${session.id} with ${batch.shipmentIds.length} shipments (spots 1-${spot - 1})`);
+      console.log(`[FulfillmentSession] Created session ${session.id} with ${validIds.length} shipments (spots 1-${spot - 1})${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}`);
 
-      return session;
+      return { session, added: validIds.length, skipped };
     } catch (error) {
       console.error('[FulfillmentSession] Error creating session:', error);
-      return null;
+      return { session: null, added: 0, skipped: [] };
     }
   }
 
