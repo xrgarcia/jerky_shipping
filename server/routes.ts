@@ -10883,6 +10883,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get fingerprint stats only (lightweight - for summary cards)
+  app.get("/api/fingerprints/stats", requireAuth, async (req, res) => {
+    try {
+      const { fingerprints: fingerprintsTable, fingerprintModels, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Fast query: count fingerprints with active shipments and packaging status
+      const statsResult = await db.execute(sql`
+        WITH active_fingerprints AS (
+          SELECT DISTINCT f.id, fm.packaging_type_id IS NOT NULL as has_packaging
+          FROM fingerprints f
+          INNER JOIN shipments s ON s.fingerprint_id = f.id
+          LEFT JOIN fingerprint_models fm ON fm.fingerprint_id = f.id
+        )
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE has_packaging) as assigned,
+          COUNT(*) FILTER (WHERE NOT has_packaging) as needs_decision
+        FROM active_fingerprints
+      `);
+      
+      const row = statsResult.rows?.[0] || {};
+      
+      res.json({
+        total: Number(row.total) || 0,
+        assigned: Number(row.assigned) || 0,
+        needsDecision: Number(row.needs_decision) || 0,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch fingerprint stats" });
+    }
+  });
+
   // Get all packaging types for dropdown or management
   app.get("/api/packaging-types", requireAuth, async (req, res) => {
     try {

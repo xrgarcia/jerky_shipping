@@ -350,18 +350,25 @@ export default function Fingerprints() {
     return () => timeouts.forEach(clearTimeout);
   }, [inlineStatus]);
 
-  // Fingerprints data
+  // Fingerprint stats only (lightweight - for summary cards)
+  const { data: fingerprintStatsData } = useQuery<{ total: number; assigned: number; needsDecision: number }>({
+    queryKey: ["/api/fingerprints/stats"],
+  });
+
+  // Fingerprints data (heavy - lazy loaded for packaging tab only)
   const {
     data: fingerprintsData,
     isLoading: fingerprintsLoading,
     refetch: refetchFingerprints,
   } = useQuery<FingerprintsResponse>({
     queryKey: ["/api/fingerprints"],
+    enabled: activeTab === 'packaging',
   });
 
-  // Packaging types
+  // Packaging types (needed for packaging tab and categorize dropdowns)
   const { data: packagingTypesData } = useQuery<PackagingTypesResponse>({
     queryKey: ["/api/packaging-types"],
+    enabled: activeTab === 'packaging' || activeTab === 'categorize',
   });
 
   // Uncategorized products
@@ -409,12 +416,14 @@ export default function Fingerprints() {
   });
 
   // Ready-to-session orders (for Build Sessions tab table)
+  // Lazy loaded - only fetch when Build tab is active
   const {
     data: readyToSessionOrdersData,
     isLoading: readyToSessionOrdersLoading,
     refetch: refetchReadyToSessionOrders,
   } = useQuery<ReadyToSessionOrdersResponse>({
     queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"],
+    enabled: activeTab === 'sessions',
   });
 
   // Mutations
@@ -438,6 +447,7 @@ export default function Fingerprints() {
         [result.fingerprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
@@ -465,6 +475,7 @@ export default function Fingerprints() {
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
@@ -533,6 +544,7 @@ export default function Fingerprints() {
       toast({ title: "Packaging type updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       setEditingPackaging(null);
       setPackagingForm({ name: "", stationType: "" });
     },
@@ -632,6 +644,7 @@ export default function Fingerprints() {
         description: `Assigned ${result.packagingTypeName} to ${result.fingerprintsAssigned} fingerprints (${result.shipmentsUpdated} shipments updated)`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
       setSelectedFingerprintIds(new Set());
@@ -647,7 +660,8 @@ export default function Fingerprints() {
   });
 
   const fingerprints = fingerprintsData?.fingerprints || [];
-  const stats = fingerprintsData?.stats;
+  // Use lightweight stats for summary cards, fall back to full data stats when available
+  const stats = fingerprintStatsData || fingerprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
   const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
   const collections = collectionsData?.collections || [];
