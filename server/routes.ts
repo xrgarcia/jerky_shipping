@@ -10178,21 +10178,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
 
   // Get count of uncategorized products only (lightweight for summary cards)
+  // OPTIMIZED: Uses shipments.decision_subphase to count shipments needing categorization
+  // This avoids expensive joins on the large shipment_qc_items table
   app.get("/api/packing-decisions/uncategorized/count", requireAuth, async (req, res) => {
     try {
-      const { productCollectionMappings } = await import("@shared/schema");
-      
-      // Count distinct uncategorized SKUs in pending_categorization shipments
-      // This is much faster than the full uncategorized query
+      // Fast query: count shipments in needs_categorization subphase
+      // These are the shipments that have products needing categorization
       const result = await db.execute(sql`
-        WITH pending_shipments AS (
-          SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
-        )
-        SELECT COUNT(DISTINCT qc.sku) as count
-        FROM shipment_qc_items qc
-        INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
-        LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
-        WHERE pcm.id IS NULL
+        SELECT COUNT(*) as count 
+        FROM shipments 
+        WHERE decision_subphase = 'needs_categorization'
       `);
       
       const count = Number((result.rows?.[0] as any)?.count) || 0;
