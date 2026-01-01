@@ -546,8 +546,28 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       qcItem.collectionId = collectionCache.get(qcItem.sku) || null;
     }
     
-    // Insert all QC items
-    await db.insert(shipmentQcItems).values(qcItemsToInsert);
+    // Upsert all QC items (use ON CONFLICT to prevent duplicates)
+    // If a shipment+sku already exists, update the quantity and other fields
+    for (const qcItem of qcItemsToInsert) {
+      await db
+        .insert(shipmentQcItems)
+        .values(qcItem)
+        .onConflictDoUpdate({
+          target: [shipmentQcItems.shipmentId, shipmentQcItems.sku],
+          set: {
+            quantityExpected: qcItem.quantityExpected,
+            barcode: qcItem.barcode,
+            description: qcItem.description,
+            imageUrl: qcItem.imageUrl,
+            collectionId: qcItem.collectionId,
+            isKitComponent: qcItem.isKitComponent,
+            parentSku: qcItem.parentSku,
+            weightValue: qcItem.weightValue,
+            weightUnit: qcItem.weightUnit,
+            updatedAt: new Date(),
+          },
+        });
+    }
     
     // Calculate and assign fingerprint
     const fingerprintResult = await calculateFingerprint(shipmentId);
