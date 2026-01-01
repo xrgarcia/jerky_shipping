@@ -1,0 +1,212 @@
+2026-01-01 05:12:48.49
+5d05763b
+User
+at v.reportStreamError (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1201:46)
+2026-01-01 05:12:48.53
+5d05763b
+System
+command finished with error [npm run start]: exit status 1
+2026-01-01 05:32:05.34
+5d05763b
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:10127:9)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:10673:24)
+2026-01-01 05:32:05.34
+5d05763b
+User
+[ShipStationShipmentETL] Error processing items for shipment 91836c1e-59c9-46c6-8e1b-150b1c2c3951: Error: timeout exceeded when trying to connect
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:11058:27)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:11020:20)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:10900:11)
+2026-01-01 05:32:05.34
+5d05763b
+User
+at async ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:10203:13)
+2026-01-01 05:37:53.84
+5d05763b
+User
+Shipment sync worker error: Error: timeout exceeded when trying to connect
+2026-01-01 05:37:53.84
+5d05763b
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-01-01 05:37:53.84
+5d05763b
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-01-01 05:37:53.84
+5d05763b
+User
+at async DatabaseStorage.getDataHealthMetrics (file:///home/runner/workspace/dist/index.js:3041:54)
+2026-01-01 05:37:53.84
+5d05763b
+User
+at async Timeout.processQueue [as _onTimeout] (file:///home/runner/workspace/dist/index.js:15647:26)
+2026-01-01 05:37:53.84
+5d05763b
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-01 05:37:53.84
+5d05763b
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+2026-01-01 05:37:53.84
+5d05763b
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-01 07:54:06.94
+5d05763b
+User
+connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(o.message="Connect\
+2026-01-01 07:54:06.94
+5d05763b
+User
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:986:42)
+2026-01-01 07:54:06.94
+5d05763b
+User
+at An._connectionCallback (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384:72)
+2026-01-01 07:54:06.94
+5d05763b
+User
+at fn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2026-01-01 07:54:06.94
+5d05763b
+User
+Node.js v20.19.3
+2026-01-01 07:54:06.94
+5d05763b
+User
+at WebSocket.onError (/home/runner/workspace/node_modules/ws/lib/event-target.js:230:9)
+2026-01-01 07:54:06.94
+5d05763b
+User
+at An._handleErrorWhileConnecting (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1290:38)
+2026-01-01 07:54:06.94
+5d05763b
+User
+^
+2026-01-01 07:54:06.94
+5d05763b
+User
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2026-01-01 07:54:06.94
+5d05763b
+User
+at WebSocket.emit (node:events:524:28)
+2026-01-01 07:54:06.94
+5d05763b
+User
+TypeError: Cannot set property message of # which has only a getter
+2026-01-01 07:54:06.94
+5d05763b
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2026-01-01 07:54:06.94
+5d05763b
+User
+at v.reportStreamError (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1201:46)
+2026-01-01 07:54:06.94
+5d05763b
+User
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384
+2026-01-01 07:54:06.94
+5d05763b
+User
+at An._handleErrorEvent (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1291:33)
+2026-01-01 07:54:11.04
+5d05763b
+System
+command finished with error [npm run start]: exit status 1
+2026-01-01 07:59:05.34
+5d05763b
+User
+TypeError: Cannot set property message of # which has only a getter
+2026-01-01 07:59:05.34
+5d05763b
+User
+at v.reportStreamError (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1201:46)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at WebSocket.onError (/home/runner/workspace/node_modules/ws/lib/event-target.js:230:9)
+2026-01-01 07:59:05.34
+5d05763b
+User
+Node.js v20.19.3
+2026-01-01 07:59:05.34
+5d05763b
+User
+^
+2026-01-01 07:59:05.34
+5d05763b
+User
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at An._handleErrorEvent (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1291:33)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:986:42)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at WebSocket.emit (node:events:524:28)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2026-01-01 07:59:05.34
+5d05763b
+User
+at An._handleErrorWhileConnecting (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1290:38)
+2026-01-01 07:59:05.34
+5d05763b
+User
+connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(o.message="Connect\
+2026-01-01 07:59:05.34
+5d05763b
+User
+at An._connectionCallback (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384:72)
+2026-01-01 07:59:05.34
+5d05763b
+User
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384
+2026-01-01 07:59:05.34
+5d05763b
+User
+at fn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2026-01-01 07:59:07.30
+5d05763b
+System
+command finished with error [npm run start]: exit status 1

@@ -9,6 +9,39 @@ import { setupWebSocket } from "./websocket";
 import { initializeDatabase, startDatabaseHeartbeat } from "./db";
 // Note: storage imported lazily after initializeDatabase() to ensure pg_trgm extension exists
 
+// Global error handlers to prevent crashes from Neon serverless connection errors
+// See: https://github.com/brianc/node-postgres/issues/3373
+// The Neon library has a bug where it tries to set error.message on ErrorEvent (read-only)
+process.on('uncaughtException', (error: Error) => {
+  const errorMessage = error?.message || String(error);
+  
+  // Check if this is the known Neon ErrorEvent bug
+  if (errorMessage.includes('Cannot set property message') && 
+      errorMessage.includes('which has only a getter')) {
+    console.error('[RECOVERED] Neon connection error caught - preventing crash:', errorMessage);
+    // Don't exit - this is a recoverable error from connection timeout
+    return;
+  }
+  
+  // For other uncaught exceptions, log and exit (standard behavior)
+  console.error('[FATAL] Uncaught exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  const reasonStr = String(reason);
+  
+  // Check if this is the known Neon ErrorEvent bug
+  if (reasonStr.includes('Cannot set property message') && 
+      reasonStr.includes('which has only a getter')) {
+    console.error('[RECOVERED] Neon connection error caught in promise - preventing crash:', reasonStr);
+    return;
+  }
+  
+  // Log other unhandled rejections but don't crash
+  console.error('[WARNING] Unhandled promise rejection:', reason);
+});
+
 const app = express();
 
 declare module 'http' {
