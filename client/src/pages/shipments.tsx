@@ -259,22 +259,22 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 7. On Hold - shipment is on hold
-    if (shipmentStatus === 'on_hold') {
-      return (
-        <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Clock className="h-3 w-3" />
-          On Hold
-        </Badge>
-      );
-    }
-    
-    // 8. Ready to Session - has fingerprint and packaging, awaiting session assignment
+    // 7. Ready to Session - has fingerprint and packaging, awaiting session assignment
     if (!sessionStatus && shipment.decisionSubphase === 'needs_session') {
       return (
         <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <Clock className="h-3 w-3" />
           Ready to Session
+        </Badge>
+      );
+    }
+    
+    // 8. On Hold - shipment is on hold
+    if (shipmentStatus === 'on_hold') {
+      return (
+        <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Clock className="h-3 w-3" />
+          On Hold
         </Badge>
       );
     }
