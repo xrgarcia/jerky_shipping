@@ -457,6 +457,7 @@ export async function syncSkuvaultProducts(): Promise<{
         weightUnit: p.weight_unit,
         parentSku: p.parent_sku,
         quantityOnHand: p.quantity_on_hand ?? 0,
+        availableQuantity: p.quantity_on_hand ?? 0, // Reset to match quantityOnHand on each sync
       }));
       
       await db.insert(skuvaultProducts).values(insertData);

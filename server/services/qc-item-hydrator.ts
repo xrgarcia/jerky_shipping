@@ -27,6 +27,7 @@ import {
   fingerprintModels,
   packagingTypes,
   stations,
+  skuvaultProducts,
   type InsertShipmentQcItem,
   type InsertFingerprint,
 } from '@shared/schema';
@@ -573,6 +574,24 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
             updatedAt: new Date(),
           },
         });
+    }
+    
+    // Decrement available_quantity in skuvault_products for each SKU
+    // This tracks inventory allocation as orders are processed
+    const skuQuantities = new Map<string, number>();
+    for (const qcItem of qcItemsToInsert) {
+      const current = skuQuantities.get(qcItem.sku) || 0;
+      skuQuantities.set(qcItem.sku, current + qcItem.quantityExpected);
+    }
+    
+    for (const [sku, quantity] of skuQuantities) {
+      await db
+        .update(skuvaultProducts)
+        .set({
+          availableQuantity: sql`GREATEST(0, ${skuvaultProducts.availableQuantity} - ${quantity})`,
+          updatedAt: new Date(),
+        })
+        .where(eq(skuvaultProducts.sku, sku));
     }
     
     // Calculate and assign fingerprint

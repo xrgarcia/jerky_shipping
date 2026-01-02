@@ -1392,7 +1392,8 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   weightValue: real("weight_value"), // Weight value as decimal (from internal_inventory) - preserves precision
   weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
   parentSku: text("parent_sku"), // For variants: the parent SKU this variant belongs to (null for parents/kits)
-  quantityOnHand: integer("quantity_on_hand").notNull().default(0), // Current stock quantity from SkuVault
+  quantityOnHand: integer("quantity_on_hand").notNull().default(0), // Current stock quantity from SkuVault (snapshot, read-only)
+  availableQuantity: integer("available_quantity").notNull().default(0), // Available stock = quantityOnHand - pending orders (decremented on QC explosion, reset on daily sync)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
