@@ -856,7 +856,8 @@ export default function SkuvaultProducts() {
                       <TableHead className="w-[140px]">Product Category</TableHead>
                       <TableHead className="w-[60px] text-center">AP</TableHead>
                       <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
-                      <TableHead className="w-[100px] text-right">Qty On Hand</TableHead>
+                      <TableHead className="w-[100px] text-right">On Hand</TableHead>
+                      <TableHead className="w-[100px] text-right">Available</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -909,6 +910,13 @@ export default function SkuvaultProducts() {
                         </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`qty-${product.sku}`}>
                           {product.quantityOnHand?.toLocaleString() ?? "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`available-${product.sku}`}>
+                          {product.availableQuantity !== null && product.availableQuantity !== undefined ? (
+                            <span className={product.availableQuantity === 0 ? "text-destructive font-semibold" : ""}>
+                              {product.availableQuantity.toLocaleString()}
+                            </span>
+                          ) : "-"}
                         </TableCell>
                       </TableRow>
                     ))}
