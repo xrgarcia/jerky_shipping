@@ -269,7 +269,17 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 8. No session yet - awaiting pick session
+    // 8. Ready to Session - has fingerprint and packaging, awaiting session assignment
+    if (!sessionStatus && shipment.decisionSubphase === 'needs_session') {
+      return (
+        <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+          <Clock className="h-3 w-3" />
+          Ready to Session
+        </Badge>
+      );
+    }
+    
+    // 9. No session yet - awaiting pick session
     if (!sessionStatus) {
       return (
         <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
