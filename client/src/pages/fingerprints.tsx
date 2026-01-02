@@ -1979,7 +1979,7 @@ export default function Fingerprints() {
                                         className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
                                       />
                                       <span className="font-medium">
-                                        {session.name || `Session #${session.sequenceNumber || session.id.slice(0, 8)}`}
+                                        Session #{session.id}
                                       </span>
                                       <Badge 
                                         variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
