@@ -510,6 +510,7 @@ export default function Fingerprints() {
         });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
         setActiveTab('live');
       } else {
         toast({
