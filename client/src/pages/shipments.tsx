@@ -189,16 +189,15 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     return <Badge variant="secondary" className="text-xs">{status}</Badge>;
   };
 
-  // Get the warehouse workflow step badge based on session and shipment status
+  // Get the lifecycle phase badge based on stored lifecyclePhase and decisionSubphase fields
   const getWorkflowStepBadge = () => {
+    const lifecyclePhase = shipment.lifecyclePhase;
+    const decisionSubphaseValue = shipment.decisionSubphase;
     const sessionStatus = shipment.sessionStatus?.toLowerCase();
-    const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
     const hasTracking = !!shipment.trackingNumber;
-    // Normalize status to uppercase for consistent comparison with raw ShipStation codes
     const status = shipment.status?.toUpperCase();
     
-    // Order of priority for workflow steps:
-    // 1. Delivered - final state (status = 'DE' from ShipStation tracking)
+    // Priority 1: Check for terminal states first (Delivered)
     if (status === 'DE' || status === 'DELIVERED') {
       return (
         <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
@@ -208,95 +207,137 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 2. On the Dock - Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
-    // Note: status is UPPERCASE 'AC' from ETL and webhooks, matching production behavior
-    if (shipmentStatus === 'label_purchased' && status === 'AC') {
-      return (
-        <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Truck className="h-3 w-3" />
-          On the Dock
-        </Badge>
-      );
+    // Priority 2: Use stored lifecycle phase for proper badge display
+    switch (lifecyclePhase) {
+      case 'on_dock':
+        return (
+          <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Truck className="h-3 w-3" />
+            On the Dock
+          </Badge>
+        );
+      
+      case 'picking_issues':
+        return (
+          <Badge className="bg-orange-600 hover:bg-orange-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <AlertTriangle className="h-3 w-3" />
+            Picking Issues
+          </Badge>
+        );
+      
+      case 'packing_ready':
+        return (
+          <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Package className="h-3 w-3" />
+            Packing Ready
+          </Badge>
+        );
+      
+      case 'picking':
+        return (
+          <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Play className="h-3 w-3" />
+            Picking
+          </Badge>
+        );
+      
+      case 'ready_to_pick':
+        return (
+          <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Timer className="h-3 w-3" />
+            Ready to Pick
+          </Badge>
+        );
+      
+      case 'ready_to_session':
+        return (
+          <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Clock className="h-3 w-3" />
+            Ready to Session
+          </Badge>
+        );
+      
+      case 'awaiting_decisions':
+        // Show decision subphase within awaiting_decisions
+        switch (decisionSubphaseValue) {
+          case 'needs_categorization':
+            return (
+              <Badge className="bg-rose-600 hover:bg-rose-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <AlertTriangle className="h-3 w-3" />
+                Needs Categorization
+              </Badge>
+            );
+          case 'needs_fingerprint':
+            return (
+              <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <Clock className="h-3 w-3" />
+                Needs Fingerprint
+              </Badge>
+            );
+          case 'needs_packaging':
+            return (
+              <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <Package className="h-3 w-3" />
+                Needs Packaging
+              </Badge>
+            );
+          case 'needs_session':
+            return (
+              <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <Clock className="h-3 w-3" />
+                Needs Session
+              </Badge>
+            );
+          case 'ready_for_skuvault':
+            return (
+              <Badge className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <CheckCircle className="h-3 w-3" />
+                Ready for SkuVault
+              </Badge>
+            );
+          default:
+            return (
+              <Badge className="bg-gray-500 hover:bg-gray-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <Clock className="h-3 w-3" />
+                Awaiting Decisions
+              </Badge>
+            );
+        }
+      
+      default:
+        // Fallback for shipments without lifecycle phase set
+        // Use session-based derivation for backwards compatibility
+        if (sessionStatus === 'closed' && !hasTracking) {
+          return (
+            <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+              <Package className="h-3 w-3" />
+              Packing Ready
+            </Badge>
+          );
+        }
+        if (sessionStatus === 'active') {
+          return (
+            <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+              <Play className="h-3 w-3" />
+              Picking
+            </Badge>
+          );
+        }
+        if (sessionStatus === 'new') {
+          return (
+            <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+              <Timer className="h-3 w-3" />
+              Ready to Pick
+            </Badge>
+          );
+        }
+        return (
+          <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Clock className="h-3 w-3" />
+            Processing
+          </Badge>
+        );
     }
-    
-    // 3. Picking Issues - inactive session (needs supervisor attention)
-    if (sessionStatus === 'inactive') {
-      return (
-        <Badge className="bg-orange-600 hover:bg-orange-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <AlertTriangle className="h-3 w-3" />
-          Picking Issues
-        </Badge>
-      );
-    }
-    
-    // 4. Packing Ready - closed session, no tracking yet
-    if (sessionStatus === 'closed' && !hasTracking) {
-      return (
-        <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Package className="h-3 w-3" />
-          Packing Ready
-        </Badge>
-      );
-    }
-    
-    // 5. Picking - active session
-    if (sessionStatus === 'active') {
-      return (
-        <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Play className="h-3 w-3" />
-          Picking
-        </Badge>
-      );
-    }
-    
-    // 6. Ready to Pick - new session
-    if (sessionStatus === 'new') {
-      return (
-        <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Timer className="h-3 w-3" />
-          Ready to Pick
-        </Badge>
-      );
-    }
-    
-    // 7. Ready to Session - on hold with no session status yet (pre-session state)
-    // This matches the "Ready to Session" lifecycle tab filter criteria
-    if (!sessionStatus && shipmentStatus === 'on_hold' && !hasTracking) {
-      return (
-        <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Clock className="h-3 w-3" />
-          Ready to Session
-        </Badge>
-      );
-    }
-    
-    // 8. On Hold - shipment is on hold (but has session or other status)
-    if (shipmentStatus === 'on_hold') {
-      return (
-        <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Clock className="h-3 w-3" />
-          On Hold
-        </Badge>
-      );
-    }
-    
-    // 9. No session yet - awaiting pick session
-    if (!sessionStatus) {
-      return (
-        <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <Clock className="h-3 w-3" />
-          Awaiting Pick
-        </Badge>
-      );
-    }
-    
-    // Fallback - unknown state
-    return (
-      <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-        <Clock className="h-3 w-3" />
-        Processing
-      </Badge>
-    );
   };
 
   return (
