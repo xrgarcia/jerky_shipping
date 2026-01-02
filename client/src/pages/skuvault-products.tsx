@@ -248,7 +248,7 @@ function ProductDetailDialog({
                 </p>
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Qty On Hand</label>
+                <label className="text-sm font-medium text-muted-foreground">On Hand</label>
                 <p className="text-sm font-mono" data-testid="detail-qty">
                   {product.quantityOnHand?.toLocaleString() ?? "-"}
                 </p>
@@ -256,6 +256,16 @@ function ProductDetailDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Available</label>
+                <p className="text-sm font-mono" data-testid="detail-available">
+                  {product.availableQuantity !== null && product.availableQuantity !== undefined ? (
+                    <span className={product.availableQuantity === 0 ? "text-destructive font-semibold" : ""}>
+                      {product.availableQuantity.toLocaleString()}
+                    </span>
+                  ) : "-"}
+                </p>
+              </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Weight</label>
                 <p className="text-sm font-mono" data-testid="detail-weight">
