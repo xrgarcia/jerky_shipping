@@ -259,8 +259,9 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 7. Ready to Session - has fingerprint and packaging, awaiting session assignment
-    if (!sessionStatus && shipment.decisionSubphase === 'needs_session') {
+    // 7. Ready to Session - on hold with no session status yet (pre-session state)
+    // This matches the "Ready to Session" lifecycle tab filter criteria
+    if (!sessionStatus && shipmentStatus === 'on_hold' && !hasTracking) {
       return (
         <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <Clock className="h-3 w-3" />
@@ -269,7 +270,7 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       );
     }
     
-    // 8. On Hold - shipment is on hold
+    // 8. On Hold - shipment is on hold (but has session or other status)
     if (shipmentStatus === 'on_hold') {
       return (
         <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
