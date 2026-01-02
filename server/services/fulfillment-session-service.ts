@@ -392,18 +392,30 @@ export class FulfillmentSessionService {
       }
 
       // Remaining shipments go to new batches
-      let currentBatch: SessionBatch | null = null;
-      while (shipmentIndex < allShipments.length) {
-        if (!currentBatch || currentBatch.shipmentIds.length >= maxPerBatch) {
-          currentBatch = {
-            stationType,
-            stationId: stationGroups[0]?.stationId || null,
-            shipmentIds: [],
-          };
-          newBatches.push(currentBatch);
+      // First, calculate how many new batches we need
+      const remainingCount = allShipments.length - shipmentIndex;
+      if (remainingCount > 0) {
+        const batchCount = Math.ceil(remainingCount / maxPerBatch);
+        
+        // Get optimal station assignments for these batches using least-work-first
+        const stationAssignments = await this.getBestStationsForBatches(stationType, batchCount);
+        
+        let batchIndex = 0;
+        let currentBatch: SessionBatch | null = null;
+        
+        while (shipmentIndex < allShipments.length) {
+          if (!currentBatch || currentBatch.shipmentIds.length >= maxPerBatch) {
+            currentBatch = {
+              stationType,
+              stationId: stationAssignments[batchIndex] || stationGroups[0]?.stationId || null,
+              shipmentIds: [],
+            };
+            newBatches.push(currentBatch);
+            batchIndex++;
+          }
+          currentBatch.shipmentIds.push(allShipments[shipmentIndex].id);
+          shipmentIndex++;
         }
-        currentBatch.shipmentIds.push(allShipments[shipmentIndex].id);
-        shipmentIndex++;
       }
     }
 
@@ -751,6 +763,155 @@ export class FulfillmentSessionService {
   // ============================================================================
   // Private Helper Methods
   // ============================================================================
+
+  /**
+   * Get the best station for a new session using least-work-first algorithm
+   * 
+   * Strategy: Assign to the station with the fewest active sessions
+   * (draft, ready, picking, packing statuses count as "active")
+   * If tied, use round-robin by station ID for consistent distribution
+   */
+  private async getBestStationForType(stationType: string): Promise<string | null> {
+    // Get all active stations of this type
+    const activeStations = await db
+      .select({ id: stations.id, name: stations.name })
+      .from(stations)
+      .where(and(
+        eq(stations.stationType, stationType),
+        eq(stations.isActive, true)
+      ))
+      .orderBy(asc(stations.id));
+
+    if (activeStations.length === 0) {
+      return null;
+    }
+
+    if (activeStations.length === 1) {
+      return activeStations[0].id;
+    }
+
+    // Count active sessions per station (draft, ready, picking, packing)
+    const activeStatuses = ['draft', 'ready', 'picking', 'packing'];
+    const sessionCounts = await db
+      .select({
+        stationId: fulfillmentSessions.stationId,
+        activeCount: sql<number>`COUNT(*)`.as('active_count'),
+      })
+      .from(fulfillmentSessions)
+      .where(and(
+        eq(fulfillmentSessions.stationType, stationType),
+        inArray(fulfillmentSessions.status, activeStatuses)
+      ))
+      .groupBy(fulfillmentSessions.stationId);
+
+    // Build a map of station ID -> active session count
+    const countMap = new Map<string, number>();
+    for (const station of activeStations) {
+      countMap.set(station.id, 0); // Initialize all stations with 0
+    }
+    for (const row of sessionCounts) {
+      if (row.stationId) {
+        countMap.set(row.stationId, Number(row.activeCount));
+      }
+    }
+
+    // Find station(s) with minimum active sessions
+    let minCount = Infinity;
+    let bestStations: string[] = [];
+    
+    for (const [stationId, count] of Array.from(countMap.entries())) {
+      if (count < minCount) {
+        minCount = count;
+        bestStations = [stationId];
+      } else if (count === minCount) {
+        bestStations.push(stationId);
+      }
+    }
+
+    // If tie, use the first one alphabetically (consistent round-robin)
+    bestStations.sort();
+    const selected = bestStations[0];
+    
+    console.log(`[FulfillmentSession] Station selection for ${stationType}: ${activeStations.map(s => `${s.name}(${countMap.get(s.id)})`).join(', ')} → selected ${activeStations.find(s => s.id === selected)?.name}`);
+    
+    return selected;
+  }
+
+  /**
+   * Get best stations for multiple new sessions of the same type
+   * Uses round-robin distribution to balance across stations
+   */
+  private async getBestStationsForBatches(
+    stationType: string, 
+    batchCount: number
+  ): Promise<string[]> {
+    // Get all active stations of this type
+    const activeStations = await db
+      .select({ id: stations.id, name: stations.name })
+      .from(stations)
+      .where(and(
+        eq(stations.stationType, stationType),
+        eq(stations.isActive, true)
+      ))
+      .orderBy(asc(stations.id));
+
+    if (activeStations.length === 0) {
+      return new Array(batchCount).fill(null);
+    }
+
+    if (activeStations.length === 1) {
+      return new Array(batchCount).fill(activeStations[0].id);
+    }
+
+    // Count active sessions per station
+    const activeStatuses = ['draft', 'ready', 'picking', 'packing'];
+    const sessionCounts = await db
+      .select({
+        stationId: fulfillmentSessions.stationId,
+        activeCount: sql<number>`COUNT(*)`.as('active_count'),
+      })
+      .from(fulfillmentSessions)
+      .where(and(
+        eq(fulfillmentSessions.stationType, stationType),
+        inArray(fulfillmentSessions.status, activeStatuses)
+      ))
+      .groupBy(fulfillmentSessions.stationId);
+
+    // Build work count per station
+    const workCounts = new Map<string, number>();
+    for (const station of activeStations) {
+      workCounts.set(station.id, 0);
+    }
+    for (const row of sessionCounts) {
+      if (row.stationId && workCounts.has(row.stationId)) {
+        workCounts.set(row.stationId, Number(row.activeCount));
+      }
+    }
+
+    // Assign batches using least-work-first
+    const assignments: string[] = [];
+    for (let i = 0; i < batchCount; i++) {
+      // Find station with minimum work
+      let minWork = Infinity;
+      let bestStation = activeStations[0].id;
+      
+      for (const [stationId, work] of Array.from(workCounts.entries())) {
+        if (work < minWork) {
+          minWork = work;
+          bestStation = stationId;
+        }
+      }
+      
+      assignments.push(bestStation);
+      // Increment the count for the assigned station (for next iteration)
+      workCounts.set(bestStation, (workCounts.get(bestStation) || 0) + 1);
+    }
+
+    const stationNames = new Map(activeStations.map(s => [s.id, s.name]));
+    console.log(`[FulfillmentSession] Distributed ${batchCount} ${stationType} sessions: ${assignments.map(id => stationNames.get(id)).join(' → ')}`);
+
+    return assignments;
+  }
 
   private async getStationIdsByType(stationType: string): Promise<string[]> {
     const stationList = await db
