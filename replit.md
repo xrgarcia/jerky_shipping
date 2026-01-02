@@ -44,6 +44,9 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **ShipStation Label Creation Endpoints**: Differentiates between creating labels for existing and new shipments.
 - **Product Categorization (Kits vs. Assembled Products)**: Distinction based on whether products are exploded into components in SkuVault's QC Sale API. A QC Validation Report identifies miscategorized products.
 - **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog data (`skuvault_products` table), synced hourly from a GCP reporting database via a 3-way merge strategy.
+    - **Real-Time Inventory Tracking**: `skuvault_products` now has two inventory fields:
+      - `quantity_on_hand`: Snapshot from SkuVault (read-only, reset on daily sync)
+      - `available_quantity`: Starts equal to `quantity_on_hand`, decremented when QC explosion creates items for pending orders. Reset on each daily sync.
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations based on `vw_po_recommendations` from the reporting database.
 
 ## External Dependencies

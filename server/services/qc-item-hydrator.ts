@@ -578,13 +578,14 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     
     // Decrement available_quantity in skuvault_products for each SKU
     // This tracks inventory allocation as orders are processed
-    const skuQuantities = new Map<string, number>();
+    const skuQuantities: Record<string, number> = {};
     for (const qcItem of qcItemsToInsert) {
-      const current = skuQuantities.get(qcItem.sku) || 0;
-      skuQuantities.set(qcItem.sku, current + qcItem.quantityExpected);
+      const qty = qcItem.quantityExpected ?? 0;
+      skuQuantities[qcItem.sku] = (skuQuantities[qcItem.sku] || 0) + qty;
     }
     
-    for (const [sku, quantity] of skuQuantities) {
+    for (const sku of Object.keys(skuQuantities)) {
+      const quantity = skuQuantities[sku];
       await db
         .update(skuvaultProducts)
         .set({
