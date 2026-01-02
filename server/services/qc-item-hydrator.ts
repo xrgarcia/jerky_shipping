@@ -548,10 +548,15 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     
     // Upsert all QC items (use ON CONFLICT to prevent duplicates)
     // If a shipment+sku already exists, update the quantity and other fields
+    // Note: We must provide explicit IDs because Drizzle's onConflictDoUpdate 
+    // doesn't correctly use database defaults when the conflict target differs from PK
     for (const qcItem of qcItemsToInsert) {
       await db
         .insert(shipmentQcItems)
-        .values(qcItem)
+        .values({
+          ...qcItem,
+          id: crypto.randomUUID(), // Explicitly provide UUID for new inserts
+        } as any)
         .onConflictDoUpdate({
           target: [shipmentQcItems.shipmentId, shipmentQcItems.sku],
           set: {
