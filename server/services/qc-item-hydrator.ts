@@ -38,6 +38,7 @@ import {
   getKitCacheStats,
 } from './kit-mappings-cache';
 import { getProductsBatch, type ProductInfo } from './product-lookup';
+import { updateShipmentLifecycle } from './lifecycle-service';
 
 const log = (message: string) => console.log(`[qc-item-hydrator] ${message}`);
 
@@ -577,6 +578,11 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     // Calculate and assign fingerprint
     const fingerprintResult = await calculateFingerprint(shipmentId);
     
+    // Re-evaluate lifecycle state after fingerprint calculation
+    // This ensures the shipment moves from needs_categorization to needs_session
+    // when fingerprint is complete and packaging is assigned
+    await updateShipmentLifecycle(shipmentId);
+    
     return { 
       shipmentId, 
       orderNumber, 
@@ -740,6 +746,8 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
           if (fingerprintResult.isNew) {
             result.newFingerprints++;
           }
+          // Re-evaluate lifecycle state after fingerprint is complete
+          await updateShipmentLifecycle(shipment.id);
         } else {
           result.pendingCategorization++;
         }
