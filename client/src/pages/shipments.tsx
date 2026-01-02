@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
@@ -57,6 +58,75 @@ interface CacheStatus {
 
 // Special package name that indicates a shipment should NOT be shipped and requires manager alert
 const DO_NOT_SHIP_PACKAGE = "**DO NOT SHIP (ALERT MGR)**";
+
+// Lifecycle phase descriptions for popover explanations
+const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string; nextSteps: string }> = {
+  on_dock: {
+    title: "On the Dock",
+    description: "This order has a shipping label printed and is ready for carrier pickup. The package is physically on the dock waiting to be scanned by the carrier.",
+    nextSteps: "Wait for carrier to pick up and scan the package. Status will update to 'In Transit' once scanned."
+  },
+  picking_issues: {
+    title: "Picking Issues",
+    description: "There was a problem during the picking process. This could be due to missing inventory, damaged items, or picker-reported issues.",
+    nextSteps: "Review the picking notes and resolve the issue. May need to cancel/reroute or wait for inventory."
+  },
+  packing_ready: {
+    title: "Packing Ready",
+    description: "All items have been picked and the order is ready to be packed. The picker has completed their session and validated all items.",
+    nextSteps: "Take to a packing station, scan to begin packing, then print the shipping label."
+  },
+  picking: {
+    title: "Picking",
+    description: "A picker is actively collecting items for this order from the warehouse shelves. The session is in progress.",
+    nextSteps: "Wait for the picker to complete the session. They will validate items and mark it ready for packing."
+  },
+  ready_to_pick: {
+    title: "Ready to Pick",
+    description: "This order has been assigned to a fulfillment session and is waiting for a picker to start. The session is created but not yet active.",
+    nextSteps: "A picker will start the session on their device and begin collecting items."
+  },
+  ready_to_session: {
+    title: "Ready to Session",
+    description: "This order has all required information (fingerprint, packaging) and is ready to be added to a fulfillment session for picking.",
+    nextSteps: "Use the Session Builder to create a new session including this order."
+  },
+  needs_categorization: {
+    title: "Needs Categorization",
+    description: "One or more products in this order haven't been categorized yet. We need to know if items are kits (need QC explosion) or assembled products.",
+    nextSteps: "Categorize the products on the Products page, then the order will progress automatically."
+  },
+  needs_fingerprint: {
+    title: "Needs Fingerprint",
+    description: "The order's fingerprint (unique combination of SKUs and quantities) hasn't been calculated yet. This is needed to determine packaging.",
+    nextSteps: "The system will automatically calculate fingerprints. If stuck, check for product data issues."
+  },
+  needs_packaging: {
+    title: "Needs Packaging",
+    description: "The order fingerprint exists but no packaging assignment has been made. We don't know what box or bag size to use.",
+    nextSteps: "Assign packaging for this fingerprint on the Packaging page, or pack a similar order to auto-assign."
+  },
+  needs_session: {
+    title: "Needs Session",
+    description: "The order is ready for fulfillment but hasn't been added to a picking session yet.",
+    nextSteps: "Include this order in a new fulfillment session using the Session Builder."
+  },
+  ready_for_skuvault: {
+    title: "Ready for SkuVault",
+    description: "All prerequisites are met and the order is ready to be synced to SkuVault for wave picking.",
+    nextSteps: "The system will sync this to SkuVault automatically, or manually trigger a sync."
+  },
+  delivered: {
+    title: "Delivered",
+    description: "The carrier has confirmed delivery to the customer's address. The order fulfillment is complete.",
+    nextSteps: "No action needed. Order is complete."
+  },
+  processing: {
+    title: "Processing",
+    description: "The order is being processed but hasn't reached a specific lifecycle stage yet. This is a transitional state.",
+    nextSteps: "The system is working on this order. Check back shortly for an updated status."
+  }
+};
 
 // Helper to check if any package is a DO NOT SHIP package
 function hasDoNotShipPackage(packages?: ShipmentPackage[]): boolean {
@@ -189,6 +259,32 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     return <Badge variant="secondary" className="text-xs">{status}</Badge>;
   };
 
+  // Helper to wrap a badge in a popover with phase information
+  const wrapBadgeWithPopover = (phaseKey: string, badge: JSX.Element) => {
+    const info = LIFECYCLE_PHASE_INFO[phaseKey];
+    if (!info) return badge;
+    
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button type="button" className="cursor-pointer" data-testid={`popover-trigger-${shipment.orderNumber}`}>
+            {badge}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80" align="end">
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm">{info.title}</h4>
+            <p className="text-sm text-muted-foreground">{info.description}</p>
+            <div className="pt-2 border-t">
+              <p className="text-xs font-medium text-foreground">Next Steps:</p>
+              <p className="text-xs text-muted-foreground mt-1">{info.nextSteps}</p>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   // Get the lifecycle phase badge based on stored lifecyclePhase and decisionSubphase fields
   const getWorkflowStepBadge = () => {
     const lifecyclePhase = shipment.lifecyclePhase;
@@ -199,144 +295,173 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     
     // Priority 1: Check for terminal states first (Delivered)
     if (status === 'DE' || status === 'DELIVERED') {
-      return (
+      const badge = (
         <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
           <CheckCircle className="h-3 w-3" />
           Delivered
         </Badge>
       );
+      return wrapBadgeWithPopover('delivered', badge);
     }
     
     // Priority 2: Use stored lifecycle phase for proper badge display
     switch (lifecyclePhase) {
-      case 'on_dock':
-        return (
+      case 'on_dock': {
+        const badge = (
           <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Truck className="h-3 w-3" />
             On the Dock
           </Badge>
         );
+        return wrapBadgeWithPopover('on_dock', badge);
+      }
       
-      case 'picking_issues':
-        return (
+      case 'picking_issues': {
+        const badge = (
           <Badge className="bg-orange-600 hover:bg-orange-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <AlertTriangle className="h-3 w-3" />
             Picking Issues
           </Badge>
         );
+        return wrapBadgeWithPopover('picking_issues', badge);
+      }
       
-      case 'packing_ready':
-        return (
+      case 'packing_ready': {
+        const badge = (
           <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Package className="h-3 w-3" />
             Packing Ready
           </Badge>
         );
+        return wrapBadgeWithPopover('packing_ready', badge);
+      }
       
-      case 'picking':
-        return (
+      case 'picking': {
+        const badge = (
           <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Play className="h-3 w-3" />
             Picking
           </Badge>
         );
+        return wrapBadgeWithPopover('picking', badge);
+      }
       
-      case 'ready_to_pick':
-        return (
+      case 'ready_to_pick': {
+        const badge = (
           <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Timer className="h-3 w-3" />
             Ready to Pick
           </Badge>
         );
+        return wrapBadgeWithPopover('ready_to_pick', badge);
+      }
       
-      case 'ready_to_session':
-        return (
+      case 'ready_to_session': {
+        const badge = (
           <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Clock className="h-3 w-3" />
             Ready to Session
           </Badge>
         );
+        return wrapBadgeWithPopover('ready_to_session', badge);
+      }
       
       case 'awaiting_decisions':
         // Show decision subphase within awaiting_decisions
         switch (decisionSubphaseValue) {
-          case 'needs_categorization':
-            return (
+          case 'needs_categorization': {
+            const badge = (
               <Badge className="bg-rose-600 hover:bg-rose-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <AlertTriangle className="h-3 w-3" />
                 Needs Categorization
               </Badge>
             );
-          case 'needs_fingerprint':
-            return (
+            return wrapBadgeWithPopover('needs_categorization', badge);
+          }
+          case 'needs_fingerprint': {
+            const badge = (
               <Badge className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <Clock className="h-3 w-3" />
                 Needs Fingerprint
               </Badge>
             );
-          case 'needs_packaging':
-            return (
+            return wrapBadgeWithPopover('needs_fingerprint', badge);
+          }
+          case 'needs_packaging': {
+            const badge = (
               <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <Package className="h-3 w-3" />
                 Needs Packaging
               </Badge>
             );
-          case 'needs_session':
-            return (
+            return wrapBadgeWithPopover('needs_packaging', badge);
+          }
+          case 'needs_session': {
+            const badge = (
               <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <Clock className="h-3 w-3" />
                 Needs Session
               </Badge>
             );
-          case 'ready_for_skuvault':
-            return (
+            return wrapBadgeWithPopover('needs_session', badge);
+          }
+          case 'ready_for_skuvault': {
+            const badge = (
               <Badge className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <CheckCircle className="h-3 w-3" />
                 Ready for SkuVault
               </Badge>
             );
-          default:
-            return (
+            return wrapBadgeWithPopover('ready_for_skuvault', badge);
+          }
+          default: {
+            const badge = (
               <Badge className="bg-gray-500 hover:bg-gray-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <Clock className="h-3 w-3" />
                 Awaiting Decisions
               </Badge>
             );
+            return wrapBadgeWithPopover('processing', badge);
+          }
         }
       
       default:
         // Fallback for shipments without lifecycle phase set
         // Use session-based derivation for backwards compatibility
         if (sessionStatus === 'closed' && !hasTracking) {
-          return (
+          const badge = (
             <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
               <Package className="h-3 w-3" />
               Packing Ready
             </Badge>
           );
+          return wrapBadgeWithPopover('packing_ready', badge);
         }
         if (sessionStatus === 'active') {
-          return (
+          const badge = (
             <Badge className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
               <Play className="h-3 w-3" />
               Picking
             </Badge>
           );
+          return wrapBadgeWithPopover('picking', badge);
         }
         if (sessionStatus === 'new') {
-          return (
+          const badge = (
             <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
               <Timer className="h-3 w-3" />
               Ready to Pick
             </Badge>
           );
+          return wrapBadgeWithPopover('ready_to_pick', badge);
         }
-        return (
+        const fallbackBadge = (
           <Badge variant="outline" className="border-gray-400 text-gray-600 dark:text-gray-400 text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <Clock className="h-3 w-3" />
             Processing
           </Badge>
         );
+        return wrapBadgeWithPopover('processing', fallbackBadge);
     }
   };
 
