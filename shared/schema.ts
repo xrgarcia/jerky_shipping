@@ -1299,6 +1299,7 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
+  shipmentSkuUnique: uniqueIndex("shipment_qc_items_shipment_sku_unique").on(table.shipmentId, table.sku),
   shipmentIdIdx: index("shipment_qc_items_shipment_id_idx").on(table.shipmentId),
   skuIdx: index("shipment_qc_items_sku_idx").on(table.sku),
   barcodeIdx: index("shipment_qc_items_barcode_idx").on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
