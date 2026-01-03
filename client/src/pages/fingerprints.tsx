@@ -241,6 +241,7 @@ interface ReadyToSessionOrder {
   orderNumber: string;
   readyToSession: boolean;
   reason: string;
+  actionTab: string | null;
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -1676,9 +1677,19 @@ export default function Fingerprints() {
                             )}
                           </td>
                           <td className="py-2 px-3 text-sm">
-                            <span className={order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
-                              {order.reason}
-                            </span>
+                            {order.actionTab ? (
+                              <button
+                                onClick={() => setActiveTab(order.actionTab as WorkflowTab)}
+                                className="text-left text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                                data-testid={`button-action-${order.orderNumber}`}
+                              >
+                                {order.reason}
+                              </button>
+                            ) : (
+                              <span className={order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
+                                {order.reason}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
