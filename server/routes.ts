@@ -11384,6 +11384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all orders that are in ready_to_session lifecycle phase
       // (on hold + MOVE OVER tag + no session + not cancelled)
       // Left join with fingerprint_models to check if fingerprint has packaging assigned
+      // Also join fingerprints to get display name for packaging assignment messages
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
@@ -11393,9 +11394,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignedStationId: shipments.assignedStationId,
           decisionSubphase: shipments.decisionSubphase,
           fingerprintModelId: fingerprintModels.id,
+          fingerprintDisplayName: fingerprints.displayName,
+          fingerprintSignature: fingerprints.signature,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+        .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .where(
           and(
@@ -11409,19 +11413,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .orderBy(asc(shipments.orderNumber));
 
-      // Evaluate each order's session readiness and provide reason
+      // Get shipment IDs that need categorization (no fingerprint)
+      const shipmentIdsNeedingCategorization = readyToSessionOrders
+        .filter(o => !o.fingerprintId)
+        .map(o => o.id);
+
+      // Batch query uncategorized SKUs for all orders that need categorization
+      let uncategorizedSkusByShipment = new Map<string, string[]>();
+      if (shipmentIdsNeedingCategorization.length > 0) {
+        const uncategorizedItems = await db
+          .select({
+            shipmentId: shipmentQcItems.shipmentId,
+            sku: shipmentQcItems.sku,
+          })
+          .from(shipmentQcItems)
+          .where(
+            and(
+              sql`${shipmentQcItems.shipmentId} IN (${sql.raw(shipmentIdsNeedingCategorization.map(id => `'${id}'`).join(','))})`,
+              isNull(shipmentQcItems.collectionId)
+            )
+          );
+
+        // Group by shipment
+        for (const item of uncategorizedItems) {
+          const existing = uncategorizedSkusByShipment.get(item.shipmentId) || [];
+          if (!existing.includes(item.sku)) {
+            existing.push(item.sku);
+          }
+          uncategorizedSkusByShipment.set(item.shipmentId, existing);
+        }
+      }
+
+      // Get collection names for building human-readable fingerprint names
+      const { productCollections } = await import("@shared/schema");
+      const allCollections = await db.select().from(productCollections);
+      const collectionsMap = new Map<string, string>();
+      allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+
+      // Helper to build human-readable fingerprint name from signature
+      const buildFingerprintName = (displayName: string | null, signature: string | null): string => {
+        if (displayName) return displayName;
+        if (!signature) return 'Unknown pattern';
+        try {
+          const sig = JSON.parse(signature) as Record<string, number>;
+          const parts = Object.entries(sig)
+            .sort((a, b) => b[1] - a[1])
+            .map(([collectionId, qty]) => {
+              const collectionName = collectionsMap.get(collectionId) || collectionId;
+              return `${collectionName} (${qty})`;
+            });
+          return parts.join(' + ');
+        } catch {
+          return 'Unknown pattern';
+        }
+      };
+
+      // Evaluate each order's session readiness and provide actionable reason
       const ordersWithStatus = readyToSessionOrders.map(order => {
         let readyToSession = false;
         let reason = '';
+        let actionTab: string | null = null;
 
         if (!order.fingerprintId) {
-          reason = 'Needs fingerprint calculation';
+          // Order needs fingerprint - check why
+          const uncategorizedSkus = uncategorizedSkusByShipment.get(order.id) || [];
+          if (uncategorizedSkus.length > 0) {
+            // Show up to 3 SKUs, then "and X more"
+            const displaySkus = uncategorizedSkus.slice(0, 3);
+            const remaining = uncategorizedSkus.length - 3;
+            reason = `Categorize SKU: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
+            actionTab = 'categorize';
+          } else {
+            // All SKUs categorized but fingerprint not calculated yet - hydration pending
+            reason = 'Waiting for fingerprint sync (run hydration)';
+            actionTab = null;
+          }
         } else if (!order.fingerprintModelId) {
-          reason = 'Fingerprint needs package assignment';
+          // Fingerprint exists but no packaging assigned
+          const fpName = buildFingerprintName(order.fingerprintDisplayName, order.fingerprintSignature);
+          reason = `Assign packaging to: ${fpName}`;
+          actionTab = 'packaging';
         } else if (!order.assignedStationId) {
-          reason = 'Needs station assignment';
+          // Packaging exists but no station - check if packaging type has station configured
+          reason = 'Packaging type missing station assignment';
+          actionTab = 'packaging';
         } else if (order.decisionSubphase !== 'needs_session') {
-          reason = `In ${order.decisionSubphase || 'processing'} phase`;
+          // Fallback for other subphases
+          const subphaseLabels: Record<string, string> = {
+            'needs_categorization': 'Categorize products',
+            'needs_fingerprint': 'Waiting for fingerprint sync',
+            'needs_packaging': 'Assign packaging',
+            'ready_for_skuvault': 'Ready for SkuVault',
+          };
+          reason = subphaseLabels[order.decisionSubphase || ''] || `Processing: ${order.decisionSubphase || 'unknown'}`;
+          actionTab = order.decisionSubphase === 'needs_categorization' ? 'categorize' : 
+                      order.decisionSubphase === 'needs_packaging' ? 'packaging' : null;
         } else {
           readyToSession = true;
           reason = 'Ready for session';
@@ -11431,6 +11517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderNumber: order.orderNumber,
           readyToSession,
           reason,
+          actionTab,
         };
       });
 
