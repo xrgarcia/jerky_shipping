@@ -1821,6 +1821,11 @@ export default function Fingerprints() {
                   <CardDescription>
                     Monitor sessions currently being picked or packed
                   </CardDescription>
+                  {liveSessions.length > 0 && (
+                    <div className="text-sm font-medium text-foreground mt-2" data-testid="text-live-sessions-summary">
+                      {liveSessions.length} session{liveSessions.length !== 1 ? 's' : ''} · {liveSessions.reduce((sum, s) => sum + s.orderCount, 0)} orders total
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="outline"
