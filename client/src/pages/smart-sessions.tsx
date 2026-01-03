@@ -398,6 +398,7 @@ export default function SmartSessions() {
                           </button>
                         </TableHead>
                         <TableHead>Completed</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -440,6 +441,16 @@ export default function SmartSessions() {
                             {session.completedAt
                               ? format(new Date(session.completedAt), "MMM d, h:mm a")
                               : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSessionId(session.id)}
+                              data-testid={`button-view-details-${session.id}`}
+                            >
+                              View Details
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
