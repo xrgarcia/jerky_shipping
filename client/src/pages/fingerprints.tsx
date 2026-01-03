@@ -1992,6 +1992,52 @@ export default function Fingerprints() {
                                       <span className="font-medium">
                                         Session #{session.id}
                                       </span>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6"
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          let orderNumbers: string[] = [];
+                                          
+                                          // Use cached details if available
+                                          if (sessionDetails[session.id]?.shipments) {
+                                            orderNumbers = sessionDetails[session.id].shipments.map(s => s.orderNumber);
+                                          } else {
+                                            // Fetch session details if not loaded
+                                            try {
+                                              const res = await fetch(`/api/fulfillment-sessions/${session.id}`, {
+                                                credentials: 'include'
+                                              });
+                                              if (res.ok) {
+                                                const data = await res.json();
+                                                orderNumbers = data.shipments?.map((s: { orderNumber: string }) => s.orderNumber) || [];
+                                                // Cache the details
+                                                setSessionDetails(prev => ({ ...prev, [session.id]: data }));
+                                              }
+                                            } catch (err) {
+                                              console.error('Failed to fetch session details:', err);
+                                            }
+                                          }
+                                          
+                                          if (orderNumbers.length > 0) {
+                                            await navigator.clipboard.writeText(orderNumbers.join('\n'));
+                                            toast({
+                                              title: "Copied!",
+                                              description: `${orderNumbers.length} order number${orderNumbers.length !== 1 ? 's' : ''} copied to clipboard`,
+                                            });
+                                          } else {
+                                            toast({
+                                              title: "No orders",
+                                              description: "This session has no orders to copy",
+                                              variant: "destructive",
+                                            });
+                                          }
+                                        }}
+                                        data-testid={`button-copy-orders-${session.id}`}
+                                      >
+                                        <Copy className="h-3.5 w-3.5" />
+                                      </Button>
                                       <Badge 
                                         variant={session.status === 'picking' ? 'default' : session.status === 'packing' ? 'secondary' : 'outline'}
                                         className={
