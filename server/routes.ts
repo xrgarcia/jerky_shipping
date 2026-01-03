@@ -10177,17 +10177,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Packing Decisions API (Smart Shipping Engine)
   // ========================================
 
-  // Get count of uncategorized products only (lightweight for summary cards)
-  // OPTIMIZED: Uses shipments.decision_subphase to count shipments needing categorization
-  // This avoids expensive joins on the large shipment_qc_items table
+  // Get count of uncategorized products only (for summary cards)
+  // Uses fingerprint_status = 'pending_categorization' to match the products list endpoint
   app.get("/api/packing-decisions/uncategorized/count", requireAuth, async (req, res) => {
     try {
-      // Fast query: count shipments in needs_categorization subphase
-      // These are the shipments that have products needing categorization
+      // Fast query: count unique uncategorized SKUs in pending_categorization shipments
+      // Uses the same fingerprint_status filter as the products list endpoint for consistency
       const result = await db.execute(sql`
-        SELECT COUNT(*) as count 
-        FROM shipments 
-        WHERE decision_subphase = 'needs_categorization'
+        WITH pending_shipments AS (
+          SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
+        )
+        SELECT COUNT(DISTINCT qc.sku) as count
+        FROM shipment_qc_items qc
+        INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
+        LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+        WHERE pcm.id IS NULL
       `);
       
       const count = Number((result.rows?.[0] as any)?.count) || 0;
