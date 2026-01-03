@@ -122,14 +122,14 @@ export function AppSidebar() {
       icon: Layers,
     },
     {
-      title: "Smart Sessions",
-      url: "/smart-sessions",
-      icon: FileSearch,
-    },
-    {
       title: "Products",
       url: "/skuvault-products",
       icon: Package,
+    },
+    {
+      title: "Smart Sessions",
+      url: "/smart-sessions",
+      icon: FileSearch,
     },
     {
       title: "Customer Service",
@@ -243,7 +243,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.slice(0, 9).map((item) => (
+              {menuItems.slice(0, 11).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
@@ -338,7 +338,7 @@ export function AppSidebar() {
               )}
               
               {/* Remaining items after Reports */}
-              {menuItems.slice(9).map((item) => (
+              {menuItems.slice(11).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <Link 
                     href={item.url}
