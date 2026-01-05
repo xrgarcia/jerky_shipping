@@ -1411,3 +1411,34 @@ export const insertSkuvaultProductSchema = createInsertSchema(skuvaultProducts).
 
 export type InsertSkuvaultProduct = z.infer<typeof insertSkuvaultProductSchema>;
 export type SkuvaultProduct = typeof skuvaultProducts.$inferSelect;
+
+// ============================================================================
+// EXCLUDED EXPLOSION SKUS (SKUs to exclude from QC explosion processing)
+// ============================================================================
+
+/**
+ * Excluded Explosion SKUs - SKUs that should be filtered out during QC item hydration
+ * 
+ * These are typically "build" SKUs (BUILDBAG, BUILDBOX, BUILDJAS) that represent
+ * instructions or packaging materials rather than actual products to be picked.
+ * 
+ * When the QC Item Hydrator processes a shipment, it will skip any items with
+ * SKUs that appear in this table.
+ */
+export const excludedExplosionSkus = pgTable("excluded_explosion_skus", {
+  id: serial("id").primaryKey(),
+  sku: text("sku").notNull().unique(),
+  reason: text("reason"), // Optional reason for exclusion (e.g., "Build instruction SKU")
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => ({
+  skuIdx: index("excluded_explosion_skus_sku_idx").on(table.sku),
+}));
+
+export const insertExcludedExplosionSkuSchema = createInsertSchema(excludedExplosionSkus).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertExcludedExplosionSku = z.infer<typeof insertExcludedExplosionSkuSchema>;
+export type ExcludedExplosionSku = typeof excludedExplosionSkus.$inferSelect;
