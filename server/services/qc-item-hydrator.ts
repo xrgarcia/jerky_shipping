@@ -40,6 +40,7 @@ import {
 } from './kit-mappings-cache';
 import { getProductsBatch, type ProductInfo } from './product-lookup';
 import { updateShipmentLifecycle } from './lifecycle-service';
+import { storage } from '../storage';
 
 const log = (message: string) => console.log(`[qc-item-hydrator] ${message}`);
 
@@ -420,6 +421,9 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found' };
     }
     
+    // Get excluded SKUs set for filtering kit components (e.g., BUILDBAG, BUILDBOX)
+    const excludedSkus = await storage.getExcludedExplosionSkuSet();
+    
     // Phase 1: Pre-fetch product info to check product categories before explosion
     // We need productCategory to determine if a SKU should be exploded
     const rawSkus = items.map(item => item.sku).filter((sku): sku is string => !!sku);
@@ -465,6 +469,11 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
         const components = getKitComponents(sku);
         if (components && components.length > 0) {
           for (const comp of components) {
+            // Skip excluded SKUs (e.g., BUILDBAG, BUILDBOX, BUILDJAS)
+            if (excludedSkus.has(comp.componentSku)) {
+              log(`Skipping excluded component SKU: ${comp.componentSku} from kit ${sku}`);
+              continue;
+            }
             const totalQty = quantity * comp.componentQuantity;
             skusToLookup.push(comp.componentSku);
             itemsToProcess.push({
