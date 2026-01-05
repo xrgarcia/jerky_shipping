@@ -85,6 +85,9 @@ import {
   productCollectionMappings,
   // Shipment QC Items
   shipmentQcItems,
+  // Excluded Explosion SKUs
+  type ExcludedExplosionSku,
+  excludedExplosionSkus,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -412,6 +415,12 @@ export interface IStorage {
   getActiveWebPackingSession(userId: string): Promise<WebPackingSession | undefined>;
   createWebPackingSession(userId: string, stationId: string, expiresAt: Date): Promise<WebPackingSession>;
   deleteWebPackingSession(userId: string): Promise<boolean>;
+
+  // Excluded Explosion SKUs
+  getExcludedExplosionSkus(): Promise<ExcludedExplosionSku[]>;
+  getExcludedExplosionSkuSet(): Promise<Set<string>>;
+  addExcludedExplosionSku(sku: string, reason?: string, createdBy?: string): Promise<ExcludedExplosionSku>;
+  deleteExcludedExplosionSku(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3752,6 +3761,37 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(productCollectionMappings.sku, skus));
     
     return result;
+  }
+
+  // Excluded Explosion SKUs
+  async getExcludedExplosionSkus(): Promise<ExcludedExplosionSku[]> {
+    return db
+      .select()
+      .from(excludedExplosionSkus)
+      .orderBy(asc(excludedExplosionSkus.sku));
+  }
+
+  async getExcludedExplosionSkuSet(): Promise<Set<string>> {
+    const results = await db
+      .select({ sku: excludedExplosionSkus.sku })
+      .from(excludedExplosionSkus);
+    return new Set(results.map(r => r.sku));
+  }
+
+  async addExcludedExplosionSku(sku: string, reason?: string, createdBy?: string): Promise<ExcludedExplosionSku> {
+    const result = await db
+      .insert(excludedExplosionSkus)
+      .values({ sku, reason, createdBy })
+      .returning();
+    return result[0];
+  }
+
+  async deleteExcludedExplosionSku(id: number): Promise<boolean> {
+    const result = await db
+      .delete(excludedExplosionSkus)
+      .where(eq(excludedExplosionSkus.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 
