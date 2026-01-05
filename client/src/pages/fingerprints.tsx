@@ -2485,14 +2485,13 @@ export default function Fingerprints() {
                             variant="ghost"
                             className="h-5 w-5"
                             onClick={() => {
-                              const url = `${window.location.origin}/shipments/${orderNumber}`;
-                              navigator.clipboard.writeText(url);
+                              navigator.clipboard.writeText(orderNumber);
                               toast({
-                                title: "Link copied",
-                                description: `Shipments link for ${orderNumber} copied to clipboard`,
+                                title: "Order copied",
+                                description: `Order ${orderNumber} copied to clipboard`,
                               });
                             }}
-                            data-testid={`button-copy-shipment-link-${orderNumber}`}
+                            data-testid={`button-copy-order-${orderNumber}`}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
