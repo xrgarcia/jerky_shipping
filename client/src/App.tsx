@@ -40,6 +40,7 @@ import PackagingTypes from "@/pages/packaging-types";
 import FulfillmentPrep from "@/pages/fingerprints";
 import SkuvaultProducts from "@/pages/skuvault-products";
 import SmartSessions from "@/pages/smart-sessions";
+import ExcludedSkus from "@/pages/excluded-skus";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -116,6 +117,7 @@ function AppContent() {
       <Route path="/downloads" component={Downloads} />
       <Route path="/stations" component={Stations} />
       <Route path="/desktop-config" component={DesktopConfig} />
+      <Route path="/settings/excluded-skus" component={ExcludedSkus} />
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />

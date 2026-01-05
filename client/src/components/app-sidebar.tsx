@@ -48,7 +48,7 @@ export function AppSidebar() {
   const [reportsOpen, setReportsOpen] = useState(isReportsPage);
   
   // Auto-expand Settings section if on a tools page
-  const isSettingsPage = location.startsWith('/tools') || location === '/stations' || location === '/desktop-config';
+  const isSettingsPage = location.startsWith('/tools') || location.startsWith('/settings/') || location === '/stations' || location === '/desktop-config';
   const [settingsOpen, setSettingsOpen] = useState(isSettingsPage);
 
   const { data: userData } = useQuery<{ user: User }>({
@@ -164,6 +164,11 @@ export function AppSidebar() {
       title: "Desktop Config",
       url: "/desktop-config",
       icon: Settings,
+    },
+    {
+      title: "Excluded SKUs",
+      url: "/settings/excluded-skus",
+      icon: AlertTriangle,
     },
   ];
   
