@@ -8120,6 +8120,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Excluded Explosion SKUs API endpoints
+  app.get("/api/excluded-explosion-skus", requireAuth, async (req, res) => {
+    try {
+      const skus = await storage.getExcludedExplosionSkus();
+      res.json(skus);
+    } catch (error: any) {
+      console.error("[ExcludedSKUs] Error fetching excluded SKUs:", error);
+      res.status(500).json({ error: "Failed to fetch excluded SKUs" });
+    }
+  });
+
+  app.post("/api/excluded-explosion-skus", requireAuth, async (req, res) => {
+    try {
+      const { sku, reason } = req.body;
+      
+      if (!sku || typeof sku !== 'string' || sku.trim() === '') {
+        return res.status(400).json({ error: "SKU is required" });
+      }
+      
+      const trimmedSku = sku.trim().toUpperCase();
+      const createdBy = req.user!.email || req.user!.id;
+      
+      const result = await storage.addExcludedExplosionSku(trimmedSku, reason || null, createdBy);
+      res.status(201).json(result);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "SKU already exists in excluded list" });
+      }
+      console.error("[ExcludedSKUs] Error adding excluded SKU:", error);
+      res.status(500).json({ error: "Failed to add excluded SKU" });
+    }
+  });
+
+  app.delete("/api/excluded-explosion-skus/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+      
+      const deleted = await storage.deleteExcludedExplosionSku(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "SKU not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ExcludedSKUs] Error deleting excluded SKU:", error);
+      res.status(500).json({ error: "Failed to delete excluded SKU" });
+    }
+  });
+
   // Reporting API endpoints
   // Returns full snapshot or date-specific data - frontend handles all filtering/sorting locally for instant performance
   app.get("/api/reporting/po-recommendations", requireAuth, async (req, res) => {
