@@ -49,6 +49,7 @@ interface SkuvaultProductsResponse {
   pageSize: number;
   totalPages: number;
   categories: string[];
+  brands: string[];
 }
 
 interface KitComponent {
@@ -229,15 +230,24 @@ function ProductDetailDialog({
                 </p>
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Is Assembled Product</label>
-                <p className="text-sm" data-testid="detail-assembled">
-                  {product.isAssembledProduct ? (
-                    <Badge variant="default">Yes</Badge>
-                  ) : (
-                    <Badge variant="outline">No</Badge>
-                  )}
+                <label className="text-sm font-medium text-muted-foreground">Brand</label>
+                <p className="text-sm" data-testid="detail-brand">
+                  {product.brand ? (
+                    <Badge variant="secondary">{product.brand}</Badge>
+                  ) : "-"}
                 </p>
               </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Is Assembled Product</label>
+              <p className="text-sm" data-testid="detail-assembled">
+                {product.isAssembledProduct ? (
+                  <Badge variant="default">Yes</Badge>
+                ) : (
+                  <Badge variant="outline">No</Badge>
+                )}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -448,9 +458,12 @@ export default function SkuvaultProducts() {
   const [pageSize, setPageSize] = useState(50);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [pendingCategories, setPendingCategories] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [pendingBrands, setPendingBrands] = useState<string[]>([]);
   const [assembledFilter, setAssembledFilter] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<SkuvaultProduct | null>(null);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+  const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
 
   // Sync pending state when popover opens
   const handleCategoryPopoverChange = (open: boolean) => {
@@ -458,6 +471,13 @@ export default function SkuvaultProducts() {
       setPendingCategories([...selectedCategories]);
     }
     setCategoryPopoverOpen(open);
+  };
+
+  const handleBrandPopoverChange = (open: boolean) => {
+    if (open) {
+      setPendingBrands([...selectedBrands]);
+    }
+    setBrandPopoverOpen(open);
   };
 
   const handleSearchChange = (value: string) => {
@@ -475,9 +495,10 @@ export default function SkuvaultProducts() {
     params.set("pageSize", pageSize.toString());
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (selectedCategories.length > 0) params.set("categories", selectedCategories.join(","));
+    if (selectedBrands.length > 0) params.set("brands", selectedBrands.join(","));
     if (assembledFilter !== "all") params.set("isAssembled", assembledFilter);
     return params.toString();
-  }, [page, pageSize, debouncedSearch, selectedCategories, assembledFilter]);
+  }, [page, pageSize, debouncedSearch, selectedCategories, selectedBrands, assembledFilter]);
 
   const { data, isLoading } = useQuery<SkuvaultProductsResponse>({
     queryKey: [`/api/skuvault-products?${queryParams}`],
@@ -518,6 +539,13 @@ export default function SkuvaultProducts() {
     setCategoryPopoverOpen(false);
   };
 
+  // Apply pending brands to actual filter
+  const applyBrands = () => {
+    setSelectedBrands([...pendingBrands]);
+    setPage(1);
+    setBrandPopoverOpen(false);
+  };
+
   const handleAssembledChange = (value: string) => {
     setAssembledFilter(value);
     setPage(1);
@@ -527,11 +555,12 @@ export default function SkuvaultProducts() {
     setSearch("");
     setDebouncedSearch("");
     setSelectedCategories([]);
+    setSelectedBrands([]);
     setAssembledFilter("all");
     setPage(1);
   };
 
-  const hasActiveFilters = search || selectedCategories.length > 0 || assembledFilter !== "all";
+  const hasActiveFilters = search || selectedCategories.length > 0 || selectedBrands.length > 0 || assembledFilter !== "all";
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -600,6 +629,7 @@ export default function SkuvaultProducts() {
   const totalProducts = data?.total || 0;
   const totalPages = data?.totalPages || 1;
   const categories = data?.categories || [];
+  const brands = data?.brands || [];
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -753,6 +783,89 @@ export default function SkuvaultProducts() {
             </div>
 
             <div>
+              <label className="text-sm font-medium mb-1.5 block">Brand</label>
+              <Popover open={brandPopoverOpen} onOpenChange={handleBrandPopoverChange}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between font-normal"
+                    data-testid="button-brand-filter"
+                  >
+                    <span className="truncate">
+                      {selectedBrands.length === 0
+                        ? "All brands"
+                        : selectedBrands.length === brands.length
+                        ? "All brands selected"
+                        : `${selectedBrands.length} selected`}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="p-2 border-b flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPendingBrands([...brands])}
+                      className="flex-1 h-8"
+                      data-testid="button-select-all-brands"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-1" />
+                      Check All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPendingBrands([])}
+                      className="flex-1 h-8"
+                      data-testid="button-uncheck-all-brands"
+                    >
+                      <Square className="w-4 h-4 mr-1" />
+                      Uncheck All
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-1">
+                      {brands.length > 0 ? brands.map((brand) => (
+                        <label
+                          key={brand}
+                          className="flex items-center space-x-2 hover-elevate rounded px-2 py-1.5 cursor-pointer"
+                          data-testid={`checkbox-brand-${brand}`}
+                        >
+                          <Checkbox
+                            checked={pendingBrands.includes(brand)}
+                            onCheckedChange={() => {
+                              setPendingBrands(prev =>
+                                prev.includes(brand)
+                                  ? prev.filter(b => b !== brand)
+                                  : [...prev, brand]
+                              );
+                            }}
+                          />
+                          <span className="text-sm truncate flex-1">{brand}</span>
+                        </label>
+                      )) : (
+                        <p className="text-sm text-muted-foreground px-2 py-4 text-center">
+                          No brands available
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  <div className="p-2 border-t">
+                    <Button
+                      onClick={applyBrands}
+                      className="w-full"
+                      data-testid="button-apply-brands"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Apply ({pendingBrands.length} selected)
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div>
               <label className="text-sm font-medium mb-1.5 block">Is Assembled Product</label>
               <Select value={assembledFilter} onValueChange={handleAssembledChange}>
                 <SelectTrigger data-testid="select-is-assembled-product">
@@ -796,6 +909,13 @@ export default function SkuvaultProducts() {
                   {selectedCategories.length === 1
                     ? `Category: ${selectedCategories[0]}`
                     : `Categories: ${selectedCategories.length} selected`}
+                </Badge>
+              )}
+              {selectedBrands.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {selectedBrands.length === 1
+                    ? `Brand: ${selectedBrands[0]}`
+                    : `Brands: ${selectedBrands.length} selected`}
                 </Badge>
               )}
               {assembledFilter !== "all" && (

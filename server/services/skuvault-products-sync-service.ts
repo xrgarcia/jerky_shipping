@@ -125,6 +125,15 @@ async function setLastSyncedDate(dateStr: string): Promise<void> {
 }
 
 /**
+ * Clear the last synced date from Redis (forces next sync to run)
+ */
+export async function clearLastSyncedDate(): Promise<void> {
+  const redis = getRedisClient();
+  await redis.del(LAST_SYNCED_DATE_KEY);
+  log('Cleared last synced date - next sync will run unconditionally');
+}
+
+/**
  * Fetch products from reporting database (3-way merge)
  * 
  * Order of queries:

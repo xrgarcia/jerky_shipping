@@ -10564,9 +10564,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
       const search = (req.query.search as string || "").trim().toLowerCase();
       const categoriesParam = req.query.categories as string; // comma-separated list
+      const brandsParam = req.query.brands as string; // comma-separated list of brands
       const isAssembled = req.query.isAssembled as string;
       
-      console.log(`[SkuVault Products] Query params: page=${page}, pageSize=${pageSize}, search="${search}", categories="${categoriesParam || 'none'}", isAssembled="${isAssembled || 'all'}"`);
+      console.log(`[SkuVault Products] Query params: page=${page}, pageSize=${pageSize}, search="${search}", categories="${categoriesParam || 'none'}", brands="${brandsParam || 'none'}", isAssembled="${isAssembled || 'all'}"`);
       
       // Build where conditions
       const conditions = [];
@@ -10588,6 +10589,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[SkuVault Products] Categories filter: ${categoryList.length} categories selected:`, categoryList.slice(0, 3).join(", "), categoryList.length > 3 ? "..." : "");
         if (categoryList.length > 0) {
           conditions.push(inArray(skuvaultProducts.productCategory, categoryList));
+        }
+      }
+      
+      // Multi-select brands filter (comma-separated)
+      if (brandsParam && brandsParam.trim()) {
+        const brandList = brandsParam.split(",").map(b => b.trim()).filter(Boolean);
+        console.log(`[SkuVault Products] Brands filter: ${brandList.length} brands selected:`, brandList.slice(0, 3).join(", "), brandList.length > 3 ? "..." : "");
+        if (brandList.length > 0) {
+          conditions.push(inArray(skuvaultProducts.brand, brandList));
         }
       }
       
@@ -10630,6 +10640,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map(r => r.category)
         .filter((c): c is string => c !== null);
       
+      // Get distinct brands for filter dropdown
+      const brandsResult = await db
+        .selectDistinct({ brand: skuvaultProducts.brand })
+        .from(skuvaultProducts)
+        .where(sql`${skuvaultProducts.brand} IS NOT NULL`)
+        .orderBy(skuvaultProducts.brand);
+      
+      const allBrands = brandsResult
+        .map(r => r.brand)
+        .filter((b): b is string => b !== null);
+      
       res.json({
         products,
         total,
@@ -10637,6 +10658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pageSize,
         totalPages,
         categories: allCategories,
+        brands: allBrands,
       });
     } catch (error: any) {
       console.error("[SkuVault Products] Error fetching products:", error);
@@ -10730,9 +10752,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Force sync skuvault products (clears cache and re-syncs from reporting database)
   app.post("/api/skuvault-products/force-sync", requireAuth, async (req, res) => {
     try {
-      const { syncSkuvaultProducts } = await import("./services/skuvault-products-sync-service");
+      const { syncSkuvaultProducts, clearLastSyncedDate } = await import("./services/skuvault-products-sync-service");
       
-      console.log("[SkuVault Products] Force sync requested");
+      console.log("[SkuVault Products] Force sync requested - clearing cache first");
+      await clearLastSyncedDate();
+      
       const result = await syncSkuvaultProducts();
       
       res.json({
