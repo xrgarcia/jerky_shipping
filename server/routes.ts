@@ -10882,6 +10882,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // SkuVault Inventory API
+  // ========================================
+
+  /**
+   * Get inventory by brand and warehouse
+   * Query params:
+   *   - brand (required): Brand name to filter by (e.g., "Jerky.com")
+   *   - warehouseCode (optional): Warehouse code, defaults to "-1" (all warehouses)
+   * 
+   * Returns inventory items with quantities, locations, and summary statistics
+   */
+  app.get("/api/skuvault/inventory/by-brand", requireAuth, async (req, res) => {
+    try {
+      const brand = req.query.brand as string;
+      const warehouseCode = (req.query.warehouseCode as string) || '-1';
+      
+      if (!brand) {
+        return res.status(400).json({ 
+          error: "Missing required parameter: brand",
+          example: "/api/skuvault/inventory/by-brand?brand=Jerky.com&warehouseCode=-1"
+        });
+      }
+      
+      console.log(`[API] Fetching inventory for brand: ${brand}, warehouse: ${warehouseCode}`);
+      
+      const response = await skuVaultService.getInventoryByBrandAndWarehouse(brand, warehouseCode);
+      
+      // Check for API errors
+      if (response.Errors && response.Errors.length > 0) {
+        console.error(`[API] SkuVault returned errors:`, response.Errors);
+        return res.status(400).json({
+          error: "SkuVault API returned errors",
+          details: response.Errors,
+        });
+      }
+      
+      res.json(response);
+    } catch (error: any) {
+      console.error(`[API] Error fetching inventory by brand:`, error);
+      
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
+  // ========================================
   // Fingerprints API (Smart Shipping Engine)
   // ========================================
 
