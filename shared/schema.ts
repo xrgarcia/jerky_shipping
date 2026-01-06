@@ -1394,6 +1394,7 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   parentSku: text("parent_sku"), // For variants: the parent SKU this variant belongs to (null for parents/kits)
   quantityOnHand: integer("quantity_on_hand").notNull().default(0), // Current stock quantity from SkuVault (snapshot, read-only)
   availableQuantity: integer("available_quantity").notNull().default(0), // Available stock = quantityOnHand - pending orders (decremented on QC explosion, reset on daily sync)
+  physicalLocation: text("physical_location"), // Physical warehouse location from SkuVault inventory API (synced hourly)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
