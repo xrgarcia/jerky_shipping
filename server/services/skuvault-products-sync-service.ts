@@ -590,11 +590,16 @@ export async function getSyncStatus(): Promise<{
 // PHYSICAL LOCATION SYNC (SkuVault Inventory API)
 // ============================================================================
 
+// Known brand names in SkuVault - these are the actual brand values used in the inventory system
+const SKUVAULT_BRANDS = [
+  'Jerky.com',
+];
+
 /**
  * Sync physical locations from SkuVault inventory API
  * 
  * This function:
- * 1. Gets distinct productCategory values (brands) from skuvault_products
+ * 1. Uses configured brand names (SKUVAULT_BRANDS) 
  * 2. For each brand, calls the SkuVault inventory API
  * 3. Matches items by SKU and updates physical_location if different
  * 
@@ -619,17 +624,9 @@ export async function syncPhysicalLocations(): Promise<{
   log('[location-sync] Starting physical location sync...');
 
   try {
-    // Get distinct brands (productCategory) from our products table
-    const distinctBrands = await db
-      .selectDistinct({ brand: skuvaultProducts.productCategory })
-      .from(skuvaultProducts)
-      .where(sql`${skuvaultProducts.productCategory} IS NOT NULL`);
+    const brands = SKUVAULT_BRANDS;
 
-    const brands = distinctBrands
-      .map(r => r.brand)
-      .filter((b): b is string => b !== null && b.trim() !== '');
-
-    log(`[location-sync] Found ${brands.length} distinct brands to process`);
+    log(`[location-sync] Processing ${brands.length} configured brand(s): ${brands.join(', ')}`);
 
     // Import the SkuVault service
     const { skuVaultService } = await import('./skuvault-service');
@@ -670,14 +667,13 @@ export async function syncPhysicalLocations(): Promise<{
           // (items are returned with primary location first typically)
         }
 
-        // Get current products for this brand from our database
+        // Get all products from our database to match against SkuVault inventory
         const currentProducts = await db
           .select({ 
             sku: skuvaultProducts.sku, 
             physicalLocation: skuvaultProducts.physicalLocation 
           })
-          .from(skuvaultProducts)
-          .where(eq(skuvaultProducts.productCategory, brand));
+          .from(skuvaultProducts);
 
         // Compare and update where different
         for (const product of currentProducts) {
