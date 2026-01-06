@@ -9782,6 +9782,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Hydrate a single shipment (for testing excluded SKUs)
+  app.post("/api/collections/hydrate-shipment", requireAuth, async (req, res) => {
+    try {
+      const { shipmentId } = req.body;
+      if (!shipmentId) {
+        return res.status(400).json({ error: "shipmentId is required" });
+      }
+      
+      const { hydrateShipment } = await import('./services/qc-item-hydrator');
+      const { ensureKitMappingsFresh } = await import('./services/kit-mappings-cache');
+      
+      await ensureKitMappingsFresh();
+      
+      // Get the order number
+      const shipmentData = await db
+        .select({ orderNumber: shipments.orderNumber })
+        .from(shipments)
+        .where(eq(shipments.id, shipmentId))
+        .limit(1);
+      
+      if (!shipmentData[0]) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+      
+      const result = await hydrateShipment(shipmentId, shipmentData[0].orderNumber || 'unknown');
+      
+      console.log(`[Collections] Hydrated shipment ${shipmentId}:`, result);
+      
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error hydrating shipment:", error);
+      res.status(500).json({ error: "Failed to hydrate shipment" });
+    }
+  });
+
   // Complete reset and recalculate ALL fingerprints
   // This performs a FULL RESET of the fulfillment prep workflow:
   // 1. Clears all fingerprint/packaging/station assignments from shipments
