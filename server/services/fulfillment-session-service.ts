@@ -19,6 +19,7 @@ import {
   fingerprints,
   shipmentQcItems,
   shipmentTags,
+  skuvaultProducts,
   DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
@@ -55,6 +56,7 @@ export interface SessionableShipment {
   fingerprintId: string | null;
   assignedStationId: string | null;
   packagingTypeId: string | null;
+  pickingPosition?: number; // Position based on earliest SKU in warehouse path
 }
 
 /** Result of session building operation */
@@ -162,7 +164,130 @@ export class FulfillmentSessionService {
         asc(shipments.orderNumber)
       );
 
-    return results;
+    // Calculate picking positions based on warehouse location path
+    const shipmentsWithPositions = await this.calculatePickingPositions(results);
+    
+    return shipmentsWithPositions;
+  }
+
+  /**
+   * Build a location-sorted SKU index for efficient warehouse picking
+   * 
+   * 1. Get all distinct SKUs from the given shipments
+   * 2. Join to skuvault_products to get physical_location
+   * 3. Sort by physical_location (alphabetically: A-1 < A-2 < B-1)
+   * 4. Return Map<sku, position> for O(1) lookups
+   */
+  private async buildLocationSortedSkuIndex(shipmentIds: string[]): Promise<Map<string, number>> {
+    if (shipmentIds.length === 0) {
+      return new Map();
+    }
+
+    // Get all distinct SKUs from shipment items with their physical locations
+    const skuLocations = await db
+      .selectDistinct({
+        sku: shipmentQcItems.sku,
+        physicalLocation: skuvaultProducts.physicalLocation,
+      })
+      .from(shipmentQcItems)
+      .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
+      .where(inArray(shipmentQcItems.shipmentId, shipmentIds));
+
+    // Sort by physical_location (nulls go last)
+    const sortedSkus = skuLocations.sort((a, b) => {
+      const locA = a.physicalLocation || 'ZZZZ'; // Nulls last
+      const locB = b.physicalLocation || 'ZZZZ';
+      return locA.localeCompare(locB);
+    });
+
+    // Build position index
+    const skuIndex = new Map<string, number>();
+    sortedSkus.forEach((item, index) => {
+      skuIndex.set(item.sku, index);
+    });
+
+    console.log(`[FulfillmentSession] Built location index for ${skuIndex.size} SKUs across ${shipmentIds.length} shipments`);
+    
+    return skuIndex;
+  }
+
+  /**
+   * Calculate picking position for each shipment based on its earliest SKU
+   * in the warehouse path (location-sorted SKU index)
+   */
+  private async calculatePickingPositions(
+    shipmentList: SessionableShipment[]
+  ): Promise<SessionableShipment[]> {
+    if (shipmentList.length === 0) {
+      return [];
+    }
+
+    const shipmentIds = shipmentList.map(s => s.id);
+    
+    // Build the location-sorted SKU index
+    const skuIndex = await this.buildLocationSortedSkuIndex(shipmentIds);
+    
+    if (skuIndex.size === 0) {
+      // No SKU data available, use order number as fallback
+      console.log(`[FulfillmentSession] No SKU location data, falling back to order number sort`);
+      return shipmentList.map((s, i) => ({ ...s, pickingPosition: i }));
+    }
+
+    // Get SKUs for each shipment
+    const shipmentSkus = await db
+      .select({
+        shipmentId: shipmentQcItems.shipmentId,
+        sku: shipmentQcItems.sku,
+      })
+      .from(shipmentQcItems)
+      .where(inArray(shipmentQcItems.shipmentId, shipmentIds));
+
+    // Group SKUs by shipment
+    const skusByShipment = new Map<string, string[]>();
+    for (const row of shipmentSkus) {
+      const skus = skusByShipment.get(row.shipmentId) || [];
+      skus.push(row.sku);
+      skusByShipment.set(row.shipmentId, skus);
+    }
+
+    // Calculate each shipment's picking position (earliest SKU in the path)
+    const shipmentsWithPositions = shipmentList.map(shipment => {
+      const skus = skusByShipment.get(shipment.id) || [];
+      
+      // Find the minimum position among all SKUs in this shipment
+      let earliestPosition = Infinity;
+      for (const sku of skus) {
+        const pos = skuIndex.get(sku);
+        if (pos !== undefined && pos < earliestPosition) {
+          earliestPosition = pos;
+        }
+      }
+      
+      // If no SKUs found in index, put at end
+      if (earliestPosition === Infinity) {
+        earliestPosition = skuIndex.size;
+      }
+
+      return { ...shipment, pickingPosition: earliestPosition };
+    });
+
+    // Sort by pickingPosition within fingerprint groups
+    shipmentsWithPositions.sort((a, b) => {
+      // First by station
+      if (a.assignedStationId !== b.assignedStationId) {
+        return (a.assignedStationId || '').localeCompare(b.assignedStationId || '');
+      }
+      // Then by fingerprint
+      if (a.fingerprintId !== b.fingerprintId) {
+        return (a.fingerprintId || '').localeCompare(b.fingerprintId || '');
+      }
+      // Finally by picking position (warehouse path order)
+      return (a.pickingPosition ?? 0) - (b.pickingPosition ?? 0);
+    });
+
+    console.log(`[FulfillmentSession] Calculated picking positions for ${shipmentsWithPositions.length} shipments`);
+    
+    return shipmentsWithPositions;
   }
 
   /**
@@ -171,7 +296,7 @@ export class FulfillmentSessionService {
    * Sorting strategy:
    * 1. Station type (boxing_machine → poly_bag → hand_pack)
    * 2. Fingerprint (same fingerprint = same products = efficient picking)
-   * 3. Order number (for consistent ordering)
+   * 3. Picking position (warehouse path order based on physical location)
    */
   async groupShipmentsForBatching(
     shipmentList: SessionableShipment[]
