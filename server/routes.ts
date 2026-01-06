@@ -10933,6 +10933,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * Get inventory by title/search term and warehouse
+   * Query params:
+   *   - term (required): Product title or search term to filter by
+   *   - warehouseCode (optional): Warehouse code, defaults to "-1" (all warehouses)
+   * 
+   * Returns inventory items with quantities, locations, and summary statistics
+   */
+  app.get("/api/skuvault/inventory/by-title", requireAuth, async (req, res) => {
+    try {
+      const term = req.query.term as string;
+      const warehouseCode = (req.query.warehouseCode as string) || '-1';
+      
+      if (!term) {
+        return res.status(400).json({ 
+          error: "Missing required parameter: term",
+          example: "/api/skuvault/inventory/by-title?term=Red Wine Beef Jerky&warehouseCode=-1"
+        });
+      }
+      
+      console.log(`[API] Fetching inventory for term: "${term}", warehouse: ${warehouseCode}`);
+      
+      const response = await skuVaultService.getInventoryByTitleAndWarehouse(term, warehouseCode);
+      
+      // Check for API errors
+      if (response.Errors && response.Errors.length > 0) {
+        console.error(`[API] SkuVault returned errors:`, response.Errors);
+        return res.status(400).json({
+          error: "SkuVault API returned errors",
+          details: response.Errors,
+        });
+      }
+      
+      res.json(response);
+    } catch (error: any) {
+      console.error(`[API] Error fetching inventory by title:`, error);
+      
+      if (error instanceof SkuVaultError) {
+        return res.status(error.statusCode).json({
+          error: error.message,
+          details: error.details,
+        });
+      }
+      
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
   // ========================================
   // Fingerprints API (Smart Shipping Engine)
   // ========================================

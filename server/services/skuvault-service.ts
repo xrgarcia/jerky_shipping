@@ -2071,6 +2071,50 @@ export class SkuVaultService {
   }
 
   /**
+   * Get inventory by title/search term and warehouse
+   * Endpoint: GET /inventory/item/getInventoryByTitleAndWarehouse
+   * 
+   * Used to search SkuVault's product catalog by product title or search term.
+   * Returns summary statistics and paginated inventory items.
+   * 
+   * @param term - Product title or search term to filter by
+   * @param warehouseCode - Warehouse code to filter by, or "-1" for all warehouses
+   * @returns InventoryByBrandResponse (same structure as brand search)
+   */
+  async getInventoryByTitleAndWarehouse(
+    term: string,
+    warehouseCode: string = '-1'
+  ): Promise<import('@shared/skuvault-types').InventoryByBrandResponse> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/inventory/item/getInventoryByTitleAndWarehouse?Term=${encodeURIComponent(term)}&WarehouseCode=${encodeURIComponent(warehouseCode)}`;
+      console.log(`[SkuVault Inventory] Fetching inventory for term: "${term}", warehouse: ${warehouseCode}`);
+      
+      const response = await this.makeQCRequest<any>('GET', endpoint);
+      
+      // Import schema for validation (reusing brand response schema - same structure)
+      const { inventoryByBrandResponseSchema } = await import('@shared/skuvault-types');
+      
+      // Validate response with Zod schema
+      const validatedResponse = inventoryByBrandResponseSchema.parse(response);
+      
+      // Log summary statistics
+      const itemCount = validatedResponse.Data?.Items?.length || 0;
+      const totalLines = validatedResponse.Data?.TotalLines || 0;
+      const productsWithQty = validatedResponse.Data?.ProductsWithQuantity || '0';
+      
+      console.log(`[SkuVault Inventory] Fetched ${itemCount} items (${totalLines} total lines, ${productsWithQty} products with quantity)`);
+      
+      return validatedResponse;
+
+    } catch (error) {
+      console.error(`[SkuVault Inventory] Error fetching inventory for term "${term}":`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Get token metadata for operations dashboard
    * Returns authentication status and last refresh timestamp
    */
