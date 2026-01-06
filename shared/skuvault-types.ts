@@ -944,3 +944,123 @@ export function transformProductLookup(envelope: ProductLookupEnvelope): Product
       };
   }
 }
+
+/**
+ * =============================================================================
+ * Inventory By Brand Types (getInventoryByBrandAndWarehouse endpoint)
+ * =============================================================================
+ * 
+ * These types represent the response from the inventory lookup endpoint,
+ * which is called to search/filter SkuVault's product catalog by brand.
+ * 
+ * Endpoint: GET /inventory/item/getInventoryByBrandAndWarehouse
+ * Query params: Brand={brandName}&WarehouseCode={code}
+ * WarehouseCode=-1 means all warehouses
+ */
+
+/**
+ * Individual inventory item from the getInventoryByBrandAndWarehouse response
+ * Note: Same product can appear multiple times with different locations
+ */
+export const inventoryItemSchema = z.object({
+  Id: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(), // Barcode
+  Sku: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+  PartNumber: z.string().nullable().optional(),
+  
+  // Quantities
+  Quantity: z.number().nullable().optional(),
+  UnlottedQuantity: z.number().nullable().optional(),
+  
+  // Location information
+  Location: z.string().nullable().optional(),
+  LocationCode: z.string().nullable().optional(),
+  LocationWithWarehouseCode: z.string().nullable().optional(),
+  LocationIsNotCounted: z.boolean().nullable().optional(),
+  ContainerCode: z.string().nullable().optional(),
+  WarehouseCode: z.string().nullable().optional(),
+  
+  // Cost structure (amount + currency symbol)
+  Cost: priceValueSchema.nullable().optional(),
+  
+  // Product images
+  PictureUrl: z.string().nullable().optional(),
+  
+  // Product flags
+  IsCasePack: z.boolean().nullable().optional(),
+  IsLotted: z.boolean().nullable().optional(),
+  IsSerialized: z.boolean().nullable().optional(),
+  
+  // Additional optional fields
+  Lots: z.array(z.any()).nullable().optional(),
+  Suppliers: z.any().nullable().optional(),
+  PrimarySupplier: z.string().nullable().optional(),
+  SerialNumbers: z.any().nullable().optional(),
+});
+
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+
+/**
+ * Data payload from getInventoryByBrandAndWarehouse response
+ * Contains summary statistics and paginated Items array
+ */
+export const inventoryByBrandDataSchema = z.object({
+  // Summary statistics (some are returned as strings)
+  ProductsWithQuantity: z.string().nullable().optional(),
+  TotalLines: z.number().nullable().optional(),
+  QuantityOnHand: z.string().nullable().optional(),
+  PickedQuantity: z.string().nullable().optional(),
+  PendingQuantity: z.string().nullable().optional(),
+  HeldQuantity: z.string().nullable().optional(),
+  AvailableQuantity: z.string().nullable().optional(),
+  
+  // Total cost with currency
+  TotalCost: priceValueSchema.nullable().optional(),
+  DecimalPlaces: z.number().nullable().optional(),
+  CurrencyISOCode: z.string().nullable().optional(),
+  
+  // Search/filter info
+  Term: z.string().nullable().optional(), // The brand name that was searched
+  
+  // Product existence check (for single product lookup scenarios)
+  ProductExist: z.boolean().nullable().optional(),
+  PictureUrl: z.string().nullable().optional(),
+  Code: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+  Sku: z.string().nullable().optional(),
+  
+  // Product flags (for single product lookup scenarios)
+  IsCasePack: z.boolean().nullable().optional(),
+  IsSerialized: z.boolean().nullable().optional(),
+  IsLotted: z.boolean().nullable().optional(),
+  IsFoundBySerialNumber: z.boolean().nullable().optional(),
+  LotScanned: z.boolean().nullable().optional(),
+  HasLots: z.boolean().nullable().optional(),
+  IsLotExpired: z.boolean().nullable().optional(),
+  
+  // Filter options
+  Classifications: z.array(z.any()).nullable().optional(),
+  Brands: z.array(z.any()).nullable().optional(),
+  Suppliers: z.array(z.any()).nullable().optional(),
+  Warehouses: z.any().nullable().optional(),
+  DisabledWarehouses: z.any().nullable().optional(),
+  CurrentWarehouse: z.any().nullable().optional(),
+  
+  // The main inventory items array
+  Items: z.array(inventoryItemSchema).nullable().optional(),
+});
+
+export type InventoryByBrandData = z.infer<typeof inventoryByBrandDataSchema>;
+
+/**
+ * Response wrapper for getInventoryByBrandAndWarehouse endpoint
+ * SkuVault returns: {"Errors": [], "Messages": [], "Data": {...}}
+ */
+export const inventoryByBrandResponseSchema = z.object({
+  Errors: z.array(z.string()).nullable().optional(),
+  Messages: z.array(z.string()).nullable().optional(),
+  Data: inventoryByBrandDataSchema.nullable().optional(),
+});
+
+export type InventoryByBrandResponse = z.infer<typeof inventoryByBrandResponseSchema>;

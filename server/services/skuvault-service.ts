@@ -2027,6 +2027,50 @@ export class SkuVaultService {
   }
 
   /**
+   * Get inventory by brand and warehouse
+   * Endpoint: GET /inventory/item/getInventoryByBrandAndWarehouse
+   * 
+   * Used to search/filter SkuVault's product catalog by brand.
+   * Returns summary statistics and paginated inventory items.
+   * 
+   * @param brand - Brand name to filter by (e.g., "Jerky.com")
+   * @param warehouseCode - Warehouse code to filter by, or "-1" for all warehouses
+   * @returns InventoryByBrandResponse with Data containing items and statistics
+   */
+  async getInventoryByBrandAndWarehouse(
+    brand: string,
+    warehouseCode: string = '-1'
+  ): Promise<import('@shared/skuvault-types').InventoryByBrandResponse> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `/inventory/item/getInventoryByBrandAndWarehouse?Brand=${encodeURIComponent(brand)}&WarehouseCode=${encodeURIComponent(warehouseCode)}`;
+      console.log(`[SkuVault Inventory] Fetching inventory for brand: ${brand}, warehouse: ${warehouseCode}`);
+      
+      const response = await this.makeQCRequest<any>('GET', endpoint);
+      
+      // Import schema for validation
+      const { inventoryByBrandResponseSchema } = await import('@shared/skuvault-types');
+      
+      // Validate response with Zod schema
+      const validatedResponse = inventoryByBrandResponseSchema.parse(response);
+      
+      // Log summary statistics
+      const itemCount = validatedResponse.Data?.Items?.length || 0;
+      const totalLines = validatedResponse.Data?.TotalLines || 0;
+      const productsWithQty = validatedResponse.Data?.ProductsWithQuantity || '0';
+      
+      console.log(`[SkuVault Inventory] Fetched ${itemCount} items (${totalLines} total lines, ${productsWithQty} products with quantity)`);
+      
+      return validatedResponse;
+
+    } catch (error) {
+      console.error(`[SkuVault Inventory] Error fetching inventory for brand ${brand}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Get token metadata for operations dashboard
    * Returns authentication status and last refresh timestamp
    */
