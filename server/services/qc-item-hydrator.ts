@@ -446,6 +446,12 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       const sku = item.sku;
       const quantity = item.quantity || 1;
       
+      // Skip excluded SKUs at top level (e.g., BUILDBAG, BUILDBOX, BUILDJAS as line items)
+      if (excludedSkus.has(sku)) {
+        log(`Skipping excluded top-level SKU: ${sku} from order ${orderNumber}`);
+        continue;
+      }
+      
       // Determine if product should be exploded into components
       const productInfo = preProductCache.get(sku);
       const isKitCategory = productInfo?.productCategory?.toLowerCase() === 'kit';
