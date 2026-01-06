@@ -278,6 +278,14 @@ function ProductDetailDialog({
                     : "-"}
                 </p>
               </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Physical Location</label>
+                <p className="text-sm font-mono" data-testid="detail-physical-location">
+                  {product.physicalLocation ? (
+                    <Badge variant="outline">{product.physicalLocation}</Badge>
+                  ) : "-"}
+                </p>
+              </div>
             </div>
 
             <div>
@@ -700,7 +708,7 @@ export default function SkuvaultProducts() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by SKU, title, barcode..."
+                  placeholder="Search by SKU, title, barcode, location..."
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-9"

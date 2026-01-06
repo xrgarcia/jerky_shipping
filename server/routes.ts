@@ -10578,7 +10578,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sql`LOWER(${skuvaultProducts.sku}) LIKE ${`%${search}%`}`,
             sql`LOWER(${skuvaultProducts.productTitle}) LIKE ${`%${search}%`}`,
             sql`LOWER(${skuvaultProducts.barcode}) LIKE ${`%${search}%`}`,
-            sql`LOWER(${skuvaultProducts.productCategory}) LIKE ${`%${search}%`}`
+            sql`LOWER(${skuvaultProducts.productCategory}) LIKE ${`%${search}%`}`,
+            sql`LOWER(${skuvaultProducts.physicalLocation}) LIKE ${`%${search}%`}`
           )
         );
       }
