@@ -585,3 +585,163 @@ export async function getSyncStatus(): Promise<{
     };
   }
 }
+
+// ============================================================================
+// PHYSICAL LOCATION SYNC (SkuVault Inventory API)
+// ============================================================================
+
+/**
+ * Sync physical locations from SkuVault inventory API
+ * 
+ * This function:
+ * 1. Gets distinct productCategory values (brands) from skuvault_products
+ * 2. For each brand, calls the SkuVault inventory API
+ * 3. Matches items by SKU and updates physical_location if different
+ * 
+ * @returns Sync statistics including updated and skipped counts
+ */
+export async function syncPhysicalLocations(): Promise<{
+  success: boolean;
+  brandsProcessed: number;
+  productsChecked: number;
+  locationsUpdated: number;
+  locationsUnchanged: number;
+  errors: string[];
+  duration: number;
+}> {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  let brandsProcessed = 0;
+  let productsChecked = 0;
+  let locationsUpdated = 0;
+  let locationsUnchanged = 0;
+
+  log('[location-sync] Starting physical location sync...');
+
+  try {
+    // Get distinct brands (productCategory) from our products table
+    const distinctBrands = await db
+      .selectDistinct({ brand: skuvaultProducts.productCategory })
+      .from(skuvaultProducts)
+      .where(sql`${skuvaultProducts.productCategory} IS NOT NULL`);
+
+    const brands = distinctBrands
+      .map(r => r.brand)
+      .filter((b): b is string => b !== null && b.trim() !== '');
+
+    log(`[location-sync] Found ${brands.length} distinct brands to process`);
+
+    // Import the SkuVault service
+    const { skuVaultService } = await import('./skuvault-service');
+
+    // Process each brand
+    for (const brand of brands) {
+      try {
+        log(`[location-sync] Processing brand: ${brand}`);
+        
+        // Call SkuVault API to get inventory for this brand
+        const response = await skuVaultService.getInventoryByBrandAndWarehouse(brand, '-1');
+        
+        if (response.Errors && response.Errors.length > 0) {
+          errors.push(`Brand "${brand}": ${response.Errors.join(', ')}`);
+          continue;
+        }
+
+        const items = response.Data?.Items || [];
+        
+        if (items.length === 0) {
+          log(`[location-sync] No items found for brand: ${brand}`);
+          brandsProcessed++;
+          continue;
+        }
+
+        // Build a map of SKU -> location (take first location with highest quantity)
+        const skuLocationMap = new Map<string, string>();
+        
+        for (const item of items) {
+          if (!item.Sku || !item.Location) continue;
+          
+          const existingLocation = skuLocationMap.get(item.Sku);
+          if (!existingLocation) {
+            // First location for this SKU - use it
+            skuLocationMap.set(item.Sku, item.Location);
+          }
+          // If we already have a location for this SKU, keep the first one
+          // (items are returned with primary location first typically)
+        }
+
+        // Get current products for this brand from our database
+        const currentProducts = await db
+          .select({ 
+            sku: skuvaultProducts.sku, 
+            physicalLocation: skuvaultProducts.physicalLocation 
+          })
+          .from(skuvaultProducts)
+          .where(eq(skuvaultProducts.productCategory, brand));
+
+        // Compare and update where different
+        for (const product of currentProducts) {
+          productsChecked++;
+          
+          const newLocation = skuLocationMap.get(product.sku);
+          
+          if (!newLocation) {
+            // SKU not found in SkuVault response - skip
+            continue;
+          }
+
+          if (product.physicalLocation === newLocation) {
+            // Location unchanged
+            locationsUnchanged++;
+          } else {
+            // Location is different - update
+            await db
+              .update(skuvaultProducts)
+              .set({ 
+                physicalLocation: newLocation,
+                updatedAt: new Date(),
+              })
+              .where(eq(skuvaultProducts.sku, product.sku));
+            
+            locationsUpdated++;
+          }
+        }
+
+        brandsProcessed++;
+        log(`[location-sync] Completed brand "${brand}": ${items.length} items from API, ${currentProducts.length} local products`);
+
+      } catch (brandError) {
+        const errorMsg = brandError instanceof Error ? brandError.message : String(brandError);
+        errors.push(`Brand "${brand}": ${errorMsg}`);
+        log(`[location-sync] Error processing brand "${brand}": ${errorMsg}`);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    log(`[location-sync] Sync complete: ${brandsProcessed} brands, ${productsChecked} products checked, ${locationsUpdated} updated, ${locationsUnchanged} unchanged (${duration}ms)`);
+
+    return {
+      success: errors.length === 0,
+      brandsProcessed,
+      productsChecked,
+      locationsUpdated,
+      locationsUnchanged,
+      errors,
+      duration,
+    };
+
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`[location-sync] Fatal error: ${errorMsg}`);
+    
+    return {
+      success: false,
+      brandsProcessed,
+      productsChecked,
+      locationsUpdated,
+      locationsUnchanged,
+      errors: [...errors, `Fatal: ${errorMsg}`],
+      duration: Date.now() - startTime,
+    };
+  }
+}

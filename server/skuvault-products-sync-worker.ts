@@ -13,6 +13,7 @@ import {
   checkAndSync,
   getSyncStatus,
   syncSkuvaultProducts,
+  syncPhysicalLocations,
 } from './services/skuvault-products-sync-service';
 
 const log = (message: string) => console.log(`[skuvault-products-worker] ${message}`);
@@ -27,6 +28,10 @@ let workerStats = {
   lastStockCheckDate: null as string | null,
   lastProductCount: 0,
   workerStartedAt: new Date(),
+  // Location sync stats
+  lastLocationSyncAt: null as Date | null,
+  lastLocationSyncUpdated: 0,
+  lastLocationSyncBrands: 0,
 };
 
 /**
@@ -72,6 +77,20 @@ async function runSyncCheck(): Promise<void> {
       log(`Sync completed: ${result.reason}`);
     } else {
       log(`No sync needed: ${result.reason}`);
+    }
+    
+    // Always run physical location sync (independent of product catalog sync)
+    log('Running physical location sync...');
+    const locationResult = await syncPhysicalLocations();
+    
+    workerStats.lastLocationSyncAt = new Date();
+    workerStats.lastLocationSyncUpdated = locationResult.locationsUpdated;
+    workerStats.lastLocationSyncBrands = locationResult.brandsProcessed;
+    
+    if (locationResult.success) {
+      log(`Location sync completed: ${locationResult.locationsUpdated} updated, ${locationResult.locationsUnchanged} unchanged`);
+    } else {
+      log(`Location sync completed with errors: ${locationResult.errors.join(', ')}`);
     }
     
   } catch (error) {
