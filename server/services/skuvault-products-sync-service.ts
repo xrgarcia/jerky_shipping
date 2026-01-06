@@ -41,6 +41,7 @@ interface ReportingProduct {
   weight_unit: string | null;
   parent_sku: string | null; // For variants: the parent SKU (null for parents/kits)
   quantity_on_hand: number | null; // Current stock quantity from SkuVault
+  brand: string | null; // Brand name (e.g., "Jerky.com", "Klements") - null for kits, filled from parent/variant queries
 }
 
 /**
@@ -86,6 +87,7 @@ function mergeProducts(
   mergeField('weight_unit');
   mergeField('parent_sku');
   mergeField('quantity_on_hand');
+  mergeField('brand');
   
   return merged;
 }
@@ -138,6 +140,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   // 1. Fetch kit products (no weight data, but have cost)
   // NOTE: is_assembled_product=false because kits are EXPLODED at fulfillment time
   // APs (pre-built products) have is_assembled_product=true and are NOT exploded
+  // Kits don't have their own brand - they inherit from parent query during merge
   const kitProducts = await reportingSql<ReportingProduct[]>`
     SELECT 
       sku,
@@ -150,7 +153,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       NULL::real as weight_value,
       NULL::text as weight_unit,
       NULL::text as parent_sku,
-      available_quantity as quantity_on_hand
+      available_quantity as quantity_on_hand,
+      NULL::text as brand
     FROM 
       public.internal_kit_inventory 
     WHERE snapshot_timestamp = (
@@ -161,7 +165,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   
   log(`[1/3] Fetched ${kitProducts.length} kit products`);
   
-  // 2. Fetch parent products (sku = primary_sku) with weight data
+  // 2. Fetch parent products (sku = primary_sku) with weight data and brand
   const parentProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       sku,
@@ -174,7 +178,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       COST::text AS unit_cost,
       (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
       NULL::text as parent_sku,
-      quantity_on_hand
+      quantity_on_hand,
+      brand
     FROM
       public.internal_inventory 
     LEFT JOIN 
@@ -193,7 +198,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   
   log(`[2/3] Fetched ${parentProducts.length} parent products`);
   
-  // 3. Fetch variant products (sku != primary_sku) with parent_sku
+  // 3. Fetch variant products (sku != primary_sku) with parent_sku and brand
   const variantProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       sku,
@@ -206,7 +211,8 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       COST::text AS unit_cost,
       primary_sku as parent_sku,
       (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
-      quantity_on_hand
+      quantity_on_hand,
+      brand
     FROM
       public.internal_inventory 
     LEFT JOIN 
@@ -458,6 +464,7 @@ export async function syncSkuvaultProducts(): Promise<{
         parentSku: p.parent_sku,
         quantityOnHand: p.quantity_on_hand ?? 0,
         availableQuantity: p.quantity_on_hand ?? 0, // Reset to match quantityOnHand on each sync
+        brand: p.brand,
       }));
       
       await db.insert(skuvaultProducts).values(insertData);
@@ -590,16 +597,11 @@ export async function getSyncStatus(): Promise<{
 // PHYSICAL LOCATION SYNC (SkuVault Inventory API)
 // ============================================================================
 
-// Known brand names in SkuVault - these are the actual brand values used in the inventory system
-const SKUVAULT_BRANDS = [
-  'Jerky.com',
-];
-
 /**
  * Sync physical locations from SkuVault inventory API
  * 
  * This function:
- * 1. Uses configured brand names (SKUVAULT_BRANDS) 
+ * 1. Gets distinct brand values from the local skuvault_products table
  * 2. For each brand, calls the SkuVault inventory API
  * 3. Matches items by SKU and updates physical_location if different
  * 
@@ -624,9 +626,17 @@ export async function syncPhysicalLocations(): Promise<{
   log('[location-sync] Starting physical location sync...');
 
   try {
-    const brands = SKUVAULT_BRANDS;
+    // Get distinct brands from our local products table
+    const distinctBrands = await db
+      .selectDistinct({ brand: skuvaultProducts.brand })
+      .from(skuvaultProducts)
+      .where(sql`${skuvaultProducts.brand} IS NOT NULL`);
 
-    log(`[location-sync] Processing ${brands.length} configured brand(s): ${brands.join(', ')}`);
+    const brands = distinctBrands
+      .map(r => r.brand)
+      .filter((b): b is string => b !== null && b.trim() !== '');
+
+    log(`[location-sync] Found ${brands.length} distinct brand(s) to process: ${brands.join(', ')}`);
 
     // Import the SkuVault service
     const { skuVaultService } = await import('./skuvault-service');
@@ -667,13 +677,14 @@ export async function syncPhysicalLocations(): Promise<{
           // (items are returned with primary location first typically)
         }
 
-        // Get all products from our database to match against SkuVault inventory
+        // Get products for this brand from our database to match against SkuVault inventory
         const currentProducts = await db
           .select({ 
             sku: skuvaultProducts.sku, 
             physicalLocation: skuvaultProducts.physicalLocation 
           })
-          .from(skuvaultProducts);
+          .from(skuvaultProducts)
+          .where(eq(skuvaultProducts.brand, brand));
 
         // Compare and update where different
         for (const product of currentProducts) {

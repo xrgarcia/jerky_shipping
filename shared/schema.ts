@@ -1395,6 +1395,7 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   quantityOnHand: integer("quantity_on_hand").notNull().default(0), // Current stock quantity from SkuVault (snapshot, read-only)
   availableQuantity: integer("available_quantity").notNull().default(0), // Available stock = quantityOnHand - pending orders (decremented on QC explosion, reset on daily sync)
   physicalLocation: text("physical_location"), // Physical warehouse location from SkuVault inventory API (synced hourly)
+  brand: text("brand"), // Brand name from SkuVault (e.g., "Jerky.com", "Klements")
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
