@@ -552,6 +552,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
         parentSku: item.parentSku,
         weightValue: product?.weightValue || null,
         weightUnit: product?.weightUnit || null,
+        physicalLocation: product?.physicalLocation || null,
       });
     }
     
@@ -586,6 +587,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
             parentSku: qcItem.parentSku,
             weightValue: qcItem.weightValue,
             weightUnit: qcItem.weightUnit,
+            physicalLocation: qcItem.physicalLocation,
             updatedAt: new Date(),
           },
         });
