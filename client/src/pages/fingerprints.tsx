@@ -1258,7 +1258,15 @@ export default function Fingerprints() {
 
         {/* Assign Packaging Tab */}
         <TabsContent value="packaging" className="mt-6 space-y-6">
-          {fingerprints.length === 0 ? (
+          {isLoadingFingerprints ? (
+            <Card className="p-12 text-center">
+              <Loader2 className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
+              <h2 className="text-xl font-semibold mb-2">Loading fingerprints...</h2>
+              <p className="text-muted-foreground">
+                Please wait while we fetch the data.
+              </p>
+            </Card>
+          ) : fingerprints.length === 0 ? (
             <Card className="p-12 text-center">
               <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">No fingerprints yet</h2>
