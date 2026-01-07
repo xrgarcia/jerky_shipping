@@ -853,9 +853,11 @@ export default function Fingerprints() {
     }
   };
 
-  const isLoading = fingerprintsLoading || uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
+  // Only show page skeleton for initial critical data, NOT for tab-specific lazy-loaded data
+  // Fingerprint loading states are handled within the packaging tab's content area
+  const isInitialLoading = uncategorizedLoading || sessionPreviewLoading || liveSessionsLoading;
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
