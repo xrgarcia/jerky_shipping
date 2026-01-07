@@ -1283,14 +1283,6 @@ export default function Fingerprints() {
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
                       <Button
-                        variant={filter === 'all' ? 'secondary' : 'ghost'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                        data-testid="button-filter-all"
-                      >
-                        All ({fingerprints.length})
-                      </Button>
-                      <Button
                         variant={filter === 'needs-mapping' ? 'secondary' : 'ghost'}
                         size="sm"
                         onClick={() => setFilter('needs-mapping')}
@@ -1307,6 +1299,14 @@ export default function Fingerprints() {
                         data-testid="button-filter-mapped"
                       >
                         Mapped ({stats?.assigned || 0})
+                      </Button>
+                      <Button
+                        variant={filter === 'all' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilter('all')}
+                        data-testid="button-filter-all"
+                      >
+                        All ({stats?.total || 0})
                       </Button>
                     </div>
                     
@@ -1426,6 +1426,12 @@ export default function Fingerprints() {
                 )}
                 
                 <ScrollArea className="h-[400px]">
+                  {isLoadingFingerprints ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      <p className="text-muted-foreground">Loading fingerprints...</p>
+                    </div>
+                  ) : (
                   <div className="space-y-2">
                     {filteredFingerprints.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
@@ -1559,6 +1565,7 @@ export default function Fingerprints() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </ScrollArea>
               </CardContent>
             </Card>
