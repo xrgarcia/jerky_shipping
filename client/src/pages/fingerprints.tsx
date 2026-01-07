@@ -294,14 +294,15 @@ export default function Fingerprints() {
     : 'categorize';
   
   // Derive filter from URL params (only relevant for packaging tab)
+  // Default to 'needs-mapping' for faster initial load
   const filter: FilterOption = activeTab === 'packaging' && VALID_SUB_TABS.includes(params.subTab as FilterOption)
     ? (params.subTab as FilterOption)
-    : 'all';
+    : 'needs-mapping';
   
   // Navigation helpers
   const setActiveTab = (tab: WorkflowTab) => {
     if (tab === 'packaging') {
-      navigate(`/fulfillment-prep/${tab}/all`);
+      navigate(`/fulfillment-prep/${tab}/needs-mapping`);
     } else {
       navigate(`/fulfillment-prep/${tab}`);
     }
@@ -357,14 +358,35 @@ export default function Fingerprints() {
     queryKey: ["/api/fingerprints/stats"],
   });
 
-  // Fingerprints data (heavy - lazy loaded for packaging tab only)
+  // Fingerprints data - lazy loaded based on active sub-tab
+  // "All" fingerprints (only load when "all" sub-tab is active)
   const {
     data: fingerprintsData,
     isLoading: fingerprintsLoading,
     refetch: refetchFingerprints,
   } = useQuery<FingerprintsResponse>({
     queryKey: ["/api/fingerprints"],
-    enabled: activeTab === 'packaging',
+    enabled: activeTab === 'packaging' && filter === 'all',
+  });
+
+  // "Needs Mapping" fingerprints (only load when "needs-mapping" sub-tab is active)
+  const {
+    data: needsMappingData,
+    isLoading: needsMappingLoading,
+    refetch: refetchNeedsMapping,
+  } = useQuery<{ fingerprints: FingerprintData[]; count: number }>({
+    queryKey: ["/api/fingerprints/needs-mapping"],
+    enabled: activeTab === 'packaging' && filter === 'needs-mapping',
+  });
+
+  // "Mapped" fingerprints (only load when "mapped" sub-tab is active)
+  const {
+    data: mappedData,
+    isLoading: mappedLoading,
+    refetch: refetchMapped,
+  } = useQuery<{ fingerprints: FingerprintData[]; count: number }>({
+    queryKey: ["/api/fingerprints/mapped"],
+    enabled: activeTab === 'packaging' && filter === 'mapped',
   });
 
   // Packaging types (needed for packaging tab and categorize dropdowns)
@@ -457,6 +479,8 @@ export default function Fingerprints() {
         [result.fingerprintId]: { type: 'success', message: `${result.shipmentsUpdated} updated` }
       }));
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
@@ -486,6 +510,8 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized"] });
       queryClient.invalidateQueries({ queryKey: ["/api/packing-decisions/uncategorized/count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
@@ -556,6 +582,8 @@ export default function Fingerprints() {
       toast({ title: "Packaging type updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       setEditingPackaging(null);
       setPackagingForm({ name: "", stationType: "" });
@@ -656,6 +684,8 @@ export default function Fingerprints() {
         description: `Assigned ${result.packagingTypeName} to ${result.fingerprintsAssigned} fingerprints (${result.shipmentsUpdated} shipments updated)`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
@@ -671,7 +701,20 @@ export default function Fingerprints() {
     },
   });
 
-  const fingerprints = fingerprintsData?.fingerprints || [];
+  // Get fingerprints based on active sub-tab
+  const fingerprints = filter === 'needs-mapping'
+    ? (needsMappingData?.fingerprints || [])
+    : filter === 'mapped'
+    ? (mappedData?.fingerprints || [])
+    : (fingerprintsData?.fingerprints || []);
+  
+  // Loading state based on active sub-tab
+  const isLoadingFingerprints = filter === 'needs-mapping'
+    ? needsMappingLoading
+    : filter === 'mapped'
+    ? mappedLoading
+    : fingerprintsLoading;
+  
   // Use lightweight stats for summary cards, fall back to full data stats when available
   const stats = fingerprintStatsData || fingerprintsData?.stats;
   const packagingTypes = packagingTypesData?.packagingTypes || [];
@@ -685,12 +728,8 @@ export default function Fingerprints() {
     s => s.status !== 'completed' && s.status !== 'cancelled'
   );
 
-  // Apply both status filter and weight filters
+  // Apply weight filters only (status filter is handled by the separate endpoints now)
   const filteredFingerprints = fingerprints.filter((fp) => {
-    // Status filter
-    if (filter === 'needs-mapping' && fp.hasPackaging) return false;
-    if (filter === 'mapped' && !fp.hasPackaging) return false;
-    
     // Weight filters (only apply if values are set)
     const fpWeight = fp.totalWeight ?? 0;
     const minW = minWeight ? parseFloat(minWeight) : null;
