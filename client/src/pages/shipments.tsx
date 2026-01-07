@@ -1682,7 +1682,7 @@ export default function Shipments() {
               <Input
                 data-testid="input-search-shipments"
                 type="search"
-                placeholder="Search by order #, tracking #, customer name, shipment ID, session ID..."
+                placeholder="Search by order #, SKU, tracking #, customer name, shipment ID, session ID..."
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);

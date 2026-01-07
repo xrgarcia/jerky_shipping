@@ -1371,7 +1371,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Text search across tracking number, carrier, order fields, session ID
+    // Text search across tracking number, carrier, order fields, session ID, and SKU in purchased items
     if (search) {
       const searchLower = search.toLowerCase();
       conditions.push(
@@ -1381,7 +1381,18 @@ export class DatabaseStorage implements IStorage {
           ilike(shipments.shipmentId, `%${searchLower}%`),
           ilike(shipments.orderNumber, `%${searchLower}%`),
           ilike(shipments.shipToName, `%${searchLower}%`),
-          ilike(shipments.sessionId, `%${searchLower}%`)
+          ilike(shipments.sessionId, `%${searchLower}%`),
+          // Search by SKU in purchased items (shipment_items)
+          exists(
+            db.select({ one: sql`1` })
+              .from(shipmentItems)
+              .where(
+                and(
+                  eq(shipmentItems.shipmentId, shipments.id),
+                  ilike(shipmentItems.sku, `%${searchLower}%`)
+                )
+              )
+          )
         )
       );
     }
