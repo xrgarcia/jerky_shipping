@@ -1739,14 +1739,35 @@ export default function Fingerprints() {
                 <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
                   <div className="flex items-start gap-3">
                     <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
-                        What does "Build Sessions" do?
+                    <div className="space-y-3">
+                      <p className="font-medium text-blue-800 dark:text-blue-200">
+                        How Smart Sessions Are Built
                       </p>
                       <p className="text-sm text-blue-700 dark:text-blue-300">
-                        Clicking Build Sessions will group the orders below into picking carts (max 28 orders each), 
-                        sorted by station type and product similarity. Sessions will appear in the Live tab 
-                        where you can monitor their progress through picking and packing.
+                        Clicking Build Sessions groups orders into optimized picking carts (max 28 orders each) 
+                        using a multi-level sorting algorithm designed to minimize warehouse travel time:
+                      </p>
+                      <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-2 list-decimal list-inside">
+                        <li>
+                          <span className="font-medium">Station Type</span> — Orders are first grouped by their 
+                          assigned packing station (Boxing Machine → Poly Bag → Hand Pack)
+                        </li>
+                        <li>
+                          <span className="font-medium">Fingerprint Grouping</span> — Within each station, orders 
+                          containing the same products are kept together for efficient batch picking
+                        </li>
+                        <li>
+                          <span className="font-medium">Warehouse Path</span> — Orders are sorted by their earliest 
+                          product's physical location (e.g., A-1 → A-2 → B-1 → C-1), so pickers follow a logical 
+                          path through the warehouse without backtracking
+                        </li>
+                        <li>
+                          <span className="font-medium">Session Size</span> — Each session holds up to 28 orders 
+                          to fit on a standard picking cart
+                        </li>
+                      </ol>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 italic">
+                        Sessions will appear in the Live tab where you can monitor their progress through picking and packing.
                       </p>
                     </div>
                   </div>
