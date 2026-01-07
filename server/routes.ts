@@ -11156,6 +11156,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get fingerprints that need mapping (no packaging assigned)
+  app.get("/api/fingerprints/needs-mapping", requireAuth, async (req, res) => {
+    try {
+      const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
+      
+      // Get fingerprints WITHOUT packaging assignment that have active shipments
+      const fingerprintsWithStats = await db
+        .select({
+          id: fingerprintsTable.id,
+          signature: fingerprintsTable.signature,
+          signatureHash: fingerprintsTable.signatureHash,
+          displayName: fingerprintsTable.displayName,
+          totalItems: fingerprintsTable.totalItems,
+          collectionCount: fingerprintsTable.collectionCount,
+          totalWeight: fingerprintsTable.totalWeight,
+          weightUnit: fingerprintsTable.weightUnit,
+          createdAt: fingerprintsTable.createdAt,
+          shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('shipment_count'),
+        })
+        .from(fingerprintsTable)
+        .innerJoin(shipmentsTable, eq(shipmentsTable.fingerprintId, fingerprintsTable.id))
+        .leftJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
+        .where(isNull(fingerprintModels.packagingTypeId))
+        .groupBy(
+          fingerprintsTable.id,
+          fingerprintsTable.signature,
+          fingerprintsTable.signatureHash,
+          fingerprintsTable.displayName,
+          fingerprintsTable.totalItems,
+          fingerprintsTable.collectionCount,
+          fingerprintsTable.totalWeight,
+          fingerprintsTable.weightUnit,
+          fingerprintsTable.createdAt
+        )
+        .orderBy(desc(sql`COUNT(DISTINCT ${shipmentsTable.id})`));
+      
+      // Parse signatures and build human-readable names
+      const collectionsMap = new Map<string, string>();
+      const allCollections = await db.select().from(productCollections);
+      allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+      
+      const fingerprintsWithNames = fingerprintsWithStats.map(fp => {
+        let humanReadableName = fp.displayName;
+        
+        if (!humanReadableName && fp.signature) {
+          try {
+            const sig = JSON.parse(fp.signature) as Record<string, number>;
+            const parts = Object.entries(sig)
+              .sort((a, b) => b[1] - a[1])
+              .map(([collectionId, qty]) => {
+                const collectionName = collectionsMap.get(collectionId) || collectionId;
+                return `${collectionName} (${qty})`;
+              });
+            humanReadableName = parts.join(' + ');
+          } catch {
+            humanReadableName = 'Unknown pattern';
+          }
+        }
+        
+        return {
+          ...fp,
+          humanReadableName: humanReadableName || 'Unknown pattern',
+          hasPackaging: false,
+          packagingTypeId: null,
+          packagingTypeName: null,
+          stationType: null,
+        };
+      });
+      
+      res.json({
+        fingerprints: fingerprintsWithNames,
+        count: fingerprintsWithNames.length,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error fetching needs-mapping:", error);
+      res.status(500).json({ error: "Failed to fetch fingerprints needing mapping" });
+    }
+  });
+
+  // Get fingerprints that are already mapped (have packaging assigned)
+  app.get("/api/fingerprints/mapped", requireAuth, async (req, res) => {
+    try {
+      const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
+      
+      // Get fingerprints WITH packaging assignment that have active shipments
+      const fingerprintsWithStats = await db
+        .select({
+          id: fingerprintsTable.id,
+          signature: fingerprintsTable.signature,
+          signatureHash: fingerprintsTable.signatureHash,
+          displayName: fingerprintsTable.displayName,
+          totalItems: fingerprintsTable.totalItems,
+          collectionCount: fingerprintsTable.collectionCount,
+          totalWeight: fingerprintsTable.totalWeight,
+          weightUnit: fingerprintsTable.weightUnit,
+          createdAt: fingerprintsTable.createdAt,
+          shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('shipment_count'),
+          packagingTypeId: fingerprintModels.packagingTypeId,
+          packagingTypeName: packagingTypes.name,
+          stationType: packagingTypes.stationType,
+        })
+        .from(fingerprintsTable)
+        .innerJoin(shipmentsTable, eq(shipmentsTable.fingerprintId, fingerprintsTable.id))
+        .innerJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
+        .innerJoin(packagingTypes, eq(packagingTypes.id, fingerprintModels.packagingTypeId))
+        .groupBy(
+          fingerprintsTable.id,
+          fingerprintsTable.signature,
+          fingerprintsTable.signatureHash,
+          fingerprintsTable.displayName,
+          fingerprintsTable.totalItems,
+          fingerprintsTable.collectionCount,
+          fingerprintsTable.totalWeight,
+          fingerprintsTable.weightUnit,
+          fingerprintsTable.createdAt,
+          fingerprintModels.packagingTypeId,
+          packagingTypes.name,
+          packagingTypes.stationType
+        )
+        .orderBy(desc(sql`COUNT(DISTINCT ${shipmentsTable.id})`));
+      
+      // Parse signatures and build human-readable names
+      const collectionsMap = new Map<string, string>();
+      const allCollections = await db.select().from(productCollections);
+      allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+      
+      const fingerprintsWithNames = fingerprintsWithStats.map(fp => {
+        let humanReadableName = fp.displayName;
+        
+        if (!humanReadableName && fp.signature) {
+          try {
+            const sig = JSON.parse(fp.signature) as Record<string, number>;
+            const parts = Object.entries(sig)
+              .sort((a, b) => b[1] - a[1])
+              .map(([collectionId, qty]) => {
+                const collectionName = collectionsMap.get(collectionId) || collectionId;
+                return `${collectionName} (${qty})`;
+              });
+            humanReadableName = parts.join(' + ');
+          } catch {
+            humanReadableName = 'Unknown pattern';
+          }
+        }
+        
+        return {
+          ...fp,
+          humanReadableName: humanReadableName || 'Unknown pattern',
+          hasPackaging: true,
+        };
+      });
+      
+      res.json({
+        fingerprints: fingerprintsWithNames,
+        count: fingerprintsWithNames.length,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error fetching mapped:", error);
+      res.status(500).json({ error: "Failed to fetch mapped fingerprints" });
+    }
+  });
+
   // Get all packaging types for dropdown or management
   app.get("/api/packaging-types", requireAuth, async (req, res) => {
     try {
