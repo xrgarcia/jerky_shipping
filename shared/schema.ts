@@ -1296,6 +1296,7 @@ export const shipmentQcItems = pgTable("shipment_qc_items", {
   parentSku: text("parent_sku"), // If kit component, the parent kit SKU
   weightValue: real("weight_value"), // Weight per unit in weightUnit (from skuvault_products) - decimal for precision
   weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
+  physicalLocation: text("physical_location"), // Warehouse location (from skuvault_products) for picking path optimization
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
