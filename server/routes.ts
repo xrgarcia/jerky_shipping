@@ -11972,6 +11972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               productTitle: skuvaultProducts.productTitle,
               weightValue: skuvaultProducts.weightValue,
               weightUnit: skuvaultProducts.weightUnit,
+              physicalLocation: skuvaultProducts.physicalLocation,
             })
             .from(shipmentItemsTable)
             .leftJoin(skuvaultProducts, eq(shipmentItemsTable.sku, skuvaultProducts.sku))
@@ -12016,6 +12017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           imageUrl: item.productImageUrl || item.imageUrl,
           weightValue: item.weightValue,
           weightUnit: item.weightUnit,
+          physicalLocation: item.physicalLocation,
         })),
       }));
       

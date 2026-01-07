@@ -189,6 +189,7 @@ interface SessionShipmentItem {
   imageUrl: string | null;
   weightValue: number | null;
   weightUnit: string | null;
+  physicalLocation: string | null;
 }
 
 interface SessionShipment {
@@ -2230,7 +2231,7 @@ export default function Fingerprints() {
                                                         <p className="text-sm font-medium text-foreground leading-snug" title={item.name}>
                                                           {item.name}
                                                         </p>
-                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                           {item.sku && (
                                                             <span className="text-xs text-muted-foreground font-mono">
                                                               {item.sku}
@@ -2239,6 +2240,11 @@ export default function Fingerprints() {
                                                           {item.weightValue != null && item.weightValue > 0 && (
                                                             <span className="text-xs text-muted-foreground">
                                                               • {item.weightValue} {item.weightUnit || 'oz'}
+                                                            </span>
+                                                          )}
+                                                          {item.physicalLocation && (
+                                                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                                              • {item.physicalLocation}
                                                             </span>
                                                           )}
                                                         </div>
