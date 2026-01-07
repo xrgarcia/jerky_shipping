@@ -11944,7 +11944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get shipments in this session
-      const { shipments: shipmentsTable, shipmentItems: shipmentItemsTable, shipmentQcItems, skuvaultProducts } = await import("@shared/schema");
+      const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
           id: shipmentsTable.id,
@@ -11958,25 +11958,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(shipmentsTable.fulfillmentSessionId, sessionId))
         .orderBy(shipmentsTable.smartSessionSpot);
       
-      // Fetch items for each shipment with product images from skuvault_products
+      // Fetch QC items (exploded items) for each shipment - these are what warehouse staff actually scan
       const shipmentIds = sessionShipments.map(s => s.id);
       const allItems = shipmentIds.length > 0 
         ? await db
             .select({
-              shipmentId: shipmentItemsTable.shipmentId,
-              sku: shipmentItemsTable.sku,
-              name: shipmentItemsTable.name,
-              quantity: shipmentItemsTable.quantity,
-              imageUrl: shipmentItemsTable.imageUrl,
-              productImageUrl: skuvaultProducts.productImageUrl,
-              productTitle: skuvaultProducts.productTitle,
-              weightValue: skuvaultProducts.weightValue,
-              weightUnit: skuvaultProducts.weightUnit,
-              physicalLocation: skuvaultProducts.physicalLocation,
+              shipmentId: shipmentQcItems.shipmentId,
+              sku: shipmentQcItems.sku,
+              name: shipmentQcItems.description,
+              quantity: shipmentQcItems.quantityExpected,
+              imageUrl: shipmentQcItems.imageUrl,
+              weightValue: shipmentQcItems.weightValue,
+              weightUnit: shipmentQcItems.weightUnit,
+              physicalLocation: shipmentQcItems.physicalLocation,
             })
-            .from(shipmentItemsTable)
-            .leftJoin(skuvaultProducts, eq(shipmentItemsTable.sku, skuvaultProducts.sku))
-            .where(inArray(shipmentItemsTable.shipmentId, shipmentIds))
+            .from(shipmentQcItems)
+            .where(inArray(shipmentQcItems.shipmentId, shipmentIds))
         : [];
       
       // Fetch per-order weights from QC items (more accurate as it includes kit expansion)
@@ -12012,9 +12009,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalWeightOz: weightByShipment.get(s.id) || null,
         items: (itemsByShipment[s.id] || []).map(item => ({
           sku: item.sku,
-          name: item.productTitle || item.name,
+          name: item.name,
           quantity: item.quantity,
-          imageUrl: item.productImageUrl || item.imageUrl,
+          imageUrl: item.imageUrl,
           weightValue: item.weightValue,
           weightUnit: item.weightUnit,
           physicalLocation: item.physicalLocation,
