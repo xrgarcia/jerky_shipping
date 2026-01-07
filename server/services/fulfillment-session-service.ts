@@ -19,7 +19,6 @@ import {
   fingerprints,
   shipmentQcItems,
   shipmentTags,
-  skuvaultProducts,
   DECISION_SUBPHASES,
   type Shipment, 
   type FulfillmentSession,
@@ -173,8 +172,8 @@ export class FulfillmentSessionService {
   /**
    * Build a location-sorted SKU index for efficient warehouse picking
    * 
-   * 1. Get all distinct SKUs from the given shipments
-   * 2. Join to skuvault_products to get physical_location
+   * 1. Get all distinct SKUs from the given shipments' QC items
+   * 2. Use physical_location stored directly on shipment_qc_items (captured at hydration)
    * 3. Sort by physical_location (alphabetically: A-1 < A-2 < B-1)
    * 4. Return Map<sku, position> for O(1) lookups
    */
@@ -183,14 +182,13 @@ export class FulfillmentSessionService {
       return new Map();
     }
 
-    // Get all distinct SKUs from shipment items with their physical locations
+    // Get all distinct SKUs from QC items with their physical locations (no join needed)
     const skuLocations = await db
       .selectDistinct({
         sku: shipmentQcItems.sku,
-        physicalLocation: skuvaultProducts.physicalLocation,
+        physicalLocation: shipmentQcItems.physicalLocation,
       })
       .from(shipmentQcItems)
-      .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
       .where(inArray(shipmentQcItems.shipmentId, shipmentIds));
 
     // Sort by physical_location (nulls go last)
