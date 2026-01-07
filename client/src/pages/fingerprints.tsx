@@ -1260,23 +1260,6 @@ export default function Fingerprints() {
 
         {/* Assign Packaging Tab */}
         <TabsContent value="packaging" className="mt-6 space-y-6">
-          {isLoadingFingerprints ? (
-            <Card className="p-12 text-center">
-              <Loader2 className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
-              <h2 className="text-xl font-semibold mb-2">Loading fingerprints...</h2>
-              <p className="text-muted-foreground">
-                Please wait while we fetch the data.
-              </p>
-            </Card>
-          ) : fingerprints.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No fingerprints yet</h2>
-              <p className="text-muted-foreground">
-                Fingerprints are discovered when orders are processed. Make sure all SKUs are categorized first.
-              </p>
-            </Card>
-          ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1579,7 +1562,6 @@ export default function Fingerprints() {
                 </ScrollArea>
               </CardContent>
             </Card>
-          )}
 
           {/* Manage Packaging Types */}
           <Collapsible open={showPackagingSection} onOpenChange={setShowPackagingSection}>
