@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -13,6 +13,35 @@ import { SessionDetailDialog, parseCustomField2 } from "@/components/session-det
 
 interface ShipmentWithOrder extends Shipment {
   order: Order | null;
+}
+
+interface SmartSessionInfo {
+  fingerprint: {
+    id: string;
+    displayName: string | null;
+    signature: string;
+    totalItems: number;
+    totalWeight: number | null;
+    weightUnit: string | null;
+  } | null;
+  session: {
+    id: number;
+    name: string | null;
+    status: string;
+    stationType: string;
+    orderCount: number;
+  } | null;
+  spotNumber: number | null;
+  packagingType: {
+    id: string;
+    name: string;
+    stationType: string | null;
+  } | null;
+  qcStation: {
+    id: string;
+    name: string;
+    stationType: string | null;
+  } | null;
 }
 
 export default function ShipmentDetails() {
@@ -44,6 +73,11 @@ export default function ShipmentDetails() {
 
   const { data: qcItems } = useQuery<ShipmentQcItem[]>({
     queryKey: ['/api/shipments', shipmentId, 'qc-items'],
+    enabled: !!shipmentId,
+  });
+
+  const { data: smartSessionInfo } = useQuery<SmartSessionInfo>({
+    queryKey: ['/api/shipments', shipmentId, 'smart-session-info'],
     enabled: !!shipmentId,
   });
 
@@ -885,6 +919,115 @@ export default function ShipmentDetails() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Smart Session Info */}
+      {smartSessionInfo && (smartSessionInfo.fingerprint || smartSessionInfo.session || smartSessionInfo.packagingType || smartSessionInfo.qcStation) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Fingerprint className="h-5 w-5" />
+              Smart Session
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Fingerprint */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+                  <Fingerprint className="h-4 w-4" />
+                  Fingerprint
+                </div>
+                {smartSessionInfo.fingerprint ? (
+                  <div className="space-y-1">
+                    <p className="text-base font-medium">
+                      {smartSessionInfo.fingerprint.displayName || 'Unnamed'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {smartSessionInfo.fingerprint.totalItems} items
+                      </Badge>
+                      {smartSessionInfo.fingerprint.totalWeight && (
+                        <Badge variant="outline" className="text-xs">
+                          {smartSessionInfo.fingerprint.totalWeight} {smartSessionInfo.fingerprint.weightUnit}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not assigned</span>
+                )}
+              </div>
+
+              {/* Session ID & Spot */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+                  <Hash className="h-4 w-4" />
+                  Session
+                </div>
+                {smartSessionInfo.session ? (
+                  <div className="space-y-1">
+                    <p className="text-base font-medium">
+                      {smartSessionInfo.session.name || `Session #${smartSessionInfo.session.id}`}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {smartSessionInfo.session.status}
+                      </Badge>
+                      {smartSessionInfo.spotNumber && (
+                        <Badge variant="secondary" className="text-xs">
+                          Spot #{smartSessionInfo.spotNumber}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not assigned</span>
+                )}
+              </div>
+
+              {/* Packaging Type */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+                  <Box className="h-4 w-4" />
+                  Packaging Type
+                </div>
+                {smartSessionInfo.packagingType ? (
+                  <div className="space-y-1">
+                    <p className="text-base font-medium">{smartSessionInfo.packagingType.name}</p>
+                    {smartSessionInfo.packagingType.stationType && (
+                      <Badge variant="outline" className="text-xs">
+                        {smartSessionInfo.packagingType.stationType.replace(/_/g, ' ')}
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not assigned</span>
+                )}
+              </div>
+
+              {/* QC Station */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
+                  <MapPinned className="h-4 w-4" />
+                  QC Station
+                </div>
+                {smartSessionInfo.qcStation ? (
+                  <div className="space-y-1">
+                    <p className="text-base font-medium">{smartSessionInfo.qcStation.name}</p>
+                    {smartSessionInfo.qcStation.stationType && (
+                      <Badge variant="outline" className="text-xs">
+                        {smartSessionInfo.qcStation.stationType.replace(/_/g, ' ')}
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Not assigned</span>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
