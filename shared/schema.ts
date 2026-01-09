@@ -1433,7 +1433,7 @@ export const excludedExplosionSkus = pgTable("excluded_explosion_skus", {
   sku: text("sku").notNull().unique(),
   reason: text("reason"), // Optional reason for exclusion (e.g., "Build instruction SKU")
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: varchar("created_by").references(() => users.id),
+  createdBy: text("created_by"), // Email of user who added the exclusion (no FK to allow any OAuth user)
 }, (table) => ({
   skuIdx: index("excluded_explosion_skus_sku_idx").on(table.sku),
 }));
