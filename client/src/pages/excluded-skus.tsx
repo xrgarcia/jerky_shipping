@@ -76,11 +76,7 @@ export default function ExcludedSkus() {
 
   const addMutation = useMutation({
     mutationFn: async (data: { sku: string; reason: string }) => {
-      return apiRequest("/api/excluded-explosion-skus", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", "/api/excluded-explosion-skus", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/excluded-explosion-skus"] });
@@ -102,9 +98,7 @@ export default function ExcludedSkus() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/excluded-explosion-skus/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/excluded-explosion-skus/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/excluded-explosion-skus"] });
