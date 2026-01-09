@@ -10929,6 +10929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sku,
           productCollectionId: collectionId,
           createdBy: req.user!.id,
+          updatedBy: req.user!.id,
         })
         .returning();
       
