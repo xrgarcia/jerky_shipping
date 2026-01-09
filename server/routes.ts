@@ -1060,6 +1060,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get smart session info for a shipment (fingerprint, session, spot, packaging, station)
+  app.get("/api/shipments/:id/smart-session-info", requireAuth, async (req, res) => {
+    try {
+      const { fingerprints, fulfillmentSessions, packagingTypes, stations } = await import("@shared/schema");
+      const idParam = req.params.id;
+      
+      // Find shipment by shipmentId or UUID
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+
+      // Fetch related entities in parallel
+      const [fingerprint, session, packagingType, assignedStation] = await Promise.all([
+        shipment.fingerprintId 
+          ? db.select().from(fingerprints).where(eq(fingerprints.id, shipment.fingerprintId)).then(r => r[0])
+          : Promise.resolve(null),
+        shipment.fulfillmentSessionId 
+          ? db.select().from(fulfillmentSessions).where(eq(fulfillmentSessions.id, shipment.fulfillmentSessionId)).then(r => r[0])
+          : Promise.resolve(null),
+        shipment.packagingTypeId 
+          ? db.select().from(packagingTypes).where(eq(packagingTypes.id, shipment.packagingTypeId)).then(r => r[0])
+          : Promise.resolve(null),
+        shipment.assignedStationId 
+          ? db.select().from(stations).where(eq(stations.id, shipment.assignedStationId)).then(r => r[0])
+          : Promise.resolve(null),
+      ]);
+
+      res.json({
+        fingerprint: fingerprint ? {
+          id: fingerprint.id,
+          displayName: fingerprint.displayName,
+          signature: fingerprint.signature,
+          totalItems: fingerprint.totalItems,
+          totalWeight: fingerprint.totalWeight,
+          weightUnit: fingerprint.weightUnit,
+        } : null,
+        session: session ? {
+          id: session.id,
+          name: session.name,
+          status: session.status,
+          stationType: session.stationType,
+          orderCount: session.orderCount,
+        } : null,
+        spotNumber: shipment.smartSessionSpot,
+        packagingType: packagingType ? {
+          id: packagingType.id,
+          name: packagingType.name,
+          stationType: packagingType.stationType,
+        } : null,
+        qcStation: assignedStation ? {
+          id: assignedStation.id,
+          name: assignedStation.name,
+          stationType: assignedStation.stationType,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching smart session info:", error);
+      res.status(500).json({ error: "Failed to fetch smart session info" });
+    }
+  });
+
   // Get all Shopify products with variants
   app.get("/api/shopify-products", requireAuth, async (req, res) => {
     try {
