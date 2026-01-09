@@ -10860,6 +10860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/skuvault-products/:sku/collections", requireAuth, async (req, res) => {
     try {
       const { sku } = req.params;
+      const { productCollections, productCollectionMappings } = await import("@shared/schema");
       
       const assignments = await db
         .select({
@@ -10888,6 +10889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sku } = req.params;
       const { collectionId } = req.body;
+      const { productCollections, productCollectionMappings } = await import("@shared/schema");
       
       if (!collectionId) {
         return res.status(400).json({ error: "collectionId is required" });
@@ -10945,6 +10947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/skuvault-products/:sku/collections/:collectionId", requireAuth, async (req, res) => {
     try {
       const { sku, collectionId } = req.params;
+      const { productCollectionMappings } = await import("@shared/schema");
       
       const deleted = await db
         .delete(productCollectionMappings)
