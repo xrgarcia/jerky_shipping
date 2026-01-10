@@ -12144,10 +12144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get collection names for building human-readable fingerprint names
-      const { productCollections } = await import("@shared/schema");
+      const { productCollections, stations } = await import("@shared/schema");
       const allCollections = await db.select().from(productCollections);
       const collectionsMap = new Map<string, string>();
       allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+
+      // Batch fetch station names for orders that have assigned stations
+      const stationIds = [...new Set(readyToSessionOrders.map(o => o.assignedStationId).filter((id): id is string => !!id))];
+      const stationsMap = new Map<string, { name: string; stationType: string | null }>();
+      if (stationIds.length > 0) {
+        const stationRows = await db
+          .select({ id: stations.id, name: stations.name, stationType: stations.stationType })
+          .from(stations)
+          .where(inArray(stations.id, stationIds));
+        stationRows.forEach(s => stationsMap.set(s.id, { name: s.name, stationType: s.stationType }));
+      }
 
       // Helper to build human-readable fingerprint name from signature
       const buildFingerprintName = (displayName: string | null, signature: string | null): string => {
@@ -12212,13 +12223,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason = 'Ready for session';
         }
 
+        const stationInfo = order.assignedStationId ? stationsMap.get(order.assignedStationId) : null;
         return {
           orderNumber: order.orderNumber,
           readyToSession,
           reason,
           actionTab,
-          stationName: order.stationName || null,
-          stationType: order.stationType || null,
+          stationName: stationInfo?.name || null,
+          stationType: stationInfo?.stationType || null,
         };
       });
 
