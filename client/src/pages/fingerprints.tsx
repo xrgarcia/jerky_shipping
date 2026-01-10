@@ -1826,6 +1826,38 @@ export default function Fingerprints() {
                   No orders in the ready-to-session phase
                 </div>
               ) : (
+                <>
+                  {/* Filtered count display */}
+                  {(() => {
+                    const totalOrders = readyToSessionOrdersData.orders.length;
+                    const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
+                      if (selectedBuildStations.size === 0) return true;
+                      const stationKey = order.stationName || '__none__';
+                      return selectedBuildStations.has(stationKey);
+                    });
+                    const filteredCount = filteredOrders.length;
+                    const readyInFiltered = filteredOrders.filter(o => o.readyToSession).length;
+                    
+                    return (
+                      <div className="flex items-center justify-between mb-3 text-sm text-muted-foreground" data-testid="text-filtered-count">
+                        <span>
+                          {selectedBuildStations.size > 0 ? (
+                            <>Showing <span className="font-medium text-foreground">{filteredCount}</span> of {totalOrders} orders</>
+                          ) : (
+                            <>{totalOrders} orders</>
+                          )}
+                          {selectedBuildStations.size > 0 && (
+                            <span className="ml-2">({readyInFiltered} ready)</span>
+                          )}
+                        </span>
+                        {selectedBuildOrderNumbers.size > 0 && (
+                          <span className="font-medium text-foreground">
+                            {selectedBuildOrderNumbers.size} selected
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 <ScrollArea className="h-[400px]">
                   <table className="w-full">
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
@@ -2004,6 +2036,7 @@ export default function Fingerprints() {
                     </tbody>
                   </table>
                 </ScrollArea>
+                </>
               )}
             </CardContent>
           </Card>
