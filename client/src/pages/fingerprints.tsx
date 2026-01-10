@@ -341,6 +341,9 @@ export default function Fingerprints() {
   const [packagingPage, setPackagingPage] = useState(1);
   const [packagingPageSize, setPackagingPageSize] = useState(10);
   
+  // Packaging type filter
+  const [packagingTypeFilter, setPackagingTypeFilter] = useState<string>("");
+  
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
@@ -737,7 +740,7 @@ export default function Fingerprints() {
     s => s.status !== 'completed' && s.status !== 'cancelled'
   );
 
-  // Apply weight filters only (status filter is handled by the separate endpoints now)
+  // Apply weight and packaging type filters (status filter is handled by the separate endpoints now)
   const filteredFingerprints = fingerprints.filter((fp) => {
     // Weight filters (only apply if values are set)
     const fpWeight = fp.totalWeight ?? 0;
@@ -746,6 +749,15 @@ export default function Fingerprints() {
     
     if (minW !== null && !isNaN(minW) && fpWeight < minW) return false;
     if (maxW !== null && !isNaN(maxW) && fpWeight > maxW) return false;
+    
+    // Packaging type filter
+    if (packagingTypeFilter) {
+      if (packagingTypeFilter === 'unassigned') {
+        if (fp.hasPackaging) return false;
+      } else {
+        if (fp.packagingTypeId !== packagingTypeFilter) return false;
+      }
+    }
     
     return true;
   });
@@ -760,7 +772,7 @@ export default function Fingerprints() {
   // Reset page when filters change
   useEffect(() => {
     setPackagingPage(1);
-  }, [filter, minWeight, maxWeight]);
+  }, [filter, minWeight, maxWeight, packagingTypeFilter]);
   
   // Helper functions for bulk selection
   const toggleSelection = (id: string) => {
@@ -1353,6 +1365,37 @@ export default function Fingerprints() {
                           onClick={() => { setMinWeight(""); setMaxWeight(""); }}
                           className="h-8 px-2"
                           data-testid="button-clear-weight-filter"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {/* Packaging type filter */}
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4 text-muted-foreground" />
+                      <Select
+                        value={packagingTypeFilter || 'all'}
+                        onValueChange={(value) => setPackagingTypeFilter(value === 'all' ? '' : value)}
+                      >
+                        <SelectTrigger className="w-[180px] h-8" data-testid="select-packaging-filter">
+                          <SelectValue placeholder="All packages" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All packages</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {packagingTypes.map((pt) => (
+                            <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {packagingTypeFilter && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPackagingTypeFilter('')}
+                          className="h-8 px-2"
+                          data-testid="button-clear-packaging-filter"
                         >
                           <X className="h-3 w-3" />
                         </Button>
