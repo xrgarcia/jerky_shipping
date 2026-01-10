@@ -12080,7 +12080,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all orders in ready-to-session phase with their session readiness status
   app.get("/api/fulfillment-sessions/ready-to-session-orders", requireAuth, async (req, res) => {
     try {
-      // Get all orders in 'needs_session' subphase (ready for session building)
+      // Get all orders that are in ready_to_session lifecycle phase
+      // (on hold + MOVE OVER tag + no session + not cancelled)
+      // Left join with fingerprint_models to check if fingerprint has packaging assigned
+      // Also join fingerprints to get display name for packaging assignment messages
       const { stations } = await import("@shared/schema");
       
       const readyToSessionOrders = await db
@@ -12096,7 +12099,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintSignature: fingerprints.signature,
           stationName: stations.name,
           stationType: stations.type,
-          packagingTypeId: shipments.packagingTypeId,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
@@ -12105,8 +12107,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(stations, eq(shipments.assignedStationId, stations.id))
         .where(
           and(
-            eq(shipments.decisionSubphase, 'needs_session'),
+            eq(shipments.shipmentStatus, 'on_hold'),
             eq(shipmentTags.name, 'MOVE OVER'),
+            isNull(shipments.sessionStatus),
+            isNull(shipments.trackingNumber),
             isNull(shipments.fulfillmentSessionId),
             ne(shipments.status, 'cancelled')
           )
