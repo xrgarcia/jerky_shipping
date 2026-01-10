@@ -11414,6 +11414,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get packing-ready fingerprints with pagination, sorting, and filtering
+  // These are fingerprints where at least one shipment is ready to pack (session closed, no tracking, pending status)
+  app.get("/api/fingerprints/packing-ready", requireAuth, async (req, res) => {
+    try {
+      const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
+      
+      // Parse query params
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 25));
+      const sortBy = (req.query.sortBy as string) || 'shipmentCount';
+      const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
+      const searchQuery = (req.query.search as string) || '';
+      const collectionFilter = (req.query.collection as string) || '';
+      const packageFilter = (req.query.package as string) || '';
+      
+      // Build the base query for packing-ready shipments
+      // Packing ready = sessionStatus='closed' AND trackingNumber IS NULL AND shipmentStatus='pending'
+      const packingReadyCondition = and(
+        eq(shipmentsTable.sessionStatus, 'closed'),
+        isNull(shipmentsTable.trackingNumber),
+        eq(shipmentsTable.shipmentStatus, 'pending')
+      );
+      
+      // Get fingerprints with packing-ready shipment counts
+      let baseQuery = db
+        .select({
+          id: fingerprintsTable.id,
+          signature: fingerprintsTable.signature,
+          signatureHash: fingerprintsTable.signatureHash,
+          displayName: fingerprintsTable.displayName,
+          totalItems: fingerprintsTable.totalItems,
+          collectionCount: fingerprintsTable.collectionCount,
+          totalWeight: fingerprintsTable.totalWeight,
+          weightUnit: fingerprintsTable.weightUnit,
+          createdAt: fingerprintsTable.createdAt,
+          packingReadyCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('packing_ready_count'),
+          packagingTypeId: fingerprintModels.packagingTypeId,
+          packagingTypeName: packagingTypes.name,
+          stationType: packagingTypes.stationType,
+        })
+        .from(fingerprintsTable)
+        .innerJoin(shipmentsTable, and(
+          eq(shipmentsTable.fingerprintId, fingerprintsTable.id),
+          packingReadyCondition
+        ))
+        .leftJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
+        .leftJoin(packagingTypes, eq(packagingTypes.id, fingerprintModels.packagingTypeId));
+      
+      // Apply filters
+      const conditions: SQL[] = [];
+      
+      if (searchQuery) {
+        conditions.push(
+          or(
+            sql`${fingerprintsTable.displayName} ILIKE ${`%${searchQuery}%`}`,
+            sql`${fingerprintsTable.signature} ILIKE ${`%${searchQuery}%`}`
+          )!
+        );
+      }
+      
+      if (packageFilter) {
+        if (packageFilter === 'unassigned') {
+          conditions.push(isNull(fingerprintModels.packagingTypeId));
+        } else {
+          conditions.push(eq(fingerprintModels.packagingTypeId, packageFilter));
+        }
+      }
+      
+      // Collection filter requires parsing the signature JSON
+      // We'll filter this in memory after the query for simplicity
+      
+      // Group by fingerprint and packaging info
+      const groupedQuery = baseQuery
+        .groupBy(
+          fingerprintsTable.id,
+          fingerprintsTable.signature,
+          fingerprintsTable.signatureHash,
+          fingerprintsTable.displayName,
+          fingerprintsTable.totalItems,
+          fingerprintsTable.collectionCount,
+          fingerprintsTable.totalWeight,
+          fingerprintsTable.weightUnit,
+          fingerprintsTable.createdAt,
+          fingerprintModels.packagingTypeId,
+          packagingTypes.name,
+          packagingTypes.stationType
+        );
+      
+      // Execute query to get all results first (for accurate total count and collection filtering)
+      const allResults = await groupedQuery;
+      
+      // Parse signatures and build human-readable names, apply collection filter
+      const collectionsMap = new Map<string, string>();
+      const allCollections = await db.select().from(productCollections);
+      allCollections.forEach(c => collectionsMap.set(c.id, c.name));
+      
+      let processedResults = allResults.map(fp => {
+        let humanReadableName = fp.displayName;
+        let collectionIds: string[] = [];
+        
+        if (fp.signature) {
+          try {
+            const sig = JSON.parse(fp.signature) as Record<string, number>;
+            collectionIds = Object.keys(sig);
+            const parts = Object.entries(sig)
+              .sort((a, b) => b[1] - a[1])
+              .map(([collectionId, qty]) => {
+                const collectionName = collectionsMap.get(collectionId) || collectionId;
+                return `${collectionName} (${qty})`;
+              });
+            humanReadableName = humanReadableName || parts.join(' + ');
+          } catch {
+            humanReadableName = humanReadableName || 'Unknown pattern';
+          }
+        }
+        
+        return {
+          ...fp,
+          humanReadableName: humanReadableName || 'Unknown pattern',
+          hasPackaging: !!fp.packagingTypeId,
+          collectionIds,
+        };
+      });
+      
+      // Apply collection filter in memory
+      if (collectionFilter) {
+        processedResults = processedResults.filter(fp => 
+          fp.collectionIds.includes(collectionFilter)
+        );
+      }
+      
+      // Apply search filter in memory (for display name matching)
+      if (searchQuery) {
+        const lowerSearch = searchQuery.toLowerCase();
+        processedResults = processedResults.filter(fp =>
+          fp.humanReadableName.toLowerCase().includes(lowerSearch) ||
+          (fp.packagingTypeName || '').toLowerCase().includes(lowerSearch)
+        );
+      }
+      
+      // Sort results
+      processedResults.sort((a, b) => {
+        let comparison = 0;
+        switch (sortBy) {
+          case 'weight':
+            comparison = (a.totalWeight || 0) - (b.totalWeight || 0);
+            break;
+          case 'shipmentCount':
+            comparison = a.packingReadyCount - b.packingReadyCount;
+            break;
+          case 'package':
+            comparison = (a.packagingTypeName || 'zzz').localeCompare(b.packagingTypeName || 'zzz');
+            break;
+          case 'fingerprint':
+            comparison = a.humanReadableName.localeCompare(b.humanReadableName);
+            break;
+          case 'collection':
+            // Sort by first collection name
+            const aCol = a.collectionIds[0] ? (collectionsMap.get(a.collectionIds[0]) || '') : '';
+            const bCol = b.collectionIds[0] ? (collectionsMap.get(b.collectionIds[0]) || '') : '';
+            comparison = aCol.localeCompare(bCol);
+            break;
+          default:
+            comparison = a.packingReadyCount - b.packingReadyCount;
+        }
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+      
+      // Calculate pagination
+      const total = processedResults.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const offset = (page - 1) * pageSize;
+      const paginatedResults = processedResults.slice(offset, offset + pageSize);
+      
+      // Get unique collections for filter dropdown
+      const uniqueCollectionIds = new Set<string>();
+      processedResults.forEach(fp => fp.collectionIds.forEach(id => uniqueCollectionIds.add(id)));
+      const availableCollections = Array.from(uniqueCollectionIds).map(id => ({
+        id,
+        name: collectionsMap.get(id) || id,
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Get unique packages for filter dropdown
+      const uniquePackages = new Map<string, string>();
+      processedResults.forEach(fp => {
+        if (fp.packagingTypeId && fp.packagingTypeName) {
+          uniquePackages.set(fp.packagingTypeId, fp.packagingTypeName);
+        }
+      });
+      const availablePackages = Array.from(uniquePackages.entries()).map(([id, name]) => ({
+        id,
+        name,
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Summary stats
+      const stats = {
+        totalFingerprints: total,
+        totalPackingReady: processedResults.reduce((sum, fp) => sum + fp.packingReadyCount, 0),
+        withPackaging: processedResults.filter(fp => fp.hasPackaging).length,
+        withoutPackaging: processedResults.filter(fp => !fp.hasPackaging).length,
+      };
+      
+      res.json({
+        fingerprints: paginatedResults,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages,
+        },
+        filters: {
+          availableCollections,
+          availablePackages,
+        },
+        stats,
+      });
+    } catch (error: any) {
+      console.error("[Fingerprints] Error fetching packing-ready:", error);
+      res.status(500).json({ error: "Failed to fetch packing-ready fingerprints" });
+    }
+  });
+
   // Get all packaging types for dropdown or management
   app.get("/api/packaging-types", requireAuth, async (req, res) => {
     try {
