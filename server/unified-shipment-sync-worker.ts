@@ -414,6 +414,141 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
   return { processed, updated, errors };
 }
 
+// Configuration for tag refresh
+const TAG_REFRESH_BATCH_SIZE = 10; // Max shipments to refresh tags for per poll cycle
+
+/**
+ * Refresh tags for shipments in pre-fingerprinting phases to catch tag removals
+ * 
+ * PURPOSE: ShipStation's modified_at cursor doesn't update when ONLY tags change.
+ * This means if a "MOVE OVER" tag is removed, our cursor-based sync won't catch it.
+ * This job specifically re-fetches tags for shipments that are in lifecycle phases
+ * where the MOVE OVER tag matters (ready_to_session, awaiting_decisions).
+ * 
+ * TRIGGERS: After main poll cycle when caught up (same as tracking backfill)
+ * 
+ * Returns number of shipments with tag changes detected
+ */
+async function refreshTagsForPreSessionShipments(): Promise<{ processed: number; updated: number; errors: number }> {
+  const { shipmentTags, LIFECYCLE_PHASES } = await import('@shared/schema');
+  const { updateShipmentLifecycle } = await import('./services/lifecycle-service');
+  
+  // Find shipments in phases where MOVE OVER tag matters:
+  // - ready_to_session: On hold + MOVE OVER tag - fingerprinting happens here
+  // - awaiting_decisions: Has fingerprint, may still be sensitive to tag changes
+  const shipmentsToRefresh = await db
+    .select({
+      id: shipments.id,
+      shipmentId: shipments.shipmentId,
+      orderNumber: shipments.orderNumber,
+      lifecyclePhase: shipments.lifecyclePhase,
+    })
+    .from(shipments)
+    .where(
+      and(
+        sql`${shipments.shipmentId} IS NOT NULL`,
+        or(
+          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.READY_TO_SESSION),
+          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.AWAITING_DECISIONS)
+        )
+      )
+    )
+    .orderBy(shipments.updatedAt)
+    .limit(TAG_REFRESH_BATCH_SIZE);
+  
+  if (shipmentsToRefresh.length === 0) {
+    return { processed: 0, updated: 0, errors: 0 };
+  }
+  
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  if (!apiKey) {
+    return { processed: 0, updated: 0, errors: 0 };
+  }
+  
+  let processed = 0;
+  let updated = 0;
+  let errors = 0;
+  
+  for (const shipment of shipmentsToRefresh) {
+    processed++;
+    
+    try {
+      // Fetch current shipment data from ShipStation to get latest tags
+      const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipment.shipmentId!)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.status === 429) {
+        console.log('[UnifiedSync] Hit rate limit during tag refresh, stopping batch');
+        break;
+      }
+      
+      if (!response.ok) {
+        errors++;
+        continue;
+      }
+      
+      const shipmentData = await response.json();
+      const freshTags = shipmentData.tags || [];
+      
+      // Get current local tags
+      const localTags = await db
+        .select({ name: shipmentTags.name })
+        .from(shipmentTags)
+        .where(eq(shipmentTags.shipmentId, shipment.id));
+      
+      const freshTagNames = new Set(freshTags.map((t: any) => t.name?.trim()).filter(Boolean));
+      const localTagNames = new Set(localTags.map(t => t.name));
+      
+      // Check if tags differ
+      const hasMoveOverLocally = localTagNames.has('MOVE OVER');
+      const hasMoveOverInShipStation = freshTagNames.has('MOVE OVER');
+      
+      if (hasMoveOverLocally !== hasMoveOverInShipStation) {
+        console.log(`[UnifiedSync] Tag change detected for ${shipment.orderNumber}: MOVE OVER ${hasMoveOverLocally ? 'removed' : 'added'} in ShipStation`);
+        
+        // Update tags: delete all and re-insert from ShipStation
+        await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipment.id));
+        
+        if (freshTags.length > 0) {
+          const tagsToInsert = freshTags
+            .filter((tag: any) => tag && (tag.name || tag.tag_id))
+            .map((tag: any) => ({
+              shipmentId: shipment.id,
+              name: tag.name?.trim() || `Tag ${tag.tag_id}`,
+              color: tag.color || null,
+              tagId: tag.tag_id?.toString() || null,
+            }));
+          
+          if (tagsToInsert.length > 0) {
+            await db.insert(shipmentTags).values(tagsToInsert);
+          }
+        }
+        
+        // Re-evaluate lifecycle phase with updated tags
+        await updateShipmentLifecycle(shipment.id, { logTransition: true });
+        
+        updated++;
+      }
+      
+    } catch (err) {
+      console.error(`[UnifiedSync] Error refreshing tags for ${shipment.orderNumber}:`, err);
+      errors++;
+    }
+  }
+  
+  if (updated > 0) {
+    console.log(`[UnifiedSync] Tag refresh complete: ${processed} checked, ${updated} with tag changes, ${errors} errors`);
+  }
+  
+  return { processed, updated, errors };
+}
+
 /**
  * Main poll cycle - fetches all shipments modified since cursor
  * 
@@ -677,13 +812,21 @@ async function runPollLoop(): Promise<boolean> {
     // Flag for immediate follow-up if more pages remain
     needsImmediateFollowup = result.hasMorePages;
     
-    // Run tracking backfill ONLY when we're caught up (not during catch-up)
+    // Run maintenance jobs ONLY when we're caught up (not during catch-up)
     // This prevents using API quota during high-priority sync
     if (!needsImmediateFollowup && !result.hitRateLimit) {
       try {
         await backfillMissingTracking();
       } catch (backfillErr) {
         console.error('[UnifiedSync] Tracking backfill error (non-fatal):', backfillErr);
+      }
+      
+      // Refresh tags for pre-session shipments to catch tag removals
+      // ShipStation's modified_at doesn't update when only tags change
+      try {
+        await refreshTagsForPreSessionShipments();
+      } catch (tagRefreshErr) {
+        console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
       }
     }
     

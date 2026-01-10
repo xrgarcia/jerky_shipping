@@ -8,8 +8,8 @@
  */
 
 import { db } from "../db";
-import { shipments, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
-import { eq, inArray } from "drizzle-orm";
+import { shipments, shipmentTags, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
+import { eq, inArray, and } from "drizzle-orm";
 import {
   deriveLifecyclePhase,
   statesAreEqual,
@@ -70,7 +70,19 @@ export async function updateShipmentLifecycleFromData(
 ): Promise<LifecycleUpdateResult> {
   const { logTransition = true, shipmentData } = options;
 
+  // Check if shipment has MOVE OVER tag in the database
+  const moveOverTag = await db
+    .select({ id: shipmentTags.id })
+    .from(shipmentTags)
+    .where(and(
+      eq(shipmentTags.shipmentId, shipment.id),
+      eq(shipmentTags.name, 'MOVE OVER')
+    ))
+    .limit(1);
+  const hasMoveOverTag = moveOverTag.length > 0;
+
   // Merge any provided shipment data updates (for pre-save checks)
+  const rawFulfillmentSessionId = shipmentData?.fulfillmentSessionId ?? shipment.fulfillmentSessionId;
   const effectiveData: ShipmentLifecycleData = {
     sessionStatus: shipmentData?.sessionStatus ?? shipment.sessionStatus,
     trackingNumber: shipmentData?.trackingNumber ?? shipment.trackingNumber,
@@ -78,8 +90,9 @@ export async function updateShipmentLifecycleFromData(
     shipmentStatus: shipmentData?.shipmentStatus ?? shipment.shipmentStatus,
     fingerprintStatus: shipmentData?.fingerprintStatus ?? shipment.fingerprintStatus,
     packagingTypeId: shipmentData?.packagingTypeId ?? shipment.packagingTypeId,
-    fulfillmentSessionId: shipmentData?.fulfillmentSessionId ?? shipment.fulfillmentSessionId,
+    fulfillmentSessionId: rawFulfillmentSessionId != null ? String(rawFulfillmentSessionId) : null,
     fingerprintId: shipmentData?.fingerprintId ?? shipment.fingerprintId,
+    hasMoveOverTag,
   };
 
   // Derive the correct lifecycle state
