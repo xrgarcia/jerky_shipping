@@ -1,11 +1,13 @@
 import { firestoreStorage } from './firestore-storage';
 import { db } from './db';
-import { shipments, shipmentItems } from '@shared/schema';
-import { eq, and, isNull, inArray, isNotNull } from 'drizzle-orm';
+import { shipments, shipmentItems, shipmentQcItems } from '@shared/schema';
+import { eq, and, isNull, inArray, isNotNull, exists, sql, notExists } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmentContext, type ShipmentContext } from './services/qcsale-cache-warmer';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
+import { hydrateShipment, calculateFingerprint } from './services/qc-item-hydrator';
+import { ensureKitMappingsFresh } from './services/kit-mappings-cache';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
 
@@ -160,6 +162,29 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
       }
     } else {
       log(`Synced session ${session.session_id} to shipment ${shipment.orderNumber}`);
+    }
+    
+    // PROACTIVE HYDRATION: If this shipment doesn't have QC items yet, hydrate now
+    // This catches shipments that bypassed the normal hydration flow (e.g., racing conditions)
+    const existingQcItems = await db
+      .select({ id: shipmentQcItems.id })
+      .from(shipmentQcItems)
+      .where(eq(shipmentQcItems.shipmentId, shipment.id))
+      .limit(1);
+    
+    if (existingQcItems.length === 0) {
+      try {
+        log(`Proactive hydration: ${shipment.orderNumber} has session but no QC items, hydrating...`);
+        await ensureKitMappingsFresh();
+        const hydrationResult = await hydrateShipment(shipment.id, shipment.orderNumber || 'unknown');
+        if (hydrationResult.error) {
+          log(`Proactive hydration error for ${shipment.orderNumber}: ${hydrationResult.error}`);
+        } else {
+          log(`Proactive hydration complete for ${shipment.orderNumber}: ${hydrationResult.itemsCreated} items created, fingerprint ${hydrationResult.fingerprintStatus}`);
+        }
+      } catch (hydrationErr: any) {
+        log(`Proactive hydration failed for ${shipment.orderNumber}: ${hydrationErr.message}`);
+      }
     }
 
     // CACHE WARMING DISABLED: Bypassing cache entirely - packing pages go direct to SkuVault API
