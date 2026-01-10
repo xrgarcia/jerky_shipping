@@ -10066,6 +10066,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Repair shipments with un-exploded kit SKUs
+  // This fixes shipments where kits weren't properly exploded during hydration
+  // (e.g., due to stale cache or race conditions)
+  app.post("/api/collections/repair-unexploded-kits", requireAuth, async (req, res) => {
+    try {
+      const { repairUnexplodedKits } = await import('./services/qc-item-hydrator');
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      console.log(`[Collections] Starting repair of un-exploded kits (limit: ${limit})`);
+      
+      const result = await repairUnexplodedKits(limit);
+      
+      console.log(`[Collections] Repair complete: ${result.shipmentsRepaired} repaired, ${result.shipmentsSkipped} skipped`);
+      
+      res.json({
+        success: true,
+        shipmentsRepaired: result.shipmentsRepaired,
+        shipmentsSkipped: result.shipmentsSkipped,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error repairing un-exploded kits:", error);
+      res.status(500).json({ error: "Failed to repair un-exploded kits" });
+    }
+  });
+
   // Lookup specific kit components
   app.get("/api/kit-mappings/:sku", requireAuth, async (req, res) => {
     try {

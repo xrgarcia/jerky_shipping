@@ -804,3 +804,115 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
   
   return result;
 }
+
+/**
+ * Repair job: Find and re-hydrate shipments with un-exploded kits
+ * 
+ * PROBLEM: Sometimes kits get stored in shipment_qc_items without being exploded
+ * into their component SKUs. This happens when:
+ * 1. Kit mappings cache was stale during initial hydration
+ * 2. Kit mappings weren't synced yet when the shipment was hydrated
+ * 
+ * DETECTION: Find QC items where:
+ * - SKU exists in kit_component_mappings (meaning it should have been exploded)
+ * - is_kit_component = false (meaning it wasn't treated as a kit component)
+ * - collection_id IS NULL (meaning it doesn't have a collection mapping)
+ * 
+ * FIX: Delete the bad QC items and re-run hydration for affected shipments
+ */
+export async function repairUnexplodedKits(limit: number = 50): Promise<{
+  shipmentsRepaired: number;
+  shipmentsSkipped: number;
+  errors: string[];
+}> {
+  const result = {
+    shipmentsRepaired: 0,
+    shipmentsSkipped: 0,
+    errors: [] as string[],
+  };
+  
+  try {
+    // Import kitComponentMappings for the repair query
+    const { kitComponentMappings } = await import('@shared/schema');
+    
+    // Ensure kit mappings cache is fresh before repair
+    await ensureKitMappingsFresh();
+    
+    // Find shipments with un-exploded kit SKUs
+    // These are QC items where the SKU:
+    // 1. Exists in kit_component_mappings (it's a kit that should be exploded)
+    // 2. Is marked as is_kit_component = false (it wasn't exploded)
+    // 3. Has no collection_id (kits typically don't have direct collection mappings)
+    const affectedShipments = await db
+      .selectDistinct({
+        shipmentId: shipmentQcItems.shipmentId,
+        orderNumber: shipments.orderNumber,
+      })
+      .from(shipmentQcItems)
+      .innerJoin(shipments, eq(shipments.id, shipmentQcItems.shipmentId))
+      .innerJoin(kitComponentMappings, eq(kitComponentMappings.kitSku, shipmentQcItems.sku))
+      .where(
+        and(
+          eq(shipmentQcItems.isKitComponent, false),
+          sql`${shipmentQcItems.collectionId} IS NULL`
+        )
+      )
+      .limit(limit);
+    
+    if (affectedShipments.length === 0) {
+      log('Repair: No shipments with un-exploded kits found');
+      return result;
+    }
+    
+    log(`Repair: Found ${affectedShipments.length} shipments with un-exploded kit SKUs`);
+    
+    for (const shipment of affectedShipments) {
+      try {
+        // Delete all existing QC items for this shipment
+        await db
+          .delete(shipmentQcItems)
+          .where(eq(shipmentQcItems.shipmentId, shipment.shipmentId));
+        
+        // Clear fingerprint data so it gets recalculated
+        await db
+          .update(shipments)
+          .set({
+            fingerprintId: null,
+            fingerprintStatus: null,
+            packagingTypeId: null,
+            assignedStationId: null,
+            packagingDecisionType: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, shipment.shipmentId));
+        
+        // Re-hydrate the shipment (this will explode kits correctly now)
+        const hydrationResult = await hydrateShipment(
+          shipment.shipmentId, 
+          shipment.orderNumber || 'unknown'
+        );
+        
+        if (hydrationResult.error) {
+          result.errors.push(`${shipment.orderNumber}: ${hydrationResult.error}`);
+          result.shipmentsSkipped++;
+        } else {
+          result.shipmentsRepaired++;
+          log(`Repaired ${shipment.orderNumber}: ${hydrationResult.itemsCreated} items, fingerprint ${hydrationResult.fingerprintStatus}`);
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        result.errors.push(`${shipment.orderNumber}: ${errorMsg}`);
+        result.shipmentsSkipped++;
+      }
+    }
+    
+    log(`Repair complete: ${result.shipmentsRepaired} repaired, ${result.shipmentsSkipped} skipped, ${result.errors.length} errors`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`Repair failed: ${errorMsg}`);
+    result.errors.push(`Fatal: ${errorMsg}`);
+  }
+  
+  return result;
+}
