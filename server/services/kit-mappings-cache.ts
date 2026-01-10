@@ -26,6 +26,10 @@ let kitMappingsCache: Map<string, KitComponent[]> | null = null;
 let reverseComponentCache: Map<string, string[]> | null = null;
 let lastLoadedAt: Date | null = null;
 
+// Maximum cache age in milliseconds before forcing a reload
+// Set to 5 minutes to catch recently synced kit mappings
+const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+
 /**
  * Load kit mappings from local database into memory cache
  */
@@ -196,13 +200,35 @@ export async function syncKitMappingsFromGcp(): Promise<{
 }
 
 /**
- * Ensure kit mappings are loaded into memory
+ * Check if cache is stale and needs refresh
+ */
+function isCacheStale(): boolean {
+  if (!lastLoadedAt) return true;
+  const age = Date.now() - lastLoadedAt.getTime();
+  return age > CACHE_MAX_AGE_MS;
+}
+
+/**
+ * Ensure kit mappings are loaded into memory AND fresh
  * Called by hydrator before processing shipments
+ * 
+ * CRITICAL FIX: Previously this only loaded once and never refreshed.
+ * Now it checks cache age and reloads if stale (>5 minutes).
+ * This prevents race conditions where:
+ * 1. GCP sync adds new kit mappings to local DB
+ * 2. Hydrator runs with stale in-memory cache
+ * 3. New kits aren't recognized and don't get exploded
  */
 export async function ensureKitMappingsFresh(): Promise<boolean> {
   try {
-    if (!kitMappingsCache) {
+    const needsRefresh = !kitMappingsCache || isCacheStale();
+    
+    if (needsRefresh) {
+      const wasEmpty = !kitMappingsCache;
       await loadFromLocalDb();
+      if (!wasEmpty) {
+        log(`Cache was stale (${Math.round((Date.now() - (lastLoadedAt?.getTime() || 0)) / 1000 / 60)}+ min old), refreshed from local DB`);
+      }
       return true;
     }
     return false;
