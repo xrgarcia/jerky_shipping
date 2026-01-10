@@ -38,6 +38,10 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics.
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
 - **Tag Refresh Job**: Periodic re-validation of ShipStation tags for shipments in `ready_to_session` and `awaiting_decisions` phases. Runs after main poll cycle when caught up. Required because ShipStation's `modified_at` cursor doesn't update when only tags change.
+- **Kit Explosion Race Condition Prevention**: Multi-layered approach to ensure kits are properly exploded into component SKUs:
+    1. **Kit Mappings Cache Age Check**: `ensureKitMappingsFresh()` checks cache age and forces reload if >5 minutes old, preventing stale mappings.
+    2. **Proactive Hydration in Session Sync**: When Firestore session sync sets `session_status`, checks if QC items exist and hydrates if missing. Catches shipments that bypass normal hydration flow.
+    3. **Repair Job Endpoint**: `POST /api/collections/repair-unexploded-kits` detects and fixes shipments with un-exploded kit SKUs by deleting QC items and re-running hydration with fresh mappings.
 - **Packing Completion Audit Logging**: All packing actions logged to `packing_logs` table.
 - **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
 - **Voided Label Handling**: Automatic new label creation, PDF validation, printing to requesting worker's station, audit logging, and QC cache invalidation.
