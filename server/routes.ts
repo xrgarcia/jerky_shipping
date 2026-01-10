@@ -12207,18 +12207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Packaging exists but no station - check if packaging type has station configured
           reason = 'Packaging type missing station assignment';
           actionTab = 'packaging';
-        } else if (order.decisionSubphase !== 'needs_session') {
-          // Fallback for other subphases
-          const subphaseLabels: Record<string, string> = {
-            'needs_categorization': 'Categorize products',
-            'needs_fingerprint': 'Waiting for fingerprint sync',
-            'needs_packaging': 'Assign packaging',
-            'ready_for_skuvault': 'Ready for SkuVault',
-          };
-          reason = subphaseLabels[order.decisionSubphase || ''] || `Processing: ${order.decisionSubphase || 'unknown'}`;
-          actionTab = order.decisionSubphase === 'needs_categorization' ? 'categorize' : 
-                      order.decisionSubphase === 'needs_packaging' ? 'packaging' : null;
         } else {
+          // Has fingerprint + packaging model + station = ready for session
+          // We derive readiness from actual data fields, not the potentially-stale decisionSubphase column
           readyToSession = true;
           reason = 'Ready for session';
         }
