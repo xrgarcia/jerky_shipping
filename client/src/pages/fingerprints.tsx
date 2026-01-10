@@ -44,6 +44,8 @@ import {
   Plus,
   Settings,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Hand,
   Pencil,
   Tag,
@@ -61,6 +63,7 @@ import {
   CheckSquare,
   Square,
   Copy,
+  Search,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -254,6 +257,47 @@ interface ReadyToSessionOrdersResponse {
   };
 }
 
+interface PackingReadyFingerprint {
+  id: string;
+  signature: string;
+  signatureHash: string;
+  displayName: string | null;
+  totalItems: number;
+  collectionCount: number;
+  totalWeight: number | null;
+  weightUnit: string | null;
+  createdAt: string;
+  packingReadyCount: number;
+  packagingTypeId: string | null;
+  packagingTypeName: string | null;
+  stationType: string | null;
+  humanReadableName: string;
+  hasPackaging: boolean;
+  collectionIds: string[];
+}
+
+interface PackingReadyResponse {
+  fingerprints: PackingReadyFingerprint[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  filters: {
+    availableCollections: { id: string; name: string }[];
+    availablePackages: { id: string; name: string }[];
+  };
+  stats: {
+    totalFingerprints: number;
+    totalPackingReady: number;
+    withPackaging: number;
+    withoutPackaging: number;
+  };
+}
+
+type PackingSortBy = 'shipmentCount' | 'weight' | 'package' | 'fingerprint' | 'collection';
+
 function getStationBadge(stationType: string | null) {
   switch (stationType) {
     case 'boxing_machine':
@@ -278,9 +322,9 @@ function getStationTypeLabel(stationType: string): string {
 
 type InlineStatus = { type: 'loading' } | { type: 'success'; message: string } | { type: 'error'; message: string };
 type FilterOption = 'all' | 'needs-mapping' | 'mapped';
-type WorkflowTab = 'categorize' | 'packaging' | 'sessions' | 'live';
+type WorkflowTab = 'categorize' | 'packaging' | 'sessions' | 'packing' | 'live';
 
-const VALID_TABS: WorkflowTab[] = ['categorize', 'packaging', 'sessions', 'live'];
+const VALID_TABS: WorkflowTab[] = ['categorize', 'packaging', 'sessions', 'packing', 'live'];
 const VALID_SUB_TABS: FilterOption[] = ['all', 'needs-mapping', 'mapped'];
 
 export default function Fingerprints() {
@@ -336,6 +380,15 @@ export default function Fingerprints() {
   
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+
+  // Packing tab state
+  const [packingPage, setPackingPage] = useState(1);
+  const [packingPageSize, setPackingPageSize] = useState(25);
+  const [packingSortBy, setPackingSortBy] = useState<PackingSortBy>('shipmentCount');
+  const [packingSortOrder, setPackingSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [packingSearch, setPackingSearch] = useState('');
+  const [packingCollectionFilter, setPackingCollectionFilter] = useState('');
+  const [packingPackageFilter, setPackingPackageFilter] = useState('');
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -456,6 +509,18 @@ export default function Fingerprints() {
   } = useQuery<ReadyToSessionOrdersResponse>({
     queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"],
     enabled: activeTab === 'sessions',
+  });
+
+  // Packing-ready fingerprints (lazy loaded - only fetch when packing tab is active)
+  const packingQueryUrl = `/api/fingerprints/packing-ready?page=${packingPage}&pageSize=${packingPageSize}&sortBy=${packingSortBy}&sortOrder=${packingSortOrder}&search=${encodeURIComponent(packingSearch)}&collection=${encodeURIComponent(packingCollectionFilter)}&package=${encodeURIComponent(packingPackageFilter)}`;
+  
+  const {
+    data: packingReadyData,
+    isLoading: packingReadyLoading,
+    refetch: refetchPackingReady,
+  } = useQuery<PackingReadyResponse>({
+    queryKey: [packingQueryUrl],
+    enabled: activeTab === 'packing',
   });
 
   // Mutations
@@ -1027,6 +1092,15 @@ export default function Fingerprints() {
                 {totalSessionableOrders}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="packing" className="flex items-center gap-2" data-testid="tab-packing">
+            <Layers className="h-4 w-4" />
+            Packing
+            {packingReadyData?.stats?.totalPackingReady ? (
+              <Badge variant="secondary" className="ml-1 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                {packingReadyData.stats.totalPackingReady}
+              </Badge>
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="live" className="flex items-center gap-2" data-testid="tab-live">
             <Eye className="h-4 w-4" />
@@ -1863,6 +1937,305 @@ export default function Fingerprints() {
                     </div>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Packing Tab */}
+        <TabsContent value="packing" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-5 w-5" />
+                    Ready to Pack
+                  </CardTitle>
+                  <CardDescription>
+                    Fingerprints with shipments ready for packing (picked, awaiting label)
+                  </CardDescription>
+                  {packingReadyData?.stats && (
+                    <div className="text-sm font-medium text-foreground mt-2" data-testid="text-packing-summary">
+                      {packingReadyData.stats.totalFingerprints} fingerprint{packingReadyData.stats.totalFingerprints !== 1 ? 's' : ''} · {packingReadyData.stats.totalPackingReady} shipment{packingReadyData.stats.totalPackingReady !== 1 ? 's' : ''} ready
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchPackingReady()}
+                  data-testid="button-refresh-packing"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Filters and Search */}
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search fingerprints..."
+                    value={packingSearch}
+                    onChange={(e) => {
+                      setPackingSearch(e.target.value);
+                      setPackingPage(1);
+                    }}
+                    className="pl-9"
+                    data-testid="input-packing-search"
+                  />
+                </div>
+                <Select
+                  value={packingCollectionFilter || 'all'}
+                  onValueChange={(value) => {
+                    setPackingCollectionFilter(value === 'all' ? '' : value);
+                    setPackingPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]" data-testid="select-collection-filter">
+                    <SelectValue placeholder="All Collections" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Collections</SelectItem>
+                    {packingReadyData?.filters?.availableCollections?.map((col) => (
+                      <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={packingPackageFilter || 'all'}
+                  onValueChange={(value) => {
+                    setPackingPackageFilter(value === 'all' ? '' : value);
+                    setPackingPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]" data-testid="select-package-filter">
+                    <SelectValue placeholder="All Packages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Packages</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {packingReadyData?.filters?.availablePackages?.map((pkg) => (
+                      <SelectItem key={pkg.id} value={pkg.id}>{pkg.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Loading State */}
+              {packingReadyLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <span className="ml-3 text-muted-foreground">Loading packing queue...</span>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!packingReadyLoading && (!packingReadyData?.fingerprints || packingReadyData.fingerprints.length === 0) && (
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Shipments Ready to Pack</h3>
+                  <p className="text-muted-foreground">
+                    Shipments will appear here once they've been picked and are awaiting labels.
+                  </p>
+                </div>
+              )}
+
+              {/* Results Table */}
+              {!packingReadyLoading && packingReadyData?.fingerprints && packingReadyData.fingerprints.length > 0 && (
+                <>
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium">
+                            <button 
+                              className="flex items-center gap-1 hover:text-foreground"
+                              onClick={() => {
+                                if (packingSortBy === 'fingerprint') {
+                                  setPackingSortOrder(packingSortOrder === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setPackingSortBy('fingerprint');
+                                  setPackingSortOrder('asc');
+                                }
+                              }}
+                              data-testid="sort-fingerprint"
+                            >
+                              Fingerprint
+                              {packingSortBy === 'fingerprint' && (
+                                <ChevronDown className={`h-4 w-4 transition-transform ${packingSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </button>
+                          </th>
+                          <th className="text-left p-3 font-medium">
+                            <button 
+                              className="flex items-center gap-1 hover:text-foreground"
+                              onClick={() => {
+                                if (packingSortBy === 'shipmentCount') {
+                                  setPackingSortOrder(packingSortOrder === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setPackingSortBy('shipmentCount');
+                                  setPackingSortOrder('desc');
+                                }
+                              }}
+                              data-testid="sort-shipments"
+                            >
+                              Shipments
+                              {packingSortBy === 'shipmentCount' && (
+                                <ChevronDown className={`h-4 w-4 transition-transform ${packingSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </button>
+                          </th>
+                          <th className="text-left p-3 font-medium">
+                            <button 
+                              className="flex items-center gap-1 hover:text-foreground"
+                              onClick={() => {
+                                if (packingSortBy === 'weight') {
+                                  setPackingSortOrder(packingSortOrder === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setPackingSortBy('weight');
+                                  setPackingSortOrder('desc');
+                                }
+                              }}
+                              data-testid="sort-weight"
+                            >
+                              Weight
+                              {packingSortBy === 'weight' && (
+                                <ChevronDown className={`h-4 w-4 transition-transform ${packingSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </button>
+                          </th>
+                          <th className="text-left p-3 font-medium">
+                            <button 
+                              className="flex items-center gap-1 hover:text-foreground"
+                              onClick={() => {
+                                if (packingSortBy === 'package') {
+                                  setPackingSortOrder(packingSortOrder === 'asc' ? 'desc' : 'asc');
+                                } else {
+                                  setPackingSortBy('package');
+                                  setPackingSortOrder('asc');
+                                }
+                              }}
+                              data-testid="sort-package"
+                            >
+                              Package
+                              {packingSortBy === 'package' && (
+                                <ChevronDown className={`h-4 w-4 transition-transform ${packingSortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </button>
+                          </th>
+                          <th className="text-left p-3 font-medium">Station</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {packingReadyData.fingerprints.map((fp, index) => (
+                          <tr 
+                            key={fp.id} 
+                            className={`border-t hover-elevate ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}
+                            data-testid={`row-fingerprint-${fp.id}`}
+                          >
+                            <td className="p-3">
+                              <div className="font-medium text-base">{fp.humanReadableName}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {fp.totalItems} item{fp.totalItems !== 1 ? 's' : ''} · {fp.collectionCount} collection{fp.collectionCount !== 1 ? 's' : ''}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="default" className="text-lg font-bold px-3 py-1 bg-orange-600">
+                                {fp.packingReadyCount}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              {fp.totalWeight != null ? (
+                                <div className="flex items-center gap-1">
+                                  <Scale className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">
+                                    {fp.totalWeight >= 16 
+                                      ? `${(fp.totalWeight / 16).toFixed(1)} lbs`
+                                      : `${fp.totalWeight.toFixed(1)} oz`}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {fp.hasPackaging ? (
+                                <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+                                  {fp.packagingTypeName}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
+                                  Unassigned
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {fp.stationType ? (
+                                getStationBadge(fp.stationType)
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {packingReadyData.pagination && packingReadyData.pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {((packingReadyData.pagination.page - 1) * packingReadyData.pagination.pageSize) + 1}–{Math.min(packingReadyData.pagination.page * packingReadyData.pagination.pageSize, packingReadyData.pagination.total)} of {packingReadyData.pagination.total}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={packingPageSize.toString()}
+                          onValueChange={(value) => {
+                            setPackingPageSize(parseInt(value));
+                            setPackingPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="w-[100px]" data-testid="select-page-size">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="25">25</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={packingReadyData.pagination.page <= 1}
+                            onClick={() => setPackingPage(packingReadyData.pagination.page - 1)}
+                            data-testid="button-prev-page"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span className="px-3 text-sm">
+                            Page {packingReadyData.pagination.page} of {packingReadyData.pagination.totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={packingReadyData.pagination.page >= packingReadyData.pagination.totalPages}
+                            onClick={() => setPackingPage(packingReadyData.pagination.page + 1)}
+                            data-testid="button-next-page"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
