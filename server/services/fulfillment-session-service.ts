@@ -347,9 +347,9 @@ export class FulfillmentSessionService {
    */
   async buildSessions(
     userId: string,
-    options: { stationType?: string; dryRun?: boolean } = {}
+    options: { stationType?: string; dryRun?: boolean; orderNumbers?: string[] } = {}
   ): Promise<SessionBuildResult> {
-    const { stationType, dryRun = false } = options;
+    const { stationType, dryRun = false, orderNumbers } = options;
 
     const result: SessionBuildResult = {
       success: true,
@@ -363,7 +363,14 @@ export class FulfillmentSessionService {
 
     try {
       // 1. Find sessionable shipments
-      const sessionableShipments = await this.findSessionableShipments(stationType);
+      let sessionableShipments = await this.findSessionableShipments(stationType);
+      
+      // Filter by specific order numbers if provided
+      if (orderNumbers && orderNumbers.length > 0) {
+        const orderSet = new Set(orderNumbers);
+        sessionableShipments = sessionableShipments.filter(s => orderSet.has(s.orderNumber));
+        console.log(`[FulfillmentSession] Filtered to ${sessionableShipments.length} shipments from ${orderNumbers.length} selected order numbers`);
+      }
       
       if (sessionableShipments.length === 0) {
         result.errors.push('No sessionable shipments found');

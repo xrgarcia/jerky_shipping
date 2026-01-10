@@ -245,6 +245,8 @@ interface ReadyToSessionOrder {
   readyToSession: boolean;
   reason: string;
   actionTab: string | null;
+  stationName: string | null;
+  stationType: string | null;
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -346,6 +348,9 @@ export default function Fingerprints() {
   
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  
+  // Order selection state for Build tab
+  const [selectedBuildOrderNumbers, setSelectedBuildOrderNumbers] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -537,13 +542,18 @@ export default function Fingerprints() {
   });
 
   const buildSessionsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/fulfillment-sessions/build", {});
+    mutationFn: async (orderNumbers?: string[]) => {
+      const body: { orderNumbers?: string[] } = {};
+      if (orderNumbers && orderNumbers.length > 0) {
+        body.orderNumbers = orderNumbers;
+      }
+      const res = await apiRequest("POST", "/api/fulfillment-sessions/build", body);
       return res.json() as Promise<BuildSessionsResult>;
     },
     onSuccess: (result) => {
       if (result.success) {
         setLastBuildResult(result);
+        setSelectedBuildOrderNumbers(new Set()); // Clear selection after build
         toast({
           title: "Sessions Created",
           description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
@@ -1812,7 +1822,25 @@ export default function Fingerprints() {
                   <table className="w-full">
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
                       <tr>
+                        <th className="py-3 px-3 font-medium text-sm bg-card w-10">
+                          <Checkbox
+                            checked={
+                              readyToSessionOrdersData.orders.filter(o => o.readyToSession).length > 0 &&
+                              readyToSessionOrdersData.orders.filter(o => o.readyToSession).every(o => selectedBuildOrderNumbers.has(o.orderNumber))
+                            }
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                const readyOrders = readyToSessionOrdersData.orders.filter(o => o.readyToSession).map(o => o.orderNumber);
+                                setSelectedBuildOrderNumbers(new Set(readyOrders));
+                              } else {
+                                setSelectedBuildOrderNumbers(new Set());
+                              }
+                            }}
+                            data-testid="checkbox-select-all-build-orders"
+                          />
+                        </th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Order Number</th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">Station</th>
                         <th className="text-center py-3 px-3 font-medium text-sm bg-card">Ready to Session</th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Reason</th>
                       </tr>
@@ -1824,8 +1852,33 @@ export default function Fingerprints() {
                           className="border-b last:border-0 hover-elevate"
                           data-testid={`row-order-${order.orderNumber}`}
                         >
+                          <td className="py-2 px-3">
+                            <Checkbox
+                              checked={selectedBuildOrderNumbers.has(order.orderNumber)}
+                              disabled={!order.readyToSession}
+                              onCheckedChange={(checked) => {
+                                setSelectedBuildOrderNumbers(prev => {
+                                  const next = new Set(prev);
+                                  if (checked) {
+                                    next.add(order.orderNumber);
+                                  } else {
+                                    next.delete(order.orderNumber);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              data-testid={`checkbox-order-${order.orderNumber}`}
+                            />
+                          </td>
                           <td className="py-2 px-3 font-mono text-sm">
                             {order.orderNumber}
+                          </td>
+                          <td className="py-2 px-3 text-sm">
+                            {order.stationName ? (
+                              <span className="text-muted-foreground">{order.stationName}</span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
                           </td>
                           <td className="py-2 px-3 text-center">
                             {order.readyToSession ? (
@@ -1871,9 +1924,14 @@ export default function Fingerprints() {
                     Orders ready to be grouped into picking sessions (max 28 per cart)
                   </CardDescription>
                 </div>
-                {totalSessionableOrders > 0 && (
+                {(totalSessionableOrders > 0 || selectedBuildOrderNumbers.size > 0) && (
                   <Button
-                    onClick={() => buildSessionsMutation.mutate()}
+                    onClick={() => {
+                      const orderNumbers = selectedBuildOrderNumbers.size > 0 
+                        ? Array.from(selectedBuildOrderNumbers) 
+                        : undefined;
+                      buildSessionsMutation.mutate(orderNumbers);
+                    }}
                     disabled={buildSessionsMutation.isPending}
                     data-testid="button-build-sessions"
                   >
@@ -1885,7 +1943,9 @@ export default function Fingerprints() {
                     ) : (
                       <>
                         <Play className="h-4 w-4 mr-2" />
-                        Build Sessions
+                        {selectedBuildOrderNumbers.size > 0 
+                          ? `Build Sessions (${selectedBuildOrderNumbers.size} selected)` 
+                          : 'Build All Sessions'}
                       </>
                     )}
                   </Button>
