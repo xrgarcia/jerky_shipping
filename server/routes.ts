@@ -12084,8 +12084,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // (on hold + MOVE OVER tag + no session + not cancelled)
       // Left join with fingerprint_models to check if fingerprint has packaging assigned
       // Also join fingerprints to get display name for packaging assignment messages
-      const { stations } = await import("@shared/schema");
-      
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
@@ -12097,14 +12095,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintModelId: fingerprintModels.id,
           fingerprintDisplayName: fingerprints.displayName,
           fingerprintSignature: fingerprints.signature,
-          stationName: stations.name,
-          stationType: stations.type,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
-        .leftJoin(stations, eq(shipments.assignedStationId, stations.id))
         .where(
           and(
             eq(shipments.shipmentStatus, 'on_hold'),
