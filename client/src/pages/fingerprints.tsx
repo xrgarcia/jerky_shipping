@@ -357,8 +357,8 @@ export default function Fingerprints() {
   // Order selection state for Build tab
   const [selectedBuildOrderNumbers, setSelectedBuildOrderNumbers] = useState<Set<string>>(new Set());
   
-  // Station filter state for Build tab
-  const [selectedBuildStations, setSelectedBuildStations] = useState<Set<string>>(new Set());
+  // Station Type filter state for Build tab
+  const [selectedBuildStationTypes, setSelectedBuildStationTypes] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -1831,9 +1831,9 @@ export default function Fingerprints() {
                   {(() => {
                     const totalOrders = readyToSessionOrdersData.orders.length;
                     const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                      if (selectedBuildStations.size === 0) return true;
-                      const stationKey = order.stationName || '__none__';
-                      return selectedBuildStations.has(stationKey);
+                      if (selectedBuildStationTypes.size === 0) return true;
+                      const stationTypeKey = order.stationType || '__none__';
+                      return selectedBuildStationTypes.has(stationTypeKey);
                     });
                     const filteredCount = filteredOrders.length;
                     const readyInFiltered = filteredOrders.filter(o => o.readyToSession).length;
@@ -1841,12 +1841,12 @@ export default function Fingerprints() {
                     return (
                       <div className="flex items-center justify-between mb-3 text-sm text-muted-foreground" data-testid="text-filtered-count">
                         <span>
-                          {selectedBuildStations.size > 0 ? (
+                          {selectedBuildStationTypes.size > 0 ? (
                             <>Showing <span className="font-medium text-foreground">{filteredCount}</span> of {totalOrders} orders</>
                           ) : (
                             <>{totalOrders} orders</>
                           )}
-                          {selectedBuildStations.size > 0 && (
+                          {selectedBuildStationTypes.size > 0 && (
                             <span className="ml-2">({readyInFiltered} ready)</span>
                           )}
                         </span>
@@ -1865,9 +1865,9 @@ export default function Fingerprints() {
                         <th className="py-3 px-3 font-medium text-sm bg-card w-10">
                           {(() => {
                             const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                              if (selectedBuildStations.size === 0) return true;
-                              const stationKey = order.stationName || '__none__';
-                              return selectedBuildStations.has(stationKey);
+                              if (selectedBuildStationTypes.size === 0) return true;
+                              const stationTypeKey = order.stationType || '__none__';
+                              return selectedBuildStationTypes.has(stationTypeKey);
                             });
                             const readyFilteredOrders = filteredOrders.filter(o => o.readyToSession);
                             return (
@@ -1898,13 +1898,13 @@ export default function Fingerprints() {
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-auto p-0 font-medium hover:bg-transparent"
-                                data-testid="button-station-filter"
+                                data-testid="button-station-type-filter"
                               >
-                                Station
-                                <Filter className={`ml-1 h-3 w-3 ${selectedBuildStations.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                                {selectedBuildStations.size > 0 && (
+                                Station Type
+                                <Filter className={`ml-1 h-3 w-3 ${selectedBuildStationTypes.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                                {selectedBuildStationTypes.size > 0 && (
                                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-                                    {selectedBuildStations.size}
+                                    {selectedBuildStationTypes.size}
                                   </Badge>
                                 )}
                               </Button>
@@ -1912,54 +1912,51 @@ export default function Fingerprints() {
                             <PopoverContent className="w-56 p-2" align="start">
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between pb-2 border-b">
-                                  <span className="text-sm font-medium">Filter by Station</span>
-                                  {selectedBuildStations.size > 0 && (
+                                  <span className="text-sm font-medium">Filter by Station Type</span>
+                                  {selectedBuildStationTypes.size > 0 && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 px-2 text-xs"
-                                      onClick={() => setSelectedBuildStations(new Set())}
-                                      data-testid="button-clear-station-filter"
+                                      onClick={() => setSelectedBuildStationTypes(new Set())}
+                                      data-testid="button-clear-station-type-filter"
                                     >
                                       Clear
                                     </Button>
                                   )}
                                 </div>
-                                {(() => {
-                                  const uniqueStations = [...new Set(
-                                    readyToSessionOrdersData.orders.map(o => o.stationName || '__none__')
-                                  )].sort((a, b) => {
-                                    if (a === '__none__') return 1;
-                                    if (b === '__none__') return -1;
-                                    return a.localeCompare(b);
-                                  });
-                                  return uniqueStations.map(station => (
-                                    <div key={station} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`station-filter-${station}`}
-                                        checked={selectedBuildStations.has(station)}
-                                        onCheckedChange={(checked) => {
-                                          setSelectedBuildStations(prev => {
-                                            const next = new Set(prev);
-                                            if (checked) {
-                                              next.add(station);
-                                            } else {
-                                              next.delete(station);
-                                            }
-                                            return next;
-                                          });
-                                        }}
-                                        data-testid={`checkbox-station-${station}`}
-                                      />
-                                      <label
-                                        htmlFor={`station-filter-${station}`}
-                                        className="text-sm cursor-pointer flex-1"
-                                      >
-                                        {station === '__none__' ? 'No Station' : station}
-                                      </label>
-                                    </div>
-                                  ));
-                                })()}
+                                {[
+                                  { value: 'boxing_machine', label: 'Boxing Machine', icon: Box },
+                                  { value: 'poly_bag', label: 'Poly Bag', icon: Package },
+                                  { value: 'hand_pack', label: 'Hand Pack', icon: Hand },
+                                  { value: '__none__', label: 'Not Assigned', icon: null },
+                                ].map(stationType => (
+                                  <div key={stationType.value} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`station-type-filter-${stationType.value}`}
+                                      checked={selectedBuildStationTypes.has(stationType.value)}
+                                      onCheckedChange={(checked) => {
+                                        setSelectedBuildStationTypes(prev => {
+                                          const next = new Set(prev);
+                                          if (checked) {
+                                            next.add(stationType.value);
+                                          } else {
+                                            next.delete(stationType.value);
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                      data-testid={`checkbox-station-type-${stationType.value}`}
+                                    />
+                                    <label
+                                      htmlFor={`station-type-filter-${stationType.value}`}
+                                      className="text-sm cursor-pointer flex-1 flex items-center gap-2"
+                                    >
+                                      {stationType.icon && <stationType.icon className="h-4 w-4" />}
+                                      {stationType.label}
+                                    </label>
+                                  </div>
+                                ))}
                               </div>
                             </PopoverContent>
                           </Popover>
@@ -1971,9 +1968,9 @@ export default function Fingerprints() {
                     <tbody>
                       {readyToSessionOrdersData.orders
                         .filter(order => {
-                          if (selectedBuildStations.size === 0) return true;
-                          const stationKey = order.stationName || '__none__';
-                          return selectedBuildStations.has(stationKey);
+                          if (selectedBuildStationTypes.size === 0) return true;
+                          const stationTypeKey = order.stationType || '__none__';
+                          return selectedBuildStationTypes.has(stationTypeKey);
                         })
                         .map((order) => (
                         <tr 
@@ -2003,8 +2000,8 @@ export default function Fingerprints() {
                             {order.orderNumber}
                           </td>
                           <td className="py-2 px-3 text-sm">
-                            {order.stationName ? (
-                              <span className="text-muted-foreground">{order.stationName}</span>
+                            {order.stationType ? (
+                              getStationBadge(order.stationType)
                             ) : (
                               <span className="text-muted-foreground/50">-</span>
                             )}
