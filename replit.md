@@ -37,6 +37,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics.
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
+- **Tag Refresh Job**: Periodic re-validation of ShipStation tags for shipments in `ready_to_session` and `awaiting_decisions` phases. Runs after main poll cycle when caught up. Required because ShipStation's `modified_at` cursor doesn't update when only tags change.
 - **Packing Completion Audit Logging**: All packing actions logged to `packing_logs` table.
 - **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
 - **Voided Label Handling**: Automatic new label creation, PDF validation, printing to requesting worker's station, audit logging, and QC cache invalidation.
