@@ -31,6 +31,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Layers,
   Package,
   CheckCircle2,
@@ -351,6 +356,9 @@ export default function Fingerprints() {
   
   // Order selection state for Build tab
   const [selectedBuildOrderNumbers, setSelectedBuildOrderNumbers] = useState<Set<string>>(new Set());
+  
+  // Station filter state for Build tab
+  const [selectedBuildStations, setSelectedBuildStations] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -1823,30 +1831,119 @@ export default function Fingerprints() {
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
                       <tr>
                         <th className="py-3 px-3 font-medium text-sm bg-card w-10">
-                          <Checkbox
-                            checked={
-                              readyToSessionOrdersData.orders.filter(o => o.readyToSession).length > 0 &&
-                              readyToSessionOrdersData.orders.filter(o => o.readyToSession).every(o => selectedBuildOrderNumbers.has(o.orderNumber))
-                            }
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                const readyOrders = readyToSessionOrdersData.orders.filter(o => o.readyToSession).map(o => o.orderNumber);
-                                setSelectedBuildOrderNumbers(new Set(readyOrders));
-                              } else {
-                                setSelectedBuildOrderNumbers(new Set());
-                              }
-                            }}
-                            data-testid="checkbox-select-all-build-orders"
-                          />
+                          {(() => {
+                            const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
+                              if (selectedBuildStations.size === 0) return true;
+                              const stationKey = order.stationName || '__none__';
+                              return selectedBuildStations.has(stationKey);
+                            });
+                            const readyFilteredOrders = filteredOrders.filter(o => o.readyToSession);
+                            return (
+                              <Checkbox
+                                checked={
+                                  readyFilteredOrders.length > 0 &&
+                                  readyFilteredOrders.every(o => selectedBuildOrderNumbers.has(o.orderNumber))
+                                }
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    const readyOrders = readyFilteredOrders.map(o => o.orderNumber);
+                                    setSelectedBuildOrderNumbers(prev => new Set([...prev, ...readyOrders]));
+                                  } else {
+                                    const readyOrdersSet = new Set(readyFilteredOrders.map(o => o.orderNumber));
+                                    setSelectedBuildOrderNumbers(prev => new Set([...prev].filter(o => !readyOrdersSet.has(o))));
+                                  }
+                                }}
+                                data-testid="checkbox-select-all-build-orders"
+                              />
+                            );
+                          })()}
                         </th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Order Number</th>
-                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">Station</th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-auto p-0 font-medium hover:bg-transparent"
+                                data-testid="button-station-filter"
+                              >
+                                Station
+                                <Filter className={`ml-1 h-3 w-3 ${selectedBuildStations.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                                {selectedBuildStations.size > 0 && (
+                                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                                    {selectedBuildStations.size}
+                                  </Badge>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-2" align="start">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between pb-2 border-b">
+                                  <span className="text-sm font-medium">Filter by Station</span>
+                                  {selectedBuildStations.size > 0 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => setSelectedBuildStations(new Set())}
+                                      data-testid="button-clear-station-filter"
+                                    >
+                                      Clear
+                                    </Button>
+                                  )}
+                                </div>
+                                {(() => {
+                                  const uniqueStations = [...new Set(
+                                    readyToSessionOrdersData.orders.map(o => o.stationName || '__none__')
+                                  )].sort((a, b) => {
+                                    if (a === '__none__') return 1;
+                                    if (b === '__none__') return -1;
+                                    return a.localeCompare(b);
+                                  });
+                                  return uniqueStations.map(station => (
+                                    <div key={station} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`station-filter-${station}`}
+                                        checked={selectedBuildStations.has(station)}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedBuildStations(prev => {
+                                            const next = new Set(prev);
+                                            if (checked) {
+                                              next.add(station);
+                                            } else {
+                                              next.delete(station);
+                                            }
+                                            return next;
+                                          });
+                                        }}
+                                        data-testid={`checkbox-station-${station}`}
+                                      />
+                                      <label
+                                        htmlFor={`station-filter-${station}`}
+                                        className="text-sm cursor-pointer flex-1"
+                                      >
+                                        {station === '__none__' ? 'No Station' : station}
+                                      </label>
+                                    </div>
+                                  ));
+                                })()}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </th>
                         <th className="text-center py-3 px-3 font-medium text-sm bg-card">Ready to Session</th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Reason</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {readyToSessionOrdersData.orders.map((order) => (
+                      {readyToSessionOrdersData.orders
+                        .filter(order => {
+                          if (selectedBuildStations.size === 0) return true;
+                          const stationKey = order.stationName || '__none__';
+                          return selectedBuildStations.has(stationKey);
+                        })
+                        .map((order) => (
                         <tr 
                           key={order.orderNumber} 
                           className="border-b last:border-0 hover-elevate"
