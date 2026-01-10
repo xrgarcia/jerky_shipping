@@ -12080,24 +12080,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all orders in ready-to-session phase with their session readiness status
   app.get("/api/fulfillment-sessions/ready-to-session-orders", requireAuth, async (req, res) => {
     try {
-      // Get all orders that are in ready_to_session lifecycle phase
-      // (on hold + MOVE OVER tag + no session + not cancelled)
-      // Left join with fingerprint_models to check if fingerprint has packaging assigned
-      // Also join fingerprints to get display name for packaging assignment messages
+      // Get all orders in 'needs_session' subphase (ready for session building)
       const { stations } = await import("@shared/schema");
       
-      // Use exists subquery to check for MOVE OVER tag
-      const hasMoveOverTag = exists(
-        db.select({ id: shipmentTags.id })
-          .from(shipmentTags)
-          .where(and(
-            eq(shipmentTags.shipmentId, shipments.id),
-            eq(shipmentTags.name, 'MOVE OVER')
-          ))
-      );
-      
-      // Include orders in lifecycle phases: awaiting_decisions (any subphase) OR needs_session
-      // This shows both ready and not-ready orders so users can see what's blocking them
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
@@ -12114,21 +12099,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           packagingTypeId: shipments.packagingTypeId,
         })
         .from(shipments)
+        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .leftJoin(stations, eq(shipments.assignedStationId, stations.id))
         .where(
           and(
-            eq(shipments.shipmentStatus, 'on_hold'),
-            hasMoveOverTag,
+            eq(shipments.decisionSubphase, 'needs_session'),
+            eq(shipmentTags.name, 'MOVE OVER'),
             isNull(shipments.fulfillmentSessionId),
-            ne(shipments.status, 'cancelled'),
-            // Only show orders in decision phases (not yet in a session)
-            or(
-              eq(shipments.decisionSubphase, 'needs_session'),
-              eq(shipments.decisionSubphase, 'needs_categorization'),
-              eq(shipments.decisionSubphase, 'needs_packaging')
-            )
+            ne(shipments.status, 'cancelled')
           )
         )
         .orderBy(asc(shipments.orderNumber));
