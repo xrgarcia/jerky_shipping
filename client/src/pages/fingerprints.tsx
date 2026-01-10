@@ -337,6 +337,10 @@ export default function Fingerprints() {
   const [selectedFingerprintIds, setSelectedFingerprintIds] = useState<Set<string>>(new Set());
   const [bulkPackagingTypeId, setBulkPackagingTypeId] = useState<string>("");
   
+  // Pagination state for packaging tab
+  const [packagingPage, setPackagingPage] = useState(1);
+  const [packagingPageSize, setPackagingPageSize] = useState(10);
+  
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
@@ -745,6 +749,18 @@ export default function Fingerprints() {
     
     return true;
   });
+  
+  // Pagination for packaging tab
+  const totalPages = Math.ceil(filteredFingerprints.length / packagingPageSize);
+  const paginatedFingerprints = filteredFingerprints.slice(
+    (packagingPage - 1) * packagingPageSize,
+    packagingPage * packagingPageSize
+  );
+  
+  // Reset page when filters change
+  useEffect(() => {
+    setPackagingPage(1);
+  }, [filter, minWeight, maxWeight]);
   
   // Helper functions for bulk selection
   const toggleSelection = (id: string) => {
@@ -1344,8 +1360,10 @@ export default function Fingerprints() {
                     </div>
                   </div>
                   
-                  <span className="text-sm text-muted-foreground">
-                    Showing {filteredFingerprints.length} of {fingerprints.length}
+                  <span className="text-sm text-muted-foreground" data-testid="text-showing-count">
+                    {filteredFingerprints.length > 0 
+                      ? `Showing ${((packagingPage - 1) * packagingPageSize) + 1}–${Math.min(packagingPage * packagingPageSize, filteredFingerprints.length)} of ${filteredFingerprints.length}`
+                      : `Showing 0 of ${fingerprints.length}`}
                   </span>
                 </div>
                 
@@ -1423,7 +1441,7 @@ export default function Fingerprints() {
                   </div>
                 )}
                 
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-[500px]">
                   {isLoadingFingerprints ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-4">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1436,7 +1454,7 @@ export default function Fingerprints() {
                         No fingerprints match this filter
                       </div>
                     ) : null}
-                    {filteredFingerprints.map((fingerprint) => (
+                    {paginatedFingerprints.map((fingerprint) => (
                       <div
                         key={fingerprint.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border ${
@@ -1565,6 +1583,59 @@ export default function Fingerprints() {
                   </div>
                   )}
                 </ScrollArea>
+                
+                {/* Pagination Controls */}
+                {filteredFingerprints.length > 0 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Rows per page:</span>
+                      <Select
+                        value={packagingPageSize.toString()}
+                        onValueChange={(value) => {
+                          setPackagingPageSize(parseInt(value));
+                          setPackagingPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[80px]" data-testid="select-page-size">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="75">75</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={packagingPage <= 1}
+                        onClick={() => setPackagingPage(packagingPage - 1)}
+                        data-testid="button-prev-page"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <span className="text-sm px-3">
+                        Page {packagingPage} of {totalPages || 1}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={packagingPage >= totalPages}
+                        onClick={() => setPackagingPage(packagingPage + 1)}
+                        data-testid="button-next-page"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
