@@ -12086,6 +12086,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Also join fingerprints to get display name for packaging assignment messages
       const { stations } = await import("@shared/schema");
       
+      // Use exists subquery to check for MOVE OVER tag
+      const hasMoveOverTag = exists(
+        db.select({ id: shipmentTags.id })
+          .from(shipmentTags)
+          .where(and(
+            eq(shipmentTags.shipmentId, shipments.id),
+            eq(shipmentTags.name, 'MOVE OVER')
+          ))
+      );
+      
+      // Include orders in lifecycle phases: awaiting_decisions (any subphase) OR needs_session
+      // This shows both ready and not-ready orders so users can see what's blocking them
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
@@ -12099,20 +12111,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintSignature: fingerprints.signature,
           stationName: stations.name,
           stationType: stations.type,
+          packagingTypeId: shipments.packagingTypeId,
         })
         .from(shipments)
-        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .leftJoin(stations, eq(shipments.assignedStationId, stations.id))
         .where(
           and(
             eq(shipments.shipmentStatus, 'on_hold'),
-            eq(shipmentTags.name, 'MOVE OVER'),
-            isNull(shipments.sessionStatus),
-            isNull(shipments.trackingNumber),
+            hasMoveOverTag,
             isNull(shipments.fulfillmentSessionId),
-            ne(shipments.status, 'cancelled')
+            ne(shipments.status, 'cancelled'),
+            // Only show orders in decision phases (not yet in a session)
+            or(
+              eq(shipments.decisionSubphase, 'needs_session'),
+              eq(shipments.decisionSubphase, 'needs_categorization'),
+              eq(shipments.decisionSubphase, 'needs_packaging')
+            )
           )
         )
         .orderBy(asc(shipments.orderNumber));
