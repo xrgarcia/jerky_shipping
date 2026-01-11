@@ -2059,17 +2059,17 @@ export default function Fingerprints() {
                       return selectedBuildStationTypes.has(stationTypeKey);
                     })
                     .filter(order => selectedBuildOrderNumbers.has(order.orderNumber))
+                    .filter(order => order.readyToSession)
                     .map(order => order.orderNumber) || [];
                   
-                  return (totalSessionableOrders > 0 || visibleSelectedOrders.length > 0) && (
+                  return (
                     <Button
                       onClick={() => {
-                        const orderNumbers = visibleSelectedOrders.length > 0 
-                          ? visibleSelectedOrders 
-                          : undefined;
-                        buildSessionsMutation.mutate(orderNumbers);
+                        if (visibleSelectedOrders.length > 0) {
+                          buildSessionsMutation.mutate(visibleSelectedOrders);
+                        }
                       }}
-                      disabled={buildSessionsMutation.isPending}
+                      disabled={buildSessionsMutation.isPending || visibleSelectedOrders.length === 0}
                       data-testid="button-build-sessions"
                     >
                       {buildSessionsMutation.isPending ? (
@@ -2082,7 +2082,7 @@ export default function Fingerprints() {
                           <Play className="h-4 w-4 mr-2" />
                           {visibleSelectedOrders.length > 0 
                             ? `Build Sessions (${visibleSelectedOrders.length} selected)` 
-                            : 'Build All Sessions'}
+                            : 'Build Sessions (select orders)'}
                         </>
                       )}
                     </Button>
