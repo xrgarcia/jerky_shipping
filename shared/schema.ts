@@ -1197,6 +1197,28 @@ export const insertKitComponentMappingSchema = createInsertSchema(kitComponentMa
 export type InsertKitComponentMapping = z.infer<typeof insertKitComponentMappingSchema>;
 export type KitComponentMapping = typeof kitComponentMappings.$inferSelect;
 
+// Slashbin Kit Component Mappings - Real-time kit mappings from Slashbin webhooks
+// Updated via webhook when kit compositions change in SkuVault
+export const slashbinKitComponentMappings = pgTable("slashbin_kit_component_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kitSku: text("kit_sku").notNull(),
+  componentSku: text("component_sku").notNull(),
+  componentQuantity: integer("component_quantity").notNull().default(1),
+  syncedAt: timestamp("synced_at").notNull().defaultNow(),
+}, (table) => ({
+  kitSkuIdx: index("slashbin_kit_component_mappings_kit_sku_idx").on(table.kitSku),
+  componentSkuIdx: index("slashbin_kit_component_mappings_component_sku_idx").on(table.componentSku),
+  uniqueMapping: index("slashbin_kit_component_mappings_unique_idx").on(table.kitSku, table.componentSku),
+}));
+
+export const insertSlashbinKitComponentMappingSchema = createInsertSchema(slashbinKitComponentMappings).omit({
+  id: true,
+  syncedAt: true,
+});
+
+export type InsertSlashbinKitComponentMapping = z.infer<typeof insertSlashbinKitComponentMappingSchema>;
+export type SlashbinKitComponentMapping = typeof slashbinKitComponentMappings.$inferSelect;
+
 // ============================================================================
 // PHASE 3: SMART SHIPPING ENGINE - FINGERPRINT DETECTION & LEARNING
 // ============================================================================
