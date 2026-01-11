@@ -2051,32 +2051,43 @@ export default function Fingerprints() {
                     Orders ready to be grouped into picking sessions (max 28 per cart)
                   </CardDescription>
                 </div>
-                {(totalSessionableOrders > 0 || selectedBuildOrderNumbers.size > 0) && (
-                  <Button
-                    onClick={() => {
-                      const orderNumbers = selectedBuildOrderNumbers.size > 0 
-                        ? Array.from(selectedBuildOrderNumbers) 
-                        : undefined;
-                      buildSessionsMutation.mutate(orderNumbers);
-                    }}
-                    disabled={buildSessionsMutation.isPending}
-                    data-testid="button-build-sessions"
-                  >
-                    {buildSessionsMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Building...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4 mr-2" />
-                        {selectedBuildOrderNumbers.size > 0 
-                          ? `Build Sessions (${selectedBuildOrderNumbers.size} selected)` 
-                          : 'Build All Sessions'}
-                      </>
-                    )}
-                  </Button>
-                )}
+                {(() => {
+                  const visibleSelectedOrders = readyToSessionOrdersData?.orders
+                    .filter(order => {
+                      if (selectedBuildStationTypes.size === 0) return true;
+                      const stationTypeKey = order.stationType || '__none__';
+                      return selectedBuildStationTypes.has(stationTypeKey);
+                    })
+                    .filter(order => selectedBuildOrderNumbers.has(order.orderNumber))
+                    .map(order => order.orderNumber) || [];
+                  
+                  return (totalSessionableOrders > 0 || visibleSelectedOrders.length > 0) && (
+                    <Button
+                      onClick={() => {
+                        const orderNumbers = visibleSelectedOrders.length > 0 
+                          ? visibleSelectedOrders 
+                          : undefined;
+                        buildSessionsMutation.mutate(orderNumbers);
+                      }}
+                      disabled={buildSessionsMutation.isPending}
+                      data-testid="button-build-sessions"
+                    >
+                      {buildSessionsMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Building...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          {visibleSelectedOrders.length > 0 
+                            ? `Build Sessions (${visibleSelectedOrders.length} selected)` 
+                            : 'Build All Sessions'}
+                        </>
+                      )}
+                    </Button>
+                  );
+                })()}
               </div>
             </CardHeader>
             <CardContent>
