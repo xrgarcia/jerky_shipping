@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -2451,14 +2451,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
-      // Log the full payload for now (actual processing to be implemented later)
-      console.log("========== SLASHBIN PAYLOAD ==========");
-      console.log("Project ID:", req.body.project_id);
-      console.log("Topic:", req.body.topic);
-      console.log("Transformed At:", req.body.transformed_at);
-      console.log("Metadata:", JSON.stringify(req.body.metadata, null, 2));
-      console.log("Payload:", JSON.stringify(req.body.payload, null, 2));
-      console.log("=======================================");
+      // Process kit mapping payload
+      const payload = req.body.payload;
+      if (!payload || !payload.sku) {
+        console.error("[Slashbin] Invalid payload: missing sku");
+        return res.status(400).json({ error: "Invalid payload: missing sku" });
+      }
+      
+      const kitSku = payload.sku;
+      const items = payload.items || [];
+      
+      console.log(`[Slashbin] Processing kit mapping for ${kitSku} with ${items.length} components`);
+      
+      // Delete existing mappings for this kit, then insert new ones
+      await db.delete(slashbinKitComponentMappings).where(eq(slashbinKitComponentMappings.kitSku, kitSku));
+      
+      if (items.length > 0) {
+        const mappingsToInsert = items.map((item: { sku: string; quantity: number }) => ({
+          kitSku,
+          componentSku: item.sku,
+          componentQuantity: item.quantity || 1,
+        }));
+        
+        await db.insert(slashbinKitComponentMappings).values(mappingsToInsert);
+      }
+      
+      console.log(`[Slashbin] Successfully updated ${items.length} component mappings for kit ${kitSku}`);
       
       // Mark job as processed for idempotency
       if (payloadJobId) {
@@ -2466,7 +2484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Return 200 to acknowledge receipt
-      res.status(200).json({ success: true, jobId: payloadJobId });
+      res.status(200).json({ success: true, jobId: payloadJobId, kitSku, componentCount: items.length });
       
     } catch (error: any) {
       console.error("Error processing Slashbin webhook:", error);
