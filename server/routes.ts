@@ -15,6 +15,7 @@ import path from "path";
 import fs from "fs";
 import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-webhook";
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
+import { verifySlashbinWebhook, isJobAlreadyProcessed, markJobAsProcessed } from "./utils/slashbin-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber, extractPdfLabelUrl } from "./utils/shipstation-api";
 import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
@@ -2400,6 +2401,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error processing ShipStation webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Slashbin webhook endpoint - receives transformed kit mappings
+  app.post("/api/webhooks/slashbin/kitMappings", async (req, res) => {
+    const receivedAt = new Date().toISOString();
+    
+    try {
+      // Extract headers
+      const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
+      const jobId = req.headers['x-slashbin-job-id'] as string;
+      const topic = req.headers['x-slashbin-topic'] as string;
+      
+      console.log("========== SLASHBIN WEBHOOK RECEIVED ==========");
+      console.log("Timestamp:", receivedAt);
+      console.log("Job ID:", jobId || 'missing');
+      console.log("Topic:", topic || 'missing');
+      console.log("Signature Present:", !!signatureHeader);
+      
+      // Get signing secret
+      const signingSecret = process.env.SLASHBIN_SIGNING_SECRET;
+      
+      if (!signingSecret) {
+        console.error("[Slashbin] SLASHBIN_SIGNING_SECRET not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+      
+      // Verify signature
+      const rawBody = req.rawBody as Buffer;
+      if (!verifySlashbinWebhook(rawBody, signatureHeader, signingSecret)) {
+        console.error("========== SLASHBIN WEBHOOK VERIFICATION FAILED ==========");
+        console.error(`Timestamp: ${receivedAt}`);
+        console.error(`Job ID: ${jobId || 'unknown'}`);
+        console.error(`Topic: ${topic || 'unknown'}`);
+        console.error(`Signature Header: ${signatureHeader ? 'present' : 'missing'}`);
+        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
+        console.error("===========================================================");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+      
+      console.log("[Slashbin] Signature verified successfully");
+      
+      // Check idempotency - avoid processing duplicate webhooks
+      const payloadJobId = req.body.slashbin_job_id || jobId;
+      if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
+        console.log(`[Slashbin] Job ${payloadJobId} already processed, skipping (idempotency)`);
+        return res.status(200).json({ success: true, message: "Already processed" });
+      }
+      
+      // Log the full payload for now (actual processing to be implemented later)
+      console.log("========== SLASHBIN PAYLOAD ==========");
+      console.log("Project ID:", req.body.project_id);
+      console.log("Topic:", req.body.topic);
+      console.log("Transformed At:", req.body.transformed_at);
+      console.log("Metadata:", JSON.stringify(req.body.metadata, null, 2));
+      console.log("Payload:", JSON.stringify(req.body.payload, null, 2));
+      console.log("=======================================");
+      
+      // Mark job as processed for idempotency
+      if (payloadJobId) {
+        markJobAsProcessed(payloadJobId);
+      }
+      
+      // Return 200 to acknowledge receipt
+      res.status(200).json({ success: true, jobId: payloadJobId });
+      
+    } catch (error: any) {
+      console.error("Error processing Slashbin webhook:", error);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });
