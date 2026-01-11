@@ -2422,10 +2422,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Signature Present:", !!signatureHeader);
       
       // Get signing secret
-      const signingSecret = process.env.SLASHBIN_SIGNING_SECRET;
+      const signingSecret = process.env.KIT_MAPPING_SIGNING_KEY;
       
       if (!signingSecret) {
-        console.error("[Slashbin] SLASHBIN_SIGNING_SECRET not configured");
+        console.error("[Slashbin] KIT_MAPPING_SIGNING_KEY not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
