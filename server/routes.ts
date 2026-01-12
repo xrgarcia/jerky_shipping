@@ -2451,10 +2451,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
-      // Process kit mapping payload
-      const payload = req.body.payload;
+      // Log full payload for debugging
+      console.log("[Slashbin] Full payload:", JSON.stringify(req.body, null, 2));
+      
+      // Process kit mapping payload - structure is transformedPayload.sku
+      const payload = req.body.transformedPayload || req.body.payload;
       if (!payload || !payload.sku) {
-        console.error("[Slashbin] Invalid payload: missing sku");
+        console.error("[Slashbin] Invalid payload: missing sku. Keys received:", Object.keys(req.body));
         return res.status(400).json({ error: "Invalid payload: missing sku" });
       }
       
