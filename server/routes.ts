@@ -2454,15 +2454,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log full payload for debugging
       console.log("[Slashbin] Full payload:", JSON.stringify(req.body, null, 2));
       
-      // Process kit mapping payload - structure is transformedPayload.sku
-      const payload = req.body.transformedPayload || req.body.payload;
-      if (!payload || !payload.sku) {
-        console.error("[Slashbin] Invalid payload: missing sku. Keys received:", Object.keys(req.body));
+      // Process kit mapping payload - structure is payload.transformedPayload.sku
+      const transformedPayload = req.body.payload?.transformedPayload;
+      if (!transformedPayload || !transformedPayload.sku) {
+        console.error("[Slashbin] Invalid payload: missing transformedPayload.sku. Structure:", 
+          JSON.stringify({ hasPayload: !!req.body.payload, hasTransformed: !!req.body.payload?.transformedPayload }));
         return res.status(400).json({ error: "Invalid payload: missing sku" });
       }
       
-      const kitSku = payload.sku;
-      const items = payload.items || [];
+      const kitSku = transformedPayload.sku;
+      const items = transformedPayload.items || [];
       
       console.log(`[Slashbin] Processing kit mapping for ${kitSku} with ${items.length} components`);
       
