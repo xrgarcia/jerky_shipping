@@ -1583,7 +1583,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShipmentTabCounts(): Promise<{ readyToSession: number; inProgress: number; shipped: number; all: number }> {
-    // Ready to Session: On-hold + MOVE OVER tag + no SkuVault session yet + not cancelled
+    // Ready to Session: On-hold or pending + MOVE OVER tag + no SkuVault session yet + not cancelled
     // This is where fingerprinting and QC explosion should happen
     const readyToSessionResult = await db
       .select({ count: count() })
@@ -1591,7 +1591,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
       .where(
         and(
-          eq(shipments.shipmentStatus, 'on_hold'),
+          or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
           sql`${shipments.sessionStatus} IS NULL`,
           isNull(shipments.trackingNumber),
           ne(shipments.status, 'cancelled'),
@@ -1671,7 +1671,7 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipments);
 
-    // Ready to Session: On hold + MOVE OVER tag + no session yet + not cancelled
+    // Ready to Session: On hold or pending + MOVE OVER tag + no session yet + not cancelled
     // This is where fingerprinting and QC explosion should happen before SkuVault picks up
     const readyToSessionResult = await db
       .select({ count: count() })
@@ -1679,7 +1679,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
       .where(
         and(
-          eq(shipments.shipmentStatus, 'on_hold'),
+          or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
           eq(shipmentTags.name, 'MOVE OVER'),
           isNull(shipments.sessionStatus),
           isNull(shipments.trackingNumber),
