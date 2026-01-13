@@ -25,7 +25,7 @@ import {
   type Station,
   type FulfillmentSessionStatus,
 } from "@shared/schema";
-import { eq, and, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
 import { updateShipmentLifecycleBatch } from "./lifecycle-service";
 
 // ============================================================================
@@ -135,7 +135,8 @@ export class FulfillmentSessionService {
       isNull(shipments.fulfillmentSessionId),
       // Lifecycle state machine criteria for READY_TO_SESSION
       // These ensure only orders that passed through the correct workflow are included
-      eq(shipments.shipmentStatus, 'on_hold'),
+      // Allow both on_hold and pending statuses (pending orders with MOVE OVER tag are also sessionable)
+      or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
       hasMoveOverTag,
       ne(shipments.status, 'cancelled'),
     ];
