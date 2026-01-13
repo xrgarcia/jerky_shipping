@@ -136,11 +136,13 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
 
   // READY_TO_SESSION: On hold + MOVE OVER tag + no SkuVault session yet + not cancelled
   // This is where fingerprinting and QC item explosion should happen
+  // Also derive subphase so session builder can find orders that are ready (needs_session)
   if (shipment.shipmentStatus === 'on_hold' && 
       shipment.hasMoveOverTag === true && 
       !shipment.sessionStatus &&
       shipment.status !== 'cancelled') {
-    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase: null };
+    const subphase = deriveDecisionSubphase(shipment);
+    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
   }
 
   // AWAITING_DECISIONS: Has fingerprint, determine which subphase
