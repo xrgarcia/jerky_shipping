@@ -39,6 +39,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
 - **Tag Refresh Job**: Periodic re-validation of ShipStation tags for shipments in `ready_to_session` and `awaiting_decisions` phases. Runs after main poll cycle when caught up. Required because ShipStation's `modified_at` cursor doesn't update when only tags change.
 - **Sessionable Order Status**: The lifecycle state machine treats both `on_hold` and `pending` shipment statuses as valid for `READY_TO_SESSION` phase. This allows orders with MOVE OVER tag and assigned packaging to be sessionable regardless of their hold status in ShipStation.
+- **Lifecycle State Machine Documentation**: See `life_cycle_states_legacy.md` for comparison of the legacy SQL-based tab criteria vs. the current state machine approach. The state machine (`server/services/lifecycle-state-machine.ts`) is the single source of truth for order status determination.
 - **Kit Explosion Race Condition Prevention**: Multi-layered approach to ensure kits are properly exploded into component SKUs:
     1. **Kit Mappings Cache Age Check**: `ensureKitMappingsFresh()` checks cache age and forces reload if >5 minutes old, preventing stale mappings.
     2. **Proactive Hydration in Session Sync**: When Firestore session sync sets `session_status`, checks if QC items exist and hydrates if missing. Catches shipments that bypass normal hydration flow.
