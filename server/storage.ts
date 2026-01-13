@@ -1583,21 +1583,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShipmentTabCounts(): Promise<{ readyToSession: number; inProgress: number; shipped: number; all: number }> {
-    // Ready to Session: On-hold or pending + MOVE OVER tag + no SkuVault session yet + not cancelled
-    // This is where fingerprinting and QC explosion should happen
+    // Ready to Session: Use lifecycle_phase as source of truth
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
-      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
-      .where(
-        and(
-          or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
-          sql`${shipments.sessionStatus} IS NULL`,
-          isNull(shipments.trackingNumber),
-          ne(shipments.status, 'cancelled'),
-          eq(shipmentTags.name, 'MOVE OVER')
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
 
     // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
     // Must match EXACTLY the sum of lifecycle tabs
@@ -1671,21 +1661,11 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipments);
 
-    // Ready to Session: On hold or pending + MOVE OVER tag + no session yet + not cancelled
-    // This is where fingerprinting and QC explosion should happen before SkuVault picks up
+    // Ready to Session: Use lifecycle_phase as source of truth
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
-      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
-      .where(
-        and(
-          or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
-          eq(shipmentTags.name, 'MOVE OVER'),
-          isNull(shipments.sessionStatus),
-          isNull(shipments.trackingNumber),
-          ne(shipments.status, 'cancelled')
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
 
     // Ready to Pick: Orders ready to be picked (session_status = 'new')
     const readyToPickResult = await db
