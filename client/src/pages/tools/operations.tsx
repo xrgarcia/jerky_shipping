@@ -634,6 +634,92 @@ function FirestoreSyncButtons({
   );
 }
 
+function LifecycleBackfillButton() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [result, setResult] = useState<{
+    success: boolean;
+    totalProcessed: number;
+    updatedCount: number;
+    skippedCount: number;
+    phaseBreakdown: Record<string, number>;
+  } | null>(null);
+
+  const backfillMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/shipments/backfill-lifecycle-phases");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/shipments/tab-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shipments/lifecycle-counts"] });
+      toast({
+        title: "Lifecycle Phase Backfill Complete",
+        description: `Updated ${data.updatedCount} shipments, ${data.skippedCount} unchanged`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Backfill Failed",
+        description: error.message || "Failed to backfill lifecycle phases",
+      });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowDialog(true)}
+        disabled={backfillMutation.isPending}
+        data-testid="button-backfill-lifecycle-phases"
+      >
+        <RefreshCw className={cn("h-4 w-4 mr-2", backfillMutation.isPending && "animate-spin")} />
+        {backfillMutation.isPending ? "Running Backfill..." : "Backfill Lifecycle Phases"}
+      </Button>
+      <AlertDialog open={showDialog} onOpenChange={setShowDialog}>
+        <AlertDialogContent data-testid="dialog-backfill-lifecycle-phases">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Backfill Lifecycle Phases?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will recalculate the lifecycle phase for all shipments with the MOVE OVER tag using the current state machine logic. 
+              Use this after changing lifecycle phase criteria to ensure all shipments are correctly categorized.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {result && (
+            <div className="text-sm space-y-2 p-3 bg-muted rounded-md">
+              <p className="font-medium">Last Run Results:</p>
+              <p>Processed: {result.totalProcessed} shipments</p>
+              <p>Updated: {result.updatedCount} | Unchanged: {result.skippedCount}</p>
+              {Object.keys(result.phaseBreakdown).length > 0 && (
+                <div>
+                  <p className="font-medium mt-2">Phase Breakdown:</p>
+                  {Object.entries(result.phaseBreakdown).map(([phase, count]) => (
+                    <p key={phase} className="text-xs">{phase}: {count}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-backfill-lifecycle">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => backfillMutation.mutate()}
+              disabled={backfillMutation.isPending}
+              data-testid="button-confirm-backfill-lifecycle"
+            >
+              {backfillMutation.isPending ? "Running..." : "Run Backfill"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 export default function OperationsPage() {
   const [purgeAction, setPurgeAction] = useState<"shopify" | "shipment" | "shopify-order-sync" | "failures" | "shopify-order-sync-failures" | null>(null);
   const [showFailuresDialog, setShowFailuresDialog] = useState(false);
@@ -2073,6 +2159,30 @@ Please analyze this failure and help me understand:
                   : 'Stopped'}
               </Badge>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-data-maintenance">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Data Maintenance
+          </CardTitle>
+          <CardDescription>Tools for maintaining data consistency</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 flex-1">
+                <p className="text-sm font-medium">Lifecycle Phase Backfill</p>
+                <p className="text-sm text-muted-foreground">
+                  Recalculate lifecycle phases for all MOVE OVER shipments using the current state machine logic.
+                  Run this after changing lifecycle phase criteria.
+                </p>
+              </div>
+            </div>
+            <LifecycleBackfillButton />
           </div>
         </CardContent>
       </Card>
