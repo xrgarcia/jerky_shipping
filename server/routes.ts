@@ -12173,7 +12173,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/fulfillment-sessions/ready-to-session-orders", requireAuth, async (req, res) => {
     try {
       // Get all orders that are in ready_to_session lifecycle phase
-      // (on_hold or pending + MOVE OVER tag + no session + not cancelled)
+      // (pending + MOVE OVER tag + no session + not cancelled)
+      // Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready
       // Left join with fingerprint_models to check if fingerprint has packaging assigned
       // Also join fingerprints to get display name for packaging assignment messages
       const readyToSessionOrders = await db
@@ -12194,8 +12195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .where(
           and(
-            // Allow both on_hold and pending statuses (pending orders with MOVE OVER tag are also sessionable)
-            or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
+            // Only pending status - on_hold is BEFORE fulfillment starts
+            eq(shipments.shipmentStatus, 'pending'),
             eq(shipmentTags.name, 'MOVE OVER'),
             isNull(shipments.sessionStatus),
             isNull(shipments.trackingNumber),

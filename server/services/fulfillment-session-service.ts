@@ -106,9 +106,11 @@ export class FulfillmentSessionService {
    * 
    * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
    * AND meets lifecycle state machine criteria for READY_TO_SESSION:
-   * - shipmentStatus = 'on_hold' (still waiting in ShipStation)
+   * - shipmentStatus = 'pending' (ready for fulfillment processing)
    * - has MOVE OVER tag (explicitly flagged for session building)
    * - status != 'cancelled' (not cancelled in ShipStation)
+   * 
+   * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
    * 
    * Uses the lifecycle state machine to ensure only orders that have completed
    * all prior decision steps (categorization, fingerprint, packaging) are included.
@@ -135,8 +137,8 @@ export class FulfillmentSessionService {
       isNull(shipments.fulfillmentSessionId),
       // Lifecycle state machine criteria for READY_TO_SESSION
       // These ensure only orders that passed through the correct workflow are included
-      // Allow both on_hold and pending statuses (pending orders with MOVE OVER tag are also sessionable)
-      or(eq(shipments.shipmentStatus, 'on_hold'), eq(shipments.shipmentStatus, 'pending')),
+      // Only pending status - on_hold is BEFORE fulfillment starts
+      eq(shipments.shipmentStatus, 'pending'),
       hasMoveOverTag,
       ne(shipments.status, 'cancelled'),
     ];

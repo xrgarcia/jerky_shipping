@@ -134,10 +134,11 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_PICK, subphase: null };
   }
 
-  // READY_TO_SESSION: On hold or pending + MOVE OVER tag + no SkuVault session yet + not cancelled
+  // READY_TO_SESSION: Pending + MOVE OVER tag + no SkuVault session yet + not cancelled
   // This is where fingerprinting and QC item explosion should happen
+  // Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
   // Also derive subphase so session builder can find orders that are ready (needs_session)
-  if ((shipment.shipmentStatus === 'on_hold' || shipment.shipmentStatus === 'pending') && 
+  if (shipment.shipmentStatus === 'pending' && 
       shipment.hasMoveOverTag === true && 
       !shipment.sessionStatus &&
       shipment.status !== 'cancelled') {

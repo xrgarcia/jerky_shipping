@@ -66,10 +66,12 @@ interface HydrationStats {
 
 /**
  * Find shipments that need QC items hydrated
- * Criteria: on_hold status + MOVE OVER tag + no session yet + no existing shipment_qc_items
+ * Criteria: pending status + MOVE OVER tag + no session yet + no existing shipment_qc_items
  * 
  * This targets the READY_TO_SESSION lifecycle phase - shipments that need fingerprinting
  * before they can be picked up by SkuVault sessioning.
+ * 
+ * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
  */
 async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: string; orderNumber: string }[]> {
   const results = await db
@@ -80,8 +82,9 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
     .from(shipments)
     .where(
       and(
-        // Status is on_hold (READY_TO_SESSION phase criteria)
-        eq(shipments.shipmentStatus, 'on_hold'),
+        // Status is pending (READY_TO_SESSION phase criteria)
+        // on_hold is BEFORE fulfillment starts
+        eq(shipments.shipmentStatus, 'pending'),
         // Has MOVE OVER tag (READY_TO_SESSION phase criteria)
         exists(
           db.select({ one: sql`1` })
