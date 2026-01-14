@@ -30,6 +30,7 @@ interface ShipmentsResponse {
 }
 
 interface TabCounts {
+  readyToFulfill: number;
   readyToSession: number;
   inProgress: number;
   shipped: number;
@@ -38,6 +39,7 @@ interface TabCounts {
 
 interface LifecycleTabCounts {
   all: number;
+  readyToFulfill: number;
   readyToSession: number;
   readyToPick: number;
   picking: number;
@@ -46,8 +48,8 @@ interface LifecycleTabCounts {
   pickingIssues: number;
 }
 
-type WorkflowTab = 'ready_to_session' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type WorkflowTab = 'ready_to_fulfill' | 'ready_to_session' | 'in_progress' | 'shipped' | 'all';
+type LifecycleTab = 'ready_to_fulfill' | 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -85,6 +87,11 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
     title: "Ready to Pick",
     description: "This order has been assigned to a fulfillment session and is waiting for a picker to start. The session is created but not yet active.",
     nextSteps: "A picker will start the session on their device and begin collecting items."
+  },
+  ready_to_fulfill: {
+    title: "Ready to Fulfill",
+    description: "This order has the MOVE OVER tag but is still on hold in ShipStation. It's waiting to be released before fulfillment can begin.",
+    nextSteps: "Wait for the order to be released from hold in ShipStation. Once released, it will move to Ready to Session."
   },
   ready_to_session: {
     title: "Ready to Session",
@@ -1211,14 +1218,14 @@ export default function Shipments() {
     queryKey: ["/api/shipments/tab-counts"],
   });
 
-  const tabCounts = tabCountsData || { readyToSession: 0, inProgress: 0, shipped: 0, all: 0 };
+  const tabCounts = tabCountsData || { readyToFulfill: 0, readyToSession: 0, inProgress: 0, shipped: 0, all: 0 };
 
   // Fetch lifecycle tab counts
   const { data: lifecycleCountsData } = useQuery<LifecycleTabCounts>({
     queryKey: ["/api/shipments/lifecycle-counts"],
   });
 
-  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToSession: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
+  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToFulfill: 0, readyToSession: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
 
   // Fetch stations for the station filter dropdown
   const { data: stationsData } = useQuery<{ id: string; name: string; stationType: string }[]>({
@@ -1557,7 +1564,18 @@ export default function Shipments() {
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
             <div className="overflow-x-auto scrollbar-thin">
-              <TabsList className="grid grid-cols-6 w-max sm:w-full h-auto p-1 gap-1">
+              <TabsList className="grid grid-cols-7 w-max sm:w-full h-auto p-1 gap-1">
+                <TabsTrigger 
+                  value="ready_to_fulfill" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-slate-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-ready-to-fulfill"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Ban className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToFulfill} orders</span>
+                </TabsTrigger>
                 <TabsTrigger 
                   value="ready_to_session" 
                   className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
@@ -2119,6 +2137,7 @@ export default function Shipments() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="ready_to_fulfill">Ready to Fulfill</SelectItem>
                           <SelectItem value="ready_to_session">Ready to Session</SelectItem>
                           <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
