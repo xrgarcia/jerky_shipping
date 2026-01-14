@@ -11,6 +11,8 @@
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer
  *             Requires: shipmentStatus='label_purchased' AND status='IT'
+ * DELIVERED: Package has been delivered to customer
+ *            Requires: shipmentStatus='label_purchased' AND status='DE'
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -112,8 +114,12 @@ const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
   const status = shipment.status?.toUpperCase();
   
-  // DELIVERED: Package has been delivered (status DE)
-  if (status && DELIVERED_STATUSES.includes(status)) {
+  // DELIVERED: Package has been delivered
+  // Requires BOTH: shipmentStatus='label_purchased' AND status='DE'
+  // NO FALLBACK - must match these exact criteria
+  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
+      status && 
+      DELIVERED_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
   }
   
