@@ -48,7 +48,7 @@ interface LifecycleTabCounts {
   pickingIssues: number;
 }
 
-type WorkflowTab = 'ready_to_fulfill' | 'ready_to_session' | 'in_progress' | 'shipped' | 'all';
+type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
 type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
@@ -898,7 +898,7 @@ export default function Shipments() {
   const [sortOrder, setSortOrder] = useState("desc");
 
   // Valid values for URL hydration
-  const validWorkflowTabs: WorkflowTab[] = ['ready_to_session', 'in_progress', 'shipped', 'all'];
+  const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
   const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
   const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
 
@@ -1477,8 +1477,8 @@ export default function Shipments() {
   const getTabDescription = () => {
     if (viewMode === 'workflow') {
       switch (activeTab) {
-        case 'ready_to_session':
-          return 'Orders on hold with MOVE OVER tag - ready for warehouse to start processing';
+        case 'ready_to_fulfill':
+          return 'Orders on hold with MOVE OVER tag - waiting to be released from ShipStation';
         case 'in_progress':
           return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
         case 'shipped':
@@ -1650,7 +1650,7 @@ export default function Shipments() {
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-auto p-1 gap-1">
+            <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
               <TabsTrigger 
                 value="ready_to_fulfill" 
                 className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-slate-600 data-[state=active]:text-white"
@@ -1661,17 +1661,6 @@ export default function Shipments() {
                   <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
                 </div>
                 <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="ready_to_session" 
-                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
-                data-testid="tab-ready-to-session"
-              >
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <Clock className="h-4 w-4 flex-shrink-0" />
-                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Session</span>
-                </div>
-                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToSession} orders</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="in_progress" 
