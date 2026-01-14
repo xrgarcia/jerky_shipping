@@ -135,10 +135,12 @@ export class FulfillmentSessionService {
       isNotNull(shipments.packagingTypeId),
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
-      // Lifecycle state machine criteria for READY_TO_SESSION
-      // These ensure only orders that passed through the correct workflow are included
-      // Only pending status - on_hold is BEFORE fulfillment starts
-      eq(shipments.shipmentStatus, 'pending'),
+      // Include orders in ready_to_session OR awaiting_decisions with needs_session subphase
+      // This allows orders that have packaging assigned but lifecycle_phase not yet updated
+      or(
+        eq(shipments.lifecyclePhase, 'ready_to_session'),
+        eq(shipments.lifecyclePhase, 'awaiting_decisions')
+      ),
       hasMoveOverTag,
       ne(shipments.status, 'cancelled'),
     ];
