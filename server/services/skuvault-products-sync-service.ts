@@ -175,6 +175,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   log(`[1/3] Fetched ${kitProducts.length} kit products`);
   
   // 2. Fetch parent products (sku = primary_sku) with weight data and brand
+  // NOTE: Uses quantity_available (not quantity_on_hand) to account for reserved/committed inventory
   const parentProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       sku,
@@ -187,7 +188,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       COST::text AS unit_cost,
       (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
       NULL::text as parent_sku,
-      quantity_on_hand,
+      quantity_available as quantity_on_hand,
       brand
     FROM
       public.internal_inventory 
@@ -208,6 +209,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
   log(`[2/3] Fetched ${parentProducts.length} parent products`);
   
   // 3. Fetch variant products (sku != primary_sku) with parent_sku and brand
+  // NOTE: Uses quantity_available (not quantity_on_hand) to account for reserved/committed inventory
   const variantProducts = await reportingSql<ReportingProduct[]>`
     SELECT
       sku,
@@ -220,7 +222,7 @@ async function fetchProductsFromReporting(): Promise<ReportingProduct[]> {
       COST::text AS unit_cost,
       primary_sku as parent_sku,
       (CASE WHEN internal_inventory_statuses.status_value THEN true ELSE false END) as is_assembled_product,
-      quantity_on_hand,
+      quantity_available as quantity_on_hand,
       brand
     FROM
       public.internal_inventory 
