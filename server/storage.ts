@@ -1327,74 +1327,28 @@ export class DatabaseStorage implements IStorage {
           // All: No additional filter
           break;
         case 'ready_to_session':
-          // Ready to Session: On hold + MOVE OVER tag + no session yet + not cancelled
-          // This is where fingerprinting and QC explosion should happen
-          conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
-          conditions.push(sql`${shipments.sessionStatus} IS NULL`);
-          conditions.push(isNull(shipments.trackingNumber));
-          conditions.push(ne(shipments.status, 'cancelled'));
-          conditions.push(
-            exists(
-              db.select({ one: sql`1` })
-                .from(shipmentTags)
-                .where(
-                  and(
-                    eq(shipmentTags.shipmentId, shipments.id),
-                    eq(shipmentTags.name, 'MOVE OVER')
-                  )
-                )
-            )
-          );
+          // Ready to Session: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'ready_to_session'));
           break;
         case 'ready_to_pick':
-          // Ready to Pick: Session status = 'new' (ready to be picked)
-          conditions.push(
-            and(
-              eq(shipments.sessionStatus, 'new'),
-              isNull(shipments.trackingNumber)
-            )
-          );
+          // Ready to Pick: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'ready_to_pick'));
           break;
         case 'picking':
-          // Picking: Session status = 'active' (currently being picked)
-          conditions.push(
-            and(
-              eq(shipments.sessionStatus, 'active'),
-              isNull(shipments.trackingNumber)
-            )
-          );
+          // Picking: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'picking'));
           break;
         case 'packing_ready':
-          // Packing Ready: Sessions closed, no tracking yet, shipment still pending
-          // Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
-          // Uses index: shipments_cache_warmer_ready_idx
-          conditions.push(
-            and(
-              eq(shipments.sessionStatus, 'closed'),
-              isNull(shipments.trackingNumber),
-              eq(shipments.shipmentStatus, 'pending'),
-              ne(shipments.status, 'cancelled')
-            )
-          );
+          // Packing Ready: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'packing_ready'));
           break;
         case 'on_dock':
-          // On Dock: Label purchased AND accepted (truly waiting for carrier pickup)
-          // shipment_status = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting item)
-          conditions.push(
-            and(
-              eq(shipments.shipmentStatus, 'label_purchased'),
-              eq(shipments.status, 'AC')
-            )
-          );
+          // On Dock: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'on_dock'));
           break;
         case 'picking_issues':
-          // Picking Issues: Inactive sessions (stuck/paused) needing review
-          conditions.push(
-            and(
-              eq(shipments.sessionStatus, 'inactive'),
-              isNull(shipments.trackingNumber)
-            )
-          );
+          // Picking Issues: Use lifecycle_phase column (single source of truth)
+          conditions.push(eq(shipments.lifecyclePhase, 'picking_issues'));
           break;
       }
     }
