@@ -5,7 +5,8 @@
  * ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
  *                                                               ↘ picking_issues (exception path)
  * 
- * READY_TO_SESSION: On hold + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+ * READY_TO_SESSION: Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+ * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault

@@ -2,8 +2,9 @@
  * QC Item Hydrator Worker
  * 
  * Scheduled worker that runs every 1 minute to populate shipment_qc_items
- * for "Ready to Fulfill" shipments (on_hold + MOVE OVER tag).
+ * for "Ready to Fulfill" shipments (pending + MOVE OVER tag).
  * 
+ * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
  * One-time hydration per shipment - once QC items exist, the shipment is skipped.
  */
 

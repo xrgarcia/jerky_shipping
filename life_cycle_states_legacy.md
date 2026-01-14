@@ -33,7 +33,7 @@ This document describes the **legacy SQL-based tab criteria** that was used befo
 | Aspect | Legacy (SQL Queries) | Current (State Machine) |
 |--------|---------------------|------------------------|
 | **Source of Truth** | Duplicated SQL conditions in `storage.ts` | Single `lifecycle_phase` column computed by state machine |
-| **Ready to Session Status** | Only `on_hold` shipment status allowed | Both `on_hold` AND `pending` statuses allowed |
+| **Ready to Session Status** | Only `on_hold` shipment status allowed | Only `pending` status (on_hold is BEFORE fulfillment starts) |
 | **Decision Tracking** | No subphases - orders just "ready" or not | Subphases track progression: `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_session` → `ready_for_skuvault` |
 | **On Dock Detection** | Only `status='AC'` (Accepted) | Both `NY` (Not Yet) and `AC` (Accepted) statuses |
 | **Packing Ready** | Required explicit `status != 'cancelled'` check | Relies on `sessionStatus='closed'` + `shipmentStatus='pending'` |
@@ -52,7 +52,7 @@ AND shipments.status != 'cancelled'
 
 **Current State Machine:**
 ```typescript
-if ((shipment.shipmentStatus === 'on_hold' || shipment.shipmentStatus === 'pending') && 
+if (shipment.shipmentStatus === 'pending' && 
     shipment.hasMoveOverTag === true && 
     !shipment.sessionStatus &&
     shipment.status !== 'cancelled') {
@@ -60,7 +60,10 @@ if ((shipment.shipmentStatus === 'on_hold' || shipment.shipmentStatus === 'pendi
 }
 ```
 
-**Why Changed:** Orders with `MOVE OVER` tag and assigned packaging should be sessionable regardless of their hold status in ShipStation. The `pending` status indicates the order is ready to be processed.
+**Why Changed:** 
+- `on_hold` is the status BEFORE fulfillment starts (orders waiting in ShipStation queue)
+- `pending` is when orders are actually ready to be sessioned and processed
+- Only `pending` orders with `MOVE OVER` tag should enter the fulfillment workflow
 
 ### Decision Subphases (New in State Machine)
 
