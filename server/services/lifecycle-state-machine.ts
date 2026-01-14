@@ -109,6 +109,16 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
 
+  // READY_TO_FULFILL: On hold + MOVE OVER tag (regardless of session state)
+  // This MUST be checked BEFORE session-based phases to properly reset orders that go back to on_hold
+  // Orders that were in packing_ready/picking but returned to on_hold should reset to ready_to_fulfill
+  if (shipment.shipmentStatus === 'on_hold' && 
+      shipment.hasMoveOverTag === true && 
+      shipment.status !== 'cancelled') {
+    const subphase = deriveDecisionSubphase(shipment);
+    return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
+  }
+
   // PICKING_ISSUES: Session status is 'inactive' (supervisor attention needed)
   if (shipment.sessionStatus === 'inactive') {
     return { phase: LIFECYCLE_PHASES.PICKING_ISSUES, subphase: null };
@@ -144,17 +154,6 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
       shipment.status !== 'cancelled') {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
-  }
-
-  // READY_TO_FULFILL: On hold + MOVE OVER tag + no SkuVault session yet + not cancelled
-  // This is BEFORE fulfillment starts - orders are waiting to be released from ShipStation hold
-  // Once released (status changes to pending), they move to READY_TO_SESSION
-  if (shipment.shipmentStatus === 'on_hold' && 
-      shipment.hasMoveOverTag === true && 
-      !shipment.sessionStatus &&
-      shipment.status !== 'cancelled') {
-    const subphase = deriveDecisionSubphase(shipment);
-    return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
   }
 
   // AWAITING_DECISIONS: Has fingerprint, determine which subphase
@@ -281,9 +280,10 @@ export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | 
 export function getLifecycleProgress(state: LifecycleState): number {
   const { phase, subphase } = state;
   
-  // Main phases (6 total, excluding picking_issues)
+  // Main phases (7 total, excluding picking_issues)
   const phaseWeights: Record<LifecyclePhase, number> = {
-    [LIFECYCLE_PHASES.READY_TO_SESSION]: 0,
+    [LIFECYCLE_PHASES.READY_TO_FULFILL]: 0,
+    [LIFECYCLE_PHASES.READY_TO_SESSION]: 5,
     [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 15,
     [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,

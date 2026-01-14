@@ -313,6 +313,16 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     
     // Priority 2: Use stored lifecycle phase for proper badge display
     switch (lifecyclePhase) {
+      case 'ready_to_fulfill': {
+        const badge = (
+          <Badge className="bg-slate-600 hover:bg-slate-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Ban className="h-3 w-3" />
+            Ready to Fulfill
+          </Badge>
+        );
+        return wrapBadgeWithPopover('ready_to_fulfill', badge);
+      }
+      
       case 'on_dock': {
         const badge = (
           <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
