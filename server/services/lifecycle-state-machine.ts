@@ -9,6 +9,8 @@
  * READY_TO_SESSION: Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
+ * IN_TRANSIT: Package is on its way to customer
+ *             Requires: shipmentStatus='label_purchased' AND status='IT'
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -115,8 +117,12 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
   }
   
-  // IN_TRANSIT: Package is on its way to customer (status IT)
-  if (status && IN_TRANSIT_STATUSES.includes(status)) {
+  // IN_TRANSIT: Package is on its way to customer
+  // Requires BOTH: shipmentStatus='label_purchased' AND status='IT'
+  // NO FALLBACK - must match these exact criteria
+  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
+      status && 
+      IN_TRANSIT_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
   }
   
