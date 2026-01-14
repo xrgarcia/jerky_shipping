@@ -194,8 +194,8 @@ export interface IStorage {
   getNonDeliveredShipments(): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
-  getShipmentTabCounts(): Promise<{ readyToSession: number; inProgress: number; shipped: number; all: number }>;
-  getLifecycleTabCounts(): Promise<{ all: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
+  getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }>;
+  getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -1582,8 +1582,14 @@ export class DatabaseStorage implements IStorage {
     return { shipments: result, total };
   }
 
-  async getShipmentTabCounts(): Promise<{ readyToSession: number; inProgress: number; shipped: number; all: number }> {
-    // Ready to Session: Use lifecycle_phase as source of truth
+  async getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }> {
+    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    const readyToFulfillResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
+
+    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1633,6 +1639,7 @@ export class DatabaseStorage implements IStorage {
       .from(shipments);
 
     return {
+      readyToFulfill: Number(readyToFulfillResult[0]?.count) || 0,
       readyToSession: Number(readyToSessionResult[0]?.count) || 0,
       inProgress: Number(inProgressResult[0]?.count) || 0,
       shipped: Number(shippedResult[0]?.count) || 0,
@@ -1655,13 +1662,19 @@ export class DatabaseStorage implements IStorage {
    * │   "closed"          │  Has value  │  DE/SP/etc  │  Delivered         │  (excluded)  │
    * └───────────────────────────────────────────────────────────────────────────────────┘
    */
-  async getLifecycleTabCounts(): Promise<{ all: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
+  async getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
     // All: Total count
     const allResult = await db
       .select({ count: count() })
       .from(shipments);
 
-    // Ready to Session: Use lifecycle_phase as source of truth
+    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    const readyToFulfillResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
+
+    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1729,6 +1742,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       all: Number(allResult[0]?.count) || 0,
+      readyToFulfill: Number(readyToFulfillResult[0]?.count) || 0,
       readyToSession: Number(readyToSessionResult[0]?.count) || 0,
       readyToPick: Number(readyToPickResult[0]?.count) || 0,
       picking: Number(pickingResult[0]?.count) || 0,

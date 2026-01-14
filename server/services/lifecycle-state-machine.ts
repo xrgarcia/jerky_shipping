@@ -2,11 +2,11 @@
  * Shipment Lifecycle State Machine
  * 
  * Manages the progression of shipments through their lifecycle phases:
- * ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
- *                                                               ↘ picking_issues (exception path)
+ * ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ *                                                                        ↘ picking_issues (exception path)
  * 
+ * READY_TO_FULFILL: On hold + MOVE OVER tag - waiting to be released from ShipStation hold
  * READY_TO_SESSION: Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
- * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -137,7 +137,6 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
 
   // READY_TO_SESSION: Pending + MOVE OVER tag + no SkuVault session yet + not cancelled
   // This is where fingerprinting and QC item explosion should happen
-  // Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
   // Also derive subphase so session builder can find orders that are ready (needs_session)
   if (shipment.shipmentStatus === 'pending' && 
       shipment.hasMoveOverTag === true && 
@@ -145,6 +144,17 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
       shipment.status !== 'cancelled') {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
+  }
+
+  // READY_TO_FULFILL: On hold + MOVE OVER tag + no SkuVault session yet + not cancelled
+  // This is BEFORE fulfillment starts - orders are waiting to be released from ShipStation hold
+  // Once released (status changes to pending), they move to READY_TO_SESSION
+  if (shipment.shipmentStatus === 'on_hold' && 
+      shipment.hasMoveOverTag === true && 
+      !shipment.sessionStatus &&
+      shipment.status !== 'cancelled') {
+    const subphase = deriveDecisionSubphase(shipment);
+    return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
   }
 
   // AWAITING_DECISIONS: Has fingerprint, determine which subphase
