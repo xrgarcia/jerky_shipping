@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from "./websocket";
 import { log } from "./vite";
 import { updateShipmentLifecycle } from "./services/lifecycle-service";
+import { withRetrySafe } from "./utils/db-retry";
 
 /**
  * Process a single batch of webhooks from the queue
@@ -326,18 +327,19 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
       }
       
       // Broadcast queue status via WebSocket
+      // Use withRetrySafe for database operations to handle transient connection issues
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
-      const failureCount = await storage.getShipmentSyncFailureCount();
+      const failureCount = await withRetrySafe(() => storage.getShipmentSyncFailureCount(), {}, 0) ?? 0;
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       
-      // Get active backfill job
-      const allBackfillJobs = await storage.getAllBackfillJobs();
+      // Get active backfill job (with retry)
+      const allBackfillJobs = await withRetrySafe(() => storage.getAllBackfillJobs(), {}, []) ?? [];
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
       
-      // Get comprehensive data health metrics
-      const dataHealth = await storage.getDataHealthMetrics();
+      // Get comprehensive data health metrics (with retry)
+      const dataHealth = await withRetrySafe(() => storage.getDataHealthMetrics()) ?? undefined;
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
@@ -349,6 +351,7 @@ export function startBackgroundWorker(intervalMs: number = 5000): NodeJS.Timeout
         dataHealth,
       });
     } catch (error) {
+      // Log but don't crash on transient errors - worker will retry on next interval
       console.error("Background worker error:", error);
     } finally {
       // Only release the lock if we still own it (handles stop/start edge cases)

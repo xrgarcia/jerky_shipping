@@ -53,6 +53,7 @@ import {
   type InsertShipmentSyncFailure 
 } from '@shared/schema';
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
+import { withRetrySafe } from './utils/db-retry';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 
@@ -1190,22 +1191,23 @@ export async function startShipmentSyncWorker(intervalMs: number = 10000): Promi
       }
       
       // Broadcast queue status via WebSocket
+      // Use withRetrySafe for database operations to handle transient connection issues
       const shopifyQueueLength = await getQueueLength();
       const shipmentSyncQueueLength = await getShipmentSyncQueueLength();
       const shopifyOrderSyncQueueLength = await getShopifyOrderSyncQueueLength();
-      const failureCount = await storage.getShipmentSyncFailureCount();
+      const failureCount = await withRetrySafe(() => storage.getShipmentSyncFailureCount(), {}, 0) ?? 0;
       const oldestShopify = await getOldestShopifyQueueMessage();
       const oldestShipmentSync = await getOldestShipmentSyncQueueMessage();
       const oldestShopifyOrderSync = await getOldestShopifyOrderSyncQueueMessage();
       
-      // Get active backfill job
-      const allBackfillJobs = await storage.getAllBackfillJobs();
+      // Get active backfill job (with retry)
+      const allBackfillJobs = await withRetrySafe(() => storage.getAllBackfillJobs(), {}, []) ?? [];
       const activeBackfillJob = allBackfillJobs.find(j => j.status === 'running' || j.status === 'pending') || null;
       
-      // Get comprehensive data health metrics
-      const dataHealth = await storage.getDataHealthMetrics();
-      // Pipeline metrics for operations dashboard
-      const pipeline = await storage.getPipelineMetrics();
+      // Get comprehensive data health metrics (with retry)
+      const dataHealth = await withRetrySafe(() => storage.getDataHealthMetrics()) ?? undefined;
+      // Pipeline metrics for operations dashboard (with retry)
+      const pipeline = await withRetrySafe(() => storage.getPipelineMetrics()) ?? undefined;
       
       broadcastQueueStatus({
         shopifyQueue: shopifyQueueLength,
@@ -1220,6 +1222,7 @@ export async function startShipmentSyncWorker(intervalMs: number = 10000): Promi
         pipeline,
       });
     } catch (error) {
+      // Log but don't crash on transient errors - worker will retry on next interval
       console.error("Shipment sync worker error:", error);
     } finally {
       // Only release the lock if we still own it (handles stop/start edge cases)
