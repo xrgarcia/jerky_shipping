@@ -637,6 +637,7 @@ function FirestoreSyncButtons({
 function LifecycleBackfillButton() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number>(7);
   const [result, setResult] = useState<{
     success: boolean;
     totalProcessed: number;
@@ -646,8 +647,8 @@ function LifecycleBackfillButton() {
   } | null>(null);
 
   const backfillMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/shipments/backfill-lifecycle-phases");
+    mutationFn: async (days: number) => {
+      const response = await apiRequest("POST", "/api/shipments/backfill-lifecycle-phases", { days });
       return response.json();
     },
     onSuccess: (data) => {
@@ -685,10 +686,24 @@ function LifecycleBackfillButton() {
           <AlertDialogHeader>
             <AlertDialogTitle>Backfill Lifecycle Phases?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will recalculate the lifecycle phase for all shipments with the MOVE OVER tag using the current state machine logic. 
-              Use this after changing lifecycle phase criteria to ensure all shipments are correctly categorized.
+              This will recalculate the lifecycle phase for shipments with the MOVE OVER tag using the current state machine logic. 
+              Select a time range to limit which shipments are processed.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">Time Range</label>
+            <select
+              className="w-full p-2 border rounded-md bg-background"
+              value={selectedDays}
+              onChange={(e) => setSelectedDays(Number(e.target.value))}
+              disabled={backfillMutation.isPending}
+              data-testid="select-backfill-days"
+            >
+              <option value={1}>Last 1 day</option>
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+            </select>
+          </div>
           {result && (
             <div className="text-sm space-y-2 p-3 bg-muted rounded-md">
               <p className="font-medium">Last Run Results:</p>
@@ -707,11 +722,11 @@ function LifecycleBackfillButton() {
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-backfill-lifecycle">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => backfillMutation.mutate()}
+              onClick={() => backfillMutation.mutate(selectedDays)}
               disabled={backfillMutation.isPending}
               data-testid="button-confirm-backfill-lifecycle"
             >
-              {backfillMutation.isPending ? "Running..." : "Run Backfill"}
+              {backfillMutation.isPending ? "Running..." : `Run Backfill (${selectedDays} days)`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2068,13 +2068,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This recalculates lifecycle_phase based on current shipment data
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
     try {
-      console.log("========== LIFECYCLE PHASE BACKFILL STARTED ==========");
+      // Optional days filter from request body (1, 7, or 30 days)
+      const { days } = req.body as { days?: number };
+      const daysLabel = days ? `last ${days} days` : 'all time';
+      console.log(`========== LIFECYCLE PHASE BACKFILL STARTED (${daysLabel}) ==========`);
       const { deriveLifecyclePhase } = await import('./services/lifecycle-state-machine');
       
-      // Fetch all shipments with MOVE OVER tag that might need lifecycle phase updates
-      // This includes shipments in early phases: on_hold, pending, and those without sessions
-      const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill();
-      console.log(`Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag for lifecycle backfill`);
+      // Fetch shipments with MOVE OVER tag that might need lifecycle phase updates
+      // If days is provided, filter to shipments created within that time range
+      const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill(days);
+      console.log(`Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag for lifecycle backfill (${daysLabel})`);
       
       let updatedCount = 0;
       let skippedCount = 0;

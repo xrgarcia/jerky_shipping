@@ -192,7 +192,7 @@ export interface IStorage {
   getShipmentByShipmentId(shipmentId: string): Promise<Shipment | undefined>;
   getShipmentsBySessionId(sessionId: string): Promise<Shipment[]>;
   getNonDeliveredShipments(): Promise<Shipment[]>;
-  getShipmentsForLifecycleBackfill(): Promise<Shipment[]>;
+  getShipmentsForLifecycleBackfill(days?: number): Promise<Shipment[]>;
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }>;
@@ -1031,19 +1031,27 @@ export class DatabaseStorage implements IStorage {
 
   // Get all shipments with MOVE OVER tag for lifecycle phase backfill
   // Returns shipments that might need lifecycle_phase recalculation
-  async getShipmentsForLifecycleBackfill(): Promise<Shipment[]> {
+  // Optional days parameter filters to shipments created within the last N days
+  async getShipmentsForLifecycleBackfill(days?: number): Promise<Shipment[]> {
+    const conditions = [
+      eq(shipmentTags.name, 'MOVE OVER'),
+      ne(shipments.status, 'cancelled')
+    ];
+    
+    // Add date filter if days parameter is provided
+    if (days && days > 0) {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      conditions.push(gte(shipments.createdAt, cutoffDate));
+    }
+    
     const result = await db
       .select({
         shipment: shipments,
       })
       .from(shipments)
       .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
-      .where(
-        and(
-          eq(shipmentTags.name, 'MOVE OVER'),
-          ne(shipments.status, 'cancelled')
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(shipments.createdAt));
     return result.map(r => r.shipment);
   }
