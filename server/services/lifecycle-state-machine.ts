@@ -201,6 +201,7 @@ export function deriveDecisionSubphase(shipment: {
  */
 export function getPhaseDisplayName(phase: LifecyclePhase): string {
   const displayNames: Record<LifecyclePhase, string> = {
+    [LIFECYCLE_PHASES.READY_TO_FULFILL]: 'Ready to Fulfill',
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 'Ready to Session',
     [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 'Awaiting Decisions',
     [LIFECYCLE_PHASES.READY_TO_PICK]: 'Ready to Pick',

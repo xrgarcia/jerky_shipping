@@ -10184,6 +10184,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill lifecycle phases for shipments affected by state machine changes
+  // This recalculates lifecycle_phase for all shipments matching ready_to_session and ready_to_fulfill criteria
+  app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
+    try {
+      console.log('[Backfill] Starting lifecycle phase backfill...');
+      
+      // Import lifecycle state machine
+      const { deriveLifecyclePhase } = await import('./services/lifecycle-state-machine');
+      const { LIFECYCLE_PHASES } = await import('@shared/schema');
+      
+      // 1. Update shipments that should be ready_to_session (pending + MOVE OVER + no session)
+      const readyToSessionCandidates = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          shipmentStatus: shipments.shipmentStatus,
+          sessionStatus: shipments.sessionStatus,
+          trackingNumber: shipments.trackingNumber,
+          status: shipments.status,
+          fingerprintStatus: shipments.fingerprintStatus,
+          fingerprintId: shipments.fingerprintId,
+          packagingTypeId: shipments.packagingTypeId,
+          fulfillmentSessionId: shipments.fulfillmentSessionId,
+          currentPhase: shipments.lifecyclePhase,
+        })
+        .from(shipments)
+        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+        .where(
+          and(
+            eq(shipments.shipmentStatus, 'pending'),
+            eq(shipmentTags.name, 'MOVE OVER'),
+            isNull(shipments.sessionStatus),
+            isNull(shipments.trackingNumber),
+            ne(shipments.status, 'cancelled')
+          )
+        );
+      
+      console.log(`[Backfill] Found ${readyToSessionCandidates.length} shipments matching ready_to_session criteria`);
+      
+      let readyToSessionUpdated = 0;
+      for (const shipment of readyToSessionCandidates) {
+        const state = deriveLifecyclePhase({
+          ...shipment,
+          hasMoveOverTag: true,
+        });
+        
+        if (shipment.currentPhase !== state.phase) {
+          await db
+            .update(shipments)
+            .set({
+              lifecyclePhase: state.phase,
+              decisionSubphase: state.subphase,
+            })
+            .where(eq(shipments.id, shipment.id));
+          readyToSessionUpdated++;
+        }
+      }
+      
+      // 2. Update shipments that should be ready_to_fulfill (on_hold + MOVE OVER + no session)
+      const readyToFulfillCandidates = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          shipmentStatus: shipments.shipmentStatus,
+          sessionStatus: shipments.sessionStatus,
+          trackingNumber: shipments.trackingNumber,
+          status: shipments.status,
+          fingerprintStatus: shipments.fingerprintStatus,
+          fingerprintId: shipments.fingerprintId,
+          packagingTypeId: shipments.packagingTypeId,
+          fulfillmentSessionId: shipments.fulfillmentSessionId,
+          currentPhase: shipments.lifecyclePhase,
+        })
+        .from(shipments)
+        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+        .where(
+          and(
+            eq(shipments.shipmentStatus, 'on_hold'),
+            eq(shipmentTags.name, 'MOVE OVER'),
+            isNull(shipments.sessionStatus),
+            ne(shipments.status, 'cancelled')
+          )
+        );
+      
+      console.log(`[Backfill] Found ${readyToFulfillCandidates.length} shipments matching ready_to_fulfill criteria`);
+      
+      let readyToFulfillUpdated = 0;
+      for (const shipment of readyToFulfillCandidates) {
+        const state = deriveLifecyclePhase({
+          ...shipment,
+          hasMoveOverTag: true,
+        });
+        
+        if (shipment.currentPhase !== state.phase) {
+          await db
+            .update(shipments)
+            .set({
+              lifecyclePhase: state.phase,
+              decisionSubphase: state.subphase,
+            })
+            .where(eq(shipments.id, shipment.id));
+          readyToFulfillUpdated++;
+        }
+      }
+      
+      console.log(`[Backfill] Complete: ${readyToSessionUpdated} ready_to_session, ${readyToFulfillUpdated} ready_to_fulfill updated`);
+      
+      res.json({
+        success: true,
+        readyToSessionCandidates: readyToSessionCandidates.length,
+        readyToSessionUpdated,
+        readyToFulfillCandidates: readyToFulfillCandidates.length,
+        readyToFulfillUpdated,
+      });
+    } catch (error: any) {
+      console.error("[Backfill] Error backfilling lifecycle phases:", error);
+      res.status(500).json({ error: "Failed to backfill lifecycle phases" });
+    }
+  });
+
   // Lookup specific kit components
   app.get("/api/kit-mappings/:sku", requireAuth, async (req, res) => {
     try {
