@@ -1,0 +1,150 @@
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_req: [ClientRequest],
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at process.processTimers (node:internal/timers:519:7),
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_receiver: null,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+},
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at async Timeout.processQueue [as _onTimeout] (file:///home/runner/workspace/dist/index.js:15653:28) {
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_eventsCount: 4,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_extensions: {},
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_redirects: 0,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at async DatabaseStorage.getShipmentSyncFailureCount (file:///home/runner/workspace/dist/index.js:3000:24)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_closeFrameReceived: false,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_isServer: false,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+}
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:426:4
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_autoPong: true,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_binaryType: 'arraybuffer',
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at WebSocket.close (/home/runner/workspace/node_modules/ws/lib/websocket.js:299:7)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_protocol: '',
+2026-01-14 14:26:12.47
+9a064b7a
+User
+[Symbol(kTarget)]: WebSocket {
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_maxListeners: undefined,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+}
+2026-01-14 14:26:12.47
+9a064b7a
+User
+[Symbol(kCapture)]: false
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_sender: null,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at S.end (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:425:83)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+[Symbol(kMessage)]: 'WebSocket was closed before the connection was established'
+2026-01-14 14:26:12.47
+9a064b7a
+User
+Background worker error: Error: Connection terminated due to connection timeout
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at runNextTicks (node:internal/process/task_queues:64:3)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_events: [Object: null prototype],
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_paused: false,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_errorEmitted: true,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+[cause]: ErrorEvent {
+2026-01-14 14:26:12.47
+9a064b7a
+User
+at S.destroy (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:426:63)
+2026-01-14 14:26:12.47
+9a064b7a
+User
+[Symbol(shapeMode)]: false,
+2026-01-14 14:26:12.47
+9a064b7a
+User
+_closeMessage: ,
+Wrap
+Colors
