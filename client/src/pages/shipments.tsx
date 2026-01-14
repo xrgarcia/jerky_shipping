@@ -1468,8 +1468,12 @@ export default function Shipments() {
   const handleTabChange = (value: string) => {
     if (viewMode === 'workflow') {
       setActiveTab(value as WorkflowTab);
+      // Clear lifecycle phase filter when in workflow view
+      setLifecyclePhaseFilter('');
     } else {
       setActiveLifecycleTab(value as LifecycleTab);
+      // Auto-set lifecycle phase filter to match the selected tab
+      setLifecyclePhaseFilter(value);
     }
     setPage(1);
   };

@@ -1648,65 +1648,35 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
 
-    // Ready to Pick: Orders ready to be picked (session_status = 'new')
+    // Ready to Pick: Use lifecycle_phase as source of truth
     const readyToPickResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.sessionStatus, 'new'),
-          isNull(shipments.trackingNumber)
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'ready_to_pick'));
 
-    // Picking: Orders currently being picked (session_status = 'active')
+    // Picking: Use lifecycle_phase as source of truth
     const pickingResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.sessionStatus, 'active'),
-          isNull(shipments.trackingNumber)
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'picking'));
 
-    // Packing Ready: Orders ready to pack (closed session, no tracking, pending shipment status)
-    // Uses shipmentStatus = 'pending' as the indicator that order hasn't shipped yet
-    // This uses the partial index: shipments_cache_warmer_ready_idx
+    // Packing Ready: Use lifecycle_phase as source of truth
     const packingReadyResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.sessionStatus, 'closed'),
-          isNull(shipments.trackingNumber),
-          eq(shipments.shipmentStatus, 'pending'),
-          ne(shipments.status, 'cancelled')
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'packing_ready'));
 
-    // On Dock: Label purchased AND accepted (truly waiting for carrier pickup)
-    // shipment_status = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting item)
+    // On Dock: Use lifecycle_phase as source of truth
     const onDockResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.shipmentStatus, 'label_purchased'),
-          eq(shipments.status, 'AC')
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'on_dock'));
 
-    // Picking Issues: Orders with inactive session status (stuck/paused)
+    // Picking Issues: Use lifecycle_phase as source of truth
     const pickingIssuesResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.sessionStatus, 'inactive'),
-          isNull(shipments.trackingNumber)
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'picking_issues'));
 
     return {
       all: Number(allResult[0]?.count) || 0,
