@@ -129,20 +129,14 @@ export class FulfillmentSessionService {
     );
 
     const conditions = [
-      // Use lifecycle state machine - only orders waiting to be sessioned
+      // Use lifecycle_phase as single source of truth
+      eq(shipments.lifecyclePhase, 'ready_to_session'),
+      // Only orders with needs_session subphase (have packaging, ready to be sessioned)
       eq(shipments.decisionSubphase, DECISION_SUBPHASES.NEEDS_SESSION),
-      // Safety checks (should already be true if in needs_session, but belt-and-suspenders)
+      // Safety checks (should already be true if in ready_to_session, but belt-and-suspenders)
       isNotNull(shipments.packagingTypeId),
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
-      // Include orders in ready_to_session OR awaiting_decisions with needs_session subphase
-      // This allows orders that have packaging assigned but lifecycle_phase not yet updated
-      or(
-        eq(shipments.lifecyclePhase, 'ready_to_session'),
-        eq(shipments.lifecyclePhase, 'awaiting_decisions')
-      ),
-      hasMoveOverTag,
-      ne(shipments.status, 'cancelled'),
     ];
 
     if (stationType) {

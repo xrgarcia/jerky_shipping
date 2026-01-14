@@ -12371,7 +12371,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all orders that are ready to be added to a session
       // Uses lifecycle_phase column as single source of truth
-      // Also includes awaiting_decisions with needs_session subphase (packaging assigned but lifecycle not yet updated)
       // Left join with fingerprint_models to check if fingerprint has packaging assigned
       // Also join fingerprints to get display name for packaging assignment messages
       const readyToSessionOrders = await db
@@ -12388,25 +12387,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintSignature: fingerprints.signature,
         })
         .from(shipments)
-        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .where(
-          and(
-            eq(shipmentTags.name, 'MOVE OVER'),
-            isNull(shipments.sessionStatus),
-            isNull(shipments.trackingNumber),
-            isNull(shipments.fulfillmentSessionId),
-            ne(shipments.status, 'cancelled'),
-            // Include orders in ready_to_session phase OR awaiting_decisions with needs_session subphase
-            or(
-              eq(shipments.lifecyclePhase, 'ready_to_session'),
-              and(
-                eq(shipments.lifecyclePhase, 'awaiting_decisions'),
-                eq(shipments.decisionSubphase, 'needs_session')
-              )
-            )
-          )
+          // Use lifecycle_phase as single source of truth
+          eq(shipments.lifecyclePhase, 'ready_to_session')
         )
         .orderBy(asc(shipments.orderNumber));
 
