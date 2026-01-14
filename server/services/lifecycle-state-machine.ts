@@ -93,17 +93,16 @@ const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
  * with shipments that don't yet have explicit lifecyclePhase set.
  * 
  * Phase priority (checked in order):
- * 1. DELIVERED - status='DE' (package delivered)
- * 2. IN_TRANSIT - status='IT' (package on the way)
+ * 1. DELIVERED - shipmentStatus='label_purchased' AND status='DE'
+ * 2. IN_TRANSIT - shipmentStatus='label_purchased' AND status='IT'
  * 3. ON_DOCK - shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
- *              Order has been packaged and is on the dock awaiting pickup from carrier
- * 4. PICKING_ISSUES - Session status is 'inactive'
- * 5. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
- * 6. PICKING - Session is 'active'
- * 7. READY_TO_PICK - Session is 'new'
- * 8. READY_TO_FULFILL - On hold + MOVE OVER tag
- * 9. READY_TO_SESSION - Pending + MOVE OVER tag + no session
- * 10. AWAITING_DECISIONS - Default fallback
+ * 4. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag AND status != 'cancelled'
+ * 5. PICKING_ISSUES - sessionStatus='inactive'
+ * 6. PACKING_READY - sessionStatus='closed' AND trackingNumber IS NULL AND shipmentStatus='pending' AND status != 'cancelled'
+ * 7. PICKING - sessionStatus='active'
+ * 8. READY_TO_PICK - sessionStatus='new'
+ * 9. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus AND status != 'cancelled'
+ * 10. AWAITING_DECISIONS - Default fallback (needs categorization/fingerprint/packaging/session)
  * 
  * Note: Status codes for tracking:
  * - NY = Not Yet in System (label created, waiting for carrier pickup)
@@ -156,14 +155,13 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.PICKING_ISSUES, subphase: null };
   }
 
-  // PACKING_READY: Session closed, no tracking yet, shipment still pending
-  // The shipmentStatus='pending' check ensures we don't include cancelled shipments
-  if (shipment.sessionStatus === 'closed' && shipment.shipmentStatus === 'pending') {
-    return { phase: LIFECYCLE_PHASES.PACKING_READY, subphase: null };
-  }
-
-  // Also handle closed sessions without explicit pending status (backwards compatibility)
-  if (shipment.sessionStatus === 'closed') {
+  // PACKING_READY: Session closed, no tracking yet, shipment still pending, not cancelled
+  // Requires ALL: sessionStatus='closed' AND trackingNumber IS NULL AND shipmentStatus='pending' AND status != 'cancelled'
+  // NO FALLBACK - must match these exact criteria
+  if (shipment.sessionStatus === 'closed' && 
+      !shipment.trackingNumber &&
+      shipment.shipmentStatus === 'pending' &&
+      shipment.status !== 'cancelled') {
     return { phase: LIFECYCLE_PHASES.PACKING_READY, subphase: null };
   }
 
