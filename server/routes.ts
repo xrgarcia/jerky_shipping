@@ -12369,9 +12369,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all orders in ready-to-session phase with their session readiness status
   app.get("/api/fulfillment-sessions/ready-to-session-orders", requireAuth, async (req, res) => {
     try {
-      // Get all orders that are in ready_to_session lifecycle phase
-      // (pending + MOVE OVER tag + no session + not cancelled)
-      // Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready
+      // Get all orders that are ready to be added to a session
+      // Uses lifecycle_phase column as single source of truth
+      // Also includes awaiting_decisions with needs_session subphase (packaging assigned but lifecycle not yet updated)
       // Left join with fingerprint_models to check if fingerprint has packaging assigned
       // Also join fingerprints to get display name for packaging assignment messages
       const readyToSessionOrders = await db
@@ -12382,6 +12382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintStatus: shipments.fingerprintStatus,
           assignedStationId: shipments.assignedStationId,
           decisionSubphase: shipments.decisionSubphase,
+          lifecyclePhase: shipments.lifecyclePhase,
           fingerprintModelId: fingerprintModels.id,
           fingerprintDisplayName: fingerprints.displayName,
           fingerprintSignature: fingerprints.signature,
@@ -12392,13 +12393,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .where(
           and(
-            // Only pending status - on_hold is BEFORE fulfillment starts
-            eq(shipments.shipmentStatus, 'pending'),
             eq(shipmentTags.name, 'MOVE OVER'),
             isNull(shipments.sessionStatus),
             isNull(shipments.trackingNumber),
             isNull(shipments.fulfillmentSessionId),
-            ne(shipments.status, 'cancelled')
+            ne(shipments.status, 'cancelled'),
+            // Include orders in ready_to_session phase OR awaiting_decisions with needs_session subphase
+            or(
+              eq(shipments.lifecyclePhase, 'ready_to_session'),
+              and(
+                eq(shipments.lifecyclePhase, 'awaiting_decisions'),
+                eq(shipments.decisionSubphase, 'needs_session')
+              )
+            )
           )
         )
         .orderBy(asc(shipments.orderNumber));
