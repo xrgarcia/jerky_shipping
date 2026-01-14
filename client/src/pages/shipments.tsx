@@ -49,7 +49,7 @@ interface LifecycleTabCounts {
 }
 
 type WorkflowTab = 'ready_to_fulfill' | 'ready_to_session' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'ready_to_fulfill' | 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -1564,18 +1564,7 @@ export default function Shipments() {
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
             <div className="overflow-x-auto scrollbar-thin">
-              <TabsList className="grid grid-cols-7 w-max sm:w-full h-auto p-1 gap-1">
-                <TabsTrigger 
-                  value="ready_to_fulfill" 
-                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-slate-600 data-[state=active]:text-white"
-                  data-testid="tab-lifecycle-ready-to-fulfill"
-                >
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <Ban className="h-4 w-4 flex-shrink-0" />
-                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
-                  </div>
-                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToFulfill} orders</span>
-                </TabsTrigger>
+              <TabsList className="grid grid-cols-6 w-max sm:w-full h-auto p-1 gap-1">
                 <TabsTrigger 
                   value="ready_to_session" 
                   className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
@@ -1651,7 +1640,18 @@ export default function Shipments() {
         ) : (
           /* Workflow Tabs */
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto p-1 gap-1">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1 gap-1">
+              <TabsTrigger 
+                value="ready_to_fulfill" 
+                className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-slate-600 data-[state=active]:text-white"
+                data-testid="tab-ready-to-fulfill"
+              >
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Ban className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
+                </div>
+                <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
+              </TabsTrigger>
               <TabsTrigger 
                 value="ready_to_session" 
                 className="flex flex-col gap-1 py-2 sm:py-3 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
