@@ -2064,6 +2064,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill lifecycle phases for all shipments using the state machine
+  // This recalculates lifecycle_phase based on current shipment data
+  app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
+    try {
+      console.log("========== LIFECYCLE PHASE BACKFILL STARTED ==========");
+      const { deriveLifecyclePhase } = await import('./services/lifecycle-state-machine');
+      
+      // Fetch all shipments with MOVE OVER tag that might need lifecycle phase updates
+      // This includes shipments in early phases: on_hold, pending, and those without sessions
+      const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill();
+      console.log(`Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag for lifecycle backfill`);
+      
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const errors: string[] = [];
+      const phaseBreakdown: Record<string, number> = {};
+      
+      for (const shipment of shipmentsWithMoveOver) {
+        try {
+          // Derive the lifecycle phase using the state machine
+          const lifecycleData = {
+            sessionStatus: shipment.sessionStatus,
+            trackingNumber: shipment.trackingNumber,
+            status: shipment.status,
+            shipmentStatus: shipment.shipmentStatus,
+            fingerprintStatus: shipment.fingerprintStatus,
+            packagingTypeId: shipment.packagingTypeId,
+            fulfillmentSessionId: shipment.fulfillmentSessionId,
+            fingerprintId: shipment.fingerprintId,
+            hasMoveOverTag: true, // We already filtered for MOVE OVER tag
+          };
+          
+          const { phase, subphase } = deriveLifecyclePhase(lifecycleData);
+          
+          // Only update if the phase has changed
+          if (shipment.lifecyclePhase !== phase || shipment.decisionSubphase !== subphase) {
+            await storage.updateShipment(shipment.id, {
+              lifecyclePhase: phase,
+              decisionSubphase: subphase,
+            });
+            updatedCount++;
+            phaseBreakdown[phase] = (phaseBreakdown[phase] || 0) + 1;
+          } else {
+            skippedCount++;
+          }
+        } catch (error: any) {
+          console.error(`Error updating lifecycle phase for shipment ${shipment.id}:`, error);
+          errors.push(`${shipment.id}: ${error.message}`);
+        }
+      }
+      
+      console.log(`========== LIFECYCLE PHASE BACKFILL COMPLETE ==========`);
+      console.log(`Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}`);
+      console.log(`Phase breakdown:`, phaseBreakdown);
+      
+      res.json({
+        success: true,
+        totalProcessed: shipmentsWithMoveOver.length,
+        updatedCount,
+        skippedCount,
+        errorCount: errors.length,
+        phaseBreakdown,
+        errors: errors.slice(0, 10), // Return first 10 errors only
+        message: `Backfill complete: ${updatedCount} shipments updated, ${skippedCount} unchanged`,
+      });
+    } catch (error: any) {
+      console.error("Error during lifecycle phase backfill:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to backfill lifecycle phases",
+      });
+    }
+  });
+
   // Sync tracking status for non-delivered shipments
   app.post("/api/shipments/sync-tracking", requireAuth, async (req, res) => {
     try {
