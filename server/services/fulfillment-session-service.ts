@@ -847,18 +847,19 @@ export class FulfillmentSessionService {
       return null;
     }
 
-    // When session moves to 'ready' (released to floor), update shipments to ready_to_pick
+    // When session moves to 'ready' (released to floor), recalculate lifecycle for linked shipments
     if (newStatus === 'ready') {
-      await db
-        .update(shipments)
-        .set({
-          lifecyclePhase: LIFECYCLE_PHASES.READY_TO_PICK,
-          decisionSubphase: null,
-          updatedAt: new Date(),
-        })
+      const { updateShipmentLifecycleBatch } = await import("./lifecycle-service");
+      const linkedShipments = await db
+        .select({ id: shipments.id })
+        .from(shipments)
         .where(eq(shipments.fulfillmentSessionId, sessionId));
       
-      console.log(`[FulfillmentSession] Session ${sessionId} released to floor - updated shipments to ready_to_pick`);
+      if (linkedShipments.length > 0) {
+        const shipmentIds = linkedShipments.map(s => s.id);
+        await updateShipmentLifecycleBatch(shipmentIds);
+        console.log(`[FulfillmentSession] Session ${sessionId} released to floor - recalculated lifecycle for ${shipmentIds.length} shipments`);
+      }
     }
 
     return updated;
@@ -902,19 +903,21 @@ export class FulfillmentSessionService {
       .where(inArray(fulfillmentSessions.id, sessionIds))
       .returning({ id: fulfillmentSessions.id });
 
-    // When sessions move to 'ready' (released to floor), update all linked shipments to ready_to_pick
+    // When sessions move to 'ready' (released to floor), recalculate lifecycle for linked shipments
     if (newStatus === 'ready' && results.length > 0) {
+      const { updateShipmentLifecycleBatch } = await import("./lifecycle-service");
       const updatedSessionIds = results.map(r => r.id);
-      await db
-        .update(shipments)
-        .set({
-          lifecyclePhase: LIFECYCLE_PHASES.READY_TO_PICK,
-          decisionSubphase: null,
-          updatedAt: new Date(),
-        })
+      
+      const linkedShipments = await db
+        .select({ id: shipments.id })
+        .from(shipments)
         .where(inArray(shipments.fulfillmentSessionId, updatedSessionIds));
       
-      console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - updated shipments to ready_to_pick`);
+      if (linkedShipments.length > 0) {
+        const shipmentIds = linkedShipments.map(s => s.id);
+        await updateShipmentLifecycleBatch(shipmentIds);
+        console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - recalculated lifecycle for ${shipmentIds.length} shipments`);
+      }
     }
 
     return { 
