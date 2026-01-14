@@ -27,8 +27,8 @@ export const pool = new Pool({
   min: 1,
   // How long a connection can be idle before being closed (5 minutes)
   idleTimeoutMillis: 300000,
-  // How long to wait for a connection before timing out (10 seconds)
-  connectionTimeoutMillis: 10000,
+  // How long to wait for a connection before timing out (15 seconds - handles Neon cold starts)
+  connectionTimeoutMillis: 15000,
 });
 export const db = drizzle({ client: pool, schema });
 
