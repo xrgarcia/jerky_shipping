@@ -316,7 +316,7 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       case 'ready_to_fulfill': {
         const badge = (
           <Badge className="bg-slate-600 hover:bg-slate-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-            <Ban className="h-3 w-3" />
+            <Timer className="h-3 w-3" />
             Ready to Fulfill
           </Badge>
         );
@@ -1657,7 +1657,7 @@ export default function Shipments() {
                 data-testid="tab-ready-to-fulfill"
               >
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <Ban className="h-4 w-4 flex-shrink-0" />
+                  <Timer className="h-4 w-4 flex-shrink-0" />
                   <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Fulfill</span>
                 </div>
                 <span className="text-[10px] sm:text-xs opacity-80">{tabCounts.readyToFulfill} orders</span>
