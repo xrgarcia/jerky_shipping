@@ -216,6 +216,8 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.PICKING]: 'Picking',
     [LIFECYCLE_PHASES.PACKING_READY]: 'Packing Ready',
     [LIFECYCLE_PHASES.ON_DOCK]: 'On the Dock',
+    [LIFECYCLE_PHASES.IN_TRANSIT]: 'In Transit',
+    [LIFECYCLE_PHASES.DELIVERED]: 'Delivered',
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 'Picking Issues',
   };
   return displayNames[phase] || phase;
@@ -297,7 +299,9 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,
     [LIFECYCLE_PHASES.PACKING_READY]: 75,
-    [LIFECYCLE_PHASES.ON_DOCK]: 100,
+    [LIFECYCLE_PHASES.ON_DOCK]: 90,
+    [LIFECYCLE_PHASES.IN_TRANSIT]: 95,
+    [LIFECYCLE_PHASES.DELIVERED]: 100,
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 50, // Same as picking (it's a branch)
   };
   
