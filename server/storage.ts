@@ -110,7 +110,7 @@ export interface OrderFilters {
 
 export interface ShipmentFilters {
   search?: string; // Search tracking number, carrier, order number, customer name
-  workflowTab?: 'ready_to_session' | 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
+  workflowTab?: 'ready_to_fulfill' | 'ready_to_session' | 'in_progress' | 'packing_queue' | 'shipped' | 'all'; // Workflow tab filter
   lifecycleTab?: 'all' | 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues'; // Warehouse lifecycle tab filter
   status?: string; // Single status for cascading filter
   statusDescription?: string;
@@ -1255,6 +1255,11 @@ export class DatabaseStorage implements IStorage {
     // Workflow tab filter - applies different filters based on selected tab
     if (workflowTab) {
       switch (workflowTab) {
+        case 'ready_to_fulfill':
+          // Ready to Fulfill: Use lifecycle_phase column (single source of truth)
+          // Orders on hold with MOVE OVER tag - waiting to be released from ShipStation
+          conditions.push(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
+          break;
         case 'ready_to_session':
           // Ready to Session: On-hold + MOVE OVER tag + no SkuVault session yet + not cancelled
           // This is where fingerprinting and QC explosion should happen
