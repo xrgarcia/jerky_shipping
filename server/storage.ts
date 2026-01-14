@@ -1519,10 +1519,28 @@ export class DatabaseStorage implements IStorage {
     // Lifecycle phase filter
     if (filters.lifecyclePhaseFilter) {
       if (filters.lifecyclePhaseFilter === 'ready_to_session') {
-        // Ready to Session is derived: on_hold + MOVE OVER tag + no session yet
-        conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
+        // Ready to Session: pending + MOVE OVER tag + no session yet
+        // Note: on_hold is BEFORE fulfillment (ready_to_fulfill), pending is when ready to session
+        conditions.push(eq(shipments.shipmentStatus, 'pending'));
         conditions.push(isNull(shipments.sessionStatus));
         conditions.push(isNull(shipments.trackingNumber));
+        conditions.push(
+          exists(
+            db.select({ one: sql`1` })
+              .from(shipmentTags)
+              .where(
+                and(
+                  eq(shipmentTags.shipmentId, shipments.id),
+                  eq(shipmentTags.name, 'MOVE OVER')
+                )
+              )
+          )
+        );
+      } else if (filters.lifecyclePhaseFilter === 'ready_to_fulfill') {
+        // Ready to Fulfill: on_hold + MOVE OVER tag + no session yet
+        // This is BEFORE fulfillment starts - orders waiting to be released from hold
+        conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
+        conditions.push(isNull(shipments.sessionStatus));
         conditions.push(
           exists(
             db.select({ one: sql`1` })
@@ -1583,17 +1601,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }> {
-    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    // Ready to Fulfill: on_hold + MOVE OVER tag + no session yet
+    // Using raw SQL to match the list query criteria exactly
     const readyToFulfillResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
+      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'on_hold'),
+          eq(shipmentTags.name, 'MOVE OVER'),
+          isNull(shipments.sessionStatus),
+          ne(shipments.status, 'cancelled')
+        )
+      );
 
-    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
+    // Ready to Session: pending + MOVE OVER tag + no session yet + no tracking
+    // Using raw SQL to match the list query criteria exactly
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
+      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'pending'),
+          eq(shipmentTags.name, 'MOVE OVER'),
+          isNull(shipments.sessionStatus),
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
+        )
+      );
 
     // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
     // Must match EXACTLY the sum of lifecycle tabs
@@ -1668,17 +1705,36 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipments);
 
-    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    // Ready to Fulfill: on_hold + MOVE OVER tag + no session yet
+    // Using raw SQL to match the list query criteria exactly
     const readyToFulfillResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
+      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'on_hold'),
+          eq(shipmentTags.name, 'MOVE OVER'),
+          isNull(shipments.sessionStatus),
+          ne(shipments.status, 'cancelled')
+        )
+      );
 
-    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
+    // Ready to Session: pending + MOVE OVER tag + no session yet + no tracking
+    // Using raw SQL to match the list query criteria exactly
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
+      .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
+      .where(
+        and(
+          eq(shipments.shipmentStatus, 'pending'),
+          eq(shipmentTags.name, 'MOVE OVER'),
+          isNull(shipments.sessionStatus),
+          isNull(shipments.trackingNumber),
+          ne(shipments.status, 'cancelled')
+        )
+      );
 
     // Ready to Pick: Orders ready to be picked (session_status = 'new')
     const readyToPickResult = await db
