@@ -2,13 +2,24 @@
 
 This document describes the **legacy SQL-based tab criteria** that was used before switching to the lifecycle state machine. The old approach duplicated query conditions across multiple functions (`getShipmentTabCounts`, `getLifecycleTabCounts`) and didn't track decision subphases.
 
+## Current Lifecycle Hierarchy
+
+```
+ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+                                                                       ↘ picking_issues (exception path)
+```
+
+- **ready_to_fulfill**: On hold + MOVE OVER tag (waiting to be released from ShipStation hold)
+- **ready_to_session**: Pending + MOVE OVER tag (released, ready for fingerprinting & sessioning)
+
 ## Legacy Tab Criteria
 
 ### Top-Level Tabs (`getShipmentTabCounts`)
 
 | Tab | Legacy SQL Criteria |
 |-----|---------------------|
-| **Ready to Session** | `shipmentStatus='on_hold'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `trackingNumber IS NULL` + `status != 'cancelled'` |
+| **Ready to Fulfill** | `shipmentStatus='on_hold'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `status != 'cancelled'` |
+| **Ready to Session** | `shipmentStatus='pending'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `status != 'cancelled'` |
 | **In Progress** | `sessionStatus='new'` OR `sessionStatus='active'` OR (`sessionStatus='closed'` + `trackingNumber IS NULL` + `shipmentStatus='pending'` + `status != 'cancelled'`) |
 | **Shipped** | `shipmentStatus='label_purchased'` + `status='IT'` (In Transit) |
 | **All** | Total count of all shipments |
@@ -17,7 +28,8 @@ This document describes the **legacy SQL-based tab criteria** that was used befo
 
 | Tab | Legacy SQL Criteria |
 |-----|---------------------|
-| **Ready to Session** | `shipmentStatus='on_hold'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `trackingNumber IS NULL` + `status != 'cancelled'` |
+| **Ready to Fulfill** | `shipmentStatus='on_hold'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `status != 'cancelled'` |
+| **Ready to Session** | `shipmentStatus='pending'` + `MOVE OVER` tag + `sessionStatus IS NULL` + `status != 'cancelled'` |
 | **Ready to Pick** | `sessionStatus='new'` + `trackingNumber IS NULL` |
 | **Picking** | `sessionStatus='active'` + `trackingNumber IS NULL` |
 | **Packing Ready** | `sessionStatus='closed'` + `trackingNumber IS NULL` + `shipmentStatus='pending'` + `status != 'cancelled'` |
@@ -33,25 +45,28 @@ This document describes the **legacy SQL-based tab criteria** that was used befo
 | Aspect | Legacy (SQL Queries) | Current (State Machine) |
 |--------|---------------------|------------------------|
 | **Source of Truth** | Duplicated SQL conditions in `storage.ts` | Single `lifecycle_phase` column computed by state machine |
-| **Ready to Session Status** | Only `on_hold` shipment status allowed | Only `pending` status (on_hold is BEFORE fulfillment starts) |
+| **On Hold vs Pending** | Both mixed into "Ready to Session" | Separated: `ready_to_fulfill` (on_hold) → `ready_to_session` (pending) |
 | **Decision Tracking** | No subphases - orders just "ready" or not | Subphases track progression: `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_session` → `ready_for_skuvault` |
 | **On Dock Detection** | Only `status='AC'` (Accepted) | Both `NY` (Not Yet) and `AC` (Accepted) statuses |
 | **Packing Ready** | Required explicit `status != 'cancelled'` check | Relies on `sessionStatus='closed'` + `shipmentStatus='pending'` |
 | **Tab Count Queries** | Each query duplicated full logic | Queries filter by `lifecycle_phase` column directly |
 
-### Ready to Session - Detailed Comparison
+### Ready to Fulfill vs Ready to Session - Detailed Comparison
 
-**Legacy:**
-```sql
-shipments.shipmentStatus = 'on_hold'
-AND shipment_tags.name = 'MOVE OVER'
-AND shipments.sessionStatus IS NULL
-AND shipments.trackingNumber IS NULL
-AND shipments.status != 'cancelled'
+**Current State Machine - Ready to Fulfill (NEW):**
+```typescript
+// On hold + MOVE OVER tag - waiting to be released from ShipStation hold
+if (shipment.shipmentStatus === 'on_hold' && 
+    shipment.hasMoveOverTag === true && 
+    !shipment.sessionStatus &&
+    shipment.status !== 'cancelled') {
+  return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
+}
 ```
 
-**Current State Machine:**
+**Current State Machine - Ready to Session:**
 ```typescript
+// Pending + MOVE OVER tag - released, ready for fingerprinting & sessioning
 if (shipment.shipmentStatus === 'pending' && 
     shipment.hasMoveOverTag === true && 
     !shipment.sessionStatus &&
@@ -63,7 +78,7 @@ if (shipment.shipmentStatus === 'pending' &&
 **Why Changed:** 
 - `on_hold` is the status BEFORE fulfillment starts (orders waiting in ShipStation queue)
 - `pending` is when orders are actually ready to be sessioned and processed
-- Only `pending` orders with `MOVE OVER` tag should enter the fulfillment workflow
+- Now we have two distinct phases: `ready_to_fulfill` for on_hold orders, `ready_to_session` for pending orders
 
 ### Decision Subphases (New in State Machine)
 
