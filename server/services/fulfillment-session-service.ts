@@ -810,6 +810,7 @@ export class FulfillmentSessionService {
 
   /**
    * Update session status with proper timestamp tracking
+   * Also updates lifecycle phase for linked shipments when status changes
    */
   async updateSessionStatus(
     sessionId: number, 
@@ -842,7 +843,25 @@ export class FulfillmentSessionService {
       .where(eq(fulfillmentSessions.id, sessionId))
       .returning();
 
-    return updated || null;
+    if (!updated) {
+      return null;
+    }
+
+    // When session moves to 'ready' (released to floor), update shipments to ready_to_pick
+    if (newStatus === 'ready') {
+      await db
+        .update(shipments)
+        .set({
+          lifecyclePhase: LIFECYCLE_PHASES.READY_TO_PICK,
+          decisionSubphase: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipments.fulfillmentSessionId, sessionId));
+      
+      console.log(`[FulfillmentSession] Session ${sessionId} released to floor - updated shipments to ready_to_pick`);
+    }
+
+    return updated;
   }
 
   /**
@@ -882,6 +901,21 @@ export class FulfillmentSessionService {
       .set(updateData)
       .where(inArray(fulfillmentSessions.id, sessionIds))
       .returning({ id: fulfillmentSessions.id });
+
+    // When sessions move to 'ready' (released to floor), update all linked shipments to ready_to_pick
+    if (newStatus === 'ready' && results.length > 0) {
+      const updatedSessionIds = results.map(r => r.id);
+      await db
+        .update(shipments)
+        .set({
+          lifecyclePhase: LIFECYCLE_PHASES.READY_TO_PICK,
+          decisionSubphase: null,
+          updatedAt: new Date(),
+        })
+        .where(inArray(shipments.fulfillmentSessionId, updatedSessionIds));
+      
+      console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - updated shipments to ready_to_pick`);
+    }
 
     return { 
       updated: results.length, 

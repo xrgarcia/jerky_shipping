@@ -12865,19 +12865,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a fulfillment session (unlinks shipments and deletes session)
   app.delete("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {
-      const { fulfillmentSessions, shipments: shipmentsTable, DECISION_SUBPHASES } = await import("@shared/schema");
+      const { fulfillmentSessions, shipments: shipmentsTable, DECISION_SUBPHASES, LIFECYCLE_PHASES } = await import("@shared/schema");
+      const { updateShipmentLifecycleBatch } = await import("./services/lifecycle-service");
       const sessionId = parseInt(req.params.id, 10);
       
       if (isNaN(sessionId)) {
         return res.status(400).json({ error: "Invalid session ID" });
       }
       
-      // First, unlink all shipments from this session and reset their decision subphase
+      // Get shipment IDs before unlinking (needed for lifecycle recalculation)
+      const linkedShipments = await db
+        .select({ id: shipmentsTable.id })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.fulfillmentSessionId, sessionId));
+      
+      const shipmentIds = linkedShipments.map(s => s.id);
+      
+      // Unlink all shipments from this session and reset to ready_to_session state
       await db
         .update(shipmentsTable)
         .set({
           fulfillmentSessionId: null,
           smartSessionSpot: null,
+          lifecyclePhase: LIFECYCLE_PHASES.READY_TO_SESSION,
           decisionSubphase: DECISION_SUBPHASES.NEEDS_SESSION,
           updatedAt: new Date(),
         })
@@ -12893,8 +12903,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Session not found" });
       }
       
-      console.log(`[FulfillmentSessions] Deleted session ${sessionId}`);
-      res.json({ success: true, deletedId: sessionId });
+      console.log(`[FulfillmentSessions] Deleted session ${sessionId}, unlinked ${shipmentIds.length} shipments back to ready_to_session`);
+      res.json({ success: true, deletedId: sessionId, shipmentsUnlinked: shipmentIds.length });
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error deleting session:", error);
       res.status(500).json({ error: "Failed to delete session" });
