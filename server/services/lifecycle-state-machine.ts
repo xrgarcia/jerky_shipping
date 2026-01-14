@@ -7,6 +7,8 @@
  * 
  * READY_TO_FULFILL: On hold + MOVE OVER tag - waiting to be released from ShipStation hold
  * READY_TO_SESSION: Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+ * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
+ *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -70,11 +72,15 @@ export interface ShipmentLifecycleData {
   hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
 }
 
-// Status codes that indicate package is on the dock (at the facility)
+// Status codes that indicate package is on the dock (at the facility, awaiting carrier pickup)
+// NY = Not Yet in System (label printed, waiting for carrier)
+// AC = Accepted by Carrier (carrier just picked it up, may still be in their truck)
 const ON_DOCK_STATUSES = ['NY', 'AC'];
 // Status codes for in transit and delivered
 const IN_TRANSIT_STATUSES = ['IT'];
 const DELIVERED_STATUSES = ['DE'];
+// Required shipmentStatus for on_dock phase
+const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
 
 /**
  * Determine the lifecycle phase based on shipment data
@@ -83,38 +89,43 @@ const DELIVERED_STATUSES = ['DE'];
  * with shipments that don't yet have explicit lifecyclePhase set.
  * 
  * Phase priority (checked in order):
- * 1. ON_DOCK - Has tracking number AND status IN ['NY', 'AC'] (labeled, at facility)
- * 2. PICKING_ISSUES - Session status is 'inactive'
- * 3. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
- * 4. PICKING - Session is 'active'
- * 5. READY_TO_PICK - Session is 'new'
- * 6. READY_TO_SESSION - On hold + MOVE OVER tag + no session (fingerprinting happens here)
- * 7. AWAITING_DECISIONS - Has fingerprint, needs packing decisions
+ * 1. DELIVERED - status='DE' (package delivered)
+ * 2. IN_TRANSIT - status='IT' (package on the way)
+ * 3. ON_DOCK - shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
+ *              Order has been packaged and is on the dock awaiting pickup from carrier
+ * 4. PICKING_ISSUES - Session status is 'inactive'
+ * 5. PACKING_READY - Session closed, no tracking yet, shipmentStatus='pending'
+ * 6. PICKING - Session is 'active'
+ * 7. READY_TO_PICK - Session is 'new'
+ * 8. READY_TO_FULFILL - On hold + MOVE OVER tag
+ * 9. READY_TO_SESSION - Pending + MOVE OVER tag + no session
+ * 10. AWAITING_DECISIONS - Default fallback
  * 
  * Note: Status codes for tracking:
  * - NY = Not Yet in System (label created, waiting for carrier pickup)
  * - AC = Accepted by Carrier (carrier just picked it up)
- * - IT = In Transit (on the way to customer) - past ON_DOCK
- * - DE = Delivered (customer received) - past ON_DOCK
+ * - IT = In Transit (on the way to customer)
+ * - DE = Delivered (customer received)
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
-  // Check tracking-based phases first (terminal states)
-  if (shipment.trackingNumber) {
-    const status = shipment.status?.toUpperCase();
-    
-    // DELIVERED: Package has been delivered (status DE)
-    if (status && DELIVERED_STATUSES.includes(status)) {
-      return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
-    }
-    
-    // IN_TRANSIT: Package is on its way to customer (status IT)
-    if (status && IN_TRANSIT_STATUSES.includes(status)) {
-      return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
-    }
-    
-    // ON_DOCK: Has tracking, status is NY/AC or null (labeled, at facility)
-    // Status 'NY' = label printed, waiting for carrier
-    // Status 'AC' = carrier just accepted/picked up
+  const status = shipment.status?.toUpperCase();
+  
+  // DELIVERED: Package has been delivered (status DE)
+  if (status && DELIVERED_STATUSES.includes(status)) {
+    return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
+  }
+  
+  // IN_TRANSIT: Package is on its way to customer (status IT)
+  if (status && IN_TRANSIT_STATUSES.includes(status)) {
+    return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
+  }
+  
+  // ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
+  // Requires BOTH: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
+  // NO FALLBACK - must match these exact criteria
+  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
+      status && 
+      ON_DOCK_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
 
