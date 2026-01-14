@@ -12,11 +12,15 @@ import { z } from "zod";
  * 
  * The complete journey of a shipment from order receipt to carrier pickup:
  * 
- * ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
- *                                                               ↘ picking_issues (exception path)
+ * ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ *                                                                        ↘ picking_issues (exception path)
+ * 
+ * ready_to_fulfill: On hold + MOVE OVER tag (waiting to be released from ShipStation hold)
+ * ready_to_session: Pending + MOVE OVER tag (released, ready for fingerprinting & sessioning)
  */
 export const LIFECYCLE_PHASES = {
-  READY_TO_SESSION: 'ready_to_session',      // On hold + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+  READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + MOVE OVER tag - waiting to be released from hold
+  READY_TO_SESSION: 'ready_to_session',      // Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
   AWAITING_DECISIONS: 'awaiting_decisions',  // Has fingerprint, needs packing decisions
   READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
   PICKING: 'picking',                         // Actively being picked
@@ -48,6 +52,7 @@ export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_S
  * Valid state transitions for lifecycle phases
  */
 export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
+  [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // When released from hold
   [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.AWAITING_DECISIONS], // After fingerprinting
   [LIFECYCLE_PHASES.AWAITING_DECISIONS]: [LIFECYCLE_PHASES.READY_TO_PICK],
   [LIFECYCLE_PHASES.READY_TO_PICK]: [LIFECYCLE_PHASES.PICKING, LIFECYCLE_PHASES.PICKING_ISSUES],
