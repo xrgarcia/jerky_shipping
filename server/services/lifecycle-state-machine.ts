@@ -72,6 +72,9 @@ export interface ShipmentLifecycleData {
 
 // Status codes that indicate package is on the dock (at the facility)
 const ON_DOCK_STATUSES = ['NY', 'AC'];
+// Status codes for in transit and delivered
+const IN_TRANSIT_STATUSES = ['IT'];
+const DELIVERED_STATUSES = ['DE'];
 
 /**
  * Determine the lifecycle phase based on shipment data
@@ -95,17 +98,23 @@ const ON_DOCK_STATUSES = ['NY', 'AC'];
  * - DE = Delivered (customer received) - past ON_DOCK
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
-  // ON_DOCK: Has tracking number AND status indicates it's still at/leaving the facility
-  // Status 'NY' = label printed, waiting for carrier
-  // Status 'AC' = carrier just accepted/picked up
-  // Once status is 'IT' (In Transit) or 'DE' (Delivered), it's past the dock
+  // Check tracking-based phases first (terminal states)
   if (shipment.trackingNumber) {
     const status = shipment.status?.toUpperCase();
-    if (!status || ON_DOCK_STATUSES.includes(status)) {
-      return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
+    
+    // DELIVERED: Package has been delivered (status DE)
+    if (status && DELIVERED_STATUSES.includes(status)) {
+      return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
     }
-    // Has tracking but IT/DE status = shipped, past our lifecycle
-    // Still return ON_DOCK as it's the terminal warehouse phase
+    
+    // IN_TRANSIT: Package is on its way to customer (status IT)
+    if (status && IN_TRANSIT_STATUSES.includes(status)) {
+      return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
+    }
+    
+    // ON_DOCK: Has tracking, status is NY/AC or null (labeled, at facility)
+    // Status 'NY' = label printed, waiting for carrier
+    // Status 'AC' = carrier just accepted/picked up
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
 
