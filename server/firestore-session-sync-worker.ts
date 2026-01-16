@@ -598,6 +598,77 @@ export async function forceFullResync(): Promise<{ success: boolean; message: st
 }
 
 /**
+ * Clear stale SkuVault session data from shipments that no longer have a matching session in Firestore.
+ * This handles cases where:
+ * - A session was reassigned to a different shipment
+ * - A session was deleted
+ * - Data was incorrectly synced to the wrong shipment
+ * 
+ * @param validSessionShipmentPairs - Set of valid "sessionId:shipmentId" pairs from Firestore
+ * @returns Number of shipments cleared
+ */
+async function clearStaleSessionData(
+  validSessionShipmentPairs: Set<string>
+): Promise<number> {
+  // Find all shipments in DB that have session data
+  const shipmentsWithSessions = await db
+    .select({
+      id: shipments.id,
+      orderNumber: shipments.orderNumber,
+      shipmentId: shipments.shipmentId,
+      sessionId: shipments.sessionId,
+    })
+    .from(shipments)
+    .where(isNotNull(shipments.sessionId));
+
+  let clearedCount = 0;
+
+  for (const shipment of shipmentsWithSessions) {
+    if (!shipment.sessionId || !shipment.shipmentId) continue;
+
+    // Check if this session:shipmentId pair exists in Firestore
+    const pairKey = `${shipment.sessionId}:${shipment.shipmentId}`;
+    
+    if (!validSessionShipmentPairs.has(pairKey)) {
+      // This shipment has session data but no matching Firestore session - clear it
+      log(`Clearing stale session data from shipment ${shipment.orderNumber} (sessionId: ${shipment.sessionId}, shipmentId: ${shipment.shipmentId})`);
+      
+      await db
+        .update(shipments)
+        .set({
+          sessionId: null,
+          sessionedAt: null,
+          waveId: null,
+          saleId: null,
+          firestoreDocumentId: null,
+          sessionStatus: null,
+          spotNumber: null,
+          pickedByUserId: null,
+          pickedByUserName: null,
+          pickStartedAt: null,
+          pickEndedAt: null,
+          savedCustomField2: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(shipments.id, shipment.id));
+
+      // Update lifecycle since session data changed
+      await updateShipmentLifecycle(shipment.id, {
+        shipmentData: { sessionStatus: null }
+      });
+
+      clearedCount++;
+    }
+  }
+
+  if (clearedCount > 0) {
+    log(`Cleared stale session data from ${clearedCount} shipments`);
+  }
+
+  return clearedCount;
+}
+
+/**
  * Get count of sessioned shipments (orders in packing queue)
  */
 export async function getSessionedShipmentCount(): Promise<number> {
@@ -623,12 +694,15 @@ export async function getSessionedShipmentCount(): Promise<number> {
  */
 export async function reimportAllSessions(
   startDate: Date
-): Promise<{ success: boolean; message: string; totalSynced: number; pagesProcessed: number }> {
+): Promise<{ success: boolean; message: string; totalSynced: number; pagesProcessed: number; clearedCount?: number }> {
   const BATCH_SIZE = 500;
   let totalSynced = 0;
   let pagesProcessed = 0;
   let currentStartDate = startDate;
   let hasMore = true;
+  
+  // Collect all valid session:shipmentId pairs for reconciliation
+  const validSessionShipmentPairs = new Set<string>();
 
   try {
     log(`Starting reimport of ALL sessions from ${startDate.toISOString()}`);
@@ -643,7 +717,6 @@ export async function reimportAllSessions(
       if (sessions.length === 0) {
         log(`No more sessions found, reimport complete`);
         hasMore = false;
-        workerStatus = 'sleeping';
         break;
       }
 
@@ -651,6 +724,11 @@ export async function reimportAllSessions(
 
       let pageSynced = 0;
       for (const session of sessions) {
+        // Track all valid session:shipmentId pairs from Firestore
+        if (session.session_id && session.shipment_id) {
+          validSessionShipmentPairs.add(`${session.session_id}:${session.shipment_id}`);
+        }
+        
         const synced = await syncSessionToShipment(session);
         if (synced) {
           pageSynced++;
@@ -688,8 +766,12 @@ export async function reimportAllSessions(
       }
     }
 
+    // RECONCILIATION: Clear stale session data from shipments that no longer match Firestore
+    log(`Collected ${validSessionShipmentPairs.size} valid session:shipmentId pairs, starting reconciliation...`);
+    const clearedCount = await clearStaleSessionData(validSessionShipmentPairs);
+
     workerStatus = 'sleeping';
-    const message = `Reimport complete: ${totalSynced} sessions synced across ${pagesProcessed} pages`;
+    const message = `Reimport complete: ${totalSynced} sessions synced across ${pagesProcessed} pages, ${clearedCount} stale shipments cleared`;
     log(message);
 
     return {
@@ -697,6 +779,7 @@ export async function reimportAllSessions(
       message,
       totalSynced,
       pagesProcessed,
+      clearedCount,
     };
   } catch (error: any) {
     const errorMsg = `Reimport error on page ${pagesProcessed}: ${error.message}`;
