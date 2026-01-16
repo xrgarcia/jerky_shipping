@@ -12746,7 +12746,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
-          shipmentId: shipmentsTable.id,
+          id: shipmentsTable.id,  // Internal UUID
+          shipmentId: shipmentsTable.shipmentId,  // ShipStation ID (se-XXX)
           orderNumber: shipmentsTable.orderNumber,
           skuvaultSaleId: shipmentsTable.saleId,
           fingerprintId: shipmentsTable.fingerprintId,
@@ -12759,11 +12760,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(shipmentsTable.smartSessionSpot);
       
       // Fetch QC items (exploded items) for each shipment - these are what warehouse staff actually scan
-      const shipmentIds = sessionShipments.map(s => s.shipmentId);
-      const allItems = shipmentIds.length > 0 
+      // Note: shipmentQcItems uses the internal UUID (s.id), not ShipStation ID (s.shipmentId)
+      const internalIds = sessionShipments.map(s => s.id);
+      const allItems = internalIds.length > 0 
         ? await db
             .select({
-              shipmentId: shipmentQcItems.shipmentId,
+              internalId: shipmentQcItems.shipmentId,  // This is the internal UUID FK
               sku: shipmentQcItems.sku,
               name: shipmentQcItems.description,
               quantity: shipmentQcItems.quantityExpected,
@@ -12773,41 +12775,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
               physicalLocation: shipmentQcItems.physicalLocation,
             })
             .from(shipmentQcItems)
-            .where(inArray(shipmentQcItems.shipmentId, shipmentIds))
+            .where(inArray(shipmentQcItems.shipmentId, internalIds))
         : [];
       
       // Fetch per-order weights from QC items (more accurate as it includes kit expansion)
-      const orderWeights = shipmentIds.length > 0
+      const orderWeights = internalIds.length > 0
         ? await db
             .select({
-              shipmentId: shipmentQcItems.shipmentId,
+              internalId: shipmentQcItems.shipmentId,
               totalWeight: sql<number>`COALESCE(SUM(${shipmentQcItems.weightValue} * ${shipmentQcItems.quantityExpected}), 0)`.as('total_weight'),
             })
             .from(shipmentQcItems)
-            .where(inArray(shipmentQcItems.shipmentId, shipmentIds))
+            .where(inArray(shipmentQcItems.shipmentId, internalIds))
             .groupBy(shipmentQcItems.shipmentId)
         : [];
       
-      // Create weight map by shipment ID
+      // Create weight map by internal UUID
       const weightByShipment = new Map<string, number>();
       for (const row of orderWeights) {
-        weightByShipment.set(row.shipmentId, Number(row.totalWeight) || 0);
+        weightByShipment.set(row.internalId, Number(row.totalWeight) || 0);
       }
       
-      // Group items by shipment ID
+      // Group items by internal UUID
       const itemsByShipment: Record<string, typeof allItems> = {};
       for (const item of allItems) {
-        if (!itemsByShipment[item.shipmentId]) {
-          itemsByShipment[item.shipmentId] = [];
+        if (!itemsByShipment[item.internalId]) {
+          itemsByShipment[item.internalId] = [];
         }
-        itemsByShipment[item.shipmentId].push(item);
+        itemsByShipment[item.internalId].push(item);
       }
       
       // Attach items and weight to each shipment
       const shipmentsWithItems = sessionShipments.map(s => ({
         ...s,
-        totalWeightOz: weightByShipment.get(s.shipmentId) || null,
-        items: (itemsByShipment[s.shipmentId] || []).map(item => ({
+        totalWeightOz: weightByShipment.get(s.id) || null,
+        items: (itemsByShipment[s.id] || []).map(item => ({
           sku: item.sku,
           name: item.name,
           quantity: item.quantity,
