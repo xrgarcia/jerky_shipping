@@ -206,6 +206,8 @@ interface SessionShipment {
   trackingNumber: string | null;
   lifecyclePhase: string | null;
   totalWeightOz: number | null;
+  shipmentId: string | null;
+  skuvaultSaleId: string | null;
   items: SessionShipmentItem[];
 }
 
@@ -2552,6 +2554,11 @@ export default function Fingerprints() {
                                                       {shipment.totalWeightOz >= 16 
                                                         ? `${(shipment.totalWeightOz / 16).toFixed(1)} lbs`
                                                         : `${shipment.totalWeightOz} oz`}
+                                                    </Badge>
+                                                  )}
+                                                  {shipment.shipmentId && (
+                                                    <Badge variant="outline" className="text-xs font-mono">
+                                                      {shipment.shipmentId}
                                                     </Badge>
                                                   )}
                                                 </div>
