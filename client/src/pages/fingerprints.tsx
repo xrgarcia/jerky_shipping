@@ -2380,11 +2380,13 @@ export default function Fingerprints() {
                                         className="h-6 w-6"
                                         onClick={async (e) => {
                                           e.stopPropagation();
-                                          let orderNumbers: string[] = [];
+                                          let saleIds: string[] = [];
                                           
                                           // Use cached details if available
                                           if (sessionDetails[session.id]?.shipments) {
-                                            orderNumbers = sessionDetails[session.id].shipments.map(s => s.orderNumber);
+                                            saleIds = sessionDetails[session.id].shipments
+                                              .map(s => s.saleId)
+                                              .filter((id): id is string => !!id);
                                           } else {
                                             // Fetch session details if not loaded
                                             try {
@@ -2393,7 +2395,9 @@ export default function Fingerprints() {
                                               });
                                               if (res.ok) {
                                                 const data = await res.json();
-                                                orderNumbers = data.shipments?.map((s: { orderNumber: string }) => s.orderNumber) || [];
+                                                saleIds = (data.shipments || [])
+                                                  .map((s: { saleId?: string }) => s.saleId)
+                                                  .filter((id: string | undefined): id is string => !!id);
                                                 // Cache the details
                                                 setSessionDetails(prev => ({ ...prev, [session.id]: data }));
                                               }
@@ -2402,16 +2406,16 @@ export default function Fingerprints() {
                                             }
                                           }
                                           
-                                          if (orderNumbers.length > 0) {
-                                            await navigator.clipboard.writeText(orderNumbers.join('\n'));
+                                          if (saleIds.length > 0) {
+                                            await navigator.clipboard.writeText(saleIds.join('\n'));
                                             toast({
                                               title: "Copied!",
-                                              description: `${orderNumbers.length} order number${orderNumbers.length !== 1 ? 's' : ''} copied to clipboard`,
+                                              description: `${saleIds.length} sale ID${saleIds.length !== 1 ? 's' : ''} copied to clipboard`,
                                             });
                                           } else {
                                             toast({
-                                              title: "No orders",
-                                              description: "This session has no orders to copy",
+                                              title: "No sale IDs",
+                                              description: "This session has no sale IDs to copy",
                                               variant: "destructive",
                                             });
                                           }

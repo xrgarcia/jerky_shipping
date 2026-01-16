@@ -12748,6 +12748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: shipmentsTable.id,
           orderNumber: shipmentsTable.orderNumber,
+          saleId: shipmentsTable.saleId,
           fingerprintId: shipmentsTable.fingerprintId,
           trackingNumber: shipmentsTable.trackingNumber,
           lifecyclePhase: shipmentsTable.lifecyclePhase,
