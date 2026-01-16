@@ -156,10 +156,12 @@ async function fetchAndMatchSaleIds(
   
   try {
     // Get shipment data from database
+    // Note: We need shipstationShipmentId (e.g., "se-947152214") for matching, not the internal UUID
     const shipmentData = await db
       .select({
         id: shipments.id,
         orderNumber: shipments.orderNumber,
+        shipstationShipmentId: shipments.shipstationShipmentId,
       })
       .from(shipments)
       .where(inArray(shipments.id, shipmentIds));
@@ -169,7 +171,7 @@ async function fetchAndMatchSaleIds(
     }
     
     // Group shipments by order number (an order can have multiple shipments)
-    const shipmentsByOrder = new Map<string, { id: string; orderNumber: string }[]>();
+    const shipmentsByOrder = new Map<string, { id: string; orderNumber: string; shipstationShipmentId: string | null }[]>();
     for (const shipment of shipmentData) {
       if (!shipment.orderNumber) continue;
       
@@ -199,7 +201,10 @@ async function fetchAndMatchSaleIds(
         
         // Try to match each shipment in this order to the returned sale ID
         for (const shipment of orderShipments) {
-          if (matchSaleIdToShipment(saleId, orderNumber, shipment.id)) {
+          // Use shipstationShipmentId (e.g., "se-947152214") for matching, not internal UUID
+          const shipmentIdForMatching = shipment.shipstationShipmentId || shipment.id;
+          
+          if (matchSaleIdToShipment(saleId, orderNumber, shipmentIdForMatching)) {
             // Update the shipment with the matched sale ID
             await db
               .update(shipments)
@@ -209,12 +214,12 @@ async function fetchAndMatchSaleIds(
               })
               .where(eq(shipments.id, shipment.id));
             
-            console.log(`[SaleIdFetch] Matched sale ID ${saleId} to shipment ${shipment.id}`);
+            console.log(`[SaleIdFetch] Matched sale ID ${saleId} to shipment ${shipment.shipstationShipmentId} (order: ${orderNumber})`);
             result.matched++;
           } else {
             // This shouldn't happen for well-formed data
-            console.warn(`[SaleIdFetch] Could not match sale ID ${saleId} to shipment ${shipment.id} (order: ${orderNumber})`);
-            result.errors.push(`Could not match sale ID for shipment ${shipment.id}`);
+            console.warn(`[SaleIdFetch] Could not match sale ID ${saleId} to shipment ${shipment.shipstationShipmentId} (order: ${orderNumber})`);
+            result.errors.push(`Could not match sale ID for shipment ${shipment.shipstationShipmentId}`);
             result.unmatched++;
           }
         }
