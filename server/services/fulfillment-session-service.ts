@@ -181,7 +181,7 @@ async function fetchAndMatchSaleIds(
     console.log(`[SaleIdFetch] Fetching sale IDs for ${shipmentData.length} shipments across ${shipmentsByOrder.size} unique orders`);
     
     // Fetch sale IDs for each unique order number
-    for (const [orderNumber, orderShipments] of shipmentsByOrder) {
+    for (const [orderNumber, orderShipments] of Array.from(shipmentsByOrder.entries())) {
       try {
         // Call SkuVault to get QC sales for this order
         const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
@@ -807,6 +807,12 @@ export class FulfillmentSessionService {
 
     // Update lifecycle phase for linked shipments
     await updateShipmentLifecycleBatch(validIds);
+    
+    // Fetch and match SkuVault sale IDs for the added shipments
+    const saleIdResult = await fetchAndMatchSaleIds(validIds);
+    if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
+      console.log(`[FulfillmentSession] Sale IDs: ${saleIdResult.matched} matched, ${saleIdResult.unmatched} unmatched`);
+    }
 
     console.log(`[FulfillmentSession] Added ${validIds.length} shipments to existing session ${sessionId} (spots ${(maxSpotResult?.maxSpot || 0) + 1}-${nextSpot - 1})`);
     
@@ -1335,6 +1341,12 @@ export class FulfillmentSessionService {
 
       // Update lifecycle phase for linked shipments
       await updateShipmentLifecycleBatch(validIds);
+      
+      // Fetch and match SkuVault sale IDs for the newly sessioned shipments
+      const saleIdResult = await fetchAndMatchSaleIds(validIds);
+      if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
+        console.log(`[FulfillmentSession] Sale IDs: ${saleIdResult.matched} matched, ${saleIdResult.unmatched} unmatched`);
+      }
 
       console.log(`[FulfillmentSession] Created session ${session.id} with ${validIds.length} shipments (spots 1-${spot - 1})${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}`);
 
