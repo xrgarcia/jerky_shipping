@@ -791,21 +791,41 @@ export async function getSessionedShipmentCount(): Promise<number> {
  * Paginates through sessions 500 at a time to avoid memory issues.
  * This is used to backfill sessions that were missed because their
  * shipment didn't exist when the session closed.
+ * 
+ * RESUMABLE: Uses Redis to store state (cursor, valid pairs) so the reimport
+ * can resume from where it left off if the server restarts.
+ * 
+ * The 1-minute sync is automatically paused while this reimport runs.
  */
 export async function reimportAllSessions(
-  startDate: Date
-): Promise<{ success: boolean; message: string; totalSynced: number; pagesProcessed: number; clearedCount?: number }> {
+  startDate: Date,
+  options?: { resume?: boolean }
+): Promise<{ success: boolean; message: string; totalSynced: number; pagesProcessed: number; clearedCount?: number; resumed?: boolean }> {
   const BATCH_SIZE = 500;
   let totalSynced = 0;
   let pagesProcessed = 0;
   let currentStartDate = startDate;
   let hasMore = true;
-  
-  // Collect all valid session:shipmentId pairs for reconciliation
-  const validSessionShipmentPairs = new Set<string>();
+  let resumed = false;
+  let originalStartDate = startDate;
 
   try {
-    log(`Starting reimport of ALL sessions from ${startDate.toISOString()}`);
+    // Check if there's an existing reimport in progress (resumable state)
+    const existingState = await getReimportCursor();
+    if (existingState && options?.resume !== false) {
+      // Resume from where we left off
+      currentStartDate = existingState.cursor;
+      originalStartDate = existingState.startDate;
+      resumed = true;
+      log(`Resuming reimport from cursor ${currentStartDate.toISOString()} (original start: ${originalStartDate.toISOString()})`);
+    } else {
+      // Fresh start - clear any stale state
+      await clearReimportState();
+      log(`Starting fresh reimport of ALL sessions from ${startDate.toISOString()}`);
+    }
+    
+    // Mark reimport as running (this pauses the 1-minute sync)
+    await setReimportRunning(true);
     workerStatus = 'running';
 
     while (hasMore) {
@@ -823,10 +843,12 @@ export async function reimportAllSessions(
       log(`Processing ${sessions.length} sessions from page ${pagesProcessed}...`);
 
       let pageSynced = 0;
+      const pagePairs: string[] = [];
+      
       for (const session of sessions) {
         // Track all valid session:shipmentId pairs from Firestore
         if (session.session_id && session.shipment_id) {
-          validSessionShipmentPairs.add(`${session.session_id}:${session.shipment_id}`);
+          pagePairs.push(`${session.session_id}:${session.shipment_id}`);
         }
         
         const synced = await syncSessionToShipment(session);
@@ -847,10 +869,12 @@ export async function reimportAllSessions(
       if (sessions.length < BATCH_SIZE) {
         log(`Last page had ${sessions.length} sessions (less than ${BATCH_SIZE}), reimport complete`);
         hasMore = false;
+        
+        // Save final pairs to Redis before reconciliation
+        await addValidPairs(pagePairs);
       } else {
         // Move cursor to the last session's updated_date for next page
         const lastSession = sessions[sessions.length - 1];
-        // Ensure updated_date is a valid Date object before calling getTime()
         const lastUpdatedDate = lastSession.updated_date instanceof Date 
           ? lastSession.updated_date 
           : new Date(lastSession.updated_date);
@@ -858,20 +882,31 @@ export async function reimportAllSessions(
         if (lastUpdatedDate && !isNaN(lastUpdatedDate.getTime())) {
           // Add 1ms to avoid re-fetching the same session
           currentStartDate = new Date(lastUpdatedDate.getTime() + 1);
+          
+          // Save cursor and pairs to Redis for resumability
+          await saveReimportCursor(currentStartDate, originalStartDate);
+          await addValidPairs(pagePairs);
+          log(`Saved cursor to Redis: ${currentStartDate.toISOString()}, ${pagePairs.length} pairs added`);
         } else {
           // Fallback: if no valid updated_date, stop to avoid infinite loop
           log(`Warning: Last session has no valid updated_date, stopping pagination`);
           hasMore = false;
+          await addValidPairs(pagePairs);
         }
       }
     }
 
     // RECONCILIATION: Clear stale session data from shipments that no longer match Firestore
-    log(`Collected ${validSessionShipmentPairs.size} valid session:shipmentId pairs, starting reconciliation...`);
+    const validSessionShipmentPairs = await getValidPairs();
+    log(`Retrieved ${validSessionShipmentPairs.size} valid session:shipmentId pairs from Redis, starting reconciliation...`);
     const clearedCount = await clearStaleSessionData(validSessionShipmentPairs);
 
+    // Clear all reimport state from Redis (we're done)
+    await clearReimportState();
+    
     workerStatus = 'sleeping';
-    const message = `Reimport complete: ${totalSynced} sessions synced across ${pagesProcessed} pages, ${clearedCount} stale shipments cleared`;
+    const resumedMsg = resumed ? ' (resumed)' : '';
+    const message = `Reimport complete${resumedMsg}: ${totalSynced} sessions synced across ${pagesProcessed} pages, ${clearedCount} stale shipments cleared`;
     log(message);
 
     return {
@@ -880,6 +915,7 @@ export async function reimportAllSessions(
       totalSynced,
       pagesProcessed,
       clearedCount,
+      resumed,
     };
   } catch (error: any) {
     const errorMsg = `Reimport error on page ${pagesProcessed}: ${error.message}`;
@@ -887,12 +923,48 @@ export async function reimportAllSessions(
     workerStats.errorsCount++;
     workerStats.lastError = error.message;
     workerStatus = 'error';
+    
+    // Keep the running flag and cursor in Redis so we can resume later
+    // Don't clear state on error - this is intentional for resumability
+    log(`Reimport state preserved in Redis for resumption`);
 
     return {
       success: false,
       message: errorMsg,
       totalSynced,
       pagesProcessed,
+      resumed,
     };
   }
+}
+
+/**
+ * Get the current reimport status (for API endpoints)
+ */
+export async function getReimportStatus(): Promise<{
+  running: boolean;
+  cursor: string | null;
+  startDate: string | null;
+  validPairsCount: number;
+}> {
+  const running = await isReimportRunning();
+  const cursorState = await getReimportCursor();
+  const pairs = await getValidPairs();
+  
+  return {
+    running,
+    cursor: cursorState?.cursor.toISOString() || null,
+    startDate: cursorState?.startDate.toISOString() || null,
+    validPairsCount: pairs.size,
+  };
+}
+
+/**
+ * Cancel an in-progress reimport (clears Redis state)
+ */
+export async function cancelReimport(): Promise<void> {
+  log('Cancelling reimport and clearing Redis state...');
+  await clearReimportState();
+  workerStatus = 'sleeping';
+  log('Reimport cancelled');
 }
