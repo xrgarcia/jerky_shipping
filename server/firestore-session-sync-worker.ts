@@ -25,8 +25,13 @@ async function isReimportRunning(): Promise<boolean> {
   try {
     const redis = getRedisClient();
     const running = await redis.get(REIMPORT_RUNNING_KEY);
-    return running === 'true';
-  } catch (error) {
+    const isRunning = running === 'true';
+    if (isRunning) {
+      log(`Reimport flag check: running=true`);
+    }
+    return isRunning;
+  } catch (error: any) {
+    log(`Error checking reimport flag: ${error.message}`);
     return false;
   }
 }
@@ -38,8 +43,10 @@ async function setReimportRunning(running: boolean): Promise<void> {
   const redis = getRedisClient();
   if (running) {
     await redis.set(REIMPORT_RUNNING_KEY, 'true');
+    log(`Reimport flag SET to true in Redis`);
   } else {
     await redis.del(REIMPORT_RUNNING_KEY);
+    log(`Reimport flag CLEARED from Redis`);
   }
 }
 
