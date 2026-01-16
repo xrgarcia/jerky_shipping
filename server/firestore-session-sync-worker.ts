@@ -58,8 +58,8 @@ async function saveReimportCursor(cursor: Date, startDate: Date): Promise<void> 
 async function getReimportCursor(): Promise<{ cursor: Date; startDate: Date } | null> {
   try {
     const redis = getRedisClient();
-    const cursorStr = await redis.get(REIMPORT_CURSOR_KEY);
-    const startDateStr = await redis.get(REIMPORT_START_DATE_KEY);
+    const cursorStr = await redis.get(REIMPORT_CURSOR_KEY) as string | null;
+    const startDateStr = await redis.get(REIMPORT_START_DATE_KEY) as string | null;
     
     if (!cursorStr || !startDateStr) return null;
     
@@ -78,7 +78,8 @@ async function getReimportCursor(): Promise<{ cursor: Date; startDate: Date } | 
 async function addValidPairs(pairs: string[]): Promise<void> {
   if (pairs.length === 0) return;
   const redis = getRedisClient();
-  await redis.sadd(REIMPORT_VALID_PAIRS_KEY, ...pairs);
+  // Use array spread with type assertion for Upstash Redis sadd
+  await (redis.sadd as (key: string, ...members: string[]) => Promise<number>)(REIMPORT_VALID_PAIRS_KEY, ...pairs);
 }
 
 /**
