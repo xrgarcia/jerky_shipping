@@ -12746,10 +12746,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
-          id: shipmentsTable.id,  // Internal UUID
-          shipmentId: shipmentsTable.shipmentId,  // ShipStation ID (se-XXX)
+          id: shipmentsTable.id,
+          shipmentId: shipmentsTable.shipmentId,
           orderNumber: shipmentsTable.orderNumber,
-          skuvaultSaleId: shipmentsTable.saleId,
+          saleId: shipmentsTable.saleId,
           fingerprintId: shipmentsTable.fingerprintId,
           trackingNumber: shipmentsTable.trackingNumber,
           lifecyclePhase: shipmentsTable.lifecyclePhase,

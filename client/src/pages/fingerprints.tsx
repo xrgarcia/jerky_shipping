@@ -201,13 +201,13 @@ interface SessionShipmentItem {
 
 interface SessionShipment {
   id: string;
+  shipmentId: string;
   orderNumber: string;
   fingerprintId: string | null;
   trackingNumber: string | null;
   lifecyclePhase: string | null;
   totalWeightOz: number | null;
-  shipmentId: string | null;
-  skuvaultSaleId: string | null;
+  saleId: string | null;
   items: SessionShipmentItem[];
 }
 
@@ -2387,7 +2387,7 @@ export default function Fingerprints() {
                                           // Use cached details if available
                                           if (sessionDetails[session.id]?.shipments) {
                                             saleIds = sessionDetails[session.id].shipments
-                                              .map(s => s.skuvaultSaleId)
+                                              .map(s => s.saleId)
                                               .filter((id): id is string => !!id);
                                           } else {
                                             // Fetch session details if not loaded
@@ -2398,7 +2398,7 @@ export default function Fingerprints() {
                                               if (res.ok) {
                                                 const data = await res.json();
                                                 saleIds = (data.shipments || [])
-                                                  .map((s: { skuvaultSaleId?: string }) => s.skuvaultSaleId)
+                                                  .map((s: { saleId?: string }) => s.saleId)
                                                   .filter((id: string | undefined): id is string => !!id);
                                                 // Cache the details
                                                 setSessionDetails(prev => ({ ...prev, [session.id]: data }));
