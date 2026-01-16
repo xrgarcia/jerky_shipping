@@ -4736,6 +4736,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get reimport status (to check if one is already running)
+  app.get("/api/operations/firestore-sessions/reimport-status", requireAuth, async (req, res) => {
+    try {
+      const { getReimportStatus } = await import("./firestore-session-sync-worker");
+      const status = await getReimportStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error getting reimport status:", error);
+      res.status(500).json({ 
+        running: false,
+        error: error.message 
+      });
+    }
+  });
+
+  // Cancel an in-progress reimport
+  app.post("/api/operations/firestore-sessions/cancel-reimport", requireAuth, async (req, res) => {
+    try {
+      const { cancelReimport } = await import("./firestore-session-sync-worker");
+      await cancelReimport();
+      res.json({ success: true, message: "Reimport cancelled" });
+    } catch (error: any) {
+      console.error("Error cancelling reimport:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // List all registered Shopify webhooks (diagnostic endpoint)
   app.get("/api/operations/list-shopify-webhooks", requireAuth, async (req, res) => {
     try {

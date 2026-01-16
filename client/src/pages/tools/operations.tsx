@@ -589,47 +589,112 @@ function FirestoreSyncButtons({
   toast: ReturnType<typeof useToast>['toast'];
 }) {
   const [isReimportLoading, setIsReimportLoading] = useState(false);
+  const [isCancelLoading, setIsCancelLoading] = useState(false);
+
+  const { data: reimportStatus, refetch: refetchStatus } = useQuery<{
+    running: boolean;
+    cursor: string | null;
+    startDate: string | null;
+    validPairsCount: number;
+  }>({
+    queryKey: ['/api/operations/firestore-sessions/reimport-status'],
+    refetchInterval: 5000,
+  });
+
+  const isRunning = reimportStatus?.running || isReimportLoading;
 
   return (
-    <div className="flex flex-wrap gap-2 mt-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={async () => {
-          setIsReimportLoading(true);
-          try {
-            const response = await apiRequest('POST', '/api/operations/firestore-sessions/reimport');
-            const result = await response.json();
-            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
-            if (result.success) {
+    <div className="flex flex-col gap-2 mt-2">
+      {reimportStatus?.running && (
+        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+          <div className="font-medium text-foreground">Re-import in progress</div>
+          {reimportStatus.cursor && (
+            <div>Cursor: {new Date(reimportStatus.cursor).toLocaleDateString()}</div>
+          )}
+          {reimportStatus.startDate && (
+            <div>Started from: {new Date(reimportStatus.startDate).toLocaleDateString()}</div>
+          )}
+          <div>Valid pairs found: {reimportStatus.validPairsCount.toLocaleString()}</div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={async () => {
+            setIsReimportLoading(true);
+            try {
+              const response = await apiRequest('POST', '/api/operations/firestore-sessions/reimport');
+              const result = await response.json();
+              queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+              refetchStatus();
+              if (result.success) {
+                toast({
+                  title: "Re-import Complete",
+                  description: `Synced ${result.totalSynced} sessions from ${result.pagesProcessed} pages (starting ${new Date(result.startDate).toLocaleDateString()})`,
+                });
+              } else if (result.resumed) {
+                toast({
+                  title: "Re-import Resumed",
+                  description: `Resumed from ${new Date(result.cursor).toLocaleDateString()}. Will continue in background.`,
+                });
+              } else {
+                toast({
+                  title: "Re-import Failed",
+                  description: result.message,
+                  variant: "destructive",
+                });
+              }
+            } catch (err) {
+              console.error('Failed to reimport sessions:', err);
               toast({
-                title: "Re-import Complete",
-                description: `Synced ${result.totalSynced} sessions from ${result.pagesProcessed} pages (starting ${new Date(result.startDate).toLocaleDateString()})`,
-              });
-            } else {
-              toast({
-                title: "Re-import Failed",
-                description: result.message,
+                title: "Failed to reimport sessions",
+                description: err instanceof Error ? err.message : "Unknown error",
                 variant: "destructive",
               });
+            } finally {
+              setIsReimportLoading(false);
+              refetchStatus();
             }
-          } catch (err) {
-            console.error('Failed to reimport sessions:', err);
-            toast({
-              title: "Failed to reimport sessions",
-              description: err instanceof Error ? err.message : "Unknown error",
-              variant: "destructive",
-            });
-          } finally {
-            setIsReimportLoading(false);
-          }
-        }}
-        disabled={isReimportLoading}
-        data-testid="button-firestore-reimport"
-      >
-        <RefreshCw className={cn("h-3 w-3 mr-1", isReimportLoading && "animate-spin")} />
-        {isReimportLoading ? "Re-importing..." : "Re-import All"}
-      </Button>
+          }}
+          disabled={isRunning}
+          data-testid="button-firestore-reimport"
+        >
+          <RefreshCw className={cn("h-3 w-3 mr-1", isRunning && "animate-spin")} />
+          {isRunning ? "Re-importing..." : "Re-import All"}
+        </Button>
+        {reimportStatus?.running && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={async () => {
+              setIsCancelLoading(true);
+              try {
+                await apiRequest('POST', '/api/operations/firestore-sessions/cancel-reimport');
+                refetchStatus();
+                toast({
+                  title: "Re-import Cancelled",
+                  description: "The re-import has been stopped.",
+                });
+              } catch (err) {
+                console.error('Failed to cancel reimport:', err);
+                toast({
+                  title: "Failed to cancel",
+                  description: err instanceof Error ? err.message : "Unknown error",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsCancelLoading(false);
+              }
+            }}
+            disabled={isCancelLoading}
+            data-testid="button-firestore-reimport-cancel"
+          >
+            <XCircle className="h-3 w-3 mr-1" />
+            {isCancelLoading ? "Cancelling..." : "Cancel"}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
