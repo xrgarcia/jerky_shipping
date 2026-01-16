@@ -98,16 +98,20 @@ async function syncSessionItemsToShipmentItems(
  */
 async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boolean> {
   try {
-    // Find shipment by order_number
+    // Find shipment by order_number AND shipment_id for precise matching
+    // This handles cases where one order may have multiple shipments
     const existingShipments = await db
       .select()
       .from(shipments)
-      .where(eq(shipments.orderNumber, session.order_number))
+      .where(and(
+        eq(shipments.orderNumber, session.order_number),
+        eq(shipments.shipmentId, session.shipment_id)
+      ))
       .limit(1);
 
     if (existingShipments.length === 0) {
       // Shipment not found - this is expected for orders not yet in ShipStation
-      log(`No shipment found for order ${session.order_number}, skipping`);
+      log(`No shipment found for order ${session.order_number} with shipmentId ${session.shipment_id}, skipping`);
       return false;
     }
 
