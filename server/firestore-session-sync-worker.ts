@@ -8,8 +8,99 @@ import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmen
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { hydrateShipment, calculateFingerprint } from './services/qc-item-hydrator';
 import { ensureKitMappingsFresh } from './services/kit-mappings-cache';
+import { getRedisClient } from './utils/queue';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
+
+// Redis keys for reimport state management
+const REIMPORT_RUNNING_KEY = 'firestore:reimport:running';
+const REIMPORT_CURSOR_KEY = 'firestore:reimport:cursor';
+const REIMPORT_START_DATE_KEY = 'firestore:reimport:startDate';
+const REIMPORT_VALID_PAIRS_KEY = 'firestore:reimport:validPairs';
+
+/**
+ * Check if a full reimport is currently in progress (stored in Redis)
+ */
+async function isReimportRunning(): Promise<boolean> {
+  try {
+    const redis = getRedisClient();
+    const running = await redis.get(REIMPORT_RUNNING_KEY);
+    return running === 'true';
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Set or clear the reimport running flag in Redis
+ */
+async function setReimportRunning(running: boolean): Promise<void> {
+  const redis = getRedisClient();
+  if (running) {
+    await redis.set(REIMPORT_RUNNING_KEY, 'true');
+  } else {
+    await redis.del(REIMPORT_RUNNING_KEY);
+  }
+}
+
+/**
+ * Save reimport cursor state to Redis for resumability
+ */
+async function saveReimportCursor(cursor: Date, startDate: Date): Promise<void> {
+  const redis = getRedisClient();
+  await redis.set(REIMPORT_CURSOR_KEY, cursor.toISOString());
+  await redis.set(REIMPORT_START_DATE_KEY, startDate.toISOString());
+}
+
+/**
+ * Get reimport cursor state from Redis (returns null if no state)
+ */
+async function getReimportCursor(): Promise<{ cursor: Date; startDate: Date } | null> {
+  try {
+    const redis = getRedisClient();
+    const cursorStr = await redis.get(REIMPORT_CURSOR_KEY);
+    const startDateStr = await redis.get(REIMPORT_START_DATE_KEY);
+    
+    if (!cursorStr || !startDateStr) return null;
+    
+    return {
+      cursor: new Date(cursorStr),
+      startDate: new Date(startDateStr),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Add valid session:shipmentId pairs to Redis set
+ */
+async function addValidPairs(pairs: string[]): Promise<void> {
+  if (pairs.length === 0) return;
+  const redis = getRedisClient();
+  await redis.sadd(REIMPORT_VALID_PAIRS_KEY, ...pairs);
+}
+
+/**
+ * Get all valid pairs from Redis set
+ */
+async function getValidPairs(): Promise<Set<string>> {
+  try {
+    const redis = getRedisClient();
+    const members = await redis.smembers(REIMPORT_VALID_PAIRS_KEY);
+    return new Set(members);
+  } catch (error) {
+    return new Set();
+  }
+}
+
+/**
+ * Clear all reimport state from Redis
+ */
+async function clearReimportState(): Promise<void> {
+  const redis = getRedisClient();
+  await redis.del(REIMPORT_RUNNING_KEY, REIMPORT_CURSOR_KEY, REIMPORT_START_DATE_KEY, REIMPORT_VALID_PAIRS_KEY);
+}
 
 // Worker state
 let workerStatus: 'sleeping' | 'running' | 'error' = 'sleeping';
@@ -446,9 +537,18 @@ async function ensureClosedSessionsWarmed(): Promise<number> {
  * - Firestore is the source of truth for session status
  * - We always catch status changes even if updated_date doesn't change
  * - No cursor management or timestamp tracking needed
+ * 
+ * IMPORTANT: This sync is paused when a full reimport is running to avoid
+ * duplicate processing and memory pressure.
  */
 export async function syncFirestoreSessions(): Promise<number> {
   try {
+    // Check if a full reimport is running - skip this sync cycle if so
+    if (await isReimportRunning()) {
+      log('Skipping sync - full reimport is in progress');
+      return 0;
+    }
+    
     workerStatus = 'running';
 
     // Query Firestore for ALL non-closed sessions (new, active, inactive)
