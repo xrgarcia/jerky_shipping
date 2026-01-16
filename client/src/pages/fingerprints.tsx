@@ -2385,7 +2385,7 @@ export default function Fingerprints() {
                                           // Use cached details if available
                                           if (sessionDetails[session.id]?.shipments) {
                                             saleIds = sessionDetails[session.id].shipments
-                                              .map(s => s.saleId)
+                                              .map(s => s.skuvaultSaleId)
                                               .filter((id): id is string => !!id);
                                           } else {
                                             // Fetch session details if not loaded
@@ -2396,7 +2396,7 @@ export default function Fingerprints() {
                                               if (res.ok) {
                                                 const data = await res.json();
                                                 saleIds = (data.shipments || [])
-                                                  .map((s: { saleId?: string }) => s.saleId)
+                                                  .map((s: { skuvaultSaleId?: string }) => s.skuvaultSaleId)
                                                   .filter((id: string | undefined): id is string => !!id);
                                                 // Cache the details
                                                 setSessionDetails(prev => ({ ...prev, [session.id]: data }));
@@ -2415,7 +2415,7 @@ export default function Fingerprints() {
                                           } else {
                                             toast({
                                               title: "No sale IDs",
-                                              description: "This session has no sale IDs to copy",
+                                              description: "This session has no sale IDs to copy. SkuVault sessions may not be started yet.",
                                               variant: "destructive",
                                             });
                                           }

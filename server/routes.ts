@@ -12746,9 +12746,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { shipments: shipmentsTable, shipmentQcItems } = await import("@shared/schema");
       const sessionShipments = await db
         .select({
-          id: shipmentsTable.id,
+          shipmentId: shipmentsTable.id,
           orderNumber: shipmentsTable.orderNumber,
-          saleId: shipmentsTable.saleId,
+          skuvaultSaleId: shipmentsTable.saleId,
           fingerprintId: shipmentsTable.fingerprintId,
           trackingNumber: shipmentsTable.trackingNumber,
           lifecyclePhase: shipmentsTable.lifecyclePhase,
@@ -12759,7 +12759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(shipmentsTable.smartSessionSpot);
       
       // Fetch QC items (exploded items) for each shipment - these are what warehouse staff actually scan
-      const shipmentIds = sessionShipments.map(s => s.id);
+      const shipmentIds = sessionShipments.map(s => s.shipmentId);
       const allItems = shipmentIds.length > 0 
         ? await db
             .select({
@@ -12806,8 +12806,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Attach items and weight to each shipment
       const shipmentsWithItems = sessionShipments.map(s => ({
         ...s,
-        totalWeightOz: weightByShipment.get(s.id) || null,
-        items: (itemsByShipment[s.id] || []).map(item => ({
+        totalWeightOz: weightByShipment.get(s.shipmentId) || null,
+        items: (itemsByShipment[s.shipmentId] || []).map(item => ({
           sku: item.sku,
           name: item.name,
           quantity: item.quantity,
