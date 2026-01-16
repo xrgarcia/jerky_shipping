@@ -27,6 +27,7 @@ import {
 } from "@shared/schema";
 import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
 import { updateShipmentLifecycleBatch } from "./lifecycle-service";
+import { skuVaultService } from "./skuvault-service";
 
 // ============================================================================
 // Types & Interfaces
@@ -95,6 +96,145 @@ const STATION_TYPE_PRIORITY: Record<string, number> = {
   'poly_bag': 2,
   'hand_pack': 3,
 };
+
+// ============================================================================
+// Sale ID Fetching Helper
+// ============================================================================
+
+/**
+ * Match a SkuVault sale ID to a shipment using suffix matching.
+ * 
+ * Sale ID format: 1-352444-5-13038-138162-JK3825359129-945045994
+ * - JK3825359129 is the order_number
+ * - 945045994 is the shipment_id suffix (our DB stores "se-945045994")
+ * 
+ * Matching rules:
+ * 1. Multi-shipment: saleId ends with {orderNumber}-{shipmentSuffix}
+ * 2. Single-shipment fallback: saleId ends with {orderNumber}
+ */
+function matchSaleIdToShipment(
+  saleId: string,
+  orderNumber: string,
+  shipmentId: string
+): boolean {
+  // Strip "se-" prefix from shipment ID to get the numeric suffix
+  const shipmentSuffix = shipmentId.replace(/^se-/, '');
+  
+  // Try multi-shipment match first (most specific)
+  if (saleId.endsWith(`${orderNumber}-${shipmentSuffix}`)) {
+    return true;
+  }
+  
+  // Fallback to single-shipment match (order number only)
+  if (saleId.endsWith(orderNumber)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Fetch SkuVault sale IDs for a list of shipments and update the database.
+ * 
+ * This function:
+ * 1. Gets order_number and shipment_id for each shipment
+ * 2. Calls SkuVault's getQCSalesByOrderNumber for each unique order
+ * 3. Matches returned sale IDs to shipments using suffix logic
+ * 4. Updates the saleId field in the shipments table
+ * 
+ * @param shipmentIds - List of shipment IDs to fetch sale IDs for
+ * @returns Object with counts of matched and unmatched shipments
+ */
+async function fetchAndMatchSaleIds(
+  shipmentIds: string[]
+): Promise<{ matched: number; unmatched: number; errors: string[] }> {
+  const result = { matched: 0, unmatched: 0, errors: [] as string[] };
+  
+  if (shipmentIds.length === 0) {
+    return result;
+  }
+  
+  try {
+    // Get shipment data from database
+    const shipmentData = await db
+      .select({
+        id: shipments.id,
+        orderNumber: shipments.orderNumber,
+      })
+      .from(shipments)
+      .where(inArray(shipments.id, shipmentIds));
+    
+    if (shipmentData.length === 0) {
+      return result;
+    }
+    
+    // Group shipments by order number (an order can have multiple shipments)
+    const shipmentsByOrder = new Map<string, { id: string; orderNumber: string }[]>();
+    for (const shipment of shipmentData) {
+      if (!shipment.orderNumber) continue;
+      
+      const existing = shipmentsByOrder.get(shipment.orderNumber) || [];
+      existing.push(shipment);
+      shipmentsByOrder.set(shipment.orderNumber, existing);
+    }
+    
+    console.log(`[SaleIdFetch] Fetching sale IDs for ${shipmentData.length} shipments across ${shipmentsByOrder.size} unique orders`);
+    
+    // Fetch sale IDs for each unique order number
+    for (const [orderNumber, orderShipments] of shipmentsByOrder) {
+      try {
+        // Call SkuVault to get QC sales for this order
+        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        
+        if (!qcSale || !qcSale.SaleId) {
+          // No sale found in SkuVault yet - this is normal for orders not yet in a SkuVault session
+          console.log(`[SaleIdFetch] No sale ID found for order ${orderNumber}`);
+          result.unmatched += orderShipments.length;
+          continue;
+        }
+        
+        // For single shipment orders, we should have one QC sale
+        // For multi-shipment orders, the sale ID format includes the shipment suffix
+        const saleId = qcSale.SaleId;
+        
+        // Try to match each shipment in this order to the returned sale ID
+        for (const shipment of orderShipments) {
+          if (matchSaleIdToShipment(saleId, orderNumber, shipment.id)) {
+            // Update the shipment with the matched sale ID
+            await db
+              .update(shipments)
+              .set({
+                saleId: saleId,
+                updatedAt: new Date(),
+              })
+              .where(eq(shipments.id, shipment.id));
+            
+            console.log(`[SaleIdFetch] Matched sale ID ${saleId} to shipment ${shipment.id}`);
+            result.matched++;
+          } else {
+            // This shouldn't happen for well-formed data
+            console.warn(`[SaleIdFetch] Could not match sale ID ${saleId} to shipment ${shipment.id} (order: ${orderNumber})`);
+            result.errors.push(`Could not match sale ID for shipment ${shipment.id}`);
+            result.unmatched++;
+          }
+        }
+        
+      } catch (error: any) {
+        console.error(`[SaleIdFetch] Error fetching sale ID for order ${orderNumber}:`, error.message);
+        result.errors.push(`Error for order ${orderNumber}: ${error.message}`);
+        result.unmatched += orderShipments.length;
+      }
+    }
+    
+    console.log(`[SaleIdFetch] Complete: ${result.matched} matched, ${result.unmatched} unmatched`);
+    
+  } catch (error: any) {
+    console.error('[SaleIdFetch] Error:', error);
+    result.errors.push(error.message);
+  }
+  
+  return result;
+}
 
 // ============================================================================
 // Session Building Service
