@@ -2116,7 +2116,13 @@ export default function Fingerprints() {
                           <td className="py-2 px-3 text-sm">
                             {order.actionTab ? (
                               <button
-                                onClick={() => setActiveTab(order.actionTab as WorkflowTab)}
+                                onClick={() => {
+                                  if (order.actionTab === 'packaging' && order.fingerprintSearchTerm) {
+                                    navigate(`/fulfillment-prep/packaging/needs-mapping?search=${encodeURIComponent(order.fingerprintSearchTerm)}`);
+                                  } else {
+                                    setActiveTab(order.actionTab as WorkflowTab);
+                                  }
+                                }}
                                 className="text-left text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                                 data-testid={`button-action-${order.orderNumber}`}
                               >
