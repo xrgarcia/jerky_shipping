@@ -12528,11 +12528,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const stationInfo = order.assignedStationId ? stationsMap.get(order.assignedStationId) : null;
+        
+        // Build a search term for linking to packaging tab - use displayName or first collection name from signature
+        let fingerprintSearchTerm: string | null = null;
+        if (actionTab === 'packaging' && order.fingerprintId) {
+          if (order.fingerprintDisplayName) {
+            fingerprintSearchTerm = order.fingerprintDisplayName;
+          } else if (order.fingerprintSignature) {
+            try {
+              const sig = JSON.parse(order.fingerprintSignature) as Record<string, number>;
+              // Get first collection name as search term
+              const firstCollectionId = Object.keys(sig)[0];
+              if (firstCollectionId) {
+                fingerprintSearchTerm = collectionsMap.get(firstCollectionId) || null;
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+        
         return {
           orderNumber: order.orderNumber,
           readyToSession,
           reason,
           actionTab,
+          fingerprintSearchTerm,
           stationName: stationInfo?.name || null,
           stationType: stationInfo?.stationType || null,
         };
