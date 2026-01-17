@@ -1372,7 +1372,7 @@ export default function Fingerprints() {
               </CardHeader>
               <CardContent>
                 {/* Filter bar with status and weight filters */}
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
                       <Button
@@ -1437,37 +1437,6 @@ export default function Fingerprints() {
                         </Button>
                       )}
                     </div>
-                    
-                    {/* Packaging type filter */}
-                    <div className="flex items-center gap-2">
-                      <Box className="h-4 w-4 text-muted-foreground" />
-                      <Select
-                        value={packagingTypeFilter || 'all'}
-                        onValueChange={(value) => setPackagingTypeFilter(value === 'all' ? '' : value)}
-                      >
-                        <SelectTrigger className="w-[180px] h-8" data-testid="select-packaging-filter">
-                          <SelectValue placeholder="All packages" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All packages</SelectItem>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {packagingTypes.map((pt) => (
-                            <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {packagingTypeFilter && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPackagingTypeFilter('')}
-                          className="h-8 px-2"
-                          data-testid="button-clear-packaging-filter"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
                   </div>
                   
                   <span className="text-sm text-muted-foreground" data-testid="text-showing-count">
@@ -1476,6 +1445,87 @@ export default function Fingerprints() {
                       : `Showing 0 of ${fingerprints.length}`}
                   </span>
                 </div>
+                
+                {/* Advanced filters accordion */}
+                <Accordion 
+                  type="single" 
+                  collapsible 
+                  value={advancedFiltersOpen}
+                  onValueChange={setAdvancedFiltersOpen}
+                  className="mb-4"
+                >
+                  <AccordionItem value="advanced-filters" className="border-none">
+                    <AccordionTrigger className="py-2 text-sm text-muted-foreground hover:no-underline" data-testid="accordion-advanced-filters">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4" />
+                        Advanced Filters
+                        {(fingerprintSearch || packagingTypeFilter) && (
+                          <Badge variant="secondary" className="ml-2">
+                            {[fingerprintSearch && 'Search', packagingTypeFilter && 'Package'].filter(Boolean).join(', ')} active
+                          </Badge>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 pb-0">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {/* Fingerprint search input */}
+                        <div className="flex items-center gap-2">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="text"
+                            placeholder="Search fingerprints..."
+                            value={fingerprintSearch}
+                            onChange={(e) => updateFingerprintSearch(e.target.value)}
+                            className="w-64 h-8"
+                            data-testid="input-fingerprint-search"
+                          />
+                          {fingerprintSearch && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateFingerprintSearch('')}
+                              className="h-8 px-2"
+                              data-testid="button-clear-fingerprint-search"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {/* Packaging type filter */}
+                        <div className="flex items-center gap-2">
+                          <Box className="h-4 w-4 text-muted-foreground" />
+                          <Select
+                            value={packagingTypeFilter || 'all'}
+                            onValueChange={(value) => setPackagingTypeFilter(value === 'all' ? '' : value)}
+                          >
+                            <SelectTrigger className="w-[180px] h-8" data-testid="select-packaging-filter">
+                              <SelectValue placeholder="All packages" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All packages</SelectItem>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {packagingTypes.map((pt) => (
+                                <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {packagingTypeFilter && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPackagingTypeFilter('')}
+                              className="h-8 px-2"
+                              data-testid="button-clear-packaging-filter"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
                 
                 {/* Bulk action bar - appears when items are selected */}
                 {selectedFingerprintIds.size > 0 && (
