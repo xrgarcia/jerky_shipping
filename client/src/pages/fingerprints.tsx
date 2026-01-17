@@ -31,6 +31,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -68,6 +74,7 @@ import {
   CheckSquare,
   Square,
   Copy,
+  Search,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -352,6 +359,37 @@ export default function Fingerprints() {
   
   // Packaging type filter
   const [packagingTypeFilter, setPackagingTypeFilter] = useState<string>("");
+  
+  // Fingerprint search filter (linkable via URL)
+  const [fingerprintSearch, setFingerprintSearch] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('search') || '';
+    }
+    return '';
+  });
+  
+  // Accordion state for advanced filters - auto-expand if search param exists
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('search') ? 'advanced-filters' : '';
+    }
+    return '';
+  });
+  
+  // Update URL when fingerprint search changes
+  const updateFingerprintSearch = (value: string) => {
+    setFingerprintSearch(value);
+    const url = new URL(window.location.href);
+    if (value) {
+      url.searchParams.set('search', value);
+      setAdvancedFiltersOpen('advanced-filters');
+    } else {
+      url.searchParams.delete('search');
+    }
+    window.history.replaceState({}, '', url.toString());
+  };
   
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
