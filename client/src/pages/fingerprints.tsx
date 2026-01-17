@@ -259,6 +259,7 @@ interface ReadyToSessionOrder {
   readyToSession: boolean;
   reason: string;
   actionTab: string | null;
+  fingerprintSearchTerm: string | null;
   stationName: string | null;
   stationType: string | null;
 }
