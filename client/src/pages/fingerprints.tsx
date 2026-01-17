@@ -800,6 +800,15 @@ export default function Fingerprints() {
 
   // Apply weight and packaging type filters (status filter is handled by the separate endpoints now)
   const filteredFingerprints = fingerprints.filter((fp) => {
+    // Fingerprint search filter
+    if (fingerprintSearch) {
+      const searchLower = fingerprintSearch.toLowerCase();
+      const nameMatch = fp.humanReadableName?.toLowerCase().includes(searchLower) || 
+                        fp.displayName?.toLowerCase().includes(searchLower) ||
+                        fp.signature?.toLowerCase().includes(searchLower);
+      if (!nameMatch) return false;
+    }
+    
     // Weight filters (only apply if values are set)
     const fpWeight = fp.totalWeight ?? 0;
     const minW = minWeight ? parseFloat(minWeight) : null;
@@ -830,7 +839,7 @@ export default function Fingerprints() {
   // Reset page when filters change
   useEffect(() => {
     setPackagingPage(1);
-  }, [filter, minWeight, maxWeight, packagingTypeFilter]);
+  }, [filter, minWeight, maxWeight, packagingTypeFilter, fingerprintSearch]);
   
   // Helper functions for bulk selection
   const toggleSelection = (id: string) => {
