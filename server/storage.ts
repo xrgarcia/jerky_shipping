@@ -3682,12 +3682,12 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async removeProductFromCollection(mappingId: string): Promise<boolean> {
+  async removeProductFromCollection(mappingId: string): Promise<ProductCollectionMapping | null> {
     const result = await db
       .delete(productCollectionMappings)
       .where(eq(productCollectionMappings.id, mappingId))
       .returning();
-    return result.length > 0;
+    return result.length > 0 ? result[0] : null;
   }
 
   async getSkuCollectionMappings(skus: string[]): Promise<{ sku: string; collectionId: string; collectionName: string }[]> {

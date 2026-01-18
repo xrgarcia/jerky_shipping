@@ -9910,12 +9910,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const affectedFingerprintIds = affectedFingerprints.map(f => f.id);
       
       if (affectedFingerprintIds.length > 0) {
-        // Step 2: Reset shipments linked to affected fingerprints to pending_categorization
+        // Step 2: Reset shipments linked to affected fingerprints to needs_recalc
         const resetResult = await db
           .update(shipmentsTable)
           .set({ 
-            fingerprintStatus: 'pending_categorization',
-            fingerprintId: null 
+            fingerprintStatus: 'needs_recalc',
+            fingerprintId: null,
+            packagingTypeId: null,
+            assignedStationId: null,
+            packagingDecisionType: null,
           })
           .where(sql`${shipmentsTable.fingerprintId} IN (${sql.raw(affectedFingerprintIds.map(id => `'${id}'`).join(','))})`);
         
@@ -9960,7 +9963,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "SKUs array is required" });
       }
       const mappings = await storage.addProductsToCollection(id, skus, userId);
-      res.status(201).json({ mappings, added: mappings.length });
+      
+      // Invalidate fingerprints for shipments containing these SKUs
+      const { onCollectionChanged } = await import('./services/qc-item-hydrator');
+      const invalidationResult = await onCollectionChanged(skus);
+      console.log(`[Collections] Added ${mappings.length} products, invalidated ${invalidationResult.shipmentsInvalidated} shipments`);
+      
+      res.status(201).json({ mappings, added: mappings.length, shipmentsInvalidated: invalidationResult.shipmentsInvalidated });
     } catch (error: any) {
       console.error("[Collections] Error adding products to collection:", error);
       res.status(500).json({ error: "Failed to add products to collection" });
@@ -9975,7 +9984,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deleted) {
         return res.status(404).json({ error: "Mapping not found" });
       }
-      res.json({ success: true });
+      
+      // Invalidate fingerprints for shipments containing this SKU
+      const { onCollectionChanged } = await import('./services/qc-item-hydrator');
+      const invalidationResult = await onCollectionChanged([deleted.sku]);
+      console.log(`[Collections] Removed product ${deleted.sku}, invalidated ${invalidationResult.shipmentsInvalidated} shipments`);
+      
+      res.json({ success: true, shipmentsInvalidated: invalidationResult.shipmentsInvalidated });
     } catch (error: any) {
       console.error("[Collections] Error removing product from collection:", error);
       res.status(500).json({ error: "Failed to remove product from collection" });
@@ -11299,11 +11314,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .returning();
       
-      console.log(`[SkuVault Products] Assigned SKU ${sku} to collection ${collectionId}`);
+      // Invalidate fingerprints for shipments containing this SKU
+      const { onCollectionChanged } = await import('./services/qc-item-hydrator');
+      const invalidationResult = await onCollectionChanged([sku]);
+      
+      console.log(`[SkuVault Products] Assigned SKU ${sku} to collection ${collectionId}, invalidated ${invalidationResult.shipmentsInvalidated} shipments`);
       
       res.json({
         success: true,
         mapping: newMapping,
+        shipmentsInvalidated: invalidationResult.shipmentsInvalidated,
       });
     } catch (error: any) {
       console.error(`[SkuVault Products] Error assigning ${req.params.sku} to collection:`, error);
@@ -11331,11 +11351,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Mapping not found" });
       }
       
-      console.log(`[SkuVault Products] Removed SKU ${sku} from collection ${collectionId}`);
+      // Invalidate fingerprints for shipments containing this SKU
+      const { onCollectionChanged } = await import('./services/qc-item-hydrator');
+      const invalidationResult = await onCollectionChanged([sku]);
+      
+      console.log(`[SkuVault Products] Removed SKU ${sku} from collection ${collectionId}, invalidated ${invalidationResult.shipmentsInvalidated} shipments`);
       
       res.json({
         success: true,
         deleted: deleted[0],
+        shipmentsInvalidated: invalidationResult.shipmentsInvalidated,
       });
     } catch (error: any) {
       console.error(`[SkuVault Products] Error removing ${req.params.sku} from collection:`, error);
