@@ -9983,15 +9983,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get pending fingerprint count for recalculation status
+  // Also returns count of uncategorized products blocking those shipments
   app.get("/api/collections/pending-fingerprints", requireAuth, async (req, res) => {
     try {
       const { shipments: shipmentsTable } = await import("@shared/schema");
-      const result = await db
+      
+      // Get pending shipment count
+      const pendingResult = await db
         .select({ count: sql<number>`count(*)` })
         .from(shipmentsTable)
         .where(eq(shipmentsTable.fingerprintStatus, 'pending_categorization'));
       
-      res.json({ pendingCount: Number(result[0]?.count || 0) });
+      const pendingCount = Number(pendingResult[0]?.count || 0);
+      
+      // Get count of unique uncategorized products blocking those shipments
+      let uncategorizedProductCount = 0;
+      if (pendingCount > 0) {
+        const uncategorizedResult = await db.execute(sql`
+          WITH pending_shipments AS (
+            SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
+          )
+          SELECT COUNT(DISTINCT qc.sku) as count
+          FROM shipment_qc_items qc
+          INNER JOIN pending_shipments ps ON qc.shipment_id = ps.id
+          LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+          WHERE pcm.id IS NULL
+        `);
+        uncategorizedProductCount = Number((uncategorizedResult.rows?.[0] as any)?.count) || 0;
+      }
+      
+      res.json({ pendingCount, uncategorizedProductCount });
     } catch (error: any) {
       console.error("[Collections] Error fetching pending fingerprint count:", error);
       res.status(500).json({ error: "Failed to fetch pending count" });

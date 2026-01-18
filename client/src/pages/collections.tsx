@@ -48,8 +48,11 @@ import {
   X,
   Upload,
   FileSpreadsheet,
-  Eye
+  Eye,
+  AlertTriangle,
+  ExternalLink
 } from "lucide-react";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ProductCollection } from "@shared/schema";
 
@@ -415,7 +418,7 @@ export default function Collections() {
     importMutation.mutate(importFile);
   };
 
-  const { data: pendingData, refetch: refetchPending } = useQuery<{ pendingCount: number }>({
+  const { data: pendingData, refetch: refetchPending } = useQuery<{ pendingCount: number; uncategorizedProductCount: number }>({
     queryKey: ["/api/collections/pending-fingerprints"],
     refetchInterval: 30000,
   });
@@ -553,19 +556,22 @@ export default function Collections() {
         <div className="flex items-center gap-2">
           {pendingData && pendingData.pendingCount > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 rounded-md border border-amber-200 dark:border-amber-800">
-              <RefreshCw className="h-4 w-4 text-amber-600" />
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
               <span className="text-sm text-amber-800 dark:text-amber-200">
-                {pendingData.pendingCount.toLocaleString()} pending
+                {pendingData.pendingCount.toLocaleString()} orders waiting on{" "}
+                <strong>{pendingData.uncategorizedProductCount || 0}</strong> uncategorized product{pendingData.uncategorizedProductCount !== 1 ? "s" : ""}
               </span>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => recalculateMutation.mutate()}
-                disabled={recalculateMutation.isPending}
+                asChild
                 className="h-7 text-xs border-amber-300"
-                data-testid="button-recalculate-fingerprints"
+                data-testid="button-view-uncategorized"
               >
-                {recalculateMutation.isPending ? "..." : "Recalculate"}
+                <Link href="/fulfillment-prep?tab=categorize">
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  View Products
+                </Link>
               </Button>
             </div>
           )}
