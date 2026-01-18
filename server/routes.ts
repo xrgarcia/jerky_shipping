@@ -10365,6 +10365,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cleanup shipped orders with stale fingerprint statuses
+  // Shipped orders (those with tracking_number or ship_date) should not have active fingerprint statuses
+  // This sets fingerprint_status to NULL for orders that have already shipped
+  app.post("/api/collections/cleanup-shipped-fingerprints", requireAuth, async (req, res) => {
+    try {
+      console.log('[Collections] Starting cleanup of shipped orders with stale fingerprint statuses...');
+      
+      // Find and update shipped orders with active fingerprint statuses
+      const result = await db.execute(sql`
+        UPDATE shipments
+        SET fingerprint_status = NULL
+        WHERE (tracking_number IS NOT NULL OR ship_date IS NOT NULL)
+          AND fingerprint_status IN ('pending_categorization', 'missing_weight', 'needs_recalc')
+        RETURNING id, order_number, fingerprint_status
+      `);
+      
+      const updatedCount = result.rows?.length || 0;
+      console.log(`[Collections] Cleaned up ${updatedCount} shipped orders`);
+      
+      res.json({
+        success: true,
+        updatedCount,
+        orders: result.rows?.slice(0, 20) || [], // Return first 20 for debugging
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error cleaning up shipped fingerprints:", error);
+      res.status(500).json({ error: "Failed to cleanup shipped fingerprints" });
+    }
+  });
+
   // Backfill lifecycle phases for shipments affected by state machine changes
   // This recalculates lifecycle_phase for all shipments matching ready_to_session and ready_to_fulfill criteria
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
