@@ -821,6 +821,8 @@ export default function OperationsPage() {
   const [webhookToDelete, setWebhookToDelete] = useState<ShopifyWebhook | null>(null);
   const [shipStationWebhookToDelete, setShipStationWebhookToDelete] = useState<ShipStationWebhook | null>(null);
   const [showClearOrderDataDialog, setShowClearOrderDataDialog] = useState(false);
+  const [showRecalculateFingerprintsDialog, setShowRecalculateFingerprintsDialog] = useState(false);
+  const [recalculateConfirmText, setRecalculateConfirmText] = useState("");
   const { toast } = useToast();
 
   // Helper function to format failure for AI analysis
@@ -1217,6 +1219,29 @@ Please analyze this failure and help me understand:
       toast({
         title: "Clear Failed",
         description: "Failed to clear order data",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const recalculateAllFingerprintsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/collections/recalculate-all-fingerprints");
+      return res.json();
+    },
+    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; itemsUpdated: number; batches: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
+      toast({
+        title: "Recalculation complete",
+        description: `${data.processed} shipments processed. ${data.completed} completed, ${data.stillPending} pending.`,
+      });
+      setShowRecalculateFingerprintsDialog(false);
+      setRecalculateConfirmText("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Recalculation failed",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -2852,6 +2877,52 @@ Please analyze this failure and help me understand:
         </CardContent>
       </Card>
 
+      <Card data-testid="card-recalculate-fingerprints" className="border-destructive">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+            <RefreshCw className="h-5 w-5" />
+            Recalculate All Fingerprints
+          </CardTitle>
+          <CardDescription>Reset and recalculate fingerprints for all shipments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="rounded-md bg-destructive/10 p-3 space-y-2">
+              <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Danger Zone
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This action will:
+              </p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground ml-2">
+                <li>Delete all existing fingerprints and fingerprint models</li>
+                <li>Reset all shipment fingerprint associations</li>
+                <li>Clear all packaging type assignments</li>
+                <li>Trigger full recalculation of fingerprints from scratch</li>
+              </ul>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Impact:</strong> All packaging decisions will need to be re-assigned to fingerprints. 
+                This process can take hours depending on the number of shipments.
+              </p>
+              <p className="text-sm font-semibold text-destructive">
+                This action cannot be undone!
+              </p>
+            </div>
+            <Button
+              data-testid="button-recalculate-fingerprints"
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowRecalculateFingerprintsDialog(true)}
+              className="w-full"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Recalculate All Fingerprints
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <AlertDialog open={purgeAction !== null} onOpenChange={(open) => !open && setPurgeAction(null)}>
         <AlertDialogContent data-testid="dialog-purge-confirmation">
           <AlertDialogHeader>
@@ -3303,6 +3374,65 @@ Please analyze this failure and help me understand:
               disabled={clearOrderDataMutation.isPending}
             >
               {clearOrderDataMutation.isPending ? "Clearing..." : "Clear All Order Data"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog 
+        open={showRecalculateFingerprintsDialog} 
+        onOpenChange={(open) => {
+          setShowRecalculateFingerprintsDialog(open);
+          if (!open) setRecalculateConfirmText("");
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-recalculate-fingerprints-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Recalculate All Fingerprints?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This will <strong className="text-destructive">permanently delete</strong> all fingerprints and reset packaging assignments:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>Fingerprints</strong> - All pattern records deleted</li>
+                <li><strong>Fingerprint Models</strong> - All packaging assignments deleted</li>
+                <li><strong>Shipment Associations</strong> - All fingerprint links reset</li>
+              </ul>
+              <div className="rounded-md bg-destructive/10 p-3 border border-destructive">
+                <p className="text-sm font-semibold text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  WARNING: This will require hours of manual work!
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  All packaging decisions will need to be manually re-assigned to fingerprints after recalculation.
+                </p>
+              </div>
+              <div className="space-y-2 pt-2">
+                <p className="text-sm font-medium">
+                  Type <code className="bg-muted px-1 py-0.5 rounded text-xs">delete all and spend hours backfilling packaging decisions</code> to confirm:
+                </p>
+                <Input
+                  value={recalculateConfirmText}
+                  onChange={(e) => setRecalculateConfirmText(e.target.value)}
+                  placeholder="Type the confirmation phrase..."
+                  data-testid="input-recalculate-confirm"
+                  className="font-mono text-sm"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-recalculate-fingerprints">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => recalculateAllFingerprintsMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-recalculate-fingerprints"
+              disabled={
+                recalculateConfirmText !== "delete all and spend hours backfilling packaging decisions" ||
+                recalculateAllFingerprintsMutation.isPending
+              }
+            >
+              {recalculateAllFingerprintsMutation.isPending ? "Recalculating..." : "Recalculate All Fingerprints"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
