@@ -10872,6 +10872,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get count of products with missing weight only (for summary cards)
+  app.get("/api/packing-decisions/missing-weight/count", requireAuth, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH missing_weight_shipments AS (
+          SELECT id FROM shipments WHERE fingerprint_status = 'missing_weight'
+        )
+        SELECT COUNT(DISTINCT qc.sku) as count
+        FROM shipment_qc_items qc
+        INNER JOIN missing_weight_shipments mws ON qc.shipment_id = mws.id
+        WHERE qc.weight_value IS NULL OR qc.weight_value = 0
+      `);
+      
+      const count = Number((result.rows?.[0] as any)?.count) || 0;
+      res.json({ count });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error fetching missing weight count:", error);
+      res.status(500).json({ error: "Failed to fetch missing weight count" });
+    }
+  });
+
+  // Get products with missing weight data
+  app.get("/api/packing-decisions/missing-weight", requireAuth, async (req, res) => {
+    try {
+      const { shipmentQcItems, shipments: shipmentsTable, skuvaultProducts } = await import("@shared/schema");
+      
+      // Get products with missing weight from missing_weight status shipments
+      const productsResult = await db.execute(sql`
+        WITH missing_weight_shipments AS (
+          SELECT id, order_date FROM shipments WHERE fingerprint_status = 'missing_weight'
+        )
+        SELECT 
+          qc.sku,
+          qc.description,
+          sv.product_title as "productTitle",
+          sv.product_image_url as "imageUrl",
+          sv.weight_value as "catalogWeight",
+          sv.weight_unit as "catalogWeightUnit",
+          sv.sku IS NOT NULL as "inSkuvaultCatalog",
+          COUNT(DISTINCT qc.shipment_id) as "shipmentCount"
+        FROM shipment_qc_items qc
+        INNER JOIN missing_weight_shipments mws ON qc.shipment_id = mws.id
+        LEFT JOIN skuvault_products sv ON qc.sku = sv.sku
+        WHERE qc.weight_value IS NULL OR qc.weight_value = 0
+        GROUP BY qc.sku, qc.description, sv.product_title, sv.product_image_url, sv.weight_value, sv.weight_unit, sv.sku
+        ORDER BY COUNT(DISTINCT qc.shipment_id) DESC
+      `);
+      
+      // Get stats
+      const statsResult = await db.execute(sql`
+        WITH missing_weight_shipments AS (
+          SELECT id, order_date FROM shipments WHERE fingerprint_status = 'missing_weight'
+        )
+        SELECT 
+          COUNT(DISTINCT qc.sku) as "totalProducts",
+          COUNT(DISTINCT qc.shipment_id) as "totalShipments",
+          MIN(mws.order_date) as "oldestOrderDate"
+        FROM shipment_qc_items qc
+        INNER JOIN missing_weight_shipments mws ON qc.shipment_id = mws.id
+        WHERE qc.weight_value IS NULL OR qc.weight_value = 0
+      `);
+      
+      const stats = (statsResult.rows?.[0] || {}) as Record<string, any>;
+      
+      res.json({
+        missingWeightProducts: productsResult.rows || [],
+        stats: {
+          totalProducts: Number(stats?.totalProducts) || 0,
+          totalShipments: Number(stats?.totalShipments) || 0,
+          oldestOrderDate: stats?.oldestOrderDate || null,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Packing Decisions] Error fetching missing weight products:", error);
+      res.status(500).json({ error: "Failed to fetch missing weight products" });
+    }
+  });
+
   // Get all SKUs that have collection assignments (for filtering uncategorized in catalog)
   app.get("/api/collections/assigned-skus", requireAuth, async (req, res) => {
     try {

@@ -139,6 +139,26 @@ interface UncategorizedResponse {
   };
 }
 
+interface MissingWeightProduct {
+  sku: string;
+  description: string | null;
+  productTitle: string | null;
+  imageUrl: string | null;
+  catalogWeight: number | null;
+  catalogWeightUnit: string | null;
+  inSkuvaultCatalog: boolean;
+  shipmentCount: number;
+}
+
+interface MissingWeightResponse {
+  missingWeightProducts: MissingWeightProduct[];
+  stats: {
+    totalProducts: number;
+    totalShipments: number;
+    oldestOrderDate: string | null;
+  };
+}
+
 interface Collection {
   id: string;
   name: string;
@@ -475,6 +495,20 @@ export default function Fingerprints() {
     enabled: activeTab === 'categorize',
   });
 
+  // Missing weight products count (lightweight - for summary cards)
+  const { data: missingWeightCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/packing-decisions/missing-weight/count"],
+  });
+
+  // Missing weight products (heavy - lazy loaded for categorize tab only)
+  const {
+    data: missingWeightData,
+    isLoading: missingWeightLoading,
+  } = useQuery<MissingWeightResponse>({
+    queryKey: ["/api/packing-decisions/missing-weight"],
+    enabled: activeTab === 'categorize',
+  });
+
   // Collections for categorization (lazy loaded for categorize tab only)
   const { data: collectionsData } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections"],
@@ -792,6 +826,8 @@ export default function Fingerprints() {
   const uncategorizedProducts = uncategorizedData?.uncategorizedProducts || [];
   // Use lightweight count for summary cards, fall back to full data length when available
   const uncategorizedCount = uncategorizedCountData?.count ?? uncategorizedProducts.length;
+  const missingWeightProducts = missingWeightData?.missingWeightProducts || [];
+  const missingWeightCount = missingWeightCountData?.count ?? missingWeightProducts.length;
   const collections = collectionsData?.collections || [];
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
@@ -1110,6 +1146,11 @@ export default function Fingerprints() {
                 {uncategorizedCount}
               </Badge>
             )}
+            {missingWeightCount > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                {missingWeightCount}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="packaging" className="flex items-center gap-2" data-testid="tab-packaging">
             <Package className="h-4 w-4" />
@@ -1141,7 +1182,7 @@ export default function Fingerprints() {
         </TabsList>
 
         {/* Categorize SKUs Tab */}
-        <TabsContent value="categorize" className="mt-6">
+        <TabsContent value="categorize" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1355,6 +1396,93 @@ export default function Fingerprints() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+            </CardContent>
+          </Card>
+
+          {/* Missing Weight Products Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scale className="h-5 w-5" />
+                Missing Weight Products
+                {missingWeightCount > 0 && (
+                  <Badge variant="secondary" className="text-red-600 bg-red-50 dark:bg-red-950/20">
+                    {missingWeightCount}
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Products that need weight data in the catalog before fingerprints can be calculated
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {missingWeightLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : missingWeightProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">All Products Have Weight</h3>
+                  <p className="text-muted-foreground">
+                    No products are missing weight data.
+                  </p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {missingWeightProducts.map((product, index) => (
+                      <div
+                        key={`${product.sku}-${index}`}
+                        className="flex flex-col p-4 rounded-lg border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+                        data-testid={`row-missing-weight-${product.sku}`}
+                      >
+                        <div className="flex gap-4 mb-3">
+                          <div className="flex-shrink-0 w-16 h-16 rounded-md bg-muted overflow-hidden border">
+                            {product.imageUrl ? (
+                              <img
+                                src={product.imageUrl}
+                                alt={product.productTitle || product.sku}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`w-full h-full flex items-center justify-center ${product.imageUrl ? 'hidden' : ''}`}>
+                              <Package className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm leading-snug line-clamp-2">
+                              {product.description || product.productTitle || 'Unknown Product'}
+                            </h4>
+                            <p className="font-mono text-xs text-muted-foreground mt-1">{product.sku}</p>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <Badge variant="secondary" className="text-xs">
+                                {product.shipmentCount} shipment{product.shipmentCount !== 1 ? 's' : ''}
+                              </Badge>
+                              {product.catalogWeight ? (
+                                <Badge variant="outline" className="text-xs text-green-600">
+                                  <Scale className="h-3 w-3 mr-1" />
+                                  {product.catalogWeight} {product.catalogWeightUnit || 'oz'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  No Weight
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
