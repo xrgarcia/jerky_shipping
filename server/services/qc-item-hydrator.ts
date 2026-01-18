@@ -528,8 +528,21 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       } else {
         // Not a kit - check if it's a variant that should fulfill the parent SKU
         // Variant products (category != 'kit' but have parentSku) should fulfill the parent
-        const fulfillSku = productInfo?.parentSku || sku;
-        const isVariant = !!productInfo?.parentSku;
+        
+        // DEFENSIVE: If product not found in catalog, defer hydration
+        // This prevents race condition where sync is running and catalog is incomplete
+        if (!productInfo) {
+          log(`Product not found in catalog: ${sku} - deferring hydration for order ${orderNumber}`);
+          return { 
+            shipmentId, 
+            orderNumber, 
+            itemsCreated: 0, 
+            error: `Product ${sku} not in catalog - will retry when catalog is available` 
+          };
+        }
+        
+        const fulfillSku = productInfo.parentSku || sku;
+        const isVariant = !!productInfo.parentSku;
         
         skusToLookup.push(fulfillSku);
         itemsToProcess.push({

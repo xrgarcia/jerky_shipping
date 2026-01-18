@@ -450,41 +450,70 @@ export async function syncSkuvaultProducts(): Promise<{
     const skus = products.map(p => p.sku).filter(Boolean);
     const imageMap = await batchResolveImageUrls(skus);
     
-    // Truncate existing data and insert new
-    log('Truncating existing skuvault_products data...');
-    await db.delete(skuvaultProducts);
+    // Use upsert (ON CONFLICT DO UPDATE) instead of truncate+insert
+    // This prevents race conditions where hydration runs during sync and finds empty table
+    log('Upserting products (no truncate - preserves data availability)...');
     
-    // Insert in batches of 500
+    // Track which SKUs we're syncing to detect orphans later
+    const syncedSkus = new Set<string>();
+    
+    // Upsert in batches of 500
     const BATCH_SIZE = 500;
-    let insertedCount = 0;
+    let upsertedCount = 0;
     
     for (let i = 0; i < products.length; i += BATCH_SIZE) {
       const batch = products.slice(i, i + BATCH_SIZE);
       
-      const insertData = batch.map(p => ({
-        sku: p.sku,
-        stockCheckDate: p.stock_check_date,
-        productTitle: p.product_title,
-        barcode: p.barcode,
-        productCategory: p.product_category,
-        isAssembledProduct: p.is_assembled_product || false,
-        unitCost: p.unit_cost,
-        productImageUrl: imageMap.get(p.sku) || null,
-        weightValue: p.weight_value,
-        weightUnit: p.weight_unit,
-        parentSku: p.parent_sku,
-        quantityOnHand: p.quantity_on_hand ?? 0,
-        availableQuantity: p.quantity_on_hand ?? 0, // Reset to match quantityOnHand on each sync
-        brand: p.brand,
-      }));
+      for (const p of batch) {
+        syncedSkus.add(p.sku);
+        
+        await db
+          .insert(skuvaultProducts)
+          .values({
+            sku: p.sku,
+            stockCheckDate: p.stock_check_date,
+            productTitle: p.product_title,
+            barcode: p.barcode,
+            productCategory: p.product_category,
+            isAssembledProduct: p.is_assembled_product || false,
+            unitCost: p.unit_cost,
+            productImageUrl: imageMap.get(p.sku) || null,
+            weightValue: p.weight_value,
+            weightUnit: p.weight_unit,
+            parentSku: p.parent_sku,
+            quantityOnHand: p.quantity_on_hand ?? 0,
+            availableQuantity: p.quantity_on_hand ?? 0,
+            brand: p.brand,
+          })
+          .onConflictDoUpdate({
+            target: skuvaultProducts.sku,
+            set: {
+              stockCheckDate: p.stock_check_date,
+              productTitle: p.product_title,
+              barcode: p.barcode,
+              productCategory: p.product_category,
+              isAssembledProduct: p.is_assembled_product || false,
+              unitCost: p.unit_cost,
+              productImageUrl: imageMap.get(p.sku) || null,
+              weightValue: p.weight_value,
+              weightUnit: p.weight_unit,
+              parentSku: p.parent_sku,
+              quantityOnHand: p.quantity_on_hand ?? 0,
+              availableQuantity: p.quantity_on_hand ?? 0,
+              brand: p.brand,
+              updatedAt: new Date(),
+            },
+          });
+      }
       
-      await db.insert(skuvaultProducts).values(insertData);
-      insertedCount += batch.length;
+      upsertedCount += batch.length;
       
       if (i + BATCH_SIZE < products.length) {
-        log(`Inserted ${insertedCount}/${products.length} products...`);
+        log(`Upserted ${upsertedCount}/${products.length} products...`);
       }
     }
+    
+    const insertedCount = upsertedCount;
     
     // Update last synced date
     await setLastSyncedDate(stockCheckDateStr);
