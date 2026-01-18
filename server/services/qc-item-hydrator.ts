@@ -749,11 +749,18 @@ export async function getHydrationStatus(): Promise<{
 /**
  * Backfill fingerprints for shipments that have QC items but no fingerprint
  * Used for shipments hydrated before fingerprint calculation was added
+ * 
+ * Also handles:
+ * - needs_recalc: Collection changed, needs fresh fingerprint
+ * - missing_weight: Products missing weight data
+ * - pending_categorization: Products not yet assigned to geometry collections
  */
 export async function backfillFingerprints(limit: number = 100): Promise<{
   processed: number;
   complete: number;
   pendingCategorization: number;
+  missingWeight: number;
+  needsRecalc: number;
   newFingerprints: number;
   errors: string[];
 }> {
@@ -761,18 +768,25 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
     processed: 0,
     complete: 0,
     pendingCategorization: 0,
+    missingWeight: 0,
+    needsRecalc: 0,
     newFingerprints: 0,
     errors: [] as string[],
   };
   
   try {
     // Find shipments with QC items that need fingerprint calculation
-    // This includes: no fingerprint_status yet, OR pending_categorization status,
-    // OR has a fingerprint with 0 weight (weight data was missing at creation time)
+    // This includes:
+    // - no fingerprint_status yet
+    // - pending_categorization: products not yet assigned to collections
+    // - missing_weight: products missing weight data (retry in case weight synced)
+    // - needs_recalc: collection changed, need fresh fingerprint
+    // - has a fingerprint with 0 weight (weight data was missing at creation time)
     const shipmentsToProcess = await db
       .select({
         id: shipments.id,
         orderNumber: shipments.orderNumber,
+        fingerprintStatus: shipments.fingerprintStatus,
       })
       .from(shipments)
       .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
@@ -784,10 +798,11 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
               .from(shipmentQcItems)
               .where(eq(shipmentQcItems.shipmentId, shipments.id))
           ),
-          // Either no fingerprint_status yet, or pending_categorization, or has 0-weight fingerprint
           or(
             sql`${shipments.fingerprintStatus} IS NULL`,
             eq(shipments.fingerprintStatus, 'pending_categorization'),
+            eq(shipments.fingerprintStatus, 'missing_weight'),
+            eq(shipments.fingerprintStatus, 'needs_recalc'),
             // Include shipments with complete fingerprints that have 0 weight
             and(
               eq(shipments.fingerprintStatus, 'complete'),
@@ -803,7 +818,13 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
       return result;
     }
     
-    log(`Backfill: Found ${shipmentsToProcess.length} shipments needing fingerprint calculation`);
+    // Count by status for logging
+    const statusCounts = shipmentsToProcess.reduce((acc, s) => {
+      const status = s.fingerprintStatus || 'null';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    log(`Backfill: Found ${shipmentsToProcess.length} shipments needing fingerprint calculation (${JSON.stringify(statusCounts)})`);
     
     for (const shipment of shipmentsToProcess) {
       try {
@@ -817,7 +838,9 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
           }
           // Re-evaluate lifecycle state after fingerprint is complete
           await updateShipmentLifecycle(shipment.id);
-        } else {
+        } else if (fingerprintResult.status === 'missing_weight') {
+          result.missingWeight++;
+        } else if (fingerprintResult.status === 'pending_categorization') {
           result.pendingCategorization++;
         }
       } catch (error) {
@@ -826,7 +849,7 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
       }
     }
     
-    log(`Backfill complete: ${result.processed} processed, ${result.complete} complete (${result.newFingerprints} new), ${result.pendingCategorization} pending categorization`);
+    log(`Backfill complete: ${result.processed} processed, ${result.complete} complete (${result.newFingerprints} new), ${result.pendingCategorization} pending cat, ${result.missingWeight} missing weight`);
     
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
