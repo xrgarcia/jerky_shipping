@@ -745,13 +745,15 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
   
   try {
     // Find shipments with QC items that need fingerprint calculation
-    // This includes: no fingerprint_status yet, OR pending_categorization status
+    // This includes: no fingerprint_status yet, OR pending_categorization status,
+    // OR has a fingerprint with 0 weight (weight data was missing at creation time)
     const shipmentsToProcess = await db
       .select({
         id: shipments.id,
         orderNumber: shipments.orderNumber,
       })
       .from(shipments)
+      .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
       .where(
         and(
           // Has QC items
@@ -760,10 +762,15 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
               .from(shipmentQcItems)
               .where(eq(shipmentQcItems.shipmentId, shipments.id))
           ),
-          // Either no fingerprint_status yet, or pending_categorization
+          // Either no fingerprint_status yet, or pending_categorization, or has 0-weight fingerprint
           or(
             sql`${shipments.fingerprintStatus} IS NULL`,
-            eq(shipments.fingerprintStatus, 'pending_categorization')
+            eq(shipments.fingerprintStatus, 'pending_categorization'),
+            // Include shipments with complete fingerprints that have 0 weight
+            and(
+              eq(shipments.fingerprintStatus, 'complete'),
+              sql`${fingerprints.totalWeight} = 0`
+            )
           )
         )
       )
