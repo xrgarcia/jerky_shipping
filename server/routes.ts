@@ -9894,10 +9894,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete a collection - cascades to invalidate related fingerprints and reset shipments
+  // Delete a collection - blocked if products still assigned
   app.delete("/api/collections/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      
+      // Step 0: Check if any products are assigned to this collection
+      const mappings = await storage.getProductCollectionMappings(id);
+      if (mappings.length > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete collection with products assigned",
+          message: `This collection still has ${mappings.length} product(s) assigned. Remove all products from the collection before deleting it.`,
+          productCount: mappings.length
+        });
+      }
+      
       const { fingerprints, fingerprintModels, shipments: shipmentsTable } = await import("@shared/schema");
       
       // Step 1: Find all fingerprints that reference this collection ID in their signature

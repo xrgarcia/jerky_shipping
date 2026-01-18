@@ -320,6 +320,10 @@ export default function Collections() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("DELETE", `/api/collections/${id}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || "Failed to delete collection");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -331,8 +335,9 @@ export default function Collections() {
       setEditingCollection(null);
     },
     onError: (error: Error) => {
+      setShowDeleteDialog(false);
       toast({
-        title: "Failed to delete collection",
+        title: "Cannot delete collection",
         description: error.message,
         variant: "destructive",
       });
@@ -1122,15 +1127,25 @@ export default function Collections() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Geometry Collection?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{editingCollection?.name}" and remove all product assignments.
-              This action cannot be undone.
+              {editingCollection && editingCollection.productCount > 0 ? (
+                <>
+                  "{editingCollection.name}" has {editingCollection.productCount} product(s) assigned. 
+                  You must remove all products before deleting the collection.
+                </>
+              ) : (
+                <>
+                  This will permanently delete "{editingCollection?.name}".
+                  This action cannot be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!!(editingCollection && editingCollection.productCount > 0)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
