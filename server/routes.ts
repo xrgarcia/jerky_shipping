@@ -10754,13 +10754,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get count of uncategorized products only (for summary cards)
   // Uses fingerprint_status = 'pending_categorization' to match the products list endpoint
+  // Excludes shipped orders (those with tracking_number or ship_date)
   app.get("/api/packing-decisions/uncategorized/count", requireAuth, async (req, res) => {
     try {
       // Fast query: count unique uncategorized SKUs in pending_categorization shipments
       // Uses the same fingerprint_status filter as the products list endpoint for consistency
+      // Excludes shipped orders to prevent already-fulfilled orders from appearing in reports
       const result = await db.execute(sql`
         WITH pending_shipments AS (
-          SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
+          SELECT id FROM shipments 
+          WHERE fingerprint_status = 'pending_categorization'
+            AND tracking_number IS NULL
+            AND ship_date IS NULL
         )
         SELECT COUNT(DISTINCT qc.sku) as count
         FROM shipment_qc_items qc
@@ -10786,13 +10791,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { shipmentQcItems, productCollectionMappings, shipments: shipmentsTable, skuvaultProducts } = await import("@shared/schema");
       
       // Run all 3 queries in parallel for better performance
+      // All queries exclude shipped orders (tracking_number or ship_date present)
       const [uncategorizedProducts, coverageStatsResult, fingerprintStatsResult] = await Promise.all([
         // Query 1: Get uncategorized products - OPTIMIZED to filter shipments first
         // Uses subquery to get pending_categorization shipment IDs first (small set ~30 rows)
         // Then only scans QC items for those shipments, not all 1M+ rows
+        // Excludes shipped orders to prevent already-fulfilled orders from appearing
         db.execute(sql`
           WITH pending_shipments AS (
-            SELECT id FROM shipments WHERE fingerprint_status = 'pending_categorization'
+            SELECT id FROM shipments 
+            WHERE fingerprint_status = 'pending_categorization'
+              AND tracking_number IS NULL
+              AND ship_date IS NULL
           )
           SELECT 
             qc.sku,
@@ -10811,9 +10821,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `),
         
         // Query 2: Coverage stats - OPTIMIZED with same approach
+        // Excludes shipped orders
         db.execute(sql`
           WITH pending_shipments AS (
-            SELECT id, order_date FROM shipments WHERE fingerprint_status = 'pending_categorization'
+            SELECT id, order_date FROM shipments 
+            WHERE fingerprint_status = 'pending_categorization'
+              AND tracking_number IS NULL
+              AND ship_date IS NULL
           )
           SELECT 
             COUNT(DISTINCT qc.sku) as "totalProducts",
@@ -10900,11 +10914,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get count of products with missing weight only (for summary cards)
+  // Excludes shipped orders (those with tracking_number or ship_date)
   app.get("/api/packing-decisions/missing-weight/count", requireAuth, async (req, res) => {
     try {
       const result = await db.execute(sql`
         WITH missing_weight_shipments AS (
-          SELECT id FROM shipments WHERE fingerprint_status = 'missing_weight'
+          SELECT id FROM shipments 
+          WHERE fingerprint_status = 'missing_weight'
+            AND tracking_number IS NULL
+            AND ship_date IS NULL
         )
         SELECT COUNT(DISTINCT qc.sku) as count
         FROM shipment_qc_items qc
@@ -10921,14 +10939,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get products with missing weight data
+  // Excludes shipped orders (those with tracking_number or ship_date)
   app.get("/api/packing-decisions/missing-weight", requireAuth, async (req, res) => {
     try {
       const { shipmentQcItems, shipments: shipmentsTable, skuvaultProducts } = await import("@shared/schema");
       
       // Get products with missing weight from missing_weight status shipments
+      // Excludes shipped orders to prevent already-fulfilled orders from appearing
       const productsResult = await db.execute(sql`
         WITH missing_weight_shipments AS (
-          SELECT id, order_date FROM shipments WHERE fingerprint_status = 'missing_weight'
+          SELECT id, order_date FROM shipments 
+          WHERE fingerprint_status = 'missing_weight'
+            AND tracking_number IS NULL
+            AND ship_date IS NULL
         )
         SELECT 
           qc.sku,
@@ -10947,10 +10970,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY COUNT(DISTINCT qc.shipment_id) DESC
       `);
       
-      // Get stats
+      // Get stats - also excludes shipped orders
       const statsResult = await db.execute(sql`
         WITH missing_weight_shipments AS (
-          SELECT id, order_date FROM shipments WHERE fingerprint_status = 'missing_weight'
+          SELECT id, order_date FROM shipments 
+          WHERE fingerprint_status = 'missing_weight'
+            AND tracking_number IS NULL
+            AND ship_date IS NULL
         )
         SELECT 
           COUNT(DISTINCT qc.sku) as "totalProducts",
