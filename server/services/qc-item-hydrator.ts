@@ -31,7 +31,7 @@ import {
   type InsertShipmentQcItem,
   type InsertFingerprint,
 } from '@shared/schema';
-import { eq, and, or, exists, sql, notExists, inArray } from 'drizzle-orm';
+import { eq, and, or, exists, sql, notExists, inArray, isNull } from 'drizzle-orm';
 import { 
   ensureKitMappingsFresh, 
   isKit, 
@@ -48,9 +48,10 @@ interface HydrationResult {
   shipmentId: string;
   orderNumber: string;
   itemsCreated: number;
-  fingerprintStatus?: 'complete' | 'pending_categorization';
+  fingerprintStatus?: 'complete' | 'pending_categorization' | 'missing_weight';
   fingerprintIsNew?: boolean;
   uncategorizedSkuCount?: number;
+  missingWeightSkuCount?: number;
   error?: string;
 }
 
@@ -650,6 +651,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       fingerprintStatus: fingerprintResult.status,
       fingerprintIsNew: fingerprintResult.isNew,
       uncategorizedSkuCount: fingerprintResult.uncategorizedSkus?.length,
+      missingWeightSkuCount: fingerprintResult.missingWeightSkus?.length,
     };
     
   } catch (error) {
@@ -942,6 +944,96 @@ export async function repairUnexplodedKits(limit: number = 50): Promise<{
     const errorMsg = error instanceof Error ? error.message : String(error);
     log(`Repair failed: ${errorMsg}`);
     result.errors.push(`Fatal: ${errorMsg}`);
+  }
+  
+  return result;
+}
+
+/**
+ * Centralized handler for when product collection assignments change
+ * Called from any collection mutation (add/remove product, delete collection)
+ * 
+ * This function:
+ * 1. Finds all shipments with QC items containing the affected SKUs
+ * 2. Clears their fingerprint assignment
+ * 3. Sets fingerprint_status to 'needs_recalc'
+ * 4. The next sync cycle will automatically recalculate their fingerprints
+ * 
+ * @param affectedSkus - Array of SKUs whose collection assignment changed
+ * @returns Object with count of affected shipments and any errors
+ */
+export async function onCollectionChanged(affectedSkus: string[]): Promise<{
+  shipmentsInvalidated: number;
+  fingerprintsOrphaned: string[];
+  errors: string[];
+}> {
+  const result = {
+    shipmentsInvalidated: 0,
+    fingerprintsOrphaned: [] as string[],
+    errors: [] as string[],
+  };
+  
+  if (affectedSkus.length === 0) {
+    return result;
+  }
+  
+  try {
+    log(`onCollectionChanged: Processing ${affectedSkus.length} affected SKUs`);
+    
+    // Find all shipments that have QC items with any of the affected SKUs
+    // Only consider shipments that haven't shipped yet (no tracking number, no ship date)
+    const affectedShipments = await db
+      .selectDistinct({
+        shipmentId: shipmentQcItems.shipmentId,
+        fingerprintId: shipments.fingerprintId,
+      })
+      .from(shipmentQcItems)
+      .innerJoin(shipments, eq(shipments.id, shipmentQcItems.shipmentId))
+      .where(and(
+        inArray(shipmentQcItems.sku, affectedSkus),
+        isNull(shipments.trackingNumber),
+        isNull(shipments.shipDate)
+      ));
+    
+    if (affectedShipments.length === 0) {
+      log('onCollectionChanged: No active shipments affected');
+      return result;
+    }
+    
+    log(`onCollectionChanged: Found ${affectedShipments.length} shipments to invalidate`);
+    
+    // Collect unique fingerprint IDs that may become orphaned
+    const fingerprintIds = new Set<string>();
+    for (const shipment of affectedShipments) {
+      if (shipment.fingerprintId) {
+        fingerprintIds.add(shipment.fingerprintId);
+      }
+    }
+    
+    // Invalidate all affected shipments in a single batch update
+    const shipmentIds = affectedShipments.map(s => s.shipmentId);
+    
+    await db
+      .update(shipments)
+      .set({
+        fingerprintId: null,
+        fingerprintStatus: 'needs_recalc',
+        packagingTypeId: null,
+        assignedStationId: null,
+        packagingDecisionType: null,
+        updatedAt: new Date(),
+      })
+      .where(inArray(shipments.id, shipmentIds));
+    
+    result.shipmentsInvalidated = shipmentIds.length;
+    result.fingerprintsOrphaned = Array.from(fingerprintIds);
+    
+    log(`onCollectionChanged: Invalidated ${result.shipmentsInvalidated} shipments, ${result.fingerprintsOrphaned.length} fingerprints may be orphaned`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`onCollectionChanged error: ${errorMsg}`);
+    result.errors.push(errorMsg);
   }
   
   return result;
