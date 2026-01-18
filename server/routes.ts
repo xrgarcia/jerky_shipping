@@ -10338,6 +10338,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Repair shipments with un-substituted variant SKUs
+  // This fixes shipments where variants weren't properly substituted with parent SKUs
+  // (e.g., due to race condition during product catalog sync)
+  app.post("/api/collections/repair-unsubstituted-variants", requireAuth, async (req, res) => {
+    try {
+      const { repairUnsubstitutedVariants } = await import('./services/qc-item-hydrator');
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      console.log(`[Collections] Starting repair of un-substituted variants (limit: ${limit})`);
+      
+      const result = await repairUnsubstitutedVariants(limit);
+      
+      console.log(`[Collections] Variant repair complete: ${result.shipmentsRepaired} repaired, ${result.shipmentsSkipped} skipped`);
+      
+      res.json({
+        success: true,
+        shipmentsRepaired: result.shipmentsRepaired,
+        shipmentsSkipped: result.shipmentsSkipped,
+        variantsFound: result.variantsFound,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error repairing un-substituted variants:", error);
+      res.status(500).json({ error: "Failed to repair un-substituted variants" });
+    }
+  });
+
   // Backfill lifecycle phases for shipments affected by state machine changes
   // This recalculates lifecycle_phase for all shipments matching ready_to_session and ready_to_fulfill criteria
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {

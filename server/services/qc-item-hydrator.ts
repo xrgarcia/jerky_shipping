@@ -986,6 +986,129 @@ export async function repairUnexplodedKits(limit: number = 50): Promise<{
 }
 
 /**
+ * Repair job: Find and re-hydrate shipments with un-substituted variant SKUs
+ * 
+ * PROBLEM: Sometimes variant SKUs get stored in shipment_qc_items without being
+ * substituted with their parent SKU. This happens when:
+ * 1. Product catalog was being synced during hydration (race condition with truncate+insert)
+ * 2. Product catalog didn't have parentSku set when hydration ran
+ * 
+ * DETECTION: Find QC items where:
+ * - SKU has a parent_sku in skuvault_products (meaning it's a variant)
+ * - is_kit_component = false (meaning it's not already a kit component)
+ * 
+ * FIX: Delete the bad QC items and re-run hydration for affected shipments
+ */
+export async function repairUnsubstitutedVariants(limit: number = 50): Promise<{
+  shipmentsRepaired: number;
+  shipmentsSkipped: number;
+  variantsFound: string[];
+  errors: string[];
+}> {
+  const result = {
+    shipmentsRepaired: 0,
+    shipmentsSkipped: 0,
+    variantsFound: [] as string[],
+    errors: [] as string[],
+  };
+  
+  try {
+    // Find shipments with un-substituted variant SKUs
+    // These are QC items where the SKU:
+    // 1. Exists in skuvault_products with a parent_sku (it's a variant)
+    // 2. Is marked as is_kit_component = false (it's a regular line item, not kit component)
+    const affectedShipments = await db
+      .selectDistinct({
+        shipmentId: shipmentQcItems.shipmentId,
+        orderNumber: shipments.orderNumber,
+        variantSku: shipmentQcItems.sku,
+        parentSku: skuvaultProducts.parentSku,
+      })
+      .from(shipmentQcItems)
+      .innerJoin(shipments, eq(shipments.id, shipmentQcItems.shipmentId))
+      .innerJoin(skuvaultProducts, eq(skuvaultProducts.sku, shipmentQcItems.sku))
+      .where(
+        and(
+          eq(shipmentQcItems.isKitComponent, false),
+          sql`${skuvaultProducts.parentSku} IS NOT NULL`,
+          // Only repair shipments that haven't shipped yet
+          isNull(shipments.trackingNumber),
+          isNull(shipments.shipDate)
+        )
+      )
+      .limit(limit);
+    
+    if (affectedShipments.length === 0) {
+      log('Repair variants: No shipments with un-substituted variants found');
+      return result;
+    }
+    
+    // Track unique variants found
+    const variantSet = new Set<string>();
+    for (const s of affectedShipments) {
+      variantSet.add(`${s.variantSku} → ${s.parentSku}`);
+    }
+    result.variantsFound = Array.from(variantSet);
+    
+    // Group by shipmentId to avoid processing same shipment multiple times
+    const uniqueShipmentIds = new Map<string, string>();
+    for (const s of affectedShipments) {
+      if (!uniqueShipmentIds.has(s.shipmentId)) {
+        uniqueShipmentIds.set(s.shipmentId, s.orderNumber || 'unknown');
+      }
+    }
+    
+    log(`Repair variants: Found ${uniqueShipmentIds.size} shipments with ${result.variantsFound.length} un-substituted variants`);
+    
+    for (const [shipmentId, orderNumber] of Array.from(uniqueShipmentIds.entries())) {
+      try {
+        // Delete all existing QC items for this shipment
+        await db
+          .delete(shipmentQcItems)
+          .where(eq(shipmentQcItems.shipmentId, shipmentId));
+        
+        // Clear fingerprint data so it gets recalculated
+        await db
+          .update(shipments)
+          .set({
+            fingerprintId: null,
+            fingerprintStatus: null,
+            packagingTypeId: null,
+            assignedStationId: null,
+            packagingDecisionType: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, shipmentId));
+        
+        // Re-hydrate the shipment (this will substitute variants correctly now)
+        const hydrationResult = await hydrateShipment(shipmentId, orderNumber);
+        
+        if (hydrationResult.error) {
+          result.errors.push(`${orderNumber}: ${hydrationResult.error}`);
+          result.shipmentsSkipped++;
+        } else {
+          result.shipmentsRepaired++;
+          log(`Repaired variants in ${orderNumber}: ${hydrationResult.itemsCreated} items, fingerprint ${hydrationResult.fingerprintStatus}`);
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        result.errors.push(`${orderNumber}: ${errorMsg}`);
+        result.shipmentsSkipped++;
+      }
+    }
+    
+    log(`Repair variants complete: ${result.shipmentsRepaired} repaired, ${result.shipmentsSkipped} skipped, ${result.errors.length} errors`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`Repair variants failed: ${errorMsg}`);
+    result.errors.push(`Fatal: ${errorMsg}`);
+  }
+  
+  return result;
+}
+
+/**
  * Centralized handler for when product collection assignments change
  * Called from any collection mutation (add/remove product, delete collection)
  * 
