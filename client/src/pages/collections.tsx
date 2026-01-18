@@ -449,28 +449,6 @@ export default function Collections() {
     },
   });
 
-  const recalculateAllMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/collections/recalculate-all-fingerprints");
-      return res.json();
-    },
-    onSuccess: (data: { processed: number; completed: number; stillPending: number; errors: number; itemsUpdated: number; batches: number }) => {
-      refetchPending();
-      queryClient.invalidateQueries({ queryKey: ["/api/fingerprints"] });
-      toast({
-        title: "Recalculation complete",
-        description: `${data.processed} shipments processed. ${data.completed} completed, ${data.stillPending} pending.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Recalculation failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
@@ -591,20 +569,6 @@ export default function Collections() {
               </Button>
             </div>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => recalculateAllMutation.mutate()}
-            disabled={recalculateAllMutation.isPending}
-            data-testid="button-recalculate-all-fingerprints"
-          >
-            {recalculateAllMutation.isPending ? (
-              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-1" />
-            )}
-            Recalculate All
-          </Button>
           <Button
             size="sm"
             variant="outline"
