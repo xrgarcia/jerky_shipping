@@ -355,7 +355,7 @@ export const shipments = pgTable("shipments", {
   packagingTypeId: varchar("packaging_type_id"), // FK to packaging_types table - assigned packaging
   assignedStationId: varchar("assigned_station_id"), // FK to stations table - where this order should be routed for packing (auto-assigned from packagingType.stationType)
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
-  fingerprintStatus: text("fingerprint_status"), // 'complete' (fingerprint assigned), 'pending_categorization' (products need collection assignment), null (not processed)
+  fingerprintStatus: text("fingerprint_status"), // 'complete' | 'pending_categorization' | 'missing_weight' | 'needs_recalc' | null
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
   lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
   decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault

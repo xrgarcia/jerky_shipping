@@ -221,10 +221,11 @@ function generateDisplayName(
 }
 
 interface FingerprintResult {
-  status: 'complete' | 'pending_categorization';
+  status: 'complete' | 'pending_categorization' | 'missing_weight';
   fingerprintId?: string;
   isNew?: boolean;
   uncategorizedSkus?: string[];
+  missingWeightSkus?: string[];
 }
 
 /**
@@ -273,7 +274,28 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     };
   }
   
-  // All items have collections - aggregate by collection and calculate total weight
+  // Check for items with missing weights (null or 0)
+  const missingWeightSkus: string[] = [];
+  for (const item of qcItems) {
+    if (!item.weightValue || item.weightValue === 0) {
+      missingWeightSkus.push(item.sku);
+    }
+  }
+  
+  if (missingWeightSkus.length > 0) {
+    // Mark shipment as missing weight data
+    await db
+      .update(shipments)
+      .set({ fingerprintStatus: 'missing_weight' })
+      .where(eq(shipments.id, shipmentId));
+    
+    return { 
+      status: 'missing_weight', 
+      missingWeightSkus: Array.from(new Set(missingWeightSkus)) // Unique SKUs
+    };
+  }
+  
+  // All items have collections and weights - aggregate by collection and calculate total weight
   const collectionQuantities = new Map<string, number>();
   let totalWeight = 0;
   let weightUnit = 'oz'; // Default weight unit
@@ -283,12 +305,10 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     const current = collectionQuantities.get(collectionId) || 0;
     collectionQuantities.set(collectionId, current + item.quantityExpected);
     
-    // Calculate weight: weightValue × quantity (default to 0 if no weight)
-    if (item.weightValue) {
-      totalWeight += item.weightValue * item.quantityExpected;
-      if (item.weightUnit) {
-        weightUnit = item.weightUnit; // Use the weight unit from items
-      }
+    // Calculate weight: weightValue × quantity
+    totalWeight += item.weightValue! * item.quantityExpected;
+    if (item.weightUnit) {
+      weightUnit = item.weightUnit; // Use the weight unit from items
     }
   }
   
