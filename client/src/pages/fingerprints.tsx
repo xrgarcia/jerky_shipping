@@ -747,23 +747,19 @@ export default function Fingerprints() {
     },
     onSuccess: (result) => {
       if (result.success && result.jobId) {
-        // Job started - set initial state, WebSocket will handle progress updates
+        // Job started - set minimal initial state, WebSocket will provide real step names
         setActiveJob({
           id: result.jobId,
           type: 'build_sessions',
           status: 'pending',
           steps: [
-            { name: "Finding sessionable orders", status: 'pending' },
-            { name: "Grouping by station type", status: 'pending' },
-            { name: "Fetching SkuVault sale IDs", status: 'pending' },
-            { name: "Creating sessions", status: 'pending' },
-            { name: "Syncing to Firestore", status: 'pending' },
+            { name: "Starting...", status: 'running' },
           ],
           currentStepIndex: 0,
         });
         toast({
           title: "Building Sessions",
-          description: "Session build started in background...",
+          description: "Creating smart sessions from selected orders...",
         });
       } else if (!result.jobId && result.success) {
         // Legacy dry run response
@@ -2432,7 +2428,7 @@ export default function Fingerprints() {
                       {buildSessionsMutation.isPending || isJobRunning ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {activeJob ? (activeJob.steps[activeJob.currentStepIndex]?.message || activeJob.steps[activeJob.currentStepIndex]?.name || 'Building...') : 'Starting...'}
+                          {activeJob?.steps[activeJob.currentStepIndex]?.name || 'Starting...'}
                         </>
                       ) : (
                         <>
