@@ -2144,7 +2144,7 @@ export class SkuVaultService {
    * @param searchTerm - Barcode, SKU, or part number to look up
    * @returns ProductLookupData if found, null if not found
    */
-  async getProductByCodeOrSku(searchTerm: string): Promise<import('@shared/skuvault-types').ProductLookupData | null> {
+  async getProductByCodeOrSku(searchTerm: string): Promise<import('@shared/skuvault-types').ProductLookupApiData | null> {
     await this.ensureAuthenticated();
 
     try {
@@ -2201,8 +2201,8 @@ export class SkuVaultService {
       
       const parsedData = JSON.parse(rawData);
       
-      const { productLookupResponseSchema } = await import('@shared/skuvault-types');
-      const validatedResponse = productLookupResponseSchema.parse(parsedData);
+      const { productLookupApiResponseSchema } = await import('@shared/skuvault-types');
+      const validatedResponse = productLookupApiResponseSchema.parse(parsedData);
       
       if (validatedResponse.Errors && validatedResponse.Errors.length > 0) {
         console.error(`[SkuVault Product Lookup] Errors:`, validatedResponse.Errors);

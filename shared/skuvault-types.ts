@@ -1066,10 +1066,11 @@ export const inventoryByBrandResponseSchema = z.object({
 export type InventoryByBrandResponse = z.infer<typeof inventoryByBrandResponseSchema>;
 
 /**
- * Product lookup response from getProductOrKitByCodeOrSkuOrPartNumber endpoint
+ * Product lookup API response from getProductOrKitByCodeOrSkuOrPartNumber endpoint
  * Used to look up a product by barcode/SKU/part number and get its parent SKU info
+ * Note: This is different from productLookupResponseSchema which is used for QC item mapping
  */
-export const productLookupDataSchema = z.object({
+export const productLookupApiDataSchema = z.object({
   Id: z.string().nullable().optional(),
   Code: z.string().nullable().optional(),
   Sku: z.string().nullable().optional(),
@@ -1097,16 +1098,16 @@ export const productLookupDataSchema = z.object({
   })).nullable().optional(),
 });
 
-export type ProductLookupData = z.infer<typeof productLookupDataSchema>;
+export type ProductLookupApiData = z.infer<typeof productLookupApiDataSchema>;
 
 /**
  * Response wrapper for getProductOrKitByCodeOrSkuOrPartNumber endpoint
  */
-export const productLookupResponseSchema = z.object({
+export const productLookupApiResponseSchema = z.object({
   Errors: z.array(z.string()).nullable().optional(),
   Messages: z.array(z.string()).nullable().optional(),
-  Data: productLookupDataSchema.nullable().optional(),
+  Data: productLookupApiDataSchema.nullable().optional(),
   Status: z.string().nullable().optional(),
 });
 
-export type ProductLookupResponse = z.infer<typeof productLookupResponseSchema>;
+export type ProductLookupApiResponse = z.infer<typeof productLookupApiResponseSchema>;
