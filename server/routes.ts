@@ -6869,7 +6869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               valid: true,
               sku: item.Sku,
               barcode: barcode,
-              title: item.Description || 'Unknown Product',
+              title: item.Title || 'Unknown Product',
               quantity: item.Quantity || 1,
               itemId: item.Id?.toString() || null,
               saleId: qcSale.SaleId || null,
@@ -6879,6 +6879,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
               kitTitle: null,
               fallbackValidation: true,
             });
+          }
+          
+          // 2b. Check AlternateSkus for variant matching
+          if (item.AlternateSkus && item.AlternateSkus.length > 0) {
+            const matchedVariant = item.AlternateSkus.find(alt => {
+              const altSku = (alt.Sku || '').toUpperCase().trim();
+              return altSku === normalizedBarcode;
+            });
+            
+            if (matchedVariant) {
+              console.log(`[Packing Validation] Variant match: barcode ${barcode} -> variant ${matchedVariant.Sku} of parent ${item.Sku} (ID: ${item.Id})`);
+              return res.json({
+                valid: true,
+                sku: item.Sku,
+                barcode: barcode,
+                title: item.Title || 'Unknown Product',
+                quantity: item.Quantity || 1,
+                itemId: item.Id?.toString() || null,
+                saleId: qcSale.SaleId || null,
+                isKitComponent: false,
+                kitId: null,
+                kitSku: null,
+                kitTitle: null,
+                fallbackValidation: true,
+                variantSku: matchedVariant.Sku,
+              });
+            }
           }
           
           // 3. If item is a kit, check kit components
@@ -6898,21 +6925,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 valid: true,
                 sku: matchedComponent.Sku,
                 barcode: barcode,
-                title: matchedComponent.Description || 'Kit Component',
+                title: matchedComponent.Title || 'Kit Component',
                 quantity: matchedComponent.Quantity || 1,
                 itemId: matchedComponent.Id?.toString() || null,
                 saleId: qcSale.SaleId || null,
                 isKitComponent: true,
                 kitId: item.Id?.toString() || null,
                 kitSku: item.Sku || null,
-                kitTitle: item.Description || null,
+                kitTitle: item.Title || null,
                 fallbackValidation: true,
               });
             }
           }
         }
         
-        // 4. No match found - log what we checked
+        // 4. Fallback: Look up scanned barcode in SkuVault to get its parent SKU
+        // This handles cases where the barcode is a variant that maps to a parent product in the order
+        console.log(`[Packing Validation] No direct match for ${barcode}, trying product lookup...`);
+        try {
+          const productLookup = await skuVaultService.getProductByCode(barcode);
+          if (productLookup && productLookup.product) {
+            const lookupSku = (productLookup.product.Sku || '').toUpperCase().trim();
+            
+            // Check if the looked-up SKU matches any item in the order
+            for (const item of qcSale.Items) {
+              const itemSku = (item.Sku || '').toUpperCase().trim();
+              
+              // Check if lookup SKU matches item SKU
+              if (lookupSku === itemSku) {
+                console.log(`[Packing Validation] Product lookup match: barcode ${barcode} -> product ${lookupSku} matches order item ${item.Sku}`);
+                return res.json({
+                  valid: true,
+                  sku: item.Sku,
+                  barcode: barcode,
+                  title: item.Title || 'Unknown Product',
+                  quantity: item.Quantity || 1,
+                  itemId: item.Id?.toString() || null,
+                  saleId: qcSale.SaleId || null,
+                  isKitComponent: false,
+                  kitId: null,
+                  kitSku: null,
+                  kitTitle: null,
+                  fallbackValidation: true,
+                  resolvedFromLookup: true,
+                });
+              }
+              
+              // Check if lookup SKU is in the item's AlternateSkus
+              if (item.AlternateSkus && item.AlternateSkus.length > 0) {
+                const matchedAlt = item.AlternateSkus.find(alt => {
+                  const altSku = (alt.Sku || '').toUpperCase().trim();
+                  return altSku === lookupSku;
+                });
+                
+                if (matchedAlt) {
+                  console.log(`[Packing Validation] Product lookup variant match: barcode ${barcode} -> product ${lookupSku} is variant of order item ${item.Sku}`);
+                  return res.json({
+                    valid: true,
+                    sku: item.Sku,
+                    barcode: barcode,
+                    title: item.Title || 'Unknown Product',
+                    quantity: item.Quantity || 1,
+                    itemId: item.Id?.toString() || null,
+                    saleId: qcSale.SaleId || null,
+                    isKitComponent: false,
+                    kitId: null,
+                    kitSku: null,
+                    kitTitle: null,
+                    fallbackValidation: true,
+                    variantSku: lookupSku,
+                    resolvedFromLookup: true,
+                  });
+                }
+              }
+            }
+            
+            console.log(`[Packing Validation] Product lookup found ${lookupSku} but it doesn't match any order items`);
+          }
+        } catch (productLookupError: any) {
+          console.log(`[Packing Validation] Product lookup failed for ${barcode}:`, productLookupError.message || productLookupError);
+        }
+        
+        // 5. No match found - log what we checked
         const checkedItems = qcSale.Items.map(i => `${i.Sku}(${i.Code})`).join(', ');
         console.log(`[Packing Validation] Barcode ${barcode} not found in QCSale items: ${checkedItems}`);
         
