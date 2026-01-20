@@ -55,12 +55,6 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
       - `quantity_on_hand`: Snapshot from SkuVault (read-only, reset on daily sync)
       - `available_quantity`: Starts equal to `quantity_on_hand`, decremented when QC explosion creates items for pending orders. Reset on each daily sync.
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations based on `vw_po_recommendations` from the reporting database.
-- **Background Job System for Session Building**: Long-running session builds (90+ seconds due to SkuVault API calls) use a database-backed job system with real-time WebSocket progress updates. Features:
-    - 5-step progress tracking: Finding orders → Grouping by station → Fetching SkuVault sale IDs → Creating sessions → Syncing to Firestore
-    - Jobs persist across browser disconnects (job continues server-side)
-    - Build button disabled during active job, re-enabled on failure for retry
-    - Automatic redirect to Live tab on successful completion
-    - Uses `background_jobs` table and `broadcastJobProgress()` WebSocket function
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.

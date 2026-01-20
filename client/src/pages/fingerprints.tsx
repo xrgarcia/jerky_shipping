@@ -195,31 +195,6 @@ interface BuildSessionsResult {
   }>;
 }
 
-interface JobStep {
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  message?: string;
-}
-
-interface BackgroundJob {
-  id: string;
-  type: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  steps: JobStep[];
-  currentStepIndex: number;
-  result?: BuildSessionsResult;
-  errorMessage?: string | null;
-}
-
-interface BuildJobResponse {
-  success: boolean;
-  jobId?: string;
-  message?: string;
-  // Legacy fields for dry run
-  sessionsCreated?: number;
-  shipmentsAssigned?: number;
-}
-
 interface FulfillmentSession {
   id: string;
   name: string | null;
@@ -445,9 +420,6 @@ export default function Fingerprints() {
   
   // Station Type filter state for Build tab
   const [selectedBuildStationTypes, setSelectedBuildStationTypes] = useState<Set<string>>(new Set());
-  
-  // Background job state for session building
-  const [activeJob, setActiveJob] = useState<BackgroundJob | null>(null);
 
 
   useEffect(() => {
@@ -465,153 +437,6 @@ export default function Fingerprints() {
     });
     return () => timeouts.forEach(clearTimeout);
   }, [inlineStatus]);
-
-  // WebSocket listener for job progress updates
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let isMounted = true;
-
-    const connect = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws?room=orders`;
-      
-      try {
-        ws = new WebSocket(wsUrl);
-      } catch (error) {
-        console.error('WebSocket creation error:', error);
-        return;
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'job_progress' && data.job) {
-            const job = data.job as BackgroundJob;
-            console.log('[WebSocket] Received job progress:', job.status, job.steps?.length, 'steps');
-            
-            // Only handle build_sessions jobs
-            if (job.type !== 'build_sessions') return;
-            
-            setActiveJob(job);
-            
-            // Handle job completion
-            if (job.status === 'completed' && job.result) {
-              console.log('[WebSocket] Job completed, redirecting to Live tab...');
-              setSelectedBuildOrderNumbers(new Set());
-              toast({
-                title: "Sessions Created",
-                description: `Created ${job.result.sessionsCreated} sessions with ${job.result.shipmentsAssigned} orders`,
-              });
-              queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
-              // Clear job and redirect after a short delay
-              setTimeout(() => {
-                setActiveJob(null);
-                setActiveTab('live');
-              }, 1000);
-            }
-            
-            // Handle job failure
-            if (job.status === 'failed') {
-              toast({
-                title: "Failed to build sessions",
-                description: job.errorMessage || "An error occurred",
-                variant: "destructive",
-              });
-              // Clear job after showing error (allows retry)
-              setTimeout(() => {
-                setActiveJob(null);
-              }, 2000);
-            }
-          }
-        } catch (error) {
-          console.error('WebSocket message error:', error);
-        }
-      };
-
-      ws.onclose = (event) => {
-        if (event.code !== 1000 && event.code !== 1001 && isMounted) {
-          const delay = Math.min(1000, 30000);
-          reconnectTimeout = setTimeout(connect, delay);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      isMounted = false;
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, [toast, setActiveTab]);
-
-  // Polling fallback for job status - in case WebSocket messages are missed
-  useEffect(() => {
-    if (!activeJob || activeJob.status === 'completed' || activeJob.status === 'failed') {
-      return;
-    }
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`/api/jobs/${activeJob.id}`, {
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          console.log('[JobPolling] Job not found or error, clearing');
-          setActiveJob(null);
-          return;
-        }
-        
-        const job = await response.json();
-        console.log('[JobPolling] Polled job status:', job.status);
-        
-        // Update job state from poll
-        setActiveJob(job);
-        
-        // Handle completion via polling
-        if (job.status === 'completed' && job.result) {
-          console.log('[JobPolling] Job completed via polling, redirecting...');
-          setSelectedBuildOrderNumbers(new Set());
-          toast({
-            title: "Sessions Created",
-            description: `Created ${job.result.sessionsCreated} sessions with ${job.result.shipmentsAssigned} orders`,
-          });
-          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
-          setTimeout(() => {
-            setActiveJob(null);
-            setActiveTab('live');
-          }, 1000);
-        }
-        
-        // Handle failure via polling
-        if (job.status === 'failed') {
-          console.log('[JobPolling] Job failed via polling');
-          toast({
-            title: "Failed to build sessions",
-            description: job.errorMessage || "An error occurred",
-            variant: "destructive",
-          });
-          setTimeout(() => {
-            setActiveJob(null);
-          }, 2000);
-        }
-      } catch (error) {
-        console.error('[JobPolling] Error polling job:', error);
-      }
-    }, 3000); // Poll every 3 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [activeJob?.id, activeJob?.status, toast, setActiveTab]);
 
   // Fingerprint stats only (lightweight - for summary cards)
   const { data: fingerprintStatsData } = useQuery<{ total: number; assigned: number; needsDecision: number }>({
@@ -806,36 +631,31 @@ export default function Fingerprints() {
         body.orderNumbers = orderNumbers;
       }
       const res = await apiRequest("POST", "/api/fulfillment-sessions/build", body);
-      return res.json() as Promise<BuildJobResponse>;
+      return res.json() as Promise<BuildSessionsResult>;
     },
     onSuccess: (result) => {
-      if (result.success && result.jobId) {
-        // Job started - set minimal initial state, WebSocket will provide real step names
-        setActiveJob({
-          id: result.jobId,
-          type: 'build_sessions',
-          status: 'pending',
-          steps: [
-            { name: "Starting...", status: 'running' },
-          ],
-          currentStepIndex: 0,
-        });
+      if (result.success) {
+        setLastBuildResult(result);
+        setSelectedBuildOrderNumbers(new Set()); // Clear selection after build
         toast({
-          title: "Building Sessions",
-          description: "Creating smart sessions from selected orders...",
+          title: "Sessions Created",
+          description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
         });
-      } else if (!result.jobId && result.success) {
-        // Legacy dry run response
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+        setActiveTab('live');
+      } else {
         toast({
-          title: "Preview Complete",
-          description: `Would create ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
+          title: "Failed to build sessions",
+          description: result.errors.join(", "),
+          variant: "destructive",
         });
       }
     },
     onError: (error: Error) => {
-      setActiveJob(null);
       toast({
-        title: "Error starting session build",
+        title: "Error building sessions",
         description: error.message,
         variant: "destructive",
       });
@@ -2476,22 +2296,20 @@ export default function Fingerprints() {
                     .filter(order => order.readyToSession)
                     .map(order => order.orderNumber) || [];
                   
-                  const isJobRunning = activeJob && (activeJob.status === 'pending' || activeJob.status === 'running');
-                  
                   return (
                     <Button
                       onClick={() => {
-                        if (visibleSelectedOrders.length > 0 && !isJobRunning) {
+                        if (visibleSelectedOrders.length > 0) {
                           buildSessionsMutation.mutate(visibleSelectedOrders);
                         }
                       }}
-                      disabled={buildSessionsMutation.isPending || isJobRunning || visibleSelectedOrders.length === 0}
+                      disabled={buildSessionsMutation.isPending || visibleSelectedOrders.length === 0}
                       data-testid="button-build-sessions"
                     >
-                      {buildSessionsMutation.isPending || isJobRunning ? (
+                      {buildSessionsMutation.isPending ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {activeJob?.steps[activeJob.currentStepIndex]?.name || 'Starting...'}
+                          Building...
                         </>
                       ) : (
                         <>
@@ -2507,40 +2325,7 @@ export default function Fingerprints() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Job Progress Indicator */}
-              {activeJob && (activeJob.status === 'pending' || activeJob.status === 'running') && (
-                <div className="mb-6 p-4 rounded-lg border border-primary/30 bg-primary/5">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="font-medium text-sm">Building Sessions...</span>
-                    </div>
-                    <div className="space-y-2">
-                      {activeJob.steps.map((step, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          {step.status === 'completed' ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          ) : step.status === 'running' ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
-                          ) : step.status === 'failed' ? (
-                            <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                          ) : (
-                            <div className="h-4 w-4 rounded-full border-2 border-muted flex-shrink-0" />
-                          )}
-                          <span className={step.status === 'running' ? 'font-medium' : step.status === 'completed' ? 'text-muted-foreground' : ''}>
-                            {step.name}
-                          </span>
-                          {step.message && step.status === 'running' && (
-                            <span className="text-muted-foreground">— {step.message}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {totalSessionableOrders > 0 && !activeJob && (
+              {totalSessionableOrders > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
                   <div className="flex items-start gap-3">
                     <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
