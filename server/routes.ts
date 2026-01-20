@@ -2522,7 +2522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[Slashbin] Signature verified successfully");
       
       // Check idempotency - avoid processing duplicate webhooks
-      const payloadJobId = req.body.slashbin_job_id || jobId;
+      const payloadJobId = req.body.slashbinJobId || jobId;
       if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
         console.log(`[Slashbin] Job ${payloadJobId} already processed, skipping (idempotency)`);
         return res.status(200).json({ success: true, message: "Already processed" });
@@ -2531,11 +2531,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log full payload for debugging
       console.log("[Slashbin] Full payload:", JSON.stringify(req.body, null, 2));
       
-      // Process kit mapping payload - structure is payload.transformedPayload.sku
-      const transformedPayload = req.body.payload?.transformedPayload;
+      // Process kit mapping payload - structure is transformedPayload.sku
+      const transformedPayload = req.body.transformedPayload;
       if (!transformedPayload || !transformedPayload.sku) {
         console.error("[Slashbin] Invalid payload: missing transformedPayload.sku. Structure:", 
-          JSON.stringify({ hasPayload: !!req.body.payload, hasTransformed: !!req.body.payload?.transformedPayload }));
+          JSON.stringify({ hasTransformed: !!req.body.transformedPayload, hasSku: !!req.body.transformedPayload?.sku }));
         return res.status(400).json({ error: "Invalid payload: missing sku" });
       }
       
