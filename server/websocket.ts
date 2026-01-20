@@ -939,6 +939,29 @@ export function broadcastQueueStatus(data: {
   broadcastToRooms(['home', 'operations', 'orders', 'backfill', 'default'], message);
 }
 
+// Broadcast background job progress updates
+export function broadcastJobProgress(job: { 
+  id: string; 
+  type: string;
+  status: string; 
+  steps: any[]; 
+  currentStepIndex: number;
+  result?: any;
+  errorMessage?: string | null;
+}): void {
+  if (!wss) {
+    return;
+  }
+
+  const message = JSON.stringify({
+    type: 'job_progress',
+    job,
+  });
+
+  // Broadcast to orders room (fingerprints page subscribes to this)
+  broadcastToRooms(['orders', 'default'], message);
+}
+
 // TypeScript global declarations
 declare global {
   var __lastQueueStatus: Record<string, string> | undefined;

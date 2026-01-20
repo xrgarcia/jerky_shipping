@@ -580,6 +580,133 @@ export class FulfillmentSessionService {
   }
 
   /**
+   * Build sessions with progress tracking for background jobs
+   * 
+   * This version reports progress updates through the provided JobProgress tracker.
+   * Steps:
+   * 1. Finding sessionable orders
+   * 2. Grouping by station type
+   * 3. Fetching SkuVault sale IDs
+   * 4. Creating sessions
+   * 5. Syncing to Firestore
+   */
+  async buildSessionsWithProgress(
+    userId: string,
+    options: { stationType?: string; orderNumbers?: string[] } = {},
+    progress: { startStep: (msg?: string) => Promise<void>; completeStep: (msg?: string) => Promise<void>; updateMessage: (msg: string) => Promise<void>; failStep: (msg: string) => Promise<void> }
+  ): Promise<SessionBuildResult> {
+    const { stationType, orderNumbers } = options;
+
+    const result: SessionBuildResult = {
+      success: true,
+      sessionsCreated: 0,
+      shipmentsAssigned: 0,
+      shipmentsSkipped: 0,
+      skippedOrders: [],
+      sessions: [],
+      errors: [],
+    };
+
+    try {
+      // Step 1: Find sessionable shipments
+      await progress.startStep("Searching for ready orders...");
+      let sessionableShipments = await this.findSessionableShipments(stationType);
+      
+      // Filter by specific order numbers if provided
+      if (orderNumbers && orderNumbers.length > 0) {
+        const orderSet = new Set(orderNumbers);
+        sessionableShipments = sessionableShipments.filter(s => orderSet.has(s.orderNumber));
+      }
+      
+      if (sessionableShipments.length === 0) {
+        await progress.failStep("No sessionable orders found");
+        result.errors.push('No sessionable shipments found');
+        result.success = false;
+        return result;
+      }
+      await progress.completeStep(`Found ${sessionableShipments.length} orders`);
+
+      // Step 2: Group by station type and fingerprint
+      await progress.startStep("Organizing orders by type...");
+      const groups = await this.groupShipmentsForBatching(sessionableShipments);
+      const draftSessions = await this.getDraftSessionsWithCapacity();
+      const { filledSessions, newBatches, shipmentsAddedToDrafts } = 
+        await this.distributeToExistingAndNew(groups, draftSessions, MAX_ORDERS_PER_SESSION);
+      await progress.completeStep(`${newBatches.length} new sessions, ${filledSessions.filter(f => f.shipmentIds.length > 0).length} existing`);
+
+      // Step 3: Fetch SkuVault sale IDs
+      await progress.startStep("Fetching SkuVault data...");
+      
+      // Collect all shipment IDs that need sale IDs
+      const allShipmentIds: string[] = [];
+      for (const filled of filledSessions) {
+        allShipmentIds.push(...filled.shipmentIds);
+      }
+      for (const batch of newBatches) {
+        allShipmentIds.push(...batch.shipments.map(s => s.id));
+      }
+      
+      if (allShipmentIds.length > 0) {
+        const saleIdResult = await fetchAndMatchSaleIds(allShipmentIds);
+        await progress.updateMessage(`Matched ${saleIdResult.matched} of ${allShipmentIds.length} orders`);
+      }
+      await progress.completeStep(`${allShipmentIds.length} orders processed`);
+
+      // Step 4: Create sessions
+      await progress.startStep("Creating sessions...");
+      let createdCount = 0;
+      const totalToCreate = filledSessions.filter(f => f.shipmentIds.length > 0).length + newBatches.length;
+      
+      // Add shipments to existing draft sessions
+      for (const filled of filledSessions) {
+        if (filled.shipmentIds.length > 0) {
+          const addResult = await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
+          result.shipmentsAssigned += addResult.added;
+          result.shipmentsSkipped += addResult.skipped.length;
+          result.skippedOrders.push(...addResult.skipped);
+          const updatedSession = await this.getSessionById(filled.sessionId);
+          if (updatedSession) {
+            result.sessions.push(updatedSession);
+          }
+          createdCount++;
+          await progress.updateMessage(`${createdCount} of ${totalToCreate} sessions...`);
+        }
+      }
+
+      // Create new sessions
+      for (const batch of newBatches) {
+        const createResult = await this.createSessionWithShipments(batch, userId);
+        if (createResult.session) {
+          result.sessions.push(createResult.session);
+          result.sessionsCreated++;
+          result.shipmentsAssigned += createResult.added;
+        }
+        result.shipmentsSkipped += createResult.skipped.length;
+        result.skippedOrders.push(...createResult.skipped);
+        createdCount++;
+        await progress.updateMessage(`${createdCount} of ${totalToCreate} sessions...`);
+      }
+      await progress.completeStep(`Created ${result.sessionsCreated} sessions`);
+
+      // Step 5: Sync to Firestore (this happens automatically via the session sync worker)
+      await progress.startStep("Finalizing...");
+      // The Firestore sync happens automatically in the background
+      // Just mark as complete
+      await progress.completeStep(`${result.shipmentsAssigned} orders assigned to sessions`);
+
+      console.log(`[FulfillmentSession] Built ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} shipments`);
+
+    } catch (error: any) {
+      result.success = false;
+      result.errors.push(error.message);
+      await progress.failStep(error.message);
+      console.error('[FulfillmentSession] Error building sessions with progress:', error);
+    }
+
+    return result;
+  }
+
+  /**
    * Get all draft sessions that have capacity for more orders
    */
   private async getDraftSessionsWithCapacity(): Promise<{ id: number; stationType: string | null; orderCount: number; maxOrders: number }[]> {

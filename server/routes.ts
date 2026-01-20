@@ -12816,7 +12816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Build fulfillment sessions from sessionable shipments
+  // Build fulfillment sessions from sessionable shipments (background job version)
   app.post("/api/fulfillment-sessions/build", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
@@ -12824,26 +12824,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not authenticated" });
       }
       
-      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
       const { stationType, dryRun, orderNumbers } = req.body;
       
-      const result = await fulfillmentSessionService.buildSessions(userId, {
-        stationType: stationType as string | undefined,
-        dryRun: dryRun === true,
-        orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
-      });
-      
-      if (!result.success) {
-        return res.status(400).json({
-          success: false,
-          errors: result.errors,
+      // For dry run, execute synchronously (fast operation)
+      if (dryRun === true) {
+        const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+        const result = await fulfillmentSessionService.buildSessions(userId, {
+          stationType: stationType as string | undefined,
+          dryRun: true,
+          orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
         });
+        return res.json(result);
       }
       
-      res.json(result);
+      // For actual build, create a background job
+      const { backgroundJobService } = await import("./services/background-job-service");
+      const { JOB_TYPES } = await import("@shared/schema");
+      const { broadcastJobProgress } = await import("./websocket");
+      
+      // Define steps for session building
+      const steps = [
+        "Finding sessionable orders",
+        "Grouping by station type",
+        "Fetching SkuVault sale IDs",
+        "Creating sessions",
+        "Syncing to Firestore",
+      ];
+      
+      // Create the job
+      const job = await backgroundJobService.createJob(
+        JOB_TYPES.BUILD_SESSIONS,
+        userId,
+        steps,
+        { stationType, orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined }
+      );
+      
+      // Broadcast initial job state
+      broadcastJobProgress({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        steps: job.steps,
+        currentStepIndex: job.currentStepIndex,
+      });
+      
+      // Return job ID immediately
+      res.json({
+        success: true,
+        jobId: job.id,
+        message: "Session build started",
+      });
+      
+      // Process job in background (don't await)
+      (async () => {
+        try {
+          const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+          
+          // Mark job as started
+          await backgroundJobService.startJob(job.id);
+          
+          // Create progress tracker with WebSocket updates
+          const progress = backgroundJobService.createProgress(
+            job.id,
+            steps,
+            (updatedJob) => {
+              broadcastJobProgress({
+                id: updatedJob.id,
+                type: updatedJob.type,
+                status: updatedJob.status,
+                steps: updatedJob.steps,
+                currentStepIndex: updatedJob.currentStepIndex,
+              });
+            }
+          );
+          
+          // Execute the build with progress updates
+          const result = await fulfillmentSessionService.buildSessionsWithProgress(userId, {
+            stationType: stationType as string | undefined,
+            orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
+          }, progress);
+          
+          // Mark job as completed
+          const completedJob = await backgroundJobService.completeJob(job.id, result);
+          if (completedJob) {
+            broadcastJobProgress({
+              id: completedJob.id,
+              type: completedJob.type,
+              status: completedJob.status,
+              steps: completedJob.steps,
+              currentStepIndex: completedJob.currentStepIndex,
+              result: completedJob.result,
+            });
+          }
+          
+          console.log(`[BackgroundJob] Job ${job.id} completed successfully`);
+        } catch (error: any) {
+          console.error(`[BackgroundJob] Job ${job.id} failed:`, error);
+          const failedJob = await backgroundJobService.failJob(job.id, error.message);
+          if (failedJob) {
+            broadcastJobProgress({
+              id: failedJob.id,
+              type: failedJob.type,
+              status: failedJob.status,
+              steps: failedJob.steps,
+              currentStepIndex: failedJob.currentStepIndex,
+              errorMessage: failedJob.errorMessage,
+            });
+          }
+        }
+      })();
+      
     } catch (error: any) {
-      console.error("[FulfillmentSessions] Error building sessions:", error);
-      res.status(500).json({ error: "Failed to build sessions" });
+      console.error("[FulfillmentSessions] Error starting build job:", error);
+      res.status(500).json({ error: "Failed to start session build" });
+    }
+  });
+
+  // Get background job status
+  app.get("/api/jobs/:jobId", requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { backgroundJobService } = await import("./services/background-job-service");
+      
+      const job = await backgroundJobService.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      res.json(job);
+    } catch (error: any) {
+      console.error("[Jobs] Error getting job:", error);
+      res.status(500).json({ error: "Failed to get job status" });
     }
   });
 
