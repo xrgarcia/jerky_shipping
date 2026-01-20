@@ -643,7 +643,7 @@ export class FulfillmentSessionService {
         allShipmentIds.push(...filled.shipmentIds);
       }
       for (const batch of newBatches) {
-        allShipmentIds.push(...batch.shipments.map(s => s.id));
+        allShipmentIds.push(...batch.shipmentIds);
       }
       
       if (allShipmentIds.length > 0) {
