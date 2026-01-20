@@ -1476,3 +1476,74 @@ export const insertExcludedExplosionSkuSchema = createInsertSchema(excludedExplo
 
 export type InsertExcludedExplosionSku = z.infer<typeof insertExcludedExplosionSkuSchema>;
 export type ExcludedExplosionSku = typeof excludedExplosionSkus.$inferSelect;
+
+// ============================================================================
+// BACKGROUND JOBS (for long-running operations with progress tracking)
+// ============================================================================
+
+/**
+ * Background Jobs - Track long-running operations with step-by-step progress
+ * 
+ * Used for operations like session building that can take 90+ seconds.
+ * The frontend can poll for status or receive WebSocket updates.
+ */
+export const JOB_STATUS = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const;
+
+export type JobStatus = typeof JOB_STATUS[keyof typeof JOB_STATUS];
+
+export const JOB_TYPES = {
+  BUILD_SESSIONS: 'build_sessions',
+} as const;
+
+export type JobType = typeof JOB_TYPES[keyof typeof JOB_TYPES];
+
+/**
+ * Step progress for a job
+ */
+export interface JobStep {
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  message?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export const backgroundJobs = pgTable("background_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // Job type (e.g., 'build_sessions')
+  status: text("status").notNull().default('pending'), // pending, running, completed, failed
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Progress tracking
+  steps: jsonb("steps").$type<JobStep[]>().notNull().default([]), // Array of step objects
+  currentStepIndex: integer("current_step_index").notNull().default(0),
+  
+  // Input/Output
+  input: jsonb("input").$type<Record<string, any>>(), // Job input parameters
+  result: jsonb("result").$type<Record<string, any>>(), // Job result on completion
+  
+  // Error handling
+  errorMessage: text("error_message"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  statusIdx: index("background_jobs_status_idx").on(table.status),
+  userIdIdx: index("background_jobs_user_id_idx").on(table.userId),
+  createdAtIdx: index("background_jobs_created_at_idx").on(table.createdAt),
+}));
+
+export const insertBackgroundJobSchema = createInsertSchema(backgroundJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBackgroundJob = z.infer<typeof insertBackgroundJobSchema>;
+export type BackgroundJob = typeof backgroundJobs.$inferSelect;
