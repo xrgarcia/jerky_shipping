@@ -2134,6 +2134,106 @@ export class SkuVaultService {
   }
 
   /**
+   * Look up a product by barcode, SKU, or part number
+   * Endpoint: GET /products/product/getProductOrKitByCodeOrSkuOrPartNumber
+   * 
+   * Used to resolve a scanned barcode to its product/parent SKU info.
+   * This is useful for variant scanning where the barcode on a product
+   * might map to a variant SKU that needs to be matched against an order.
+   * 
+   * @param searchTerm - Barcode, SKU, or part number to look up
+   * @returns ProductLookupData if found, null if not found
+   */
+  async getProductByCodeOrSku(searchTerm: string): Promise<import('@shared/skuvault-types').ProductLookupData | null> {
+    await this.ensureAuthenticated();
+
+    try {
+      const url = `https://app.skuvault.com/products/product/getProductOrKitByCodeOrSkuOrPartNumber?SearchTerm=${encodeURIComponent(searchTerm)}`;
+      console.log(`[SkuVault Product Lookup] Looking up: ${searchTerm}`);
+      
+      await this.applyRateLimit();
+      
+      const headers = await this.getApiHeaders();
+      const response = await this.client.request({
+        method: 'GET',
+        url,
+        headers,
+        transformResponse: [],
+      });
+      
+      let rawData = response.data as string;
+      
+      // Check if response is HTML (session expired)
+      const trimmedData = rawData.trim().toLowerCase();
+      if (trimmedData.startsWith('<!doctype') || trimmedData.startsWith('<html') || trimmedData.startsWith('<')) {
+        console.log('[SkuVault Product Lookup] Received HTML response (session expired), re-authenticating...');
+        await this.tokenCache.clear();
+        this.isAuthenticated = false;
+        await this.ensureAuthenticated();
+        
+        const retryHeaders = await this.getApiHeaders();
+        const retryResponse = await this.client.request({
+          method: 'GET',
+          url,
+          headers: retryHeaders,
+          transformResponse: [],
+        });
+        rawData = retryResponse.data as string;
+        
+        const retryTrimmed = rawData.trim().toLowerCase();
+        if (retryTrimmed.startsWith('<!doctype') || retryTrimmed.startsWith('<html') || (retryTrimmed.startsWith('<') && !rawData.startsWith(")]}',"))) {
+          console.error('[SkuVault Product Lookup] Re-authentication failed');
+          throw new SkuVaultError('SkuVault authentication failed', 401, ['Authentication failed']);
+        }
+      }
+      
+      // Strip anti-XSSI prefix if present
+      if (rawData.startsWith(")]}',")) {
+        rawData = rawData.substring(6);
+      }
+      
+      // Safety check before parsing
+      const jsonTrimmed = rawData.trim();
+      if (!jsonTrimmed.startsWith('{') && !jsonTrimmed.startsWith('[')) {
+        console.error(`[SkuVault Product Lookup] Response is not valid JSON: ${rawData.substring(0, 100)}`);
+        return null;
+      }
+      
+      const parsedData = JSON.parse(rawData);
+      
+      const { productLookupResponseSchema } = await import('@shared/skuvault-types');
+      const validatedResponse = productLookupResponseSchema.parse(parsedData);
+      
+      if (validatedResponse.Errors && validatedResponse.Errors.length > 0) {
+        console.error(`[SkuVault Product Lookup] Errors:`, validatedResponse.Errors);
+        return null;
+      }
+      
+      if (!validatedResponse.Data || !validatedResponse.Data.Sku) {
+        console.log(`[SkuVault Product Lookup] No product found for: ${searchTerm}`);
+        return null;
+      }
+      
+      console.log(`[SkuVault Product Lookup] Found product:`, {
+        Sku: validatedResponse.Data.Sku,
+        Code: validatedResponse.Data.Code,
+        Title: validatedResponse.Data.Title,
+        VariationParentSku: validatedResponse.Data.VariationParentSku,
+        IsKit: validatedResponse.Data.IsKit,
+      });
+      
+      return validatedResponse.Data;
+
+    } catch (error) {
+      if (error instanceof SkuVaultError) {
+        throw error;
+      }
+      console.error(`[SkuVault Product Lookup] Error looking up ${searchTerm}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get token metadata for operations dashboard
    * Returns authentication status and last refresh timestamp
    */
