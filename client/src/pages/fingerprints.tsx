@@ -488,6 +488,7 @@ export default function Fingerprints() {
           const data = JSON.parse(event.data);
           if (data.type === 'job_progress' && data.job) {
             const job = data.job as BackgroundJob;
+            console.log('[WebSocket] Received job progress:', job.status, job.steps?.length, 'steps');
             
             // Only handle build_sessions jobs
             if (job.type !== 'build_sessions') return;
@@ -496,6 +497,7 @@ export default function Fingerprints() {
             
             // Handle job completion
             if (job.status === 'completed' && job.result) {
+              console.log('[WebSocket] Job completed, redirecting to Live tab...');
               setSelectedBuildOrderNumbers(new Set());
               toast({
                 title: "Sessions Created",
@@ -549,6 +551,67 @@ export default function Fingerprints() {
       }
     };
   }, [toast, setActiveTab]);
+
+  // Polling fallback for job status - in case WebSocket messages are missed
+  useEffect(() => {
+    if (!activeJob || activeJob.status === 'completed' || activeJob.status === 'failed') {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/jobs/${activeJob.id}`, {
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          console.log('[JobPolling] Job not found or error, clearing');
+          setActiveJob(null);
+          return;
+        }
+        
+        const job = await response.json();
+        console.log('[JobPolling] Polled job status:', job.status);
+        
+        // Update job state from poll
+        setActiveJob(job);
+        
+        // Handle completion via polling
+        if (job.status === 'completed' && job.result) {
+          console.log('[JobPolling] Job completed via polling, redirecting...');
+          setSelectedBuildOrderNumbers(new Set());
+          toast({
+            title: "Sessions Created",
+            description: `Created ${job.result.sessionsCreated} sessions with ${job.result.shipmentsAssigned} orders`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+          setTimeout(() => {
+            setActiveJob(null);
+            setActiveTab('live');
+          }, 1000);
+        }
+        
+        // Handle failure via polling
+        if (job.status === 'failed') {
+          console.log('[JobPolling] Job failed via polling');
+          toast({
+            title: "Failed to build sessions",
+            description: job.errorMessage || "An error occurred",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            setActiveJob(null);
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('[JobPolling] Error polling job:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [activeJob?.id, activeJob?.status, toast, setActiveTab]);
 
   // Fingerprint stats only (lightweight - for summary cards)
   const { data: fingerprintStatsData } = useQuery<{ total: number; assigned: number; needsDecision: number }>({
