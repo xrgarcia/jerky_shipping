@@ -1822,6 +1822,25 @@ export class SkuVaultService {
         FailedItems: qcSale.FailedItems?.length ?? 0,
       });
       
+      // DEBUG: Log full item details to inspect variant fields (AlternateCodes, AlternateSkus)
+      if (qcSale.Items && qcSale.Items.length > 0) {
+        console.log(`[SkuVault QC Sales] FULL ITEMS DEBUG for order ${orderNumber}:`);
+        for (const item of qcSale.Items) {
+          console.log(`[SkuVault QC Sales] Item: ${JSON.stringify({
+            Sku: item.Sku,
+            Code: item.Code,
+            PartNumber: item.PartNumber,
+            Title: item.Title,
+            Quantity: item.Quantity,
+            IsKit: item.IsKit,
+            AlternateCodes: item.AlternateCodes,
+            AlternateSkus: item.AlternateSkus,
+            AllKitItemsAndSubstitutes: item.AllKitItemsAndSubstitutes,
+            KitProducts: item.KitProducts ? item.KitProducts.length + ' components' : null,
+          }, null, 2)}`);
+        }
+      }
+      
       return qcSale;
 
     } catch (error) {
