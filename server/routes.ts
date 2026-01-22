@@ -12785,6 +12785,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stationRows.forEach(s => stationsMap.set(s.id, { name: s.name, stationType: s.stationType }));
       }
 
+      // Batch query inventory availability for all SKUs in these orders
+      // Check if any order has SKUs with available_quantity <= 0 (unfulfillable)
+      const allShipmentIds = readyToSessionOrders.map(o => o.id);
+      let unfulfillableSkusByShipment = new Map<string, string[]>();
+      
+      if (allShipmentIds.length > 0) {
+        // Get all SKUs for all shipments
+        const allQcItems = await db
+          .select({
+            shipmentId: shipmentQcItems.shipmentId,
+            sku: shipmentQcItems.sku,
+          })
+          .from(shipmentQcItems)
+          .where(
+            sql`${shipmentQcItems.shipmentId} IN (${sql.raw(allShipmentIds.map(id => `'${id}'`).join(','))})`
+          );
+
+        // Get unique SKUs to check inventory
+        const uniqueSkus = [...new Set(allQcItems.map(item => item.sku))];
+        
+        if (uniqueSkus.length > 0) {
+          // Query skuvault_products for available_quantity
+          const { skuvaultProducts } = await import("@shared/schema");
+          const inventoryData = await db
+            .select({
+              sku: skuvaultProducts.sku,
+              availableQuantity: skuvaultProducts.availableQuantity,
+            })
+            .from(skuvaultProducts)
+            .where(inArray(skuvaultProducts.sku, uniqueSkus));
+          
+          // Build SKU -> available_quantity map
+          const inventoryMap = new Map<string, number>();
+          inventoryData.forEach(inv => inventoryMap.set(inv.sku, inv.availableQuantity));
+          
+          // Check each shipment's SKUs for unfulfillable items
+          for (const item of allQcItems) {
+            const available = inventoryMap.get(item.sku);
+            // SKU is unfulfillable if available_quantity is 0 or below, or SKU not found in inventory
+            if (available === undefined || available <= 0) {
+              const existing = unfulfillableSkusByShipment.get(item.shipmentId) || [];
+              if (!existing.includes(item.sku)) {
+                existing.push(item.sku);
+              }
+              unfulfillableSkusByShipment.set(item.shipmentId, existing);
+            }
+          }
+        }
+      }
+
       // Helper to build human-readable fingerprint name from signature
       const buildFingerprintName = (displayName: string | null, signature: string | null): string => {
         if (displayName) return displayName;
@@ -12809,7 +12859,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let reason = '';
         let actionTab: string | null = null;
 
-        if (!order.fingerprintId) {
+        // Check for unfulfillable SKUs first - this takes priority
+        const unfulfillableSkus = unfulfillableSkusByShipment.get(order.id) || [];
+        if (unfulfillableSkus.length > 0) {
+          // Show up to 3 SKUs, then "and X more"
+          const displaySkus = unfulfillableSkus.slice(0, 3);
+          const remaining = unfulfillableSkus.length - 3;
+          reason = `Out of stock: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
+          actionTab = null; // No action tab - inventory issue needs replenishment
+        } else if (!order.fingerprintId) {
           // Order needs fingerprint - check why
           const uncategorizedSkus = uncategorizedSkusByShipment.get(order.id) || [];
           if (uncategorizedSkus.length > 0) {
