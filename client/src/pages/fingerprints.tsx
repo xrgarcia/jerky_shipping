@@ -282,6 +282,7 @@ interface ReadyToSessionOrder {
   fingerprintSearchTerm: string | null;
   stationName: string | null;
   stationType: string | null;
+  tags: { name: string; color: string | null }[];
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -420,6 +421,9 @@ export default function Fingerprints() {
   
   // Station Type filter state for Build tab
   const [selectedBuildStationTypes, setSelectedBuildStationTypes] = useState<Set<string>>(new Set());
+  
+  // Tag filter state for Build tab
+  const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -2059,22 +2063,32 @@ export default function Fingerprints() {
                   {(() => {
                     const totalOrders = readyToSessionOrdersData.orders.length;
                     const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                      if (selectedBuildStationTypes.size === 0) return true;
-                      const stationTypeKey = order.stationType || '__none__';
-                      return selectedBuildStationTypes.has(stationTypeKey);
+                      // Station type filter
+                      if (selectedBuildStationTypes.size > 0) {
+                        const stationTypeKey = order.stationType || '__none__';
+                        if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
+                      }
+                      // Tag filter - order must have at least one of the selected tags
+                      if (selectedBuildTags.size > 0) {
+                        const orderTagNames = order.tags?.map(t => t.name) || [];
+                        const hasMatchingTag = orderTagNames.some(tagName => selectedBuildTags.has(tagName));
+                        if (!hasMatchingTag) return false;
+                      }
+                      return true;
                     });
                     const filteredCount = filteredOrders.length;
                     const readyInFiltered = filteredOrders.filter(o => o.readyToSession).length;
+                    const hasFilters = selectedBuildStationTypes.size > 0 || selectedBuildTags.size > 0;
                     
                     return (
                       <div className="flex items-center justify-between mb-3 text-sm text-muted-foreground" data-testid="text-filtered-count">
                         <span>
-                          {selectedBuildStationTypes.size > 0 ? (
+                          {hasFilters ? (
                             <>Showing <span className="font-medium text-foreground">{filteredCount}</span> of {totalOrders} orders</>
                           ) : (
                             <>{totalOrders} orders</>
                           )}
-                          {selectedBuildStationTypes.size > 0 && (
+                          {hasFilters && (
                             <span className="ml-2">({readyInFiltered} ready)</span>
                           )}
                         </span>
@@ -2093,9 +2107,17 @@ export default function Fingerprints() {
                         <th className="py-3 px-3 font-medium text-sm bg-card w-10">
                           {(() => {
                             const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                              if (selectedBuildStationTypes.size === 0) return true;
-                              const stationTypeKey = order.stationType || '__none__';
-                              return selectedBuildStationTypes.has(stationTypeKey);
+                              // Station type filter
+                              if (selectedBuildStationTypes.size > 0) {
+                                const stationTypeKey = order.stationType || '__none__';
+                                if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
+                              }
+                              // Tag filter
+                              if (selectedBuildTags.size > 0) {
+                                const orderTagNames = order.tags?.map(t => t.name) || [];
+                                if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
+                              }
+                              return true;
                             });
                             const readyFilteredOrders = filteredOrders.filter(o => o.readyToSession);
                             return (
@@ -2189,6 +2211,90 @@ export default function Fingerprints() {
                             </PopoverContent>
                           </Popover>
                         </th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-auto p-0 font-medium hover:bg-transparent"
+                                data-testid="button-tag-filter"
+                              >
+                                Tags
+                                <Filter className={`ml-1 h-3 w-3 ${selectedBuildTags.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                                {selectedBuildTags.size > 0 && (
+                                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                                    {selectedBuildTags.size}
+                                  </Badge>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2" align="start">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between pb-2 border-b">
+                                  <span className="text-sm font-medium">Filter by Tag</span>
+                                  {selectedBuildTags.size > 0 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => setSelectedBuildTags(new Set())}
+                                      data-testid="button-clear-tag-filter"
+                                    >
+                                      Clear
+                                    </Button>
+                                  )}
+                                </div>
+                                <ScrollArea className="h-[200px]">
+                                  {(() => {
+                                    // Get unique tags from all orders
+                                    const allTags = new Map<string, string | null>();
+                                    readyToSessionOrdersData.orders.forEach(order => {
+                                      order.tags?.forEach(tag => {
+                                        if (!allTags.has(tag.name)) {
+                                          allTags.set(tag.name, tag.color);
+                                        }
+                                      });
+                                    });
+                                    const sortedTags = [...allTags.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+                                    
+                                    if (sortedTags.length === 0) {
+                                      return <div className="text-sm text-muted-foreground py-2">No tags found</div>;
+                                    }
+                                    
+                                    return sortedTags.map(([tagName, tagColor]) => (
+                                      <div key={tagName} className="flex items-center space-x-2 py-1">
+                                        <Checkbox
+                                          id={`tag-filter-${tagName}`}
+                                          checked={selectedBuildTags.has(tagName)}
+                                          onCheckedChange={(checked) => {
+                                            setSelectedBuildTags(prev => {
+                                              const next = new Set(prev);
+                                              if (checked) {
+                                                next.add(tagName);
+                                              } else {
+                                                next.delete(tagName);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                          data-testid={`checkbox-tag-${tagName}`}
+                                        />
+                                        <label
+                                          htmlFor={`tag-filter-${tagName}`}
+                                          className="text-sm cursor-pointer flex-1 flex items-center gap-2"
+                                        >
+                                          <Tag className="h-3 w-3" style={{ color: tagColor || undefined }} />
+                                          {tagName}
+                                        </label>
+                                      </div>
+                                    ));
+                                  })()}
+                                </ScrollArea>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </th>
                         <th className="text-center py-3 px-3 font-medium text-sm bg-card">Ready to Session</th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Reason</th>
                       </tr>
@@ -2196,9 +2302,17 @@ export default function Fingerprints() {
                     <tbody>
                       {readyToSessionOrdersData.orders
                         .filter(order => {
-                          if (selectedBuildStationTypes.size === 0) return true;
-                          const stationTypeKey = order.stationType || '__none__';
-                          return selectedBuildStationTypes.has(stationTypeKey);
+                          // Station type filter
+                          if (selectedBuildStationTypes.size > 0) {
+                            const stationTypeKey = order.stationType || '__none__';
+                            if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
+                          }
+                          // Tag filter
+                          if (selectedBuildTags.size > 0) {
+                            const orderTagNames = order.tags?.map(t => t.name) || [];
+                            if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
+                          }
+                          return true;
                         })
                         .map((order) => (
                         <tr 
@@ -2230,6 +2344,29 @@ export default function Fingerprints() {
                           <td className="py-2 px-3 text-sm">
                             {order.stationType ? (
                               getStationBadge(order.stationType)
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-sm">
+                            {order.tags && order.tags.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {order.tags.slice(0, 2).map((tag, idx) => (
+                                  <Badge 
+                                    key={idx} 
+                                    variant="outline" 
+                                    className="text-xs px-1.5 py-0"
+                                    style={{ borderColor: tag.color || undefined, color: tag.color || undefined }}
+                                  >
+                                    {tag.name}
+                                  </Badge>
+                                ))}
+                                {order.tags.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    +{order.tags.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-muted-foreground/50">-</span>
                             )}
@@ -2288,9 +2425,17 @@ export default function Fingerprints() {
                 {(() => {
                   const visibleSelectedOrders = readyToSessionOrdersData?.orders
                     .filter(order => {
-                      if (selectedBuildStationTypes.size === 0) return true;
-                      const stationTypeKey = order.stationType || '__none__';
-                      return selectedBuildStationTypes.has(stationTypeKey);
+                      // Station type filter
+                      if (selectedBuildStationTypes.size > 0) {
+                        const stationTypeKey = order.stationType || '__none__';
+                        if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
+                      }
+                      // Tag filter
+                      if (selectedBuildTags.size > 0) {
+                        const orderTagNames = order.tags?.map(t => t.name) || [];
+                        if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
+                      }
+                      return true;
                     })
                     .filter(order => selectedBuildOrderNumbers.has(order.orderNumber))
                     .filter(order => order.readyToSession)
