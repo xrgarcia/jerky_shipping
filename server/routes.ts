@@ -12785,9 +12785,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stationRows.forEach(s => stationsMap.set(s.id, { name: s.name, stationType: s.stationType }));
       }
 
+      // Batch fetch tags for all orders
+      const allShipmentIds = readyToSessionOrders.map(o => o.id);
+      let tagsByShipment = new Map<string, { name: string; color: string | null }[]>();
+      
+      if (allShipmentIds.length > 0) {
+        const allTags = await db
+          .select({
+            shipmentId: shipmentTags.shipmentId,
+            name: shipmentTags.name,
+            color: shipmentTags.color,
+          })
+          .from(shipmentTags)
+          .where(
+            sql`${shipmentTags.shipmentId} IN (${sql.raw(allShipmentIds.map(id => `'${id}'`).join(','))})`
+          );
+
+        // Group by shipment
+        for (const tag of allTags) {
+          const existing = tagsByShipment.get(tag.shipmentId) || [];
+          existing.push({ name: tag.name, color: tag.color });
+          tagsByShipment.set(tag.shipmentId, existing);
+        }
+      }
+
       // Batch query inventory availability for all SKUs in these orders
       // Check if any order has SKUs with available_quantity <= 0 (unfulfillable)
-      const allShipmentIds = readyToSessionOrders.map(o => o.id);
       let unfulfillableSkusByShipment = new Map<string, string[]>();
       
       if (allShipmentIds.length > 0) {
@@ -12918,6 +12941,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Get tags for this order
+        const orderTags = tagsByShipment.get(order.id) || [];
+        
         return {
           orderNumber: order.orderNumber,
           readyToSession,
@@ -12926,6 +12952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintSearchTerm,
           stationName: stationInfo?.name || null,
           stationType: stationInfo?.stationType || null,
+          tags: orderTags,
         };
       });
 
