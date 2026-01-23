@@ -2313,7 +2313,19 @@ export default function Fingerprints() {
                                         }
                                       });
                                     });
-                                    const sortedTags = [...allTags.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+                                    // Sort: required tags first (in order), then optional tags alphabetically
+                                    const sortedTags = [...allTags.entries()].sort((a, b) => {
+                                      const aRequired = REQUIRED_BUILD_TAGS.indexOf(a[0]);
+                                      const bRequired = REQUIRED_BUILD_TAGS.indexOf(b[0]);
+                                      // Both required: sort by their order in REQUIRED_BUILD_TAGS
+                                      if (aRequired !== -1 && bRequired !== -1) return aRequired - bRequired;
+                                      // Only a is required: a comes first
+                                      if (aRequired !== -1) return -1;
+                                      // Only b is required: b comes first
+                                      if (bRequired !== -1) return 1;
+                                      // Neither required: sort alphabetically
+                                      return a[0].localeCompare(b[0]);
+                                    });
                                     
                                     if (sortedTags.length === 0) {
                                       return <div className="text-sm text-muted-foreground py-2">No tags found</div>;
