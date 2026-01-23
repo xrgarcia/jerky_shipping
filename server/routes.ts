@@ -12727,10 +12727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintModelId: fingerprintModels.id,
           fingerprintDisplayName: fingerprints.displayName,
           fingerprintSignature: fingerprints.signature,
+          packagingStationType: packagingTypes.stationType,
         })
         .from(shipments)
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
+        .leftJoin(packagingTypes, eq(fingerprintModels.packagingTypeId, packagingTypes.id))
         .where(
           // Use lifecycle_phase as single source of truth
           eq(shipments.lifecyclePhase, 'ready_to_session')
@@ -12897,11 +12899,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Show up to 3 SKUs, then "and X more"
             const displaySkus = uncategorizedSkus.slice(0, 3);
             const remaining = uncategorizedSkus.length - 3;
-            reason = `Categorize SKU: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
+            reason = `Missing Collection: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
             actionTab = 'categorize';
           } else {
             // All SKUs categorized but fingerprint not calculated yet - hydration pending
-            reason = 'Waiting for fingerprint sync (run hydration)';
+            reason = 'System is analyzing this order';
             actionTab = null;
           }
         } else if (!order.fingerprintModelId) {
@@ -12910,8 +12912,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason = `Assign packaging to: ${fpName}`;
           actionTab = 'packaging';
         } else if (!order.assignedStationId) {
-          // Packaging exists but no station - check if packaging type has station configured
-          reason = 'Packaging type missing station assignment';
+          // Packaging exists but no station - show packaging type for context
+          const stationTypeLabel = order.packagingStationType === 'boxing_machine' ? 'Boxer' 
+            : order.packagingStationType === 'poly_bag' ? 'Bagger' 
+            : order.packagingStationType === 'hand_pack' ? 'Hand Pack' 
+            : 'Unknown';
+          reason = `Needs workstation assignment (${stationTypeLabel})`;
           actionTab = 'packaging';
         } else {
           // Has fingerprint + packaging model + station = ready for session
