@@ -2096,12 +2096,17 @@ export default function Fingerprints() {
                         const stationTypeKey = order.stationType || '__none__';
                         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
                       }
-                      // Tag filter - order must have at least one of the selected tags
-                      if (selectedBuildTags.size > 0) {
-                        const orderTagNames = order.tags?.map(t => t.name) || [];
-                        const hasMatchingTag = orderTagNames.some(tagName => selectedBuildTags.has(tagName));
-                        if (!hasMatchingTag) return false;
-                      }
+                      // Tag filter - order must have required tags AND NOT have any unchecked optional tags
+                      const orderTagNames = order.tags?.map(t => t.name) || [];
+                      // Must have ALL required tags
+                      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+                      if (!hasAllRequiredTags) return false;
+                      // Compute unchecked optional tags (all tags in order that are NOT selected, excluding required tags)
+                      const uncheckedOptionalTags = orderTagNames.filter(tag => 
+                        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                      );
+                      // If order has any unchecked optional tag, exclude it
+                      if (uncheckedOptionalTags.length > 0) return false;
                       return true;
                     });
                     const filteredCount = filteredOrders.length;
@@ -2140,11 +2145,16 @@ export default function Fingerprints() {
                                 const stationTypeKey = order.stationType || '__none__';
                                 if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
                               }
-                              // Tag filter
-                              if (selectedBuildTags.size > 0) {
-                                const orderTagNames = order.tags?.map(t => t.name) || [];
-                                if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
-                              }
+                              // Tag filter - order must have required tags AND NOT have any unchecked optional tags
+                              const orderTagNames = order.tags?.map(t => t.name) || [];
+                              // Must have ALL required tags
+                              const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+                              if (!hasAllRequiredTags) return false;
+                              // Compute unchecked optional tags
+                              const uncheckedOptionalTags = orderTagNames.filter(tag => 
+                                !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                              );
+                              if (uncheckedOptionalTags.length > 0) return false;
                               return true;
                             });
                             const readyFilteredOrders = filteredOrders.filter(o => o.readyToSession);
@@ -2359,11 +2369,16 @@ export default function Fingerprints() {
                             const stationTypeKey = order.stationType || '__none__';
                             if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
                           }
-                          // Tag filter
-                          if (selectedBuildTags.size > 0) {
-                            const orderTagNames = order.tags?.map(t => t.name) || [];
-                            if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
-                          }
+                          // Tag filter - order must have required tags AND NOT have any unchecked optional tags
+                          const orderTagNames = order.tags?.map(t => t.name) || [];
+                          // Must have ALL required tags
+                          const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+                          if (!hasAllRequiredTags) return false;
+                          // Compute unchecked optional tags
+                          const uncheckedOptionalTags = orderTagNames.filter(tag => 
+                            !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                          );
+                          if (uncheckedOptionalTags.length > 0) return false;
                           return true;
                         })
                         .map((order) => (
@@ -2478,11 +2493,16 @@ export default function Fingerprints() {
                         const stationTypeKey = order.stationType || '__none__';
                         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
                       }
-                      // Tag filter
-                      if (selectedBuildTags.size > 0) {
-                        const orderTagNames = order.tags?.map(t => t.name) || [];
-                        if (!orderTagNames.some(tagName => selectedBuildTags.has(tagName))) return false;
-                      }
+                      // Tag filter - order must have required tags AND NOT have any unchecked optional tags
+                      const orderTagNames = order.tags?.map(t => t.name) || [];
+                      // Must have ALL required tags
+                      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+                      if (!hasAllRequiredTags) return false;
+                      // Compute unchecked optional tags
+                      const uncheckedOptionalTags = orderTagNames.filter(tag => 
+                        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                      );
+                      if (uncheckedOptionalTags.length > 0) return false;
                       return true;
                     })
                     .filter(order => selectedBuildOrderNumbers.has(order.orderNumber))
