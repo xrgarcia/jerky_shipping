@@ -864,15 +864,14 @@ export default function Fingerprints() {
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
   
-  // Base metric for header card: orders with required tags AND readyToSession (no user filters applied)
+  // Base metric for header card: orders with required tags (no user filters applied, matches table base query)
   const baseReadyToSessionCount = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return 0;
     return readyToSessionOrdersData.orders.filter(order => {
       const orderTagNames = order.tags?.map(t => t.name) || [];
       // Must have ALL required tags
       const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-      // Must be ready to session
-      return hasAllRequiredTags && order.readyToSession;
+      return hasAllRequiredTags;
     }).length;
   }, [readyToSessionOrdersData]);
   
