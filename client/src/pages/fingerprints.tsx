@@ -2460,27 +2460,31 @@ export default function Fingerprints() {
                             )}
                           </td>
                           <td className="py-2 px-3 text-sm">
-                            {order.tags && order.tags.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {order.tags.slice(0, 2).map((tag, idx) => (
-                                  <Badge 
-                                    key={idx} 
-                                    variant="outline" 
-                                    className="text-xs px-1.5 py-0"
-                                    style={{ borderColor: tag.color || undefined, color: tag.color || undefined }}
-                                  >
-                                    {tag.name}
-                                  </Badge>
-                                ))}
-                                {order.tags.length > 2 && (
-                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                    +{order.tags.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground/50">-</span>
-                            )}
+                            {(() => {
+                              const optionalTags = order.tags?.filter(t => !REQUIRED_BUILD_TAGS.includes(t.name)) || [];
+                              if (optionalTags.length === 0) {
+                                return <span className="text-muted-foreground/50">-</span>;
+                              }
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {optionalTags.slice(0, 2).map((tag, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      variant="outline" 
+                                      className="text-xs px-1.5 py-0"
+                                      style={{ borderColor: tag.color || undefined, color: tag.color || undefined }}
+                                    >
+                                      {tag.name}
+                                    </Badge>
+                                  ))}
+                                  {optionalTags.length > 2 && (
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                      +{optionalTags.length - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="py-2 px-3 text-center">
                             {order.readyToSession ? (
