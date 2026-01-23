@@ -279,6 +279,7 @@ interface ReadyToSessionOrder {
   readyToSession: boolean;
   reason: string;
   actionTab: string | null;
+  actionUrl: string | null;
   fingerprintSearchTerm: string | null;
   stationName: string | null;
   stationType: string | null;
@@ -2390,14 +2391,10 @@ export default function Fingerprints() {
                             )}
                           </td>
                           <td className="py-2 px-3 text-sm">
-                            {order.actionTab ? (
+                            {order.actionUrl ? (
                               <button
                                 onClick={() => {
-                                  if (order.actionTab === 'packaging' && order.fingerprintSearchTerm) {
-                                    navigate(`/fulfillment-prep/packaging/needs-mapping?search=${encodeURIComponent(order.fingerprintSearchTerm)}`);
-                                  } else {
-                                    setActiveTab(order.actionTab as WorkflowTab);
-                                  }
+                                  navigate(order.actionUrl!);
                                 }}
                                 className="text-left text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                                 data-testid={`button-action-${order.orderNumber}`}

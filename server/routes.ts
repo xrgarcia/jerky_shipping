@@ -12950,11 +12950,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get tags for this order
         const orderTags = tagsByShipment.get(order.id) || [];
         
+        // Build actionUrl for direct navigation
+        let actionUrl: string | null = null;
+        if (!readyToSession) {
+          if (!order.fingerprintId) {
+            // Need to analyze this order - link to Sessions tab
+            actionUrl = '/fulfillment-prep/sessions';
+          } else if (!order.packagingModelId) {
+            // Need packaging mapping - link to Packaging tab with fingerprint search
+            if (fingerprintSearchTerm) {
+              actionUrl = `/fulfillment-prep/packaging/needs-mapping?search=${encodeURIComponent(fingerprintSearchTerm)}`;
+            } else {
+              actionUrl = '/fulfillment-prep/packaging/needs-mapping';
+            }
+          } else if (!order.assignedStationId) {
+            // Need station assignment - link to Packaging Types page
+            actionUrl = '/packaging-types';
+          }
+        }
+        
         return {
           orderNumber: order.orderNumber,
           readyToSession,
           reason,
           actionTab,
+          actionUrl,
           fingerprintSearchTerm,
           stationName: stationInfo?.name || null,
           stationType: stationInfo?.stationType || null,
