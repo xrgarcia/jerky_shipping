@@ -413,6 +413,17 @@ export default function Fingerprints() {
     window.history.replaceState({}, '', url.toString());
   };
   
+  // Sync fingerprintSearch state when URL changes (e.g., navigating from Build tab link)
+  // Runs when tab/filter changes OR on initial mount to pick up ?search= param
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchFromUrl = urlParams.get('search') || '';
+    if (searchFromUrl) {
+      setFingerprintSearch(searchFromUrl);
+      setAdvancedFiltersOpen('advanced-filters');
+    }
+  }, [activeTab, filter]);
+  
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   
