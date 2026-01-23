@@ -436,7 +436,10 @@ export default function Fingerprints() {
   
   // Tag filter state for Build tab
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
-
+  const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
+  
+  // Required tags that cannot be unchecked
+  const REQUIRED_BUILD_TAGS = ['All Orders', 'Move Over'];
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -573,6 +576,19 @@ export default function Fingerprints() {
     enabled: activeTab === 'sessions',
   });
 
+  // Initialize tag filter with all tags checked when data first loads
+  useEffect(() => {
+    if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
+      const allTagNames = new Set<string>();
+      readyToSessionOrdersData.orders.forEach(order => {
+        order.tags?.forEach(tag => allTagNames.add(tag.name));
+      });
+      // Always include required tags even if not in data
+      REQUIRED_BUILD_TAGS.forEach(tag => allTagNames.add(tag));
+      setSelectedBuildTags(allTagNames);
+      setBuildTagsInitialized(true);
+    }
+  }, [readyToSessionOrdersData, buildTagsInitialized]);
 
   // Mutations
   const assignMutation = useMutation({
@@ -2245,17 +2261,36 @@ export default function Fingerprints() {
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between pb-2 border-b">
                                   <span className="text-sm font-medium">Filter by Tag</span>
-                                  {selectedBuildTags.size > 0 && (
+                                  <div className="flex gap-1">
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 px-2 text-xs"
-                                      onClick={() => setSelectedBuildTags(new Set())}
-                                      data-testid="button-clear-tag-filter"
+                                      onClick={() => {
+                                        const allTagNames = new Set<string>();
+                                        readyToSessionOrdersData.orders.forEach(order => {
+                                          order.tags?.forEach(tag => allTagNames.add(tag.name));
+                                        });
+                                        REQUIRED_BUILD_TAGS.forEach(tag => allTagNames.add(tag));
+                                        setSelectedBuildTags(allTagNames);
+                                      }}
+                                      data-testid="button-check-all-tags"
                                     >
-                                      Clear
+                                      All
                                     </Button>
-                                  )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => {
+                                        // Keep only required tags
+                                        setSelectedBuildTags(new Set(REQUIRED_BUILD_TAGS));
+                                      }}
+                                      data-testid="button-uncheck-all-tags"
+                                    >
+                                      None
+                                    </Button>
+                                  </div>
                                 </div>
                                 <ScrollArea className="h-[200px]">
                                   {(() => {
@@ -2274,12 +2309,16 @@ export default function Fingerprints() {
                                       return <div className="text-sm text-muted-foreground py-2">No tags found</div>;
                                     }
                                     
-                                    return sortedTags.map(([tagName, tagColor]) => (
+                                    return sortedTags.map(([tagName, tagColor]) => {
+                                      const isRequired = REQUIRED_BUILD_TAGS.includes(tagName);
+                                      return (
                                       <div key={tagName} className="flex items-center space-x-2 py-1">
                                         <Checkbox
                                           id={`tag-filter-${tagName}`}
-                                          checked={selectedBuildTags.has(tagName)}
+                                          checked={isRequired || selectedBuildTags.has(tagName)}
+                                          disabled={isRequired}
                                           onCheckedChange={(checked) => {
+                                            if (isRequired) return; // Cannot uncheck required tags
                                             setSelectedBuildTags(prev => {
                                               const next = new Set(prev);
                                               if (checked) {
@@ -2294,13 +2333,14 @@ export default function Fingerprints() {
                                         />
                                         <label
                                           htmlFor={`tag-filter-${tagName}`}
-                                          className="text-sm cursor-pointer flex-1 flex items-center gap-2"
+                                          className={`text-sm flex-1 flex items-center gap-2 ${isRequired ? 'text-muted-foreground' : 'cursor-pointer'}`}
                                         >
                                           <Tag className="h-3 w-3" style={{ color: tagColor || undefined }} />
                                           {tagName}
+                                          {isRequired && <span className="text-xs text-muted-foreground">(required)</span>}
                                         </label>
                                       </div>
-                                    ));
+                                    );});
                                   })()}
                                 </ScrollArea>
                               </div>
