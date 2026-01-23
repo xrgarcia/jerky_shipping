@@ -863,6 +863,27 @@ export default function Fingerprints() {
   const collections = collectionsData?.collections || [];
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
+  
+  // Compute filtered sessionable orders count (applies same tag filter as table)
+  const filteredSessionableOrders = useMemo(() => {
+    if (!readyToSessionOrdersData?.orders) return [];
+    return readyToSessionOrdersData.orders.filter(order => {
+      const orderTagNames = order.tags?.map(t => t.name) || [];
+      // Must have ALL required tags
+      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+      if (!hasAllRequiredTags) return false;
+      // Compute unchecked optional tags
+      const uncheckedOptionalTags = orderTagNames.filter(tag => 
+        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+      );
+      if (uncheckedOptionalTags.length > 0) return false;
+      return true;
+    });
+  }, [readyToSessionOrdersData, selectedBuildTags]);
+  
+  const filteredSessionableCount = filteredSessionableOrders.length;
+  const filteredReadyCount = filteredSessionableOrders.filter(o => o.readyToSession).length;
+  
   const liveSessions = (liveSessionsData || []).filter(
     s => s.status !== 'completed' && s.status !== 'cancelled'
   );
@@ -1129,10 +1150,10 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${totalSessionableOrders > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
+                className={`text-2xl font-bold ${filteredReadyCount > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
                 data-testid="text-sessionable-count"
               >
-                {totalSessionableOrders}
+                {filteredReadyCount}
               </span>
               <span className="text-sm text-muted-foreground">
                 ready to session
@@ -1196,9 +1217,9 @@ export default function Fingerprints() {
           <TabsTrigger value="sessions" className="flex items-center gap-2" data-testid="tab-sessions">
             <ListPlus className="h-4 w-4" />
             Build
-            {totalSessionableOrders > 0 && (
+            {filteredReadyCount > 0 && (
               <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {totalSessionableOrders}
+                {filteredReadyCount}
               </Badge>
             )}
           </TabsTrigger>
@@ -2550,7 +2571,7 @@ export default function Fingerprints() {
               </div>
             </CardHeader>
             <CardContent>
-              {totalSessionableOrders > 0 && (
+              {filteredReadyCount > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
                   <div className="flex items-start gap-3">
                     <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -2589,7 +2610,7 @@ export default function Fingerprints() {
                 </div>
               )}
 
-              {totalSessionableOrders === 0 ? (
+              {filteredReadyCount === 0 ? (
                 <div className="text-center py-12">
                   <ListPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No Orders Ready for Sessions</h3>
@@ -2635,7 +2656,7 @@ export default function Fingerprints() {
                     </div>
                     <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
                       <span>Total Orders</span>
-                      <span>{totalSessionableOrders}</span>
+                      <span>{filteredReadyCount}</span>
                     </div>
                   </div>
                 </div>
