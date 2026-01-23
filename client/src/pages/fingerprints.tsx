@@ -439,7 +439,7 @@ export default function Fingerprints() {
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
   
   // Required tags that cannot be unchecked
-  const REQUIRED_BUILD_TAGS = ['All Orders', 'Move Over'];
+  const REQUIRED_BUILD_TAGS = ['All Orders', 'MOVE OVER'];
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
