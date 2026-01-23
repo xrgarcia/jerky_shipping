@@ -864,7 +864,19 @@ export default function Fingerprints() {
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
   
-  // Compute filtered sessionable orders count (applies same tag filter as table)
+  // Base metric for header card: orders with required tags AND readyToSession (no user filters applied)
+  const baseReadyToSessionCount = useMemo(() => {
+    if (!readyToSessionOrdersData?.orders) return 0;
+    return readyToSessionOrdersData.orders.filter(order => {
+      const orderTagNames = order.tags?.map(t => t.name) || [];
+      // Must have ALL required tags
+      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
+      // Must be ready to session
+      return hasAllRequiredTags && order.readyToSession;
+    }).length;
+  }, [readyToSessionOrdersData]);
+  
+  // Compute filtered sessionable orders count (applies user filters for table display)
   const filteredSessionableOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
     return readyToSessionOrdersData.orders.filter(order => {
@@ -1150,10 +1162,10 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${filteredReadyCount > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
+                className={`text-2xl font-bold ${baseReadyToSessionCount > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
                 data-testid="text-sessionable-count"
               >
-                {filteredReadyCount}
+                {baseReadyToSessionCount}
               </span>
               <span className="text-sm text-muted-foreground">
                 ready to session
@@ -1217,9 +1229,9 @@ export default function Fingerprints() {
           <TabsTrigger value="sessions" className="flex items-center gap-2" data-testid="tab-sessions">
             <ListPlus className="h-4 w-4" />
             Build
-            {filteredReadyCount > 0 && (
+            {baseReadyToSessionCount > 0 && (
               <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {filteredReadyCount}
+                {baseReadyToSessionCount}
               </Badge>
             )}
           </TabsTrigger>
