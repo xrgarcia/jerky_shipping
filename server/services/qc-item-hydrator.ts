@@ -431,6 +431,10 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
  */
 export async function hydrateShipment(shipmentId: string, orderNumber: string): Promise<HydrationResult> {
   try {
+    // Ensure kit mappings cache is fresh before processing
+    // This MUST happen before isKit() is called to properly detect kit products
+    await ensureKitMappingsFresh();
+    
     // Get shipment items (non-exploded)
     const items = await db
       .select({
