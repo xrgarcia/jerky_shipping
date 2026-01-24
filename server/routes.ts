@@ -2553,11 +2553,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log full payload for debugging
       console.log("[Slashbin] Full payload:", JSON.stringify(req.body, null, 2));
       
-      // Process kit mapping payload - structure is payload.sku (or transformedPayload.sku for backwards compatibility)
-      const kitPayload = req.body.payload || req.body.transformedPayload;
+      // Process kit mapping payload - structure is payload.sku
+      const kitPayload = req.body.payload;
       if (!kitPayload || !kitPayload.sku) {
-        console.error("[Slashbin] Invalid payload: missing payload.sku. Structure:", 
-          JSON.stringify({ hasPayload: !!req.body.payload, hasTransformed: !!req.body.transformedPayload, hasSku: !!kitPayload?.sku }));
+        console.error("[Slashbin] Invalid payload: missing payload.sku");
         return res.status(400).json({ error: "Invalid payload: missing sku" });
       }
       
