@@ -355,9 +355,15 @@ export default function ShipmentDetails() {
     );
   }
 
+  // Check if any QC items are out of stock (availableQuantity may be enriched by API)
+  const hasOutOfStockItems = qcItems?.some(item => {
+    const available = (item as any).availableQuantity;
+    return available !== undefined && available !== null && available < (item.quantityExpected ?? 0);
+  }) ?? false;
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* Header */}
+      {/* Navigation */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => setLocation("/shipments")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -365,89 +371,60 @@ export default function ShipmentDetails() {
         </Button>
       </div>
 
-      {/* Main Info Card */}
+      {/* TIER 1: Order Header - Critical Information */}
       <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <Truck className="h-8 w-8 text-muted-foreground" />
-                <CardTitle className="text-4xl font-mono font-bold">
-                  {shipment.trackingNumber || "No Tracking Number"}
-                </CardTitle>
-                {shipment.trackingNumber && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
-                    data-testid="button-copy-tracking"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              
-              {shipment.orderNumber && (
+        <CardContent className="pt-6 space-y-5">
+          {/* Row 1: Order Number + Status + ShipStation Link */}
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Order Number</p>
                 <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-muted-foreground" />
-                  <p className="text-2xl font-semibold">Order #{shipment.orderNumber}</p>
+                  <span className="text-3xl font-bold font-mono" data-testid="text-order-number">
+                    {shipment.orderNumber || 'Unknown'}
+                  </span>
+                  {shipment.orderNumber && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(shipment.orderNumber!, "Order number")}
+                      data-testid="button-copy-order"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Out of Stock Warning */}
+              {hasOutOfStockItems && (
+                <Badge variant="outline" className="border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Out of Stock
+                </Badge>
+              )}
+              
+              {/* Status Badge */}
+              {getStatusBadge(shipment.shipmentStatus || shipment.status)}
+              
+              {/* ShipStation Link */}
+              {shipment.orderNumber && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`https://ship11.shipstation.com/orders/all-orders-search-result?quickSearch=${shipment.orderNumber}`, '_blank')}
+                  data-testid="button-open-shipstation"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  ShipStation
+                </Button>
               )}
             </div>
-
-            <div className="flex flex-col items-end gap-3">
-              {getStatusBadge(shipment.status)}
-              <div className="flex flex-wrap gap-2 justify-end">
-                {shipment.isReturn && (
-                  <Badge variant="outline" className="border-purple-500 text-purple-700 dark:text-purple-400">
-                    Return
-                  </Badge>
-                )}
-                {shipment.isGift && (
-                  <Badge variant="outline" className="border-pink-500 text-pink-700 dark:text-pink-400">
-                    Gift
-                  </Badge>
-                )}
-                {shipment.saturdayDelivery && (
-                  <Badge variant="outline" className="border-blue-500 text-blue-700 dark:text-blue-400">
-                    Saturday Delivery
-                  </Badge>
-                )}
-                {shipment.containsAlcohol && (
-                  <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
-                    Contains Alcohol
-                  </Badge>
-                )}
-              </div>
-            </div>
           </div>
-          
-          {shipment.statusDescription && (
-            <p className="text-lg text-muted-foreground mt-2">{shipment.statusDescription}</p>
-          )}
-        </CardHeader>
-      </Card>
 
-      {/* Life Cycle Status Card */}
-      <Card className="border-2 border-dashed border-muted-foreground/30">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              Life Cycle Status
-            </CardTitle>
-            {(() => {
-              const info = getLifecycleInfo(shipment);
-              return (
-                <div className="flex items-center gap-2">
-                  <Badge className={info.badgeClass}>{info.label}</Badge>
-                </div>
-              );
-            })()}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Visual Flow Stepper - Always Visible */}
+          {/* Row 2: Lifecycle Stepper */}
           {(() => {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
@@ -455,7 +432,12 @@ export default function ShipmentDetails() {
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
             
             return (
-              <div className="space-y-3">
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Life Cycle</span>
+                  <Badge className={currentInfo.badgeClass}>{currentInfo.label}</Badge>
+                </div>
+                
                 {/* Main Flow */}
                 <div className="overflow-x-auto overflow-y-visible pt-4 pb-3">
                   <div className="flex items-start gap-1 min-w-max">
@@ -518,11 +500,44 @@ export default function ShipmentDetails() {
             );
           })()}
 
-          {/* Collapsible Details Section */}
-          <details className="group">
-            <summary className="cursor-pointer flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground border-t">
+          {/* Row 3: Tags */}
+          {tags && tags.length > 0 && (
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Tags</p>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag, index) => (
+                  <Badge 
+                    key={index} 
+                    variant={tag.name === 'MOVE OVER' ? 'default' : 'secondary'}
+                    className={tag.name === 'MOVE OVER' ? 'bg-green-600 hover:bg-green-700' : ''}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Row 4: Gift Information (if applicable) */}
+          {(shipment.isGift || shipment.notesForGift) && (
+            <div className="border-t pt-4">
+              <div className="bg-pink-50 dark:bg-pink-950/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Gift className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+                  <span className="font-semibold text-pink-700 dark:text-pink-400">Gift Order</span>
+                </div>
+                {shipment.notesForGift && (
+                  <p className="text-base" data-testid="text-gift-message">{shipment.notesForGift}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Collapsible Lifecycle Details */}
+          <details className="group border-t pt-4">
+            <summary className="cursor-pointer flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
-              <span className="font-medium">Show Details</span>
+              <span className="font-medium">Lifecycle Details</span>
             </summary>
             
             <div className="pt-4 space-y-6">
@@ -719,305 +734,240 @@ export default function ShipmentDetails() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Customer Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Shipping Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {shipment.shipToName && (
+      {/* TIER 2: Shipping Context */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Shipping Context
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Address */}
+            <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Name</p>
-                <p className="text-xl font-semibold">{shipment.shipToName}</p>
-              </div>
-            )}
-
-            {(shipment.shipToEmail || shipment.shipToPhone) && (
-              <div className="space-y-2">
-                {shipment.shipToEmail && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${shipment.shipToEmail}`} className="hover:underline">
-                      {shipment.shipToEmail}
-                    </a>
-                  </div>
-                )}
-                {shipment.shipToPhone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${shipment.shipToPhone}`} className="hover:underline">
-                      {shipment.shipToPhone}
-                    </a>
-                  </div>
+                <p className="text-sm text-muted-foreground mb-1">Ship To</p>
+                <p className="text-xl font-semibold">{shipment.shipToName || 'Unknown'}</p>
+                {shipment.shipToCompany && (
+                  <p className="text-muted-foreground">{shipment.shipToCompany}</p>
                 )}
               </div>
-            )}
-
-            {(shipment.shipToAddressLine1 || shipment.shipToCity) && (
-              <div>
-                <div className="flex items-start gap-2 mb-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                  <p className="text-sm text-muted-foreground">Address</p>
-                </div>
-                <div className="pl-6 space-y-1">
-                  {shipment.shipToCompany && <p className="font-semibold">{shipment.shipToCompany}</p>}
-                  {shipment.shipToAddressLine1 && <p>{shipment.shipToAddressLine1}</p>}
-                  {shipment.shipToAddressLine2 && <p>{shipment.shipToAddressLine2}</p>}
-                  {shipment.shipToAddressLine3 && <p>{shipment.shipToAddressLine3}</p>}
-                  <p>
-                    {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </p>
-                  {shipment.shipToCountry && <p>{shipment.shipToCountry}</p>}
-                  {shipment.shipToIsResidential && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {shipment.shipToIsResidential === 'yes' ? 'Residential Address' : shipment.shipToIsResidential === 'no' ? 'Commercial Address' : ''}
-                    </p>
-                  )}
-                </div>
+              
+              <div className="space-y-1 text-base">
+                {shipment.shipToAddressLine1 && <p>{shipment.shipToAddressLine1}</p>}
+                {shipment.shipToAddressLine2 && <p>{shipment.shipToAddressLine2}</p>}
+                {shipment.shipToAddressLine3 && <p>{shipment.shipToAddressLine3}</p>}
+                <p>
+                  {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+                {shipment.shipToCountry && <p>{shipment.shipToCountry}</p>}
+                {shipment.shipToIsResidential && (
+                  <Badge variant="outline" className="mt-2">
+                    {shipment.shipToIsResidential === 'yes' ? 'Residential' : 'Commercial'}
+                  </Badge>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Shipping Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Shipping Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {shipment.carrierCode && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Carrier</p>
-                <p className="text-xl font-semibold uppercase">{shipment.carrierCode}</p>
-              </div>
-            )}
-
-            {shipment.serviceCode && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Service</p>
-                <p className="text-lg">{shipment.serviceCode}</p>
-              </div>
-            )}
-
-            {shipment.totalWeight && (
-              <div className="flex items-center gap-2">
-                <Weight className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Weight</p>
-                  <p className="text-lg font-semibold">{shipment.totalWeight}</p>
-                </div>
-              </div>
-            )}
-
-            {shipment.orderDate && (
-              <div className="flex items-start gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground mt-1" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="text-lg">{new Date(shipment.orderDate).toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">({formatRelativeTime(shipment.orderDate)})</p>
-                </div>
-              </div>
-            )}
-
-            {shipment.shipDate && (
-              <div className="flex items-start gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground mt-1" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Shipped</p>
-                  <p className="text-lg">{new Date(shipment.shipDate).toLocaleString()}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Session/Spot Info */}
-            {(() => {
-              const sessionInfo = parseCustomField2(shipment.customField2);
-              if (!sessionInfo) return null;
-              return (
-                <div className="flex items-start gap-2">
-                  <Boxes className="h-4 w-4 text-muted-foreground mt-1" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pick Session</p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSessionId(sessionInfo.sessionId)}
-                        className="text-lg font-semibold text-primary hover:underline cursor-pointer"
-                        data-testid={`link-session-${sessionInfo.sessionId}`}
-                      >
-                        Session {sessionInfo.sessionId}
-                      </button>
-                      <Badge variant="secondary">
-                        Spot #{sessionInfo.spot}
-                      </Badge>
+              {/* Contact Info */}
+              {(shipment.shipToEmail || shipment.shipToPhone) && (
+                <div className="space-y-2 pt-2 border-t">
+                  {shipment.shipToEmail && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground truncate">{shipment.shipToEmail}</span>
                     </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {shipment.labelUrl && (
-              <div className="pt-2">
-                <Button
-                  variant="default"
-                  className="w-full"
-                  onClick={() => window.open(shipment.labelUrl!, '_blank')}
-                  data-testid="button-view-label"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Shipping Label
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Special Notes */}
-      {(shipment.notesForGift || shipment.notesFromBuyer) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Special Instructions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {shipment.notesForGift && (
-              <div className="bg-pink-50 dark:bg-pink-950/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Gift className="h-5 w-5 text-pink-600 dark:text-pink-400" />
-                  <p className="font-semibold text-pink-700 dark:text-pink-400">Gift Message</p>
-                </div>
-                <p className="text-lg" data-testid="text-gift-message">{shipment.notesForGift}</p>
-              </div>
-            )}
-            {shipment.notesFromBuyer && (
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-2">Customer Notes</p>
-                <p className="text-lg" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Items - with tabs for Purchased vs Fulfilled */}
-      {((items && items.length > 0) || (qcItems && qcItems.length > 0)) && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Items
-              </CardTitle>
-              {tags && tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag, index) => (
-                    <Badge key={index} variant="secondary">
-                      {tag.name}
-                    </Badge>
-                  ))}
+                  )}
+                  {shipment.shipToPhone && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{shipment.shipToPhone}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="purchased" className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="purchased" className="flex items-center gap-2" data-testid="tab-purchased-items">
-                  <ShoppingCart className="h-4 w-4" />
-                  Purchased Items ({items?.length || 0})
-                </TabsTrigger>
-                <TabsTrigger value="fulfilled" className="flex items-center gap-2" data-testid="tab-fulfilled-items">
-                  <PackageCheck className="h-4 w-4" />
-                  Fulfilled Items ({qcItems?.length || 0})
-                </TabsTrigger>
-              </TabsList>
-              
-              {/* Purchased Items Tab */}
-              <TabsContent value="purchased">
-                {items && items.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left px-6 py-4 font-semibold">SKU</th>
-                          <th className="text-left px-6 py-4 font-semibold">Product</th>
-                          <th className="text-center px-6 py-4 font-semibold">Quantity</th>
-                          <th className="text-right px-6 py-4 font-semibold">Unit Price</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {items.map((item, index) => (
-                          <tr key={index} className="hover-elevate" data-testid={`row-purchased-item-${index}`}>
-                            <td className="px-6 py-4">
-                              <code className="text-sm font-mono bg-muted px-3 py-1.5 rounded">
-                                {item.sku || 'N/A'}
-                              </code>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                {item.imageUrl && (
-                                  <img 
-                                    src={item.imageUrl} 
-                                    alt={item.name || 'Product'}
-                                    className="w-16 h-16 object-cover rounded border"
-                                  />
-                                )}
-                                <span className="text-base font-medium">{item.name || 'Unknown Product'}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="text-xl font-bold">{item.quantity}</span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <span className="text-lg">
-                                {item.unitPrice ? `$${parseFloat(item.unitPrice).toFixed(2)}` : 'N/A'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+
+            {/* Right Column: Shipping Method & Timestamps */}
+            <div className="space-y-4">
+              {/* Shipping Method */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Carrier</p>
+                  <p className="text-lg font-semibold uppercase">{shipment.carrierCode || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Service</p>
+                  <p className="text-base">{shipment.serviceCode || '—'}</p>
+                </div>
+              </div>
+
+              {/* Tracking */}
+              {shipment.trackingNumber && (
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-sm text-muted-foreground mb-1">Tracking Number</p>
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono text-sm">{shipment.trackingNumber}</code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
+                      data-testid="button-copy-tracking"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No purchased items found
-                  </div>
-                )}
-              </TabsContent>
-              
-              {/* Fulfilled Items Tab (QC Items - exploded kits) */}
-              <TabsContent value="fulfilled">
-                {qcItems && qcItems.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left px-6 py-4 font-semibold">SKU</th>
-                          <th className="text-left px-6 py-4 font-semibold">Barcode</th>
-                          <th className="text-left px-6 py-4 font-semibold">Product</th>
-                          <th className="text-center px-6 py-4 font-semibold">Qty Expected</th>
-                          <th className="text-right px-6 py-4 font-semibold">Weight</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {qcItems.map((qcItem, index) => (
-                          <tr key={qcItem.id || index} className="hover-elevate" data-testid={`row-fulfilled-item-${index}`}>
-                            <td className="px-6 py-4">
+                </div>
+              )}
+
+              {/* Customer Notes */}
+              {shipment.notesFromBuyer && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">Customer Notes</p>
+                  <p className="text-sm" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
+                <div>
+                  <p className="text-xs text-muted-foreground">Order Date</p>
+                  <p className="font-mono">{shipment.orderDate ? new Date(shipment.orderDate).toLocaleDateString() : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Ship Date</p>
+                  <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleDateString() : '—'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* TIER 3: Fulfillment Items */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PackageCheck className="h-5 w-5" />
+            Fulfillment Items
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Session Info Bar */}
+          {(() => {
+            const sessionInfo = parseCustomField2(shipment.customField2);
+            return (
+              <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-6">
+                  {smartSessionInfo?.session ? (
+                    <div className="flex items-center gap-2">
+                      <Boxes className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Session</p>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSessionId(String(smartSessionInfo.session!.id))}
+                          className="font-semibold text-primary hover:underline cursor-pointer"
+                          data-testid={`link-session-${smartSessionInfo.session.id}`}
+                        >
+                          {smartSessionInfo.session.name || `Session ${smartSessionInfo.session.id}`}
+                        </button>
+                      </div>
+                    </div>
+                  ) : sessionInfo ? (
+                    <div className="flex items-center gap-2">
+                      <Boxes className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Session</p>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSessionId(sessionInfo.sessionId)}
+                          className="font-semibold text-primary hover:underline cursor-pointer"
+                          data-testid={`link-session-${sessionInfo.sessionId}`}
+                        >
+                          Session {sessionInfo.sessionId}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Boxes className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Session</p>
+                        <span className="text-muted-foreground">Not assigned</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {smartSessionInfo?.spotNumber && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Spot</p>
+                      <Badge variant="secondary">#{smartSessionInfo.spotNumber}</Badge>
+                    </div>
+                  )}
+                  
+                  {shipment.sessionStatus && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Session Status</p>
+                      <Badge variant={shipment.sessionStatus === 'closed' ? 'default' : 'secondary'}>
+                        {shipment.sessionStatus}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  {qcItems?.length || 0} QC items / {items?.length || 0} ordered
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Items Tabs - QC Items is default */}
+          <Tabs defaultValue="qc" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="qc" className="flex items-center gap-2" data-testid="tab-qc-items">
+                <PackageCheck className="h-4 w-4" />
+                QC Items ({qcItems?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="purchased" className="flex items-center gap-2" data-testid="tab-purchased-items">
+                <ShoppingCart className="h-4 w-4" />
+                Ordered Items ({items?.length || 0})
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* QC Items Tab (default) */}
+            <TabsContent value="qc">
+              {qcItems && qcItems.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold">SKU</th>
+                        <th className="text-left px-4 py-3 font-semibold">Product</th>
+                        <th className="text-center px-4 py-3 font-semibold">Expected</th>
+                        <th className="text-center px-4 py-3 font-semibold">Available</th>
+                        <th className="text-right px-4 py-3 font-semibold">Weight</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {qcItems.map((qcItem, index) => {
+                        const available = (qcItem as any).availableQuantity ?? null;
+                        const expected = qcItem.quantityExpected ?? 0;
+                        const isOutOfStock = available !== null && available < expected;
+                        
+                        return (
+                          <tr 
+                            key={qcItem.id || index} 
+                            className={isOutOfStock ? 'bg-red-50 dark:bg-red-950/20' : ''} 
+                            data-testid={`row-qc-item-${index}`}
+                          >
+                            <td className="px-4 py-3">
                               <div className="flex flex-col gap-1">
-                                <code className="text-sm font-mono bg-muted px-3 py-1.5 rounded">
+                                <code className="text-sm font-mono bg-muted px-2 py-1 rounded inline-block">
                                   {qcItem.sku || 'N/A'}
                                 </code>
                                 {qcItem.isKitComponent && qcItem.parentSku && (
@@ -1025,232 +975,267 @@ export default function ShipmentDetails() {
                                     from kit: {qcItem.parentSku}
                                   </span>
                                 )}
+                                {qcItem.barcode && (
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    {qcItem.barcode}
+                                  </span>
+                                )}
                               </div>
                             </td>
-                            <td className="px-6 py-4">
-                              <code className="text-sm font-mono text-muted-foreground">
-                                {qcItem.barcode || 'N/A'}
-                              </code>
-                            </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 {qcItem.imageUrl && (
                                   <img 
                                     src={qcItem.imageUrl} 
                                     alt={qcItem.description || 'Product'}
-                                    className="w-16 h-16 object-cover rounded border"
+                                    className="w-12 h-12 object-cover rounded border flex-shrink-0"
                                   />
                                 )}
-                                <span className="text-base font-medium">{qcItem.description || 'Unknown Product'}</span>
+                                <span className="text-sm font-medium">{qcItem.description || 'Unknown Product'}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="text-xl font-bold">{qcItem.quantityExpected}</span>
+                            <td className="px-4 py-3 text-center">
+                              <span className="text-lg font-bold">{expected}</span>
                             </td>
-                            <td className="px-6 py-4 text-right">
-                              <span className="text-lg">
-                                {qcItem.weightValue ? `${qcItem.weightValue} ${qcItem.weightUnit || 'oz'}` : 'N/A'}
+                            <td className="px-4 py-3 text-center">
+                              {available !== null ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className={`text-lg font-bold ${isOutOfStock ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                    {available}
+                                  </span>
+                                  {isOutOfStock && (
+                                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="text-sm">
+                                {qcItem.weightValue ? `${qcItem.weightValue} ${qcItem.weightUnit || 'oz'}` : '—'}
                               </span>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No fulfilled items yet</p>
-                    <p className="text-sm mt-1">Fulfilled items appear once the order is tagged "MOVE OVER" and ready for picking</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Packages */}
-      {packages && packages.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Boxes className="h-5 w-5" />
-              Packages ({packages.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left px-6 py-4 font-semibold">Package</th>
-                    <th className="text-center px-6 py-4 font-semibold">Weight</th>
-                    <th className="text-center px-6 py-4 font-semibold">Dimensions</th>
-                    <th className="text-right px-6 py-4 font-semibold">Insured Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {packages.map((pkg, index) => {
-                    const hasSize = pkg.dimensionLength && pkg.dimensionWidth && pkg.dimensionHeight &&
-                      (parseFloat(pkg.dimensionLength) > 0 || parseFloat(pkg.dimensionWidth) > 0 || parseFloat(pkg.dimensionHeight) > 0);
-                    
-                    return (
-                      <tr key={pkg.id || index} className="hover-elevate" data-testid={`row-package-${index}`}>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-base font-medium">{pkg.packageName || 'Package'}</span>
-                            {pkg.packageCode && (
-                              <code className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded w-fit">
-                                {pkg.packageCode}
-                              </code>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {pkg.weightValue && pkg.weightUnit ? (
-                            <span className="text-lg font-medium">
-                              {pkg.weightValue} {pkg.weightUnit}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">N/A</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {hasSize ? (
-                            <span className="text-sm">
-                              {pkg.dimensionLength} x {pkg.dimensionWidth} x {pkg.dimensionHeight} {pkg.dimensionUnit}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">N/A</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          {pkg.insuredAmount && parseFloat(pkg.insuredAmount) > 0 ? (
-                            <span className="text-lg">
-                              ${parseFloat(pkg.insuredAmount).toFixed(2)} {pkg.insuredCurrency?.toUpperCase()}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">None</span>
-                          )}
-                        </td>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  <PackageCheck className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No QC items yet</p>
+                  <p className="text-sm mt-1">QC items appear once the order is tagged "MOVE OVER" and ready for picking</p>
+                </div>
+              )}
+            </TabsContent>
+            
+            {/* Ordered Items Tab */}
+            <TabsContent value="purchased">
+              {items && items.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold">SKU</th>
+                        <th className="text-left px-4 py-3 font-semibold">Product</th>
+                        <th className="text-center px-4 py-3 font-semibold">Quantity</th>
+                        <th className="text-right px-4 py-3 font-semibold">Unit Price</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {items.map((item, index) => (
+                        <tr key={index} data-testid={`row-purchased-item-${index}`}>
+                          <td className="px-4 py-3">
+                            <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {item.sku || 'N/A'}
+                            </code>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {item.imageUrl && (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.name || 'Product'}
+                                  className="w-12 h-12 object-cover rounded border flex-shrink-0"
+                                />
+                              )}
+                              <span className="text-sm font-medium">{item.name || 'Unknown Product'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-lg font-bold">{item.quantity}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm">
+                              {item.unitPrice ? `$${parseFloat(item.unitPrice).toFixed(2)}` : 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No ordered items found</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* TIER 4: Package Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Box className="h-5 w-5" />
+            Package Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Station Type & Fingerprint Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Station Type */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-1">Station Type</p>
+              {smartSessionInfo?.packagingType?.stationType ? (
+                <div className="flex items-center gap-2">
+                  <Badge className={
+                    smartSessionInfo.packagingType.stationType === 'bagging' 
+                      ? 'bg-purple-600 hover:bg-purple-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }>
+                    {smartSessionInfo.packagingType.stationType.replace(/_/g, ' ').toUpperCase()}
+                  </Badge>
+                </div>
+              ) : smartSessionInfo?.session?.stationType ? (
+                <Badge variant="secondary">
+                  {smartSessionInfo.session.stationType.replace(/_/g, ' ')}
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground">Not determined</span>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Smart Session Info */}
-      {smartSessionInfo && (smartSessionInfo.fingerprint || smartSessionInfo.session || smartSessionInfo.packagingType || smartSessionInfo.qcStation) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Fingerprint className="h-5 w-5" />
-              Smart Session
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Fingerprint */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
-                  <Fingerprint className="h-4 w-4" />
-                  Fingerprint
-                </div>
-                {smartSessionInfo.fingerprint ? (
-                  <div className="space-y-1">
-                    <p className="text-base font-medium">
-                      {smartSessionInfo.fingerprint.displayName || 'Unnamed'}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {smartSessionInfo.fingerprint.totalItems} items
-                      </Badge>
-                      {smartSessionInfo.fingerprint.totalWeight && (
-                        <Badge variant="outline" className="text-xs">
-                          {smartSessionInfo.fingerprint.totalWeight} {smartSessionInfo.fingerprint.weightUnit}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Not assigned</span>
-                )}
-              </div>
+            {/* Packaging Type */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-1">Packaging Type</p>
+              {smartSessionInfo?.packagingType ? (
+                <p className="font-medium">{smartSessionInfo.packagingType.name}</p>
+              ) : (
+                <span className="text-muted-foreground">Not assigned</span>
+              )}
+            </div>
 
-              {/* Session ID & Spot */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
-                  <Hash className="h-4 w-4" />
-                  Session
-                </div>
-                {smartSessionInfo.session ? (
-                  <div className="space-y-1">
-                    <p className="text-base font-medium">
-                      {smartSessionInfo.session.name || `Session #${smartSessionInfo.session.id}`}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {smartSessionInfo.session.status}
-                      </Badge>
-                      {smartSessionInfo.spotNumber && (
-                        <Badge variant="secondary" className="text-xs">
-                          Spot #{smartSessionInfo.spotNumber}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Not assigned</span>
-                )}
-              </div>
-
-              {/* Packaging Type */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
-                  <Box className="h-4 w-4" />
-                  Packaging Type
-                </div>
-                {smartSessionInfo.packagingType ? (
-                  <div className="space-y-1">
-                    <p className="text-base font-medium">{smartSessionInfo.packagingType.name}</p>
-                    {smartSessionInfo.packagingType.stationType && (
-                      <Badge variant="outline" className="text-xs">
-                        {smartSessionInfo.packagingType.stationType.replace(/_/g, ' ')}
-                      </Badge>
+            {/* Fingerprint */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-1">Fingerprint</p>
+              {smartSessionInfo?.fingerprint ? (
+                <div className="space-y-1">
+                  <p className="font-medium">{smartSessionInfo.fingerprint.displayName || 'Unnamed'}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{smartSessionInfo.fingerprint.totalItems} items</span>
+                    {smartSessionInfo.fingerprint.totalWeight && (
+                      <span>{smartSessionInfo.fingerprint.totalWeight} {smartSessionInfo.fingerprint.weightUnit}</span>
                     )}
                   </div>
-                ) : (
-                  <span className="text-muted-foreground">Not assigned</span>
-                )}
-              </div>
-
-              {/* QC Station */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
-                  <MapPinned className="h-4 w-4" />
-                  QC Station
                 </div>
-                {smartSessionInfo.qcStation ? (
-                  <div className="space-y-1">
-                    <p className="text-base font-medium">{smartSessionInfo.qcStation.name}</p>
-                    {smartSessionInfo.qcStation.stationType && (
-                      <Badge variant="outline" className="text-xs">
-                        {smartSessionInfo.qcStation.stationType.replace(/_/g, ' ')}
-                      </Badge>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Not assigned</span>
-                )}
+              ) : (
+                <span className="text-muted-foreground">Not assigned</span>
+              )}
+            </div>
+
+            {/* QC Station */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-1">QC Station</p>
+              {smartSessionInfo?.qcStation ? (
+                <p className="font-medium">{smartSessionInfo.qcStation.name}</p>
+              ) : (
+                <span className="text-muted-foreground">Not assigned</span>
+              )}
+            </div>
+          </div>
+
+          {/* Package Details */}
+          {packages && packages.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-3">Packages ({packages.length})</p>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-semibold text-sm">Package</th>
+                      <th className="text-center px-4 py-3 font-semibold text-sm">Weight</th>
+                      <th className="text-center px-4 py-3 font-semibold text-sm">Dimensions</th>
+                      <th className="text-right px-4 py-3 font-semibold text-sm">Insured</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {packages.map((pkg, index) => {
+                      const hasSize = pkg.dimensionLength && pkg.dimensionWidth && pkg.dimensionHeight &&
+                        (parseFloat(pkg.dimensionLength) > 0 || parseFloat(pkg.dimensionWidth) > 0 || parseFloat(pkg.dimensionHeight) > 0);
+                      
+                      return (
+                        <tr key={pkg.id || index} data-testid={`row-package-${index}`}>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-medium">{pkg.packageName || 'Package'}</span>
+                              {pkg.packageCode && (
+                                <code className="text-xs font-mono text-muted-foreground">
+                                  {pkg.packageCode}
+                                </code>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {pkg.weightValue && pkg.weightUnit ? (
+                              <span className="font-medium">
+                                {pkg.weightValue} {pkg.weightUnit}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {hasSize ? (
+                              <span className="text-sm">
+                                {pkg.dimensionLength} x {pkg.dimensionWidth} x {pkg.dimensionHeight} {pkg.dimensionUnit}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {pkg.insuredAmount && parseFloat(pkg.insuredAmount) > 0 ? (
+                              <span>
+                                ${parseFloat(pkg.insuredAmount).toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* No packages yet */}
+          {(!packages || packages.length === 0) && (
+            <div className="text-center py-4 text-muted-foreground border rounded-lg">
+              <Boxes className="h-6 w-6 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No package details yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Session Detail Modal */}
       <SessionDetailDialog 
