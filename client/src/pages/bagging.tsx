@@ -3724,7 +3724,7 @@ export default function Bagging() {
                           </div>
                           
                           {/* Collapsible Components Section */}
-                          <Accordion type="single" collapsible className="border-t border-purple-200 dark:border-purple-800">
+                          <Accordion type="single" collapsible defaultValue="components" className="border-t border-purple-200 dark:border-purple-800">
                             <AccordionItem value="components" className="border-0">
                               <AccordionTrigger className="px-4 py-2 hover:no-underline text-sm text-purple-600 dark:text-purple-400">
                                 <span className="flex items-center gap-2">
@@ -4003,7 +4003,7 @@ export default function Bagging() {
                       
                       {/* Completed Items Section - Collapsible */}
                       {completedItems.length > 0 && (
-                        <Accordion type="single" collapsible data-testid="accordion-completed-items-container">
+                        <Accordion type="single" collapsible defaultValue="completed-items" data-testid="accordion-completed-items-container">
                           <AccordionItem value="completed-items" className="border rounded-lg px-4" data-testid="accordion-completed-items">
                             <AccordionTrigger className="hover:no-underline" data-testid="trigger-completed-items">
                               <span className="text-sm font-medium flex items-center gap-2">
