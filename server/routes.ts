@@ -1870,8 +1870,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get shipment QC items (fulfilled items) for a specific shipment (accepts shipmentId or UUID)
+  // Enriched with availableQuantity from skuvault_products
   app.get("/api/shipments/:shipmentId/qc-items", requireAuth, async (req, res) => {
     try {
+      const { skuvaultProducts } = await import("@shared/schema");
       const idParam = req.params.shipmentId;
       
       // Try lookup by ShipStation shipmentId first
@@ -1886,14 +1888,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Shipment not found" });
       }
       
-      // Fetch QC items using the database ID
-      const qcItems = await db
-        .select()
+      // Fetch QC items with availableQuantity from skuvault_products
+      const qcItemsWithInventory = await db
+        .select({
+          id: shipmentQcItems.id,
+          shipmentId: shipmentQcItems.shipmentId,
+          sku: shipmentQcItems.sku,
+          barcode: shipmentQcItems.barcode,
+          description: shipmentQcItems.description,
+          quantityExpected: shipmentQcItems.quantityExpected,
+          quantityScanned: shipmentQcItems.quantityScanned,
+          collectionId: shipmentQcItems.collectionId,
+          syncedToSkuvault: shipmentQcItems.syncedToSkuvault,
+          isKitComponent: shipmentQcItems.isKitComponent,
+          parentSku: shipmentQcItems.parentSku,
+          createdAt: shipmentQcItems.createdAt,
+          updatedAt: shipmentQcItems.updatedAt,
+          imageUrl: shipmentQcItems.imageUrl,
+          weightValue: shipmentQcItems.weightValue,
+          weightUnit: shipmentQcItems.weightUnit,
+          physicalLocation: shipmentQcItems.physicalLocation,
+          availableQuantity: skuvaultProducts.availableQuantity,
+        })
         .from(shipmentQcItems)
+        .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
         .where(eq(shipmentQcItems.shipmentId, shipment.id))
         .orderBy(shipmentQcItems.sku);
       
-      res.json(qcItems);
+      res.json(qcItemsWithInventory);
     } catch (error: any) {
       console.error(`Error fetching shipment QC items for ${req.params.shipmentId}:`, error);
       res.status(500).json({ error: "Failed to fetch shipment QC items" });
