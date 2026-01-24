@@ -563,15 +563,36 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       return { shipmentId, orderNumber, itemsCreated: 0, error: 'No items to insert after processing' };
     }
     
+    // Phase 2.5: Aggregate items by SKU to sum quantities
+    // This prevents the upsert from overwriting kit-exploded components with direct line items
+    // Example: Kit explodes to 7x SKU-A, plus direct line item 1x SKU-A = 8x SKU-A total
+    const aggregatedItems = new Map<string, ItemToProcess>();
+    for (const item of itemsToProcess) {
+      const existing = aggregatedItems.get(item.sku);
+      if (existing) {
+        // Sum quantities
+        existing.quantity += item.quantity;
+        // If any instance is a kit component, mark as such (preserve kit lineage)
+        if (item.isKitComponent) {
+          existing.isKitComponent = true;
+          existing.parentSku = item.parentSku;
+        }
+      } else {
+        // Clone to avoid mutating original
+        aggregatedItems.set(item.sku, { ...item });
+      }
+    }
+    const aggregatedItemsArray = Array.from(aggregatedItems.values());
+    
     // Phase 3: Batch fetch product info for all SKUs (including kit components)
     // This may include new SKUs from kit explosion that weren't in preProductCache
     const productCache = await getProductsBatch(skusToLookup);
     
-    // Phase 4: Build QC items with product info
+    // Phase 4: Build QC items with product info (using aggregated items)
     const qcItemsToInsert: InsertShipmentQcItem[] = [];
     const allSkus: string[] = [];
     
-    for (const item of itemsToProcess) {
+    for (const item of aggregatedItemsArray) {
       const product = productCache.get(item.sku);
       allSkus.push(item.sku);
       
