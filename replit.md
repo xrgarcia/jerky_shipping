@@ -45,6 +45,10 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
     2. **Hourly GCP Sync**: `syncKitMappingsFromGcp()` runs hourly to populate the cache with all kit mappings from the reporting database, with cache invalidation for updated SKUs.
     3. **Proactive Hydration in Session Sync**: When Firestore session sync sets `session_status`, checks if QC items exist and hydrates if missing. Catches shipments that bypass normal hydration flow.
     4. **Repair Job Endpoint**: `POST /api/collections/repair-unexploded-kits` detects and fixes shipments with un-exploded kit SKUs by deleting QC items and re-running hydration.
+- **Split/Merge Detection**: The ETL service detects when shipment items change (due to order splits or merges in ShipStation) by comparing incoming items against existing ones using a normalized "SKU:QTY" fingerprint. When changes are detected:
+    1. Existing `shipment_qc_items` are deleted to trigger re-hydration
+    2. The `fingerprintId` is reset to null for re-calculation
+    3. Changes are logged with old/new item fingerprints for debugging
 - **Packing Completion Audit Logging**: All packing actions logged to `packing_logs` table.
 - **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
 - **Voided Label Handling**: Automatic new label creation, PDF validation, printing to requesting worker's station, audit logging, and QC cache invalidation.
