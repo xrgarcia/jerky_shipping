@@ -761,7 +761,7 @@ export default function ShipmentDetails() {
             };
 
             return (
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-x-6 gap-y-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Carrier</p>
                   <p className="font-semibold">{parseCarrier(shipment.serviceCode)}</p>
