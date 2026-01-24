@@ -2610,55 +2610,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
-      // Process Shopify order payload - structure is payload object
+      // Process Shopify order payload - structure uses snake_case from Slashbin
       const orderPayload = req.body.payload;
-      if (!orderPayload || !orderPayload.orderNumber) {
-        console.error("[Slashbin/ShopifyOrders] Parse FAILED - missing payload.orderNumber");
+      if (!orderPayload || !orderPayload.order_number) {
+        console.error("[Slashbin/ShopifyOrders] Parse FAILED - missing payload.order_number");
         console.error("[Slashbin/ShopifyOrders] Available keys in payload:", orderPayload ? Object.keys(orderPayload) : 'payload is null/undefined');
-        return res.status(400).json({ error: "Invalid payload: missing orderNumber" });
+        return res.status(400).json({ error: "Invalid payload: missing order_number" });
       }
       
-      const orderNumber = orderPayload.orderNumber;
-      const items = orderPayload.items || [];
+      const orderNumber = orderPayload.order_number;
+      const items = orderPayload.order_items || [];
       
-      console.log(`[Slashbin] Processing Shopify order ${orderNumber} with ${items.length} items`);
+      console.log(`[Slashbin/ShopifyOrders] Processing order ${orderNumber} with ${items.length} items`);
       
-      // Upsert order data into slashbin_orders table
+      // Upsert order data into slashbin_orders table (mapping snake_case to camelCase)
       const orderData = {
-        orderNumber: orderPayload.orderNumber,
-        orderTotal: orderPayload.orderTotal?.toString() || null,
-        orderDate: orderPayload.orderDate ? new Date(orderPayload.orderDate) : null,
-        buyerEmail: orderPayload.buyerEmail || null,
-        taxTotal: orderPayload.taxTotal?.toString() || null,
-        subTotal: orderPayload.subTotal?.toString() || null,
-        shippingCost: orderPayload.shippingCost?.toString() || null,
-        discountTotal: orderPayload.discountTotal?.toString() || null,
+        orderNumber: orderPayload.order_number,
+        orderTotal: orderPayload.order_total?.toString() || null,
+        orderDate: orderPayload.order_date ? new Date(orderPayload.order_date) : null,
+        buyerEmail: orderPayload.buyer_email || null,
+        taxTotal: orderPayload.tax_total?.toString() || null,
+        subTotal: orderPayload.sub_total?.toString() || null,
+        shippingCost: orderPayload.shipping_cost?.toString() || null,
+        discountTotal: orderPayload.discount_total?.toString() || null,
         tags: orderPayload.tags || null,
-        refundTotal: orderPayload.refundTotal?.toString() || null,
+        refundTotal: orderPayload.refund_total?.toString() || null,
         notes: orderPayload.notes || null,
-        shippingMethod: orderPayload.shippingMethod || null,
-        orderStatus: orderPayload.orderStatus || null,
-        salesChannel: orderPayload.salesChannel || null,
-        // Flattened shipping address fields
-        shippingFirstName: orderPayload.shippingAddress?.firstName || null,
-        shippingLastName: orderPayload.shippingAddress?.lastName || null,
-        shippingAddress1: orderPayload.shippingAddress?.address1 || null,
-        shippingAddress2: orderPayload.shippingAddress?.address2 || null,
-        shippingCity: orderPayload.shippingAddress?.city || null,
-        shippingProvince: orderPayload.shippingAddress?.province || null,
-        shippingProvinceCode: orderPayload.shippingAddress?.provinceCode || null,
-        shippingZip: orderPayload.shippingAddress?.zip || null,
-        shippingCountry: orderPayload.shippingAddress?.country || null,
-        shippingCountryCode: orderPayload.shippingAddress?.countryCode || null,
-        shippingPhone: orderPayload.shippingAddress?.phone || null,
-        shippingCompany: orderPayload.shippingAddress?.company || null,
+        shippingMethod: orderPayload.shipping_method || null,
+        orderStatus: orderPayload.order_status || null,
+        salesChannel: orderPayload.sales_channel || null,
+        // Flattened shipping fields (from payload.shipping)
+        shippingFirstName: orderPayload.shipping?.first_name || null,
+        shippingLastName: orderPayload.shipping?.last_name || null,
+        shippingAddress1: orderPayload.shipping?.address1 || null,
+        shippingAddress2: orderPayload.shipping?.address2 || null,
+        shippingCity: orderPayload.shipping?.city || null,
+        shippingProvince: orderPayload.shipping?.province || null,
+        shippingProvinceCode: orderPayload.shipping?.province_code || null,
+        shippingZip: orderPayload.shipping?.zip || null,
+        shippingCountry: orderPayload.shipping?.country || null,
+        shippingCountryCode: orderPayload.shipping?.country_code || null,
+        shippingPhone: orderPayload.shipping?.phone || null,
+        shippingCompany: orderPayload.shipping?.company || null,
         // Flattened customer fields
-        customerId: orderPayload.customer?.id?.toString() || null,
+        customerId: orderPayload.customer?.id?.toString() || orderPayload.customer?.customer_id?.toString() || null,
         customerEmail: orderPayload.customer?.email || null,
-        customerFirstName: orderPayload.customer?.firstName || null,
-        customerLastName: orderPayload.customer?.lastName || null,
+        customerFirstName: orderPayload.customer?.first_name || null,
+        customerLastName: orderPayload.customer?.last_name || null,
         customerPhone: orderPayload.customer?.phone || null,
-        customerCreatedAt: orderPayload.customer?.createdAt ? new Date(orderPayload.customer.createdAt) : null,
+        customerCreatedAt: orderPayload.customer?.created_at ? new Date(orderPayload.customer.created_at) : null,
         customerCurrency: orderPayload.customer?.currency || null,
         customerProvince: orderPayload.customer?.province || null,
         customerCountry: orderPayload.customer?.country || null,
@@ -2686,21 +2686,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const itemsToInsert = items.map((item: any) => ({
           orderNumber,
           sku: item.sku || '',
-          productName: item.productName || null,
+          productName: item.product_name || null,
           qty: item.qty || null,
-          fulfillmentStatus: item.fulfillmentStatus || null,
+          fulfillmentStatus: item.fulfillment_status || null,
           price: item.price?.toString() || null,
-          productBrand: item.productBrand || null,
+          productBrand: item.product_brand || null,
           weight: item.weight?.toString() || null,
           tax: item.tax?.toString() || null,
           subtotal: item.subtotal?.toString() || null,
-          productId: item.productId?.toString() || null,
+          productId: item.product_id?.toString() || null,
         }));
         
         await db.insert(slashbinOrderItems).values(itemsToInsert);
       }
       
-      console.log(`[Slashbin] Successfully upserted order ${orderNumber} with ${items.length} items`);
+      console.log(`[Slashbin/ShopifyOrders] OK: ${orderNumber} (${items.length} items)`);
       
       // Mark job as processed for idempotency
       if (payloadJobId) {
