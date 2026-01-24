@@ -2611,10 +2611,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Signature Present:", !!signatureHeader);
       
       // Get signing secret
-      const signingSecret = process.env.SHOPIFY_ORDERS_SIGNING_KEY;
+      const signingSecret = process.env.SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY;
       
       if (!signingSecret) {
-        console.error("[Slashbin] SHOPIFY_ORDERS_SIGNING_KEY not configured");
+        console.error("[Slashbin] SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
