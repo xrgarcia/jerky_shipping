@@ -2506,66 +2506,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Slashbin webhook endpoint - receives transformed kit mappings
   app.post("/api/webhooks/slashbin/kitMappings", async (req, res) => {
-    const receivedAt = new Date().toISOString();
-    
     try {
-      // Extract headers
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
       const jobId = req.headers['x-slashbin-job-id'] as string;
-      const topic = req.headers['x-slashbin-topic'] as string;
       
-      console.log("========== SLASHBIN WEBHOOK RECEIVED ==========");
-      console.log("Timestamp:", receivedAt);
-      console.log("Job ID:", jobId || 'missing');
-      console.log("Topic:", topic || 'missing');
-      console.log("Signature Present:", !!signatureHeader);
-      
-      // Get signing secret
       const signingSecret = process.env.KIT_MAPPING_SIGNING_KEY;
-      
       if (!signingSecret) {
-        console.error("[Slashbin] KIT_MAPPING_SIGNING_KEY not configured");
+        console.error("[Slashbin/KitMappings] KIT_MAPPING_SIGNING_KEY not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
-      // Verify signature
       const rawBody = req.rawBody as Buffer;
       if (!verifySlashbinWebhook(rawBody, signatureHeader, signingSecret)) {
-        console.error("========== SLASHBIN WEBHOOK VERIFICATION FAILED ==========");
-        console.error(`Timestamp: ${receivedAt}`);
-        console.error(`Job ID: ${jobId || 'unknown'}`);
-        console.error(`Topic: ${topic || 'unknown'}`);
-        console.error(`Signature Header: ${signatureHeader ? 'present' : 'missing'}`);
-        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
-        console.error("===========================================================");
+        console.error("[Slashbin/KitMappings] HMAC verification FAILED");
         return res.status(401).json({ error: "Webhook verification failed" });
       }
       
-      console.log("[Slashbin] Signature verified successfully");
-      
-      // Check idempotency - avoid processing duplicate webhooks
       const payloadJobId = req.body.slashbinJobId || jobId;
       if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
-        console.log(`[Slashbin] Job ${payloadJobId} already processed, skipping (idempotency)`);
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
-      // Log full payload for debugging
-      console.log("[Slashbin] Full payload:", JSON.stringify(req.body, null, 2));
-      
-      // Process kit mapping payload - structure is payload.sku
       const kitPayload = req.body.payload;
       if (!kitPayload || !kitPayload.sku) {
-        console.error("[Slashbin] Invalid payload: missing payload.sku");
+        console.error("[Slashbin/KitMappings] Parse FAILED - missing payload.sku");
         return res.status(400).json({ error: "Invalid payload: missing sku" });
       }
       
       const kitSku = kitPayload.sku;
       const items = kitPayload.items || [];
       
-      console.log(`[Slashbin] Processing kit mapping for ${kitSku} with ${items.length} components`);
-      
-      // Delete existing mappings for this kit, then insert new ones
       await db.delete(slashbinKitComponentMappings).where(eq(slashbinKitComponentMappings.kitSku, kitSku));
       
       if (items.length > 0) {
@@ -2574,22 +2544,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           componentSku: item.sku,
           componentQuantity: item.quantity || 1,
         }));
-        
         await db.insert(slashbinKitComponentMappings).values(mappingsToInsert);
       }
       
-      console.log(`[Slashbin] Successfully updated ${items.length} component mappings for kit ${kitSku}`);
+      console.log(`[Slashbin/KitMappings] OK: ${kitSku} (${items.length} components)`);
       
-      // Mark job as processed for idempotency
       if (payloadJobId) {
         markJobAsProcessed(payloadJobId);
       }
       
-      // Return 200 to acknowledge receipt
       res.status(200).json({ success: true, jobId: payloadJobId, kitSku, componentCount: items.length });
       
     } catch (error: any) {
-      console.error("Error processing Slashbin webhook:", error);
+      console.error("[Slashbin/KitMappings] Error:", error.message);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });
@@ -2631,19 +2598,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Webhook verification failed" });
       }
       
-      console.log("[Slashbin] Shopify orders signature verified successfully");
+      console.log("[Slashbin/ShopifyOrders] HMAC verification OK");
+      
+      // Log full JSON payload for debugging
+      console.log("[Slashbin/ShopifyOrders] Full payload:", JSON.stringify(req.body, null, 2));
       
       // Check idempotency - avoid processing duplicate webhooks
       const payloadJobId = req.body.slashbinJobId || jobId;
       if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
-        console.log(`[Slashbin] Job ${payloadJobId} already processed, skipping (idempotency)`);
+        console.log(`[Slashbin/ShopifyOrders] Job ${payloadJobId} already processed (idempotency)`);
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
       // Process Shopify order payload - structure is payload object
       const orderPayload = req.body.payload;
       if (!orderPayload || !orderPayload.orderNumber) {
-        console.error("[Slashbin] Invalid payload: missing payload.orderNumber");
+        console.error("[Slashbin/ShopifyOrders] Parse FAILED - missing payload.orderNumber");
+        console.error("[Slashbin/ShopifyOrders] Available keys in payload:", orderPayload ? Object.keys(orderPayload) : 'payload is null/undefined');
         return res.status(400).json({ error: "Invalid payload: missing orderNumber" });
       }
       
