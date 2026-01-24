@@ -1,18 +1,21 @@
 /**
  * Kit Mappings Cache Service
  * 
- * Manages kit→component mappings with:
+ * Manages kit→component mappings with lazy loading:
  * 1. Local PostgreSQL table as persistent storage (kit_component_mappings)
  * 2. Hourly sync from GCP reporting database (full two-way sync with deletes)
- * 3. In-memory cache for fast lookups during hydration
+ * 3. In-memory cache with lazy loading (check cache first, DB on miss)
  * 
- * The local table is the source of truth for the hydrator.
- * GCP is the upstream source, synced hourly.
+ * Pattern: Cache-first with DB fallback
+ * - Check in-memory cache first (O(1) lookup)
+ * - On cache miss, query DB for that specific SKU
+ * - If found in DB, add to cache and return
+ * - If not in DB, cache the "miss" to avoid repeated queries
  */
 
 import { db } from '../db';
 import { kitComponentMappings } from '@shared/schema';
-import { eq, sql, inArray, and } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { reportingSql } from '../reporting-db';
 
 const log = (message: string) => console.log(`[kit-mappings-cache] ${message}`);
@@ -22,64 +25,147 @@ export interface KitComponent {
   componentQuantity: number;
 }
 
-let kitMappingsCache: Map<string, KitComponent[]> | null = null;
-let reverseComponentCache: Map<string, string[]> | null = null;
-let lastLoadedAt: Date | null = null;
+// In-memory cache: SKU → components (empty array means "checked DB, not a kit")
+const kitMappingsCache = new Map<string, KitComponent[]>();
 
-// Maximum cache age in milliseconds before forcing a reload
-// Set to 5 minutes to catch recently synced kit mappings
-const CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+// Reverse cache: component SKU → parent kit SKUs
+const reverseComponentCache = new Map<string, string[]>();
+
+// Track when we last did a full load (for stats only)
+let lastFullLoadAt: Date | null = null;
 
 /**
- * Load kit mappings from local database into memory cache
+ * Load a single kit's components from DB into cache
+ * Returns components if found, empty array if not a kit
  */
-async function loadFromLocalDb(): Promise<void> {
+async function loadKitFromDb(sku: string): Promise<KitComponent[]> {
   try {
     const results = await db
       .select({
-        kitSku: kitComponentMappings.kitSku,
         componentSku: kitComponentMappings.componentSku,
         componentQuantity: kitComponentMappings.componentQuantity,
       })
-      .from(kitComponentMappings);
+      .from(kitComponentMappings)
+      .where(eq(kitComponentMappings.kitSku, sku));
     
-    const mappings = new Map<string, KitComponent[]>();
-    const reverseMap = new Map<string, string[]>();
+    const components: KitComponent[] = results.map(row => ({
+      componentSku: row.componentSku,
+      componentQuantity: row.componentQuantity,
+    }));
     
-    for (const row of results) {
-      const component: KitComponent = {
-        componentSku: row.componentSku,
-        componentQuantity: row.componentQuantity,
-      };
-      
-      if (!mappings.has(row.kitSku)) {
-        mappings.set(row.kitSku, []);
+    // Cache the result (even if empty - negative cache)
+    kitMappingsCache.set(sku, components);
+    
+    // Update reverse cache for each component
+    for (const comp of components) {
+      if (!reverseComponentCache.has(comp.componentSku)) {
+        reverseComponentCache.set(comp.componentSku, []);
       }
-      mappings.get(row.kitSku)!.push(component);
-      
-      if (!reverseMap.has(row.componentSku)) {
-        reverseMap.set(row.componentSku, []);
-      }
-      if (!reverseMap.get(row.componentSku)!.includes(row.kitSku)) {
-        reverseMap.get(row.componentSku)!.push(row.kitSku);
+      const parents = reverseComponentCache.get(comp.componentSku)!;
+      if (!parents.includes(sku)) {
+        parents.push(sku);
       }
     }
     
-    kitMappingsCache = mappings;
-    reverseComponentCache = reverseMap;
-    lastLoadedAt = new Date();
-    
-    log(`Loaded ${mappings.size} kit mappings from local DB`);
+    return components;
   } catch (error) {
-    log(`Error loading from local DB: ${error}`);
+    log(`Error loading kit ${sku} from DB: ${error}`);
     throw error;
   }
 }
 
 /**
+ * Check if a SKU is a kit (has components)
+ * Lazy-loads from DB on cache miss
+ */
+export async function isKit(sku: string): Promise<boolean> {
+  // Check cache first
+  if (kitMappingsCache.has(sku)) {
+    const components = kitMappingsCache.get(sku)!;
+    return components.length > 0;
+  }
+  
+  // Cache miss - load from DB
+  const components = await loadKitFromDb(sku);
+  return components.length > 0;
+}
+
+/**
+ * Get kit components for a parent SKU
+ * Lazy-loads from DB on cache miss
+ * Returns undefined if not a kit (no components)
+ */
+export async function getKitComponents(sku: string): Promise<KitComponent[] | undefined> {
+  // Check cache first
+  if (kitMappingsCache.has(sku)) {
+    const components = kitMappingsCache.get(sku)!;
+    return components.length > 0 ? components : undefined;
+  }
+  
+  // Cache miss - load from DB
+  const components = await loadKitFromDb(sku);
+  return components.length > 0 ? components : undefined;
+}
+
+/**
+ * Get parent kit SKUs that contain this component SKU (reverse lookup)
+ * For this, we need to query the DB since we may not have loaded all kits yet
+ */
+export async function getParentKitsForComponent(componentSku: string): Promise<string[] | undefined> {
+  // Check reverse cache first
+  if (reverseComponentCache.has(componentSku)) {
+    const parents = reverseComponentCache.get(componentSku)!;
+    return parents.length > 0 ? parents : undefined;
+  }
+  
+  // Cache miss - query DB for all kits containing this component
+  try {
+    const results = await db
+      .select({
+        kitSku: kitComponentMappings.kitSku,
+      })
+      .from(kitComponentMappings)
+      .where(eq(kitComponentMappings.componentSku, componentSku));
+    
+    const parentSkus = results.map(r => r.kitSku);
+    
+    // Cache the result
+    reverseComponentCache.set(componentSku, parentSkus);
+    
+    return parentSkus.length > 0 ? parentSkus : undefined;
+  } catch (error) {
+    log(`Error looking up parents for component ${componentSku}: ${error}`);
+    return undefined;
+  }
+}
+
+/**
+ * Invalidate cache entries for specific SKUs
+ * Called after GCP sync to ensure updated mappings are reloaded
+ */
+export function invalidateCacheEntries(skus: string[]): void {
+  for (const sku of skus) {
+    kitMappingsCache.delete(sku);
+  }
+  // Also clear reverse cache since parent relationships may have changed
+  if (skus.length > 0) {
+    reverseComponentCache.clear();
+  }
+}
+
+/**
+ * Clear entire cache (useful for testing or after major sync)
+ */
+export function clearCache(): void {
+  kitMappingsCache.clear();
+  reverseComponentCache.clear();
+  log('Cache cleared');
+}
+
+/**
  * Sync kit mappings from GCP to local database
  * Full two-way sync: upserts new/changed records, deletes stale records
- * Returns stats about what changed
+ * Invalidates cache for affected SKUs after sync
  */
 export async function syncKitMappingsFromGcp(): Promise<{
   inserted: number;
@@ -89,6 +175,7 @@ export async function syncKitMappingsFromGcp(): Promise<{
   error?: string;
 }> {
   const stats = { inserted: 0, updated: 0, deleted: 0, unchanged: 0 };
+  const affectedSkus: string[] = [];
   
   try {
     log('Starting kit mappings sync from GCP...');
@@ -131,8 +218,8 @@ export async function syncKitMappingsFromGcp(): Promise<{
     }
     
     const toInsert: { kitSku: string; componentSku: string; componentQuantity: number }[] = [];
-    const toUpdate: { id: string; componentQuantity: number }[] = [];
-    const toDelete: string[] = [];
+    const toUpdate: { id: string; componentQuantity: number; kitSku: string }[] = [];
+    const toDelete: { id: string; kitSku: string }[] = [];
     
     for (const [key, gcpQty] of Array.from(gcpMappings.entries())) {
       const [kitSku, componentSku] = key.split('|');
@@ -140,8 +227,10 @@ export async function syncKitMappingsFromGcp(): Promise<{
       
       if (!local) {
         toInsert.push({ kitSku, componentSku, componentQuantity: gcpQty });
+        if (!affectedSkus.includes(kitSku)) affectedSkus.push(kitSku);
       } else if (local.quantity !== gcpQty) {
-        toUpdate.push({ id: local.id, componentQuantity: gcpQty });
+        toUpdate.push({ id: local.id, componentQuantity: gcpQty, kitSku });
+        if (!affectedSkus.includes(kitSku)) affectedSkus.push(kitSku);
       } else {
         stats.unchanged++;
       }
@@ -149,7 +238,9 @@ export async function syncKitMappingsFromGcp(): Promise<{
     
     for (const [key, local] of Array.from(localMappings.entries())) {
       if (!gcpMappings.has(key)) {
-        toDelete.push(local.id);
+        const [kitSku] = key.split('|');
+        toDelete.push({ id: local.id, kitSku });
+        if (!affectedSkus.includes(kitSku)) affectedSkus.push(kitSku);
       }
     }
     
@@ -182,12 +273,16 @@ export async function syncKitMappingsFromGcp(): Promise<{
     if (toDelete.length > 0) {
       await db
         .delete(kitComponentMappings)
-        .where(inArray(kitComponentMappings.id, toDelete));
+        .where(inArray(kitComponentMappings.id, toDelete.map(d => d.id)));
       stats.deleted = toDelete.length;
       log(`Deleted ${toDelete.length} stale mappings`);
     }
     
-    await loadFromLocalDb();
+    // Invalidate cache for affected SKUs so next lookup gets fresh data
+    if (affectedSkus.length > 0) {
+      invalidateCacheEntries(affectedSkus);
+      log(`Invalidated cache for ${affectedSkus.length} affected kit SKUs`);
+    }
     
     log(`Sync complete: ${stats.inserted} inserted, ${stats.updated} updated, ${stats.deleted} deleted, ${stats.unchanged} unchanged`);
     
@@ -200,91 +295,127 @@ export async function syncKitMappingsFromGcp(): Promise<{
 }
 
 /**
- * Check if cache is stale and needs refresh
+ * Bulk preload kit mappings for a list of SKUs
+ * Useful when you know you'll need multiple kit lookups
+ * More efficient than individual lookups due to batch query
  */
-function isCacheStale(): boolean {
-  if (!lastLoadedAt) return true;
-  const age = Date.now() - lastLoadedAt.getTime();
-  return age > CACHE_MAX_AGE_MS;
-}
-
-/**
- * Ensure kit mappings are loaded into memory AND fresh
- * Called by hydrator before processing shipments
- * 
- * CRITICAL FIX: Previously this only loaded once and never refreshed.
- * Now it checks cache age and reloads if stale (>5 minutes).
- * This prevents race conditions where:
- * 1. GCP sync adds new kit mappings to local DB
- * 2. Hydrator runs with stale in-memory cache
- * 3. New kits aren't recognized and don't get exploded
- */
-export async function ensureKitMappingsFresh(): Promise<boolean> {
+export async function preloadKitMappings(skus: string[]): Promise<void> {
+  // Filter to SKUs not already in cache
+  const uncachedSkus = skus.filter(sku => !kitMappingsCache.has(sku));
+  
+  if (uncachedSkus.length === 0) return;
+  
   try {
-    const needsRefresh = !kitMappingsCache || isCacheStale();
+    const results = await db
+      .select({
+        kitSku: kitComponentMappings.kitSku,
+        componentSku: kitComponentMappings.componentSku,
+        componentQuantity: kitComponentMappings.componentQuantity,
+      })
+      .from(kitComponentMappings)
+      .where(inArray(kitComponentMappings.kitSku, uncachedSkus));
     
-    if (needsRefresh) {
-      const wasEmpty = !kitMappingsCache;
-      await loadFromLocalDb();
-      if (!wasEmpty) {
-        log(`Cache was stale (${Math.round((Date.now() - (lastLoadedAt?.getTime() || 0)) / 1000 / 60)}+ min old), refreshed from local DB`);
+    // Group results by kit SKU
+    const groupedResults = new Map<string, KitComponent[]>();
+    for (const row of results) {
+      if (!groupedResults.has(row.kitSku)) {
+        groupedResults.set(row.kitSku, []);
       }
-      return true;
+      groupedResults.get(row.kitSku)!.push({
+        componentSku: row.componentSku,
+        componentQuantity: row.componentQuantity,
+      });
     }
-    return false;
+    
+    // Add to cache (including negative entries for SKUs not found)
+    for (const sku of uncachedSkus) {
+      const components = groupedResults.get(sku) || [];
+      kitMappingsCache.set(sku, components);
+      
+      // Update reverse cache
+      for (const comp of components) {
+        if (!reverseComponentCache.has(comp.componentSku)) {
+          reverseComponentCache.set(comp.componentSku, []);
+        }
+        const parents = reverseComponentCache.get(comp.componentSku)!;
+        if (!parents.includes(sku)) {
+          parents.push(sku);
+        }
+      }
+    }
+    
+    log(`Preloaded ${uncachedSkus.length} SKUs (${groupedResults.size} are kits)`);
   } catch (error) {
-    log(`Error ensuring kit mappings fresh: ${error}`);
-    return false;
+    log(`Error preloading kit mappings: ${error}`);
+    throw error;
   }
 }
 
 /**
- * Force refresh from local DB (for after sync completes)
+ * Get all kit mappings (loads everything from DB)
+ * Use sparingly - mainly for bulk analysis or debugging
  */
-export async function forceRefreshKitMappings(): Promise<void> {
-  await loadFromLocalDb();
-  log('Force refresh from local DB complete');
-}
-
-/**
- * Check if a SKU is a kit (has components)
- */
-export function isKit(sku: string): boolean {
-  return kitMappingsCache?.has(sku) ?? false;
-}
-
-/**
- * Get kit components for a parent SKU
- */
-export function getKitComponents(sku: string): KitComponent[] | undefined {
-  return kitMappingsCache?.get(sku);
-}
-
-/**
- * Get parent kit SKUs that contain this component SKU (reverse lookup)
- */
-export function getParentKitsForComponent(componentSku: string): string[] | undefined {
-  return reverseComponentCache?.get(componentSku);
-}
-
-/**
- * Get all kit mappings (for bulk analysis)
- */
-export function getAllKitMappings(): Map<string, KitComponent[]> | null {
-  return kitMappingsCache;
+export async function getAllKitMappings(): Promise<Map<string, KitComponent[]>> {
+  try {
+    const results = await db
+      .select({
+        kitSku: kitComponentMappings.kitSku,
+        componentSku: kitComponentMappings.componentSku,
+        componentQuantity: kitComponentMappings.componentQuantity,
+      })
+      .from(kitComponentMappings);
+    
+    const mappings = new Map<string, KitComponent[]>();
+    
+    for (const row of results) {
+      if (!mappings.has(row.kitSku)) {
+        mappings.set(row.kitSku, []);
+      }
+      mappings.get(row.kitSku)!.push({
+        componentSku: row.componentSku,
+        componentQuantity: row.componentQuantity,
+      });
+    }
+    
+    // Update cache with everything we loaded
+    for (const [sku, components] of mappings) {
+      kitMappingsCache.set(sku, components);
+    }
+    
+    lastFullLoadAt = new Date();
+    log(`Full load: ${mappings.size} kit mappings`);
+    
+    return mappings;
+  } catch (error) {
+    log(`Error loading all kit mappings: ${error}`);
+    throw error;
+  }
 }
 
 /**
  * Get cache statistics
  */
 export function getKitCacheStats(): {
-  kitCount: number;
-  snapshotTimestamp: string | null;
-  lastLoadedAt: string | null;
+  cachedKitCount: number;
+  cachedNonKitCount: number;
+  totalCached: number;
+  lastFullLoadAt: string | null;
 } {
+  let kitCount = 0;
+  let nonKitCount = 0;
+  
+  for (const [, components] of kitMappingsCache) {
+    if (components.length > 0) {
+      kitCount++;
+    } else {
+      nonKitCount++;
+    }
+  }
+  
   return {
-    kitCount: kitMappingsCache?.size ?? 0,
-    snapshotTimestamp: null,
-    lastLoadedAt: lastLoadedAt?.toISOString() ?? null,
+    cachedKitCount: kitCount,
+    cachedNonKitCount: nonKitCount,
+    totalCached: kitMappingsCache.size,
+    lastFullLoadAt: lastFullLoadAt?.toISOString() ?? null,
   };
 }
