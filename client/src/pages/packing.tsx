@@ -3482,7 +3482,7 @@ export default function Packing() {
                           </div>
                           
                           {/* Collapsible Components Section */}
-                          <Accordion type="single" collapsible className="border-t border-purple-200 dark:border-purple-800">
+                          <Accordion type="single" collapsible defaultValue="components" className="border-t border-purple-200 dark:border-purple-800">
                             <AccordionItem value="components" className="border-0">
                               <AccordionTrigger className="px-4 py-2 hover:no-underline text-sm text-purple-600 dark:text-purple-400">
                                 <span className="flex items-center gap-2">
