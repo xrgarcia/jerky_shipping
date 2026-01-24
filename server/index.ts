@@ -270,7 +270,7 @@ async function initializeAfterListen(storage: any) {
     startSkuvaultProductsSyncWorker(3600000); // Sync products every 1 hour
     
     // Start kit component mappings sync worker (syncs kit mappings from reporting DB hourly)
-    const { syncKitMappingsFromGcp, ensureKitMappingsFresh } = await import("./services/kit-mappings-cache");
+    const { syncKitMappingsFromGcp } = await import("./services/kit-mappings-cache");
     await syncKitMappingsFromGcp(); // Initial sync on startup
     setInterval(async () => {
       try {

@@ -33,10 +33,10 @@ import {
 } from '@shared/schema';
 import { eq, and, or, exists, sql, notExists, inArray, isNull } from 'drizzle-orm';
 import { 
-  ensureKitMappingsFresh, 
   isKit, 
   getKitComponents,
   getKitCacheStats,
+  preloadKitMappings,
 } from './kit-mappings-cache';
 import { getProductsBatch, type ProductInfo } from './product-lookup';
 import { updateShipmentLifecycle } from './lifecycle-service';
@@ -431,10 +431,6 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
  */
 export async function hydrateShipment(shipmentId: string, orderNumber: string): Promise<HydrationResult> {
   try {
-    // Ensure kit mappings cache is fresh before processing
-    // This MUST happen before isKit() is called to properly detect kit products
-    await ensureKitMappingsFresh();
-    
     // Get shipment items (non-exploded)
     const items = await db
       .select({
@@ -456,6 +452,9 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     // We need productCategory to determine if a SKU should be exploded
     const rawSkus = items.map(item => item.sku).filter((sku): sku is string => !!sku);
     const preProductCache = await getProductsBatch(rawSkus);
+    
+    // Preload kit mappings for all SKUs (batch query is more efficient)
+    await preloadKitMappings(rawSkus);
     
     // Phase 2: Build list of all SKUs we need (exploding only products with category 'kit')
     const skusToLookup: string[] = [];
@@ -485,7 +484,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       const isKitCategory = productInfo?.productCategory?.toLowerCase() === 'kit';
       const isAssembledProduct = productInfo?.isAssembledProduct ?? false;
       const quantityOnHand = productInfo?.quantityOnHand ?? 0;
-      const hasKitComponents = isKit(sku);
+      const hasKitComponents = await isKit(sku);
       
       // Explode if:
       // 1. Product category is 'kit' AND has component mappings, OR
@@ -500,7 +499,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       }
       
       if (shouldExplode) {
-        const components = getKitComponents(sku);
+        const components = await getKitComponents(sku);
         if (components && components.length > 0) {
           for (const comp of components) {
             // Skip excluded SKUs (e.g., BUILDBAG, BUILDBOX, BUILDJAS)
@@ -715,17 +714,6 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
   };
   
   try {
-    // Ensure kit mappings cache is fresh before processing
-    const cacheRefreshed = await ensureKitMappingsFresh();
-    if (cacheRefreshed) {
-      log('Kit mappings cache was refreshed with new data');
-    }
-    
-    const cacheStats = getKitCacheStats();
-    if (cacheStats.kitCount === 0) {
-      log('Warning: Kit mappings cache is empty');
-    }
-    
     // Find shipments needing hydration
     const shipmentsToProcess = await findShipmentsNeedingHydration(batchSize);
     
@@ -927,9 +915,6 @@ export async function repairUnexplodedKits(limit: number = 50): Promise<{
   try {
     // Import kitComponentMappings for the repair query
     const { kitComponentMappings } = await import('@shared/schema');
-    
-    // Ensure kit mappings cache is fresh before repair
-    await ensureKitMappingsFresh();
     
     // Find shipments with un-exploded kit SKUs
     // These are QC items where the SKU:

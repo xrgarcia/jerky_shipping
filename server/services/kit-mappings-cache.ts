@@ -378,7 +378,7 @@ export async function getAllKitMappings(): Promise<Map<string, KitComponent[]>> 
     }
     
     // Update cache with everything we loaded
-    for (const [sku, components] of mappings) {
+    for (const [sku, components] of Array.from(mappings.entries())) {
       kitMappingsCache.set(sku, components);
     }
     
@@ -404,7 +404,7 @@ export function getKitCacheStats(): {
   let kitCount = 0;
   let nonKitCount = 0;
   
-  for (const [, components] of kitMappingsCache) {
+  for (const [, components] of Array.from(kitMappingsCache.entries())) {
     if (components.length > 0) {
       kitCount++;
     } else {

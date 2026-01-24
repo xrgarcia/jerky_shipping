@@ -7,7 +7,6 @@ import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/fir
 import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmentContext, type ShipmentContext } from './services/qcsale-cache-warmer';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { hydrateShipment, calculateFingerprint } from './services/qc-item-hydrator';
-import { ensureKitMappingsFresh } from './services/kit-mappings-cache';
 import { getRedisClient } from './utils/queue';
 
 const log = (message: string) => console.log(`[firestore-session-sync] ${message}`);
@@ -278,7 +277,6 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     if (existingQcItems.length === 0) {
       try {
         log(`Proactive hydration: ${shipment.orderNumber} has session but no QC items, hydrating...`);
-        await ensureKitMappingsFresh();
         const hydrationResult = await hydrateShipment(shipment.id, shipment.orderNumber || 'unknown');
         if (hydrationResult.error) {
           log(`Proactive hydration error for ${shipment.orderNumber}: ${hydrationResult.error}`);

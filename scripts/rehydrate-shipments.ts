@@ -20,7 +20,6 @@ import { db } from '../server/db';
 import { shipments, shipmentQcItems } from '../shared/schema';
 import { eq, sql, notExists } from 'drizzle-orm';
 import { hydrateShipment } from '../server/services/qc-item-hydrator';
-import { ensureKitMappingsFresh } from '../server/services/kit-mappings-cache';
 
 async function clearQcItemsForShipment(shipmentId: string): Promise<number> {
   const result = await db
@@ -142,10 +141,6 @@ Examples:
     console.log('No shipments to process. Exiting.');
     process.exit(0);
   }
-
-  console.log('Ensuring kit mappings cache is fresh...');
-  await ensureKitMappingsFresh();
-  console.log('Kit mappings cache ready\n');
 
   console.log('Starting hydration...\n');
   console.log('='.repeat(60));

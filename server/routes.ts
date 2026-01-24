@@ -10197,9 +10197,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { hydrateShipment } = await import('./services/qc-item-hydrator');
-      const { ensureKitMappingsFresh } = await import('./services/kit-mappings-cache');
-      
-      await ensureKitMappingsFresh();
       
       // Get the order number
       const shipmentData = await db
@@ -10236,13 +10233,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { shipments: shipmentsTable, shipmentQcItems, fingerprints, fingerprintModels } = await import("@shared/schema");
       const { hydrateShipment } = await import('./services/qc-item-hydrator');
-      const { ensureKitMappingsFresh } = await import('./services/kit-mappings-cache');
       
       console.log(`[Collections] Starting COMPLETE RESET of fulfillment prep workflow...`);
-      
-      // Ensure kit mappings cache is fresh before processing
-      await ensureKitMappingsFresh();
-      console.log(`[Collections] Kit mappings cache refreshed`);
       
       // ========== PHASE 1: COMPLETE RESET ==========
       
@@ -10615,8 +10607,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getKitComponents, isKit } = await import('./services/kit-mappings-cache');
       const { sku } = req.params;
       
-      const isKitResult = isKit(sku);
-      const components = getKitComponents(sku);
+      const isKitResult = await isKit(sku);
+      const components = await getKitComponents(sku);
       
       res.json({
         sku,
@@ -13736,7 +13728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Try to get kit components if this might be a kit/AP
             try {
-              const components = getKitComponents(sku);
+              const components = await getKitComponents(sku);
               if (components && components.length > 0) {
                 kitComponents = components;
               }
@@ -13746,7 +13738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Get parent kits this SKU belongs to (reverse lookup)
             try {
-              const parents = getParentKitsForComponent(sku);
+              const parents = await getParentKitsForComponent(sku);
               if (parents && parents.length > 0) {
                 parentKits = parents;
               }
