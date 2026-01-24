@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision, real, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision, real, serial, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1227,6 +1227,97 @@ export const insertSlashbinKitComponentMappingSchema = createInsertSchema(slashb
 
 export type InsertSlashbinKitComponentMapping = z.infer<typeof insertSlashbinKitComponentMappingSchema>;
 export type SlashbinKitComponentMapping = typeof slashbinKitComponentMappings.$inferSelect;
+
+// Slashbin Orders - Shopify orders received via Slashbin webhooks
+// Flattens shipping and customer objects into main table
+export const slashbinOrders = pgTable("slashbin_orders", {
+  orderNumber: varchar("order_number").primaryKey(), // e.g., "JK3825361274"
+  orderTotal: numeric("order_total", { precision: 10, scale: 2 }),
+  orderDate: timestamp("order_date"),
+  buyerEmail: text("buyer_email"),
+  taxTotal: numeric("tax_total", { precision: 10, scale: 2 }),
+  subTotal: numeric("sub_total", { precision: 10, scale: 2 }),
+  shippingCost: numeric("shipping_cost", { precision: 10, scale: 2 }),
+  discountTotal: numeric("discount_total", { precision: 10, scale: 2 }),
+  tags: text("tags"),
+  refundTotal: numeric("refund_total", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  shippingMethod: text("shipping_method"),
+  orderStatus: text("order_status"),
+  salesChannel: text("sales_channel"),
+  // Flattened shipping fields
+  shippingFirstName: text("shipping_first_name"),
+  shippingLastName: text("shipping_last_name"),
+  shippingAddress1: text("shipping_address1"),
+  shippingAddress2: text("shipping_address2"),
+  shippingCity: text("shipping_city"),
+  shippingProvince: text("shipping_province"),
+  shippingProvinceCode: text("shipping_province_code"),
+  shippingZip: text("shipping_zip"),
+  shippingCountry: text("shipping_country"),
+  shippingCountryCode: text("shipping_country_code"),
+  shippingPhone: text("shipping_phone"),
+  shippingCompany: text("shipping_company"),
+  // Flattened customer fields
+  customerId: text("customer_id"),
+  customerEmail: text("customer_email"),
+  customerFirstName: text("customer_first_name"),
+  customerLastName: text("customer_last_name"),
+  customerPhone: text("customer_phone"),
+  customerCreatedAt: timestamp("customer_created_at"),
+  customerCurrency: text("customer_currency"),
+  customerProvince: text("customer_province"),
+  customerCountry: text("customer_country"),
+  customerAddress1: text("customer_address1"),
+  customerCity: text("customer_city"),
+  customerZip: text("customer_zip"),
+  // Tracking timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orderDateIdx: index("slashbin_orders_order_date_idx").on(table.orderDate),
+  orderStatusIdx: index("slashbin_orders_order_status_idx").on(table.orderStatus),
+  buyerEmailIdx: index("slashbin_orders_buyer_email_idx").on(table.buyerEmail),
+}));
+
+export const insertSlashbinOrderSchema = createInsertSchema(slashbinOrders).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSlashbinOrder = z.infer<typeof insertSlashbinOrderSchema>;
+export type SlashbinOrder = typeof slashbinOrders.$inferSelect;
+
+// Slashbin Order Items - Line items for Slashbin orders
+// Composite primary key of order_number + sku
+export const slashbinOrderItems = pgTable("slashbin_order_items", {
+  orderNumber: varchar("order_number").notNull().references(() => slashbinOrders.orderNumber, { onDelete: "cascade" }),
+  sku: text("sku").notNull(),
+  productName: text("product_name"),
+  qty: integer("qty"),
+  fulfillmentStatus: text("fulfillment_status"),
+  price: numeric("price", { precision: 10, scale: 2 }),
+  productBrand: text("product_brand"),
+  weight: numeric("weight", { precision: 10, scale: 2 }),
+  tax: numeric("tax", { precision: 10, scale: 2 }),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }),
+  productId: text("product_id"),
+  // Tracking timestamps
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.orderNumber, table.sku] }),
+  orderNumberIdx: index("slashbin_order_items_order_number_idx").on(table.orderNumber),
+  skuIdx: index("slashbin_order_items_sku_idx").on(table.sku),
+}));
+
+export const insertSlashbinOrderItemSchema = createInsertSchema(slashbinOrderItems).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSlashbinOrderItem = z.infer<typeof insertSlashbinOrderItemSchema>;
+export type SlashbinOrderItem = typeof slashbinOrderItems.$inferSelect;
 
 // ============================================================================
 // PHASE 3: SMART SHIPPING ENGINE - FINGERPRINT DETECTION & LEARNING
