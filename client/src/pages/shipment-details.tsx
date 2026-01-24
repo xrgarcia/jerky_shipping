@@ -734,116 +734,114 @@ export default function ShipmentDetails() {
         </CardContent>
       </Card>
 
-      {/* TIER 2: Shipping Context */}
+      {/* TIER 2: Shipping */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Shipping Context
+            Shipping
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Address */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Ship To</p>
-                <p className="text-xl font-semibold">{shipment.shipToName || 'Unknown'}</p>
-                {shipment.shipToCompany && (
-                  <p className="text-muted-foreground">{shipment.shipToCompany}</p>
-                )}
-              </div>
-              
-              <div className="space-y-1 text-base">
-                {shipment.shipToAddressLine1 && <p>{shipment.shipToAddressLine1}</p>}
-                {shipment.shipToAddressLine2 && <p>{shipment.shipToAddressLine2}</p>}
-                {shipment.shipToAddressLine3 && <p>{shipment.shipToAddressLine3}</p>}
-                <p>
-                  {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
-                    .filter(Boolean)
-                    .join(', ')}
-                </p>
-                {shipment.shipToCountry && <p>{shipment.shipToCountry}</p>}
-                {shipment.shipToIsResidential && (
-                  <Badge variant="outline" className="mt-2">
-                    {shipment.shipToIsResidential === 'yes' ? 'Residential' : 'Commercial'}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Contact Info */}
-              {(shipment.shipToEmail || shipment.shipToPhone) && (
-                <div className="space-y-2 pt-2 border-t">
-                  {shipment.shipToEmail && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground truncate">{shipment.shipToEmail}</span>
-                    </div>
-                  )}
-                  {shipment.shipToPhone && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{shipment.shipToPhone}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+        <CardContent className="space-y-4">
+          {/* Top Row: Carrier, Service, Order Date, Ship Date - all aligned */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Carrier</p>
+              <p className="font-semibold uppercase">{shipment.carrierCode || '—'}</p>
             </div>
-
-            {/* Right Column: Shipping Method & Timestamps */}
-            <div className="space-y-4">
-              {/* Shipping Method */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Carrier</p>
-                  <p className="text-lg font-semibold uppercase">{shipment.carrierCode || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Service</p>
-                  <p className="text-base">{shipment.serviceCode || '—'}</p>
-                </div>
-              </div>
-
-              {/* Tracking */}
-              {shipment.trackingNumber && (
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-sm text-muted-foreground mb-1">Tracking Number</p>
-                  <div className="flex items-center gap-2">
-                    <code className="font-mono text-sm">{shipment.trackingNumber}</code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
-                      data-testid="button-copy-tracking"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Customer Notes */}
-              {shipment.notesFromBuyer && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">Customer Notes</p>
-                  <p className="text-sm" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
-                <div>
-                  <p className="text-xs text-muted-foreground">Order Date</p>
-                  <p className="font-mono">{shipment.orderDate ? new Date(shipment.orderDate).toLocaleDateString() : '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Ship Date</p>
-                  <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleDateString() : '—'}</p>
-                </div>
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Service</p>
+              <p className="font-medium">{shipment.serviceCode || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Order Date</p>
+              <p className="font-mono">{shipment.orderDate ? new Date(shipment.orderDate).toLocaleDateString() : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Ship Date</p>
+              <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleDateString() : '—'}</p>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="border-t" />
+
+          {/* Address and Contact Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Ship To Address */}
+            <div className="lg:col-span-2">
+              <p className="text-xs text-muted-foreground mb-2">Ship To</p>
+              <div className="flex flex-col sm:flex-row sm:gap-8">
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">{shipment.shipToName || 'Unknown'}</p>
+                  {shipment.shipToCompany && (
+                    <p className="text-muted-foreground">{shipment.shipToCompany}</p>
+                  )}
+                  <div className="text-sm space-y-0.5">
+                    {shipment.shipToAddressLine1 && <p>{shipment.shipToAddressLine1}</p>}
+                    {shipment.shipToAddressLine2 && <p>{shipment.shipToAddressLine2}</p>}
+                    {shipment.shipToAddressLine3 && <p>{shipment.shipToAddressLine3}</p>}
+                    <p>
+                      {[shipment.shipToCity, shipment.shipToState, shipment.shipToPostalCode]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </p>
+                    {shipment.shipToCountry && <p>{shipment.shipToCountry}</p>}
+                  </div>
+                  {shipment.shipToIsResidential && (
+                    <Badge variant="outline" className="mt-2">
+                      {shipment.shipToIsResidential === 'yes' ? 'Residential' : 'Commercial'}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Contact Info */}
+                {(shipment.shipToEmail || shipment.shipToPhone) && (
+                  <div className="space-y-2 mt-4 sm:mt-0 sm:border-l sm:pl-8">
+                    {shipment.shipToEmail && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground truncate">{shipment.shipToEmail}</span>
+                      </div>
+                    )}
+                    {shipment.shipToPhone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{shipment.shipToPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tracking */}
+            {shipment.trackingNumber && (
+              <div className="bg-muted/50 rounded-lg p-3 h-fit">
+                <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
+                <div className="flex items-center gap-2">
+                  <code className="font-mono text-sm">{shipment.trackingNumber}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
+                    data-testid="button-copy-tracking"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Customer Notes */}
+          {shipment.notesFromBuyer && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">Customer Notes</p>
+              <p className="text-sm" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
