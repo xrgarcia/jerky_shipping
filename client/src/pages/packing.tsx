@@ -3761,7 +3761,7 @@ export default function Packing() {
                       
                       {/* Completed Items Section - Collapsible */}
                       {completedItems.length > 0 && (
-                        <Accordion type="single" collapsible data-testid="accordion-completed-items-container">
+                        <Accordion type="single" collapsible defaultValue="completed-items" data-testid="accordion-completed-items-container">
                           <AccordionItem value="completed-items" className="border rounded-lg px-4" data-testid="accordion-completed-items">
                             <AccordionTrigger className="hover:no-underline" data-testid="trigger-completed-items">
                               <span className="text-sm font-medium flex items-center gap-2">
