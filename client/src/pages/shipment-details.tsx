@@ -457,7 +457,7 @@ export default function ShipmentDetails() {
             return (
               <div className="space-y-3">
                 {/* Main Flow */}
-                <div className="overflow-x-auto overflow-y-visible py-3">
+                <div className="overflow-x-auto overflow-y-visible pt-4 pb-3">
                   <div className="flex items-start gap-1 min-w-max">
                     {lifecycleFlowSteps.map((step, index) => {
                       const isPast = currentIndex > index;
@@ -485,7 +485,7 @@ export default function ShipmentDetails() {
                             </div>
                             <span className={`
                               text-xs mt-2 text-center leading-tight h-8 flex items-start justify-center
-                              ${isCurrent ? 'font-semibold text-primary' : ''}
+                              ${isCurrent ? 'font-bold text-primary' : ''}
                               ${isPast ? 'text-green-600 dark:text-green-500' : ''}
                               ${isFuture || isUnreachable ? 'text-muted-foreground' : ''}
                             `}>
