@@ -446,8 +446,8 @@ export default function ShipmentDetails() {
             })()}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Visual Flow Stepper */}
+        <CardContent className="space-y-4">
+          {/* Visual Flow Stepper - Always Visible */}
           {(() => {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
@@ -455,7 +455,7 @@ export default function ShipmentDetails() {
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
             
             return (
-              <div className="space-y-4">
+              <div className="space-y-3 pt-2">
                 {/* Main Flow */}
                 <div className="overflow-x-auto pb-2">
                   <div className="flex items-center gap-1 min-w-max">
@@ -518,195 +518,202 @@ export default function ShipmentDetails() {
             );
           })()}
 
-          {/* Why This Status & What Happens Next */}
-          {(() => {
-            const info = getLifecycleInfo(shipment);
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm">Why This Status?</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{info.whyThisStatus}</p>
-                </div>
-                <div className="bg-primary/5 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Play className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">What Happens Next?</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{info.whatHappensNext}</p>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Current Status Values */}
-          {(() => {
-            const info = getLifecycleInfo(shipment);
-            const isMatched = (field: string) => info.matchedFields.includes(field);
-            const matchedClass = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500';
-            const notMatchedClass = 'bg-muted';
-            
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
-                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
-                    {shipment.shipmentStatus || 'null'}
-                  </code>
-                  {isMatched('shipmentStatus') && <p className="text-xs text-green-600">✓ matched</p>}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
-                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
-                    {shipment.status || 'null'}
-                  </code>
-                  {isMatched('status') && <p className="text-xs text-green-600">✓ matched</p>}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Status</p>
-                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
-                    {shipment.sessionStatus || 'null'}
-                  </code>
-                  {isMatched('sessionStatus') && <p className="text-xs text-green-600">✓ matched</p>}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">MOVE OVER Tag</p>
-                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('hasMoveOverTag') ? matchedClass : (hasMoveOverTag ? 'bg-green-100 dark:bg-green-900/30' : notMatchedClass)}`}>
-                    {hasMoveOverTag ? 'YES' : 'NO'}
-                  </code>
-                  {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">✓ matched</p>}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
-                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
-                    {shipment.trackingNumber ? 'YES' : 'NO'}
-                  </code>
-                  {isMatched('trackingNumber') && <p className="text-xs text-green-600">✓ matched</p>}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Label Preview & Session Info Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Label Section */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Shipping Label</span>
-              </div>
-              {shipment.labelUrl ? (
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
-                    Label Available
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(shipment.labelUrl!, '_blank')}
-                    data-testid="button-view-label"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    View Label
-                  </Button>
-                </div>
-              ) : (
-                <Badge variant="outline" className="text-muted-foreground">
-                  No Label Generated
-                </Badge>
-              )}
-            </div>
-
-            {/* Session Info */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Boxes className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Session Info</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {shipment.sessionId ? (
-                  <Badge variant="secondary">Session: {shipment.sessionId}</Badge>
-                ) : (
-                  <Badge variant="outline" className="text-muted-foreground">No Session</Badge>
-                )}
-                {shipment.pickerName && (
-                  <Badge variant="secondary">Picker: {shipment.pickerName}</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Timestamps */}
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Timer className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Timestamps</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Pick Started</p>
-                <p className="font-mono">{shipment.pickStartedAt ? new Date(shipment.pickStartedAt).toLocaleString() : '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pick Ended</p>
-                <p className="font-mono">{shipment.pickEndedAt ? new Date(shipment.pickEndedAt).toLocaleString() : '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Ship Date</p>
-                <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleString() : '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Last Updated</p>
-                <p className="font-mono">{shipment.updatedAt ? new Date(shipment.updatedAt).toLocaleString() : '—'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Technical Details (Collapsible) */}
-          <details className="border-t pt-4">
-            <summary className="cursor-pointer flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground">
-              <Play className="h-4 w-4" />
-              <span className="font-semibold">Technical Details (for debugging)</span>
+          {/* Collapsible Details Section */}
+          <details className="group">
+            <summary className="cursor-pointer flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground border-t">
+              <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+              <span className="font-medium">Show Details</span>
             </summary>
-            <div className="mt-3 space-y-3">
-              {/* Current field values */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="bg-muted/50 rounded p-2">
-                  <span className="text-muted-foreground">shipmentStatus:</span>
-                  <code className="block font-mono">{shipment.shipmentStatus || 'null'}</code>
+            
+            <div className="pt-4 space-y-6">
+              {/* Why This Status & What Happens Next */}
+              {(() => {
+                const info = getLifecycleInfo(shipment);
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold text-sm">Why This Status?</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{info.whyThisStatus}</p>
+                    </div>
+                    <div className="bg-primary/5 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Play className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-sm">What Happens Next?</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{info.whatHappensNext}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Current Status Values */}
+              {(() => {
+                const info = getLifecycleInfo(shipment);
+                const isMatched = (field: string) => info.matchedFields.includes(field);
+                const matchedClass = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500';
+                const notMatchedClass = 'bg-muted';
+                
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
+                        {shipment.shipmentStatus || 'null'}
+                      </code>
+                      {isMatched('shipmentStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
+                        {shipment.status || 'null'}
+                      </code>
+                      {isMatched('status') && <p className="text-xs text-green-600">✓ matched</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Status</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
+                        {shipment.sessionStatus || 'null'}
+                      </code>
+                      {isMatched('sessionStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">MOVE OVER Tag</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('hasMoveOverTag') ? matchedClass : (hasMoveOverTag ? 'bg-green-100 dark:bg-green-900/30' : notMatchedClass)}`}>
+                        {hasMoveOverTag ? 'YES' : 'NO'}
+                      </code>
+                      {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">✓ matched</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
+                        {shipment.trackingNumber ? 'YES' : 'NO'}
+                      </code>
+                      {isMatched('trackingNumber') && <p className="text-xs text-green-600">✓ matched</p>}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Label Preview & Session Info Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Label Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold">Shipping Label</span>
+                  </div>
+                  {shipment.labelUrl ? (
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
+                        Label Available
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(shipment.labelUrl!, '_blank')}
+                        data-testid="button-view-label"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        View Label
+                      </Button>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      No Label Generated
+                    </Badge>
+                  )}
                 </div>
-                <div className="bg-muted/50 rounded p-2">
-                  <span className="text-muted-foreground">status:</span>
-                  <code className="block font-mono">{shipment.status || 'null'}</code>
-                </div>
-                <div className="bg-muted/50 rounded p-2">
-                  <span className="text-muted-foreground">sessionStatus:</span>
-                  <code className="block font-mono">{shipment.sessionStatus || 'null'}</code>
-                </div>
-                <div className="bg-muted/50 rounded p-2">
-                  <span className="text-muted-foreground">hasMoveOverTag:</span>
-                  <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
+
+                {/* Session Info */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Boxes className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold">Session Info</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {shipment.sessionId ? (
+                      <Badge variant="secondary">Session: {shipment.sessionId}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">No Session</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
-              
-              {/* All lifecycle phases reference */}
-              <div className="text-xs">
-                <p className="text-muted-foreground mb-2">Lifecycle phase priority (checked in order):</p>
-                <ol className="list-decimal list-inside space-y-1 text-muted-foreground font-mono">
-                  <li>DELIVERED: shipmentStatus='label_purchased' AND status='DE'</li>
-                  <li>IN_TRANSIT: shipmentStatus='label_purchased' AND status='IT'</li>
-                  <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')</li>
-                  <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasMoveOverTag</li>
-                  <li>PICKING_ISSUES: sessionStatus='inactive'</li>
-                  <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
-                  <li>PICKING: sessionStatus='active'</li>
-                  <li>READY_TO_PICK: sessionStatus='new'</li>
-                  <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus</li>
-                  <li>AWAITING_DECISIONS: fallback</li>
-                </ol>
+
+              {/* Timestamps */}
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Timer className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Timestamps</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pick Started</p>
+                    <p className="font-mono">{shipment.pickStartedAt ? new Date(shipment.pickStartedAt).toLocaleString() : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pick Ended</p>
+                    <p className="font-mono">{shipment.pickEndedAt ? new Date(shipment.pickEndedAt).toLocaleString() : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ship Date</p>
+                    <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleString() : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Last Updated</p>
+                    <p className="font-mono">{shipment.updatedAt ? new Date(shipment.updatedAt).toLocaleString() : '—'}</p>
+                  </div>
+                </div>
               </div>
+
+              {/* Technical Details (Nested Collapsible) */}
+              <details className="border-t pt-4">
+                <summary className="cursor-pointer flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground">
+                  <Play className="h-4 w-4" />
+                  <span className="font-semibold">Technical Details (for debugging)</span>
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {/* Current field values */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">shipmentStatus:</span>
+                      <code className="block font-mono">{shipment.shipmentStatus || 'null'}</code>
+                    </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">status:</span>
+                      <code className="block font-mono">{shipment.status || 'null'}</code>
+                    </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">sessionStatus:</span>
+                      <code className="block font-mono">{shipment.sessionStatus || 'null'}</code>
+                    </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">hasMoveOverTag:</span>
+                      <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
+                    </div>
+                  </div>
+                  
+                  {/* All lifecycle phases reference */}
+                  <div className="text-xs">
+                    <p className="text-muted-foreground mb-2">Lifecycle phase priority (checked in order):</p>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground font-mono">
+                      <li>DELIVERED: shipmentStatus='label_purchased' AND status='DE'</li>
+                      <li>IN_TRANSIT: shipmentStatus='label_purchased' AND status='IT'</li>
+                      <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')</li>
+                      <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasMoveOverTag</li>
+                      <li>PICKING_ISSUES: sessionStatus='inactive'</li>
+                      <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
+                      <li>PICKING: sessionStatus='active'</li>
+                      <li>READY_TO_PICK: sessionStatus='new'</li>
+                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus</li>
+                      <li>AWAITING_DECISIONS: fallback</li>
+                    </ol>
+                  </div>
+                </div>
+              </details>
             </div>
           </details>
         </CardContent>
