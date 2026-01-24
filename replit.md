@@ -41,9 +41,10 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Sessionable Order Status**: The lifecycle state machine treats only `pending` shipment status as valid for `READY_TO_SESSION` phase. The `on_hold` status indicates orders that are BEFORE fulfillment starts (waiting in ShipStation queue), while `pending` indicates orders ready to be sessioned.
 - **Lifecycle State Machine Documentation**: See `life_cycle_states_legacy.md` for comparison of the legacy SQL-based tab criteria vs. the current state machine approach. The state machine (`server/services/lifecycle-state-machine.ts`) is the single source of truth for order status determination.
 - **Kit Explosion Race Condition Prevention**: Multi-layered approach to ensure kits are properly exploded into component SKUs:
-    1. **Kit Mappings Cache Age Check**: `ensureKitMappingsFresh()` checks cache age and forces reload if >5 minutes old, preventing stale mappings.
-    2. **Proactive Hydration in Session Sync**: When Firestore session sync sets `session_status`, checks if QC items exist and hydrates if missing. Catches shipments that bypass normal hydration flow.
-    3. **Repair Job Endpoint**: `POST /api/collections/repair-unexploded-kits` detects and fixes shipments with un-exploded kit SKUs by deleting QC items and re-running hydration with fresh mappings.
+    1. **Lazy-Loading Kit Cache**: `isKit()` and `getKitComponents()` are async functions that use a cache-first pattern with automatic DB fallback on cache miss. Negative caching prevents repeated DB lookups for non-kit SKUs.
+    2. **Hourly GCP Sync**: `syncKitMappingsFromGcp()` runs hourly to populate the cache with all kit mappings from the reporting database, with cache invalidation for updated SKUs.
+    3. **Proactive Hydration in Session Sync**: When Firestore session sync sets `session_status`, checks if QC items exist and hydrates if missing. Catches shipments that bypass normal hydration flow.
+    4. **Repair Job Endpoint**: `POST /api/collections/repair-unexploded-kits` detects and fixes shipments with un-exploded kit SKUs by deleting QC items and re-running hydration.
 - **Packing Completion Audit Logging**: All packing actions logged to `packing_logs` table.
 - **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
 - **Voided Label Handling**: Automatic new label creation, PDF validation, printing to requesting worker's station, audit logging, and QC cache invalidation.
