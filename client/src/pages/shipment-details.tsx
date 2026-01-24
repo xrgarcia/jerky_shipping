@@ -455,9 +455,9 @@ export default function ShipmentDetails() {
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
             
             return (
-              <div className="space-y-3 pt-4">
+              <div className="space-y-3">
                 {/* Main Flow */}
-                <div className="overflow-x-auto pb-2">
+                <div className="overflow-x-auto overflow-y-visible py-3">
                   <div className="flex items-start gap-1 min-w-max">
                     {lifecycleFlowSteps.map((step, index) => {
                       const isPast = currentIndex > index;
