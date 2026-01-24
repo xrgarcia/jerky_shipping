@@ -743,44 +743,67 @@ export default function ShipmentDetails() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Row 1: Tracking, Service, Order Date, Ship Date, Total Weight */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
-              {shipment.trackingNumber ? (
-                <div className="flex items-center gap-1">
-                  <code className="font-mono text-sm truncate">{shipment.trackingNumber}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 flex-shrink-0"
-                    onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
-                    data-testid="button-copy-tracking"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
+          {/* Row 1: Carrier, Service, Tracking, Order Date, Ship Date, Total Weight */}
+          {(() => {
+            // Parse carrier from service_code (e.g., "usps_ground_advantage" -> "USPS")
+            const parseCarrier = (serviceCode: string | null): string => {
+              if (!serviceCode) return '—';
+              const carrier = serviceCode.split('_')[0];
+              return carrier ? carrier.toUpperCase() : '—';
+            };
+            
+            // Parse service name from service_code (e.g., "usps_ground_advantage" -> "Ground Advantage")
+            const parseService = (serviceCode: string | null): string => {
+              if (!serviceCode) return '—';
+              const parts = serviceCode.split('_');
+              if (parts.length <= 1) return serviceCode;
+              return parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+            };
+
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Carrier</p>
+                  <p className="font-semibold">{parseCarrier(shipment.serviceCode)}</p>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Service</p>
-              <p className="font-medium">{shipment.serviceCode || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Order Date</p>
-              <p className="font-mono">{shipment.orderDate ? new Date(shipment.orderDate).toLocaleDateString() : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Ship Date</p>
-              <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleDateString() : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
-              <p className="font-medium">{shipment.totalWeight || '—'}</p>
-            </div>
-          </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Service</p>
+                  <p className="font-medium">{parseService(shipment.serviceCode)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
+                  {shipment.trackingNumber ? (
+                    <div className="flex items-center gap-1">
+                      <code className="font-mono text-sm truncate">{shipment.trackingNumber}</code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 flex-shrink-0"
+                        onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
+                        data-testid="button-copy-tracking"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">—</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Order Date</p>
+                  <p className="font-mono">{shipment.orderDate ? new Date(shipment.orderDate).toLocaleDateString() : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Ship Date</p>
+                  <p className="font-mono">{shipment.shipDate ? new Date(shipment.shipDate).toLocaleDateString() : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
+                  <p className="font-medium">{shipment.totalWeight || '—'}</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Divider */}
           <div className="border-t" />
