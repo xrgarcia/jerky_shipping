@@ -455,10 +455,10 @@ export default function ShipmentDetails() {
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
             
             return (
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-4">
                 {/* Main Flow */}
                 <div className="overflow-x-auto pb-2">
-                  <div className="flex items-center gap-1 min-w-max">
+                  <div className="flex items-start gap-1 min-w-max">
                     {lifecycleFlowSteps.map((step, index) => {
                       const isPast = currentIndex > index;
                       const isCurrent = currentPhase === step.phase;
@@ -466,12 +466,12 @@ export default function ShipmentDetails() {
                       const isUnreachable = isExceptionState && currentIndex < index;
                       
                       return (
-                        <div key={step.phase} className="flex items-center">
-                          <div className={`flex flex-col items-center ${isCurrent ? 'scale-110' : ''}`}>
+                        <div key={step.phase} className="flex items-start">
+                          <div className="flex flex-col items-center w-[70px]">
                             <div className={`
-                              w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all
+                              w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0
                               ${isPast ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-600' : ''}
-                              ${isCurrent ? 'bg-primary text-primary-foreground border-primary ring-4 ring-primary/20' : ''}
+                              ${isCurrent ? 'bg-primary text-primary-foreground border-primary ring-4 ring-primary/20 scale-110' : ''}
                               ${isFuture ? 'bg-muted border-muted-foreground/30 text-muted-foreground' : ''}
                               ${isUnreachable ? 'bg-muted/50 border-dashed border-muted-foreground/20 text-muted-foreground/50' : ''}
                             `}>
@@ -484,7 +484,7 @@ export default function ShipmentDetails() {
                               )}
                             </div>
                             <span className={`
-                              text-xs mt-1 text-center max-w-[70px] leading-tight
+                              text-xs mt-2 text-center leading-tight h-8 flex items-start justify-center
                               ${isCurrent ? 'font-semibold text-primary' : ''}
                               ${isPast ? 'text-green-600 dark:text-green-500' : ''}
                               ${isFuture || isUnreachable ? 'text-muted-foreground' : ''}
@@ -494,7 +494,7 @@ export default function ShipmentDetails() {
                           </div>
                           {index < lifecycleFlowSteps.length - 1 && (
                             <ChevronRight className={`
-                              h-4 w-4 mx-1 flex-shrink-0
+                              h-4 w-4 mt-3 flex-shrink-0
                               ${isPast ? 'text-green-500' : 'text-muted-foreground/30'}
                             `} />
                           )}
