@@ -398,12 +398,19 @@ export default function ShipmentDetails() {
             </div>
             
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Out of Stock Warning */}
-              {hasOutOfStockItems && (
-                <Badge variant="outline" className="border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Out of Stock
-                </Badge>
+              {/* Stock Status Badge - always show either IN STOCK or OUT OF STOCK */}
+              {qcItems && qcItems.length > 0 && (
+                hasOutOfStockItems ? (
+                  <Badge variant="outline" className="border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 gap-1" data-testid="badge-out-of-stock">
+                    <AlertTriangle className="h-3 w-3" />
+                    OUT OF STOCK
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 gap-1" data-testid="badge-in-stock">
+                    <CheckCircle className="h-3 w-3" />
+                    IN STOCK
+                  </Badge>
+                )
               )}
               
               {/* Status Badge */}
