@@ -285,6 +285,7 @@ interface ReadyToSessionOrder {
   stationName: string | null;
   stationType: string | null;
   tags: { name: string; color: string | null }[];
+  duplicateOf: string | null;
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -2451,7 +2452,18 @@ export default function Fingerprints() {
                             />
                           </td>
                           <td className="py-2 px-3 font-mono text-sm">
-                            {order.orderNumber}
+                            <div className="flex items-center gap-2">
+                              {order.orderNumber}
+                              {order.duplicateOf && (
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs px-1.5 py-0 border-amber-500 text-amber-600 dark:text-amber-400"
+                                  data-testid={`badge-duplicate-${order.orderNumber}`}
+                                >
+                                  duplicate: {order.duplicateOf}
+                                </Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2 px-3 text-sm">
                             {order.stationType ? (
