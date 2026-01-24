@@ -12,7 +12,7 @@ import { storage } from '../storage';
 import type { IStorage } from '../storage';
 import type { InsertShipment, InsertShipmentItem, InsertShipmentTag, InsertShipmentPackage } from '@shared/schema';
 import { db } from '../db';
-import { shipmentItems, shipmentTags, shipmentPackages, orderItems } from '@shared/schema';
+import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { updateShipmentLifecycle } from './lifecycle-service';
 
@@ -213,8 +213,20 @@ export class ShipStationShipmentETLService {
   }
 
   /**
+   * Build a normalized fingerprint of items for comparison
+   * Returns a sorted string of "SKU:QTY" pairs to detect split/merge changes
+   */
+  private buildItemsFingerprint(items: { sku: string | null; quantity: number }[]): string {
+    return items
+      .map(item => `${item.sku || 'NO_SKU'}:${item.quantity}`)
+      .sort()
+      .join('|');
+  }
+
+  /**
    * Process shipment items - normalize into shipment_items table
    * Deletes existing entries and re-creates from current shipmentData
+   * IMPORTANT: Detects item changes (split/merge) and invalidates QC items when items change
    */
   async processShipmentItems(shipmentId: string, shipmentData: any): Promise<void> {
     if (!shipmentData || !shipmentData.items || !Array.isArray(shipmentData.items)) {
@@ -222,6 +234,48 @@ export class ShipStationShipmentETLService {
     }
 
     try {
+      // Get existing items to detect changes
+      const existingItems = await db
+        .select({ sku: shipmentItems.sku, quantity: shipmentItems.quantity })
+        .from(shipmentItems)
+        .where(eq(shipmentItems.shipmentId, shipmentId));
+
+      // Build fingerprints for comparison
+      const existingFingerprint = this.buildItemsFingerprint(existingItems);
+      const incomingFingerprint = this.buildItemsFingerprint(
+        shipmentData.items.map((item: any) => ({
+          sku: item.sku || null,
+          quantity: item.quantity,
+        }))
+      );
+
+      // Check if items have changed (split/merge detection)
+      const itemsChanged = existingItems.length > 0 && existingFingerprint !== incomingFingerprint;
+
+      if (itemsChanged) {
+        console.log(`[ShipStationShipmentETL] ITEM CHANGE DETECTED for shipment ${shipmentId}`);
+        console.log(`[ShipStationShipmentETL]   Old items: ${existingFingerprint}`);
+        console.log(`[ShipStationShipmentETL]   New items: ${incomingFingerprint}`);
+
+        // Invalidate QC items - delete existing ones so hydrator will re-run
+        const deletedQcItems = await db
+          .delete(shipmentQcItems)
+          .where(eq(shipmentQcItems.shipmentId, shipmentId))
+          .returning({ id: shipmentQcItems.id });
+
+        if (deletedQcItems.length > 0) {
+          console.log(`[ShipStationShipmentETL]   Deleted ${deletedQcItems.length} QC items for re-hydration`);
+        }
+
+        // Reset fingerprint so it gets recalculated
+        await db
+          .update(shipments)
+          .set({ fingerprintId: null })
+          .where(eq(shipments.id, shipmentId));
+
+        console.log(`[ShipStationShipmentETL]   Reset fingerprintId for re-calculation`);
+      }
+
       // Delete existing entries for this shipment (ensure clean state)
       await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, shipmentId));
 
