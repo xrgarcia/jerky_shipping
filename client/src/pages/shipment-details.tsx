@@ -835,13 +835,30 @@ export default function ShipmentDetails() {
             )}
           </div>
 
-          {/* Customer Notes */}
-          {shipment.notesFromBuyer && (
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-1">Customer Notes</p>
-              <p className="text-sm" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
+          {/* Notes Section - always visible */}
+          <div className="border-t pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer Notes */}
+              <div className={shipment.notesFromBuyer ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3" : ""}>
+                <p className="text-xs text-muted-foreground mb-1">Customer Notes</p>
+                {shipment.notesFromBuyer ? (
+                  <p className="text-sm" data-testid="text-buyer-notes">{shipment.notesFromBuyer}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+              </div>
+
+              {/* Gift Notes */}
+              <div className={shipment.notesForGift ? "bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3" : ""}>
+                <p className="text-xs text-muted-foreground mb-1">Gift Notes</p>
+                {shipment.notesForGift ? (
+                  <p className="text-sm" data-testid="text-gift-notes">{shipment.notesForGift}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+              </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
