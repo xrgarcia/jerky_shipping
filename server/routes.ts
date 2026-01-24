@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -2590,6 +2590,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error: any) {
       console.error("Error processing Slashbin webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Slashbin webhook endpoint - receives Shopify orders from Slashbin
+  app.post("/api/webhooks/slashbin/shopifyOrders", async (req, res) => {
+    const receivedAt = new Date().toISOString();
+    
+    try {
+      // Extract headers
+      const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
+      const jobId = req.headers['x-slashbin-job-id'] as string;
+      const topic = req.headers['x-slashbin-topic'] as string;
+      
+      console.log("========== SLASHBIN SHOPIFY ORDERS WEBHOOK RECEIVED ==========");
+      console.log("Timestamp:", receivedAt);
+      console.log("Job ID:", jobId || 'missing');
+      console.log("Topic:", topic || 'missing');
+      console.log("Signature Present:", !!signatureHeader);
+      
+      // Get signing secret
+      const signingSecret = process.env.SHOPIFY_ORDERS_SIGNING_KEY;
+      
+      if (!signingSecret) {
+        console.error("[Slashbin] SHOPIFY_ORDERS_SIGNING_KEY not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+      
+      // Verify signature
+      const rawBody = req.rawBody as Buffer;
+      if (!verifySlashbinWebhook(rawBody, signatureHeader, signingSecret)) {
+        console.error("========== SLASHBIN SHOPIFY ORDERS WEBHOOK VERIFICATION FAILED ==========");
+        console.error(`Timestamp: ${receivedAt}`);
+        console.error(`Job ID: ${jobId || 'unknown'}`);
+        console.error(`Topic: ${topic || 'unknown'}`);
+        console.error(`Signature Header: ${signatureHeader ? 'present' : 'missing'}`);
+        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
+        console.error("===========================================================");
+        return res.status(401).json({ error: "Webhook verification failed" });
+      }
+      
+      console.log("[Slashbin] Shopify orders signature verified successfully");
+      
+      // Check idempotency - avoid processing duplicate webhooks
+      const payloadJobId = req.body.slashbinJobId || jobId;
+      if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
+        console.log(`[Slashbin] Job ${payloadJobId} already processed, skipping (idempotency)`);
+        return res.status(200).json({ success: true, message: "Already processed" });
+      }
+      
+      // Process Shopify order payload - structure is payload object
+      const orderPayload = req.body.payload;
+      if (!orderPayload || !orderPayload.orderNumber) {
+        console.error("[Slashbin] Invalid payload: missing payload.orderNumber");
+        return res.status(400).json({ error: "Invalid payload: missing orderNumber" });
+      }
+      
+      const orderNumber = orderPayload.orderNumber;
+      const items = orderPayload.items || [];
+      
+      console.log(`[Slashbin] Processing Shopify order ${orderNumber} with ${items.length} items`);
+      
+      // Upsert order data into slashbin_orders table
+      const orderData = {
+        orderNumber: orderPayload.orderNumber,
+        orderTotal: orderPayload.orderTotal?.toString() || null,
+        orderDate: orderPayload.orderDate ? new Date(orderPayload.orderDate) : null,
+        buyerEmail: orderPayload.buyerEmail || null,
+        taxTotal: orderPayload.taxTotal?.toString() || null,
+        subTotal: orderPayload.subTotal?.toString() || null,
+        shippingCost: orderPayload.shippingCost?.toString() || null,
+        discountTotal: orderPayload.discountTotal?.toString() || null,
+        tags: orderPayload.tags || null,
+        refundTotal: orderPayload.refundTotal?.toString() || null,
+        notes: orderPayload.notes || null,
+        shippingMethod: orderPayload.shippingMethod || null,
+        orderStatus: orderPayload.orderStatus || null,
+        salesChannel: orderPayload.salesChannel || null,
+        // Flattened shipping address fields
+        shippingFirstName: orderPayload.shippingAddress?.firstName || null,
+        shippingLastName: orderPayload.shippingAddress?.lastName || null,
+        shippingAddress1: orderPayload.shippingAddress?.address1 || null,
+        shippingAddress2: orderPayload.shippingAddress?.address2 || null,
+        shippingCity: orderPayload.shippingAddress?.city || null,
+        shippingProvince: orderPayload.shippingAddress?.province || null,
+        shippingProvinceCode: orderPayload.shippingAddress?.provinceCode || null,
+        shippingZip: orderPayload.shippingAddress?.zip || null,
+        shippingCountry: orderPayload.shippingAddress?.country || null,
+        shippingCountryCode: orderPayload.shippingAddress?.countryCode || null,
+        shippingPhone: orderPayload.shippingAddress?.phone || null,
+        shippingCompany: orderPayload.shippingAddress?.company || null,
+        // Flattened customer fields
+        customerId: orderPayload.customer?.id?.toString() || null,
+        customerEmail: orderPayload.customer?.email || null,
+        customerFirstName: orderPayload.customer?.firstName || null,
+        customerLastName: orderPayload.customer?.lastName || null,
+        customerPhone: orderPayload.customer?.phone || null,
+        customerCreatedAt: orderPayload.customer?.createdAt ? new Date(orderPayload.customer.createdAt) : null,
+        customerCurrency: orderPayload.customer?.currency || null,
+        customerProvince: orderPayload.customer?.province || null,
+        customerCountry: orderPayload.customer?.country || null,
+        customerAddress1: orderPayload.customer?.address1 || null,
+        customerCity: orderPayload.customer?.city || null,
+        customerZip: orderPayload.customer?.zip || null,
+        updatedAt: new Date(),
+      };
+      
+      // Upsert the order (insert or update on conflict)
+      await db.insert(slashbinOrders)
+        .values(orderData)
+        .onConflictDoUpdate({
+          target: slashbinOrders.orderNumber,
+          set: {
+            ...orderData,
+            updatedAt: new Date(),
+          },
+        });
+      
+      // Delete existing items for this order, then insert new ones
+      await db.delete(slashbinOrderItems).where(eq(slashbinOrderItems.orderNumber, orderNumber));
+      
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item: any) => ({
+          orderNumber,
+          sku: item.sku || '',
+          productName: item.productName || null,
+          qty: item.qty || null,
+          fulfillmentStatus: item.fulfillmentStatus || null,
+          price: item.price?.toString() || null,
+          productBrand: item.productBrand || null,
+          weight: item.weight?.toString() || null,
+          tax: item.tax?.toString() || null,
+          subtotal: item.subtotal?.toString() || null,
+          productId: item.productId?.toString() || null,
+        }));
+        
+        await db.insert(slashbinOrderItems).values(itemsToInsert);
+      }
+      
+      console.log(`[Slashbin] Successfully upserted order ${orderNumber} with ${items.length} items`);
+      
+      // Mark job as processed for idempotency
+      if (payloadJobId) {
+        markJobAsProcessed(payloadJobId);
+      }
+      
+      // Return 200 to acknowledge receipt
+      res.status(200).json({ success: true, jobId: payloadJobId, orderNumber, itemCount: items.length });
+      
+    } catch (error: any) {
+      console.error("Error processing Slashbin Shopify orders webhook:", error);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });
