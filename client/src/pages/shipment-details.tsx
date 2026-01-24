@@ -763,13 +763,34 @@ export default function ShipmentDetails() {
             </div>
           </div>
 
+          {/* Tracking Number - below shipping method */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
+            {shipment.trackingNumber ? (
+              <div className="flex items-center gap-2">
+                <code className="font-mono text-sm">{shipment.trackingNumber}</code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
+                  data-testid="button-copy-tracking"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">—</p>
+            )}
+          </div>
+
           {/* Divider */}
           <div className="border-t" />
 
           {/* Address and Contact Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
             {/* Ship To Address */}
-            <div className="lg:col-span-2">
+            <div>
               <p className="text-xs text-muted-foreground mb-2">Ship To</p>
               <div className="flex flex-col sm:flex-row sm:gap-8">
                 <div className="space-y-1">
@@ -814,25 +835,6 @@ export default function ShipmentDetails() {
                 )}
               </div>
             </div>
-
-            {/* Tracking */}
-            {shipment.trackingNumber && (
-              <div className="bg-muted/50 rounded-lg p-3 h-fit">
-                <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
-                <div className="flex items-center gap-2">
-                  <code className="font-mono text-sm">{shipment.trackingNumber}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => copyToClipboard(shipment.trackingNumber!, "Tracking number")}
-                    data-testid="button-copy-tracking"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Notes Section - always visible */}
