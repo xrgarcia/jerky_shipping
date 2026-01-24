@@ -12732,6 +12732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const readyToSessionOrders = await db
         .select({
           id: shipments.id,
+          shipmentId: shipments.shipmentId,
           orderNumber: shipments.orderNumber,
           fingerprintId: shipments.fingerprintId,
           fingerprintStatus: shipments.fingerprintStatus,
@@ -12905,7 +12906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const displaySkus = unfulfillableSkus.slice(0, 3);
           const remaining = unfulfillableSkus.length - 3;
           reason = `Out of stock: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
-          actionTab = null; // No action tab - inventory issue needs replenishment
+          actionTab = 'out_of_stock'; // Special action tab for out-of-stock - links to shipment details
         } else if (!order.fingerprintId) {
           // Order needs fingerprint - check why
           const uncategorizedSkus = uncategorizedSkusByShipment.get(order.id) || [];
@@ -12967,7 +12968,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Build actionUrl for direct navigation
         let actionUrl: string | null = null;
         if (!readyToSession) {
-          if (!order.fingerprintId) {
+          if (actionTab === 'out_of_stock' && order.shipmentId) {
+            // Out of stock - link to shipment details page
+            actionUrl = `/shipments/${order.shipmentId}`;
+          } else if (!order.fingerprintId) {
             // Need to analyze this order - link to Sessions tab
             actionUrl = '/fulfillment-prep/sessions';
           } else if (!order.packagingModelId) {
@@ -12985,6 +12989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return {
           orderNumber: order.orderNumber,
+          shipmentId: order.shipmentId,
           readyToSession,
           reason,
           actionTab,

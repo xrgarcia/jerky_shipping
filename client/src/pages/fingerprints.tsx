@@ -276,6 +276,7 @@ interface SkuShipmentsResponse {
 
 interface ReadyToSessionOrder {
   orderNumber: string;
+  shipmentId: string | null;
   readyToSession: boolean;
   reason: string;
   actionTab: string | null;
