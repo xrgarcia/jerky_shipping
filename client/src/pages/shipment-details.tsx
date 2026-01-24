@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box, ChevronRight, CircleDot, Circle, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -131,95 +131,200 @@ export default function ShipmentDetails() {
     }
   };
 
-  const getWorkflowStepBadge = (shipment: ShipmentWithOrder): { badge: JSX.Element; step: string; reason: string; matchedFields: string[] } => {
+  // Derive hasMoveOverTag from tags array
+  const hasMoveOverTag = tags?.some(tag => tag.name === 'MOVE OVER') ?? false;
+
+  // Lifecycle phases matching backend's deriveLifecyclePhase exactly
+  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'awaiting_decisions';
+  
+  interface LifecycleInfo {
+    phase: LifecyclePhase;
+    label: string;
+    description: string;
+    whyThisStatus: string;
+    whatHappensNext: string;
+    colorClass: string;
+    badgeClass: string;
+    isException?: boolean;
+    matchedFields: string[];
+  }
+
+  const getLifecycleInfo = (shipment: ShipmentWithOrder): LifecycleInfo => {
     const hasTracking = !!shipment.trackingNumber;
     const sessionStatus = shipment.sessionStatus?.toLowerCase();
     const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
-    // Normalize status to uppercase for consistent comparison with raw ShipStation codes
     const status = shipment.status?.toUpperCase();
 
-    if (status === 'DE' || status === 'DELIVERED') {
-      return {
-        step: 'Delivered',
-        reason: `status = 'DE' (ShipStation delivered)`,
-        matchedFields: ['status'],
-        badge: <Badge className="bg-green-600 text-white">Delivered</Badge>
-      };
-    }
+    // Priority order matches backend's deriveLifecyclePhase exactly
 
-    if (shipmentStatus === 'on_hold') {
+    // 1. DELIVERED - shipmentStatus='label_purchased' AND status='DE'
+    if (shipmentStatus === 'label_purchased' && status === 'DE') {
       return {
-        step: 'On Hold',
-        reason: `shipmentStatus = 'on_hold' (checked before tracking/session)`,
-        matchedFields: ['shipmentStatus'],
-        badge: <Badge className="bg-amber-600 text-white">On Hold</Badge>
-      };
-    }
-
-    // On the Dock: Label purchased AND status = 'AC' (Accepted - carrier awaiting pickup)
-    if (shipmentStatus === 'label_purchased' && status === 'AC') {
-      return {
-        step: 'On the Dock',
-        reason: `shipmentStatus = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting pickup)`,
+        phase: 'delivered',
+        label: 'Delivered',
+        description: 'Package has been delivered to the customer',
+        whyThisStatus: 'The carrier confirmed delivery to the customer.',
+        whatHappensNext: 'Order complete! No further action needed.',
+        colorClass: 'bg-green-600',
+        badgeClass: 'bg-green-600 text-white',
         matchedFields: ['shipmentStatus', 'status'],
-        badge: <Badge className="bg-blue-600 text-white">On the Dock</Badge>
       };
     }
 
+    // 2. IN_TRANSIT - shipmentStatus='label_purchased' AND status='IT'
+    if (shipmentStatus === 'label_purchased' && status === 'IT') {
+      return {
+        phase: 'in_transit',
+        label: 'In Transit',
+        description: 'Package is on its way to the customer',
+        whyThisStatus: 'The carrier has picked up the package and it\'s in transit.',
+        whatHappensNext: 'Waiting for carrier to deliver the package.',
+        colorClass: 'bg-blue-500',
+        badgeClass: 'bg-blue-500 text-white',
+        matchedFields: ['shipmentStatus', 'status'],
+      };
+    }
+
+    // 3. ON_DOCK - shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
+    if (shipmentStatus === 'label_purchased' && status && ['NY', 'AC'].includes(status)) {
+      return {
+        phase: 'on_dock',
+        label: 'On the Dock',
+        description: 'Packaged and waiting for carrier pickup',
+        whyThisStatus: 'Label was printed and package is ready. Waiting for carrier to pick it up.',
+        whatHappensNext: 'Carrier will pick up the package during their next visit.',
+        colorClass: 'bg-blue-600',
+        badgeClass: 'bg-blue-600 text-white',
+        matchedFields: ['shipmentStatus', 'status'],
+      };
+    }
+
+    // 4. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag
+    if (shipmentStatus === 'on_hold' && hasMoveOverTag && status !== 'CA') {
+      return {
+        phase: 'ready_to_fulfill',
+        label: 'Ready to Fulfill',
+        description: 'On hold in ShipStation, waiting to be released',
+        whyThisStatus: 'Order is tagged "MOVE OVER" but still on hold in ShipStation.',
+        whatHappensNext: 'ShipStation will release this order when the hold date passes.',
+        colorClass: 'bg-amber-600',
+        badgeClass: 'bg-amber-600 text-white',
+        matchedFields: ['shipmentStatus', 'hasMoveOverTag'],
+      };
+    }
+
+    // 5. PICKING_ISSUES - sessionStatus='inactive'
     if (sessionStatus === 'inactive') {
       return {
-        step: 'Picking Issues',
-        reason: `sessionStatus = 'inactive' (flagged for supervisor attention)`,
+        phase: 'picking_issues',
+        label: 'Picking Issues',
+        description: 'Problem during picking - needs supervisor attention',
+        whyThisStatus: 'The picker marked this session as inactive due to a problem.',
+        whatHappensNext: 'A supervisor needs to review and resolve the issue.',
+        colorClass: 'bg-red-600',
+        badgeClass: 'bg-red-600 text-white',
+        isException: true,
         matchedFields: ['sessionStatus'],
-        badge: <Badge className="bg-orange-600 text-white">Picking Issues</Badge>
       };
     }
 
-    if (sessionStatus === 'closed' && !hasTracking) {
+    // 6. PACKING_READY - sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'
+    if (sessionStatus === 'closed' && !hasTracking && shipmentStatus === 'pending' && status !== 'CA') {
       return {
-        step: 'Packing Ready',
-        reason: `sessionStatus = 'closed' AND trackingNumber = null (cache is warmed)`,
-        matchedFields: ['sessionStatus', 'trackingNumber'],
-        badge: <Badge className="bg-purple-600 text-white">Packing Ready</Badge>
+        phase: 'packing_ready',
+        label: 'Packing Ready',
+        description: 'Picked and ready to be packed',
+        whyThisStatus: 'All items have been picked. Order is ready for QC and packing.',
+        whatHappensNext: 'A packer will scan and pack this order, then print the label.',
+        colorClass: 'bg-purple-600',
+        badgeClass: 'bg-purple-600 text-white',
+        matchedFields: ['sessionStatus', 'trackingNumber', 'shipmentStatus'],
       };
     }
 
+    // 7. PICKING - sessionStatus='active'
     if (sessionStatus === 'active') {
       return {
-        step: 'Picking',
-        reason: `sessionStatus = 'active' (picker is working on it)`,
+        phase: 'picking',
+        label: 'Picking',
+        description: 'A picker is currently working on this order',
+        whyThisStatus: 'This order is in an active picking session.',
+        whatHappensNext: 'Picker will complete the pick, then it moves to packing.',
+        colorClass: 'bg-cyan-600',
+        badgeClass: 'bg-cyan-600 text-white',
         matchedFields: ['sessionStatus'],
-        badge: <Badge className="bg-cyan-600 text-white">Picking</Badge>
       };
     }
 
+    // 8. READY_TO_PICK - sessionStatus='new'
     if (sessionStatus === 'new') {
       return {
-        step: 'Ready to Pick',
-        reason: `sessionStatus = 'new' (in pick queue)`,
+        phase: 'ready_to_pick',
+        label: 'Ready to Pick',
+        description: 'In the pick queue, waiting for a picker',
+        whyThisStatus: 'This order is assigned to a session and waiting to be picked.',
+        whatHappensNext: 'A picker will start working on this session.',
+        colorClass: 'bg-yellow-600',
+        badgeClass: 'bg-yellow-600 text-white',
         matchedFields: ['sessionStatus'],
-        badge: <Badge className="bg-yellow-600 text-white">Ready to Pick</Badge>
       };
     }
 
+    // 9. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus
+    if (shipmentStatus === 'pending' && hasMoveOverTag && !sessionStatus && status !== 'CA') {
+      return {
+        phase: 'ready_to_session',
+        label: 'Ready to Session',
+        description: 'Released from hold, waiting to be added to a pick session',
+        whyThisStatus: 'Order is released and has the "MOVE OVER" tag, but not yet in a session.',
+        whatHappensNext: 'System will assign this order to a picking session.',
+        colorClass: 'bg-teal-600',
+        badgeClass: 'bg-teal-600 text-white',
+        matchedFields: ['shipmentStatus', 'hasMoveOverTag', 'sessionStatus'],
+      };
+    }
+
+    // 10. AWAITING_DECISIONS - fallback
     return {
-      step: 'Awaiting Pick',
-      reason: `No sessionStatus (value: ${shipment.sessionStatus || 'null'}), shipmentStatus = '${shipment.shipmentStatus || 'null'}'`,
+      phase: 'awaiting_decisions',
+      label: 'Awaiting Decisions',
+      description: 'Missing required information before it can proceed',
+      whyThisStatus: `Status: ${shipmentStatus || 'unknown'}, Session: ${sessionStatus || 'none'}, MOVE OVER tag: ${hasMoveOverTag ? 'Yes' : 'No'}`,
+      whatHappensNext: 'System needs more information (fingerprint, packaging type, etc.).',
+      colorClass: 'bg-gray-500',
+      badgeClass: 'bg-gray-500 text-white',
       matchedFields: [],
-      badge: <Badge variant="outline">Awaiting Pick</Badge>
     };
   };
 
-  const workflowCriteria = [
-    { step: 'Delivered', criteria: "status = 'delivered'", colorClass: 'bg-green-600', order: 1 },
-    { step: 'On Hold', criteria: "shipmentStatus = 'on_hold' (checked FIRST, before tracking)", colorClass: 'bg-amber-600', order: 2 },
-    { step: 'On the Dock', criteria: "shipmentStatus = 'label_purchased' AND status = 'AC' (Accepted - carrier awaiting pickup)", colorClass: 'bg-blue-600', order: 3 },
-    { step: 'Picking Issues', criteria: "sessionStatus = 'inactive'", colorClass: 'bg-orange-600', order: 4 },
-    { step: 'Packing Ready', criteria: "sessionStatus = 'closed' AND no trackingNumber", colorClass: 'bg-purple-600', order: 5 },
-    { step: 'Picking', criteria: "sessionStatus = 'active'", colorClass: 'bg-cyan-600', order: 6 },
-    { step: 'Ready to Pick', criteria: "sessionStatus = 'new'", colorClass: 'bg-yellow-600', order: 7 },
-    { step: 'Awaiting Pick', criteria: "No matching conditions (fallback)", colorClass: 'bg-gray-600', order: 8 },
+  // The normal flow order (for the visual stepper)
+  const lifecycleFlowSteps: { phase: LifecyclePhase; label: string; description: string }[] = [
+    { phase: 'ready_to_fulfill', label: 'Ready to Fulfill', description: 'On hold, waiting to release' },
+    { phase: 'ready_to_session', label: 'Ready to Session', description: 'Waiting for pick session' },
+    { phase: 'ready_to_pick', label: 'Ready to Pick', description: 'In pick queue' },
+    { phase: 'picking', label: 'Picking', description: 'Being picked' },
+    { phase: 'packing_ready', label: 'Packing Ready', description: 'Ready to pack' },
+    { phase: 'on_dock', label: 'On the Dock', description: 'Waiting for carrier' },
+    { phase: 'in_transit', label: 'In Transit', description: 'On the way' },
+    { phase: 'delivered', label: 'Delivered', description: 'Complete' },
   ];
+
+  // Exception states (shown separately)
+  const exceptionStates: { phase: LifecyclePhase; label: string; description: string }[] = [
+    { phase: 'picking_issues', label: 'Picking Issues', description: 'Needs supervisor attention' },
+    { phase: 'awaiting_decisions', label: 'Awaiting Decisions', description: 'Missing information' },
+  ];
+
+  // Legacy wrapper for backward compatibility
+  const getWorkflowStepBadge = (shipment: ShipmentWithOrder): { badge: JSX.Element; step: string; reason: string; matchedFields: string[] } => {
+    const info = getLifecycleInfo(shipment);
+    return {
+      step: info.label,
+      reason: info.whyThisStatus,
+      matchedFields: info.matchedFields,
+      badge: <Badge className={info.badgeClass}>{info.label}</Badge>
+    };
+  };
 
   if (isLoading) {
     return (
@@ -323,75 +428,162 @@ export default function ShipmentDetails() {
         </CardHeader>
       </Card>
 
-      {/* Workflow Status Card */}
+      {/* Life Cycle Status Card */}
       <Card className="border-2 border-dashed border-muted-foreground/30">
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5" />
-              Workflow Status
+              Life Cycle Status
             </CardTitle>
             {(() => {
-              const workflow = getWorkflowStepBadge(shipment);
+              const info = getLifecycleInfo(shipment);
               return (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Current Step:</span>
-                  {workflow.badge}
+                  <Badge className={info.badgeClass}>{info.label}</Badge>
                 </div>
               );
             })()}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Why This Category */}
-          <div className="bg-muted/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="font-semibold">Why This Category?</span>
-            </div>
-            <code className="text-sm bg-background px-2 py-1 rounded block">
-              {getWorkflowStepBadge(shipment).reason}
-            </code>
-          </div>
+          {/* Visual Flow Stepper */}
+          {(() => {
+            const currentInfo = getLifecycleInfo(shipment);
+            const currentPhase = currentInfo.phase;
+            const isExceptionState = currentInfo.isException || currentPhase === 'awaiting_decisions';
+            const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
+            
+            return (
+              <div className="space-y-4">
+                {/* Main Flow */}
+                <div className="overflow-x-auto pb-2">
+                  <div className="flex items-center gap-1 min-w-max">
+                    {lifecycleFlowSteps.map((step, index) => {
+                      const isPast = currentIndex > index;
+                      const isCurrent = currentPhase === step.phase;
+                      const isFuture = currentIndex < index && !isExceptionState;
+                      const isUnreachable = isExceptionState && currentIndex < index;
+                      
+                      return (
+                        <div key={step.phase} className="flex items-center">
+                          <div className={`flex flex-col items-center ${isCurrent ? 'scale-110' : ''}`}>
+                            <div className={`
+                              w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all
+                              ${isPast ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-600' : ''}
+                              ${isCurrent ? 'bg-primary text-primary-foreground border-primary ring-4 ring-primary/20' : ''}
+                              ${isFuture ? 'bg-muted border-muted-foreground/30 text-muted-foreground' : ''}
+                              ${isUnreachable ? 'bg-muted/50 border-dashed border-muted-foreground/20 text-muted-foreground/50' : ''}
+                            `}>
+                              {isPast ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : isCurrent ? (
+                                <CircleDot className="h-5 w-5" />
+                              ) : (
+                                <Circle className="h-5 w-5" />
+                              )}
+                            </div>
+                            <span className={`
+                              text-xs mt-1 text-center max-w-[70px] leading-tight
+                              ${isCurrent ? 'font-semibold text-primary' : ''}
+                              ${isPast ? 'text-green-600 dark:text-green-500' : ''}
+                              ${isFuture || isUnreachable ? 'text-muted-foreground' : ''}
+                            `}>
+                              {step.label}
+                            </span>
+                          </div>
+                          {index < lifecycleFlowSteps.length - 1 && (
+                            <ChevronRight className={`
+                              h-4 w-4 mx-1 flex-shrink-0
+                              ${isPast ? 'text-green-500' : 'text-muted-foreground/30'}
+                            `} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Exception State Warning */}
+                {isExceptionState && (
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-medium text-red-800 dark:text-red-200">{currentInfo.label}</span>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">{currentInfo.description}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Why This Status & What Happens Next */}
+          {(() => {
+            const info = getLifecycleInfo(shipment);
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Why This Status?</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{info.whyThisStatus}</p>
+                </div>
+                <div className="bg-primary/5 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Play className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-sm">What Happens Next?</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{info.whatHappensNext}</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Current Status Values */}
           {(() => {
-            const workflow = getWorkflowStepBadge(shipment);
-            const isMatched = (field: string) => workflow.matchedFields.includes(field);
+            const info = getLifecycleInfo(shipment);
+            const isMatched = (field: string) => info.matchedFields.includes(field);
             const matchedClass = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500';
             const notMatchedClass = 'bg-muted';
             
             return (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
-                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
-                    {shipment.status || 'null'}
-                  </code>
-                  <p className="text-xs text-muted-foreground">status field {isMatched('status') && '✓ matched'}</p>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
-                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
+                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
                     {shipment.shipmentStatus || 'null'}
                   </code>
-                  <p className="text-xs text-muted-foreground">shipmentStatus field {isMatched('shipmentStatus') && '✓ matched'}</p>
+                  {isMatched('shipmentStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
+                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
+                    {shipment.status || 'null'}
+                  </code>
+                  {isMatched('status') && <p className="text-xs text-green-600">✓ matched</p>}
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Status</p>
-                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
+                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
                     {shipment.sessionStatus || 'null'}
                   </code>
-                  <p className="text-xs text-muted-foreground">sessionStatus field {isMatched('sessionStatus') && '✓ matched'}</p>
+                  {isMatched('sessionStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">MOVE OVER Tag</p>
+                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('hasMoveOverTag') ? matchedClass : (hasMoveOverTag ? 'bg-green-100 dark:bg-green-900/30' : notMatchedClass)}`}>
+                    {hasMoveOverTag ? 'YES' : 'NO'}
+                  </code>
+                  {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">✓ matched</p>}
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
-                  <code className={`text-lg font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
+                  <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
                     {shipment.trackingNumber ? 'YES' : 'NO'}
                   </code>
-                  <p className="text-xs text-muted-foreground truncate" title={shipment.trackingNumber || undefined}>
-                    {isMatched('trackingNumber') ? '✓ matched • ' : ''}{shipment.trackingNumber ? shipment.trackingNumber.substring(0, 16) + (shipment.trackingNumber.length > 16 ? '...' : '') : 'No tracking'}
-                  </p>
+                  {isMatched('trackingNumber') && <p className="text-xs text-green-600">✓ matched</p>}
                 </div>
               </div>
             );
@@ -472,31 +664,51 @@ export default function ShipmentDetails() {
             </div>
           </div>
 
-          {/* Workflow Criteria Reference */}
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Play className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">All Workflow Stages & Criteria</span>
+          {/* Technical Details (Collapsible) */}
+          <details className="border-t pt-4">
+            <summary className="cursor-pointer flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground">
+              <Play className="h-4 w-4" />
+              <span className="font-semibold">Technical Details (for debugging)</span>
+            </summary>
+            <div className="mt-3 space-y-3">
+              {/* Current field values */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div className="bg-muted/50 rounded p-2">
+                  <span className="text-muted-foreground">shipmentStatus:</span>
+                  <code className="block font-mono">{shipment.shipmentStatus || 'null'}</code>
+                </div>
+                <div className="bg-muted/50 rounded p-2">
+                  <span className="text-muted-foreground">status:</span>
+                  <code className="block font-mono">{shipment.status || 'null'}</code>
+                </div>
+                <div className="bg-muted/50 rounded p-2">
+                  <span className="text-muted-foreground">sessionStatus:</span>
+                  <code className="block font-mono">{shipment.sessionStatus || 'null'}</code>
+                </div>
+                <div className="bg-muted/50 rounded p-2">
+                  <span className="text-muted-foreground">hasMoveOverTag:</span>
+                  <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
+                </div>
+              </div>
+              
+              {/* All lifecycle phases reference */}
+              <div className="text-xs">
+                <p className="text-muted-foreground mb-2">Lifecycle phase priority (checked in order):</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground font-mono">
+                  <li>DELIVERED: shipmentStatus='label_purchased' AND status='DE'</li>
+                  <li>IN_TRANSIT: shipmentStatus='label_purchased' AND status='IT'</li>
+                  <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')</li>
+                  <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasMoveOverTag</li>
+                  <li>PICKING_ISSUES: sessionStatus='inactive'</li>
+                  <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
+                  <li>PICKING: sessionStatus='active'</li>
+                  <li>READY_TO_PICK: sessionStatus='new'</li>
+                  <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus</li>
+                  <li>AWAITING_DECISIONS: fallback</li>
+                </ol>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-              {workflowCriteria.map((item) => {
-                const currentStep = getWorkflowStepBadge(shipment).step;
-                const isActive = item.step === currentStep;
-                return (
-                  <div 
-                    key={item.step}
-                    className={`flex items-start gap-2 p-2 rounded ${isActive ? 'bg-primary/10 ring-1 ring-primary' : ''}`}
-                  >
-                    <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${item.colorClass}`} />
-                    <div>
-                      <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>{item.step}</span>
-                      <p className="text-xs text-muted-foreground font-mono">{item.criteria}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          </details>
         </CardContent>
       </Card>
 
