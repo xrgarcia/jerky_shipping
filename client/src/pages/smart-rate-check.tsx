@@ -138,8 +138,9 @@ export default function SmartRateCheck() {
   queryParams.set("page", page.toString());
   queryParams.set("limit", limit.toString());
 
+  const queryString = queryParams.toString();
   const { data, isLoading, refetch, isFetching } = useQuery<RateAnalysisResponse>({
-    queryKey: ["/api/rate-analysis", queryParams.toString()],
+    queryKey: [`/api/rate-analysis?${queryString}`],
   });
 
   const handleSort = (column: SortColumn) => {
