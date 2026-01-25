@@ -2563,65 +2563,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Slashbin webhook endpoint - receives Shopify orders from Slashbin
   app.post("/api/webhooks/slashbin/shopifyOrders", async (req, res) => {
-    const receivedAt = new Date().toISOString();
-    
     try {
       // Extract headers
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
       const jobId = req.headers['x-slashbin-job-id'] as string;
-      const topic = req.headers['x-slashbin-topic'] as string;
-      
-      console.log("========== SLASHBIN SHOPIFY ORDERS WEBHOOK RECEIVED ==========");
-      console.log("Timestamp:", receivedAt);
-      console.log("Job ID:", jobId || 'missing');
-      console.log("Topic:", topic || 'missing');
-      console.log("Signature Present:", !!signatureHeader);
       
       // Get signing secret
       const signingSecret = process.env.SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY;
       
       if (!signingSecret) {
-        console.error("[Slashbin] SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY not configured");
+        console.error("[Slashbin/ShopifyOrders] SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
       // Verify signature
       const rawBody = req.rawBody as Buffer;
       if (!verifySlashbinWebhook(rawBody, signatureHeader, signingSecret)) {
-        console.error("========== SLASHBIN SHOPIFY ORDERS WEBHOOK VERIFICATION FAILED ==========");
-        console.error(`Timestamp: ${receivedAt}`);
-        console.error(`Job ID: ${jobId || 'unknown'}`);
-        console.error(`Topic: ${topic || 'unknown'}`);
-        console.error(`Signature Header: ${signatureHeader ? 'present' : 'missing'}`);
-        console.error(`Body Size: ${rawBody?.length || 0} bytes`);
-        console.error("===========================================================");
+        console.error("[Slashbin/ShopifyOrders] HMAC FAILED - sig:", signatureHeader ? 'present' : 'missing', "body:", rawBody?.length || 0, "bytes");
         return res.status(401).json({ error: "Webhook verification failed" });
       }
       
-      console.log("[Slashbin/ShopifyOrders] HMAC verification OK");
-      
-      // Log full JSON payload for debugging
-      console.log("[Slashbin/ShopifyOrders] Full payload:", JSON.stringify(req.body, null, 2));
-      
       // Check idempotency - avoid processing duplicate webhooks
-      const payloadJobId = req.body.slashbinJobId || jobId;
+      const payloadJobId = req.body.slashbin_job_id || jobId;
       if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
-        console.log(`[Slashbin/ShopifyOrders] Job ${payloadJobId} already processed (idempotency)`);
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
       // Process Shopify order payload - structure uses snake_case from Slashbin
       const orderPayload = req.body.payload;
       if (!orderPayload || !orderPayload.order_number) {
-        console.error("[Slashbin/ShopifyOrders] Parse FAILED - missing payload.order_number");
-        console.error("[Slashbin/ShopifyOrders] Available keys in payload:", orderPayload ? Object.keys(orderPayload) : 'payload is null/undefined');
+        console.error("[Slashbin/ShopifyOrders] HMAC OK, Parse FAILED - missing order_number. Keys:", orderPayload ? Object.keys(orderPayload) : 'null');
         return res.status(400).json({ error: "Invalid payload: missing order_number" });
       }
       
       const orderNumber = orderPayload.order_number;
       const items = orderPayload.order_items || [];
-      
-      console.log(`[Slashbin/ShopifyOrders] Processing order ${orderNumber} with ${items.length} items`);
       
       // Upsert order data into slashbin_orders table (mapping snake_case to camelCase)
       const orderData = {
@@ -2700,8 +2676,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.insert(slashbinOrderItems).values(itemsToInsert);
       }
       
-      console.log(`[Slashbin/ShopifyOrders] OK: ${orderNumber} (${items.length} items)`);
-      
       // Mark job as processed for idempotency
       if (payloadJobId) {
         markJobAsProcessed(payloadJobId);
@@ -2711,7 +2685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ success: true, jobId: payloadJobId, orderNumber, itemCount: items.length });
       
     } catch (error: any) {
-      console.error("Error processing Slashbin Shopify orders webhook:", error);
+      console.error("[Slashbin/ShopifyOrders] Error:", error.message);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });
