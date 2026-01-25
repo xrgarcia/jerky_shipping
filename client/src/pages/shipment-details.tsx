@@ -1292,17 +1292,17 @@ export default function ShipmentDetails() {
                   {/* Status Badge */}
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     {hasSavings ? (
-                      <Badge className="bg-green-600 hover:bg-green-700 gap-1" data-testid="badge-savings-available">
+                      <Badge className="bg-green-600 gap-1" data-testid="badge-savings-available">
                         <DollarSign className="h-3 w-3" />
                         Savings Available
                       </Badge>
                     ) : (
-                      <Badge className="bg-blue-600 hover:bg-blue-700 gap-1" data-testid="badge-optimal-choice">
+                      <Badge className="bg-blue-600 gap-1" data-testid="badge-optimal-choice">
                         <CheckCircle className="h-3 w-3" />
                         Optimal Choice
                       </Badge>
                     )}
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground" data-testid="text-rates-compared">
                       Compared {analysis.ratesComparedCount} rates
                     </span>
                   </div>
@@ -1310,17 +1310,17 @@ export default function ShipmentDetails() {
                   {/* Comparison Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Customer's Choice */}
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-2" data-testid="card-customer-choice">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Customer Selected</p>
-                      <p className="font-medium text-lg">
+                      <p className="font-medium text-lg" data-testid="text-customer-method">
                         {analysis.customerShippingMethod?.replace(/_/g, ' ').toUpperCase() || 'Unknown'}
                       </p>
                       <div className="flex items-center gap-4 text-sm">
-                        <span className="font-bold text-lg">
+                        <span className="font-bold text-lg" data-testid="text-customer-cost">
                           ${parseFloat(analysis.customerShippingCost || '0').toFixed(2)}
                         </span>
                         {analysis.customerDeliveryDays && (
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground" data-testid="text-customer-days">
                             {analysis.customerDeliveryDays} {analysis.customerDeliveryDays === 1 ? 'day' : 'days'}
                           </span>
                         )}
@@ -1328,19 +1328,19 @@ export default function ShipmentDetails() {
                     </div>
 
                     {/* Smart Recommendation */}
-                    <div className={`rounded-lg p-4 space-y-2 ${hasSavings ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                    <div className={`rounded-lg p-4 space-y-2 ${hasSavings ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-muted/50'}`} data-testid="card-smart-recommendation">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">
                         {hasSavings ? 'Recommended' : 'Best Option'}
                       </p>
-                      <p className="font-medium text-lg">
+                      <p className="font-medium text-lg" data-testid="text-smart-method">
                         {analysis.smartShippingMethod?.replace(/_/g, ' ').toUpperCase() || 'Unknown'}
                       </p>
                       <div className="flex items-center gap-4 text-sm">
-                        <span className={`font-bold text-lg ${hasSavings ? 'text-green-700 dark:text-green-400' : ''}`}>
+                        <span className={`font-bold text-lg ${hasSavings ? 'text-green-700 dark:text-green-400' : ''}`} data-testid="text-smart-cost">
                           ${parseFloat(analysis.smartShippingCost || '0').toFixed(2)}
                         </span>
                         {analysis.smartDeliveryDays && (
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground" data-testid="text-smart-days">
                             {analysis.smartDeliveryDays} {analysis.smartDeliveryDays === 1 ? 'day' : 'days'}
                           </span>
                         )}
@@ -1350,14 +1350,14 @@ export default function ShipmentDetails() {
 
                   {/* Savings Highlight */}
                   {hasSavings && (
-                    <div className="bg-green-100 dark:bg-green-950/50 border border-green-300 dark:border-green-700 rounded-lg p-4 flex items-center justify-between" data-testid="savings-highlight">
+                    <div className="bg-green-100 dark:bg-green-950/50 border border-green-300 dark:border-green-700 rounded-lg p-4 flex items-center justify-between gap-4" data-testid="savings-highlight">
                       <div className="flex items-center gap-2">
                         <TrendingDown className="h-5 w-5 text-green-600 dark:text-green-400" />
                         <span className="font-medium text-green-800 dark:text-green-200">
                           Potential Savings
                         </span>
                       </div>
-                      <span className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      <span className="text-2xl font-bold text-green-700 dark:text-green-300" data-testid="text-savings-amount">
                         ${parseFloat(analysis.costSavings || '0').toFixed(2)}
                       </span>
                     </div>
