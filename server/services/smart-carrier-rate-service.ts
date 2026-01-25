@@ -11,6 +11,7 @@ import { db } from '../db';
 import { shipmentRateAnalysis, shipments } from '@shared/schema';
 import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { updateShipmentLifecycle } from './lifecycle-service';
 
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
@@ -212,6 +213,14 @@ export class SmartCarrierRateService {
         });
       
       console.log(`[SmartCarrierRate] Saved analysis for shipment ${shipment.shipmentId}: ${result.analysis.reasoning}`);
+      
+      // Trigger lifecycle update to advance from needs_rate_check subphase
+      try {
+        await updateShipmentLifecycle(shipment.id, { logTransition: true });
+      } catch (lifecycleError: any) {
+        console.warn(`[SmartCarrierRate] Failed to update lifecycle for ${shipment.id}:`, lifecycleError.message);
+      }
+      
       return result;
       
     } catch (error: any) {

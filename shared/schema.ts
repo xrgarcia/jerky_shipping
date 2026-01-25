@@ -38,9 +38,10 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * 
  * The progression of packing decisions before orders can be sessioned:
  * 
- * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
+ * needs_rate_check → needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
  */
 export const DECISION_SUBPHASES = {
+  NEEDS_RATE_CHECK: 'needs_rate_check',          // Rate analysis pending - checking for cheaper shipping options
   NEEDS_CATEGORIZATION: 'needs_categorization',  // SKUs not yet assigned to collections
   NEEDS_FINGERPRINT: 'needs_fingerprint',            // Fingerprint not yet calculated
   NEEDS_PACKAGING: 'needs_packaging',            // Fingerprint has no packaging type mapping
@@ -70,6 +71,7 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
  * Valid state transitions for decision subphases (within AWAITING_DECISIONS)
  */
 export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> = {
+  [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_CATEGORIZATION],
   [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: [DECISION_SUBPHASES.NEEDS_FINGERPRINT],
   [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
   [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_SESSION],

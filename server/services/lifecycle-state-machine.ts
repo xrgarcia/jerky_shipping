@@ -74,6 +74,7 @@ export interface ShipmentLifecycleData {
   fulfillmentSessionId?: string | null;
   fingerprintId?: string | null;
   hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
+  rateAnalysisComplete?: boolean;   // Whether smart carrier rate analysis has been completed
 }
 
 // Status codes that indicate package is on the dock (at the facility, awaiting carrier pickup)
@@ -200,6 +201,7 @@ export function deriveDecisionSubphase(shipment: {
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
   sessionStatus?: string | null;
+  rateAnalysisComplete?: boolean;
 }): DecisionSubphase {
   // READY_FOR_SKUVAULT: In fulfillment session, ready to push
   if (shipment.fulfillmentSessionId && !shipment.sessionStatus) {
@@ -221,8 +223,13 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
-  // NEEDS_CATEGORIZATION: SKUs need collection assignment
-  return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
+  // NEEDS_CATEGORIZATION: Rate check done, SKUs need collection assignment
+  if (shipment.rateAnalysisComplete === true) {
+    return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
+  }
+
+  // NEEDS_RATE_CHECK: First step - need to analyze shipping rates
+  return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
 }
 
 /**
@@ -249,6 +256,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
  */
 export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
   const displayNames: Record<DecisionSubphase, string> = {
+    [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 'Needs Rate Check',
     [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 'Needs Categorization',
     [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 'Needs Fingerprint',
     [DECISION_SUBPHASES.NEEDS_PACKAGING]: 'Needs Packaging',
@@ -292,6 +300,7 @@ export function getNextPhase(phase: LifecyclePhase): LifecyclePhase | null {
  */
 export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | null {
   const happyPath: DecisionSubphase[] = [
+    DECISION_SUBPHASES.NEEDS_RATE_CHECK,
     DECISION_SUBPHASES.NEEDS_CATEGORIZATION,
     DECISION_SUBPHASES.NEEDS_FINGERPRINT,
     DECISION_SUBPHASES.NEEDS_PACKAGING,
@@ -331,10 +340,11 @@ export function getLifecycleProgress(state: LifecycleState): number {
   // Within AWAITING_DECISIONS, add subphase progress (0-25%)
   if (phase === LIFECYCLE_PHASES.AWAITING_DECISIONS && subphase) {
     const subphaseWeights: Record<DecisionSubphase, number> = {
-      [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 0,
-      [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 5,
-      [DECISION_SUBPHASES.NEEDS_PACKAGING]: 10,
-      [DECISION_SUBPHASES.NEEDS_SESSION]: 15,
+      [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 0,
+      [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 4,
+      [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 8,
+      [DECISION_SUBPHASES.NEEDS_PACKAGING]: 12,
+      [DECISION_SUBPHASES.NEEDS_SESSION]: 16,
       [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 20,
     };
     baseProgress += subphaseWeights[subphase];
