@@ -107,8 +107,19 @@ const PAGE_SIZES = [10, 25, 50, 100];
 type SortColumn = "analyzedAt" | "costSavings" | "customerShippingCost" | "smartShippingCost" | "orderDate";
 
 export default function SmartRateCheck() {
-  const [orderDateFrom, setOrderDateFrom] = useState("");
-  const [orderDateTo, setOrderDateTo] = useState("");
+  const getDefaultDates = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    return {
+      from: thirtyDaysAgo.toISOString().split('T')[0],
+      to: today.toISOString().split('T')[0]
+    };
+  };
+  
+  const defaultDates = getDefaultDates();
+  const [orderDateFrom, setOrderDateFrom] = useState(defaultDates.from);
+  const [orderDateTo, setOrderDateTo] = useState(defaultDates.to);
   const [orderNumber, setOrderNumber] = useState("");
   const [lifecyclePhase, setLifecyclePhase] = useState("all");
   const [page, setPage] = useState(1);
@@ -169,8 +180,9 @@ export default function SmartRateCheck() {
   };
 
   const handleReset = () => {
-    setOrderDateFrom("");
-    setOrderDateTo("");
+    const defaults = getDefaultDates();
+    setOrderDateFrom(defaults.from);
+    setOrderDateTo(defaults.to);
     setOrderNumber("");
     setLifecyclePhase("all");
     setSortBy("analyzedAt");
