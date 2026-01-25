@@ -4,8 +4,8 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems } from "@shared/schema";
-import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists } from "drizzle-orm";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis } from "@shared/schema";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
@@ -2357,6 +2357,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.cancelRateAnalysisJob(id);
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Smart Rate Check Page - Rate analysis data with filtering, pagination, sorting, and metrics
+  app.get("/api/rate-analysis", requireAuth, async (req, res) => {
+    try {
+      const { 
+        orderDateFrom,
+        orderDateTo,
+        orderNumber,
+        lifecyclePhase,
+        sortBy = 'analyzedAt',
+        sortOrder = 'desc',
+        page = '1',
+        limit = '25'
+      } = req.query;
+      
+      const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 25));
+      const offset = (pageNum - 1) * limitNum;
+      
+      // Build dynamic conditions
+      const conditions: SQL<unknown>[] = [];
+      
+      if (orderDateFrom) {
+        conditions.push(gte(shipments.orderDate, new Date(orderDateFrom as string)));
+      }
+      if (orderDateTo) {
+        conditions.push(lte(shipments.orderDate, new Date(orderDateTo as string)));
+      }
+      if (orderNumber) {
+        conditions.push(ilike(shipments.orderNumber, `%${orderNumber}%`));
+      }
+      if (lifecyclePhase) {
+        conditions.push(eq(shipments.lifecyclePhase, lifecyclePhase as string));
+      }
+      
+      // Get total count for pagination
+      const countQuery = db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(shipmentRateAnalysis)
+        .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      
+      const [{ count: totalCount }] = await countQuery;
+      
+      // Build sort order
+      type SortableColumn = 'analyzedAt' | 'costSavings' | 'customerShippingCost' | 'smartShippingCost' | 'orderDate';
+      const sortColumn = (sortBy as SortableColumn) || 'analyzedAt';
+      const sortDir = sortOrder === 'asc' ? asc : desc;
+      
+      const sortMapping: Record<SortableColumn, any> = {
+        analyzedAt: shipmentRateAnalysis.createdAt,
+        costSavings: shipmentRateAnalysis.costSavings,
+        customerShippingCost: shipmentRateAnalysis.customerShippingCost,
+        smartShippingCost: shipmentRateAnalysis.smartShippingCost,
+        orderDate: shipments.orderDate
+      };
+      
+      // Get paginated results with shipment data
+      const results = await db
+        .select({
+          // Rate analysis fields
+          shipmentId: shipmentRateAnalysis.shipmentId,
+          customerShippingMethod: shipmentRateAnalysis.customerShippingMethod,
+          customerShippingCost: shipmentRateAnalysis.customerShippingCost,
+          customerDeliveryDays: shipmentRateAnalysis.customerDeliveryDays,
+          smartShippingMethod: shipmentRateAnalysis.smartShippingMethod,
+          smartShippingCost: shipmentRateAnalysis.smartShippingCost,
+          smartDeliveryDays: shipmentRateAnalysis.smartDeliveryDays,
+          costSavings: shipmentRateAnalysis.costSavings,
+          reasoning: shipmentRateAnalysis.reasoning,
+          ratesComparedCount: shipmentRateAnalysis.ratesComparedCount,
+          carrierCode: shipmentRateAnalysis.carrierCode,
+          serviceCode: shipmentRateAnalysis.serviceCode,
+          originPostalCode: shipmentRateAnalysis.originPostalCode,
+          destinationPostalCode: shipmentRateAnalysis.destinationPostalCode,
+          destinationState: shipmentRateAnalysis.destinationState,
+          analyzedAt: shipmentRateAnalysis.createdAt,
+          // Shipment fields for display and filtering
+          orderNumber: shipments.orderNumber,
+          orderDate: shipments.orderDate,
+          lifecyclePhase: shipments.lifecyclePhase,
+          decisionSubphase: shipments.decisionSubphase,
+        })
+        .from(shipmentRateAnalysis)
+        .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(sortDir(sortMapping[sortColumn] || shipmentRateAnalysis.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+      
+      // Calculate aggregate metrics (for all matching records, not just current page)
+      const metricsQuery = await db
+        .select({
+          totalAnalyzed: sql<number>`count(*)::int`,
+          totalSavings: sql<string>`coalesce(sum(${shipmentRateAnalysis.costSavings}), 0)`,
+          totalCurrentSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.customerShippingCost}), 0)`,
+          totalRecommendedSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.smartShippingCost}), 0)`,
+          shipmentsWithSavings: sql<number>`count(case when ${shipmentRateAnalysis.costSavings} > 0 then 1 end)::int`,
+        })
+        .from(shipmentRateAnalysis)
+        .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      
+      const metrics = metricsQuery[0];
+      const totalAnalyzed = metrics.totalAnalyzed || 0;
+      const shipmentsWithSavings = metrics.shipmentsWithSavings || 0;
+      
+      res.json({
+        data: results,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limitNum),
+        },
+        metrics: {
+          totalAnalyzed,
+          totalSavings: parseFloat(metrics.totalSavings) || 0,
+          totalCurrentSpend: parseFloat(metrics.totalCurrentSpend) || 0,
+          totalRecommendedSpend: parseFloat(metrics.totalRecommendedSpend) || 0,
+          shipmentsWithSavings,
+          percentWithSavings: totalAnalyzed > 0 ? Math.round((shipmentsWithSavings / totalAnalyzed) * 100) : 0,
+          averageSavingsPerShipment: totalAnalyzed > 0 ? (parseFloat(metrics.totalSavings) || 0) / totalAnalyzed : 0,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching rate analysis data:", error);
       res.status(500).json({ error: error.message });
     }
   });

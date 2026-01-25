@@ -32,7 +32,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch } from "lucide-react";
+import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch, DollarSign } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -130,6 +130,11 @@ export function AppSidebar() {
       title: "Smart Sessions",
       url: "/smart-sessions",
       icon: FileSearch,
+    },
+    {
+      title: "Smart Rate Check",
+      url: "/smart-rate-check",
+      icon: DollarSign,
     },
     {
       title: "Customer Service",

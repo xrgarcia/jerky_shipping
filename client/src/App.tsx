@@ -40,6 +40,7 @@ import PackagingTypes from "@/pages/packaging-types";
 import FulfillmentPrep from "@/pages/fingerprints";
 import SkuvaultProducts from "@/pages/skuvault-products";
 import SmartSessions from "@/pages/smart-sessions";
+import SmartRateCheck from "@/pages/smart-rate-check";
 import ExcludedSkus from "@/pages/excluded-skus";
 import type { User } from "@shared/schema";
 
@@ -122,6 +123,7 @@ function AppContent() {
       <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
       <Route path="/smart-sessions" component={SmartSessions} />
+      <Route path="/smart-rate-check" component={SmartRateCheck} />
       <Route path="/skuvault-products" component={SkuvaultProducts} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
