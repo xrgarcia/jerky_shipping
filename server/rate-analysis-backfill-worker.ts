@@ -33,7 +33,7 @@ async function getShipmentsForJob(daysBack: number | null): Promise<typeof shipm
   if (daysBack) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-    baseConditions.push(gte(shipments.shipDate, cutoffDate));
+    baseConditions.push(gte(shipments.orderDate, cutoffDate));
   }
   
   const results = await db
