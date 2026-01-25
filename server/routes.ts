@@ -2386,7 +2386,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(gte(shipments.orderDate, new Date(orderDateFrom as string)));
       }
       if (orderDateTo) {
-        conditions.push(lte(shipments.orderDate, new Date(orderDateTo as string)));
+        // Set to end of day (23:59:59.999) to include all records from that day
+        const toDate = new Date(orderDateTo as string);
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(shipments.orderDate, toDate));
       }
       if (orderNumber) {
         conditions.push(ilike(shipments.orderNumber, `%${orderNumber}%`));
