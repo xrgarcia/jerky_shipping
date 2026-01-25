@@ -58,7 +58,83 @@ interface RatesResponse {
   rate_request_id?: string;
 }
 
+interface ShipStationCarrier {
+  carrier_id: string;
+  carrier_code: string;
+  account_number?: string;
+  nickname?: string;
+  is_primary?: boolean;
+  is_disabled_by_billing_plan?: boolean;
+}
+
+interface CarriersCache {
+  carriers: ShipStationCarrier[];
+  fetchedAt: Date;
+}
+
 export class SmartCarrierRateService {
+  private carriersCache: CarriersCache | null = null;
+  
+  /**
+   * Fetch all carriers configured in ShipStation account.
+   * Caches the result for the duration of the batch run.
+   */
+  async fetchCarriers(forceRefresh = false): Promise<ShipStationCarrier[]> {
+    if (this.carriersCache && !forceRefresh) {
+      const cacheAge = Date.now() - this.carriersCache.fetchedAt.getTime();
+      const maxAge = 60 * 60 * 1000; // 1 hour
+      if (cacheAge < maxAge) {
+        return this.carriersCache.carriers;
+      }
+    }
+    
+    if (!SHIPSTATION_API_KEY) {
+      throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+    }
+    
+    const url = `${SHIPSTATION_API_BASE}/v2/carriers`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'api-key': SHIPSTATION_API_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ShipStation carriers API error: ${response.status} ${errorText}`);
+    }
+    
+    const data = await response.json();
+    const carriers: ShipStationCarrier[] = data.carriers || data || [];
+    
+    this.carriersCache = {
+      carriers,
+      fetchedAt: new Date(),
+    };
+    
+    console.log(`[SmartCarrierRate] Fetched ${carriers.length} carriers from ShipStation`);
+    return carriers;
+  }
+  
+  /**
+   * Get carrier IDs for rate filtering
+   */
+  async getCarrierIds(): Promise<string[]> {
+    const carriers = await this.fetchCarriers();
+    return carriers
+      .filter(c => !c.is_disabled_by_billing_plan)
+      .map(c => c.carrier_id);
+  }
+  
+  /**
+   * Clear carriers cache (useful at start of new batch run)
+   */
+  clearCarriersCache(): void {
+    this.carriersCache = null;
+  }
   
   /**
    * Analyze a shipment and find the most cost-effective shipping method
@@ -241,6 +317,15 @@ export class SmartCarrierRateService {
     let failed = 0;
     const errors: string[] = [];
     
+    // Fetch and cache carriers at start of batch run
+    try {
+      this.clearCarriersCache();
+      const carriers = await this.fetchCarriers();
+      console.log(`[SmartCarrierRate] Batch started with ${carriers.length} carriers: ${carriers.map(c => c.carrier_code).join(', ')}`);
+    } catch (error: any) {
+      console.warn(`[SmartCarrierRate] Failed to fetch carriers, continuing without filter:`, error.message);
+    }
+    
     for (let i = 0; i < shipmentIds.length; i++) {
       const shipmentId = shipmentIds[i];
       
@@ -282,7 +367,8 @@ export class SmartCarrierRateService {
   }
   
   /**
-   * Fetch rates for a shipment from ShipStation
+   * Fetch rates for a shipment from ShipStation using GET /v2/shipments/{id}/rates
+   * This endpoint returns all available rates for an existing shipment
    */
   private async fetchRatesForShipment(shipmentId: string): Promise<ShipStationRate[]> {
     if (!SHIPSTATION_API_KEY) {
@@ -304,8 +390,19 @@ export class SmartCarrierRateService {
       throw new Error(`ShipStation rates API error: ${response.status} ${errorText}`);
     }
     
-    const data: RatesResponse = await response.json();
-    return data.rates || [];
+    const data = await response.json();
+    
+    // ShipStation returns an array with a single object containing the rates array
+    if (Array.isArray(data) && data.length > 0 && data[0].rates) {
+      return data[0].rates;
+    }
+    
+    // Direct rates response
+    if (data.rates) {
+      return data.rates;
+    }
+    
+    return [];
   }
   
   /**
