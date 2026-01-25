@@ -1127,6 +1127,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get rate analysis for a shipment
+  app.get("/api/shipments/:id/rate-analysis", requireAuth, async (req, res) => {
+    try {
+      const { shipmentRateAnalysis } = await import("@shared/schema");
+      const idParam = req.params.id;
+      
+      // Find shipment by shipmentId or UUID
+      let shipment = await storage.getShipmentByShipmentId(idParam);
+      if (!shipment) {
+        shipment = await storage.getShipment(idParam);
+      }
+      
+      if (!shipment) {
+        return res.status(404).json({ error: "Shipment not found" });
+      }
+
+      // Rate analysis is keyed by ShipStation shipmentId
+      if (!shipment.shipmentId) {
+        return res.json({ rateAnalysis: null, reason: "No ShipStation shipment ID" });
+      }
+
+      const [analysis] = await db
+        .select()
+        .from(shipmentRateAnalysis)
+        .where(eq(shipmentRateAnalysis.shipmentId, shipment.shipmentId))
+        .limit(1);
+
+      res.json({ rateAnalysis: analysis || null });
+    } catch (error) {
+      console.error("Error fetching rate analysis:", error);
+      res.status(500).json({ error: "Failed to fetch rate analysis" });
+    }
+  });
+
   // Get all Shopify products with variants
   app.get("/api/shopify-products", requireAuth, async (req, res) => {
     try {
