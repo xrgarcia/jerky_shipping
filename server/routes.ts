@@ -2260,6 +2260,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Rate Analysis Jobs - Background job management
+  // These jobs run in the background and survive page changes/logouts
+  
+  // Get all rate analysis jobs (for operations page)
+  app.get("/api/rate-analysis-jobs", requireAuth, async (req, res) => {
+    try {
+      const jobs = await storage.getAllRateAnalysisJobs();
+      const activeJob = await storage.getActiveRateAnalysisJob();
+      res.json({ jobs, activeJob });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Create a new rate analysis job with a preset
+  app.post("/api/rate-analysis-jobs", requireAuth, async (req, res) => {
+    try {
+      const { preset } = req.body as { preset: '1day' | '7days' | '30days' | '90days' | 'all' };
+      
+      if (!preset || !['1day', '7days', '30days', '90days', 'all'].includes(preset)) {
+        return res.status(400).json({ error: 'Invalid preset. Must be: 1day, 7days, 30days, 90days, or all' });
+      }
+      
+      // Check if there's already an active job
+      const activeJob = await storage.getActiveRateAnalysisJob();
+      if (activeJob) {
+        return res.status(409).json({ 
+          error: 'A rate analysis job is already running',
+          activeJob 
+        });
+      }
+      
+      // Determine days back from preset
+      const daysBackMap: Record<string, number | null> = {
+        '1day': 1,
+        '7days': 7,
+        '30days': 30,
+        '90days': 90,
+        'all': null,
+      };
+      
+      const job = await storage.createRateAnalysisJob({
+        preset,
+        daysBack: daysBackMap[preset],
+        status: 'pending',
+      });
+      
+      console.log(`[RateAnalysis] Created job ${job.id} with preset ${preset}`);
+      res.json({ success: true, job });
+    } catch (error: any) {
+      console.error("Error creating rate analysis job:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Cancel a rate analysis job
+  app.post("/api/rate-analysis-jobs/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.cancelRateAnalysisJob(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Sync tracking status for non-delivered shipments
   app.post("/api/shipments/sync-tracking", requireAuth, async (req, res) => {

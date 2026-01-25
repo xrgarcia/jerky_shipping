@@ -1635,3 +1635,33 @@ export const insertShipmentRateAnalysisSchema = createInsertSchema(shipmentRateA
 
 export type InsertShipmentRateAnalysis = z.infer<typeof insertShipmentRateAnalysisSchema>;
 export type ShipmentRateAnalysis = typeof shipmentRateAnalysis.$inferSelect;
+
+// Rate Analysis Jobs - Background jobs for backfilling rate analysis on historical shipments
+// These jobs run in the background and can survive page changes/logouts
+export const rateAnalysisJobs = pgTable("rate_analysis_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  preset: text("preset").notNull(), // '1day', '7days', '30days', '90days', 'all'
+  daysBack: integer("days_back"), // null for 'all time'
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed, cancelled
+  shipmentsTotal: integer("shipments_total").notNull().default(0),
+  shipmentsAnalyzed: integer("shipments_analyzed").notNull().default(0),
+  shipmentsFailed: integer("shipments_failed").notNull().default(0),
+  savingsFound: numeric("savings_found").default("0"), // Total potential savings found
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("rate_analysis_jobs_status_idx").on(table.status),
+  createdAtIdx: index("rate_analysis_jobs_created_at_idx").on(table.createdAt.desc().nullsLast()),
+}));
+
+export const insertRateAnalysisJobSchema = createInsertSchema(rateAnalysisJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRateAnalysisJob = z.infer<typeof insertRateAnalysisJobSchema>;
+export type RateAnalysisJob = typeof rateAnalysisJobs.$inferSelect;

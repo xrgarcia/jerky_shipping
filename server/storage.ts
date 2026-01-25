@@ -88,6 +88,9 @@ import {
   // Excluded Explosion SKUs
   type ExcludedExplosionSku,
   excludedExplosionSkus,
+  type RateAnalysisJob,
+  type InsertRateAnalysisJob,
+  rateAnalysisJobs,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -243,6 +246,13 @@ export interface IStorage {
   incrementBackfillShopifyFetchFailed(id: string): Promise<void>;
   incrementBackfillShipstationFetchCompleted(id: string): Promise<void>;
   incrementBackfillShipstationFetchFailed(id: string): Promise<void>;
+  
+  // Rate Analysis Jobs
+  createRateAnalysisJob(job: InsertRateAnalysisJob): Promise<RateAnalysisJob>;
+  getRateAnalysisJob(id: string): Promise<RateAnalysisJob | undefined>;
+  getAllRateAnalysisJobs(): Promise<RateAnalysisJob[]>;
+  getActiveRateAnalysisJob(): Promise<RateAnalysisJob | undefined>;
+  cancelRateAnalysisJob(id: string): Promise<void>;
 
   // Print Queue
   createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
@@ -2234,6 +2244,45 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(backfillJobs.id, id));
+  }
+  
+  // Rate Analysis Jobs
+  async createRateAnalysisJob(job: InsertRateAnalysisJob): Promise<RateAnalysisJob> {
+    const result = await db.insert(rateAnalysisJobs).values(job).returning();
+    return result[0];
+  }
+  
+  async getRateAnalysisJob(id: string): Promise<RateAnalysisJob | undefined> {
+    const result = await db.select().from(rateAnalysisJobs).where(eq(rateAnalysisJobs.id, id));
+    return result[0];
+  }
+  
+  async getAllRateAnalysisJobs(): Promise<RateAnalysisJob[]> {
+    return db.select().from(rateAnalysisJobs).orderBy(desc(rateAnalysisJobs.createdAt)).limit(20);
+  }
+  
+  async getActiveRateAnalysisJob(): Promise<RateAnalysisJob | undefined> {
+    const result = await db
+      .select()
+      .from(rateAnalysisJobs)
+      .where(or(
+        eq(rateAnalysisJobs.status, "pending"),
+        eq(rateAnalysisJobs.status, "running")
+      ))
+      .orderBy(desc(rateAnalysisJobs.createdAt))
+      .limit(1);
+    return result[0];
+  }
+  
+  async cancelRateAnalysisJob(id: string): Promise<void> {
+    await db
+      .update(rateAnalysisJobs)
+      .set({
+        status: "cancelled",
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(rateAnalysisJobs.id, id));
   }
 
   // Print Queue

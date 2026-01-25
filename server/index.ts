@@ -261,6 +261,10 @@ async function initializeAfterListen(storage: any) {
     const { startUnifiedShipmentSyncWorker } = await import("./unified-shipment-sync-worker");
     await startUnifiedShipmentSyncWorker(); // Internal 30s polling interval
     
+    // Start rate analysis backfill worker (processes background rate analysis jobs)
+    const { startRateAnalysisBackfillWorker } = await import("./rate-analysis-backfill-worker");
+    startRateAnalysisBackfillWorker();
+    
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours
