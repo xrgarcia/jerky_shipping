@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { shipments, shipmentRateAnalysis, rateAnalysisJobs } from "@shared/schema";
-import { eq, and, isNotNull, isNull, gte, desc } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, gte, desc, inArray } from "drizzle-orm";
 import { smartCarrierRateService } from "./services/smart-carrier-rate-service";
 
 const BATCH_SIZE = 50;
@@ -23,11 +23,16 @@ async function isJobCancelled(jobId: string): Promise<boolean> {
   return job?.status === "cancelled";
 }
 
+// Only these shipment statuses can have rates fetched from ShipStation
+const QUOTEABLE_STATUSES = ['pending', 'on_hold'];
+
 async function getShipmentsForJob(daysBack: number | null): Promise<typeof shipments.$inferSelect[]> {
   const baseConditions = [
     isNotNull(shipments.serviceCode),
     isNotNull(shipments.shipToPostalCode),
-    isNotNull(shipments.shipmentId)
+    isNotNull(shipments.shipmentId),
+    // Only include shipments in quoteable states (not shipped, voided, cancelled)
+    inArray(shipments.shipmentStatus, QUOTEABLE_STATUSES)
   ];
   
   if (daysBack) {
