@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box, ChevronRight, CircleDot, Circle, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box, ChevronRight, CircleDot, Circle, CheckCircle2, AlertCircle, TrendingDown, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem } from "@shared/schema";
+import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem, ShipmentRateAnalysis } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { SessionDetailDialog, parseCustomField2 } from "@/components/session-detail-dialog";
 
@@ -78,6 +78,11 @@ export default function ShipmentDetails() {
 
   const { data: smartSessionInfo } = useQuery<SmartSessionInfo>({
     queryKey: ['/api/shipments', shipmentId, 'smart-session-info'],
+    enabled: !!shipmentId,
+  });
+
+  const { data: rateAnalysisData } = useQuery<{ rateAnalysis: ShipmentRateAnalysis | null }>({
+    queryKey: ['/api/shipments', shipmentId, 'rate-analysis'],
     enabled: !!shipmentId,
   });
 
@@ -1262,6 +1267,125 @@ export default function ShipmentDetails() {
             <div className="text-center py-4 text-muted-foreground border rounded-lg">
               <Boxes className="h-6 w-6 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No package details yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* TIER 5: Rate Checker */}
+      <Card data-testid="card-rate-checker">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Rate Checker
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rateAnalysisData?.rateAnalysis ? (
+            (() => {
+              const analysis = rateAnalysisData.rateAnalysis;
+              const hasSavings = analysis.costSavings && parseFloat(analysis.costSavings) > 0;
+              const isOptimal = analysis.smartShippingMethod === analysis.customerShippingMethod;
+              
+              return (
+                <div className="space-y-4">
+                  {/* Status Badge */}
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    {hasSavings ? (
+                      <Badge className="bg-green-600 hover:bg-green-700 gap-1" data-testid="badge-savings-available">
+                        <DollarSign className="h-3 w-3" />
+                        Savings Available
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-blue-600 hover:bg-blue-700 gap-1" data-testid="badge-optimal-choice">
+                        <CheckCircle className="h-3 w-3" />
+                        Optimal Choice
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      Compared {analysis.ratesComparedCount} rates
+                    </span>
+                  </div>
+
+                  {/* Comparison Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Customer's Choice */}
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Customer Selected</p>
+                      <p className="font-medium text-lg">
+                        {analysis.customerShippingMethod?.replace(/_/g, ' ').toUpperCase() || 'Unknown'}
+                      </p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="font-bold text-lg">
+                          ${parseFloat(analysis.customerShippingCost || '0').toFixed(2)}
+                        </span>
+                        {analysis.customerDeliveryDays && (
+                          <span className="text-muted-foreground">
+                            {analysis.customerDeliveryDays} {analysis.customerDeliveryDays === 1 ? 'day' : 'days'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Smart Recommendation */}
+                    <div className={`rounded-lg p-4 space-y-2 ${hasSavings ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-muted/50'}`}>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                        {hasSavings ? 'Recommended' : 'Best Option'}
+                      </p>
+                      <p className="font-medium text-lg">
+                        {analysis.smartShippingMethod?.replace(/_/g, ' ').toUpperCase() || 'Unknown'}
+                      </p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className={`font-bold text-lg ${hasSavings ? 'text-green-700 dark:text-green-400' : ''}`}>
+                          ${parseFloat(analysis.smartShippingCost || '0').toFixed(2)}
+                        </span>
+                        {analysis.smartDeliveryDays && (
+                          <span className="text-muted-foreground">
+                            {analysis.smartDeliveryDays} {analysis.smartDeliveryDays === 1 ? 'day' : 'days'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Savings Highlight */}
+                  {hasSavings && (
+                    <div className="bg-green-100 dark:bg-green-950/50 border border-green-300 dark:border-green-700 rounded-lg p-4 flex items-center justify-between" data-testid="savings-highlight">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          Potential Savings
+                        </span>
+                      </div>
+                      <span className="text-2xl font-bold text-green-700 dark:text-green-300">
+                        ${parseFloat(analysis.costSavings || '0').toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Route Info */}
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground pt-2 border-t">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {analysis.originPostalCode} → {analysis.destinationPostalCode}
+                    </span>
+                    {analysis.destinationState && (
+                      <span className="font-medium">{analysis.destinationState}</span>
+                    )}
+                    {analysis.updatedAt && (
+                      <span className="ml-auto">
+                        Analyzed {formatRelativeTime(analysis.updatedAt)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="text-center py-6 text-muted-foreground border rounded-lg">
+              <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Rate analysis pending</p>
+              <p className="text-xs mt-1">Analysis runs automatically during shipment sync</p>
             </div>
           )}
         </CardContent>
