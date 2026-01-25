@@ -2163,6 +2163,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill smart carrier rate analysis for shipments
+  // Analyzes shipments to find cost-effective shipping alternatives
+  app.post("/api/shipments/backfill-rate-analysis", requireAuth, async (req, res) => {
+    try {
+      const { days, limit: batchLimit, skipExisting } = req.body as { days?: number; limit?: number; skipExisting?: boolean };
+      const daysLabel = days ? `last ${days} days` : 'all time';
+      const maxShipments = batchLimit || 100;
+      const shouldSkipExisting = skipExisting !== false; // Default to true
+      
+      console.log(`========== RATE ANALYSIS BACKFILL STARTED (${daysLabel}, limit: ${maxShipments}, skipExisting: ${shouldSkipExisting}) ==========`);
+      
+      const { smartCarrierRateService } = await import('./services/smart-carrier-rate-service');
+      const { shipmentRateAnalysis } = await import('@shared/schema');
+      
+      // Build base conditions
+      const baseConditions = [
+        isNotNull(shipments.serviceCode),
+        isNotNull(shipments.shipToPostalCode),
+        isNotNull(shipments.shipmentId)
+      ];
+      
+      // Apply date filter if provided (using shipDate which is more reliably populated)
+      if (days) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        baseConditions.push(gte(shipments.shipDate, cutoffDate));
+      }
+      
+      // Get shipments that need analysis
+      let shipmentsToAnalyze;
+      
+      if (shouldSkipExisting) {
+        // Exclude shipments that already have rate analysis (left join + null check)
+        shipmentsToAnalyze = await db
+          .select({ shipment: shipments })
+          .from(shipments)
+          .leftJoin(shipmentRateAnalysis, eq(shipments.shipmentId, shipmentRateAnalysis.shipmentId))
+          .where(
+            and(
+              ...baseConditions,
+              isNull(shipmentRateAnalysis.shipmentId) // Only shipments without existing analysis
+            )
+          )
+          .limit(maxShipments)
+          .then(rows => rows.map(r => r.shipment));
+      } else {
+        // Analyze all matching shipments (re-analyze if requested)
+        shipmentsToAnalyze = await db
+          .select()
+          .from(shipments)
+          .where(and(...baseConditions))
+          .limit(maxShipments);
+      }
+      
+      console.log(`Found ${shipmentsToAnalyze.length} shipments for rate analysis backfill (${daysLabel})`);
+      
+      let successCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+      
+      for (const shipment of shipmentsToAnalyze) {
+        try {
+          const result = await smartCarrierRateService.analyzeAndSave(shipment);
+          if (result.success) {
+            successCount++;
+          } else {
+            failedCount++;
+            errors.push(`${shipment.shipmentId}: ${result.error}`);
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 150));
+        } catch (error: any) {
+          failedCount++;
+          errors.push(`${shipment.shipmentId}: ${error.message}`);
+        }
+      }
+      
+      console.log(`========== RATE ANALYSIS BACKFILL COMPLETE ==========`);
+      console.log(`Success: ${successCount}, Failed: ${failedCount}`);
+      
+      res.json({
+        success: true,
+        totalProcessed: shipmentsToAnalyze.length,
+        successCount,
+        failedCount,
+        errors: errors.slice(0, 10),
+        message: `Rate analysis backfill complete: ${successCount} shipments analyzed, ${failedCount} failed`,
+      });
+    } catch (error: any) {
+      console.error("Error during rate analysis backfill:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to backfill rate analysis",
+      });
+    }
+  });
+
   // Sync tracking status for non-delivered shipments
   app.post("/api/shipments/sync-tracking", requireAuth, async (req, res) => {
     try {

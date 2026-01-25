@@ -1567,3 +1567,71 @@ export const insertExcludedExplosionSkuSchema = createInsertSchema(excludedExplo
 
 export type InsertExcludedExplosionSku = z.infer<typeof insertExcludedExplosionSkuSchema>;
 export type ExcludedExplosionSku = typeof excludedExplosionSkus.$inferSelect;
+
+// ============================================================================
+// SMART CARRIER RATE ANALYSIS (Cost Optimization)
+// ============================================================================
+
+/**
+ * Shipment Rate Analysis Table
+ * 
+ * Stores the results of smart carrier rate checking for cost optimization.
+ * Uses shipment_id (ShipStation ID like "se-1111111") as primary key for
+ * easy joins with the main shipments table.
+ * 
+ * This enables reporting on:
+ * - Total potential cost savings across all shipments
+ * - Which carrier/service combos are most cost-effective from OKC
+ * - Comparison of customer-selected vs optimal shipping methods
+ */
+export const shipmentRateAnalysis = pgTable("shipment_rate_analysis", {
+  // Primary key: ShipStation shipment ID (e.g., "se-1111111")
+  shipmentId: text("shipment_id").primaryKey(),
+  
+  // Customer's original selection
+  customerShippingMethod: text("customer_shipping_method"), // e.g., "ups_ground"
+  customerShippingCost: numeric("customer_shipping_cost", { precision: 10, scale: 2 }),
+  customerDeliveryDays: integer("customer_delivery_days"),
+  
+  // Smart recommendation (cost-effective alternative that meets delivery requirements)
+  smartShippingMethod: text("smart_shipping_method"), // e.g., "fedex_ground"
+  smartShippingCost: numeric("smart_shipping_cost", { precision: 10, scale: 2 }),
+  smartDeliveryDays: integer("smart_delivery_days"),
+  
+  // Savings calculation
+  costSavings: numeric("cost_savings", { precision: 10, scale: 2 }), // customer_cost - smart_cost
+  
+  // Human-readable explanation
+  reasoning: text("reasoning"), // e.g., "FedEx Ground saves $2.45 vs UPS Ground with same 3-day delivery"
+  
+  // Analysis metadata
+  ratesComparedCount: integer("rates_compared_count"), // How many rates were evaluated
+  carrierCode: text("carrier_code"), // Smart method's carrier (e.g., "fedex", "ups", "usps")
+  serviceCode: text("service_code"), // Smart method's service code
+  
+  // Origin/destination context (for pattern analysis)
+  originPostalCode: text("origin_postal_code").notNull().default("73108"), // Jerky.com fulfillment center
+  destinationPostalCode: text("destination_postal_code"),
+  destinationState: text("destination_state"),
+  
+  // Tracking
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Index for savings reports
+  costSavingsIdx: index("shipment_rate_analysis_cost_savings_idx").on(table.costSavings.desc().nullsLast()),
+  // Index for destination pattern analysis
+  destinationStateIdx: index("shipment_rate_analysis_destination_state_idx").on(table.destinationState),
+  // Index for carrier comparison reports
+  smartMethodIdx: index("shipment_rate_analysis_smart_method_idx").on(table.smartShippingMethod),
+  // Index for time-based queries
+  createdAtIdx: index("shipment_rate_analysis_created_at_idx").on(table.createdAt.desc()),
+}));
+
+export const insertShipmentRateAnalysisSchema = createInsertSchema(shipmentRateAnalysis).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipmentRateAnalysis = z.infer<typeof insertShipmentRateAnalysisSchema>;
+export type ShipmentRateAnalysis = typeof shipmentRateAnalysis.$inferSelect;

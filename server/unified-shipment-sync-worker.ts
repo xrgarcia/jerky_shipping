@@ -18,6 +18,7 @@ import { db } from './db';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
+import { smartCarrierRateService } from './services/smart-carrier-rate-service';
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
 import { 
   getQueueLength, 
@@ -126,6 +127,7 @@ function getInitialCursorValue(): string {
  * Sync a single shipment to database
  * Uses existing ETL service which handles items, tags, and database operations
  * Then updates sync tracking timestamps
+ * Also triggers smart carrier rate analysis for cost optimization
  */
 async function syncShipment(shipmentData: any): Promise<string> {
   const now = new Date();
@@ -134,7 +136,7 @@ async function syncShipment(shipmentData: any): Promise<string> {
   // Use existing ETL service - handles full upsert including items and tags
   const shipmentDbId = await shipStationShipmentETL.processShipment(shipmentData, null);
   
-  // Update sync tracking timestamps and fetch the order number from DB
+  // Update sync tracking timestamps and fetch shipment data for rate analysis
   const [updatedShipment] = await db
     .update(shipments)
     .set({
@@ -142,7 +144,7 @@ async function syncShipment(shipmentData: any): Promise<string> {
       shipstationModifiedAt: modifiedAt,
     })
     .where(eq(shipments.id, shipmentDbId))
-    .returning({ orderNumber: shipments.orderNumber });
+    .returning();
   
   // Broadcast update via WebSocket with shipment_synced event type
   // Use the order number from the database record (properly extracted by ETL)
@@ -153,6 +155,14 @@ async function syncShipment(shipmentData: any): Promise<string> {
       orderNumber,
       syncedAt: now.toISOString(),
     }, 'shipment_synced');
+  }
+  
+  // Trigger smart carrier rate analysis (non-blocking)
+  // Only analyze if shipment has the required data
+  if (updatedShipment && updatedShipment.shipmentId && updatedShipment.serviceCode && updatedShipment.shipToPostalCode) {
+    smartCarrierRateService.analyzeAndSave(updatedShipment).catch(err => {
+      console.error(`[UnifiedSync] Rate analysis failed for ${updatedShipment.shipmentId}:`, err.message);
+    });
   }
   
   return shipmentDbId;
