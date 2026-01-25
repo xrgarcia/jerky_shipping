@@ -91,15 +91,26 @@ async function processJob(jobId: string): Promise<void> {
       const batch = shipmentsToAnalyze.slice(i, i + BATCH_SIZE);
       
       for (const shipment of batch) {
-        const result = await smartCarrierRateService.analyzeAndSave(shipment);
-        if (result.success && result.analysis) {
-          analyzed++;
-          const savings = parseFloat(result.analysis.costSavings || "0");
-          if (savings > 0) {
-            totalSavings += savings;
+        try {
+          const result = await smartCarrierRateService.analyzeAndSave(shipment);
+          if (result.success && result.analysis) {
+            analyzed++;
+            const savings = parseFloat(result.analysis.costSavings || "0");
+            if (savings > 0) {
+              totalSavings += savings;
+            }
+          } else {
+            failed++;
+            // Log the first few failures in detail for debugging
+            if (failed <= 3) {
+              log(`Failed shipment ${shipment.shipmentId}: ${result.error}`);
+            }
           }
-        } else {
+        } catch (error: any) {
           failed++;
+          if (failed <= 3) {
+            log(`Exception analyzing shipment ${shipment.shipmentId}: ${error.message}`);
+          }
         }
         
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_SHIPMENTS_MS));
