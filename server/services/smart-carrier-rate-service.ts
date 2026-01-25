@@ -12,9 +12,7 @@ import { shipmentRateAnalysis, shipments } from '@shared/schema';
 import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { updateShipmentLifecycle } from './lifecycle-service';
-
-const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
-const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
+import { getRatesForShipment, getCarriers, getRatesEstimate } from '../utils/shipstation-api';
 
 const FULFILLMENT_CENTER = {
   address: "4132 Will Rogers Pkwy",
@@ -77,6 +75,7 @@ export class SmartCarrierRateService {
   
   /**
    * Fetch all carriers configured in ShipStation account.
+   * Uses the centralized ShipStation API service with rate limiting.
    * Caches the result for the duration of the batch run.
    */
   async fetchCarriers(forceRefresh = false): Promise<ShipStationCarrier[]> {
@@ -88,27 +87,8 @@ export class SmartCarrierRateService {
       }
     }
     
-    if (!SHIPSTATION_API_KEY) {
-      throw new Error('SHIPSTATION_API_KEY environment variable is not set');
-    }
-    
-    const url = `${SHIPSTATION_API_BASE}/v2/carriers`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'api-key': SHIPSTATION_API_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ShipStation carriers API error: ${response.status} ${errorText}`);
-    }
-    
-    const data = await response.json();
-    const carriers: ShipStationCarrier[] = data.carriers || data || [];
+    const result = await getCarriers();
+    const carriers: ShipStationCarrier[] = result.data || [];
     
     this.carriersCache = {
       carriers,
@@ -367,46 +347,17 @@ export class SmartCarrierRateService {
   }
   
   /**
-   * Fetch rates for a shipment from ShipStation using GET /v2/shipments/{id}/rates
-   * This endpoint returns all available rates for an existing shipment
+   * Fetch rates for a shipment from ShipStation using the centralized API service
+   * Includes rate limiting, retry logic, and proper error handling
    */
   private async fetchRatesForShipment(shipmentId: string): Promise<ShipStationRate[]> {
-    if (!SHIPSTATION_API_KEY) {
-      throw new Error('SHIPSTATION_API_KEY environment variable is not set');
-    }
-    
-    const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}/rates`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'api-key': SHIPSTATION_API_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ShipStation rates API error: ${response.status} ${errorText}`);
-    }
-    
-    const data = await response.json();
-    
-    // ShipStation returns an array with a single object containing the rates array
-    if (Array.isArray(data) && data.length > 0 && data[0].rates) {
-      return data[0].rates;
-    }
-    
-    // Direct rates response
-    if (data.rates) {
-      return data.rates;
-    }
-    
-    return [];
+    const result = await getRatesForShipment(shipmentId);
+    return result.data;
   }
   
   /**
    * Fetch rates using shipment details (for shipments not yet in ShipStation)
+   * Uses the centralized ShipStation API service with rate limiting
    */
   async fetchRatesEstimate(params: {
     destinationPostalCode: string;
@@ -417,10 +368,6 @@ export class SmartCarrierRateService {
     widthInches?: number;
     heightInches?: number;
   }): Promise<ShipStationRate[]> {
-    if (!SHIPSTATION_API_KEY) {
-      throw new Error('SHIPSTATION_API_KEY environment variable is not set');
-    }
-    
     const requestBody: any = {
       shipment: {
         validate_address: 'no_validation',
@@ -456,24 +403,8 @@ export class SmartCarrierRateService {
       rate_options: {},
     };
     
-    const url = `${SHIPSTATION_API_BASE}/v2/rates`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'api-key': SHIPSTATION_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ShipStation rates API error: ${response.status} ${errorText}`);
-    }
-    
-    const data: RatesResponse = await response.json();
-    return data.rates || [];
+    const result = await getRatesEstimate(requestBody);
+    return result.data;
   }
   
   /**

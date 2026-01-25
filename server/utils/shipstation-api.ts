@@ -1042,3 +1042,155 @@ export async function updateShipmentNumber(shipmentId: string, newShipmentNumber
   
   return { success: true };
 }
+
+/**
+ * Get available shipping rates for an existing shipment
+ * Uses GET /v2/shipments/{id}/rates endpoint with rate limit handling and retry logic
+ */
+export async function getRatesForShipment(shipmentId: string, maxRetries: number = 3): Promise<ApiResponseWithRateLimit<any[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}/rates`;
+  let lastRateLimit: RateLimitInfo = { limit: 40, remaining: 40, reset: 60 };
+  let retryCount = 0;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api-key': SHIPSTATION_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      lastRateLimit = extractRateLimitInfo(response.headers);
+
+      // Handle 429 rate limit responses with retry
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+        console.log(`[ShipStation] Rate limited (429) for rates on shipment ${shipmentId}, waiting ${retryAfter}s before retry ${retryCount + 1}/${maxRetries}...`);
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+        retryCount++;
+        continue;
+      }
+
+      // Handle 500 errors with retry (ShipStation occasionally has transient errors)
+      if (response.status === 500 && retryCount < maxRetries) {
+        console.log(`[ShipStation] Server error (500) for rates on shipment ${shipmentId}, retry ${retryCount + 1}/${maxRetries}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        retryCount++;
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ShipStation rates API error: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      // ShipStation returns an array with a single object containing the rates array
+      let rates: any[] = [];
+      if (Array.isArray(data) && data.length > 0 && data[0].rates) {
+        rates = data[0].rates;
+      } else if (data.rates) {
+        rates = data.rates;
+      }
+
+      return { data: rates, rateLimit: lastRateLimit };
+    } catch (error: any) {
+      if (retryCount >= maxRetries) {
+        throw error;
+      }
+      console.log(`[ShipStation] Error fetching rates for ${shipmentId}: ${error.message}, retry ${retryCount + 1}/${maxRetries}...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      retryCount++;
+    }
+  }
+
+  return { data: [], rateLimit: lastRateLimit };
+}
+
+/**
+ * Get available carriers from ShipStation
+ * Uses GET /v2/carriers endpoint with rate limit handling
+ */
+export async function getCarriers(): Promise<ApiResponseWithRateLimit<any[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/carriers`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const rateLimit = extractRateLimitInfo(response.headers);
+
+  if (response.status === 429) {
+    const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    console.log(`[ShipStation] Rate limited (429) for carriers, waiting ${retryAfter}s before retry...`);
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+    // Recursive retry
+    return getCarriers();
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation carriers API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const carriers = data.carriers || [];
+
+  return { data: carriers, rateLimit };
+}
+
+/**
+ * Get rate estimates for a potential shipment (not yet created in ShipStation)
+ * Uses POST /v2/rates endpoint with rate limit handling
+ */
+export async function getRatesEstimate(shipmentDetails: any): Promise<ApiResponseWithRateLimit<any[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/rates`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(shipmentDetails),
+  });
+
+  const rateLimit = extractRateLimitInfo(response.headers);
+
+  if (response.status === 429) {
+    const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    console.log(`[ShipStation] Rate limited (429) for rate estimate, waiting ${retryAfter}s before retry...`);
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+    // Recursive retry
+    return getRatesEstimate(shipmentDetails);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation rates API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const rates = data.rates || [];
+
+  return { data: rates, rateLimit };
+}
