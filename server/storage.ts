@@ -94,6 +94,9 @@ import {
   type RateAnalysisJob,
   type InsertRateAnalysisJob,
   rateAnalysisJobs,
+  type LifecycleRepairJob,
+  type InsertLifecycleRepairJob,
+  lifecycleRepairJobs,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -256,6 +259,14 @@ export interface IStorage {
   getAllRateAnalysisJobs(): Promise<RateAnalysisJob[]>;
   getActiveRateAnalysisJob(): Promise<RateAnalysisJob | undefined>;
   cancelRateAnalysisJob(id: string): Promise<void>;
+
+  // Lifecycle Repair Jobs
+  createLifecycleRepairJob(job: InsertLifecycleRepairJob): Promise<LifecycleRepairJob>;
+  getLifecycleRepairJob(id: string): Promise<LifecycleRepairJob | undefined>;
+  getAllLifecycleRepairJobs(): Promise<LifecycleRepairJob[]>;
+  getActiveLifecycleRepairJob(): Promise<LifecycleRepairJob | undefined>;
+  updateLifecycleRepairJob(id: string, updates: Partial<InsertLifecycleRepairJob>): Promise<LifecycleRepairJob | undefined>;
+  cancelLifecycleRepairJob(id: string): Promise<void>;
 
   // Print Queue
   createPrintJob(job: InsertPrintQueue): Promise<PrintQueue>;
@@ -2292,6 +2303,57 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(rateAnalysisJobs.id, id));
+  }
+
+  // Lifecycle Repair Jobs
+  async createLifecycleRepairJob(job: InsertLifecycleRepairJob): Promise<LifecycleRepairJob> {
+    const result = await db.insert(lifecycleRepairJobs).values(job).returning();
+    return result[0];
+  }
+  
+  async getLifecycleRepairJob(id: string): Promise<LifecycleRepairJob | undefined> {
+    const result = await db.select().from(lifecycleRepairJobs).where(eq(lifecycleRepairJobs.id, id));
+    return result[0];
+  }
+  
+  async getAllLifecycleRepairJobs(): Promise<LifecycleRepairJob[]> {
+    return db.select().from(lifecycleRepairJobs).orderBy(desc(lifecycleRepairJobs.createdAt)).limit(20);
+  }
+  
+  async getActiveLifecycleRepairJob(): Promise<LifecycleRepairJob | undefined> {
+    const result = await db
+      .select()
+      .from(lifecycleRepairJobs)
+      .where(or(
+        eq(lifecycleRepairJobs.status, "pending"),
+        eq(lifecycleRepairJobs.status, "running")
+      ))
+      .orderBy(desc(lifecycleRepairJobs.createdAt))
+      .limit(1);
+    return result[0];
+  }
+  
+  async updateLifecycleRepairJob(id: string, updates: Partial<InsertLifecycleRepairJob>): Promise<LifecycleRepairJob | undefined> {
+    const result = await db
+      .update(lifecycleRepairJobs)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(lifecycleRepairJobs.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async cancelLifecycleRepairJob(id: string): Promise<void> {
+    await db
+      .update(lifecycleRepairJobs)
+      .set({
+        status: "cancelled",
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(lifecycleRepairJobs.id, id));
   }
 
   // Print Queue
