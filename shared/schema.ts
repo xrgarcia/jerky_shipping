@@ -1644,6 +1644,15 @@ export const shipmentRateAnalysis = pgTable("shipment_rate_analysis", {
   packageWidthIn: numeric("package_width_in", { precision: 6, scale: 2 }),
   packageHeightIn: numeric("package_height_in", { precision: 6, scale: 2 }),
   
+  // All rates checked during analysis (for validation and transparency)
+  // Format: [{carrier: "usps", service: "first_class_mail", cost: 3.92, deliveryDays: 1}, ...]
+  allRatesChecked: jsonb("all_rates_checked").$type<Array<{
+    carrier: string;
+    service: string;
+    cost: number;
+    deliveryDays: number | null;
+  }>>(),
+  
   // Tracking
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
