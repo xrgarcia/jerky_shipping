@@ -42,6 +42,9 @@ import {
   orderItems,
   type ShipmentSyncFailure,
   shipmentSyncFailures,
+  type ShipmentsDeadLetter,
+  type InsertShipmentsDeadLetter,
+  shipmentsDeadLetters,
   type ShopifyOrderSyncFailure,
   shopifyOrderSyncFailures,
   type PackingLog,
@@ -432,6 +435,12 @@ export interface IStorage {
   getExcludedExplosionSkuSet(): Promise<Set<string>>;
   addExcludedExplosionSku(sku: string, reason?: string, createdBy?: string): Promise<ExcludedExplosionSku>;
   deleteExcludedExplosionSku(id: number): Promise<boolean>;
+
+  // Shipments Dead Letters
+  upsertShipmentsDeadLetter(deadLetter: InsertShipmentsDeadLetter): Promise<ShipmentsDeadLetter>;
+  getShipmentsDeadLetter(shipmentId: string): Promise<ShipmentsDeadLetter | undefined>;
+  getAllShipmentsDeadLetters(limit?: number): Promise<ShipmentsDeadLetter[]>;
+  deleteShipmentsDeadLetter(shipmentId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3782,6 +3791,47 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(excludedExplosionSkus)
       .where(eq(excludedExplosionSkus.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Shipments Dead Letters
+  async upsertShipmentsDeadLetter(deadLetter: InsertShipmentsDeadLetter): Promise<ShipmentsDeadLetter> {
+    const result = await db
+      .insert(shipmentsDeadLetters)
+      .values(deadLetter)
+      .onConflictDoUpdate({
+        target: shipmentsDeadLetters.shipmentId,
+        set: {
+          data: deadLetter.data,
+          reason: deadLetter.reason,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getShipmentsDeadLetter(shipmentId: string): Promise<ShipmentsDeadLetter | undefined> {
+    const result = await db
+      .select()
+      .from(shipmentsDeadLetters)
+      .where(eq(shipmentsDeadLetters.shipmentId, shipmentId));
+    return result[0];
+  }
+
+  async getAllShipmentsDeadLetters(limit: number = 100): Promise<ShipmentsDeadLetter[]> {
+    return await db
+      .select()
+      .from(shipmentsDeadLetters)
+      .orderBy(desc(shipmentsDeadLetters.createdAt))
+      .limit(limit);
+  }
+
+  async deleteShipmentsDeadLetter(shipmentId: string): Promise<boolean> {
+    const result = await db
+      .delete(shipmentsDeadLetters)
+      .where(eq(shipmentsDeadLetters.shipmentId, shipmentId))
       .returning();
     return result.length > 0;
   }

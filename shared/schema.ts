@@ -824,6 +824,23 @@ export const insertShipmentSyncFailureSchema = createInsertSchema(shipmentSyncFa
 export type InsertShipmentSyncFailure = z.infer<typeof insertShipmentSyncFailureSchema>;
 export type ShipmentSyncFailure = typeof shipmentSyncFailures.$inferSelect;
 
+// Shipments dead letters table - stores shipments that cannot be processed
+export const shipmentsDeadLetters = pgTable("shipments_dead_letters", {
+  shipmentId: text("shipment_id").primaryKey(), // ShipStation shipment ID like "se-123454356"
+  data: jsonb("data").notNull(), // Raw shipment data from ShipStation
+  reason: text("reason").notNull(), // Why it was dead-lettered (e.g., "null_order_number")
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertShipmentsDeadLetterSchema = createInsertSchema(shipmentsDeadLetters).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShipmentsDeadLetter = z.infer<typeof insertShipmentsDeadLetterSchema>;
+export type ShipmentsDeadLetter = typeof shipmentsDeadLetters.$inferSelect;
+
 // Shopify order sync failures table for dead letter queue
 export const shopifyOrderSyncFailures = pgTable("shopify_order_sync_failures", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

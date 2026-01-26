@@ -146,6 +146,17 @@ export class ShipStationShipmentETLService {
       
       finalShipmentId = existing.id;
     } else {
+      // NEW: Check for null order_number before creating - dead-letter if missing
+      if (!orderNumber) {
+        console.log(`[ETL] Dead-lettering shipment ${shipmentId} - no order_number in ShipStation data`);
+        await this.storage.upsertShipmentsDeadLetter({
+          shipmentId: String(shipmentId),
+          data: shipmentData,
+          reason: 'null_order_number',
+        });
+        throw new Error(`Shipment ${shipmentId} dead-lettered: null order_number`);
+      }
+      
       const created = await this.storage.createShipment(shipmentRecord);
       finalShipmentId = created.id;
     }
