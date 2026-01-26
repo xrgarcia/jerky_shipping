@@ -1695,3 +1695,30 @@ export const insertRateAnalysisJobSchema = createInsertSchema(rateAnalysisJobs).
 
 export type InsertRateAnalysisJob = z.infer<typeof insertRateAnalysisJobSchema>;
 export type RateAnalysisJob = typeof rateAnalysisJobs.$inferSelect;
+
+// Lifecycle Repair Jobs - Background jobs for fixing stale lifecycle phases
+// These jobs run in the background and can survive page changes/logouts
+export const lifecycleRepairJobs = pgTable("lifecycle_repair_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed, cancelled
+  shipmentsTotal: integer("shipments_total").notNull().default(0),
+  shipmentsRepaired: integer("shipments_repaired").notNull().default(0),
+  shipmentsFailed: integer("shipments_failed").notNull().default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("lifecycle_repair_jobs_status_idx").on(table.status),
+  createdAtIdx: index("lifecycle_repair_jobs_created_at_idx").on(table.createdAt.desc().nullsLast()),
+}));
+
+export const insertLifecycleRepairJobSchema = createInsertSchema(lifecycleRepairJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLifecycleRepairJob = z.infer<typeof insertLifecycleRepairJobSchema>;
+export type LifecycleRepairJob = typeof lifecycleRepairJobs.$inferSelect;
