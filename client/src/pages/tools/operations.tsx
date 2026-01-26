@@ -682,6 +682,7 @@ function UnifiedSyncButtons({
 }) {
   const [isPollLoading, setIsPollLoading] = useState(false);
   const [isResyncLoading, setIsResyncLoading] = useState(false);
+  const [isResync1Loading, setIsResync1Loading] = useState(false);
   const [isResync90Loading, setIsResync90Loading] = useState(false);
 
   return (

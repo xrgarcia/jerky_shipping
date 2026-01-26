@@ -5121,6 +5121,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force 1-day resync (reset cursor to 1 day ago)
+  app.post("/api/operations/force-unified-resync-1", requireAuth, async (req, res) => {
+    try {
+      const { forceResyncWithDays } = await import("./unified-shipment-sync-worker");
+      await forceResyncWithDays(1);
+      res.json({ success: true, message: "Full resync initiated - cursor reset to 1-day lookback" });
+    } catch (error) {
+      console.error("Error forcing 1-day unified resync:", error);
+      res.status(500).json({ error: "Failed to force 1-day unified resync" });
+    }
+  });
+
   // Force 90-day resync (reset cursor to 90 days ago)
   app.post("/api/operations/force-unified-resync-90", requireAuth, async (req, res) => {
     try {
