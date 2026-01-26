@@ -459,9 +459,8 @@ export class ShipStationShipmentETLService {
    * Extract order_number from shipmentData
    * Returns the customer-facing order number (e.g., "JK3825345229")
    * Handles multiple ShipStation API response formats
-   * Falls back to shipment_id if no order number found (prevents null constraint violations)
    */
-  private extractOrderNumber(shipmentData: any): string {
+  private extractOrderNumber(shipmentData: any): string | null {
     // Try shipment_number / shipmentNumber (most common in webhooks)
     if (shipmentData?.shipment_number) return shipmentData.shipment_number;
     if (shipmentData?.shipmentNumber) return shipmentData.shipmentNumber;
@@ -476,10 +475,7 @@ export class ShipStationShipmentETLService {
     if (shipmentData?.shipment?.order_number) return shipmentData.shipment.order_number;
     if (shipmentData?.shipment?.orderNumber) return shipmentData.shipment.orderNumber;
     
-    // Tactical fallback: use shipment_id to prevent null constraint violation
-    // These are likely manually created shipments without associated orders
-    const shipmentId = shipmentData?.shipment_id || shipmentData?.shipmentId || 'unknown';
-    return `SS-${shipmentId}`;
+    return null;
   }
 
   /**
