@@ -190,10 +190,10 @@ async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<
     const order = orderNumber ? await storage.getOrderByOrderNumber(orderNumber) : null;
     
     // Use ETL service to process the shipment with fresh data
-    const result = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
-    if (result.skipped) {
+    const etlResult = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+    if (etlResult.skipped) {
       log(`[ReverseSync] Shipment skipped (dead-lettered)`);
-      return;
+      return { message, success: true, statusChanged: false, rateLimit };
     }
     
     // Update the timestamp after ETL processing
