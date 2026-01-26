@@ -92,6 +92,19 @@ type RateAnalysisJob = {
   updatedAt: string;
 };
 
+type LifecycleRepairJob = {
+  id: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  shipmentsTotal: number;
+  shipmentsRepaired: number;
+  shipmentsFailed: number;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type QueueStats = {
   shopifyQueue: {
     size: number;
@@ -657,6 +670,167 @@ function RateAnalysisJobsCard() {
                     <span>{job.shipmentsAnalyzed} analyzed</span>
                     {job.savingsFound && parseFloat(job.savingsFound) > 0 && (
                       <span className="text-green-600">${parseFloat(job.savingsFound).toFixed(2)} savings</span>
+                    )}
+                    {job.completedAt && (
+                      <span>{formatDistanceToNow(new Date(job.completedAt))} ago</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LifecycleRepairJobsCard() {
+  const { toast } = useToast();
+  
+  const { data: repairData, isLoading, refetch } = useQuery<{ jobs: LifecycleRepairJob[]; activeJob: LifecycleRepairJob | null }>({
+    queryKey: ["/api/lifecycle-repair-jobs"],
+    refetchInterval: 5000,
+  });
+  
+  const createJobMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/lifecycle-repair-jobs");
+    },
+    onSuccess: () => {
+      refetch();
+      toast({
+        title: "Repair Started",
+        description: "Lifecycle phase repair job has been queued and will run in the background",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to start lifecycle repair job",
+      });
+    },
+  });
+  
+  const cancelJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return await apiRequest("POST", `/api/lifecycle-repair-jobs/${jobId}/cancel`);
+    },
+    onSuccess: () => {
+      refetch();
+      toast({
+        title: "Job Cancelled",
+        description: "Lifecycle repair job has been cancelled",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to cancel job",
+      });
+    },
+  });
+  
+  const activeJob = repairData?.activeJob;
+  const jobs = repairData?.jobs || [];
+  
+  return (
+    <Card data-testid="card-lifecycle-repair-jobs">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Lifecycle Phase Repair
+        </CardTitle>
+        <CardDescription>
+          Repair stale lifecycle phases for shipments stuck in 'on_dock' but with carrier status indicating delivery/transit.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {activeJob ? (
+            <div className="rounded-md border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                  <span className="font-medium">
+                    {activeJob.status === 'running' ? 'Repairing' : 'Pending'} Lifecycle Phases
+                  </span>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => cancelJobMutation.mutate(activeJob.id)}
+                  disabled={cancelJobMutation.isPending}
+                  data-testid="button-cancel-lifecycle-repair"
+                >
+                  Cancel
+                </Button>
+              </div>
+              {activeJob.status === 'running' && activeJob.shipmentsTotal > 0 && (
+                <div className="space-y-1">
+                  <Progress 
+                    value={(activeJob.shipmentsRepaired / activeJob.shipmentsTotal) * 100} 
+                    className="h-2"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{activeJob.shipmentsRepaired} / {activeJob.shipmentsTotal} repaired</span>
+                    {activeJob.shipmentsFailed > 0 && (
+                      <span className="text-destructive">
+                        {activeJob.shipmentsFailed} failed
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => createJobMutation.mutate()}
+              disabled={createJobMutation.isPending}
+              data-testid="button-start-lifecycle-repair"
+            >
+              {createJobMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                "Start Lifecycle Repair"
+              )}
+            </Button>
+          )}
+          
+          {jobs.length > 0 && (
+            <div className="space-y-2 pt-4 border-t">
+              <h4 className="text-sm font-medium text-muted-foreground">Recent Jobs</h4>
+              {jobs.slice(0, 5).map((job) => (
+                <div 
+                  key={job.id} 
+                  className="flex items-center justify-between p-2 rounded-md border text-sm"
+                  data-testid={`lifecycle-repair-job-item-${job.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={
+                        job.status === "running" ? "default" : 
+                        job.status === "completed" ? "default" :
+                        job.status === "failed" ? "destructive" :
+                        "secondary"
+                      }
+                    >
+                      {job.status === "running" && <RefreshCw className="h-3 w-3 mr-1 animate-spin" />}
+                      {job.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {job.status === "failed" && <XCircle className="h-3 w-3 mr-1" />}
+                      {job.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{job.shipmentsRepaired} repaired</span>
+                    {job.shipmentsFailed > 0 && (
+                      <span className="text-destructive">{job.shipmentsFailed} failed</span>
                     )}
                     {job.completedAt && (
                       <span>{formatDistanceToNow(new Date(job.completedAt))} ago</span>
@@ -2977,6 +3151,9 @@ Please analyze this failure and help me understand:
 
       {/* Rate Analysis Jobs */}
       <RateAnalysisJobsCard />
+
+      {/* Lifecycle Repair Jobs */}
+      <LifecycleRepairJobsCard />
 
       {/* All Backfill Jobs List */}
       <Card data-testid="card-all-backfill-jobs">
