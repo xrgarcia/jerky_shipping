@@ -716,6 +716,35 @@ function UnifiedSyncButtons({
         size="sm"
         variant="outline"
         onClick={async () => {
+          setIsResync1Loading(true);
+          try {
+            await apiRequest('POST', '/api/operations/force-unified-resync-1');
+            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+            toast({
+              title: "1-Day Resync Started",
+              description: "Cursor reset to 1 day ago.",
+            });
+          } catch (err) {
+            console.error('Failed to force 1-day resync:', err);
+            toast({
+              title: "Failed to force 1-day resync",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsResync1Loading(false);
+          }
+        }}
+        disabled={!credentialsConfigured || isResync1Loading}
+        data-testid="button-force-unified-resync-1"
+      >
+        <RefreshCw className={cn("h-3 w-3 mr-1", isResync1Loading && "animate-spin")} />
+        {isResync1Loading ? "Resetting..." : "Resync (1-day)"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
           setIsResyncLoading(true);
           try {
             await apiRequest('POST', '/api/operations/force-unified-resync');
