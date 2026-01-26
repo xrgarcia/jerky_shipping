@@ -1,0 +1,151 @@
+7:50:17 PM [express] GET /api/rate-analysis-jobs 304 in 170ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:22.96
+3d8fe571
+User
+7:50:22 PM [express] GET /api/rate-analysis-jobs 304 in 168ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:28.19
+3d8fe571
+User
+7:50:28 PM [express] GET /api/rate-analysis-jobs 304 in 168ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:33.41
+3d8fe571
+User
+7:50:33 PM [express] GET /api/rate-analysis-jobs 304 in 160ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:38.64
+3d8fe571
+User
+7:50:38 PM [express] GET /api/rate-analysis-jobs 304 in 164ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:43.87
+3d8fe571
+User
+7:50:43 PM [express] GET /api/rate-analysis-jobs 304 in 163ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:49.10
+3d8fe571
+User
+7:50:49 PM [express] GET /api/rate-analysis-jobs 304 in 171ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:50.58
+3d8fe571
+User
+7:50:50 PM [rate-analysis-worker] Job 42ebe828-6805-4a05-a250-48ff71897cc4 progress: 50/108 (0 analyzed, 50 failed)
+2026-01-26 13:50:54.32
+3d8fe571
+User
+7:50:54 PM [express] GET /api/rate-analysis-jobs 200 in 174ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:50:59.54
+3d8fe571
+User
+7:50:59 PM [express] GET /api/rate-analysis-jobs 304 in 171ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:04.76
+3d8fe571
+User
+7:51:04 PM [express] GET /api/rate-analysis-jobs 304 in 169ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:09.98
+3d8fe571
+User
+7:51:09 PM [express] GET /api/rate-analysis-jobs 304 in 168ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:15.21
+3d8fe571
+User
+7:51:15 PM [express] GET /api/rate-analysis-jobs 304 in 169ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:20.46
+3d8fe571
+User
+7:51:20 PM [express] GET /api/rate-analysis-jobs 304 in 168ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:25.71
+3d8fe571
+User
+7:51:25 PM [express] GET /api/rate-analysis-jobs 304 in 167ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:31.11
+3d8fe571
+User
+7:51:31 PM [express] GET /api/rate-analysis-jobs 304 in 172ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:36.53
+3d8fe571
+User
+7:51:36 PM [express] GET /api/rate-analysis-jobs 304 in 174ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:41.98
+3d8fe571
+User
+7:51:41 PM [express] GET /api/rate-analysis-jobs 304 in 170ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:51:58.12
+3d8fe571
+User
+7:51:58 PM [express] GET /api/rate-analysis-jobs 304 in 159ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:03.54
+3d8fe571
+User
+7:52:03 PM [express] GET /api/rate-analysis-jobs 304 in 173ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:08.95
+3d8fe571
+User
+7:52:08 PM [express] GET /api/rate-analysis-jobs 304 in 169ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:13.49
+3d8fe571
+User
+7:52:13 PM [express] GET /api/rate-analysis 304 in 202ms :: {"data":[],"pagination":{"page":1,"limit…
+2026-01-26 13:52:15.70
+3d8fe571
+User
+7:52:15 PM [express] GET /api/rate-analysis 304 in 209ms :: {"data":[],"pagination":{"page":1,"limit…
+2026-01-26 13:52:39.53
+3d8fe571
+User
+7:52:39 PM [express] GET /api/rate-analysis-jobs 304 in 405ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:44.98
+3d8fe571
+User
+7:52:44 PM [express] GET /api/rate-analysis-jobs 304 in 393ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:50.47
+3d8fe571
+User
+7:52:50 PM [express] GET /api/rate-analysis-jobs 304 in 177ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:52:55.87
+3d8fe571
+User
+7:52:55 PM [express] GET /api/rate-analysis-jobs 304 in 167ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:53:12.15
+3d8fe571
+User
+7:53:12 PM [rate-analysis-worker] Job 42ebe828-6805-4a05-a250-48ff71897cc4 progress: 100/108 (0 analyzed, 100 failed)
+2026-01-26 13:53:39.03
+3d8fe571
+User
+7:53:39 PM [rate-analysis-worker] Job 42ebe828-6805-4a05-a250-48ff71897cc4 progress: 108/108 (0 analyzed, 108 failed)
+2026-01-26 13:53:39.07
+3d8fe571
+User
+7:53:39 PM [rate-analysis-worker] Job 42ebe828-6805-4a05-a250-48ff71897cc4 completed: 0 analyzed, 108 failed, $0.00 potential savings
+2026-01-26 13:53:56.67
+3d8fe571
+User
+7:53:56 PM [express] GET /api/rate-analysis-jobs 200 in 172ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:54:02.09
+3d8fe571
+User
+7:54:02 PM [express] GET /api/rate-analysis-jobs 304 in 174ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:54:57.48
+3d8fe571
+User
+7:54:57 PM [express] GET /api/rate-analysis-jobs 304 in 164ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:55:02.87
+3d8fe571
+User
+7:55:02 PM [express] GET /api/rate-analysis-jobs 304 in 168ms :: {"jobs":[{"id":"42ebe828-6805-4a05-…
+2026-01-26 13:56:21.02
+3d8fe571
+User
+[Lifecycle] JK3825361341: packing_ready → awaiting_decisions/needs_rate_check
+2026-01-26 13:56:35.63
+3d8fe571
+User
+[Lifecycle] JK3825361116: awaiting_decisions/needs_rate_check → in_transit
+2026-01-26 13:56:56.71
+3d8fe571
+User
+7:56:56 PM [express] GET /api/rate-analysis 304 in 206ms :: {"data":[],"pagination":{"page":1,"limit…
+2026-01-26 13:56:56.71
+3d8fe571
+User
+7:56:56 PM [express] GET /api/rate-analysis 304 in 206ms :: {"data":[],"pagination":{"page":1,"limit…
+Wrap
+Colors
