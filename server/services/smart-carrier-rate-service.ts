@@ -8,11 +8,21 @@
  */
 
 import { db } from '../db';
-import { shipmentRateAnalysis, shipments } from '@shared/schema';
+import { shipmentRateAnalysis, shipments, fingerprints, fingerprintModels, packagingTypes } from '@shared/schema';
 import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { updateShipmentLifecycle } from './lifecycle-service';
 import { getRatesForShipment, getCarriers, getRatesEstimate } from '../utils/shipstation-api';
+
+// Package details for rate calculation
+interface PackageDetails {
+  weightOz: number;
+  lengthIn?: number;
+  widthIn?: number;
+  heightIn?: number;
+  usedFallback: boolean;
+  source: string;
+}
 
 const FULFILLMENT_CENTER = {
   address: "4132 Will Rogers Pkwy",
@@ -117,14 +127,108 @@ export class SmartCarrierRateService {
   }
   
   /**
+   * Get package details for rate calculation.
+   * Priority: 1) Fingerprint's assigned packaging + weight, 2) ShipStation shipment data
+   * 
+   * Returns package dimensions and weight, along with whether fallback was used.
+   */
+  async getPackageDetails(shipment: Shipment): Promise<PackageDetails | null> {
+    // Try to get package details from fingerprint's assigned packaging
+    if (shipment.fingerprintId) {
+      try {
+        // Get the fingerprint with its weight
+        const [fingerprint] = await db
+          .select()
+          .from(fingerprints)
+          .where(eq(fingerprints.id, shipment.fingerprintId))
+          .limit(1);
+        
+        // Get the assigned packaging model
+        const [model] = await db
+          .select()
+          .from(fingerprintModels)
+          .where(eq(fingerprintModels.fingerprintId, shipment.fingerprintId))
+          .limit(1);
+        
+        if (fingerprint && model?.packagingTypeId) {
+          // Get the packaging type dimensions
+          const [packaging] = await db
+            .select()
+            .from(packagingTypes)
+            .where(eq(packagingTypes.id, model.packagingTypeId))
+            .limit(1);
+          
+          if (packaging && fingerprint.totalWeight) {
+            // Convert weight to ounces if needed
+            let weightOz = fingerprint.totalWeight;
+            if (fingerprint.weightUnit === 'lb' || fingerprint.weightUnit === 'pound' || fingerprint.weightUnit === 'pounds') {
+              weightOz = fingerprint.totalWeight * 16;
+            }
+            
+            const packageDetails: PackageDetails = {
+              weightOz,
+              usedFallback: false,
+              source: `Fingerprint packaging: ${packaging.name}`,
+            };
+            
+            // Add dimensions if available
+            if (packaging.dimensionLength && packaging.dimensionWidth && packaging.dimensionHeight) {
+              packageDetails.lengthIn = parseFloat(packaging.dimensionLength);
+              packageDetails.widthIn = parseFloat(packaging.dimensionWidth);
+              packageDetails.heightIn = parseFloat(packaging.dimensionHeight);
+            }
+            
+            console.log(`[SmartCarrierRate] Using fingerprint package for ${shipment.shipmentId}: ${weightOz.toFixed(2)}oz, ${packaging.name}`);
+            return packageDetails;
+          }
+        }
+      } catch (error: any) {
+        console.warn(`[SmartCarrierRate] Error fetching fingerprint package for ${shipment.shipmentId}:`, error.message);
+      }
+    }
+    
+    // Fallback: Use ShipStation shipment's weight data
+    if (shipment.totalWeight) {
+      // Parse weight from "value unit" format (e.g., "2.5 pounds")
+      const weightMatch = shipment.totalWeight.match(/^([\d.]+)\s*(\w+)?$/);
+      if (weightMatch) {
+        let weightValue = parseFloat(weightMatch[1]);
+        const unit = (weightMatch[2] || 'oz').toLowerCase();
+        
+        // Convert to ounces
+        let weightOz = weightValue;
+        if (unit.includes('pound') || unit.includes('lb')) {
+          weightOz = weightValue * 16;
+        } else if (unit.includes('kg')) {
+          weightOz = weightValue * 35.274;
+        } else if (unit.includes('gram') || unit === 'g') {
+          weightOz = weightValue * 0.03527;
+        }
+        
+        console.log(`[SmartCarrierRate] Using ShipStation fallback weight for ${shipment.shipmentId}: ${weightOz.toFixed(2)}oz (from ${shipment.totalWeight})`);
+        return {
+          weightOz,
+          usedFallback: true,
+          source: `ShipStation shipment weight: ${shipment.totalWeight}`,
+        };
+      }
+    }
+    
+    // No weight data available
+    return null;
+  }
+  
+  /**
    * Analyze a shipment and find the most cost-effective shipping method
    * that meets the customer's expected delivery timeframe.
    * 
    * Logic:
-   * 1. Find customer's selected rate and its delivery days
-   * 2. Filter to rates that deliver in same or fewer days
-   * 3. Pick the cheapest from eligible rates
-   * 4. If customer's rate not found, use a conservative default (ground ~5 days)
+   * 1. Get package details (fingerprint's packaging first, ShipStation fallback)
+   * 2. Fetch rates using package details or ShipStation shipment API
+   * 3. Find customer's selected rate and its delivery days
+   * 4. Filter to rates that deliver in same or fewer days
+   * 5. Pick the cheapest from eligible rates
+   * 6. Track whether fallback package data was used
    */
   async analyzeShipment(shipment: Shipment): Promise<RateAnalysisResult> {
     const shipmentId = shipment.shipmentId;
@@ -143,7 +247,28 @@ export class SmartCarrierRateService {
     }
     
     try {
-      const rates = await this.fetchRatesForShipment(shipmentId);
+      // Get package details (prefer fingerprint's assigned packaging, fallback to ShipStation)
+      const packageDetails = await this.getPackageDetails(shipment);
+      
+      let rates: ShipStationRate[];
+      let usedFallback = true; // Default to true if no package details
+      
+      if (packageDetails && !packageDetails.usedFallback) {
+        // Use rates estimate API with fingerprint's package dimensions
+        rates = await this.fetchRatesEstimate({
+          destinationPostalCode: shipment.shipToPostalCode,
+          destinationCity: shipment.shipToCity || undefined,
+          destinationState: shipment.shipToState || undefined,
+          weightOunces: packageDetails.weightOz,
+          lengthInches: packageDetails.lengthIn,
+          widthInches: packageDetails.widthIn,
+          heightInches: packageDetails.heightIn,
+        });
+        usedFallback = false;
+      } else {
+        // Use ShipStation's shipment rates API (uses their stored package data)
+        rates = await this.fetchRatesForShipment(shipmentId);
+      }
       
       if (!rates || rates.length === 0) {
         return { success: false, error: 'No rates returned from ShipStation' };
@@ -196,16 +321,17 @@ export class SmartCarrierRateService {
       const smartCost = smartRate.shipping_amount.amount;
       const savings = customerCost ? customerCost - smartCost : 0;
       
-      // Build human-readable reasoning
+      // Build human-readable reasoning with package source
+      const packageSource = usedFallback ? '(ShipStation package data)' : '(using assigned packaging)';
       let reasoning: string;
       if (smartRate.service_code === customerMethod) {
-        reasoning = `Customer's choice (${customerMethod}) is the most cost-effective option at $${smartCost.toFixed(2)}`;
+        reasoning = `Customer's choice (${customerMethod}) is the most cost-effective option at $${smartCost.toFixed(2)} ${packageSource}`;
       } else if (!customerRate) {
-        reasoning = `${smartRate.service_code} recommended at $${smartCost.toFixed(2)} (${smartRate.delivery_days} days) - customer's ${customerMethod} not available for comparison`;
+        reasoning = `${smartRate.service_code} recommended at $${smartCost.toFixed(2)} (${smartRate.delivery_days} days) ${packageSource} - customer's ${customerMethod} not available for comparison`;
       } else if (savings > 0) {
-        reasoning = `${smartRate.service_code} saves $${savings.toFixed(2)} vs ${customerMethod} with ${smartRate.delivery_days}-day delivery (same or faster)`;
+        reasoning = `${smartRate.service_code} saves $${savings.toFixed(2)} vs ${customerMethod} with ${smartRate.delivery_days}-day delivery (same or faster) ${packageSource}`;
       } else {
-        reasoning = `${smartRate.service_code} at $${smartCost.toFixed(2)} is the cheapest option for ${smartRate.delivery_days}-day delivery`;
+        reasoning = `${smartRate.service_code} at $${smartCost.toFixed(2)} is the cheapest option for ${smartRate.delivery_days}-day delivery ${packageSource}`;
       }
       
       const analysis: InsertShipmentRateAnalysis = {
@@ -224,6 +350,12 @@ export class SmartCarrierRateService {
         originPostalCode: FULFILLMENT_CENTER.postal_code,
         destinationPostalCode: shipment.shipToPostalCode,
         destinationState: shipment.shipToState || null,
+        // Package tracking fields
+        usedFallbackPackageDetails: usedFallback,
+        packageWeightOz: packageDetails?.weightOz?.toString() || null,
+        packageLengthIn: packageDetails?.lengthIn?.toString() || null,
+        packageWidthIn: packageDetails?.widthIn?.toString() || null,
+        packageHeightIn: packageDetails?.heightIn?.toString() || null,
       };
       
       return { success: true, analysis };
