@@ -11690,6 +11690,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Update lifecycle phase for all affected shipments (fingerprint recalculation may have changed their status)
+      if (affectedShipments.length > 0) {
+        const shipmentIds = affectedShipments.map(s => s.shipmentId);
+        await updateShipmentLifecycleBatch(shipmentIds);
+      }
+      
       console.log(`[Packing Decisions] Assigned ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${fingerprintsUpdated} now complete`);
       
       res.json({
@@ -12896,7 +12902,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await updateShipmentLifecycleBatch(shipmentIds);
       }
       
-      console.log(`[Fingerprints] Assigned packaging ${packagingType.name} to fingerprint ${fingerprintId}, updated ${updatedShipments.length} shipments${assignedStationId ? ` (station: ${assignedStationId})` : ''}`);
+      // Re-run rate analysis for shipments that used fallback package details
+      // Now that we have the actual package assignment, the rates may be more accurate
+      let rateAnalysisRerun = 0;
+      try {
+        const { shipmentRateAnalysis, shipments: shipmentsSchema } = await import("@shared/schema");
+        const { smartCarrierRateService } = await import("./services/smart-carrier-rate-service");
+        
+        // Find shipments with this fingerprint that have rate analysis using fallback
+        const shipmentsNeedingReanalysis = await db
+          .select({
+            id: shipmentsSchema.id,
+            shipmentId: shipmentsSchema.shipmentId,
+          })
+          .from(shipmentsSchema)
+          .innerJoin(shipmentRateAnalysis, eq(shipmentRateAnalysis.shipmentId, shipmentsSchema.shipmentId))
+          .where(and(
+            eq(shipmentsSchema.fingerprintId, fingerprintId),
+            eq(shipmentRateAnalysis.usedFallbackPackageDetails, true)
+          ));
+        
+        if (shipmentsNeedingReanalysis.length > 0) {
+          console.log(`[Fingerprints] Re-running rate analysis for ${shipmentsNeedingReanalysis.length} shipments that used fallback package data`);
+          
+          for (const s of shipmentsNeedingReanalysis) {
+            // Fetch full shipment for analysis
+            const [fullShipment] = await db
+              .select()
+              .from(shipmentsSchema)
+              .where(eq(shipmentsSchema.id, s.id))
+              .limit(1);
+            
+            if (fullShipment) {
+              const result = await smartCarrierRateService.analyzeAndSave(fullShipment);
+              if (result.success) {
+                rateAnalysisRerun++;
+              }
+            }
+          }
+          
+          console.log(`[Fingerprints] Successfully re-analyzed ${rateAnalysisRerun}/${shipmentsNeedingReanalysis.length} shipments with new package data`);
+        }
+      } catch (rateError: any) {
+        console.warn(`[Fingerprints] Error re-running rate analysis:`, rateError.message);
+      }
+      
+      console.log(`[Fingerprints] Assigned packaging ${packagingType.name} to fingerprint ${fingerprintId}, updated ${updatedShipments.length} shipments${assignedStationId ? ` (station: ${assignedStationId})` : ''}${rateAnalysisRerun > 0 ? `, re-analyzed ${rateAnalysisRerun} rates` : ''}`);
       
       res.json({
         success: true,
@@ -12904,6 +12955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipmentsUpdated: updatedShipments.length,
         packagingTypeName: packagingType.name,
         assignedStationId,
+        rateAnalysisRerun,
       });
     } catch (error: any) {
       console.error("[Fingerprints] Error assigning packaging:", error);
