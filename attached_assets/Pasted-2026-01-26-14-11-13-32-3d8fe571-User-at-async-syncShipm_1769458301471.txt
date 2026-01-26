@@ -1,0 +1,212 @@
+2026-01-26 14:11:13.32
+3d8fe571
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:11837:24)
+2026-01-26 14:11:13.32
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.32
+3d8fe571
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12317:27)
+2026-01-26 14:11:13.32
+3d8fe571
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:12274:20)
+2026-01-26 14:11:13.32
+3d8fe571
+User
+[UnifiedSync] Shipment se-950259149 failed (attempt 1/3)
+2026-01-26 14:11:13.36
+3d8fe571
+User
+[ETL] Extracted shipmentStatus: pending for order null
+2026-01-26 14:11:13.36
+3d8fe571
+User
+[ETL] Dead-lettering shipment se-950259155 - no order_number in ShipStation data
+2026-01-26 14:11:13.38
+c1fa48ed
+User
+[firestore-session-sync] Synced session 14504 to shipment JK3825361389 (3 items updated)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:12274:20)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:11837:24)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12149:11)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12317:27)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+[UnifiedSync] Error syncing shipment se-950259155: Error: Shipment se-950259155 dead-lettered: null order_number
+2026-01-26 14:11:13.41
+3d8fe571
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-26 14:11:13.41
+3d8fe571
+User
+[UnifiedSync] Shipment se-950259155 failed (attempt 1/3)
+2026-01-26 14:11:13.45
+3d8fe571
+User
+[ETL] Dead-lettering shipment se-950259169 - no order_number in ShipStation data
+2026-01-26 14:11:13.45
+3d8fe571
+User
+[ETL] Extracted shipmentStatus: pending for order null
+2026-01-26 14:11:13.46
+c1fa48ed
+User
+[skuvault-products-sync] [location-sync] No items found for brand: Redstone Foods
+2026-01-26 14:11:13.46
+c1fa48ed
+User
+[SkuVault Inventory] Fetched 0 items (0 total lines, 0 products with quantity)
+2026-01-26 14:11:13.46
+c1fa48ed
+User
+[skuvault-products-sync] [location-sync] Processing brand: Klements
+2026-01-26 14:11:13.47
+c1fa48ed
+User
+[SkuVault Inventory] Fetching inventory for brand: Klements, warehouse: -1
+2026-01-26 14:11:13.47
+c1fa48ed
+User
+[SkuVault] Rate limiting: waiting 1755ms before next request
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:12274:20)
+2026-01-26 14:11:13.49
+3d8fe571
+User
+[UnifiedSync] Error syncing shipment se-950259169: Error: Shipment se-950259169 dead-lettered: null order_number
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:11837:24)
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12317:27)
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12149:11)
+2026-01-26 14:11:13.49
+3d8fe571
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-26 14:11:13.50
+3d8fe571
+User
+[UnifiedSync] Shipment se-950259169 failed (attempt 1/3)
+2026-01-26 14:11:13.54
+3d8fe571
+User
+[ETL] Dead-lettering shipment se-950259172 - no order_number in ShipStation data
+2026-01-26 14:11:13.54
+3d8fe571
+User
+[ETL] Extracted shipmentStatus: pending for order null
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12149:11)
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12317:27)
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:11837:24)
+2026-01-26 14:11:13.58
+3d8fe571
+User
+[UnifiedSync] Error syncing shipment se-950259172: Error: Shipment se-950259172 dead-lettered: null order_number
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-26 14:11:13.58
+3d8fe571
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:12274:20)
+2026-01-26 14:11:13.59
+3d8fe571
+User
+[UnifiedSync] Shipment se-950259172 failed (attempt 1/3)
+2026-01-26 14:11:13.63
+3d8fe571
+User
+[ETL] Extracted shipmentStatus: pending for order null
+2026-01-26 14:11:13.63
+3d8fe571
+User
+[ETL] Dead-lettering shipment se-950259173 - no order_number in ShipStation data
+2026-01-26 14:11:13.67
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.67
+3d8fe571
+User
+[UnifiedSync] Error syncing shipment se-950259173: Error: Shipment se-950259173 dead-lettered: null order_number
+2026-01-26 14:11:13.67
+3d8fe571
+User
+[UnifiedSync] Shipment se-950259173 failed (attempt 1/3)
+2026-01-26 14:11:13.76
+3d8fe571
+User
+at ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:11258:19)
+2026-01-26 14:11:13.76
+3d8fe571
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12317:27)
+2026-01-26 14:11:13.76
+3d8fe571
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12149:11)
+2026-01-26 14:11:13.76
+3d8fe571
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-26 14:11:13.81
+3d8fe571
+User
+[ETL] Dead-lettering shipment se-950259183 - no order_number in ShipStation data
+2026-01-26 14:11:13.83
+c1fa48ed
+User
+[firestore-session-sync] Synced session 14504 to shipment JK3825361394 (1 items updated)
+2026-01-26 14:11:14.28
+c1fa48ed
+User
+[firestore-session-sync] Synced session 14506 to shipment JK3825361643 (2 items updated)
