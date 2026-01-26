@@ -3646,6 +3646,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dead-lettered shipments report - shipments that failed ETL processing
+  app.get("/api/reports/shipments-dlq", requireAuth, async (req, res) => {
+    try {
+      const { search, page = "1", limit = "50" } = req.query;
+      const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 50));
+      
+      // Get all dead letters
+      const allDeadLetters = await storage.getAllShipmentsDeadLetters(1000);
+      
+      // Filter by search if provided
+      let filtered = allDeadLetters;
+      if (search && typeof search === 'string' && search.trim()) {
+        const searchLower = search.toLowerCase().trim();
+        filtered = allDeadLetters.filter(dl => {
+          const data = dl.data as any;
+          return (
+            dl.shipmentId.toLowerCase().includes(searchLower) ||
+            (dl.reason && dl.reason.toLowerCase().includes(searchLower)) ||
+            (data?.ship_to?.name && data.ship_to.name.toLowerCase().includes(searchLower)) ||
+            (data?.ship_to?.city_locality && data.ship_to.city_locality.toLowerCase().includes(searchLower)) ||
+            (data?.ship_to?.state_province && data.ship_to.state_province.toLowerCase().includes(searchLower))
+          );
+        });
+      }
+      
+      // Paginate
+      const total = filtered.length;
+      const totalPages = Math.ceil(total / limitNum);
+      const offset = (pageNum - 1) * limitNum;
+      const paginated = filtered.slice(offset, offset + limitNum);
+      
+      res.json({
+        deadLetters: paginated.map(dl => ({
+          shipmentId: dl.shipmentId,
+          reason: dl.reason,
+          createdAt: dl.createdAt,
+          updatedAt: dl.updatedAt,
+          data: dl.data,
+        })),
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      });
+    } catch (error) {
+      console.error("Error fetching dead-lettered shipments:", error);
+      res.status(500).json({ error: "Failed to fetch dead-lettered shipments" });
+    }
+  });
+
   // Duplicate shipments report - finds orders with multiple shipments
   app.get("/api/reports/duplicate-shipments", requireAuth, async (req, res) => {
     try {
