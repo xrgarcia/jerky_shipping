@@ -135,6 +135,19 @@ export class ShipStationShipmentETLService {
       console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
       console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
       
+      // Protect carrier tracking statuses - only webhooks can set/update these
+      // Carrier statuses are 2-letter codes: AC, IT, DE, UN, EX, NY, SP
+      // ShipStation statuses that can be overwritten: new, shipped, pending, cancelled, label_purchased, on_hold
+      const EDITABLE_STATUSES = ['new', 'shipped', 'pending', 'cancelled', 'label_purchased', 'on_hold'];
+      const existingStatus = existing.status;
+      
+      if (existingStatus && !EDITABLE_STATUSES.includes(existingStatus)) {
+        // Existing status is a carrier code - preserve it, don't overwrite
+        console.log(`[ETL] Preserving carrier status '${existingStatus}' - skipping status update`);
+        delete (shipmentRecord as any).status;
+        delete (shipmentRecord as any).statusDescription;
+      }
+      
       const updatedShipment = await this.storage.updateShipment(existing.id, shipmentRecord);
       
       if (updatedShipment) {
@@ -788,7 +801,8 @@ export class ShipStationShipmentETLService {
     
     // Default fallback for other states (including label_purchased)
     // Only webhooks provide actual tracking status codes like AC, IT, DE
-    return 'shipped';
+    // Use 'new' as default - sync should never set carrier statuses
+    return 'new';
   }
 
   /**
