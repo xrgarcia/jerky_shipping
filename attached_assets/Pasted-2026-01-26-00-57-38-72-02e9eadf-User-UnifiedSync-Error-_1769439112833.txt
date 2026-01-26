@@ -1,0 +1,214 @@
+2026-01-26 00:57:38.72
+02e9eadf
+User
+[UnifiedSync] Error syncing shipment se-950057243: Error: timeout exceeded when trying to connect
+2026-01-26 00:57:38.72
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 00:57:38.72
+02e9eadf
+User
+at async DatabaseStorage.getOrderByOrderNumber (file:///home/runner/workspace/dist/index.js:1736:18)
+2026-01-26 01:01:11.02
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 01:53:00.92
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 02:02:24.62
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 03:35:30.92
+02e9eadf
+User
+[UnifiedSync] Error broadcasting worker status: Error: timeout exceeded when trying to connect
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:11441:5)
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at async broadcastWorkerStatus (file:///home/runner/workspace/dist/index.js:11546:24)
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at async DatabaseStorage.getDataHealthMetrics (file:///home/runner/workspace/dist/index.js:3027:35)
+2026-01-26 03:35:30.92
+02e9eadf
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-01-26 03:42:24.27
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 03:42:54.62
+02e9eadf
+User
+Error processing individual webhook: Error: timeout exceeded when trying to connect
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at async DatabaseStorage.upsertShopifyProduct (file:///home/runner/workspace/dist/index.js:2676:24)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at async processWebhookBatch (file:///home/runner/workspace/dist/index.js:16087:11)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at async Timeout.processQueue [as _onTimeout] (file:///home/runner/workspace/dist/index.js:16214:27)
+2026-01-26 03:42:54.62
+02e9eadf
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-26 03:43:42.22
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 04:34:31.12
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:10446:9)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:10502:40)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:10992:24)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:11419:20)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:11299:11)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+[ShipStationShipmentETL] Error processing items for shipment 6158eaac-5849-4a52-98f9-e5fcef2d4395: Error: timeout exceeded when trying to connect
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-26 08:24:25.12
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:11299:11)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:10993:29)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:11419:20)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 08:27:28.58
+02e9eadf
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-26 08:27:28.58
+02e9eadf
+User
+[UnifiedSync] Error syncing shipment se-949700072: Error: timeout exceeded when trying to connect
+2026-01-26 08:30:03.01
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-01-26 08:31:12.42
+02e9eadf
+User
+at async processWebhookBatch (file:///home/runner/workspace/dist/index.js:16114:13)
+2026-01-26 08:31:12.42
+02e9eadf
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-01-26 08:31:12.42
+02e9eadf
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-01-26 08:31:12.42
+02e9eadf
+User
+Error processing individual webhook: Error: timeout exceeded when trying to connect
+2026-01-26 08:31:12.42
+02e9eadf
+User
+at async DatabaseStorage.upsertShopifyProductVariant (file:///home/runner/workspace/dist/index.js:2722:24)
+2026-01-26 08:31:12.42
+02e9eadf
+User
+at async Timeout.processQueue [as _onTimeout] (file:///home/runner/workspace/dist/index.js:16214:27)
+2026-01-26 08:40:41.32
+02e9eadf
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+Wrap
+Colors
