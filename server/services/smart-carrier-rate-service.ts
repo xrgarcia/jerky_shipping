@@ -335,6 +335,14 @@ export class SmartCarrierRateService {
         reasoning = `${smartRate.service_code} at $${smartCost.toFixed(2)} is the cheapest option for ${smartRate.delivery_days}-day delivery ${packageSource}`;
       }
       
+      // Build allRatesChecked from the full rates array
+      const allRatesChecked = rates.map(r => ({
+        carrier: r.carrier_code || 'unknown',
+        service: r.service_code,
+        cost: r.shipping_amount?.amount || 0,
+        deliveryDays: r.delivery_days ?? null,
+      })).sort((a, b) => a.cost - b.cost);
+      
       const analysis: InsertShipmentRateAnalysis = {
         shipmentId,
         customerShippingMethod: customerMethod,
@@ -357,6 +365,8 @@ export class SmartCarrierRateService {
         packageLengthIn: packageDetails?.lengthIn?.toString() || null,
         packageWidthIn: packageDetails?.widthIn?.toString() || null,
         packageHeightIn: packageDetails?.heightIn?.toString() || null,
+        // All rates checked for transparency
+        allRatesChecked,
       };
       
       return { success: true, analysis };
@@ -398,6 +408,7 @@ export class SmartCarrierRateService {
             serviceCode: result.analysis.serviceCode,
             destinationPostalCode: result.analysis.destinationPostalCode,
             destinationState: result.analysis.destinationState,
+            allRatesChecked: result.analysis.allRatesChecked,
             updatedAt: new Date(),
           },
         });
