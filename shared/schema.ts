@@ -1616,6 +1616,17 @@ export const shipmentRateAnalysis = pgTable("shipment_rate_analysis", {
   destinationPostalCode: text("destination_postal_code"),
   destinationState: text("destination_state"),
   
+  // Package details source tracking
+  // When true: Used ShipStation fallback package data (needs re-analysis when package assigned)
+  // When false: Used fingerprint's assigned package data (accurate, no re-analysis needed)
+  usedFallbackPackageDetails: boolean("used_fallback_package_details").notNull().default(true),
+  
+  // Package dimensions used for rate calculation (for debugging/audit)
+  packageWeightOz: numeric("package_weight_oz", { precision: 10, scale: 2 }),
+  packageLengthIn: numeric("package_length_in", { precision: 6, scale: 2 }),
+  packageWidthIn: numeric("package_width_in", { precision: 6, scale: 2 }),
+  packageHeightIn: numeric("package_height_in", { precision: 6, scale: 2 }),
+  
   // Tracking
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
