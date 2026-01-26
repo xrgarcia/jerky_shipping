@@ -45,6 +45,7 @@ const TRACKING_BACKFILL_BATCH_SIZE = 10; // Max shipments to backfill per poll c
 const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older than 2 days
 const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
 const MAX_SYNC_FAILURES_BEFORE_DEADLETTER = 3; // Dead-letter after this many failed attempts
+const MAX_POLL_DURATION_MS = 5 * 60 * 1000; // 5 minute maximum poll duration - self-healing timeout
 
 // Worker state
 let isPolling = false;
@@ -815,7 +816,15 @@ async function runPollLoop(): Promise<boolean> {
   let needsImmediateFollowup = false;
   
   try {
-    const result = await pollCycle();
+    // Self-healing timeout: If pollCycle hangs (e.g., due to DB connection issues),
+    // forcefully abort after MAX_POLL_DURATION_MS to reset the isPolling flag
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Poll timeout exceeded (${MAX_POLL_DURATION_MS / 1000}s) - aborting to allow recovery`));
+      }, MAX_POLL_DURATION_MS);
+    });
+    
+    const result = await Promise.race([pollCycle(), timeoutPromise]);
     
     console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
     
