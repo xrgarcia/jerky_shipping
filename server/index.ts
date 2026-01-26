@@ -265,6 +265,10 @@ async function initializeAfterListen(storage: any) {
     const { startRateAnalysisBackfillWorker } = await import("./rate-analysis-backfill-worker");
     startRateAnalysisBackfillWorker();
     
+    // Start lifecycle repair worker (processes background lifecycle phase repair jobs)
+    const { startLifecycleRepairWorker } = await import("./lifecycle-repair-worker");
+    startLifecycleRepairWorker();
+    
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours

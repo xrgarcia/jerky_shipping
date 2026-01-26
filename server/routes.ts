@@ -2360,6 +2360,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Lifecycle Repair Jobs - repair stale lifecycle phases
+  app.get("/api/lifecycle-repair-jobs", requireAuth, async (req, res) => {
+    try {
+      const jobs = await storage.getAllLifecycleRepairJobs();
+      const activeJob = await storage.getActiveLifecycleRepairJob();
+      res.json({ jobs, activeJob });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.post("/api/lifecycle-repair-jobs", requireAuth, async (req, res) => {
+    try {
+      // Check if there's already an active job
+      const activeJob = await storage.getActiveLifecycleRepairJob();
+      if (activeJob) {
+        return res.status(409).json({ 
+          error: 'A lifecycle repair job is already running',
+          activeJob 
+        });
+      }
+      
+      const job = await storage.createLifecycleRepairJob({
+        status: 'pending',
+      });
+      
+      console.log(`[LifecycleRepair] Created job ${job.id}`);
+      res.json({ success: true, job });
+    } catch (error: any) {
+      console.error("Error creating lifecycle repair job:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.post("/api/lifecycle-repair-jobs/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.cancelLifecycleRepairJob(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   
   // Smart Rate Check Page - Rate analysis data with filtering, pagination, sorting, and metrics
   app.get("/api/rate-analysis", requireAuth, async (req, res) => {
