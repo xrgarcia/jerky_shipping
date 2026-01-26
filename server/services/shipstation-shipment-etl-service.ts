@@ -24,9 +24,9 @@ export class ShipStationShipmentETLService {
    * Handles shipment record creation/update, items, and tags
    * Automatically links to order if orderId not provided but order number exists
    * Preserves existing orderId on updates to prevent de-linking
-   * Returns the final shipment database ID
+   * Returns a result object with the shipment ID or skip information
    */
-  async processShipment(shipmentData: any, orderId: string | null = null): Promise<string> {
+  async processShipment(shipmentData: any, orderId: string | null = null): Promise<{ id: string; skipped?: false } | { id: null; skipped: true; reason: string }> {
     // Validate shipment ID first
     const shipmentId = this.extractShipmentId(shipmentData);
     if (!shipmentId) {
@@ -159,7 +159,7 @@ export class ShipStationShipmentETLService {
       
       finalShipmentId = existing.id;
     } else {
-      // NEW: Check for null order_number before creating - dead-letter if missing
+      // Check for null order_number before creating - dead-letter if missing
       if (!orderNumber) {
         console.log(`[ETL] Dead-lettering shipment ${shipmentId} - no order_number in ShipStation data`);
         await this.storage.upsertShipmentsDeadLetter({
@@ -167,7 +167,7 @@ export class ShipStationShipmentETLService {
           data: shipmentData,
           reason: 'null_order_number',
         });
-        throw new Error(`Shipment ${shipmentId} dead-lettered: null order_number`);
+        return { id: null, skipped: true, reason: `dead-lettered: null order_number` };
       }
       
       const created = await this.storage.createShipment(shipmentRecord);
@@ -183,7 +183,7 @@ export class ShipStationShipmentETLService {
     // This ensures phase transitions are triggered by ShipStation events (label creation, tracking updates, etc.)
     await updateShipmentLifecycle(finalShipmentId, { logTransition: true });
     
-    return finalShipmentId;
+    return { id: finalShipmentId };
   }
 
   /**
