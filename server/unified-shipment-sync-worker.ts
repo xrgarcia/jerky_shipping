@@ -129,13 +129,21 @@ function getInitialCursorValue(): string {
  * Uses existing ETL service which handles items, tags, and database operations
  * Then updates sync tracking timestamps
  * Also triggers smart carrier rate analysis for cost optimization
+ * Returns the shipment DB ID, or null if the shipment was skipped (e.g., dead-lettered)
  */
-async function syncShipment(shipmentData: any): Promise<string> {
+async function syncShipment(shipmentData: any): Promise<{ id: string | null; skipped?: boolean }> {
   const now = new Date();
   const modifiedAt = shipmentData.modified_at ? new Date(shipmentData.modified_at) : now;
   
   // Use existing ETL service - handles full upsert including items and tags
-  const shipmentDbId = await shipStationShipmentETL.processShipment(shipmentData, null);
+  const result = await shipStationShipmentETL.processShipment(shipmentData, null);
+  
+  // If shipment was skipped (e.g., dead-lettered), return early without error
+  if (result.skipped) {
+    return { id: null, skipped: true };
+  }
+  
+  const shipmentDbId = result.id;
   
   // Update sync tracking timestamps and fetch shipment data for rate analysis
   const [updatedShipment] = await db
@@ -166,7 +174,7 @@ async function syncShipment(shipmentData: any): Promise<string> {
     });
   }
   
-  return shipmentDbId;
+  return { id: shipmentDbId };
 }
 
 /**
@@ -650,7 +658,17 @@ async function pollCycle(): Promise<{
         }
         
         try {
-          await syncShipment(shipment);
+          const syncResult = await syncShipment(shipment);
+          
+          // Handle skipped shipments (e.g., dead-lettered) - count as success, not error
+          if (syncResult.skipped) {
+            // Track timestamp for cursor advancement but don't count as processed
+            if (modifiedAt) {
+              successTimestamps.push(modifiedAt);
+            }
+            continue;
+          }
+          
           totalProcessed++;
           // Track successful timestamps for cursor advancement
           if (modifiedAt) {

@@ -190,7 +190,11 @@ async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<
     const order = orderNumber ? await storage.getOrderByOrderNumber(orderNumber) : null;
     
     // Use ETL service to process the shipment with fresh data
-    await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+    const result = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+    if (result.skipped) {
+      log(`[ReverseSync] Shipment skipped (dead-lettered)`);
+      return;
+    }
     
     // Update the timestamp after ETL processing
     if (dbShipment) {
@@ -528,7 +532,12 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                         const order = await storage.getOrderByOrderNumber(orderNumber);
                         
                         // Use ETL service to process complete shipment (creates record + items + tags)
-                        const finalShipmentId = await shipStationShipmentETL.processShipment(fullShipmentData, order?.id || null);
+                        const result = await shipStationShipmentETL.processShipment(fullShipmentData, order?.id || null);
+                        if (result.skipped) {
+                          log(`[${trackingNumber}] Shipment skipped (dead-lettered)`);
+                          continue;
+                        }
+                        const finalShipmentId = result.id;
                         
                         // Broadcast if linked to order
                         if (order) {
@@ -591,7 +600,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           }
           
           // Use ETL service to process complete shipment (creates/updates record + items + tags)
-          const finalShipmentId = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
+          const result = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
+          if (result.skipped) {
+            log(`[${trackingNumber}] Shipment skipped (dead-lettered)`);
+            processedCount++;
+            continue;
+          }
+          const finalShipmentId = result.id;
           
           if (cachedShipment) {
             log(`[${trackingNumber}] Updated shipment from webhook (0 API calls)`);
@@ -665,7 +680,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             const existingShipmentOrphan = await storage.getShipmentByTrackingNumber(trackingNumber);
             
             // Use ETL service to process complete shipment (creates/updates record + items + tags)
-            const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, null);
+            const result = await shipStationShipmentETL.processShipment(shipmentData, null);
+            if (result.skipped) {
+              log(`[${trackingNumber}] Shipment skipped (dead-lettered)`);
+              processedCount++;
+              continue;
+            }
+            const finalShipmentId = result.id;
             
             if (existingShipmentOrphan) {
               log(`[${trackingNumber}] Updated shipment without order linkage`);
@@ -733,7 +754,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
         const existingShipment = await storage.getShipmentByTrackingNumber(trackingNumber);
         
         // Use ETL service to process complete shipment (creates/updates record + items + tags)
-        const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, order.id);
+        const result = await shipStationShipmentETL.processShipment(shipmentData, order.id);
+        if (result.skipped) {
+          log(`[${trackingNumber}] Shipment skipped (dead-lettered)`);
+          processedCount++;
+          continue;
+        }
+        const finalShipmentId = result.id;
         
         if (existingShipment) {
           log(`[${trackingNumber}] Updated shipment for order ${order.orderNumber}`);
@@ -786,7 +813,13 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           const webhookOrderNum = webhookData.shipment_number || webhookData.order_number || webhookData.orderNumber;
           log(`[${orderNumber}] [DEBUG] webhookData has shipment_id=${webhookShipmentId}, order_number=${webhookOrderNum}`);
           
-          const finalShipmentId = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
+          const result = await shipStationShipmentETL.processShipment(webhookData, order?.id || null);
+          if (result.skipped) {
+            log(`[${orderNumber}] Shipment skipped (dead-lettered)`);
+            processedCount++;
+            continue;
+          }
+          const finalShipmentId = result.id;
           
           if (existingShipment) {
             log(`[${orderNumber}] Updated shipment from webhook (0 API calls)`);
@@ -934,7 +967,12 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
           const existingShipment = await storage.getShipmentByShipmentId(shipmentId);
           
           // Use ETL service to process complete shipment (creates/updates record + items + tags)
-          const finalShipmentId = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+          const result = await shipStationShipmentETL.processShipment(shipmentData, order?.id || null);
+          if (result.skipped) {
+            log(`[${orderNumber}] Shipment ${shipmentId} skipped (dead-lettered)`);
+            continue;
+          }
+          const finalShipmentId = result.id;
 
           if (existingShipment) {
             log(`[${orderNumber}] Updated shipment ${shipmentId}${order ? ` for order ${order.orderNumber}` : ' (no order linkage)'}`);

@@ -422,7 +422,11 @@ export class BackfillService {
     try {
       // Use centralized ETL service to process the shipment
       // It will automatically link to order if order number exists in database
-      await shipStationShipmentETL.processShipment(shipmentData);
+      const result = await shipStationShipmentETL.processShipment(shipmentData);
+      if (result.skipped) {
+        console.log(`[Backfill] Shipment skipped (dead-lettered)`);
+        return; // Don't throw error for skipped shipments
+      }
     } catch (error) {
       console.error(`[Backfill] Error saving shipment:`, error);
       throw error;
