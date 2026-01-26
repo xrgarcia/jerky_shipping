@@ -47,6 +47,13 @@ import {
 import { format } from "date-fns";
 import { Link } from "wouter";
 
+interface RateOption {
+  carrier: string;
+  service: string;
+  cost: number;
+  deliveryDays: number | null;
+}
+
 interface RateAnalysisRow {
   shipmentId: string;
   customerShippingMethod: string | null;
@@ -68,6 +75,7 @@ interface RateAnalysisRow {
   orderDate: string | null;
   lifecyclePhase: string | null;
   decisionSubphase: string | null;
+  allRatesChecked: RateOption[] | null;
 }
 
 interface RateAnalysisResponse {
@@ -605,18 +613,82 @@ export default function SmartRateCheck() {
       </Card>
 
       <Dialog open={!!expandedComment} onOpenChange={() => setExpandedComment(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Rate Analysis Comment</DialogTitle>
+            <DialogTitle>Rate Analysis Details</DialogTitle>
             <DialogDescription>
-              Full reasoning for the rate recommendation
+              Full reasoning and all carrier rates checked
             </DialogDescription>
           </DialogHeader>
-          <div className="p-4 bg-muted rounded-md">
-            <p className="text-sm whitespace-pre-wrap" data-testid="text-expanded-comment">
-              {expandedComment && data?.data.find((r) => r.shipmentId === expandedComment)?.reasoning}
-            </p>
-          </div>
+          {(() => {
+            const row = expandedComment ? data?.data.find((r) => r.shipmentId === expandedComment) : null;
+            if (!row) return null;
+            
+            return (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-md">
+                  <p className="text-sm font-medium mb-1">Recommendation</p>
+                  <p className="text-sm whitespace-pre-wrap" data-testid="text-expanded-comment">
+                    {row.reasoning}
+                  </p>
+                </div>
+                
+                {row.allRatesChecked && row.allRatesChecked.length > 0 ? (
+                  <div>
+                    <p className="text-sm font-medium mb-2">All Rates Checked ({row.allRatesChecked.length})</p>
+                    <div className="border rounded-md overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-24">Carrier</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead className="text-right w-20">Cost</TableHead>
+                            <TableHead className="text-right w-20">Days</TableHead>
+                            <TableHead className="w-24">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {row.allRatesChecked.map((rate, idx) => {
+                            const isCustomerChoice = rate.service === row.customerShippingMethod;
+                            const isSmartPick = rate.service === row.smartShippingMethod;
+                            
+                            return (
+                              <TableRow 
+                                key={`${rate.carrier}-${rate.service}-${idx}`}
+                                className={isSmartPick ? "bg-green-50 dark:bg-green-950/20" : isCustomerChoice ? "bg-blue-50 dark:bg-blue-950/20" : ""}
+                                data-testid={`row-rate-${idx}`}
+                              >
+                                <TableCell className="font-mono text-xs uppercase">{rate.carrier}</TableCell>
+                                <TableCell className="font-mono text-xs">{rate.service}</TableCell>
+                                <TableCell className="text-right font-mono">${rate.cost.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">{rate.deliveryDays ?? "—"}</TableCell>
+                                <TableCell>
+                                  {isSmartPick && (
+                                    <Badge variant="default" className="text-xs bg-green-600">
+                                      Lowest
+                                    </Badge>
+                                  )}
+                                  {isCustomerChoice && !isSmartPick && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Selected
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    No rate details available for this analysis.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
