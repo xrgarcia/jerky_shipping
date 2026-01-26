@@ -336,7 +336,12 @@ export class SmartCarrierRateService {
       }
       
       // Build allRatesChecked from the full rates array
-      const allRatesChecked = rates.map(r => ({
+      const allRatesChecked: Array<{
+        carrier: string;
+        service: string;
+        cost: number;
+        deliveryDays: number | null;
+      }> = rates.map(r => ({
         carrier: r.carrier_code || 'unknown',
         service: r.service_code,
         cost: r.shipping_amount?.amount || 0,

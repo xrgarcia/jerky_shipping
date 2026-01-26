@@ -2484,6 +2484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           destinationPostalCode: shipmentRateAnalysis.destinationPostalCode,
           destinationState: shipmentRateAnalysis.destinationState,
           analyzedAt: shipmentRateAnalysis.createdAt,
+          allRatesChecked: shipmentRateAnalysis.allRatesChecked,
           // Shipment fields for display and filtering
           orderNumber: shipments.orderNumber,
           orderDate: shipments.orderDate,
