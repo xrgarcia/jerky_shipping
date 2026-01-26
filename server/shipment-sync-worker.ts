@@ -412,6 +412,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // and extracting empty data would overwrite existing customer columns
             await storage.updateShipment(cachedShipment.id, updateData);
             
+            // Update lifecycle phase after status change (webhook fast-path)
+            await updateShipmentLifecycle(cachedShipment.id, { logTransition: true });
+            
             // Broadcast realtime update to WebSocket clients
             const order = await storage.getOrder(cachedShipment.orderId);
             if (order) {
@@ -489,6 +492,9 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       };
                       
                       await storage.updateShipment(dbShipment.id, updateData);
+                      
+                      // Update lifecycle phase after status change (label lookup path)
+                      await updateShipmentLifecycle(dbShipment.id, { logTransition: true });
                       
                       // Broadcast realtime update if shipment is linked to order
                       if (dbShipment.orderId) {
