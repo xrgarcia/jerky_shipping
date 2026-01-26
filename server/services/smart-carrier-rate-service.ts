@@ -500,11 +500,20 @@ export class SmartCarrierRateService {
     widthInches?: number;
     heightInches?: number;
   }): Promise<ShipStationRate[]> {
+    // Get enabled carrier IDs for rate options
+    const carrierIds = await this.getCarrierIds();
+    
+    if (carrierIds.length === 0) {
+      console.warn(`[SmartCarrierRate] No enabled carriers found, cannot fetch rate estimate`);
+      throw new Error('No enabled carriers available for rate estimation');
+    }
+    
     const requestBody: any = {
       shipment: {
         validate_address: 'no_validation',
         ship_from: {
           name: "Jerky.com",
+          phone: "4055551212", // Required by ShipStation API
           address_line1: FULFILLMENT_CENTER.address,
           city_locality: FULFILLMENT_CENTER.city,
           state_province: FULFILLMENT_CENTER.state,
@@ -512,6 +521,8 @@ export class SmartCarrierRateService {
           country_code: FULFILLMENT_CENTER.country,
         },
         ship_to: {
+          name: "Customer", // Required by ShipStation API
+          phone: "0000000000", // Placeholder - required by API but not used for rating
           postal_code: params.destinationPostalCode,
           country_code: "US",
           ...(params.destinationCity && { city_locality: params.destinationCity }),
@@ -532,7 +543,9 @@ export class SmartCarrierRateService {
           }),
         }],
       },
-      rate_options: {},
+      rate_options: {
+        carrier_ids: carrierIds,
+      },
     };
     
     const result = await getRatesEstimate(requestBody);
