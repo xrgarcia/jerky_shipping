@@ -370,6 +370,9 @@ export class SmartCarrierRateService {
    * Analyze and save rate analysis for a shipment
    */
   async analyzeAndSave(shipment: Shipment): Promise<RateAnalysisResult> {
+    // Temporarily disabled - remove this return to re-enable
+    return { success: false, error: 'Rate analysis temporarily disabled' };
+    
     const result = await this.analyzeShipment(shipment);
     
     if (!result.success || !result.analysis) {
