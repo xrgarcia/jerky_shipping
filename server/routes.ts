@@ -10992,6 +10992,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Repair stale lifecycle phases - fixes shipments where stored phase doesn't match derived phase
+  // Primary use case: on_dock shipments that should be delivered/in_transit based on carrier status
+  app.post("/api/admin/repair-lifecycle-phases", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 1000;
+      const dryRun = req.query.dryRun === 'true';
+      
+      console.log(`[Repair] Starting lifecycle phase repair (limit: ${limit}, dryRun: ${dryRun})`);
+      
+      // Import lifecycle functions
+      const { deriveLifecyclePhase, LIFECYCLE_PHASES } = await import('./services/lifecycle-state-machine');
+      
+      // Find shipments where stored phase is on_dock but status indicates different phase
+      // These are stale - the status was updated by webhooks but lifecycle wasn't recalculated
+      const staleShipments = await db
+        .select({
+          id: shipments.id,
+          orderNumber: shipments.orderNumber,
+          status: shipments.status,
+          shipmentStatus: shipments.shipmentStatus,
+          lifecyclePhase: shipments.lifecyclePhase,
+          trackingNumber: shipments.trackingNumber,
+          sessionStatus: shipments.sessionStatus,
+        })
+        .from(shipments)
+        .where(
+          and(
+            eq(shipments.lifecyclePhase, 'on_dock'),
+            or(
+              // Carrier codes that indicate NOT on_dock
+              inArray(shipments.status, ['DE', 'IT', 'SP', 'UN', 'EX']),
+              // ShipStation statuses that shouldn't be on_dock
+              inArray(shipments.status, ['shipped', 'cancelled'])
+            )
+          )
+        )
+        .limit(limit);
+      
+      console.log(`[Repair] Found ${staleShipments.length} stale on_dock shipments`);
+      
+      if (dryRun) {
+        // Group by status for summary
+        const summary: Record<string, number> = {};
+        staleShipments.forEach(s => {
+          summary[s.status || 'null'] = (summary[s.status || 'null'] || 0) + 1;
+        });
+        
+        return res.json({
+          success: true,
+          dryRun: true,
+          totalFound: staleShipments.length,
+          byStatus: summary,
+          sample: staleShipments.slice(0, 10),
+        });
+      }
+      
+      // Recalculate lifecycle for each stale shipment
+      let repaired = 0;
+      let errors = 0;
+      const changes: Array<{id: string, orderNumber: string | null, from: string, to: string}> = [];
+      
+      for (const shipment of staleShipments) {
+        try {
+          // Get full shipment data for lifecycle calculation
+          const fullShipment = await storage.getShipment(shipment.id);
+          if (!fullShipment) continue;
+          
+          // Get tags for MOVE OVER detection
+          const tags = await storage.getShipmentTagsByShipmentId(shipment.id);
+          const hasMoveOverTag = tags.some(t => t.name === 'MOVE OVER');
+          
+          // Derive the correct phase
+          const derivedState = deriveLifecyclePhase({
+            shipmentStatus: fullShipment.shipmentStatus,
+            status: fullShipment.status,
+            trackingNumber: fullShipment.trackingNumber,
+            sessionStatus: fullShipment.sessionStatus,
+            qcCompleted: fullShipment.qcCompleted || false,
+            hasMoveOverTag,
+            fingerprintId: fullShipment.fingerprintId,
+          });
+          
+          const newPhase = derivedState.phase;
+          const oldPhase = shipment.lifecyclePhase;
+          
+          if (newPhase !== oldPhase) {
+            await db
+              .update(shipments)
+              .set({ 
+                lifecyclePhase: newPhase,
+                lifecycleSubphase: derivedState.subphase,
+              })
+              .where(eq(shipments.id, shipment.id));
+            
+            changes.push({
+              id: shipment.id,
+              orderNumber: shipment.orderNumber,
+              from: oldPhase || 'null',
+              to: newPhase,
+            });
+            repaired++;
+          }
+        } catch (error: any) {
+          console.error(`[Repair] Error repairing ${shipment.id}:`, error.message);
+          errors++;
+        }
+      }
+      
+      console.log(`[Repair] Complete: ${repaired} repaired, ${errors} errors`);
+      
+      res.json({
+        success: true,
+        totalFound: staleShipments.length,
+        repaired,
+        errors,
+        changes: changes.slice(0, 50), // Return first 50 changes for verification
+      });
+    } catch (error: any) {
+      console.error("[Repair] Error repairing lifecycle phases:", error);
+      res.status(500).json({ error: "Failed to repair lifecycle phases" });
+    }
+  });
+
   // Backfill lifecycle phases for shipments affected by state machine changes
   // This recalculates lifecycle_phase for all shipments matching ready_to_session and ready_to_fulfill criteria
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
