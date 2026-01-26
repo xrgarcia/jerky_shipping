@@ -1190,7 +1190,18 @@ export async function getRatesEstimate(shipmentDetails: any): Promise<ApiRespons
   }
 
   const data = await response.json();
-  const rates = data.rates || [];
+  // ShipStation V2 rates API returns rates under rate_response.rates
+  const rateResponse = data.rate_response || data;
+  const rates = rateResponse.rates || [];
+  
+  // Log why rates might be empty
+  if (rates.length === 0) {
+    const invalidRates = rateResponse.invalid_rates || [];
+    if (invalidRates.length > 0) {
+      console.log(`[SmartCarrierRate] No valid rates - ${invalidRates.length} invalid:`, 
+        invalidRates.slice(0, 2).map((r: any) => `${r.carrier_id}: ${r.error_messages?.join(', ') || 'unknown error'}`));
+    }
+  }
 
   return { data: rates, rateLimit };
 }

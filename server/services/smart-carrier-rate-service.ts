@@ -256,6 +256,7 @@ export class SmartCarrierRateService {
       if (packageDetails && !packageDetails.usedFallback) {
         // Use rates estimate API with fingerprint's package dimensions
         rates = await this.fetchRatesEstimate({
+          destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
           destinationPostalCode: shipment.shipToPostalCode,
           destinationCity: shipment.shipToCity || undefined,
           destinationState: shipment.shipToState || undefined,
@@ -373,6 +374,7 @@ export class SmartCarrierRateService {
     const result = await this.analyzeShipment(shipment);
     
     if (!result.success || !result.analysis) {
+      console.log(`[SmartCarrierRate] Analysis failed for ${shipment.shipmentId}: ${result.error}`);
       return result;
     }
     
@@ -492,6 +494,7 @@ export class SmartCarrierRateService {
    * Uses the centralized ShipStation API service with rate limiting
    */
   async fetchRatesEstimate(params: {
+    destinationAddressLine1?: string;
     destinationPostalCode: string;
     destinationCity?: string;
     destinationState?: string;
@@ -523,6 +526,7 @@ export class SmartCarrierRateService {
         ship_to: {
           name: "Customer", // Required by ShipStation API
           phone: "0000000000", // Placeholder - required by API but not used for rating
+          address_line1: params.destinationAddressLine1 || "123 Main St", // Required by API
           postal_code: params.destinationPostalCode,
           country_code: "US",
           ...(params.destinationCity && { city_locality: params.destinationCity }),
