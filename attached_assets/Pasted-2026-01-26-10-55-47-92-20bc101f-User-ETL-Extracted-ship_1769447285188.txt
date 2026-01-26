@@ -1,0 +1,214 @@
+2026-01-26 10:55:47.92
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950179992
+2026-01-26 10:55:48.03
+20bc101f
+User
+[firestore-session-sync] Synced session 14497 to shipment JK3825361515 (1 items updated)
+2026-01-26 10:55:48.03
+20bc101f
+User
+[firestore-session-sync] Synced session 14497 to shipment JK3825361515 (1 items updated)
+2026-01-26 10:55:48.33
+20bc101f
+User
+[Lifecycle] SS-se-950179992: null → awaiting_decisions/needs_rate_check
+2026-01-26 10:55:48.35
+20bc101f
+User
+[firestore-session-sync] Synced session 14494 to shipment JK3825361553
+2026-01-26 10:55:48.48
+20bc101f
+User
+[SkuVault Inventory] Fetched 459 items (459 total lines, 297 products with quantity)
+2026-01-26 10:55:48.61
+20bc101f
+User
+[skuvault-products-sync] [location-sync] Processing brand: Redstone Foods
+2026-01-26 10:55:48.62
+20bc101f
+User
+[SkuVault Inventory] Fetching inventory for brand: Redstone Foods, warehouse: -1
+2026-01-26 10:55:48.62
+20bc101f
+User
+[SkuVault] Rate limiting: waiting 369ms before next request
+2026-01-26 10:55:48.75
+20bc101f
+User
+[firestore-session-sync] Synced session 14496 to shipment JK3825361360 (1 items updated)
+2026-01-26 10:55:49.00
+20bc101f
+User
+[Lifecycle] SS-se-950179994: null → awaiting_decisions/needs_rate_check
+2026-01-26 10:55:49.08
+20bc101f
+User
+[ETL] Found existing shipment 2b53b9ef-c1f9-419f-9b55-12e5647120d4 by ShipStation ID se-950178692
+2026-01-26 10:55:49.21
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950178692
+2026-01-26 10:55:49.21
+20bc101f
+User
+[ETL] Fresh hold_until_date: null
+2026-01-26 10:55:49.22
+20bc101f
+User
+[SkuVault Inventory] Fetched 0 items (0 total lines, 0 products with quantity)
+2026-01-26 10:55:49.22
+20bc101f
+User
+[skuvault-products-sync] [location-sync] No items found for brand: Redstone Foods
+2026-01-26 10:55:49.22
+20bc101f
+User
+[skuvault-products-sync] [location-sync] Processing brand: Klements
+2026-01-26 10:55:49.23
+20bc101f
+User
+[SkuVault] Rate limiting: waiting 1758ms before next request
+2026-01-26 10:55:49.24
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950179997
+2026-01-26 10:55:49.25
+20bc101f
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2026-01-26 10:55:49.48
+20bc101f
+User
+[firestore-session-sync] Synced session 14494 to shipment JK3825361401
+2026-01-26 10:55:49.65
+20bc101f
+User
+[Lifecycle] SS-se-950179997: null → awaiting_decisions/needs_rate_check
+2026-01-26 10:55:49.69
+20bc101f
+User
+[ETL] Found existing shipment ff810a8b-fa85-4b38-bf53-2d9c95c0af6a by ShipStation ID se-950178696
+2026-01-26 10:55:49.82
+20bc101f
+User
+[ETL] Fresh hold_until_date: null
+2026-01-26 10:55:49.82
+20bc101f
+User
+[ETL] Cached hold_until_date: null
+2026-01-26 10:55:49.82
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950178696
+2026-01-26 10:55:49.87
+20bc101f
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2026-01-26 10:55:49.87
+20bc101f
+User
+[firestore-session-sync] Synced session 14495 to shipment JK3825361508
+2026-01-26 10:55:50.31
+20bc101f
+User
+[ETL] Found existing shipment 5f18d27f-746b-449b-b75e-728d16acbc51 by ShipStation ID se-950178701
+2026-01-26 10:55:50.44
+20bc101f
+User
+[ETL] Updating existing shipment 5f18d27f-746b-449b-b75e-728d16acbc51 (ShipStation ID: se-950178701)
+2026-01-26 10:55:50.44
+20bc101f
+User
+[ETL] Fresh hold_until_date: null
+2026-01-26 10:55:50.44
+20bc101f
+User
+[ETL] Cached hold_until_date: null
+2026-01-26 10:55:50.49
+20bc101f
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2026-01-26 10:55:50.93
+20bc101f
+User
+[ETL] Found existing shipment 9e6f0041-5c08-4f2b-ad8d-f9f40abdef62 by ShipStation ID se-950178707
+2026-01-26 10:55:51.06
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950178707
+2026-01-26 10:55:51.06
+20bc101f
+User
+[ETL] Fresh hold_until_date: null
+2026-01-26 10:55:51.06
+20bc101f
+User
+[ETL] Cached hold_until_date: null
+2026-01-26 10:55:51.10
+20bc101f
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2026-01-26 10:55:51.22
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950180005
+2026-01-26 10:55:51.26
+20bc101f
+User
+[SkuVault Inventory] Fetched 3 items (3 total lines, 1 products with quantity)
+2026-01-26 10:55:51.30
+20bc101f
+User
+[skuvault-products-sync] [location-sync] Processing brand: Bricktown Jerky
+2026-01-26 10:55:51.30
+20bc101f
+User
+[skuvault-products-sync] [location-sync] Completed brand "Klements": 3 items from API, 22 local products
+2026-01-26 10:55:51.30
+20bc101f
+User
+[SkuVault Inventory] Fetching inventory for brand: Bricktown Jerky, warehouse: -1
+2026-01-26 10:56:21.00
+20bc101f
+User
+[Lifecycle] SS-se-950180122: null → awaiting_decisions/needs_rate_check
+2026-01-26 10:56:21.27
+20bc101f
+User
+[firestore-session-sync] Synced session 14496 to shipment JK3825361545 (1 items updated)
+2026-01-26 10:56:21.36
+20bc101f
+User
+[ETL] Found existing shipment ab3fd7ae-31f0-49cc-be05-dd1125397ac6 by ShipStation ID se-950178861
+2026-01-26 10:56:21.49
+20bc101f
+User
+[ETL] Fresh hold_until_date: null
+2026-01-26 10:56:21.49
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950178861
+2026-01-26 10:56:21.53
+20bc101f
+User
+[ETL] Update succeeded - new hold_until_date in DB: null
+2026-01-26 10:56:21.66
+20bc101f
+User
+[firestore-session-sync] Synced session 14495 to shipment JK3825361532
+2026-01-26 10:56:21.68
+20bc101f
+User
+[Lifecycle] SS-se-950180127: null → awaiting_decisions/needs_rate_check
+2026-01-26 10:56:23.26
+20bc101f
+User
+[ETL] Found existing shipment 013d96c2-8818-448f-8104-e8ec07456765 by ShipStation ID se-950178870
+2026-01-26 10:56:23.29
+20bc101f
+User
+[ETL] Extracted shipmentStatus: pending for order SS-se-950180148
+Wrap
+Colors
