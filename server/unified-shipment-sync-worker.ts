@@ -627,14 +627,25 @@ async function pollCycle(): Promise<{
         const shipmentId = shipment.shipment_id;
         const modifiedAt = shipment.modified_at || '';
         
-        // Skip already dead-lettered shipments - don't block cursor advancement
-        if (shipmentId && modifiedAt) {
-          const alreadyDeadLettered = await isShipmentDeadLettered(shipmentId, modifiedAt);
-          if (alreadyDeadLettered) {
-            console.log(`[UnifiedSync] Skipping dead-lettered shipment ${shipmentId} (modified ${modifiedAt})`);
-            // Treat as success for cursor advancement - we're intentionally skipping it
-            successTimestamps.push(modifiedAt);
+        // Skip already dead-lettered shipments - check database by shipmentId only
+        // This handles cases where modifiedAt changes but shipment is still dead-lettered
+        if (shipmentId) {
+          const dbDeadLetter = await storage.getShipmentsDeadLetter(shipmentId);
+          if (dbDeadLetter) {
+            // Silently skip - no need to log every time, just advance cursor
+            if (modifiedAt) {
+              successTimestamps.push(modifiedAt);
+            }
             continue;
+          }
+          
+          // Also check Redis as secondary mechanism (for recently dead-lettered before DB write)
+          if (modifiedAt) {
+            const redisDeadLettered = await isShipmentDeadLettered(shipmentId, modifiedAt);
+            if (redisDeadLettered) {
+              successTimestamps.push(modifiedAt);
+              continue;
+            }
           }
         }
         
