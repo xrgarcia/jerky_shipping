@@ -13498,6 +13498,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Batch query SKUs with missing weight for orders with fingerprint_status = 'missing_weight'
+      const shipmentIdsWithMissingWeight = readyToSessionOrders
+        .filter(o => o.fingerprintStatus === 'missing_weight')
+        .map(o => o.id);
+
+      let missingWeightSkusByShipment = new Map<string, string[]>();
+      if (shipmentIdsWithMissingWeight.length > 0) {
+        // Get all QC items for these shipments and join with skuvault_products to find SKUs missing weight
+        const { skuvaultProducts } = await import("@shared/schema");
+        const qcItemsForWeightCheck = await db
+          .select({
+            shipmentId: shipmentQcItems.shipmentId,
+            sku: shipmentQcItems.sku,
+            catalogWeight: skuvaultProducts.weightValue,
+          })
+          .from(shipmentQcItems)
+          .leftJoin(skuvaultProducts, eq(shipmentQcItems.sku, skuvaultProducts.sku))
+          .where(
+            sql`${shipmentQcItems.shipmentId} IN (${sql.raw(shipmentIdsWithMissingWeight.map(id => `'${id}'`).join(','))})`
+          );
+
+        // Group by shipment - only include SKUs where weight is null or 0
+        for (const item of qcItemsForWeightCheck) {
+          if (item.catalogWeight === null || item.catalogWeight === 0) {
+            const existing = missingWeightSkusByShipment.get(item.shipmentId) || [];
+            if (!existing.includes(item.sku)) {
+              existing.push(item.sku);
+            }
+            missingWeightSkusByShipment.set(item.shipmentId, existing);
+          }
+        }
+      }
+
       // Get collection names for building human-readable fingerprint names
       const { productCollections, stations } = await import("@shared/schema");
       const allCollections = await db.select().from(productCollections);
@@ -13643,17 +13676,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason = `Out of stock: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
           actionTab = 'out_of_stock'; // Special action tab for out-of-stock - links to shipment details
         } else if (!order.fingerprintId) {
-          // Order needs fingerprint - check why
+          // Order needs fingerprint - check why in priority order
           const uncategorizedSkus = uncategorizedSkusByShipment.get(order.id) || [];
+          const missingWeightSkus = missingWeightSkusByShipment.get(order.id) || [];
+          
           if (uncategorizedSkus.length > 0) {
-            // Show up to 3 SKUs, then "and X more"
+            // SKUs missing collection assignment - highest priority fix
             const displaySkus = uncategorizedSkus.slice(0, 3);
             const remaining = uncategorizedSkus.length - 3;
             reason = `Missing Collection: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
             actionTab = 'categorize';
+          } else if (missingWeightSkus.length > 0 || order.fingerprintStatus === 'missing_weight') {
+            // SKUs missing weight data
+            if (missingWeightSkus.length > 0) {
+              const displaySkus = missingWeightSkus.slice(0, 3);
+              const remaining = missingWeightSkus.length - 3;
+              reason = `Missing Weight: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
+            } else {
+              reason = 'Missing Weight: Check product catalog';
+            }
+            actionTab = 'categorize';
+          } else if (order.fingerprintStatus === 'pending_categorization') {
+            // Still being processed - check for any issues
+            reason = 'Pending categorization - check for uncategorized SKUs';
+            actionTab = 'categorize';
+          } else if (order.fingerprintStatus === 'needs_recalc') {
+            // Fingerprint needs recalculation - will auto-resolve
+            reason = 'Fingerprint recalculating...';
+            actionTab = null;
           } else {
-            // All SKUs categorized but fingerprint not calculated yet - hydration pending
-            reason = 'System is analyzing this order';
+            // Genuinely being processed - show more specific status
+            reason = `Processing (${order.fingerprintStatus || 'analyzing'})`;
             actionTab = null;
           }
         } else if (!order.fingerprintModelId) {
@@ -13713,25 +13766,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? firstOrderWithAddress 
           : null;
         
-        // Build actionUrl for direct navigation
+        // Build actionUrl for direct navigation based on actionTab
         let actionUrl: string | null = null;
-        if (!readyToSession) {
-          if (actionTab === 'out_of_stock' && order.shipmentId) {
-            // Out of stock - link to shipment details page
-            actionUrl = `/shipments/${order.shipmentId}`;
-          } else if (!order.fingerprintId) {
-            // Need to analyze this order - link to Sessions tab
-            actionUrl = '/fulfillment-prep/sessions';
-          } else if (!order.packagingModelId) {
-            // Need packaging mapping - link to Packaging tab with fingerprint search
-            if (fingerprintSearchTerm) {
-              actionUrl = `/fulfillment-prep/packaging/needs-mapping?search=${encodeURIComponent(fingerprintSearchTerm)}`;
-            } else {
-              actionUrl = '/fulfillment-prep/packaging/needs-mapping';
-            }
-          } else if (!order.assignedStationId) {
-            // Need station assignment - link to Packaging Types page
-            actionUrl = '/packaging-types';
+        if (!readyToSession && actionTab) {
+          switch (actionTab) {
+            case 'out_of_stock':
+              // Out of stock - link to shipment details page
+              if (order.shipmentId) {
+                actionUrl = `/shipments/${order.shipmentId}`;
+              }
+              break;
+            case 'categorize':
+              // Missing collection or weight - link to categorize tab
+              actionUrl = '/fulfillment-prep/categorize';
+              break;
+            case 'packaging':
+              // Need packaging mapping - link to Packaging tab with fingerprint search
+              if (fingerprintSearchTerm) {
+                actionUrl = `/fulfillment-prep/packaging/needs-mapping?search=${encodeURIComponent(fingerprintSearchTerm)}`;
+              } else {
+                actionUrl = '/fulfillment-prep/packaging/needs-mapping';
+              }
+              break;
+            default:
+              // No specific action - null URL
+              break;
           }
         }
         
