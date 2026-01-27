@@ -223,13 +223,10 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
-  // NEEDS_CATEGORIZATION: Rate check done, SKUs need collection assignment
-  if (shipment.rateAnalysisComplete === true) {
-    return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
-  }
-
-  // NEEDS_RATE_CHECK: First step - need to analyze shipping rates
-  return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
+  // NEEDS_CATEGORIZATION: SKUs need collection assignment
+  // NOTE: Rate check bypassed - go directly to categorization
+  // Previously checked: if (shipment.rateAnalysisComplete === true)
+  return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
 }
 
 /**

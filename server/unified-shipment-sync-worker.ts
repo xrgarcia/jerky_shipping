@@ -166,13 +166,12 @@ async function syncShipment(shipmentData: any): Promise<{ id: string | null; ski
     }, 'shipment_synced');
   }
   
-  // Trigger smart carrier rate analysis (non-blocking)
-  // Only analyze if shipment has the required data
-  if (updatedShipment && updatedShipment.shipmentId && updatedShipment.serviceCode && updatedShipment.shipToPostalCode) {
-    smartCarrierRateService.analyzeAndSave(updatedShipment).catch(err => {
-      console.error(`[UnifiedSync] Rate analysis failed for ${updatedShipment.shipmentId}:`, err.message);
-    });
-  }
+  // DISABLED: Smart carrier rate analysis - bypassing rate check phase
+  // if (updatedShipment && updatedShipment.shipmentId && updatedShipment.serviceCode && updatedShipment.shipToPostalCode) {
+  //   smartCarrierRateService.analyzeAndSave(updatedShipment).catch(err => {
+  //     console.error(`[UnifiedSync] Rate analysis failed for ${updatedShipment.shipmentId}:`, err.message);
+  //   });
+  // }
   
   return { id: shipmentDbId };
 }
