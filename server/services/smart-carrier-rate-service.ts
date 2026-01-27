@@ -256,6 +256,7 @@ export class SmartCarrierRateService {
       if (packageDetails && !packageDetails.usedFallback) {
         // Use rates estimate API with fingerprint's package dimensions
         rates = await this.fetchRatesEstimate({
+          shipmentId,  // Pass ShipStation shipment ID to reference existing shipment
           destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
           destinationPostalCode: shipment.shipToPostalCode,
           destinationCity: shipment.shipToCity || undefined,
@@ -506,10 +507,11 @@ export class SmartCarrierRateService {
   }
   
   /**
-   * Fetch rates using shipment details (for shipments not yet in ShipStation)
+   * Fetch rates using shipment details with the existing ShipStation shipment ID
    * Uses the centralized ShipStation API service with rate limiting
    */
   async fetchRatesEstimate(params: {
+    shipmentId: string;  // ShipStation shipment ID (e.g., "se-950536244")
     destinationAddressLine1?: string;
     destinationPostalCode: string;
     destinationCity?: string;
@@ -527,7 +529,10 @@ export class SmartCarrierRateService {
       throw new Error('No enabled carriers available for rate estimation');
     }
     
+    console.log(`[SmartCarrierRate] Requesting rates for shipment ${params.shipmentId} with ${carrierIds.length} carriers`);
+    
     const requestBody: any = {
+      shipment_id: params.shipmentId,  // Reference existing ShipStation shipment
       shipment: {
         validate_address: 'no_validation',
         ship_from: {
