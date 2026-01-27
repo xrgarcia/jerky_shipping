@@ -1,6 +1,6 @@
 import { firestoreStorage } from './firestore-storage';
 import { db } from './db';
-import { shipments, shipmentItems, shipmentQcItems } from '@shared/schema';
+import { shipments, shipmentItems, shipmentQcItems, skuvaultProducts } from '@shared/schema';
 import { eq, and, isNull, inArray, isNotNull, exists, sql, notExists } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
@@ -107,6 +107,63 @@ async function getValidPairs(): Promise<Set<string>> {
 async function clearReimportState(): Promise<void> {
   const redis = getRedisClient();
   await redis.del(REIMPORT_RUNNING_KEY, REIMPORT_CURSOR_KEY, REIMPORT_START_DATE_KEY, REIMPORT_VALID_PAIRS_KEY);
+}
+
+/**
+ * Allocate inventory when a shipment gets assigned to a session
+ * Moves quantities from pending → allocated in skuvault_products
+ * 
+ * This should be called when:
+ * 1. A shipment previously had no sessionId (null) and now gets one
+ * 2. The shipment has QC items that need their inventory allocated
+ * 
+ * @param shipmentId - The internal shipment ID (not ShipStation shipment ID)
+ * @param orderNumber - For logging purposes
+ */
+async function allocateInventoryForSession(shipmentId: string, orderNumber: string): Promise<number> {
+  try {
+    const qcItems = await db
+      .select({
+        sku: shipmentQcItems.sku,
+        quantityExpected: shipmentQcItems.quantityExpected,
+      })
+      .from(shipmentQcItems)
+      .where(eq(shipmentQcItems.shipmentId, shipmentId));
+    
+    if (qcItems.length === 0) {
+      return 0;
+    }
+    
+    const skuQuantities: Record<string, number> = {};
+    for (const item of qcItems) {
+      const qty = item.quantityExpected ?? 0;
+      skuQuantities[item.sku] = (skuQuantities[item.sku] || 0) + qty;
+    }
+    
+    let allocatedCount = 0;
+    for (const sku of Object.keys(skuQuantities)) {
+      const quantity = skuQuantities[sku];
+      await db
+        .update(skuvaultProducts)
+        .set({
+          pendingQuantity: sql`GREATEST(0, ${skuvaultProducts.pendingQuantity} - ${quantity})`,
+          allocatedQuantity: sql`${skuvaultProducts.allocatedQuantity} + ${quantity}`,
+          availableQuantity: sql`GREATEST(0, ${skuvaultProducts.availableQuantity} - ${quantity})`,
+          updatedAt: new Date(),
+        })
+        .where(eq(skuvaultProducts.sku, sku));
+      allocatedCount++;
+    }
+    
+    if (allocatedCount > 0) {
+      log(`Allocated inventory for ${orderNumber}: ${allocatedCount} SKUs moved from pending to allocated`);
+    }
+    
+    return allocatedCount;
+  } catch (error: any) {
+    log(`Error allocating inventory for ${orderNumber}: ${error.message}`);
+    return 0;
+  }
 }
 
 // Worker state
@@ -253,6 +310,13 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
     await updateShipmentLifecycle(shipment.id, {
       shipmentData: { sessionStatus: normalizedSessionStatus }
     });
+
+    // INVENTORY ALLOCATION: When a shipment gets its first session, move inventory from pending → allocated
+    // This ensures inventory is "committed" only when the warehouse manager builds a session
+    const isFirstSession = shipment.sessionId === null;
+    if (isFirstSession) {
+      await allocateInventoryForSession(shipment.id, shipment.orderNumber || session.order_number);
+    }
 
     // Sync session items to shipment_items table
     if (session.order_items && session.order_items.length > 0) {
