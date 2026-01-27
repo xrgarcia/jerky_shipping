@@ -483,6 +483,8 @@ export async function syncSkuvaultProducts(): Promise<{
             parentSku: p.parent_sku,
             quantityOnHand: p.quantity_on_hand ?? 0,
             availableQuantity: p.quantity_on_hand ?? 0,
+            pendingQuantity: 0,
+            allocatedQuantity: 0,
             brand: p.brand,
           })
           .onConflictDoUpdate({
@@ -500,6 +502,8 @@ export async function syncSkuvaultProducts(): Promise<{
               parentSku: p.parent_sku,
               quantityOnHand: p.quantity_on_hand ?? 0,
               availableQuantity: p.quantity_on_hand ?? 0,
+              pendingQuantity: 0,
+              allocatedQuantity: 0,
               brand: p.brand,
               updatedAt: new Date(),
             },
