@@ -1535,7 +1535,9 @@ export const skuvaultProducts = pgTable("skuvault_products", {
   weightUnit: text("weight_unit"), // Weight unit (e.g., "oz", "lb")
   parentSku: text("parent_sku"), // For variants: the parent SKU this variant belongs to (null for parents/kits)
   quantityOnHand: integer("quantity_on_hand").notNull().default(0), // Current stock quantity from SkuVault (snapshot, read-only)
-  availableQuantity: integer("available_quantity").notNull().default(0), // Available stock = quantityOnHand - pending orders (decremented on QC explosion, reset on daily sync)
+  pendingQuantity: integer("pending_quantity").notNull().default(0), // Orders hydrated but not yet in a session (incremented on QC explosion, cleared when session starts)
+  allocatedQuantity: integer("allocated_quantity").notNull().default(0), // Orders in active sessions (moved from pending when session is built)
+  availableQuantity: integer("available_quantity").notNull().default(0), // Available stock = quantityOnHand - allocatedQuantity (pending doesn't block availability, reset on daily sync)
   physicalLocation: text("physical_location"), // Physical warehouse location from SkuVault inventory API (synced hourly)
   brand: text("brand"), // Brand name from SkuVault (e.g., "Jerky.com", "Klements")
   createdAt: timestamp("created_at").notNull().defaultNow(),
