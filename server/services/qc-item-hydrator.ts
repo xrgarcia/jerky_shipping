@@ -654,8 +654,9 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
         });
     }
     
-    // Decrement available_quantity in skuvault_products for each SKU
-    // This tracks inventory allocation as orders are processed
+    // Increment pending_quantity in skuvault_products for each SKU
+    // This tracks orders that are hydrated but not yet in a session
+    // Pending inventory doesn't block availability - it only becomes "allocated" when session is built
     const skuQuantities: Record<string, number> = {};
     for (const qcItem of qcItemsToInsert) {
       const qty = qcItem.quantityExpected ?? 0;
@@ -667,7 +668,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       await db
         .update(skuvaultProducts)
         .set({
-          availableQuantity: sql`GREATEST(0, ${skuvaultProducts.availableQuantity} - ${quantity})`,
+          pendingQuantity: sql`${skuvaultProducts.pendingQuantity} + ${quantity}`,
           updatedAt: new Date(),
         })
         .where(eq(skuvaultProducts.sku, sku));
