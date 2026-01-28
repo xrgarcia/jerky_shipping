@@ -1,0 +1,148 @@
+2026-01-27 18:07:25.84
+c90b4656
+User
+at /home/runner/workspace/node_modules/express/lib/router/index.js:286:9
+2026-01-27 18:07:25.84
+c90b4656
+User
+at trim_prefix (/home/runner/workspace/node_modules/express/lib/router/index.js:328:13)
+2026-01-27 18:07:25.84
+c90b4656
+User
+at next (/home/runner/workspace/node_modules/express/lib/router/index.js:280:10)
+2026-01-27 18:07:42.83
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:17:13.47
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:19:23.35
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:29:53.34
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:33:03.22
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:34:03.82
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:41:23.34
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:43:33.13
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 18:53:03.07
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 19:01:31.90
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 19:06:43.56
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 19:11:02.71
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 19:31:02.95
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 19:40:32.62
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 20:03:43.67
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 20:12:17.48
+c90b4656
+User
+[SkuVault QC] Request error: timeout of 30000ms exceeded
+2026-01-27 20:12:17.48
+c90b4656
+User
+at runNextTicks (node:internal/process/task_queues:64:3)
+2026-01-27 20:12:17.48
+c90b4656
+User
+at async SkuVaultService.getInventoryByBrandAndWarehouse (file:///home/runner/workspace/dist/index.js:8989:28)
+2026-01-27 20:12:17.48
+c90b4656
+User
+at async syncPhysicalLocations (file:///home/runner/workspace/dist/index.js:15583:26)
+2026-01-27 20:12:17.48
+c90b4656
+User
+at async runSyncCheck (file:///home/runner/workspace/dist/index.js:18843:28) {
+2026-01-27 20:12:17.48
+c90b4656
+User
+}
+2026-01-27 20:12:17.48
+c90b4656
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-01-27 20:12:17.48
+c90b4656
+User
+statusCode: 500,
+2026-01-27 20:12:17.48
+c90b4656
+User
+at processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-27 20:12:17.48
+c90b4656
+User
+[SkuVault Inventory] Error fetching inventory for brand Oklahoma Jerky Company: SkuVaultError: QC request failed: timeout of 30000ms exceeded
+2026-01-27 20:12:17.48
+c90b4656
+User
+details: undefined
+2026-01-27 20:12:17.48
+c90b4656
+User
+at SkuVaultService.makeQCRequest (file:///home/runner/workspace/dist/index.js:8417:17)
+2026-01-27 20:13:13.30
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:32:26.83
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:32:39.18
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:33:09.35
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:33:59.24
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:35:29.26
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constraint "slashbin_order_items_pkey"
+2026-01-27 21:38:19.26
+c90b4656
+User
+[Slashbin/ShopifyOrders] Error: duplicate key value violates unique constra
