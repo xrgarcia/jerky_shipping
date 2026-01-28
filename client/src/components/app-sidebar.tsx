@@ -235,6 +235,11 @@ export function AppSidebar() {
       icon: Inbox,
     },
     {
+      title: "Kit Mappings",
+      url: "/reports/kit-mappings",
+      icon: Layers,
+    },
+    {
       title: "Packing Ready (Debug)",
       url: "/packing-ready",
       icon: Database,
