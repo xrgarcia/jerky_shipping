@@ -1308,8 +1308,9 @@ export type InsertSlashbinOrder = z.infer<typeof insertSlashbinOrderSchema>;
 export type SlashbinOrder = typeof slashbinOrders.$inferSelect;
 
 // Slashbin Order Items - Line items for Slashbin orders
-// Composite primary key of order_number + sku
+// Uses auto-generated UUID primary key to allow duplicate SKUs in the same order
 export const slashbinOrderItems = pgTable("slashbin_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: varchar("order_number").notNull().references(() => slashbinOrders.orderNumber, { onDelete: "cascade" }),
   sku: text("sku").notNull(),
   productName: text("product_name"),
@@ -1325,12 +1326,12 @@ export const slashbinOrderItems = pgTable("slashbin_order_items", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-  pk: primaryKey({ columns: [table.orderNumber, table.sku] }),
   orderNumberIdx: index("slashbin_order_items_order_number_idx").on(table.orderNumber),
   skuIdx: index("slashbin_order_items_sku_idx").on(table.sku),
 }));
 
 export const insertSlashbinOrderItemSchema = createInsertSchema(slashbinOrderItems).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });
