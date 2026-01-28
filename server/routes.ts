@@ -3742,6 +3742,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Kit Mappings Comparison Report - compares kit_component_mappings with slashbin_kit_component_mappings
+  app.get("/api/reports/kit-mappings-comparison", requireAuth, async (req, res) => {
+    try {
+      // Get summary counts
+      const summaryResult = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(DISTINCT kit_sku) FROM kit_component_mappings) as normal_kit_count,
+          (SELECT COUNT(DISTINCT kit_sku) FROM slashbin_kit_component_mappings) as slashbin_kit_count,
+          (SELECT COUNT(*) FROM kit_component_mappings) as normal_total_mappings,
+          (SELECT COUNT(*) FROM slashbin_kit_component_mappings) as slashbin_total_mappings
+      `);
+      const summary = summaryResult.rows[0] as {
+        normal_kit_count: string;
+        slashbin_kit_count: string;
+        normal_total_mappings: string;
+        slashbin_total_mappings: string;
+      };
+
+      // Kits only in normal table (not in slashbin)
+      const kitsOnlyInNormalResult = await db.execute(sql`
+        SELECT k.kit_sku, k.component_sku, k.component_quantity
+        FROM kit_component_mappings k
+        WHERE k.kit_sku NOT IN (SELECT DISTINCT kit_sku FROM slashbin_kit_component_mappings)
+        ORDER BY k.kit_sku, k.component_sku
+      `);
+
+      // Kits only in slashbin table (not in normal)
+      const kitsOnlyInSlashbinResult = await db.execute(sql`
+        SELECT s.kit_sku, s.component_sku, s.component_quantity
+        FROM slashbin_kit_component_mappings s
+        WHERE s.kit_sku NOT IN (SELECT DISTINCT kit_sku FROM kit_component_mappings)
+        ORDER BY s.kit_sku, s.component_sku
+      `);
+
+      // Components only in normal (for kits that exist in both tables)
+      const componentsOnlyInNormalResult = await db.execute(sql`
+        SELECT k.kit_sku, k.component_sku, k.component_quantity, 'missing_in_slashbin' as diff_type
+        FROM kit_component_mappings k
+        WHERE k.kit_sku IN (SELECT DISTINCT kit_sku FROM slashbin_kit_component_mappings)
+          AND NOT EXISTS (
+            SELECT 1 FROM slashbin_kit_component_mappings s 
+            WHERE s.kit_sku = k.kit_sku AND s.component_sku = k.component_sku
+          )
+        ORDER BY k.kit_sku, k.component_sku
+      `);
+
+      // Components only in slashbin (for kits that exist in both tables)
+      const componentsOnlyInSlashbinResult = await db.execute(sql`
+        SELECT s.kit_sku, s.component_sku, s.component_quantity, 'missing_in_normal' as diff_type
+        FROM slashbin_kit_component_mappings s
+        WHERE s.kit_sku IN (SELECT DISTINCT kit_sku FROM kit_component_mappings)
+          AND NOT EXISTS (
+            SELECT 1 FROM kit_component_mappings k 
+            WHERE k.kit_sku = s.kit_sku AND k.component_sku = s.component_sku
+          )
+        ORDER BY s.kit_sku, s.component_sku
+      `);
+
+      // Quantity mismatches (same kit + component but different quantities)
+      const quantityMismatchesResult = await db.execute(sql`
+        SELECT 
+          k.kit_sku, 
+          k.component_sku, 
+          k.component_quantity as normal_quantity,
+          s.component_quantity as slashbin_quantity,
+          'quantity_mismatch' as diff_type
+        FROM kit_component_mappings k
+        INNER JOIN slashbin_kit_component_mappings s 
+          ON k.kit_sku = s.kit_sku AND k.component_sku = s.component_sku
+        WHERE k.component_quantity != s.component_quantity
+        ORDER BY k.kit_sku, k.component_sku
+      `);
+
+      res.json({
+        summary: {
+          normalKitCount: parseInt(summary.normal_kit_count) || 0,
+          slashbinKitCount: parseInt(summary.slashbin_kit_count) || 0,
+          normalTotalMappings: parseInt(summary.normal_total_mappings) || 0,
+          slashbinTotalMappings: parseInt(summary.slashbin_total_mappings) || 0,
+        },
+        kitsOnlyInNormal: kitsOnlyInNormalResult.rows.map((row: any) => ({
+          kitSku: row.kit_sku,
+          componentSku: row.component_sku,
+          componentQuantity: row.component_quantity,
+        })),
+        kitsOnlyInSlashbin: kitsOnlyInSlashbinResult.rows.map((row: any) => ({
+          kitSku: row.kit_sku,
+          componentSku: row.component_sku,
+          componentQuantity: row.component_quantity,
+        })),
+        componentDifferences: [
+          ...componentsOnlyInNormalResult.rows.map((row: any) => ({
+            kitSku: row.kit_sku,
+            componentSku: row.component_sku,
+            normalQuantity: row.component_quantity,
+            slashbinQuantity: null,
+            diffType: 'missing_in_slashbin',
+          })),
+          ...componentsOnlyInSlashbinResult.rows.map((row: any) => ({
+            kitSku: row.kit_sku,
+            componentSku: row.component_sku,
+            normalQuantity: null,
+            slashbinQuantity: row.component_quantity,
+            diffType: 'missing_in_normal',
+          })),
+          ...quantityMismatchesResult.rows.map((row: any) => ({
+            kitSku: row.kit_sku,
+            componentSku: row.component_sku,
+            normalQuantity: row.normal_quantity,
+            slashbinQuantity: row.slashbin_quantity,
+            diffType: 'quantity_mismatch',
+          })),
+        ],
+      });
+    } catch (error) {
+      console.error("Error generating kit mappings comparison:", error);
+      res.status(500).json({ error: "Failed to generate kit mappings comparison" });
+    }
+  });
+
   // Duplicate shipments report - finds orders with multiple shipments
   app.get("/api/reports/duplicate-shipments", requireAuth, async (req, res) => {
     try {
