@@ -1260,17 +1260,6 @@ export default function Collections() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <div className="flex items-center gap-1">
-                      <Checkbox
-                        id="uncategorized-modal"
-                        checked={showUncategorizedOnly}
-                        onCheckedChange={(checked) => setShowUncategorizedOnly(checked === true)}
-                        data-testid="checkbox-uncategorized-filter"
-                      />
-                      <Label htmlFor="uncategorized-modal" className="text-xs cursor-pointer whitespace-nowrap">
-                        Not in any collection
-                      </Label>
-                    </div>
                   </div>
                 </div>
 
