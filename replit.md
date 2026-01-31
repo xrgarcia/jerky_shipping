@@ -56,6 +56,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **ShipStation Label Creation Endpoints**: Differentiates between creating labels for existing and new shipments.
 - **Product Categorization (Kits vs. Assembled Products)**: Distinction based on whether products are exploded into components in SkuVault's QC Sale API. A QC Validation Report identifies miscategorized products.
 - **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog data (`skuvault_products` table), synced hourly from a GCP reporting database via a 3-way merge strategy.
+- **Packaging Types Sync Worker**: Hourly sync from ShipStation `/v2/packages` endpoint. Matches by `package_id` first (ShipStation's unique identifier), falls back to name matching for initial backfill. Only inserts/updates - never deletes. Preserves local `id`, `is_active`, and `stationType` fields.
     - **Two-Tier Inventory Tracking System**: Prevents premature inventory deduction so higher-priority orders don't show "out of stock" before warehouse managers build picking sessions. The `skuvault_products` table has four inventory fields:
       - `quantity_on_hand`: Snapshot from SkuVault (read-only, reset on daily sync)
       - `pending_quantity`: Orders hydrated but NOT yet in a session (does NOT reduce availability)
