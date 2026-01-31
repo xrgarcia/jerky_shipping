@@ -3724,20 +3724,22 @@ export class DatabaseStorage implements IStorage {
       const searchLower = search.toLowerCase().trim();
       const searchPattern = `%${searchLower}%`;
       
+      // Find collections containing products that match the search
       const matchingCollectionIds = await db
         .selectDistinct({ collectionId: productCollectionMappings.productCollectionId })
         .from(productCollectionMappings)
-        .innerJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
+        .leftJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
         .where(
           or(
-            sql`LOWER(${productCollectionMappings.sku}) LIKE ${searchPattern}`,
-            sql`LOWER(${skuvaultProducts.productTitle}) LIKE ${searchPattern}`,
-            sql`LOWER(${skuvaultProducts.upc}) LIKE ${searchPattern}`
+            ilike(productCollectionMappings.sku, searchPattern),
+            ilike(skuvaultProducts.productTitle, searchPattern),
+            ilike(skuvaultProducts.upc, searchPattern)
           )
         );
       
       const matchingIds = new Set(matchingCollectionIds.map(r => r.collectionId));
       
+      // Filter collections by name/description OR by containing matching products
       result = result.filter(c => 
         c.name.toLowerCase().includes(searchLower) ||
         c.description?.toLowerCase().includes(searchLower) ||
