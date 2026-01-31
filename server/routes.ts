@@ -10639,6 +10639,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(collection);
     } catch (error: any) {
       console.error("[Collections] Error creating collection:", error);
+      
+      // Handle conflict error when auto-adding products that are already assigned
+      if (error.code === 'PRODUCTS_ALREADY_ASSIGNED' && error.conflicts) {
+        return res.status(409).json({ 
+          error: "Some products are already assigned to other collections",
+          code: error.code,
+          conflicts: error.conflicts
+        });
+      }
+      
       res.status(500).json({ error: "Failed to create collection" });
     }
   });

@@ -309,7 +309,24 @@ export default function Collections() {
       incrementalQuantity?: number | null;
       productCategory?: string;
     }) => {
-      const res = await apiRequest("POST", "/api/collections", data);
+      const res = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Failed to create collection" }));
+        const error = new Error(errorData.error || "Failed to create collection") as Error & { 
+          code?: string; 
+          conflicts?: Array<{ sku: string; collectionName: string }>;
+        };
+        if (errorData.code) (error as any).code = errorData.code;
+        if (errorData.conflicts) (error as any).conflicts = errorData.conflicts;
+        throw error;
+      }
+      
       return res.json();
     },
     onSuccess: (newCollection) => {
@@ -327,12 +344,21 @@ export default function Collections() {
       });
       setShowViewEditDialog(true);
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to create collection",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error & { code?: string; conflicts?: Array<{ sku: string; collectionName: string }> }) => {
+      if (error.code === 'PRODUCTS_ALREADY_ASSIGNED' && error.conflicts) {
+        const collectionNames = [...new Set(error.conflicts.map(c => c.collectionName))];
+        toast({
+          title: "Cannot create collection",
+          description: `${error.conflicts.length} product(s) are already assigned to: ${collectionNames.join(", ")}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to create collection",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
 
