@@ -1170,22 +1170,6 @@ export default function Collections() {
                   data-testid="input-edit-collection-incremental-qty"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Category</Label>
-                <Select 
-                  value={formData.productCategory} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, productCategory: value }))}
-                >
-                  <SelectTrigger className="h-9" data-testid="select-edit-collection-category">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productCategories.map(category => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             {/* Two-Column Layout: Products in Collection | Add Products */}
