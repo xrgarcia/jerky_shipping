@@ -1149,7 +1149,7 @@ export default function Collections() {
             </div>
 
             {/* Two-Column Layout: Products in Collection | Add Products */}
-            <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 overflow-hidden">
+            <div className="grid grid-cols-2 gap-4 h-[400px] overflow-hidden">
               {/* Left: Products IN Collection */}
               <div className="flex flex-col border rounded-lg overflow-hidden">
                 <div className="p-3 bg-[#6B8E23]/10 border-b flex items-center justify-between">
