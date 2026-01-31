@@ -3725,7 +3725,7 @@ export class DatabaseStorage implements IStorage {
       const searchPattern = `%${searchLower}%`;
       
       // Find collections containing products that match the search
-      // Use and() with isNotNull() to handle null columns from leftJoin safely
+      // Use COALESCE to handle null columns from leftJoin safely
       const matchingCollectionIds = await db
         .selectDistinct({ collectionId: productCollectionMappings.productCollectionId })
         .from(productCollectionMappings)
@@ -3733,8 +3733,8 @@ export class DatabaseStorage implements IStorage {
         .where(
           or(
             ilike(productCollectionMappings.sku, searchPattern),
-            and(isNotNull(skuvaultProducts.productTitle), ilike(skuvaultProducts.productTitle, searchPattern)),
-            and(isNotNull(skuvaultProducts.upc), ilike(skuvaultProducts.upc, searchPattern))
+            sql`COALESCE(${skuvaultProducts.productTitle}, '') ILIKE ${searchPattern}`,
+            sql`COALESCE(${skuvaultProducts.upc}, '') ILIKE ${searchPattern}`
           )
         );
       
