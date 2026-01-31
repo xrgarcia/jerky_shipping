@@ -34,12 +34,12 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Package,
-  Plus,
   Pencil,
   Box,
   Hand,
   Layers,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PackagingType } from "@shared/schema";
@@ -70,7 +70,6 @@ function StationBadge({ stationType }: { stationType: string | null }) {
 
 export default function PackagingTypes() {
   const { toast } = useToast();
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingType, setEditingType] = useState<PackagingType | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
@@ -93,33 +92,6 @@ export default function PackagingTypes() {
       const res = await fetch(`/api/packaging-types?includeInactive=${showInactive}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest("POST", "/api/packaging-types", {
-        name: data.name,
-        packageCode: data.packageCode || null,
-        stationType: data.stationType || null,
-        dimensionLength: data.dimensionLength || null,
-        dimensionWidth: data.dimensionWidth || null,
-        dimensionHeight: data.dimensionHeight || null,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Packaging type created" });
-      queryClient.invalidateQueries({ queryKey: ["/api/packaging-types"] });
-      setShowCreateDialog(false);
-      resetForm();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to create packaging type",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
@@ -177,8 +149,6 @@ export default function PackagingTypes() {
 
     if (editingType) {
       updateMutation.mutate({ id: editingType.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
     }
   };
 
@@ -193,8 +163,8 @@ export default function PackagingTypes() {
   const activeCount = packagingTypes.filter(t => t.isActive).length;
   const inactiveCount = packagingTypes.filter(t => !t.isActive).length;
 
-  const isDialogOpen = showCreateDialog || !!editingType;
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isDialogOpen = !!editingType;
+  const isPending = updateMutation.isPending;
 
   return (
     <div className="p-6 space-y-6">
@@ -228,14 +198,12 @@ export default function PackagingTypes() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            data-testid="button-create-packaging-type"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Packaging Type
-          </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground" data-testid="info-sync-note">
+        <Info className="h-4 w-4 shrink-0" />
+        <span>Packaging types are automatically synced from ShipStation every hour. You can edit station assignments and active status locally.</span>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -373,20 +341,15 @@ export default function PackagingTypes() {
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => {
         if (!open) {
-          setShowCreateDialog(false);
           setEditingType(null);
           resetForm();
         }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingType ? "Edit Packaging Type" : "Create Packaging Type"}
-            </DialogTitle>
+            <DialogTitle>Edit Packaging Type</DialogTitle>
             <DialogDescription>
-              {editingType
-                ? "Update the packaging type details"
-                : "Add a new packaging option for order fulfillment"}
+              Update the packaging type details
             </DialogDescription>
           </DialogHeader>
 
@@ -463,7 +426,6 @@ export default function PackagingTypes() {
             <Button
               variant="outline"
               onClick={() => {
-                setShowCreateDialog(false);
                 setEditingType(null);
                 resetForm();
               }}
@@ -476,7 +438,7 @@ export default function PackagingTypes() {
               disabled={isPending}
               data-testid="button-submit"
             >
-              {isPending ? "Saving..." : editingType ? "Update" : "Create"}
+              {isPending ? "Saving..." : "Update"}
             </Button>
           </DialogFooter>
         </DialogContent>
