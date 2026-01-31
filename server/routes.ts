@@ -11626,12 +11626,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search product catalog from local skuvault_products table
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
-      const { search, category, isKit, loadAll } = req.query;
-      const { skuvaultProducts } = await import("@shared/schema");
+      const { search, category, isKit, loadAll, excludeAssigned } = req.query;
+      const { skuvaultProducts, productCollectionMappings } = await import("@shared/schema");
       
       const searchTerm = search ? String(search).trim() : null;
       const categoryFilter = category && category !== "all" ? String(category) : null;
       const shouldLoadAll = loadAll === "true";
+      const shouldExcludeAssigned = excludeAssigned === "true";
       
       // Need at least a search term, one filter, or explicit loadAll flag
       const hasFilters = categoryFilter || isKit === "yes" || isKit === "no";
@@ -11660,6 +11661,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(skuvaultProducts.isAssembledProduct, true));
       } else if (isKit === "no") {
         conditions.push(eq(skuvaultProducts.isAssembledProduct, false));
+      }
+      
+      // If excludeAssigned, filter out products already in any collection
+      if (shouldExcludeAssigned) {
+        conditions.push(sql`NOT EXISTS (
+          SELECT 1 FROM ${productCollectionMappings} pcm 
+          WHERE pcm.sku = ${skuvaultProducts.sku}
+        )`);
       }
       
       const products = await db

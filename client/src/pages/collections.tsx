@@ -245,14 +245,18 @@ export default function Collections() {
       search: debouncedSearch, 
       category: categoryFilter, 
       isKit: kitFilter,
-      loadAll: showUncategorizedOnly || !!selectedCollectionId
+      loadAll: showUncategorizedOnly || !!selectedCollectionId,
+      excludeAssigned: showUncategorizedOnly || !!selectedCollectionId
     }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);
       if (categoryFilter !== "all") params.set("category", categoryFilter);
       if (kitFilter !== "either") params.set("isKit", kitFilter);
-      if (showUncategorizedOnly || selectedCollectionId) params.set("loadAll", "true");
+      if (showUncategorizedOnly || selectedCollectionId) {
+        params.set("loadAll", "true");
+        params.set("excludeAssigned", "true");
+      }
       
       const res = await fetch(`/api/product-catalog?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch products");
@@ -285,11 +289,8 @@ export default function Collections() {
     return result;
   }, [collections, collectionFilterFromValidation]);
   
-  const catalogProducts = useMemo(() => {
-    const products = catalogData?.products || [];
-    if (!showUncategorizedOnly) return products;
-    return products.filter(p => !assignedSkusGlobal.has(p.sku));
-  }, [catalogData?.products, showUncategorizedOnly, assignedSkusGlobal]);
+  // Server-side filtering via excludeAssigned now handles this
+  const catalogProducts = catalogData?.products || [];
 
   const assignedSkusInCollection = useMemo(() => {
     return new Set(collectionProducts.map(m => m.sku));
