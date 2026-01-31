@@ -11627,7 +11627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/product-catalog", requireAuth, async (req, res) => {
     try {
       const { search, category, isKit, loadAll, excludeAssigned } = req.query;
-      const { skuvaultProducts, productCollectionMappings } = await import("@shared/schema");
+      const { skuvaultProducts } = await import("@shared/schema");
       
       const searchTerm = search ? String(search).trim() : null;
       const categoryFilter = category && category !== "all" ? String(category) : null;
@@ -11666,8 +11666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If excludeAssigned, filter out products already in any collection
       if (shouldExcludeAssigned) {
         conditions.push(sql`NOT EXISTS (
-          SELECT 1 FROM ${productCollectionMappings} pcm 
-          WHERE pcm.sku = ${skuvaultProducts.sku}
+          SELECT 1 FROM product_collection_mappings 
+          WHERE product_collection_mappings.sku = ${skuvaultProducts.sku}
         )`);
       }
       
