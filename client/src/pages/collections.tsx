@@ -213,6 +213,10 @@ export default function Collections() {
     return new Set(assignedSkusData?.assignedSkus || []);
   }, [assignedSkusData]);
 
+  const duplicatedSkusSet = useMemo(() => {
+    return new Set(duplicateProductsData?.duplicateProducts.map(p => p.sku) || []);
+  }, [duplicateProductsData]);
+
   const hasActiveFilters = categoryFilter !== "all" || kitFilter !== "either" || showUncategorizedOnly;
   const shouldQuery = (showViewEditDialog && !!selectedCollectionId) || debouncedSearch.length >= 2 || hasActiveFilters;
 
@@ -1177,7 +1181,14 @@ export default function Collections() {
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <Package className="h-4 w-4 text-[#6B8E23] shrink-0" />
                             <div className="min-w-0">
-                              <span className="font-mono text-xs font-semibold">{mapping.sku}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-xs font-semibold">{mapping.sku}</span>
+                                {duplicatedSkusSet.has(mapping.sku) && (
+                                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0" data-testid={`badge-duplicated-${mapping.sku}`}>
+                                    Duplicated
+                                  </Badge>
+                                )}
+                              </div>
                               {mapping.product?.productTitle && (
                                 <p className="text-xs text-muted-foreground truncate">
                                   {mapping.product.productTitle}
