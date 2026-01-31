@@ -373,22 +373,48 @@ export default function Collections() {
 
   const addProductsMutation = useMutation({
     mutationFn: async ({ collectionId, skus }: { collectionId: string; skus: string[] }) => {
-      const res = await apiRequest("POST", `/api/collections/${collectionId}/products`, { skus });
-      return res.json();
+      const res = await fetch(`/api/collections/${collectionId}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ skus }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const error = new Error(data.error || "Failed to add products") as Error & {
+          code?: string;
+          conflicts?: Array<{ sku: string; collectionId: string; collectionName: string }>;
+        };
+        if (data.code) error.code = data.code;
+        if (data.conflicts) error.conflicts = data.conflicts;
+        throw error;
+      }
+      return data;
     },
     onSuccess: () => {
       toast({ title: "Products added to collection" });
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections", selectedCollectionId, "products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections/assigned-skus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/validation/duplicate-products"] });
       setSelectedSkus(new Set());
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to add products",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error & { code?: string; conflicts?: Array<{ sku: string; collectionId: string; collectionName: string }> }) => {
+      if (error.code === "PRODUCTS_ALREADY_ASSIGNED" && error.conflicts) {
+        const uniqueCollections = [...new Set(error.conflicts.map(c => c.collectionName))];
+        const conflictSkus = [...new Set(error.conflicts.map(c => c.sku))];
+        toast({
+          title: "Products already in other collections",
+          description: `${conflictSkus.length} product(s) already assigned to: ${uniqueCollections.join(", ")}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to add products",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -402,6 +428,7 @@ export default function Collections() {
       queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections", selectedCollectionId, "products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/collections/assigned-skus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections/validation/duplicate-products"] });
     },
     onError: (error: Error) => {
       toast({
