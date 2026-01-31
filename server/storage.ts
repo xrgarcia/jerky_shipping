@@ -3724,21 +3724,25 @@ export class DatabaseStorage implements IStorage {
       const searchLower = search.toLowerCase().trim();
       const searchPattern = `%${searchLower}%`;
       
-      // Find collections containing products that match the search
-      // Use COALESCE to handle null columns from leftJoin safely
-      const matchingCollectionIds = await db
+      // Find collections containing products that match the search by SKU
+      const skuMatches = await db
         .selectDistinct({ collectionId: productCollectionMappings.productCollectionId })
         .from(productCollectionMappings)
-        .leftJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
-        .where(
-          or(
-            ilike(productCollectionMappings.sku, searchPattern),
-            sql`COALESCE(${skuvaultProducts.productTitle}, '') ILIKE ${searchPattern}`,
-            sql`COALESCE(${skuvaultProducts.upc}, '') ILIKE ${searchPattern}`
-          )
-        );
+        .where(ilike(productCollectionMappings.sku, searchPattern));
       
-      const matchingIds = new Set(matchingCollectionIds.map(r => r.collectionId));
+      // Find collections containing products that match by title or UPC
+      const productMatches = await db.execute(sql`
+        SELECT DISTINCT pcm.product_collection_id as "collectionId"
+        FROM product_collection_mappings pcm
+        LEFT JOIN skuvault_products sp ON pcm.sku = sp.sku
+        WHERE sp.product_title ILIKE ${searchPattern}
+           OR sp.upc ILIKE ${searchPattern}
+      `);
+      
+      const matchingIds = new Set([
+        ...skuMatches.map(r => r.collectionId),
+        ...(productMatches.rows as Array<{collectionId: string}>).map(r => r.collectionId)
+      ]);
       
       // Filter collections by name/description OR by containing matching products
       result = result.filter(c => 
