@@ -3730,13 +3730,13 @@ export class DatabaseStorage implements IStorage {
         .from(productCollectionMappings)
         .where(ilike(productCollectionMappings.sku, searchPattern));
       
-      // Find collections containing products that match by title or UPC
+      // Find collections containing products that match by title or barcode
       const productMatches = await db.execute(sql`
         SELECT DISTINCT pcm.product_collection_id as "collectionId"
         FROM product_collection_mappings pcm
         LEFT JOIN skuvault_products sp ON pcm.sku = sp.sku
         WHERE sp.product_title ILIKE ${searchPattern}
-           OR sp.upc ILIKE ${searchPattern}
+           OR sp.barcode ILIKE ${searchPattern}
       `);
       
       const matchingIds = new Set([
