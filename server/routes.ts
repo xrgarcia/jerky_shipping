@@ -10752,6 +10752,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json({ mappings, added: mappings.length, shipmentsInvalidated: invalidationResult.shipmentsInvalidated });
     } catch (error: any) {
+      // Handle products already assigned to other collections
+      if (error.code === 'PRODUCTS_ALREADY_ASSIGNED') {
+        console.log(`[Collections] Rejected adding products - ${error.conflicts.length} already assigned to other collections`);
+        return res.status(409).json({
+          error: "Products already assigned to other collections",
+          code: "PRODUCTS_ALREADY_ASSIGNED",
+          conflicts: error.conflicts,
+        });
+      }
       console.error("[Collections] Error adding products to collection:", error);
       res.status(500).json({ error: "Failed to add products to collection" });
     }

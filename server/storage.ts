@@ -3783,8 +3783,37 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(productCollectionMappings.sku));
   }
 
-  async addProductsToCollection(collectionId: string, skus: string[], userId: string): Promise<ProductCollectionMapping[]> {
+  async addProductsToCollection(
+    collectionId: string, 
+    skus: string[], 
+    userId: string,
+    options: { skipConflictCheck?: boolean } = {}
+  ): Promise<ProductCollectionMapping[]> {
     if (skus.length === 0) return [];
+    
+    // Check for products already in OTHER collections (unless skipped for bulk import with override)
+    if (!options.skipConflictCheck) {
+      const existingMappings = await this.getSkuCollectionMappings(skus);
+      const conflictsInOtherCollections = existingMappings.filter(
+        m => m.collectionId !== collectionId
+      );
+      
+      if (conflictsInOtherCollections.length > 0) {
+        const conflictDetails = conflictsInOtherCollections.map(c => ({
+          sku: c.sku,
+          collectionId: c.collectionId,
+          collectionName: c.collectionName,
+        }));
+        
+        const error = new Error('Products already assigned to other collections') as Error & { 
+          code: string; 
+          conflicts: typeof conflictDetails;
+        };
+        error.code = 'PRODUCTS_ALREADY_ASSIGNED';
+        error.conflicts = conflictDetails;
+        throw error;
+      }
+    }
     
     const values = skus.map(sku => ({
       productCollectionId: collectionId,
