@@ -1205,3 +1205,58 @@ export async function getRatesEstimate(shipmentDetails: any): Promise<ApiRespons
 
   return { data: rates, rateLimit };
 }
+
+/**
+ * ShipStation Package from /v2/packages endpoint
+ */
+export interface ShipStationPackage {
+  package_id: string;
+  package_code: string;
+  name: string;
+  dimensions: {
+    unit: string;
+    length: number;
+    width: number;
+    height: number;
+  };
+  description: string | null;
+}
+
+/**
+ * Get all custom packages from ShipStation
+ * Uses GET /v2/packages endpoint
+ */
+export async function getPackages(): Promise<ApiResponseWithRateLimit<ShipStationPackage[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/packages`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const rateLimit = extractRateLimitInfo(response.headers);
+
+  if (response.status === 429) {
+    const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    console.log(`[ShipStation] Rate limited (429) for packages, waiting ${retryAfter}s before retry...`);
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+    return getPackages();
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation packages API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const packages = data.packages || [];
+
+  return { data: packages, rateLimit };
+}

@@ -1347,6 +1347,7 @@ export type SlashbinOrderItem = typeof slashbinOrderItems.$inferSelect;
 // Seeded from historical shipment_packages data
 export const packagingTypes = pgTable("packaging_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packageId: text("package_id").unique(), // ShipStation unique identifier (e.g., "se-154479") - prevents duplicate imports
   name: text("name").notNull().unique(), // e.g., "Box #2 (13 x 13 x 13)", "Poly Bag 16x18"
   packageCode: text("package_code"), // ShipStation package code
   dimensionLength: text("dimension_length"),
@@ -1358,6 +1359,7 @@ export const packagingTypes = pgTable("packaging_types", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
+  packageIdIdx: index("packaging_types_package_id_idx").on(table.packageId),
   nameIdx: index("packaging_types_name_idx").on(table.name),
   stationTypeIdx: index("packaging_types_station_type_idx").on(table.stationType),
 }));
