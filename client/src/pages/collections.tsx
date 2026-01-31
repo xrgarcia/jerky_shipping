@@ -188,7 +188,7 @@ export default function Collections() {
     }
   }, [showViewEditDialog, selectedCollectionId]);
 
-  const { data: collectionsData, isLoading: collectionsLoading } = useQuery<CollectionsResponse>({
+  const { data: collectionsData, isLoading: collectionsLoading, isFetching: collectionsFetching } = useQuery<CollectionsResponse>({
     queryKey: ["/api/collections", { search: debouncedTableSearch || undefined }],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -200,6 +200,7 @@ export default function Collections() {
       if (!res.ok) throw new Error("Failed to fetch collections");
       return res.json();
     },
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: collectionProductsData, isLoading: collectionProductsLoading, refetch: refetchProducts } = useQuery<CollectionProductsResponse>({
