@@ -9,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -50,7 +52,8 @@ import {
   FileSpreadsheet,
   Eye,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  AlertCircle
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -99,6 +102,18 @@ interface AssignedSkusResponse {
   assignedSkus: string[];
 }
 
+interface DuplicateProduct {
+  sku: string;
+  productTitle: string | null;
+  collectionCount: number;
+  collections: { collectionId: string; collectionName: string }[];
+}
+
+interface DuplicateProductsResponse {
+  duplicateProducts: DuplicateProduct[];
+  totalCount: number;
+}
+
 export default function Collections() {
   const { toast } = useToast();
   
@@ -136,6 +151,10 @@ export default function Collections() {
   const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [tableSearch, setTableSearch] = useState("");
+  
+  const [activeTab, setActiveTab] = useState("manage");
+  const [showDuplicateProductsModal, setShowDuplicateProductsModal] = useState(false);
+  const [collectionFilterFromValidation, setCollectionFilterFromValidation] = useState<string | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -185,6 +204,11 @@ export default function Collections() {
     staleTime: 30 * 1000,
   });
 
+  const { data: duplicateProductsData, isLoading: duplicateProductsLoading } = useQuery<DuplicateProductsResponse>({
+    queryKey: ["/api/collections/validation/duplicate-products"],
+    staleTime: 60 * 1000,
+  });
+
   const assignedSkusGlobal = useMemo(() => {
     return new Set(assignedSkusData?.assignedSkus || []);
   }, [assignedSkusData]);
@@ -225,7 +249,10 @@ export default function Collections() {
   const filteredCollections = useMemo(() => {
     let result = [...collections];
     
-    if (tableSearch.trim()) {
+    // If we have a filter from validation tab (clicking a collection name)
+    if (collectionFilterFromValidation) {
+      result = result.filter(c => c.id === collectionFilterFromValidation);
+    } else if (tableSearch.trim()) {
       const search = tableSearch.toLowerCase();
       result = result.filter(c => 
         c.name.toLowerCase().includes(search) ||
@@ -238,7 +265,7 @@ export default function Collections() {
     result.sort((a, b) => a.name.localeCompare(b.name));
     
     return result;
-  }, [collections, tableSearch]);
+  }, [collections, tableSearch, collectionFilterFromValidation]);
   
   const catalogProducts = useMemo(() => {
     const products = catalogData?.products || [];
@@ -548,6 +575,17 @@ export default function Collections() {
     });
   };
 
+  const handleCollectionClickFromValidation = (collectionId: string) => {
+    setShowDuplicateProductsModal(false);
+    setCollectionFilterFromValidation(collectionId);
+    setTableSearch("");
+    setActiveTab("manage");
+  };
+
+  const clearValidationFilter = () => {
+    setCollectionFilterFromValidation(null);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Page Header */}
@@ -608,19 +646,60 @@ export default function Collections() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search collections by name, description, or category..."
-          value={tableSearch}
-          onChange={(e) => setTableSearch(e.target.value)}
-          className="pl-9 max-w-md"
-          data-testid="input-table-search"
-        />
-      </div>
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        if (val !== "manage") {
+          clearValidationFilter();
+        }
+      }} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="manage" data-testid="tab-manage-collections">Manage Collections</TabsTrigger>
+          <TabsTrigger value="validation" data-testid="tab-validation" className="gap-1">
+            Validation
+            {duplicateProductsData && duplicateProductsData.totalCount > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5">
+                {duplicateProductsData.totalCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Collections Table */}
+        <TabsContent value="manage" className="space-y-4">
+          {/* Filter indicator when coming from validation */}
+          {collectionFilterFromValidation && (
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border">
+              <span className="text-sm text-muted-foreground">Filtered to collection:</span>
+              <Badge variant="secondary">
+                {collections.find(c => c.id === collectionFilterFromValidation)?.name || "Unknown"}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearValidationFilter}
+                className="h-6 px-2 text-xs"
+                data-testid="button-clear-validation-filter"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear filter
+              </Button>
+            </div>
+          )}
+
+          {/* Search Bar */}
+          {!collectionFilterFromValidation && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search collections by name, description, or category..."
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                className="pl-9 max-w-md"
+                data-testid="input-table-search"
+              />
+            </div>
+          )}
+
+          {/* Collections Table */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -730,7 +809,146 @@ export default function Collections() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
+        </TabsContent>
+
+        <TabsContent value="validation" className="space-y-6">
+          {/* Duplicate Products Metric Card */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card 
+              className={`cursor-pointer transition-colors ${
+                duplicateProductsData && duplicateProductsData.totalCount > 0 
+                  ? "border-destructive/50 bg-destructive/5 hover:bg-destructive/10" 
+                  : "hover:bg-muted/50"
+              }`}
+              onClick={() => {
+                if (duplicateProductsData && duplicateProductsData.totalCount > 0) {
+                  setShowDuplicateProductsModal(true);
+                }
+              }}
+              data-testid="card-duplicate-products"
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-full ${
+                    duplicateProductsData && duplicateProductsData.totalCount > 0 
+                      ? "bg-destructive/20" 
+                      : "bg-muted"
+                  }`}>
+                    <AlertCircle className={`h-6 w-6 ${
+                      duplicateProductsData && duplicateProductsData.totalCount > 0 
+                        ? "text-destructive" 
+                        : "text-muted-foreground"
+                    }`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Products in Multiple Collections</p>
+                    <div className="flex items-center gap-2">
+                      {duplicateProductsLoading ? (
+                        <Skeleton className="h-8 w-12" />
+                      ) : (
+                        <p className={`text-3xl font-bold ${
+                          duplicateProductsData && duplicateProductsData.totalCount > 0 
+                            ? "text-destructive" 
+                            : ""
+                        }`}>
+                          {duplicateProductsData?.totalCount ?? 0}
+                        </p>
+                      )}
+                      {duplicateProductsData && duplicateProductsData.totalCount > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          Error
+                        </Badge>
+                      )}
+                    </div>
+                    {duplicateProductsData && duplicateProductsData.totalCount > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Click to view details
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Info section */}
+          {duplicateProductsData && duplicateProductsData.totalCount === 0 && (
+            <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+              <Check className="h-5 w-5 text-green-600" />
+              <span className="text-sm text-green-800 dark:text-green-200">
+                All products are assigned to exactly one geometry collection.
+              </span>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Duplicate Products Modal */}
+      <Dialog open={showDuplicateProductsModal} onOpenChange={setShowDuplicateProductsModal}>
+        <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-serif flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Products in Multiple Collections
+            </DialogTitle>
+            <DialogDescription>
+              These products appear in more than one geometry collection. Click a collection name to view it.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[150px]">SKU</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="w-[80px] text-center">Count</TableHead>
+                  <TableHead>Collections</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {duplicateProductsData?.duplicateProducts.map((product) => (
+                  <TableRow key={product.sku} data-testid={`duplicate-product-${product.sku}`}>
+                    <TableCell className="font-mono text-xs font-medium">
+                      {product.sku}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">
+                      {product.productTitle || "—"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="destructive">{product.collectionCount}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {product.collections.map((col) => (
+                          <Badge 
+                            key={col.collectionId}
+                            variant="outline" 
+                            className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-xs"
+                            onClick={() => handleCollectionClickFromValidation(col.collectionId)}
+                            data-testid={`badge-collection-${col.collectionId}`}
+                          >
+                            {col.collectionName}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+          <DialogFooter className="border-t pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowDuplicateProductsModal(false)}
+              data-testid="button-close-duplicates-modal"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Collection Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

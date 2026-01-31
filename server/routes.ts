@@ -11935,6 +11935,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get products that appear in more than one geometry collection (validation)
+  app.get("/api/collections/validation/duplicate-products", requireAuth, async (req, res) => {
+    try {
+      const { productCollectionMappings, productCollections, skuvaultProducts } = await import("@shared/schema");
+      
+      // Find SKUs that appear in multiple collections
+      const duplicateSkus = await db
+        .select({
+          sku: productCollectionMappings.sku,
+          collectionCount: count(productCollectionMappings.productCollectionId).as('collection_count'),
+        })
+        .from(productCollectionMappings)
+        .groupBy(productCollectionMappings.sku)
+        .having(sql`count(${productCollectionMappings.productCollectionId}) > 1`);
+      
+      if (duplicateSkus.length === 0) {
+        return res.json({ duplicateProducts: [], totalCount: 0 });
+      }
+      
+      const skuList = duplicateSkus.map(d => d.sku);
+      
+      // Get collection details for each duplicate SKU
+      const mappingsWithCollections = await db
+        .select({
+          sku: productCollectionMappings.sku,
+          collectionId: productCollections.id,
+          collectionName: productCollections.name,
+        })
+        .from(productCollectionMappings)
+        .innerJoin(productCollections, eq(productCollectionMappings.productCollectionId, productCollections.id))
+        .where(inArray(productCollectionMappings.sku, skuList));
+      
+      // Get product details from skuvault_products
+      const productDetails = await db
+        .select({
+          sku: skuvaultProducts.sku,
+          productTitle: skuvaultProducts.productTitle,
+        })
+        .from(skuvaultProducts)
+        .where(inArray(skuvaultProducts.sku, skuList));
+      
+      const productTitleMap = new Map(productDetails.map(p => [p.sku, p.productTitle]));
+      
+      // Group by SKU
+      const skuCollectionsMap = new Map<string, { collectionId: string; collectionName: string }[]>();
+      for (const mapping of mappingsWithCollections) {
+        if (!skuCollectionsMap.has(mapping.sku)) {
+          skuCollectionsMap.set(mapping.sku, []);
+        }
+        skuCollectionsMap.get(mapping.sku)!.push({
+          collectionId: mapping.collectionId,
+          collectionName: mapping.collectionName,
+        });
+      }
+      
+      // Build response with SKU, product title, and collections
+      const duplicateProducts = skuList.map(sku => ({
+        sku,
+        productTitle: productTitleMap.get(sku) || null,
+        collectionCount: skuCollectionsMap.get(sku)?.length || 0,
+        collections: skuCollectionsMap.get(sku) || [],
+      }));
+      
+      // Sort by collection count (highest first), then by SKU
+      duplicateProducts.sort((a, b) => {
+        if (b.collectionCount !== a.collectionCount) {
+          return b.collectionCount - a.collectionCount;
+        }
+        return a.sku.localeCompare(b.sku);
+      });
+      
+      res.json({
+        duplicateProducts,
+        totalCount: duplicateProducts.length,
+      });
+    } catch (error: any) {
+      console.error("[Collections] Error fetching duplicate products:", error);
+      res.status(500).json({ error: "Failed to fetch duplicate products" });
+    }
+  });
+
   // Quick-assign a product to a collection and recalculate fingerprints
   // Uses product_collection_mappings as source of truth - no need to update QC items
   // NOTE: Both /assign and /categorize endpoints do the same thing - /categorize is the frontend-facing name
