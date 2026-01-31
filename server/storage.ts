@@ -3722,16 +3722,17 @@ export class DatabaseStorage implements IStorage {
     
     if (search && search.trim()) {
       const searchLower = search.toLowerCase().trim();
+      const searchPattern = `%${searchLower}%`;
       
       const matchingCollectionIds = await db
         .selectDistinct({ collectionId: productCollectionMappings.productCollectionId })
         .from(productCollectionMappings)
-        .leftJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
+        .innerJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
         .where(
           or(
-            ilike(productCollectionMappings.sku, `%${searchLower}%`),
-            ilike(skuvaultProducts.productTitle, `%${searchLower}%`),
-            ilike(skuvaultProducts.upc, `%${searchLower}%`)
+            sql`LOWER(${productCollectionMappings.sku}) LIKE ${searchPattern}`,
+            sql`LOWER(${skuvaultProducts.productTitle}) LIKE ${searchPattern}`,
+            sql`LOWER(${skuvaultProducts.upc}) LIKE ${searchPattern}`
           )
         );
       
