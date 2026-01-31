@@ -10568,9 +10568,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all collections with product counts
+  // Supports optional ?search= query param to filter by collection name, description, category, or product SKU/name/barcode
   app.get("/api/collections", requireAuth, async (req, res) => {
     try {
-      const collections = await storage.getProductCollections();
+      const search = req.query.search as string | undefined;
+      const collections = await storage.getProductCollections(search);
       res.json({ collections });
     } catch (error: any) {
       console.error("[Collections] Error fetching collections:", error);

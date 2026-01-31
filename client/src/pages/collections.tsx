@@ -151,18 +151,27 @@ export default function Collections() {
   const [showUncategorizedOnly, setShowUncategorizedOnly] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [tableSearch, setTableSearch] = useState("");
+  const [debouncedTableSearch, setDebouncedTableSearch] = useState("");
   
   const [activeTab, setActiveTab] = useState("manage");
   const [showDuplicateProductsModal, setShowDuplicateProductsModal] = useState(false);
   const [collectionFilterFromValidation, setCollectionFilterFromValidation] = useState<string | null>(null);
 
-  // Debounce search input
+  // Debounce search input for product search in modal
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(productSearch);
     }, 300);
     return () => clearTimeout(timer);
   }, [productSearch]);
+
+  // Debounce search input for table search (collections list)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTableSearch(tableSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [tableSearch]);
 
   // Clear selected SKUs when filters change
   useEffect(() => {
@@ -180,7 +189,17 @@ export default function Collections() {
   }, [showViewEditDialog, selectedCollectionId]);
 
   const { data: collectionsData, isLoading: collectionsLoading } = useQuery<CollectionsResponse>({
-    queryKey: ["/api/collections"],
+    queryKey: ["/api/collections", { search: debouncedTableSearch || undefined }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedTableSearch) {
+        params.set("search", debouncedTableSearch);
+      }
+      const url = `/api/collections${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch collections");
+      return res.json();
+    },
   });
 
   const { data: collectionProductsData, isLoading: collectionProductsLoading, refetch: refetchProducts } = useQuery<CollectionProductsResponse>({
@@ -250,26 +269,20 @@ export default function Collections() {
   const collectionProducts = collectionProductsData?.mappings || [];
   
   // Filter and sort collections by name
+  // Note: Search filtering is now done server-side via debouncedTableSearch in the API query
   const filteredCollections = useMemo(() => {
     let result = [...collections];
     
     // If we have a filter from validation tab (clicking a collection name)
     if (collectionFilterFromValidation) {
       result = result.filter(c => c.id === collectionFilterFromValidation);
-    } else if (tableSearch.trim()) {
-      const search = tableSearch.toLowerCase();
-      result = result.filter(c => 
-        c.name.toLowerCase().includes(search) ||
-        (c.description?.toLowerCase().includes(search)) ||
-        (c.productCategory?.toLowerCase().includes(search))
-      );
     }
     
     // Always sort alphabetically by name
     result.sort((a, b) => a.name.localeCompare(b.name));
     
     return result;
-  }, [collections, tableSearch, collectionFilterFromValidation]);
+  }, [collections, collectionFilterFromValidation]);
   
   const catalogProducts = useMemo(() => {
     const products = catalogData?.products || [];
@@ -721,7 +734,7 @@ export default function Collections() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search collections by name, description, or category..."
+                placeholder="Search by collection name, product SKU, title, or barcode..."
                 value={tableSearch}
                 onChange={(e) => setTableSearch(e.target.value)}
                 className="pl-9 max-w-md"

@@ -3701,8 +3701,8 @@ export class DatabaseStorage implements IStorage {
   // PRODUCT COLLECTIONS (Smart Shipping Engine)
   // ============================================================================
 
-  async getProductCollections(): Promise<(ProductCollection & { productCount: number })[]> {
-    const collections = await db.select().from(productCollections).orderBy(asc(productCollections.name));
+  async getProductCollections(search?: string): Promise<(ProductCollection & { productCount: number })[]> {
+    let collections = await db.select().from(productCollections).orderBy(asc(productCollections.name));
     
     const countsResult = await db
       .select({
@@ -3714,10 +3714,37 @@ export class DatabaseStorage implements IStorage {
     
     const countsMap = new Map(countsResult.map(r => [r.productCollectionId, Number(r.count)]));
     
-    return collections.map(c => ({
+    let result = collections.map(c => ({
       ...c,
       productCount: countsMap.get(c.id) || 0,
     }));
+    
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      
+      const matchingCollectionIds = await db
+        .selectDistinct({ collectionId: productCollectionMappings.productCollectionId })
+        .from(productCollectionMappings)
+        .leftJoin(skuvaultProducts, eq(productCollectionMappings.sku, skuvaultProducts.sku))
+        .where(
+          or(
+            ilike(productCollectionMappings.sku, `%${searchLower}%`),
+            ilike(skuvaultProducts.productTitle, `%${searchLower}%`),
+            ilike(skuvaultProducts.upc, `%${searchLower}%`)
+          )
+        );
+      
+      const matchingIds = new Set(matchingCollectionIds.map(r => r.collectionId));
+      
+      result = result.filter(c => 
+        c.name.toLowerCase().includes(searchLower) ||
+        c.description?.toLowerCase().includes(searchLower) ||
+        c.productCategory?.toLowerCase().includes(searchLower) ||
+        matchingIds.has(c.id)
+      );
+    }
+    
+    return result;
   }
 
   async getProductCollection(id: string): Promise<ProductCollection | undefined> {
