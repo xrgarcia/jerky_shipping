@@ -1,0 +1,256 @@
+{
+    "packages": [
+        {
+            "package_id": "se-154479",
+            "package_code": "package",
+            "name": "**DO NOT SHIP (ALERT MGR)**",
+            "dimensions": {
+                "unit": "inch",
+                "length": 1.00,
+                "width": 1.00,
+                "height": 1.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-160557",
+            "package_code": "package",
+            "name": "**WEIGH PACKAGE & TAKE PIC **",
+            "dimensions": {
+                "unit": "inch",
+                "length": 1.00,
+                "width": 1.00,
+                "height": 1.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-154037",
+            "package_code": "package",
+            "name": "07 Box",
+            "dimensions": {
+                "unit": "inch",
+                "length": 12.00,
+                "width": 12.00,
+                "height": 8.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-170082",
+            "package_code": "package",
+            "name": "Box # 8 (12x12x9)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 12.00,
+                "width": 12.00,
+                "height": 9.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-153789",
+            "package_code": "package",
+            "name": "Box #1 (12 x 12 x 8)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 12.00,
+                "width": 12.00,
+                "height": 8.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-153790",
+            "package_code": "package",
+            "name": "Box #2 (13 x 13 x 13)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 13.00,
+                "width": 13.00,
+                "height": 13.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-153791",
+            "package_code": "package",
+            "name": "Box #3 (16 x 16 x 16)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 16.00,
+                "width": 16.00,
+                "height": 16.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-156032",
+            "package_code": "package",
+            "name": "Box #4 (20 x 12 x 4)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 20.00,
+                "width": 12.00,
+                "height": 4.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-163514",
+            "package_code": "package",
+            "name": "Box #5 (8 x 8 x 8)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 8.00,
+                "width": 8.00,
+                "height": 8.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-164232",
+            "package_code": "package",
+            "name": "Box #6 (16 x 13 x 13)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 16.00,
+                "width": 13.00,
+                "height": 13.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-165828",
+            "package_code": "package",
+            "name": "Box #7 (24 x 6 x 6)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 24.00,
+                "width": 6.00,
+                "height": 6.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-170455",
+            "package_code": "package",
+            "name": "Box #9 (16 x 10 x 6)",
+            "dimensions": {
+                "unit": "inch",
+                "length": 16.00,
+                "width": 10.00,
+                "height": 6.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-159392",
+            "package_code": "package",
+            "name": "Brown Box",
+            "dimensions": {
+                "unit": "inch",
+                "length": 10.50,
+                "width": 12.50,
+                "height": 3.20
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-154985",
+            "package_code": "package",
+            "name": "Jerky.com Box",
+            "dimensions": {
+                "unit": "inch",
+                "length": 8.00,
+                "width": 8.00,
+                "height": 8.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-154036",
+            "package_code": "package",
+            "name": "Large Jerky.com Envelope",
+            "dimensions": {
+                "unit": "inch",
+                "length": 15.00,
+                "width": 12.00,
+                "height": 3.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-154035",
+            "package_code": "package",
+            "name": "Poly Bag",
+            "dimensions": {
+                "unit": "inch",
+                "length": 8.00,
+                "width": 6.00,
+                "height": 0.75
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-168574",
+            "package_code": "package",
+            "name": "Poly Bagger",
+            "dimensions": {
+                "unit": "inch",
+                "length": 18.00,
+                "width": 13.00,
+                "height": 3.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-157956",
+            "package_code": "package",
+            "name": "Rate A",
+            "dimensions": {
+                "unit": "inch",
+                "length": 10.00,
+                "width": 7.00,
+                "height": 5.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-158866",
+            "package_code": "package",
+            "name": "Shoe box",
+            "dimensions": {
+                "unit": "inch",
+                "length": 14.75,
+                "width": 7.25,
+                "height": 5.25
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-154709",
+            "package_code": "package",
+            "name": "Small Jerky.com Envelope",
+            "dimensions": {
+                "unit": "inch",
+                "length": 6.00,
+                "width": 6.00,
+                "height": 6.00
+            },
+            "description": null
+        },
+        {
+            "package_id": "se-164586",
+            "package_code": "package",
+            "name": "STORE TRANSFER",
+            "dimensions": {
+                "unit": "inch",
+                "length": 16.00,
+                "width": 16.00,
+                "height": 16.00
+            },
+            "description": null
+        }
+    ]
+}
