@@ -97,6 +97,7 @@ import {
   type LifecycleRepairJob,
   type InsertLifecycleRepairJob,
   lifecycleRepairJobs,
+  skuvaultProducts,
 } from "@shared/schema";
 
 export interface OrderFilters {
