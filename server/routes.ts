@@ -13178,18 +13178,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all packaging types for dropdown or management
   app.get("/api/packaging-types", requireAuth, async (req, res) => {
     try {
-      const { packagingTypes } = await import("@shared/schema");
+      const { packagingTypes, shipments } = await import("@shared/schema");
       const includeInactive = req.query.includeInactive === 'true';
       
-      let query = db.select().from(packagingTypes);
+      // Get packaging types with fingerprint counts
+      const typesWithCounts = await db
+        .select({
+          id: packagingTypes.id,
+          name: packagingTypes.name,
+          packageCode: packagingTypes.packageCode,
+          packageId: packagingTypes.packageId,
+          stationType: packagingTypes.stationType,
+          dimensionLength: packagingTypes.dimensionLength,
+          dimensionWidth: packagingTypes.dimensionWidth,
+          dimensionHeight: packagingTypes.dimensionHeight,
+          isActive: packagingTypes.isActive,
+          fingerprintCount: sql<number>`COUNT(${shipments.id})::int`,
+        })
+        .from(packagingTypes)
+        .leftJoin(shipments, eq(shipments.packagingTypeId, packagingTypes.id))
+        .where(includeInactive ? undefined : eq(packagingTypes.isActive, true))
+        .groupBy(packagingTypes.id)
+        .orderBy(packagingTypes.name);
       
-      if (!includeInactive) {
-        query = query.where(eq(packagingTypes.isActive, true)) as typeof query;
-      }
-      
-      const types = await query.orderBy(packagingTypes.name);
-      
-      res.json({ packagingTypes: types });
+      res.json({ packagingTypes: typesWithCounts });
     } catch (error: any) {
       console.error("[Packaging Types] Error fetching:", error);
       res.status(500).json({ error: "Failed to fetch packaging types" });

@@ -44,8 +44,12 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PackagingType } from "@shared/schema";
 
+interface PackagingTypeWithCount extends PackagingType {
+  fingerprintCount: number;
+}
+
 interface PackagingTypesResponse {
-  packagingTypes: PackagingType[];
+  packagingTypes: PackagingTypeWithCount[];
 }
 
 const STATION_TYPES = [
@@ -70,7 +74,7 @@ function StationBadge({ stationType }: { stationType: string | null }) {
 
 export default function PackagingTypes() {
   const { toast } = useToast();
-  const [editingType, setEditingType] = useState<PackagingType | null>(null);
+  const [editingType, setEditingType] = useState<PackagingTypeWithCount | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -126,7 +130,7 @@ export default function PackagingTypes() {
     });
   };
 
-  const openEditDialog = (type: PackagingType) => {
+  const openEditDialog = (type: PackagingTypeWithCount) => {
     setEditingType(type);
     setFormData({
       name: type.name,
@@ -352,6 +356,15 @@ export default function PackagingTypes() {
               Update the packaging type details
             </DialogDescription>
           </DialogHeader>
+
+          {editingType && editingType.fingerprintCount > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg" data-testid="fingerprint-count-info">
+              <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{editingType.fingerprintCount.toLocaleString()}</span> shipments use this packaging type
+              </span>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div className="space-y-2">
