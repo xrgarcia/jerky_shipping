@@ -277,6 +277,10 @@ async function initializeAfterListen(storage: any) {
     const { startSkuvaultProductsSyncWorker } = await import("./skuvault-products-sync-worker");
     startSkuvaultProductsSyncWorker(3600000); // Sync products every 1 hour
     
+    // Start Packaging Types sync worker (syncs package types from ShipStation hourly)
+    const { startPackagingTypesSyncWorker } = await import("./packaging-types-sync-worker");
+    startPackagingTypesSyncWorker(3600000); // Sync packaging types every 1 hour
+    
     // Start kit component mappings sync worker (syncs kit mappings from reporting DB hourly)
     const { syncKitMappingsFromGcp } = await import("./services/kit-mappings-cache");
     await syncKitMappingsFromGcp(); // Initial sync on startup
