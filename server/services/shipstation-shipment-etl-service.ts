@@ -181,7 +181,7 @@ export class ShipStationShipmentETLService {
     
     // Queue lifecycle evaluation for async processing
     // This enables side effects (like auto rate check) to be triggered reliably
-    await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber);
+    await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
     
     return { id: finalShipmentId };
   }

@@ -5058,6 +5058,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('[queue-stats] Error getting unified sync worker status:', error.message);
       }
 
+      // Get lifecycle event worker status
+      let lifecycleEventWorkerStatus = undefined;
+      try {
+        const { getLifecycleWorkerStatus } = await import("./lifecycle-event-worker");
+        lifecycleEventWorkerStatus = await getLifecycleWorkerStatus();
+      } catch (error: any) {
+        console.error('[queue-stats] Error getting lifecycle event worker status:', error.message);
+      }
+
       res.json({
         shopifyQueue: {
           size: shopifyQueueLength,
@@ -5086,6 +5095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firestoreSessionSyncWorkerStatus,
         firestoreSessionSyncWorkerStats,
         unifiedSyncWorker,
+        lifecycleEventWorkerStatus,
       });
     } catch (error) {
       console.error("Error fetching queue stats:", error);

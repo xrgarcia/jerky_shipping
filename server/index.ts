@@ -269,6 +269,10 @@ async function initializeAfterListen(storage: any) {
     const { startLifecycleRepairWorker } = await import("./lifecycle-repair-worker");
     startLifecycleRepairWorker();
     
+    // Start lifecycle event worker (event-driven state machine with side effects)
+    const { startLifecycleWorker } = await import("./lifecycle-event-worker");
+    startLifecycleWorker();
+    
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours
