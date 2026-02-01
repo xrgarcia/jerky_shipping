@@ -141,20 +141,11 @@ export class SmartCarrierRateService {
     const customerMethod = shipment.serviceCode!;
     
     try {
-      console.log(`[SmartCarrierRate] Using package for ${shipmentId}: ${eligibility.weightOz?.toFixed(2)}oz, ${eligibility.packagingName}${eligibility.shipstationPackageId ? ` (${eligibility.shipstationPackageId})` : ''}`);
+      console.log(`[SmartCarrierRate] Using package for ${shipmentId}: ${eligibility.weightOz?.toFixed(2)}oz, ${eligibility.packagingName}`);
       
-      // Use rates estimate API with fingerprint's package dimensions
+      // Use rates estimate API with shipment_id only - ShipStation uses the existing shipment's details
       const rates = await this.fetchRatesEstimate({
         shipmentId,
-        destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
-        destinationPostalCode: shipment.shipToPostalCode!,
-        destinationCity: shipment.shipToCity || undefined,
-        destinationState: shipment.shipToState || undefined,
-        weightOunces: eligibility.weightOz!,
-        lengthInches: eligibility.lengthIn,
-        widthInches: eligibility.widthIn,
-        heightInches: eligibility.heightIn,
-        shipstationPackageId: eligibility.shipstationPackageId,
       });
       const usedFallback = false;
       
@@ -389,15 +380,6 @@ export class SmartCarrierRateService {
    */
   async fetchRatesEstimate(params: {
     shipmentId: string;  // ShipStation shipment ID (e.g., "se-950536244")
-    destinationAddressLine1?: string;
-    destinationPostalCode: string;
-    destinationCity?: string;
-    destinationState?: string;
-    weightOunces: number;
-    lengthInches?: number;
-    widthInches?: number;
-    heightInches?: number;
-    shipstationPackageId?: string;  // ShipStation package type ID (e.g., "se-154479")
   }): Promise<ShipStationRate[]> {
     // Get enabled carrier IDs for rate options
     const carrierIds = await this.getCarrierIds();
@@ -407,22 +389,16 @@ export class SmartCarrierRateService {
       throw new Error('No enabled carriers available for rate estimation');
     }
     
-    console.log(`[SmartCarrierRate] Requesting rates for shipment ${params.shipmentId} with ${carrierIds.length} carriers${params.shipstationPackageId ? `, package_type: ${params.shipstationPackageId}` : ''}`);
+    console.log(`[SmartCarrierRate] Requesting rates for shipment ${params.shipmentId} with ${carrierIds.length} carriers`);
     
-    // Use shipment_id with rate_options - ShipStation uses the existing shipment's details
+    // Use shipment_id with rate_options only - ShipStation uses the existing shipment's details
     // DO NOT include a shipment object - that creates duplicate empty orders
-    // Instead, pass package_types in rate_options to specify which package to rate for
-    const requestBody: any = {
+    const requestBody = {
       shipment_id: params.shipmentId,
       rate_options: {
         carrier_ids: carrierIds,
       },
     };
-    
-    // Add package_types if we have a ShipStation package ID from our fingerprint/packaging mapping
-    if (params.shipstationPackageId) {
-      requestBody.rate_options.package_types = [params.shipstationPackageId];
-    }
     
     const result = await getRatesEstimate(requestBody);
     return result.data;
