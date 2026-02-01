@@ -2312,10 +2312,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new rate analysis job with a preset
   app.post("/api/rate-analysis-jobs", requireAuth, async (req, res) => {
     try {
-      const { preset } = req.body as { preset: '1day' | '7days' | '30days' | '90days' | 'all' };
+      const { preset } = req.body as { preset: '1day' | '7days' | '30days' | '90days' | 'all' | 'eligible' };
       
-      if (!preset || !['1day', '7days', '30days', '90days', 'all'].includes(preset)) {
-        return res.status(400).json({ error: 'Invalid preset. Must be: 1day, 7days, 30days, 90days, or all' });
+      if (!preset || !['1day', '7days', '30days', '90days', 'all', 'eligible'].includes(preset)) {
+        return res.status(400).json({ error: 'Invalid preset. Must be: 1day, 7days, 30days, 90days, all, or eligible' });
       }
       
       // Check if there's already an active job
@@ -2328,12 +2328,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Determine days back from preset
+      // 'eligible' and 'all' both use null (no date filter) - they rely on eligibility criteria only
       const daysBackMap: Record<string, number | null> = {
         '1day': 1,
         '7days': 7,
         '30days': 30,
         '90days': 90,
         'all': null,
+        'eligible': null,
       };
       
       const job = await storage.createRateAnalysisJob({

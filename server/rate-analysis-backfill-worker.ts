@@ -27,14 +27,25 @@ async function isJobCancelled(jobId: string): Promise<boolean> {
 const QUOTEABLE_STATUSES = ['pending', 'on_hold'];
 
 async function getShipmentsForJob(daysBack: number | null): Promise<typeof shipments.$inferSelect[]> {
+  // Core eligibility criteria for rate check:
+  // 1. Has shipmentId, serviceCode, shipToPostalCode (basic requirements)
+  // 2. Has fingerprintId (weight/dimensions assigned)
+  // 3. Has packagingTypeId (packaging type assigned)
+  // 4. Is in a quoteable status (pending or on_hold)
+  // 5. Not already analyzed (no entry in shipmentRateAnalysis)
   const baseConditions = [
     isNotNull(shipments.serviceCode),
     isNotNull(shipments.shipToPostalCode),
     isNotNull(shipments.shipmentId),
+    // Rate check eligibility requires fingerprint and packaging type
+    isNotNull(shipments.fingerprintId),
+    isNotNull(shipments.packagingTypeId),
     // Only include shipments in quoteable states (not shipped, voided, cancelled)
     inArray(shipments.shipmentStatus, QUOTEABLE_STATUSES)
   ];
   
+  // When daysBack is specified, use it as a filter
+  // When null (eligible preset), find ALL eligible shipments regardless of date
   if (daysBack) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);

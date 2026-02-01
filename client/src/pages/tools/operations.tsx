@@ -78,7 +78,7 @@ type BackfillJob = {
 
 type RateAnalysisJob = {
   id: string;
-  preset: '1day' | '7days' | '30days' | '90days' | 'all';
+  preset: '1day' | '7days' | '30days' | '90days' | 'all' | 'eligible';
   daysBack: number | null;
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   shipmentsTotal: number;
@@ -560,6 +560,7 @@ function RateAnalysisJobsCard() {
   });
   
   const presets = [
+    { value: 'eligible', label: 'All Eligible' },
     { value: '1day', label: 'Last 1 Day' },
     { value: '7days', label: 'Last 7 Days' },
     { value: '30days', label: 'Last 30 Days' },
