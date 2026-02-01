@@ -67,6 +67,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
       2. **Session creation** (`firestore-session-sync-worker.ts`): Moves quantities from `pending` → `allocated`, decrements `available_quantity`
       3. **Daily sync** (`skuvault-products-sync-service.ts`): Resets all quantities to fresh SkuVault data (`pending_quantity` and `allocated_quantity` → 0)
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations based on `vw_po_recommendations` from the reporting database.
+- **Shipping Cost Tracking**: Actual carrier costs extracted from ShipStation labels API (`labels[0].shipment_cost.amount`) and stored in `shipments.shipping_cost`. This is what the company pays to carriers for label creation, distinct from customer-paid shipping which is stored in `shopify_orders.shipping_cost`. Enables cost analysis and margin calculations.
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
