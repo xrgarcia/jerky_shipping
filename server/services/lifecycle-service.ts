@@ -5,6 +5,11 @@
  * All event handlers (webhooks, sync workers, internal actions) should
  * call this service to update lifecycle state, ensuring consistent
  * phase transitions across the entire system.
+ * 
+ * EVENT-DRIVEN ARCHITECTURE:
+ * Instead of calling updateShipmentLifecycle() directly, producers should
+ * call queueLifecycleEvaluation() to emit events. The lifecycle worker
+ * consumes these events, runs the state machine, and triggers side effects.
  */
 
 import { db } from "../db";
@@ -17,6 +22,11 @@ import {
   type LifecycleUpdateResult,
   type ShipmentLifecycleData,
 } from "./lifecycle-state-machine";
+import {
+  enqueueLifecycleEvent,
+  enqueueLifecycleEventBatch,
+  type LifecycleEventReason,
+} from "../utils/queue";
 
 /**
  * Update the lifecycle phase for a single shipment
@@ -209,4 +219,64 @@ export async function updateShipmentLifecycleByOrderNumber(
   }
 
   return updateShipmentLifecycleFromData(shipment);
+}
+
+// ============================================================================
+// EVENT-DRIVEN LIFECYCLE FUNCTIONS
+// ============================================================================
+// These functions queue lifecycle events for async processing instead of
+// updating immediately. This enables reliable side-effect triggering.
+// ============================================================================
+
+/**
+ * Queue a lifecycle evaluation for a single shipment
+ * 
+ * This is the preferred way to trigger lifecycle updates. Instead of
+ * calling updateShipmentLifecycle() directly, emit an event that the
+ * lifecycle worker will process asynchronously.
+ * 
+ * @param shipmentId - The shipment UUID (primary key)
+ * @param reason - Why the evaluation is being triggered
+ * @param orderNumber - Optional order number for logging
+ * @param metadata - Optional extra context
+ * @returns true if event was queued, false if already in queue
+ */
+export async function queueLifecycleEvaluation(
+  shipmentId: string,
+  reason: LifecycleEventReason,
+  orderNumber?: string,
+  metadata?: Record<string, any>
+): Promise<boolean> {
+  return enqueueLifecycleEvent({
+    shipmentId,
+    reason,
+    orderNumber,
+    enqueuedAt: Date.now(),
+    metadata,
+  });
+}
+
+/**
+ * Queue lifecycle evaluations for multiple shipments
+ * 
+ * Use this for batch operations like packaging assignment to fingerprints.
+ * Events are deduplicated - if a shipment is already queued, it won't be
+ * added again.
+ * 
+ * @param items - Array of shipment IDs and order numbers
+ * @param reason - Why the evaluations are being triggered
+ * @returns Number of events successfully queued
+ */
+export async function queueLifecycleEvaluationBatch(
+  items: Array<{ shipmentId: string; orderNumber?: string }>,
+  reason: LifecycleEventReason
+): Promise<number> {
+  const now = Date.now();
+  const events = items.map(item => ({
+    shipmentId: item.shipmentId,
+    orderNumber: item.orderNumber,
+    reason,
+    enqueuedAt: now,
+  }));
+  return enqueueLifecycleEventBatch(events);
 }
