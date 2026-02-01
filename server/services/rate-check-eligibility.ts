@@ -24,6 +24,7 @@ export interface PackageDataResult {
   widthIn?: number;
   heightIn?: number;
   packagingName?: string;
+  shipstationPackageId?: string;
 }
 
 /**
@@ -123,6 +124,7 @@ export class RateCheckEligibility {
         eligible: true,
         weightOz,
         packagingName: packaging.name,
+        shipstationPackageId: packaging.packageId || undefined,
       };
 
       if (packaging.dimensionLength && packaging.dimensionWidth && packaging.dimensionHeight) {
