@@ -435,13 +435,15 @@ export class ShipStationShipmentService {
    * - Only updates if existing package is null OR package name is "Package" (generic default)
    * - Only updates if shipment status is "pending" (not yet shipped)
    * 
-   * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462")
-   * @param newPackageCode The new package code to assign (e.g., "package_12345")
-   * @param existingPackageName The current package name on the shipment (for guardrail check)
-   * @param shipmentStatus The current shipment status (for guardrail check)
+   * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462") - used for PUT URL
+   * @param shipmentData The full ShipStation shipment payload - needed because PUT requires the entire object
+   * @param newPackageCode The new package code to assign (e.g., "package_12345") - the value to set on packages[0].package_code
+   * @param existingPackageName The current package name on the shipment - for guardrail: skip if already has a real package
+   * @param shipmentStatus The current shipment status - for guardrail: only update "pending" shipments
    */
   async updateShipmentPackage(
     shipmentId: string,
+    shipmentData: Record<string, any>,
     newPackageCode: string,
     existingPackageName: string | null,
     shipmentStatus: string
@@ -472,7 +474,6 @@ export class ShipStationShipmentService {
         return { success: true, updated: false, reason };
       }
 
-      // Get current shipment data from ShipStation
       const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
       const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
       
@@ -480,32 +481,10 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: 'SHIPSTATION_API_KEY not configured' };
       }
 
-      // Fetch current shipment
-      const getUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
-      console.log(`[ShipmentService] Fetching current shipment data from ${getUrl}`);
-      
-      const getResponse = await fetch(getUrl, {
-        headers: {
-          'api-key': SHIPSTATION_API_KEY,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!getResponse.ok) {
-        const errorText = await getResponse.text();
-        return { success: false, updated: false, error: `Failed to fetch shipment: ${getResponse.status} ${errorText}` };
-      }
-
-      const currentShipment = await getResponse.json();
-      
-      if (!currentShipment || !currentShipment.shipment_id) {
-        return { success: false, updated: false, error: `Shipment ${shipmentId} not found in ShipStation` };
-      }
-
       // Build update payload with new package
-      const updatePayload = {
-        ...currentShipment,
-        packages: currentShipment.packages?.map((pkg: any, index: number) => {
+      const updatePayload: any = {
+        ...shipmentData,
+        packages: shipmentData.packages?.map((pkg: any, index: number) => {
           if (index === 0) {
             return {
               ...pkg,
