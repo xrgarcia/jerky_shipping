@@ -122,19 +122,8 @@ const PAGE_SIZES = [10, 25, 50, 100];
 type SortColumn = "analyzedAt" | "costSavings" | "customerShippingCost" | "smartShippingCost" | "orderDate";
 
 export default function SmartRateCheck() {
-  const getDefaultDates = () => {
-    const today = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    return {
-      from: thirtyDaysAgo.toISOString().split('T')[0],
-      to: today.toISOString().split('T')[0]
-    };
-  };
-  
-  const defaultDates = getDefaultDates();
-  const [orderDateFrom, setOrderDateFrom] = useState(defaultDates.from);
-  const [orderDateTo, setOrderDateTo] = useState(defaultDates.to);
+  const [orderDateFrom, setOrderDateFrom] = useState("");
+  const [orderDateTo, setOrderDateTo] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
   const [lifecyclePhase, setLifecyclePhase] = useState("all");
   const [page, setPage] = useState(1);
@@ -189,16 +178,9 @@ export default function SmartRateCheck() {
     return method.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  const truncateText = (text: string | null, maxLength: number = 60) => {
-    if (!text) return "-";
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  };
-
   const handleReset = () => {
-    const defaults = getDefaultDates();
-    setOrderDateFrom(defaults.from);
-    setOrderDateTo(defaults.to);
+    setOrderDateFrom("");
+    setOrderDateTo("");
     setOrderNumber("");
     setLifecyclePhase("all");
     setSortBy("analyzedAt");
@@ -545,7 +527,7 @@ export default function SmartRateCheck() {
                       <TableHead className="min-w-[100px]">Actual Cost</TableHead>
                       <TableHead className="min-w-[80px]">Destination</TableHead>
                       <TableHead className="min-w-[60px]">Rates</TableHead>
-                      <TableHead className="min-w-[200px]">Comments</TableHead>
+                      <TableHead className="min-w-[40px] w-[40px]"></TableHead>
                       <TableHead
                         className="min-w-[120px] cursor-pointer hover-elevate"
                         onClick={() => handleSort("analyzedAt")}
@@ -631,19 +613,17 @@ export default function SmartRateCheck() {
                           <TableCell data-testid={`text-rates-count-${row.shipmentId}`}>
                             {row.ratesComparedCount ?? "-"}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-center">
                             {row.reasoning ? (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => setExpandedComment(row.shipmentId)}
-                                className="text-left text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 max-w-[200px]"
                                 data-testid={`button-expand-comment-${row.shipmentId}`}
                               >
-                                <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{truncateText(row.reasoning)}</span>
-                              </button>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
+                            ) : null}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground" data-testid={`text-analyzed-at-${row.shipmentId}`}>
                             {format(new Date(row.analyzedAt), "MMM d, h:mm a")}
