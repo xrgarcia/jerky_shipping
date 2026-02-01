@@ -407,8 +407,9 @@ export class SmartCarrierRateService {
     
     console.log(`[SmartCarrierRate] Requesting rates for shipment ${params.shipmentId} with ${carrierIds.length} carriers`);
     
+    // Note: ShipStation requires EITHER shipment_id OR shipment, not both
+    // We use the shipment object to override package details with our fingerprint data
     const requestBody: any = {
-      shipment_id: params.shipmentId,  // Reference existing ShipStation shipment
       shipment: {
         validate_address: 'no_validation',
         ship_from: {
