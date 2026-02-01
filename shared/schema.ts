@@ -351,6 +351,8 @@ export const shipments = pgTable("shipments", {
   // QC completion tracking
   qcCompleted: boolean("qc_completed").default(false), // True when packing QC scan is complete (set on boxing/bagging completion)
   qcCompletedAt: timestamp("qc_completed_at"), // When QC was completed (null = not completed)
+  // Actual shipping cost from ShipStation label
+  shippingCost: numeric("shipping_cost", { precision: 10, scale: 2 }), // Actual cost paid for shipping label (from ShipStation labels API)
   // Smart Shipping Engine fields (Phase 3)
   qcStationId: varchar("qc_station_id"), // FK to stations table - where this order was packed (set during QC)
   fingerprintId: varchar("fingerprint_id"), // FK to fingerprints table - calculated collection composition
