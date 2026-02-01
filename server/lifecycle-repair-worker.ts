@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { shipments, lifecycleRepairJobs } from "@shared/schema";
 import { eq, or, and, ne } from "drizzle-orm";
-import { updateShipmentLifecycleFromData } from "./services/lifecycle-service";
+import { queueLifecycleEvaluation } from "./services/lifecycle-service";
 
 const BATCH_SIZE = 100;
 const POLL_INTERVAL_MS = 10000;
@@ -67,9 +67,8 @@ async function processJob(jobId: string): Promise<void> {
       .set({ shipmentsTotal: total, updatedAt: new Date() })
       .where(eq(lifecycleRepairJobs.id, jobId));
     
-    let repaired = 0;
+    let queued = 0;
     let failed = 0;
-    const phaseChanges: Record<string, number> = {};
     
     for (let i = 0; i < shipmentsToRepair.length; i += BATCH_SIZE) {
       if (await isJobCancelled(jobId)) {
@@ -81,44 +80,38 @@ async function processJob(jobId: string): Promise<void> {
       
       for (const shipment of batch) {
         try {
-          const result = await updateShipmentLifecycleFromData(shipment, { logTransition: false });
-          
-          if (result.changed) {
-            repaired++;
-            const transition = `${result.previousPhase} -> ${result.newPhase}`;
-            phaseChanges[transition] = (phaseChanges[transition] || 0) + 1;
-          }
+          await queueLifecycleEvaluation(shipment.id, 'lifecycle_repair', shipment.orderNumber || undefined);
+          queued++;
         } catch (error: any) {
           failed++;
-          log(`Error repairing shipment ${shipment.id}: ${error.message}`);
+          log(`Error queuing lifecycle evaluation for shipment ${shipment.id}: ${error.message}`);
         }
       }
       
       await db
         .update(lifecycleRepairJobs)
         .set({
-          shipmentsRepaired: repaired,
+          shipmentsRepaired: queued,
           shipmentsFailed: failed,
           updatedAt: new Date(),
         })
         .where(eq(lifecycleRepairJobs.id, jobId));
       
-      log(`Progress: ${i + batch.length}/${total} processed, ${repaired} repaired, ${failed} failed`);
+      log(`Progress: ${i + batch.length}/${total} processed, ${queued} queued for evaluation, ${failed} failed`);
     }
     
     await db
       .update(lifecycleRepairJobs)
       .set({
         status: "completed",
-        shipmentsRepaired: repaired,
+        shipmentsRepaired: queued,
         shipmentsFailed: failed,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(lifecycleRepairJobs.id, jobId));
     
-    log(`Job ${jobId} completed: ${repaired} repaired, ${failed} failed`);
-    log(`Phase transitions: ${JSON.stringify(phaseChanges)}`);
+    log(`Job ${jobId} completed: ${queued} queued for lifecycle evaluation, ${failed} failed`);
     
   } catch (error: any) {
     log(`Error processing job ${jobId}: ${error.message}`);

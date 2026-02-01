@@ -963,12 +963,15 @@ const MAX_LIFECYCLE_RETRIES = 3;
 
 export type LifecycleEventReason = 
   | 'webhook'           // ShipStation webhook triggered update
+  | 'webhook_tracking'  // ShipStation tracking webhook update
   | 'shipment_sync'     // Unified shipment sync worker
   | 'categorization'    // Product categorized
   | 'fingerprint'       // Fingerprint assigned
   | 'packaging'         // Packaging type assigned
   | 'session'           // Added to fulfillment session
   | 'rate_check'        // Rate check completed
+  | 'rate_analysis'     // Smart carrier rate analysis completed
+  | 'lifecycle_repair'  // Lifecycle repair worker batch operation
   | 'manual'            // Manual trigger from UI
   | 'backfill';         // Batch backfill operation
 

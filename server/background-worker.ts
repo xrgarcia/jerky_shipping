@@ -5,7 +5,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { storage } from "./storage";
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from "./websocket";
 import { log } from "./vite";
-import { updateShipmentLifecycle } from "./services/lifecycle-service";
+import { queueLifecycleEvaluation } from "./services/lifecycle-service";
 import { withRetrySafe } from "./utils/db-retry";
 
 /**
@@ -196,10 +196,8 @@ export async function processWebhookBatch(maxBatchSize: number = 50): Promise<nu
             
             console.log(`Updated shipment ${existingShipment.id} with tracking ${trackingNumber} from webhook`);
             
-            // Update lifecycle phase based on new status
-            await updateShipmentLifecycle(existingShipment.id, {
-              shipmentData: { status: newStatus }
-            });
+            // Queue lifecycle evaluation based on new status
+            await queueLifecycleEvaluation(existingShipment.id, 'webhook_tracking', existingShipment.orderNumber || undefined);
             
             // Broadcast update to connected clients
             if (existingShipment.orderId) {
