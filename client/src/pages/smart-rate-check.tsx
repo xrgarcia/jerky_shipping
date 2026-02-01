@@ -76,6 +76,8 @@ interface RateAnalysisRow {
   lifecyclePhase: string | null;
   decisionSubphase: string | null;
   allRatesChecked: RateOption[] | null;
+  actualShippingCost: string | null;
+  carrierServiceCode: string | null;
 }
 
 interface RateAnalysisResponse {
@@ -88,12 +90,18 @@ interface RateAnalysisResponse {
   };
   metrics: {
     totalAnalyzed: number;
-    totalSavings: number;
-    totalCurrentSpend: number;
+    totalPotentialSavings: number;
+    totalCustomerShippingCost: number;
     totalRecommendedSpend: number;
     shipmentsWithSavings: number;
     percentWithSavings: number;
     averageSavingsPerShipment: number;
+    totalActualSpend: number;
+    shipmentsWithActualCost: number;
+    realizedSavings: number;
+    missedSavings: number;
+    adoptedRecommendationCount: number;
+    adoptionRate: number;
   };
 }
 
@@ -223,99 +231,159 @@ export default function SmartRateCheck() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-28" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i + 4} className="h-28" />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <Card data-testid="card-total-savings">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <TrendingDown className="h-4 w-4 text-green-600" />
-                Total Savings Available
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600" data-testid="text-total-savings">
-                {formatCurrency(metrics?.totalSavings ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card data-testid="card-shipments-analyzed">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Shipments Analyzed
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-shipments-analyzed">
+                  {metrics?.totalAnalyzed?.toLocaleString() ?? 0}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {metrics?.shipmentsWithActualCost?.toLocaleString() ?? 0} with label cost
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-current-spend">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Total Current Spend
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold" data-testid="text-current-spend">
-                {formatCurrency(metrics?.totalCurrentSpend ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-potential-savings">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-amber-600" />
+                  Potential Savings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-amber-600" data-testid="text-potential-savings">
+                  {formatCurrency(metrics?.totalPotentialSavings ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {metrics?.percentWithSavings ?? 0}% have savings opportunity
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-recommended-spend">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                Total Recommended Spend
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-blue-600" data-testid="text-recommended-spend">
-                {formatCurrency(metrics?.totalRecommendedSpend ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-realized-savings">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-green-600" />
+                  Realized Savings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-green-600" data-testid="text-realized-savings">
+                  {formatCurrency(metrics?.realizedSavings ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {metrics?.adoptedRecommendationCount?.toLocaleString() ?? 0} adopted recommendations
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-shipments-analyzed">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Shipments Analyzed
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold" data-testid="text-shipments-analyzed">
-                {metrics?.totalAnalyzed?.toLocaleString() ?? 0}
-              </p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-missed-savings">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-red-600" />
+                  Missed Savings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-red-600" data-testid="text-missed-savings">
+                  {formatCurrency(metrics?.missedSavings ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Could have saved more
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card data-testid="card-percent-with-savings">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <Percent className="h-4 w-4 text-amber-600" />
-                % With Savings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-amber-600" data-testid="text-percent-savings">
-                {metrics?.percentWithSavings ?? 0}%
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {metrics?.shipmentsWithSavings?.toLocaleString() ?? 0} shipments
-              </p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card data-testid="card-actual-spend">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Actual Label Spend
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-actual-spend">
+                  {formatCurrency(metrics?.totalActualSpend ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  What was paid for labels
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-avg-savings">
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-purple-600" />
-                Avg Savings/Shipment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-purple-600" data-testid="text-avg-savings">
-                {formatCurrency(metrics?.averageSavingsPerShipment ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-recommended-spend">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  Recommended Spend
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-blue-600" data-testid="text-recommended-spend">
+                  {formatCurrency(metrics?.totalRecommendedSpend ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Optimal shipping cost
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-adoption-rate">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-purple-600" />
+                  Adoption Rate
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-purple-600" data-testid="text-adoption-rate">
+                  {metrics?.adoptionRate ?? 0}%
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Using recommended carrier
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-avg-savings">
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  Avg Savings/Shipment
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold" data-testid="text-avg-savings">
+                  {formatCurrency(metrics?.averageSavingsPerShipment ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Per analyzed shipment
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -475,6 +543,7 @@ export default function SmartRateCheck() {
                           <SortIcon column="costSavings" />
                         </div>
                       </TableHead>
+                      <TableHead className="min-w-[100px]">Actual Cost</TableHead>
                       <TableHead className="min-w-[80px]">Destination</TableHead>
                       <TableHead className="min-w-[60px]">Rates</TableHead>
                       <TableHead className="min-w-[200px]">Comments</TableHead>
@@ -542,6 +611,20 @@ export default function SmartRateCheck() {
                             >
                               {hasSavings ? `+${formatCurrency(savings)}` : formatCurrency(savings)}
                             </Badge>
+                          </TableCell>
+                          <TableCell data-testid={`text-actual-cost-${row.shipmentId}`}>
+                            {row.actualShippingCost ? (
+                              <span className={
+                                row.smartShippingCost && 
+                                Math.abs(parseFloat(row.actualShippingCost) - parseFloat(row.smartShippingCost)) < 0.50
+                                  ? "text-green-600 font-medium"
+                                  : ""
+                              }>
+                                {formatCurrency(row.actualShippingCost)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-xs" data-testid={`text-destination-${row.shipmentId}`}>
                             {row.destinationState || row.destinationPostalCode || "-"}
