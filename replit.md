@@ -32,6 +32,11 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Centralized ETL Architecture**: Standardized data transformations for Shopify orders and ShipStation shipments.
 - **Worker Coordination System**: Redis-backed mutex for production-ready coordination of poll workers and backfill jobs.
 - **Dual Shipment Sync Architecture**: Combines a cursor-based Unified Shipment Sync Worker for scheduled polling and a Webhook Processing Queue for real-time events.
+- **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects. Key files: `server/lifecycle-event-worker.ts`, `server/services/lifecycle-service.ts`, `server/utils/queue.ts`.
+    - **Queue Features**: FIFO processing, deduplication by shipmentId, retry with exponential backoff (max 3), 1-hour expiry on in-flight set
+    - **Side Effect Registry**: Automated actions triggered by state transitions (e.g., `needs_rate_check` → automatic smart carrier rate analysis)
+    - **Producers**: ETL service, sync workers, hydrator, and webhooks push to `queueLifecycleEvaluation()`
+    - **Consumer**: Lifecycle event worker processes queue, runs state machine, triggers registered side effects
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
