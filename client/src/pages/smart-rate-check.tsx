@@ -77,7 +77,6 @@ interface RateAnalysisRow {
   decisionSubphase: string | null;
   allRatesChecked: RateOption[] | null;
   actualShippingCost: string | null;
-  carrierServiceCode: string | null;
 }
 
 interface RateAnalysisResponse {

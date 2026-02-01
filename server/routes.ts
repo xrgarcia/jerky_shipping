@@ -2490,9 +2490,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderDate: shipments.orderDate,
           lifecyclePhase: shipments.lifecyclePhase,
           decisionSubphase: shipments.decisionSubphase,
-          // Actual shipping cost from shipment (what was actually paid)
-          actualShippingCost: shipments.shippingCost,
-          carrierServiceCode: shipments.carrierServiceCode,
         })
         .from(shipmentRateAnalysis)
         .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
@@ -2505,29 +2502,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metricsQuery = await db
         .select({
           totalAnalyzed: sql<number>`count(*)::int`,
-          totalPotentialSavings: sql<string>`coalesce(sum(${shipmentRateAnalysis.costSavings}), 0)`,
-          totalCustomerShippingCost: sql<string>`coalesce(sum(${shipmentRateAnalysis.customerShippingCost}), 0)`,
+          totalSavings: sql<string>`coalesce(sum(${shipmentRateAnalysis.costSavings}), 0)`,
+          totalCurrentSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.customerShippingCost}), 0)`,
           totalRecommendedSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.smartShippingCost}), 0)`,
           shipmentsWithSavings: sql<number>`count(case when ${shipmentRateAnalysis.costSavings} > 0 then 1 end)::int`,
-          // Actual costs from shipped shipments
-          totalActualSpend: sql<string>`coalesce(sum(${shipments.shippingCost}), 0)`,
-          shipmentsWithActualCost: sql<number>`count(case when ${shipments.shippingCost} is not null then 1 end)::int`,
-          // Realized savings: when actual cost matches or is close to smart recommendation
-          realizedSavings: sql<string>`coalesce(sum(
-            case 
-              when ${shipments.shippingCost} is not null 
-                and abs(${shipments.shippingCost} - ${shipmentRateAnalysis.smartShippingCost}) < 0.50 
-              then ${shipmentRateAnalysis.costSavings}
-              else 0 
-            end
-          ), 0)`,
-          adoptedRecommendationCount: sql<number>`count(
-            case 
-              when ${shipments.shippingCost} is not null 
-                and abs(${shipments.shippingCost} - ${shipmentRateAnalysis.smartShippingCost}) < 0.50 
-              then 1 
-            end
-          )::int`,
         })
         .from(shipmentRateAnalysis)
         .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
@@ -2536,11 +2514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metrics = metricsQuery[0];
       const totalAnalyzed = metrics.totalAnalyzed || 0;
       const shipmentsWithSavings = metrics.shipmentsWithSavings || 0;
-      const shipmentsWithActualCost = metrics.shipmentsWithActualCost || 0;
-      const adoptedRecommendationCount = metrics.adoptedRecommendationCount || 0;
-      const totalPotentialSavings = parseFloat(metrics.totalPotentialSavings) || 0;
-      const realizedSavings = parseFloat(metrics.realizedSavings) || 0;
-      const missedSavings = totalPotentialSavings - realizedSavings;
+      const totalSavings = parseFloat(metrics.totalSavings) || 0;
       
       res.json({
         data: results,
@@ -2552,22 +2526,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         metrics: {
           totalAnalyzed,
-          totalPotentialSavings,
-          totalCustomerShippingCost: parseFloat(metrics.totalCustomerShippingCost) || 0,
+          totalPotentialSavings: totalSavings,
+          totalCustomerShippingCost: parseFloat(metrics.totalCurrentSpend) || 0,
           totalRecommendedSpend: parseFloat(metrics.totalRecommendedSpend) || 0,
           shipmentsWithSavings,
           percentWithSavings: totalAnalyzed > 0 ? Math.round((shipmentsWithSavings / totalAnalyzed) * 100) : 0,
-          averageSavingsPerShipment: totalAnalyzed > 0 ? totalPotentialSavings / totalAnalyzed : 0,
-          // Actual cost metrics
-          totalActualSpend: parseFloat(metrics.totalActualSpend) || 0,
-          shipmentsWithActualCost,
-          // Adoption metrics
-          realizedSavings,
-          missedSavings,
-          adoptedRecommendationCount,
-          adoptionRate: shipmentsWithActualCost > 0 
-            ? Math.round((adoptedRecommendationCount / shipmentsWithActualCost) * 100) 
-            : 0,
+          averageSavingsPerShipment: totalAnalyzed > 0 ? totalSavings / totalAnalyzed : 0,
         }
       });
     } catch (error: any) {
