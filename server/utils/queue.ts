@@ -948,3 +948,168 @@ export async function getDeadLetteredShipments(): Promise<string[]> {
   const members = await redis.smembers(SHIPMENT_SYNC_DEADLETTER_SET);
   return members || [];
 }
+
+// ============================================================================
+// LIFECYCLE EVENT QUEUE
+// ============================================================================
+// Event-driven lifecycle state machine queue for shipments.
+// Events are queued when shipment data changes (webhooks, user actions, sync).
+// A worker consumes events, derives lifecycle state, and triggers side effects.
+// ============================================================================
+
+const LIFECYCLE_QUEUE_KEY = 'lifecycle:events';
+const LIFECYCLE_INFLIGHT_KEY = 'lifecycle:inflight';
+const MAX_LIFECYCLE_RETRIES = 3;
+
+export type LifecycleEventReason = 
+  | 'webhook'           // ShipStation webhook triggered update
+  | 'shipment_sync'     // Unified shipment sync worker
+  | 'categorization'    // Product categorized
+  | 'fingerprint'       // Fingerprint assigned
+  | 'packaging'         // Packaging type assigned
+  | 'session'           // Added to fulfillment session
+  | 'rate_check'        // Rate check completed
+  | 'manual'            // Manual trigger from UI
+  | 'backfill';         // Batch backfill operation
+
+export interface LifecycleEvent {
+  shipmentId: string;           // Internal shipment UUID (primary key)
+  orderNumber?: string;         // For logging/debugging
+  reason: LifecycleEventReason;
+  enqueuedAt: number;
+  retryCount?: number;
+  metadata?: Record<string, any>; // Optional context (e.g., which field changed)
+}
+
+/**
+ * Enqueue a lifecycle event for a shipment with deduplication
+ * Returns true if enqueued, false if already in queue/processing
+ */
+export async function enqueueLifecycleEvent(event: LifecycleEvent): Promise<boolean> {
+  const redis = getRedisClient();
+  const dedupeKey = `lifecycle:${event.shipmentId}`;
+  
+  // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
+  const added = await redis.sadd(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
+  
+  if (added === 0) {
+    return false; // Already queued/processing
+  }
+  
+  // Set expiry on the set (1 hour as safety net)
+  await redis.expire(LIFECYCLE_INFLIGHT_KEY, 3600);
+  
+  // FIFO: RPUSH (tail) + LPOP (head)
+  await redis.rpush(LIFECYCLE_QUEUE_KEY, JSON.stringify(event));
+  return true;
+}
+
+/**
+ * Enqueue lifecycle events for multiple shipments (batch operation)
+ * Returns count of messages successfully enqueued (deduplicated ones are skipped)
+ */
+export async function enqueueLifecycleEventBatch(events: LifecycleEvent[]): Promise<number> {
+  if (events.length === 0) return 0;
+  
+  const redis = getRedisClient();
+  const toEnqueue: LifecycleEvent[] = [];
+  const seenIds = new Set<string>();
+  
+  for (const event of events) {
+    // Skip duplicates within this batch
+    if (seenIds.has(event.shipmentId)) {
+      continue;
+    }
+    
+    const dedupeKey = `lifecycle:${event.shipmentId}`;
+    const added = await redis.sadd(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
+    
+    if (added === 1) {
+      toEnqueue.push(event);
+      seenIds.add(event.shipmentId);
+    }
+  }
+  
+  if (toEnqueue.length === 0) return 0;
+  
+  await redis.expire(LIFECYCLE_INFLIGHT_KEY, 3600);
+  
+  const serialized = toEnqueue.map(e => JSON.stringify(e));
+  await redis.rpush(LIFECYCLE_QUEUE_KEY, ...serialized);
+  
+  return toEnqueue.length;
+}
+
+/**
+ * Dequeue the next lifecycle event (FIFO order)
+ */
+export async function dequeueLifecycleEvent(): Promise<LifecycleEvent | null> {
+  const redis = getRedisClient();
+  const data = await redis.lpop(LIFECYCLE_QUEUE_KEY);
+  
+  if (!data) return null;
+  
+  if (typeof data === 'object') {
+    return data as LifecycleEvent;
+  }
+  
+  return JSON.parse(data as string);
+}
+
+/**
+ * Mark a lifecycle event as completed (remove from in-flight set)
+ */
+export async function completeLifecycleEvent(shipmentId: string): Promise<void> {
+  const redis = getRedisClient();
+  const dedupeKey = `lifecycle:${shipmentId}`;
+  await redis.srem(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
+}
+
+/**
+ * Re-enqueue a failed lifecycle event with incremented retry count
+ * Returns false if max retries exceeded
+ */
+export async function retryLifecycleEvent(event: LifecycleEvent): Promise<boolean> {
+  const retryCount = (event.retryCount || 0) + 1;
+  
+  if (retryCount > MAX_LIFECYCLE_RETRIES) {
+    console.error(`[LifecycleQueue] Max retries exceeded for shipment ${event.shipmentId}`);
+    return false;
+  }
+  
+  const redis = getRedisClient();
+  const retryEvent = { ...event, retryCount, enqueuedAt: Date.now() };
+  
+  // Re-add to queue (already in in-flight set, so no dedupe check needed)
+  await redis.rpush(LIFECYCLE_QUEUE_KEY, JSON.stringify(retryEvent));
+  return true;
+}
+
+/**
+ * Get the current lifecycle queue length
+ */
+export async function getLifecycleQueueLength(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.llen(LIFECYCLE_QUEUE_KEY) || 0;
+}
+
+/**
+ * Get count of in-flight lifecycle events (being processed)
+ */
+export async function getLifecycleInflightCount(): Promise<number> {
+  const redis = getRedisClient();
+  return await redis.scard(LIFECYCLE_INFLIGHT_KEY) || 0;
+}
+
+/**
+ * Clear the lifecycle queue (for testing/reset)
+ */
+export async function clearLifecycleQueue(): Promise<number> {
+  const redis = getRedisClient();
+  const length = await getLifecycleQueueLength();
+  if (length > 0) {
+    await redis.del(LIFECYCLE_QUEUE_KEY);
+  }
+  await redis.del(LIFECYCLE_INFLIGHT_KEY);
+  return length;
+}
