@@ -427,4 +427,150 @@ export class ShipStationShipmentService {
     const syncResult = await this.syncShipmentsForOrder(orderNumber);
     return syncResult.shipments[0] || null;
   }
+
+  /**
+   * Update the package type for a shipment in ShipStation
+   * 
+   * Guardrails:
+   * - Only updates if existing package is null OR package name is "Package" (generic default)
+   * - Only updates if shipment status is "pending" (not yet shipped)
+   * 
+   * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462")
+   * @param newPackageCode The new package code to assign (e.g., "package_12345")
+   * @param existingPackageName The current package name on the shipment (for guardrail check)
+   * @param shipmentStatus The current shipment status (for guardrail check)
+   */
+  async updateShipmentPackage(
+    shipmentId: string,
+    newPackageCode: string,
+    existingPackageName: string | null,
+    shipmentStatus: string
+  ): Promise<{
+    success: boolean;
+    updated: boolean;
+    reason?: string;
+    error?: string;
+  }> {
+    try {
+      console.log(`[ShipmentService] updateShipmentPackage called for ${shipmentId}`);
+      console.log(`[ShipmentService] - existingPackageName: ${existingPackageName}`);
+      console.log(`[ShipmentService] - shipmentStatus: ${shipmentStatus}`);
+      console.log(`[ShipmentService] - newPackageCode: ${newPackageCode}`);
+
+      // Guardrail 1: Check shipment status - must be "pending"
+      if (shipmentStatus !== 'pending') {
+        const reason = `Shipment status is "${shipmentStatus}", not "pending". Cannot update package after shipment is processed.`;
+        console.log(`[ShipmentService] Skipping package update: ${reason}`);
+        return { success: true, updated: false, reason };
+      }
+
+      // Guardrail 2: Check existing package - only update if null or generic "Package"
+      const isGenericPackage = existingPackageName === null || existingPackageName === 'Package';
+      if (!isGenericPackage) {
+        const reason = `Shipment already has a specific package assigned: "${existingPackageName}". Will not override.`;
+        console.log(`[ShipmentService] Skipping package update: ${reason}`);
+        return { success: true, updated: false, reason };
+      }
+
+      // Get current shipment data from ShipStation
+      const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
+      const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
+      
+      if (!SHIPSTATION_API_KEY) {
+        return { success: false, updated: false, error: 'SHIPSTATION_API_KEY not configured' };
+      }
+
+      // Fetch current shipment
+      const getUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
+      console.log(`[ShipmentService] Fetching current shipment data from ${getUrl}`);
+      
+      const getResponse = await fetch(getUrl, {
+        headers: {
+          'api-key': SHIPSTATION_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!getResponse.ok) {
+        const errorText = await getResponse.text();
+        return { success: false, updated: false, error: `Failed to fetch shipment: ${getResponse.status} ${errorText}` };
+      }
+
+      const currentShipment = await getResponse.json();
+      
+      if (!currentShipment || !currentShipment.shipment_id) {
+        return { success: false, updated: false, error: `Shipment ${shipmentId} not found in ShipStation` };
+      }
+
+      // Build update payload with new package
+      const updatePayload = {
+        ...currentShipment,
+        packages: currentShipment.packages?.map((pkg: any, index: number) => {
+          if (index === 0) {
+            return {
+              ...pkg,
+              package_code: newPackageCode,
+            };
+          }
+          return pkg;
+        }) || [{ package_code: newPackageCode }],
+      };
+
+      // Remove read-only fields that the API won't accept
+      delete updatePayload.shipment_id;
+      delete updatePayload.created_at;
+      delete updatePayload.modified_at;
+      delete updatePayload.label_id;
+      delete updatePayload.shipment_status;
+      delete updatePayload.label_status;
+      delete updatePayload.tracking_number;
+      delete updatePayload.label_download;
+      delete updatePayload.form_download;
+      delete updatePayload.insurance_claim;
+
+      // Handle null ship_from / warehouse_id (same pattern as updateShipmentNumber)
+      if (updatePayload.ship_from === null && updatePayload.warehouse_id === null) {
+        console.log(`[ShipmentService] Both ship_from and warehouse_id are null, using default ship_from`);
+        updatePayload.ship_from = {
+          name: "Jerky.com",
+          phone: "",
+          company_name: "Jerky.com",
+          address_line1: "3600 NW 10th St",
+          city_locality: "Oklahoma City",
+          state_province: "OK",
+          postal_code: "73107",
+          country_code: "US",
+        };
+        delete updatePayload.warehouse_id;
+      } else {
+        if (updatePayload.ship_from === null) delete updatePayload.ship_from;
+        if (updatePayload.warehouse_id === null) delete updatePayload.warehouse_id;
+      }
+
+      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with new package_code: ${newPackageCode}`);
+
+      const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
+      const updateResponse = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: {
+          'api-key': SHIPSTATION_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        console.error(`[ShipmentService] Failed to PUT shipment ${shipmentId}:`, updateResponse.status, errorText);
+        return { success: false, updated: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
+      }
+
+      console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package to: ${newPackageCode}`);
+      return { success: true, updated: true };
+
+    } catch (error: any) {
+      console.error(`[ShipmentService] Error updating shipment package:`, error);
+      return { success: false, updated: false, error: error.message };
+    }
+  }
 }
