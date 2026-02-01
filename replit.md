@@ -32,11 +32,42 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Centralized ETL Architecture**: Standardized data transformations for Shopify orders and ShipStation shipments.
 - **Worker Coordination System**: Redis-backed mutex for production-ready coordination of poll workers and backfill jobs.
 - **Dual Shipment Sync Architecture**: Combines a cursor-based Unified Shipment Sync Worker for scheduled polling and a Webhook Processing Queue for real-time events.
-- **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects. Key files: `server/lifecycle-event-worker.ts`, `server/services/lifecycle-service.ts`, `server/utils/queue.ts`.
-    - **Queue Features**: FIFO processing, deduplication by shipmentId, retry with exponential backoff (max 3), 1-hour expiry on in-flight set
-    - **Side Effect Registry**: Automated actions triggered by state transitions (e.g., `needs_rate_check` → automatic smart carrier rate analysis)
-    - **Producers**: ETL service, sync workers, hydrator, and webhooks push to `queueLifecycleEvaluation()`
-    - **Consumer**: Lifecycle event worker processes queue, runs state machine, triggers registered side effects
+- **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects.
+    - **Why We Built It**: Decouples lifecycle evaluation from synchronous producers, enabling reliable side effects (like automatic rate checks), better error isolation, rate limiting to prevent API exhaustion, and centralized observability via the Operations Dashboard. Previously, lifecycle updates were scattered across many files with inconsistent error handling.
+    - **Key Files**:
+      - `server/lifecycle-event-worker.ts` - Queue consumer that processes lifecycle events
+      - `server/services/lifecycle-service.ts` - Exposes `queueLifecycleEvaluation()` for producers
+      - `server/services/lifecycle-state-machine.ts` - Determines correct phase based on shipment state
+      - `server/utils/queue.ts` - Redis queue primitives and `LifecycleEventReason` type
+    - **Queue Features**: FIFO processing, deduplication by shipmentId (prevents duplicate evaluations), retry with exponential backoff (max 3 attempts), 1-hour expiry on in-flight set to prevent stuck events
+    - **Rate Limiting**: Processes 5 rate checks per worker cycle with 500ms delay between side effects to avoid ShipStation API exhaustion
+    - **Side Effect Registry**: Automated actions triggered by state transitions:
+      - `needs_rate_check` subphase → Triggers smart carrier rate analysis automatically
+      - Future side effects can be added by registering handlers in the worker
+    - **Producers** (all push to `queueLifecycleEvaluation()`):
+      - `server/services/shipstation-shipment-etl-service.ts` - After ETL transforms shipment data
+      - `server/unified-shipment-sync-worker.ts` - After sync worker updates shipments
+      - `server/services/qc-item-hydrator.ts` - After hydrating QC items
+      - `server/webhooks.ts` - After processing ShipStation webhooks
+      - `server/background-worker.ts` - After processing tracking webhooks (reason: `webhook_tracking`)
+      - `server/services/smart-carrier-rate-service.ts` - After completing rate analysis (reason: `rate_analysis`)
+      - `server/lifecycle-repair-worker.ts` - Batch lifecycle repairs (reason: `lifecycle_repair`)
+    - **Consumer**: Lifecycle event worker (`server/lifecycle-event-worker.ts`) polls queue, runs state machine, triggers registered side effects
+    - **Event Reasons** (for logging/debugging):
+      - `webhook` - ShipStation webhook triggered update
+      - `webhook_tracking` - ShipStation tracking webhook update
+      - `shipment_sync` - Unified shipment sync worker
+      - `categorization` - Product categorized
+      - `fingerprint` - Fingerprint assigned
+      - `packaging` - Packaging type assigned
+      - `session` - Added to fulfillment session
+      - `rate_check` - Rate check triggered
+      - `rate_analysis` - Smart carrier rate analysis completed
+      - `lifecycle_repair` - Lifecycle repair worker batch operation
+      - `manual` - Manual trigger from UI
+      - `backfill` - Batch backfill operation
+    - **Synchronous Exception**: Only `firestore-session-sync-worker.ts` uses synchronous lifecycle updates (via `updateShipmentLifecycle()`) because it requires pre-update shipmentData to detect session transitions
+    - **Monitoring**: Operations Dashboard (`/operations`) shows real-time queue depth, worker status, and processing metrics via WebSocket updates
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
