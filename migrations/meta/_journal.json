@@ -15,6 +15,13 @@
       "when": 1769572070266,
       "tag": "0001_blue_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769961612661,
+      "tag": "0002_even_random",
+      "breakpoints": true
     }
   ]
 }
