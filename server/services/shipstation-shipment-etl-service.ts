@@ -232,6 +232,7 @@ export class ShipStationShipmentETLService {
       ...this.extractReturnGiftFields(shipmentData),
       totalWeight: this.extractTotalWeight(shipmentData),
       ...this.extractAdvancedOptions(shipmentData),
+      shippingCost: this.extractShippingCost(shipmentData),
       shipmentData,
     };
   }
@@ -648,6 +649,30 @@ export class ShipStationShipmentETLService {
       importServices: advOpts.import_services ?? null,
       overrideHoliday: advOpts.override_holiday ?? null,
     };
+  }
+
+  /**
+   * Extract shipping cost from labels array
+   * The unified sync attaches labels from /v2/labels endpoint to shipmentData.labels
+   * Each label has shipment_cost: { currency: "usd", amount: 18.49 }
+   */
+  private extractShippingCost(shipmentData: any): string | null {
+    // Check if labels array exists (attached by unified sync from /v2/labels endpoint)
+    if (Array.isArray(shipmentData?.labels) && shipmentData.labels.length > 0) {
+      const label = shipmentData.labels[0];
+      // ShipStation V2 API returns shipment_cost as { currency: "usd", amount: 18.49 }
+      const cost = label?.shipment_cost?.amount;
+      if (cost !== null && cost !== undefined) {
+        return cost.toString();
+      }
+    }
+    
+    // Fallback: check root level (may be attached directly in some cases)
+    if (shipmentData?.shipment_cost?.amount !== null && shipmentData?.shipment_cost?.amount !== undefined) {
+      return shipmentData.shipment_cost.amount.toString();
+    }
+    
+    return null;
   }
 
   /**
