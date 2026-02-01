@@ -407,48 +407,20 @@ export class SmartCarrierRateService {
     
     console.log(`[SmartCarrierRate] Requesting rates for shipment ${params.shipmentId} with ${carrierIds.length} carriers`);
     
-    // Note: ShipStation requires EITHER shipment_id OR shipment, not both
-    // We use the shipment object to override package details with our fingerprint data
+    // Use shipment_id only - ShipStation will use the existing shipment's details
+    // DO NOT include a shipment object - that creates duplicate empty orders
     const requestBody: any = {
-      shipment: {
-        validate_address: 'no_validation',
-        ship_from: {
-          name: "Jerky.com",
-          phone: "4055551212", // Required by ShipStation API
-          address_line1: FULFILLMENT_CENTER.address,
-          city_locality: FULFILLMENT_CENTER.city,
-          state_province: FULFILLMENT_CENTER.state,
-          postal_code: FULFILLMENT_CENTER.postal_code,
-          country_code: FULFILLMENT_CENTER.country,
-        },
-        ship_to: {
-          name: "Customer", // Required by ShipStation API
-          phone: "0000000000", // Placeholder - required by API but not used for rating
-          address_line1: params.destinationAddressLine1 || "123 Main St", // Required by API
-          postal_code: params.destinationPostalCode,
-          country_code: "US",
-          ...(params.destinationCity && { city_locality: params.destinationCity }),
-          ...(params.destinationState && { state_province: params.destinationState }),
-        },
-        packages: [{
-          weight: {
-            value: params.weightOunces,
-            unit: "ounce"
-          },
-          ...(params.lengthInches && params.widthInches && params.heightInches && {
-            dimensions: {
-              unit: "inch",
-              length: params.lengthInches,
-              width: params.widthInches,
-              height: params.heightInches,
-            }
-          }),
-        }],
-      },
+      shipment_id: params.shipmentId,
       rate_options: {
         carrier_ids: carrierIds,
       },
     };
+    
+    // NOTE: Package details from fingerprint are NOT sent to ShipStation rate API
+    // because including a shipment object alongside shipment_id causes issues.
+    // ShipStation uses the package details already stored on the shipment.
+    // Future: If we need to override package details, we'd need to update the
+    // shipment first, then request rates, or use a different approach.
     
     const result = await getRatesEstimate(requestBody);
     return result.data;
