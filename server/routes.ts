@@ -2492,6 +2492,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderDate: shipments.orderDate,
           lifecyclePhase: shipments.lifecyclePhase,
           decisionSubphase: shipments.decisionSubphase,
+          // Actual shipping cost from label creation (stored in shipments table)
+          actualShippingCost: shipments.shippingCost,
         })
         .from(shipmentRateAnalysis)
         .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
@@ -2501,6 +2503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .offset(offset);
       
       // Calculate aggregate metrics (for all matching records, not just current page)
+      // Uses shipments.shippingCost for actual label cost (from unified sync worker)
       const metricsQuery = await db
         .select({
           totalAnalyzed: sql<number>`count(*)::int`,
@@ -2508,6 +2511,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalCurrentSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.customerShippingCost}), 0)`,
           totalRecommendedSpend: sql<string>`coalesce(sum(${shipmentRateAnalysis.smartShippingCost}), 0)`,
           shipmentsWithSavings: sql<number>`count(case when ${shipmentRateAnalysis.costSavings} > 0 then 1 end)::int`,
+          // Actual cost metrics from shipments.shippingCost (label cost from ShipStation)
+          shipmentsWithActualCost: sql<number>`count(case when ${shipments.shippingCost} is not null then 1 end)::int`,
+          totalActualSpend: sql<string>`coalesce(sum(${shipments.shippingCost}), 0)`,
+          // Realized savings: when actual cost <= smart recommendation (adopted recommendation)
+          adoptedRecommendationCount: sql<number>`count(case when ${shipments.shippingCost} is not null and ${shipments.shippingCost} <= ${shipmentRateAnalysis.smartShippingCost} then 1 end)::int`,
+          // Realized savings = sum of (customer rate - actual cost) when actual cost <= smart rate
+          realizedSavings: sql<string>`coalesce(sum(case when ${shipments.shippingCost} is not null and ${shipments.shippingCost} <= ${shipmentRateAnalysis.smartShippingCost} then ${shipmentRateAnalysis.customerShippingCost} - ${shipments.shippingCost} else 0 end), 0)`,
+          // Missed savings = sum of (actual cost - smart rate) when actual cost > smart rate and there was savings opportunity
+          missedSavings: sql<string>`coalesce(sum(case when ${shipments.shippingCost} is not null and ${shipments.shippingCost} > ${shipmentRateAnalysis.smartShippingCost} and ${shipmentRateAnalysis.costSavings} > 0 then ${shipments.shippingCost} - ${shipmentRateAnalysis.smartShippingCost} else 0 end), 0)`,
         })
         .from(shipmentRateAnalysis)
         .innerJoin(shipments, eq(shipmentRateAnalysis.shipmentId, shipments.shipmentId))
@@ -2516,7 +2528,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metrics = metricsQuery[0];
       const totalAnalyzed = metrics.totalAnalyzed || 0;
       const shipmentsWithSavings = metrics.shipmentsWithSavings || 0;
+      const shipmentsWithActualCost = metrics.shipmentsWithActualCost || 0;
       const totalSavings = parseFloat(metrics.totalSavings) || 0;
+      const adoptedRecommendationCount = metrics.adoptedRecommendationCount || 0;
       
       res.json({
         data: results,
@@ -2534,6 +2548,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shipmentsWithSavings,
           percentWithSavings: totalAnalyzed > 0 ? Math.round((shipmentsWithSavings / totalAnalyzed) * 100) : 0,
           averageSavingsPerShipment: totalAnalyzed > 0 ? totalSavings / totalAnalyzed : 0,
+          // Actual cost metrics
+          totalActualSpend: parseFloat(metrics.totalActualSpend) || 0,
+          shipmentsWithActualCost,
+          realizedSavings: parseFloat(metrics.realizedSavings) || 0,
+          missedSavings: parseFloat(metrics.missedSavings) || 0,
+          adoptedRecommendationCount,
+          adoptionRate: shipmentsWithActualCost > 0 ? Math.round((adoptedRecommendationCount / shipmentsWithActualCost) * 100) : 0,
         }
       });
     } catch (error: any) {
