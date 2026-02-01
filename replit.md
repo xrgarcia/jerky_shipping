@@ -35,10 +35,11 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects.
     - **Why We Built It**: Decouples lifecycle evaluation from synchronous producers, enabling reliable side effects (like automatic rate checks), better error isolation, rate limiting to prevent API exhaustion, and centralized observability via the Operations Dashboard. Previously, lifecycle updates were scattered across many files with inconsistent error handling.
     - **Key Files**:
-      - `server/lifecycle-event-worker.ts` - Queue consumer that processes lifecycle events
+      - `server/lifecycle-event-worker.ts` - Queue consumer that processes lifecycle events and executes side effects
       - `server/services/lifecycle-service.ts` - Exposes `queueLifecycleEvaluation()` for producers
-      - `server/services/lifecycle-state-machine.ts` - Determines correct phase based on shipment state
+      - `server/services/lifecycle-state-machine.ts` - Pure logic that determines correct phase based on shipment state (no side effects)
       - `server/utils/queue.ts` - Redis queue primitives and `LifecycleEventReason` type
+    - **Architecture Separation**: The state machine only *determines* what phase a shipment should be in (pure logic, no actions). The worker *executes* side effects based on the state machine's result. This separation keeps the state machine testable and predictable while allowing the worker to handle complex async operations like API calls.
     - **Queue Features**: FIFO processing, deduplication by shipmentId (prevents duplicate evaluations), retry with exponential backoff (max 3 attempts), 1-hour expiry on in-flight set to prevent stuck events
     - **Rate Limiting**: Processes 5 rate checks per worker cycle with 500ms delay between side effects to avoid ShipStation API exhaustion
     - **Side Effect Registry**: Automated actions triggered by state transitions:
