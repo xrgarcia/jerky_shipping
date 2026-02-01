@@ -449,7 +449,7 @@ const TAG_REFRESH_BATCH_SIZE = 10; // Max shipments to refresh tags for per poll
  */
 async function refreshTagsForPreSessionShipments(): Promise<{ processed: number; updated: number; errors: number }> {
   const { shipmentTags, LIFECYCLE_PHASES } = await import('@shared/schema');
-  const { updateShipmentLifecycle } = await import('./services/lifecycle-service');
+  const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
   
   // Find shipments in phases where MOVE OVER tag matters:
   // - ready_to_session: On hold + MOVE OVER tag - fingerprinting happens here
@@ -548,8 +548,8 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
           }
         }
         
-        // Re-evaluate lifecycle phase with updated tags
-        await updateShipmentLifecycle(shipment.id, { logTransition: true });
+        // Queue lifecycle evaluation for async processing (tag refresh)
+        await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
         
         updated++;
       }

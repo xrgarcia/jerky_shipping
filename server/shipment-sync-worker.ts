@@ -55,7 +55,7 @@ import {
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
 import { withRetrySafe } from './utils/db-retry';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
-import { updateShipmentLifecycle } from './services/lifecycle-service';
+import { queueLifecycleEvaluation } from './services/lifecycle-service';
 
 function log(message: string) {
   const timestamp = new Date().toLocaleTimeString();
@@ -164,8 +164,8 @@ async function processReverseSyncMessage(message: ShipmentSyncMessage): Promise<
           shipmentStatus: 'cancelled',
           reverseSyncLastCheckedAt: new Date(),
         });
-        // Update lifecycle phase after status change
-        await updateShipmentLifecycle(dbShipment.id, { logTransition: true });
+        // Queue lifecycle evaluation for async processing
+        await queueLifecycleEvaluation(dbShipment.id, 'shipment_sync', dbShipment.orderNumber || undefined);
         log(`[reverse-sync] [${shipmentId}] Not found in ShipStation - marked as cancelled`);
       }
       return { message, success: true, statusChanged: true, rateLimit };
@@ -416,8 +416,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
             // and extracting empty data would overwrite existing customer columns
             await storage.updateShipment(cachedShipment.id, updateData);
             
-            // Update lifecycle phase after status change (webhook fast-path)
-            await updateShipmentLifecycle(cachedShipment.id, { logTransition: true });
+            // Queue lifecycle evaluation for async processing (webhook fast-path)
+            await queueLifecycleEvaluation(cachedShipment.id, 'webhook', cachedShipment.orderNumber || undefined);
             
             // Broadcast realtime update to WebSocket clients
             const order = await storage.getOrder(cachedShipment.orderId);
@@ -497,8 +497,8 @@ export async function processShipmentSyncBatch(batchSize: number): Promise<numbe
                       
                       await storage.updateShipment(dbShipment.id, updateData);
                       
-                      // Update lifecycle phase after status change (label lookup path)
-                      await updateShipmentLifecycle(dbShipment.id, { logTransition: true });
+                      // Queue lifecycle evaluation for async processing (label lookup path)
+                      await queueLifecycleEvaluation(dbShipment.id, 'webhook', dbShipment.orderNumber || undefined);
                       
                       // Broadcast realtime update if shipment is linked to order
                       if (dbShipment.orderId) {

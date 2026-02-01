@@ -35,10 +35,8 @@ import {
   getLifecycleInflightCount,
   type LifecycleEvent,
 } from './utils/queue';
-import {
-  updateShipmentLifecycle,
-  type LifecycleUpdateResult,
-} from './services/lifecycle-service';
+import { updateShipmentLifecycle } from './services/lifecycle-service';
+import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { db } from './db';
 import { shipments } from '@shared/schema';

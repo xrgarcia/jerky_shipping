@@ -39,7 +39,7 @@ import {
   preloadKitMappings,
 } from './kit-mappings-cache';
 import { getProductsBatch, type ProductInfo } from './product-lookup';
-import { updateShipmentLifecycle } from './lifecycle-service';
+import { queueLifecycleEvaluation } from './lifecycle-service';
 import { storage } from '../storage';
 
 const log = (message: string) => console.log(`[qc-item-hydrator] ${message}`);
@@ -677,10 +677,9 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     // Calculate and assign fingerprint
     const fingerprintResult = await calculateFingerprint(shipmentId);
     
-    // Re-evaluate lifecycle state after fingerprint calculation
-    // This ensures the shipment moves from needs_categorization to needs_session
-    // when fingerprint is complete and packaging is assigned
-    await updateShipmentLifecycle(shipmentId);
+    // Queue lifecycle evaluation for async processing (fingerprint calculation)
+    // This enables side effects like auto rate check to be triggered
+    await queueLifecycleEvaluation(shipmentId, 'fingerprint', orderNumber);
     
     return { 
       shipmentId, 
@@ -863,8 +862,8 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
           if (fingerprintResult.isNew) {
             result.newFingerprints++;
           }
-          // Re-evaluate lifecycle state after fingerprint is complete
-          await updateShipmentLifecycle(shipment.id);
+          // Queue lifecycle evaluation for async processing (batch fingerprint)
+          await queueLifecycleEvaluation(shipment.id, 'fingerprint', shipment.orderNumber || undefined);
         } else if (fingerprintResult.status === 'missing_weight') {
           result.missingWeight++;
         } else if (fingerprintResult.status === 'pending_categorization') {

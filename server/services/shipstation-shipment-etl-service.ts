@@ -14,7 +14,7 @@ import type { InsertShipment, InsertShipmentItem, InsertShipmentTag, InsertShipm
 import { db } from '../db';
 import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { updateShipmentLifecycle } from './lifecycle-service';
+import { queueLifecycleEvaluation } from './lifecycle-service';
 
 export class ShipStationShipmentETLService {
   constructor(private readonly storage: IStorage) {}
@@ -179,9 +179,9 @@ export class ShipStationShipmentETLService {
     await this.processShipmentTags(finalShipmentId, shipmentData);
     await this.processShipmentPackages(finalShipmentId, shipmentData);
     
-    // Update lifecycle phase based on new shipment state
-    // This ensures phase transitions are triggered by ShipStation events (label creation, tracking updates, etc.)
-    await updateShipmentLifecycle(finalShipmentId, { logTransition: true });
+    // Queue lifecycle evaluation for async processing
+    // This enables side effects (like auto rate check) to be triggered reliably
+    await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber);
     
     return { id: finalShipmentId };
   }
