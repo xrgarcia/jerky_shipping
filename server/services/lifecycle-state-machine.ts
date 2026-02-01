@@ -26,6 +26,7 @@ import {
   type LifecyclePhase,
   type DecisionSubphase,
 } from "@shared/schema";
+import { RateCheckEligibility } from './rate-check-eligibility';
 
 export interface LifecycleState {
   phase: LifecyclePhase;
@@ -202,6 +203,9 @@ export function deriveDecisionSubphase(shipment: {
   fulfillmentSessionId?: string | null;
   sessionStatus?: string | null;
   rateAnalysisComplete?: boolean;
+  shipmentId?: string | null;
+  shipToPostalCode?: string | null;
+  serviceCode?: string | null;
 }): DecisionSubphase {
   // READY_FOR_SKUVAULT: In fulfillment session, ready to push
   if (shipment.fulfillmentSessionId && !shipment.sessionStatus) {
@@ -223,9 +227,16 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
+  // NEEDS_RATE_CHECK: All required data present but rate analysis not complete
+  // Uses centralized eligibility checker to validate all requirements
+  if (shipment.rateAnalysisComplete !== true) {
+    const eligibility = RateCheckEligibility.checkBasicRequirements(shipment);
+    if (eligibility.eligible) {
+      return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
+    }
+  }
+
   // NEEDS_CATEGORIZATION: SKUs need collection assignment
-  // NOTE: Rate check bypassed - go directly to categorization
-  // Previously checked: if (shipment.rateAnalysisComplete === true)
   return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
 }
 

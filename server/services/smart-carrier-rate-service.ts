@@ -8,21 +8,12 @@
  */
 
 import { db } from '../db';
-import { shipmentRateAnalysis, shipments, fingerprints, fingerprintModels, packagingTypes } from '@shared/schema';
+import { shipmentRateAnalysis, shipments } from '@shared/schema';
 import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { updateShipmentLifecycle } from './lifecycle-service';
 import { getCarriers, getRatesEstimate } from '../utils/shipstation-api';
-
-// Package details for rate calculation
-interface PackageDetails {
-  weightOz: number;
-  lengthIn?: number;
-  widthIn?: number;
-  heightIn?: number;
-  usedFallback: boolean;
-  source: string;
-}
+import { RateCheckEligibility } from './rate-check-eligibility';
 
 const FULFILLMENT_CENTER = {
   address: "4132 Will Rogers Pkwy",
@@ -127,98 +118,6 @@ export class SmartCarrierRateService {
   }
   
   /**
-   * Get package details for rate calculation.
-   * Priority: 1) Fingerprint's assigned packaging + weight, 2) ShipStation shipment data
-   * 
-   * Returns package dimensions and weight, along with whether fallback was used.
-   */
-  async getPackageDetails(shipment: Shipment): Promise<PackageDetails | null> {
-    // Try to get package details from fingerprint's assigned packaging
-    if (shipment.fingerprintId) {
-      try {
-        // Get the fingerprint with its weight
-        const [fingerprint] = await db
-          .select()
-          .from(fingerprints)
-          .where(eq(fingerprints.id, shipment.fingerprintId))
-          .limit(1);
-        
-        // Get the assigned packaging model
-        const [model] = await db
-          .select()
-          .from(fingerprintModels)
-          .where(eq(fingerprintModels.fingerprintId, shipment.fingerprintId))
-          .limit(1);
-        
-        if (fingerprint && model?.packagingTypeId) {
-          // Get the packaging type dimensions
-          const [packaging] = await db
-            .select()
-            .from(packagingTypes)
-            .where(eq(packagingTypes.id, model.packagingTypeId))
-            .limit(1);
-          
-          if (packaging && fingerprint.totalWeight) {
-            // Convert weight to ounces if needed
-            let weightOz = fingerprint.totalWeight;
-            if (fingerprint.weightUnit === 'lb' || fingerprint.weightUnit === 'pound' || fingerprint.weightUnit === 'pounds') {
-              weightOz = fingerprint.totalWeight * 16;
-            }
-            
-            const packageDetails: PackageDetails = {
-              weightOz,
-              usedFallback: false,
-              source: `Fingerprint packaging: ${packaging.name}`,
-            };
-            
-            // Add dimensions if available
-            if (packaging.dimensionLength && packaging.dimensionWidth && packaging.dimensionHeight) {
-              packageDetails.lengthIn = parseFloat(packaging.dimensionLength);
-              packageDetails.widthIn = parseFloat(packaging.dimensionWidth);
-              packageDetails.heightIn = parseFloat(packaging.dimensionHeight);
-            }
-            
-            console.log(`[SmartCarrierRate] Using fingerprint package for ${shipment.shipmentId}: ${weightOz.toFixed(2)}oz, ${packaging.name}`);
-            return packageDetails;
-          }
-        }
-      } catch (error: any) {
-        console.warn(`[SmartCarrierRate] Error fetching fingerprint package for ${shipment.shipmentId}:`, error.message);
-      }
-    }
-    
-    // Fallback: Use ShipStation shipment's weight data
-    if (shipment.totalWeight) {
-      // Parse weight from "value unit" format (e.g., "2.5 pounds")
-      const weightMatch = shipment.totalWeight.match(/^([\d.]+)\s*(\w+)?$/);
-      if (weightMatch) {
-        let weightValue = parseFloat(weightMatch[1]);
-        const unit = (weightMatch[2] || 'oz').toLowerCase();
-        
-        // Convert to ounces
-        let weightOz = weightValue;
-        if (unit.includes('pound') || unit.includes('lb')) {
-          weightOz = weightValue * 16;
-        } else if (unit.includes('kg')) {
-          weightOz = weightValue * 35.274;
-        } else if (unit.includes('gram') || unit === 'g') {
-          weightOz = weightValue * 0.03527;
-        }
-        
-        console.log(`[SmartCarrierRate] Using ShipStation fallback weight for ${shipment.shipmentId}: ${weightOz.toFixed(2)}oz (from ${shipment.totalWeight})`);
-        return {
-          weightOz,
-          usedFallback: true,
-          source: `ShipStation shipment weight: ${shipment.totalWeight}`,
-        };
-      }
-    }
-    
-    // No weight data available
-    return null;
-  }
-  
-  /**
    * Analyze a shipment and find the most cost-effective shipping method
    * that meets the customer's expected delivery timeframe.
    * 
@@ -231,45 +130,30 @@ export class SmartCarrierRateService {
    * 6. Track whether fallback package data was used
    */
   async analyzeShipment(shipment: Shipment): Promise<RateAnalysisResult> {
-    const shipmentId = shipment.shipmentId;
+    // Use centralized eligibility checker for validation
+    const eligibility = await RateCheckEligibility.checkWithPackageData(shipment);
     
-    if (!shipmentId) {
-      return { success: false, error: 'Shipment has no ShipStation ID' };
+    if (!eligibility.eligible) {
+      return { success: false, error: eligibility.reason || 'Eligibility check failed' };
     }
     
-    if (!shipment.shipToPostalCode) {
-      return { success: false, error: 'Shipment has no destination postal code' };
-    }
-    
-    const customerMethod = shipment.serviceCode;
-    if (!customerMethod) {
-      return { success: false, error: 'Shipment has no service code' };
-    }
+    const shipmentId = shipment.shipmentId!;
+    const customerMethod = shipment.serviceCode!;
     
     try {
-      // Get package details from fingerprint's assigned packaging
-      // We ONLY rate check when fingerprint package details are available
-      const packageDetails = await this.getPackageDetails(shipment);
-      
-      if (!packageDetails) {
-        return { success: false, error: 'Shipment has no package weight data' };
-      }
-      
-      if (packageDetails.usedFallback) {
-        return { success: false, error: 'Shipment has no fingerprint package assignment - cannot rate check without assigned packaging' };
-      }
+      console.log(`[SmartCarrierRate] Using package for ${shipmentId}: ${eligibility.weightOz?.toFixed(2)}oz, ${eligibility.packagingName}`);
       
       // Use rates estimate API with fingerprint's package dimensions
       const rates = await this.fetchRatesEstimate({
-        shipmentId,  // Pass ShipStation shipment ID to reference existing shipment
+        shipmentId,
         destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
-        destinationPostalCode: shipment.shipToPostalCode,
+        destinationPostalCode: shipment.shipToPostalCode!,
         destinationCity: shipment.shipToCity || undefined,
         destinationState: shipment.shipToState || undefined,
-        weightOunces: packageDetails.weightOz,
-        lengthInches: packageDetails.lengthIn,
-        widthInches: packageDetails.widthIn,
-        heightInches: packageDetails.heightIn,
+        weightOunces: eligibility.weightOz!,
+        lengthInches: eligibility.lengthIn,
+        widthInches: eligibility.widthIn,
+        heightInches: eligibility.heightIn,
       });
       const usedFallback = false;
       
@@ -368,10 +252,10 @@ export class SmartCarrierRateService {
         destinationState: shipment.shipToState || null,
         // Package tracking fields
         usedFallbackPackageDetails: usedFallback,
-        packageWeightOz: packageDetails?.weightOz?.toString() || null,
-        packageLengthIn: packageDetails?.lengthIn?.toString() || null,
-        packageWidthIn: packageDetails?.widthIn?.toString() || null,
-        packageHeightIn: packageDetails?.heightIn?.toString() || null,
+        packageWeightOz: eligibility.weightOz?.toString() || null,
+        packageLengthIn: eligibility.lengthIn?.toString() || null,
+        packageWidthIn: eligibility.widthIn?.toString() || null,
+        packageHeightIn: eligibility.heightIn?.toString() || null,
         // All rates checked for transparency
         allRatesChecked,
       };
