@@ -12,7 +12,7 @@ import { shipmentRateAnalysis, shipments, fingerprints, fingerprintModels, packa
 import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { updateShipmentLifecycle } from './lifecycle-service';
-import { getRatesForShipment, getCarriers, getRatesEstimate } from '../utils/shipstation-api';
+import { getCarriers, getRatesEstimate } from '../utils/shipstation-api';
 
 // Package details for rate calculation
 interface PackageDetails {
@@ -247,30 +247,31 @@ export class SmartCarrierRateService {
     }
     
     try {
-      // Get package details (prefer fingerprint's assigned packaging, fallback to ShipStation)
+      // Get package details from fingerprint's assigned packaging
+      // We ONLY rate check when fingerprint package details are available
       const packageDetails = await this.getPackageDetails(shipment);
       
-      let rates: ShipStationRate[];
-      let usedFallback = true; // Default to true if no package details
-      
-      if (packageDetails && !packageDetails.usedFallback) {
-        // Use rates estimate API with fingerprint's package dimensions
-        rates = await this.fetchRatesEstimate({
-          shipmentId,  // Pass ShipStation shipment ID to reference existing shipment
-          destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
-          destinationPostalCode: shipment.shipToPostalCode,
-          destinationCity: shipment.shipToCity || undefined,
-          destinationState: shipment.shipToState || undefined,
-          weightOunces: packageDetails.weightOz,
-          lengthInches: packageDetails.lengthIn,
-          widthInches: packageDetails.widthIn,
-          heightInches: packageDetails.heightIn,
-        });
-        usedFallback = false;
-      } else {
-        // Use ShipStation's shipment rates API (uses their stored package data)
-        rates = await this.fetchRatesForShipment(shipmentId);
+      if (!packageDetails) {
+        return { success: false, error: 'Shipment has no package weight data' };
       }
+      
+      if (packageDetails.usedFallback) {
+        return { success: false, error: 'Shipment has no fingerprint package assignment - cannot rate check without assigned packaging' };
+      }
+      
+      // Use rates estimate API with fingerprint's package dimensions
+      const rates = await this.fetchRatesEstimate({
+        shipmentId,  // Pass ShipStation shipment ID to reference existing shipment
+        destinationAddressLine1: shipment.shipToAddressLine1 || undefined,
+        destinationPostalCode: shipment.shipToPostalCode,
+        destinationCity: shipment.shipToCity || undefined,
+        destinationState: shipment.shipToState || undefined,
+        weightOunces: packageDetails.weightOz,
+        lengthInches: packageDetails.lengthIn,
+        widthInches: packageDetails.widthIn,
+        heightInches: packageDetails.heightIn,
+      });
+      const usedFallback = false;
       
       if (!rates || rates.length === 0) {
         return { success: false, error: 'No rates returned from ShipStation' };
@@ -495,15 +496,6 @@ export class SmartCarrierRateService {
     }
     
     return { success, failed, errors };
-  }
-  
-  /**
-   * Fetch rates for a shipment from ShipStation using the centralized API service
-   * Includes rate limiting, retry logic, and proper error handling
-   */
-  private async fetchRatesForShipment(shipmentId: string): Promise<ShipStationRate[]> {
-    const result = await getRatesForShipment(shipmentId);
-    return result.data;
   }
   
   /**
