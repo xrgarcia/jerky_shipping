@@ -12,13 +12,18 @@
  *     → Redis Queue
  *     → This Worker
  *     → State Machine (deriveLifecyclePhase)
- *     → Side Effects (e.g., auto rate check)
+ *     → Side Effects (subphase-based and reason-based)
  * 
- * SIDE EFFECTS REGISTRY:
- * When a shipment enters certain states, automated actions can be triggered:
- * - NEEDS_RATE_CHECK → Run smart carrier rate analysis
- * - (Future: NEEDS_FINGERPRINT → Auto-assign fingerprint if match found)
- * - (Future: NEEDS_SESSION → Notify session builder)
+ * SIDE EFFECTS - TWO TYPES:
+ * 
+ * 1. SUBPHASE-BASED (sideEffectsRegistry):
+ *    Triggered when a shipment ENTERS a specific subphase:
+ *    - NEEDS_RATE_CHECK → Run smart carrier rate analysis
+ * 
+ * 2. REASON-BASED (reasonSideEffects):
+ *    Triggered based on the event reason, regardless of subphase:
+ *    - fingerprint/packaging → Sync package dimensions to ShipStation
+ *      (when packagingTypeId is set, updates ShipStation with box dimensions)
  * 
  * FEATURES:
  * - FIFO processing with deduplication
@@ -34,12 +39,15 @@ import {
   getLifecycleQueueLength,
   getLifecycleInflightCount,
   type LifecycleEvent,
+  type LifecycleEventReason,
 } from './utils/queue';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
+import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
-import { shipments } from '@shared/schema';
+import { storage } from './storage';
+import { shipments, packagingTypes } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
 
@@ -68,8 +76,9 @@ const POLL_INTERVAL_MS = 2000; // Check queue every 2 seconds
 const IDLE_POLL_INTERVAL_MS = 10000; // When queue is empty, check less frequently
 const SIDE_EFFECT_DELAY_MS = 500; // Delay between side effect executions
 
-// Shared rate service instance for reuse
+// Shared service instances for reuse
 const rateService = new SmartCarrierRateService();
+const shipmentService = new ShipStationShipmentService(storage);
 
 /**
  * Side effect registry - maps state transitions to automated actions
@@ -119,6 +128,129 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
 };
 
 /**
+ * Reason-based side effects - triggered based on event reason + shipment state
+ * Unlike subphase effects which trigger on entering a state, these trigger
+ * when specific actions complete (e.g., fingerprint assigned with packaging)
+ */
+interface ReasonSideEffectConfig {
+  enabled: boolean;
+  reasons: LifecycleEventReason[];
+  description: string;
+  handler: (shipmentId: string, orderNumber?: string) => Promise<boolean>;
+}
+
+const reasonSideEffects: ReasonSideEffectConfig[] = [
+  {
+    enabled: true,
+    reasons: ['fingerprint', 'packaging'],
+    description: 'Sync package dimensions to ShipStation when packaging type is determined',
+    handler: async (shipmentId: string, orderNumber?: string): Promise<boolean> => {
+      try {
+        // Load the shipment with packaging type
+        const [shipment] = await db
+          .select()
+          .from(shipments)
+          .where(eq(shipments.id, shipmentId))
+          .limit(1);
+
+        if (!shipment) {
+          log(`Package sync: Shipment not found ${shipmentId}`, 'warn');
+          return false;
+        }
+
+        // Only proceed if shipment has a packagingTypeId
+        if (!shipment.packagingTypeId) {
+          log(`Package sync: No packagingTypeId set for ${orderNumber || shipmentId}, skipping`);
+          return true; // Not an error, just nothing to do
+        }
+
+        // Look up the packaging type dimensions
+        const [packagingType] = await db
+          .select()
+          .from(packagingTypes)
+          .where(eq(packagingTypes.id, shipment.packagingTypeId))
+          .limit(1);
+
+        if (!packagingType) {
+          log(`Package sync: Packaging type not found ${shipment.packagingTypeId}`, 'warn');
+          return false;
+        }
+
+        // Check if we have dimensions
+        if (!packagingType.dimensionLength || !packagingType.dimensionWidth || !packagingType.dimensionHeight) {
+          log(`Package sync: Packaging type ${packagingType.name} missing dimensions, skipping ShipStation sync`);
+          return true; // Not an error, some packages may not have dimensions
+        }
+
+        // Parse shipmentData to get the ShipStation payload
+        const shipmentData = shipment.shipmentData as Record<string, any> | null;
+        if (!shipmentData) {
+          log(`Package sync: No shipmentData for ${orderNumber || shipmentId}, cannot sync to ShipStation`);
+          return false;
+        }
+
+        // Build dimensions object with validation
+        const length = parseFloat(packagingType.dimensionLength);
+        const width = parseFloat(packagingType.dimensionWidth);
+        const height = parseFloat(packagingType.dimensionHeight);
+
+        // Validate dimensions are valid numbers
+        if (!isFinite(length) || !isFinite(width) || !isFinite(height)) {
+          log(`Package sync: Invalid dimensions for ${packagingType.name} (L:${packagingType.dimensionLength}, W:${packagingType.dimensionWidth}, H:${packagingType.dimensionHeight}), skipping`);
+          return true; // Not an error, just skip
+        }
+
+        const packageDimensions = {
+          length,
+          width,
+          height,
+          unit: packagingType.dimensionUnit || 'inch',
+        };
+
+        // Get existing package info from shipmentData for guardrail check
+        // Check name, dimensions, and package_code to determine if a specific package is already set
+        const existingPkg = shipmentData.packages?.[0];
+        const existingPackageName = existingPkg?.name || existingPkg?.package_name || null;
+        
+        // Additional guardrail: if existing package has non-null dimensions, it's already been set
+        const hasExistingDimensions = existingPkg?.dimensions?.length && 
+                                      existingPkg?.dimensions?.width && 
+                                      existingPkg?.dimensions?.height;
+        if (hasExistingDimensions) {
+          log(`Package sync: Shipment ${orderNumber || shipmentId} already has package dimensions set, skipping`);
+          return true;
+        }
+
+        // Call updateShipmentPackage
+        const result = await shipmentService.updateShipmentPackage(
+          shipment.shipmentId,
+          shipmentData,
+          packageDimensions,
+          existingPackageName,
+          shipment.status || 'pending'
+        );
+
+        if (result.success) {
+          if (result.updated) {
+            log(`Package sync: Updated ShipStation package for ${orderNumber || shipmentId} - ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+            sideEffectTriggeredCount++;
+          } else {
+            log(`Package sync: Skipped ${orderNumber || shipmentId}: ${result.reason}`);
+          }
+          return true;
+        } else {
+          log(`Package sync: Failed for ${orderNumber || shipmentId}: ${result.error}`, 'warn');
+          return false;
+        }
+      } catch (error: any) {
+        log(`Package sync: Error for ${shipmentId}: ${error.message}`, 'error');
+        return false;
+      }
+    },
+  },
+];
+
+/**
  * Process a single lifecycle event
  */
 async function processEvent(event: LifecycleEvent): Promise<boolean> {
@@ -145,6 +277,18 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
         
         // Execute side effect (fire and forget for now - don't block queue)
         await sideEffect.handler(event.shipmentId, event.orderNumber);
+      }
+    }
+
+    // Check reason-based side effects (triggered by specific event reasons)
+    for (const reasonEffect of reasonSideEffects) {
+      if (reasonEffect.enabled && reasonEffect.reasons.includes(event.reason)) {
+        log(`Triggering reason-based side effect for ${orderRef}: ${reasonEffect.description}`);
+        
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, SIDE_EFFECT_DELAY_MS));
+        
+        await reasonEffect.handler(event.shipmentId, event.orderNumber);
       }
     }
 

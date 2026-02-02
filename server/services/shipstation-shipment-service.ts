@@ -435,16 +435,24 @@ export class ShipStationShipmentService {
    * - Only updates if existing package is null OR package name is "Package" (generic default)
    * - Only updates if shipment status is "pending" (not yet shipped)
    * 
+   * NOTE: ShipStation custom packages all have package_code="package". They are differentiated
+   * by dimensions. We use dimensions to uniquely identify the package type.
+   * 
    * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462") - used for PUT URL
    * @param shipmentData The full ShipStation shipment payload - needed because PUT requires the entire object
-   * @param newPackageCode The new package code to assign (e.g., "package_12345") - the value to set on packages[0].package_code
+   * @param packageDimensions The dimensions to set on the package - uniquely identifies the package type
    * @param existingPackageName The current package name on the shipment - for guardrail: skip if already has a real package
    * @param shipmentStatus The current shipment status - for guardrail: only update "pending" shipments
    */
   async updateShipmentPackage(
     shipmentId: string,
     shipmentData: Record<string, any>,
-    newPackageCode: string,
+    packageDimensions: {
+      length: number;
+      width: number;
+      height: number;
+      unit: string;
+    },
     existingPackageName: string | null,
     shipmentStatus: string
   ): Promise<{
@@ -457,7 +465,7 @@ export class ShipStationShipmentService {
       console.log(`[ShipmentService] updateShipmentPackage called for ${shipmentId}`);
       console.log(`[ShipmentService] - existingPackageName: ${existingPackageName}`);
       console.log(`[ShipmentService] - shipmentStatus: ${shipmentStatus}`);
-      console.log(`[ShipmentService] - newPackageCode: ${newPackageCode}`);
+      console.log(`[ShipmentService] - packageDimensions: ${JSON.stringify(packageDimensions)}`);
 
       // Guardrail 1: Check shipment status - must be "pending"
       if (shipmentStatus !== 'pending') {
@@ -481,18 +489,20 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: 'SHIPSTATION_API_KEY not configured' };
       }
 
-      // Build update payload with new package
+      // Build update payload with new package dimensions
+      // ShipStation custom packages all use package_code="package" - dimensions make them unique
       const updatePayload: any = {
         ...shipmentData,
         packages: shipmentData.packages?.map((pkg: any, index: number) => {
           if (index === 0) {
             return {
               ...pkg,
-              package_code: newPackageCode,
+              package_code: 'package',
+              dimensions: packageDimensions,
             };
           }
           return pkg;
-        }) || [{ package_code: newPackageCode }],
+        }) || [{ package_code: 'package', dimensions: packageDimensions }],
       };
 
       // Remove read-only fields that the API won't accept
@@ -526,7 +536,7 @@ export class ShipStationShipmentService {
         if (updatePayload.warehouse_id === null) delete updatePayload.warehouse_id;
       }
 
-      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with new package_code: ${newPackageCode}`);
+      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with dimensions: ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
 
       const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
       const updateResponse = await fetch(updateUrl, {
@@ -544,7 +554,7 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
       }
 
-      console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package to: ${newPackageCode}`);
+      console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package dimensions: ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
       return { success: true, updated: true };
 
     } catch (error: any) {
