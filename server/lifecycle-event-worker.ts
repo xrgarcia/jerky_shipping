@@ -230,16 +230,14 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         };
 
         // Get existing package info from shipmentData for guardrail check
-        // Check name, dimensions, and package_code to determine if a specific package is already set
         const existingPkg = shipmentData.packages?.[0];
         const existingPackageName = existingPkg?.name || existingPkg?.package_name || null;
         
-        // Additional guardrail: if existing package has non-null dimensions, it's already been set
-        const hasExistingDimensions = existingPkg?.dimensions?.length && 
-                                      existingPkg?.dimensions?.width && 
-                                      existingPkg?.dimensions?.height;
-        if (hasExistingDimensions) {
-          log(`Package sync: Shipment ${orderNumber || shipmentId} already has package dimensions set, skipping`);
+        // Guardrail: only allow overwrite if package_name is null/empty OR equals "Package" (case-insensitive)
+        // If a specific package name was set (not default), someone intentionally changed it - don't overwrite
+        const isDefaultPackage = !existingPackageName || existingPackageName.toLowerCase() === 'package';
+        if (!isDefaultPackage) {
+          log(`Package sync: Shipment ${orderNumber || shipmentId} has custom package "${existingPackageName}" set, skipping`);
           return true;
         }
 
