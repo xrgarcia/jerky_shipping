@@ -39,7 +39,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Product Categorization**: Distinction between kits and assembled products based on SkuVault's QC Sale API behavior.
 - **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog data, synced hourly from a GCP reporting database.
 - **Packaging Types Sync Worker**: Hourly sync from ShipStation `/v2/packages` endpoint, preserving local `id`, `is_active`, and `stationType` fields.
-- **Automated Package Assignment**: When a fingerprint with a linked packaging type is assigned, the lifecycle event worker automatically syncs package dimensions to ShipStation.
+- **Automated Package Assignment**: Two-table architecture where `fingerprints` stores order item signatures and `fingerprint_models` stores learned rules (fingerprint → packaging type). When a user assigns a packaging type via UI, the endpoint creates/updates the fingerprint_model AND directly updates all shipments with that fingerprint. The lifecycle event worker can also copy packagingTypeId from fingerprint_models to shipments when missing, then syncs dimensions to ShipStation (respecting status guardrails - only "pending" shipments can be updated).
 - **Two-Tier Inventory Tracking System**: `skuvault_products` table uses `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity` to prevent premature inventory deduction.
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations from a reporting database view.
 - **Shipping Cost Tracking**: Actual carrier costs from ShipStation labels API are stored in `shipments.shipping_cost` for cost analysis.

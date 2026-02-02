@@ -47,7 +47,7 @@ import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
 import { storage } from './storage';
-import { shipments, packagingTypes, featureFlags, fingerprints } from '@shared/schema';
+import { shipments, packagingTypes, featureFlags, fingerprintModels } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
 
@@ -193,28 +193,28 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: false, shouldRetry: false, error: 'Shipment not found' };
         }
 
-        // If shipment doesn't have a packagingTypeId, try to get it from the fingerprint
+        // If shipment doesn't have a packagingTypeId, try to get it from the fingerprint model
         let packagingTypeIdToSync = shipment.packagingTypeId;
         
         if (!packagingTypeIdToSync && shipment.fingerprintId) {
-          // Look up the fingerprint's packaging type
-          const [fingerprint] = await db
-            .select({ packagingTypeId: fingerprints.packagingTypeId })
-            .from(fingerprints)
-            .where(eq(fingerprints.id, shipment.fingerprintId))
+          // Look up the fingerprint model (learned rule: fingerprint → packaging type)
+          const [model] = await db
+            .select({ packagingTypeId: fingerprintModels.packagingTypeId })
+            .from(fingerprintModels)
+            .where(eq(fingerprintModels.fingerprintId, shipment.fingerprintId))
             .limit(1);
           
-          if (fingerprint?.packagingTypeId) {
-            // Copy packaging type from fingerprint to shipment
-            log(`Package sync: Copying packagingTypeId from fingerprint to shipment ${orderNumber || shipmentId}`);
+          if (model?.packagingTypeId) {
+            // Copy packaging type from fingerprint model to shipment
+            log(`Package sync: Copying packagingTypeId from fingerprint model to shipment ${orderNumber || shipmentId}`);
             await db.update(shipments)
               .set({ 
-                packagingTypeId: fingerprint.packagingTypeId,
+                packagingTypeId: model.packagingTypeId,
                 requiresManualPackage: false,
                 packageAssignmentError: null
               })
               .where(eq(shipments.id, shipmentId));
-            packagingTypeIdToSync = fingerprint.packagingTypeId;
+            packagingTypeIdToSync = model.packagingTypeId;
           }
         }
         
