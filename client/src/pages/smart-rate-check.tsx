@@ -679,7 +679,7 @@ export default function SmartRateCheck() {
       </Card>
 
       <Dialog open={!!expandedComment} onOpenChange={() => setExpandedComment(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rate Analysis Details</DialogTitle>
             <DialogDescription>
