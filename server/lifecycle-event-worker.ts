@@ -47,7 +47,7 @@ import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
 import { storage } from './storage';
-import { shipments, packagingTypes, featureFlags } from '@shared/schema';
+import { shipments, packagingTypes, featureFlags, fingerprints } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
 
@@ -193,8 +193,33 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: false, shouldRetry: false, error: 'Shipment not found' };
         }
 
-        // Only proceed if shipment has a packagingTypeId
-        if (!shipment.packagingTypeId) {
+        // If shipment doesn't have a packagingTypeId, try to get it from the fingerprint
+        let packagingTypeIdToSync = shipment.packagingTypeId;
+        
+        if (!packagingTypeIdToSync && shipment.fingerprintId) {
+          // Look up the fingerprint's packaging type
+          const [fingerprint] = await db
+            .select({ packagingTypeId: fingerprints.packagingTypeId })
+            .from(fingerprints)
+            .where(eq(fingerprints.id, shipment.fingerprintId))
+            .limit(1);
+          
+          if (fingerprint?.packagingTypeId) {
+            // Copy packaging type from fingerprint to shipment
+            log(`Package sync: Copying packagingTypeId from fingerprint to shipment ${orderNumber || shipmentId}`);
+            await db.update(shipments)
+              .set({ 
+                packagingTypeId: fingerprint.packagingTypeId,
+                requiresManualPackage: false,
+                packageAssignmentError: null
+              })
+              .where(eq(shipments.id, shipmentId));
+            packagingTypeIdToSync = fingerprint.packagingTypeId;
+          }
+        }
+        
+        // Only proceed if we have a packagingTypeId to sync
+        if (!packagingTypeIdToSync) {
           log(`Package sync: No packagingTypeId set for ${orderNumber || shipmentId}, skipping`);
           return { success: true, shouldRetry: false }; // Not an error, just nothing to do
         }
@@ -203,12 +228,12 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         const [packagingType] = await db
           .select()
           .from(packagingTypes)
-          .where(eq(packagingTypes.id, shipment.packagingTypeId))
+          .where(eq(packagingTypes.id, packagingTypeIdToSync))
           .limit(1);
 
         if (!packagingType) {
-          log(`Package sync: Packaging type not found ${shipment.packagingTypeId}`, 'warn');
-          return { success: false, shouldRetry: false, error: `Packaging type ${shipment.packagingTypeId} not found` };
+          log(`Package sync: Packaging type not found ${packagingTypeIdToSync}`, 'warn');
+          return { success: false, shouldRetry: false, error: `Packaging type ${packagingTypeIdToSync} not found` };
         }
 
         // Check if we have dimensions
