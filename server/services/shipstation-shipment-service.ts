@@ -504,11 +504,14 @@ export class ShipStationShipmentService {
         ...shipmentData,
         packages: shipmentData.packages?.map((pkg: any, index: number) => {
           if (index === 0) {
+            // Remove read-only shipment_package_id to allow package_id change
+            const { shipment_package_id, ...pkgWithoutId } = pkg;
             return {
-              ...pkg,
+              ...pkgWithoutId,
               package_id: packageInfo.packageId,
               package_code: 'package',
-              name: packageInfo.name,
+              name: packageInfo.name,           // V2 packages uses 'name'
+              package_name: packageInfo.name,   // V2 shipments uses 'package_name'
               dimensions: packageDimensions,
             };
           }
@@ -517,6 +520,7 @@ export class ShipStationShipmentService {
           package_id: packageInfo.packageId,
           package_code: 'package',
           name: packageInfo.name,
+          package_name: packageInfo.name,
           dimensions: packageDimensions,
         }],
       };
@@ -563,6 +567,7 @@ export class ShipStationShipmentService {
       }
 
       console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with package: ${packageInfo.name} (${packageInfo.packageId}) ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+      console.log(`[ShipmentService] Package payload:`, JSON.stringify(updatePayload.packages[0], null, 2));
 
       const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
       const updateResponse = await fetch(updateUrl, {
