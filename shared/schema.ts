@@ -360,6 +360,9 @@ export const shipments = pgTable("shipments", {
   assignedStationId: varchar("assigned_station_id"), // FK to stations table - where this order should be routed for packing (auto-assigned from packagingType.stationType)
   packagingDecisionType: text("packaging_decision_type"), // 'auto' (from model) or 'manual' (human decided)
   fingerprintStatus: text("fingerprint_status"), // 'complete' | 'pending_categorization' | 'missing_weight' | 'needs_recalc' | null
+  // Package assignment failure tracking
+  requiresManualPackage: boolean("requires_manual_package").default(false), // True when auto-assignment failed after retries
+  packageAssignmentError: text("package_assignment_error"), // Error message explaining why auto-assignment failed
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
   lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
   decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
