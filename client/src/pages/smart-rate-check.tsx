@@ -695,14 +695,14 @@ export default function SmartRateCheck() {
                 {/* Package dimensions used for rate check */}
                 <div className="p-4 bg-muted rounded-md">
                   <p className="text-sm font-medium mb-2">Package Used for Rate Check</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <div className="flex justify-between">
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Weight:</span>
                       <span className="font-mono" data-testid="text-package-weight">
                         {row.packageWeightOz ? `${parseFloat(row.packageWeightOz).toFixed(2)} oz` : "—"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Dimensions:</span>
                       <span className="font-mono" data-testid="text-package-dimensions">
                         {row.packageLengthIn && row.packageWidthIn && row.packageHeightIn
