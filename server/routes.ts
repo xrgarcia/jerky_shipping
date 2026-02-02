@@ -983,6 +983,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.doNotShip = true;
       }
 
+      // Parse needsManualPackage filter (shipments that failed auto package sync)
+      if (req.query.needsManualPackage === 'true') {
+        filters.requiresManualPackage = true;
+      }
+
       // Parse sessioning-related filters
       if (req.query.hasFingerprint === 'true') {
         filters.hasFingerprint = true;

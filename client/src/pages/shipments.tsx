@@ -882,6 +882,7 @@ export default function Shipments() {
   const [showWithoutOrders, setShowWithoutOrders] = useState(false);
   const [showShippedWithoutTracking, setShowShippedWithoutTracking] = useState(false);
   const [showDoNotShipOnly, setShowDoNotShipOnly] = useState(false);
+  const [showNeedsManualPackage, setShowNeedsManualPackage] = useState(false);
   
   // Sessioning-related filter states
   const [hasFingerprint, setHasFingerprint] = useState<string>(""); // "", "true", "false"
@@ -961,6 +962,7 @@ export default function Shipments() {
     setShowWithoutOrders(params.get('withoutOrders') === 'true');
     setShowShippedWithoutTracking(params.get('shippedWithoutTracking') === 'true');
     setShowDoNotShipOnly(params.get('doNotShip') === 'true');
+    setShowNeedsManualPackage(params.get('needsManualPackage') === 'true');
     
     // Sessioning-related filters
     setHasFingerprint(params.get('hasFingerprint') || '');
@@ -1039,6 +1041,7 @@ export default function Shipments() {
     if (showWithoutOrders) params.set('withoutOrders', 'true');
     if (showShippedWithoutTracking) params.set('shippedWithoutTracking', 'true');
     if (showDoNotShipOnly) params.set('doNotShip', 'true');
+    if (showNeedsManualPackage) params.set('needsManualPackage', 'true');
     
     // Sessioning-related filters
     if (hasFingerprint) params.set('hasFingerprint', hasFingerprint);
@@ -1062,7 +1065,7 @@ export default function Shipments() {
       const newUrl = newSearch ? `?${newSearch}` : '';
       window.history.replaceState({}, '', `/shipments${newUrl}`);
     }
-  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, page, pageSize, sortBy, sortOrder, isInitialized]);
+  }, [viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, showNeedsManualPackage, page, pageSize, sortBy, sortOrder, isInitialized]);
 
   // Close warehouse status dropdown when clicking outside
   useEffect(() => {
@@ -1206,6 +1209,7 @@ export default function Shipments() {
     if (showWithoutOrders) params.append('withoutOrders', 'true');
     if (showShippedWithoutTracking) params.append('shippedWithoutTracking', 'true');
     if (showDoNotShipOnly) params.append('doNotShip', 'true');
+    if (showNeedsManualPackage) params.append('needsManualPackage', 'true');
     
     // Sessioning-related filters
     if (hasFingerprint) params.append('hasFingerprint', hasFingerprint);
@@ -1309,7 +1313,7 @@ export default function Shipments() {
   };
 
   const { data: shipmentsData, isLoading, isError, error } = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, serviceCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, hasFingerprint, decisionSubphase, hasPackaging, assignedStationId, hasSession, lifecyclePhaseFilter, page, pageSize, sortBy, sortOrder }],
+    queryKey: ["/api/shipments", { viewMode, activeTab, activeLifecycleTab, search, status, statusDescription, shipmentStatus, carrierCode, serviceCode, packageName, dateFrom, dateTo, showOrphanedOnly, showWithoutOrders, showShippedWithoutTracking, showDoNotShipOnly, showNeedsManualPackage, hasFingerprint, decisionSubphase, hasPackaging, assignedStationId, hasSession, lifecyclePhaseFilter, page, pageSize, sortBy, sortOrder }],
     queryFn: async () => {
       const queryString = buildQueryString();
       const url = `/api/shipments?${queryString}`;
@@ -1424,6 +1428,7 @@ export default function Shipments() {
     setShowWithoutOrders(false);
     setShowShippedWithoutTracking(false);
     setShowDoNotShipOnly(false);
+    setShowNeedsManualPackage(false);
     // Sessioning-related filters
     setHasFingerprint("");
     setDecisionSubphase("");
@@ -1448,6 +1453,7 @@ export default function Shipments() {
     showWithoutOrders,
     showShippedWithoutTracking,
     showDoNotShipOnly,
+    showNeedsManualPackage,
     hasFingerprint,
     decisionSubphase,
     hasPackaging,
@@ -2004,6 +2010,23 @@ export default function Shipments() {
                           className="text-sm cursor-pointer text-red-600 dark:text-red-400 font-semibold"
                         >
                           Show DO NOT SHIP only
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="needs-manual-package-filter"
+                          checked={showNeedsManualPackage}
+                          onCheckedChange={(checked) => {
+                            setShowNeedsManualPackage(checked as boolean);
+                            setPage(1);
+                          }}
+                          data-testid="checkbox-needs-manual-package-filter"
+                        />
+                        <label
+                          htmlFor="needs-manual-package-filter"
+                          className="text-sm cursor-pointer text-amber-600 dark:text-amber-400 font-semibold"
+                        >
+                          Needs Manual Package
                         </label>
                       </div>
                     </div>

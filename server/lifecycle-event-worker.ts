@@ -143,6 +143,15 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
 };
 
 /**
+ * Result from a reason-based side effect
+ */
+interface ReasonSideEffectResult {
+  success: boolean;
+  shouldRetry: boolean;  // If false and success is false, we've given up
+  error?: string;        // Error message for logging/flagging
+}
+
+/**
  * Reason-based side effects - triggered based on event reason + shipment state
  * Unlike subphase effects which trigger on entering a state, these trigger
  * when specific actions complete (e.g., fingerprint assigned with packaging)
@@ -151,21 +160,25 @@ interface ReasonSideEffectConfig {
   enabled: boolean;
   reasons: LifecycleEventReason[];
   description: string;
-  handler: (shipmentId: string, orderNumber?: string) => Promise<boolean>;
+  supportsRetry: boolean;  // If true, failed results can trigger event retry
+  handler: (shipmentId: string, orderNumber?: string, retryCount?: number) => Promise<ReasonSideEffectResult>;
 }
+
+const MAX_PACKAGE_SYNC_RETRIES = 3;
 
 const reasonSideEffects: ReasonSideEffectConfig[] = [
   {
     enabled: true,
     reasons: ['fingerprint', 'packaging'],
     description: 'Sync package dimensions to ShipStation when packaging type is determined',
-    handler: async (shipmentId: string, orderNumber?: string): Promise<boolean> => {
+    supportsRetry: true,
+    handler: async (shipmentId: string, orderNumber?: string, retryCount: number = 0): Promise<ReasonSideEffectResult> => {
       try {
         // Check feature flag first
         const flagEnabled = await isFeatureFlagEnabled('auto_package_sync');
         if (!flagEnabled) {
           log(`Package sync: Feature flag disabled, skipping for ${orderNumber || shipmentId}`);
-          return true; // Not an error, feature is just disabled
+          return { success: true, shouldRetry: false }; // Not an error, feature is just disabled
         }
 
         // Load the shipment with packaging type
@@ -177,13 +190,13 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
 
         if (!shipment) {
           log(`Package sync: Shipment not found ${shipmentId}`, 'warn');
-          return false;
+          return { success: false, shouldRetry: false, error: 'Shipment not found' };
         }
 
         // Only proceed if shipment has a packagingTypeId
         if (!shipment.packagingTypeId) {
           log(`Package sync: No packagingTypeId set for ${orderNumber || shipmentId}, skipping`);
-          return true; // Not an error, just nothing to do
+          return { success: true, shouldRetry: false }; // Not an error, just nothing to do
         }
 
         // Look up the packaging type dimensions
@@ -195,20 +208,20 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
 
         if (!packagingType) {
           log(`Package sync: Packaging type not found ${shipment.packagingTypeId}`, 'warn');
-          return false;
+          return { success: false, shouldRetry: false, error: `Packaging type ${shipment.packagingTypeId} not found` };
         }
 
         // Check if we have dimensions
         if (!packagingType.dimensionLength || !packagingType.dimensionWidth || !packagingType.dimensionHeight) {
           log(`Package sync: Packaging type ${packagingType.name} missing dimensions, skipping ShipStation sync`);
-          return true; // Not an error, some packages may not have dimensions
+          return { success: true, shouldRetry: false }; // Not an error, some packages may not have dimensions
         }
 
         // Parse shipmentData to get the ShipStation payload
         const shipmentData = shipment.shipmentData as Record<string, any> | null;
         if (!shipmentData) {
           log(`Package sync: No shipmentData for ${orderNumber || shipmentId}, cannot sync to ShipStation`);
-          return false;
+          return { success: false, shouldRetry: retryCount < MAX_PACKAGE_SYNC_RETRIES, error: 'No shipmentData available' };
         }
 
         // Build dimensions object with validation
@@ -219,7 +232,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         // Validate dimensions are valid numbers
         if (!isFinite(length) || !isFinite(width) || !isFinite(height)) {
           log(`Package sync: Invalid dimensions for ${packagingType.name} (L:${packagingType.dimensionLength}, W:${packagingType.dimensionWidth}, H:${packagingType.dimensionHeight}), skipping`);
-          return true; // Not an error, just skip
+          return { success: true, shouldRetry: false }; // Not an error, just skip
         }
 
         const packageDimensions = {
@@ -238,7 +251,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         const isDefaultPackage = !existingPackageName || existingPackageName.toLowerCase() === 'package';
         if (!isDefaultPackage) {
           log(`Package sync: Shipment ${orderNumber || shipmentId} has custom package "${existingPackageName}" set, skipping`);
-          return true;
+          return { success: true, shouldRetry: false };
         }
 
         // Call updateShipmentPackage
@@ -254,17 +267,53 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           if (result.updated) {
             log(`Package sync: Updated ShipStation package for ${orderNumber || shipmentId} - ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
             sideEffectTriggeredCount++;
+            // Clear any previous error flag since we succeeded
+            await db.update(shipments)
+              .set({ requiresManualPackage: false, packageAssignmentError: null })
+              .where(eq(shipments.id, shipmentId));
           } else {
             log(`Package sync: Skipped ${orderNumber || shipmentId}: ${result.reason}`);
           }
-          return true;
+          return { success: true, shouldRetry: false };
         } else {
-          log(`Package sync: Failed for ${orderNumber || shipmentId}: ${result.error}`, 'warn');
-          return false;
+          const errorMsg = result.error || 'Unknown ShipStation error';
+          log(`Package sync: Failed for ${orderNumber || shipmentId} (attempt ${retryCount + 1}/${MAX_PACKAGE_SYNC_RETRIES}): ${errorMsg}`, 'warn');
+          
+          // Check if we should retry or give up
+          const shouldRetry = retryCount < MAX_PACKAGE_SYNC_RETRIES - 1;
+          
+          if (!shouldRetry) {
+            // Max retries exhausted - flag the shipment for manual intervention
+            log(`Package sync: Max retries exceeded for ${orderNumber || shipmentId}, flagging for manual package assignment`, 'error');
+            await db.update(shipments)
+              .set({ 
+                requiresManualPackage: true, 
+                packageAssignmentError: `Failed after ${MAX_PACKAGE_SYNC_RETRIES} attempts: ${errorMsg}` 
+              })
+              .where(eq(shipments.id, shipmentId));
+          }
+          
+          return { success: false, shouldRetry, error: errorMsg };
         }
       } catch (error: any) {
-        log(`Package sync: Error for ${shipmentId}: ${error.message}`, 'error');
-        return false;
+        const errorMsg = error.message || 'Unknown error';
+        log(`Package sync: Error for ${shipmentId} (attempt ${retryCount + 1}/${MAX_PACKAGE_SYNC_RETRIES}): ${errorMsg}`, 'error');
+        
+        // Check if we should retry or give up
+        const shouldRetry = retryCount < MAX_PACKAGE_SYNC_RETRIES - 1;
+        
+        if (!shouldRetry) {
+          // Max retries exhausted - flag the shipment for manual intervention
+          log(`Package sync: Max retries exceeded for ${shipmentId}, flagging for manual package assignment`, 'error');
+          await db.update(shipments)
+            .set({ 
+              requiresManualPackage: true, 
+              packageAssignmentError: `Failed after ${MAX_PACKAGE_SYNC_RETRIES} attempts: ${errorMsg}` 
+            })
+            .where(eq(shipments.id, shipmentId));
+        }
+        
+        return { success: false, shouldRetry, error: errorMsg };
       }
     },
   },
@@ -301,6 +350,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     }
 
     // Check reason-based side effects (triggered by specific event reasons)
+    let needsRetry = false;
     for (const reasonEffect of reasonSideEffects) {
       if (reasonEffect.enabled && reasonEffect.reasons.includes(event.reason)) {
         log(`Triggering reason-based side effect for ${orderRef}: ${reasonEffect.description}`);
@@ -308,8 +358,20 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
         // Add small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, SIDE_EFFECT_DELAY_MS));
         
-        await reasonEffect.handler(event.shipmentId, event.orderNumber);
+        // Pass retry count so handler knows which attempt this is
+        const effectResult = await reasonEffect.handler(event.shipmentId, event.orderNumber, event.retryCount || 0);
+        
+        // If side effect failed and supports retry, we need to retry the whole event
+        if (!effectResult.success && effectResult.shouldRetry && reasonEffect.supportsRetry) {
+          log(`Reason-based side effect needs retry for ${orderRef}: ${effectResult.error}`);
+          needsRetry = true;
+        }
       }
+    }
+    
+    // If any reason-based side effect needs retry, signal failure to trigger retry
+    if (needsRetry) {
+      return false;
     }
 
     processedCount++;

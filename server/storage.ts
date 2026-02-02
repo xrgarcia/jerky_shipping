@@ -134,6 +134,7 @@ export interface ShipmentFilters {
   withoutOrders?: boolean; // Filter for shipments with no linked order
   shippedWithoutTracking?: boolean; // Filter for shipments with status='shipped' but no tracking number
   doNotShip?: boolean; // Filter for shipments with "**DO NOT SHIP (ALERT MGR)**" package
+  requiresManualPackage?: boolean; // Filter for shipments that need manual package assignment
   // Sessioning-related filters
   hasFingerprint?: boolean; // Filter for shipments with/without fingerprint
   decisionSubphase?: string; // Filter by decision subphase (needs_categorization, needs_fingerprint, etc.)
@@ -1500,6 +1501,11 @@ export class DatabaseStorage implements IStorage {
         .from(shipmentPackages)
         .where(eq(shipmentPackages.packageName, doNotShipPackageName));
       conditions.push(inArray(shipments.id, shipmentIdsWithDoNotShip));
+    }
+
+    // Requires manual package filter (shipments where auto package sync failed)
+    if (filters.requiresManualPackage) {
+      conditions.push(eq(shipments.requiresManualPackage, true));
     }
 
     // Sessioning-related filters
