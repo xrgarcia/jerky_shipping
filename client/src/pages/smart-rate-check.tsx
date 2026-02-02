@@ -77,6 +77,10 @@ interface RateAnalysisRow {
   decisionSubphase: string | null;
   allRatesChecked: RateOption[] | null;
   actualShippingCost: string | null;
+  packageWeightOz: string | null;
+  packageLengthIn: string | null;
+  packageWidthIn: string | null;
+  packageHeightIn: string | null;
 }
 
 interface RateAnalysisResponse {
