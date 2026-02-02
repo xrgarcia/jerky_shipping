@@ -17,7 +17,7 @@ import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-web
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { verifySlashbinWebhook, isJobAlreadyProcessed, markJobAsProcessed } from "./utils/slashbin-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber, extractPdfLabelUrl } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync, enqueueLifecycleEvent } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -3986,44 +3986,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fixing shipment number:", error);
       res.status(500).json({ error: error.message || "Failed to fix shipment number" });
-    }
-  });
-
-  // Manually trigger package sync - queues a lifecycle event with reason 'packaging'
-  // This re-triggers the package dimension sync side effect for a specific shipment
-  app.post("/api/shipments/:orderNumber/queue-package-sync", requireAuth, async (req, res) => {
-    try {
-      const { orderNumber } = req.params;
-      
-      // Find shipment by order number
-      const [shipment] = await db
-        .select({ id: shipments.id, orderNumber: shipments.orderNumber })
-        .from(shipments)
-        .where(eq(shipments.orderNumber, orderNumber))
-        .limit(1);
-      
-      if (!shipment) {
-        return res.status(404).json({ error: `Shipment not found for order ${orderNumber}` });
-      }
-      
-      // Queue a lifecycle event with reason 'packaging' to trigger package sync side effect
-      const queued = await enqueueLifecycleEvent({
-        shipmentId: shipment.id,
-        orderNumber: shipment.orderNumber || undefined,
-        reason: 'packaging',
-        enqueuedAt: Date.now(),
-      });
-      
-      if (queued) {
-        console.log(`[Package Sync] Queued lifecycle event for ${orderNumber} (shipment ${shipment.id})`);
-        res.json({ success: true, message: `Package sync queued for ${orderNumber}` });
-      } else {
-        // Already in queue or processing
-        res.json({ success: true, message: `${orderNumber} already in lifecycle queue` });
-      }
-    } catch (error: any) {
-      console.error("Error queuing package sync:", error);
-      res.status(500).json({ error: error.message || "Failed to queue package sync" });
     }
   });
 
