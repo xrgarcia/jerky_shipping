@@ -1315,10 +1315,7 @@ Please analyze this failure and help me understand:
   // Mutation to update feature flags
   const updateFeatureFlagMutation = useMutation({
     mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
-      return apiRequest(`/api/operations/feature-flags/${key}`, {
-        method: 'PUT',
-        body: JSON.stringify({ enabled }),
-      });
+      return apiRequest('PUT', `/api/operations/feature-flags/${key}`, { enabled });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations/feature-flags"] });

@@ -47,9 +47,24 @@ import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
 import { storage } from './storage';
-import { shipments, packagingTypes } from '@shared/schema';
+import { shipments, packagingTypes, featureFlags } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
+
+// Feature flag helper - checks if a feature is enabled in the database
+async function isFeatureFlagEnabled(key: string): Promise<boolean> {
+  try {
+    const [flag] = await db
+      .select({ enabled: featureFlags.enabled })
+      .from(featureFlags)
+      .where(eq(featureFlags.key, key))
+      .limit(1);
+    return flag?.enabled ?? false;
+  } catch (error) {
+    log(`Feature flag check error for ${key}: ${error}`, 'warn');
+    return false; // Default to disabled on error
+  }
+}
 
 function log(message: string, level: 'info' | 'warn' | 'error' = 'info') {
   const timestamp = new Date().toLocaleTimeString();
@@ -146,6 +161,13 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
     description: 'Sync package dimensions to ShipStation when packaging type is determined',
     handler: async (shipmentId: string, orderNumber?: string): Promise<boolean> => {
       try {
+        // Check feature flag first
+        const flagEnabled = await isFeatureFlagEnabled('auto_package_sync');
+        if (!flagEnabled) {
+          log(`Package sync: Feature flag disabled, skipping for ${orderNumber || shipmentId}`);
+          return true; // Not an error, feature is just disabled
+        }
+
         // Load the shipment with packaging type
         const [shipment] = await db
           .select()
