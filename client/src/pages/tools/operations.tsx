@@ -24,7 +24,8 @@ import {
   Pause,
   Zap,
   WifiOff,
-  Monitor
+  Monitor,
+  ToggleLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -188,6 +190,15 @@ type EnvironmentInfo = {
     baseUrl: string;
     environment: "production" | "development";
   };
+};
+
+type FeatureFlag = {
+  id: number;
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
 };
 
 type ShopifyValidation = {
@@ -1279,6 +1290,50 @@ Please analyze this failure and help me understand:
   // Fetch environment info (static, no polling)
   const { data: envInfo, isLoading: envLoading } = useQuery<EnvironmentInfo>({
     queryKey: ["/api/operations/environment"],
+  });
+
+  // Fetch feature flags
+  const { data: featureFlags, isLoading: featureFlagsLoading } = useQuery<FeatureFlag[]>({
+    queryKey: ["/api/operations/feature-flags"],
+  });
+
+  // Known feature flags with their descriptions for display
+  const knownFeatureFlags = [
+    {
+      key: 'auto_package_sync',
+      label: 'Auto Package Sync',
+      description: 'Automatically sync package dimensions to ShipStation when fingerprints with packaging types are assigned',
+    },
+  ];
+
+  // Get current state of a feature flag
+  const getFeatureFlagState = (key: string): boolean => {
+    const flag = featureFlags?.find(f => f.key === key);
+    return flag?.enabled ?? false;
+  };
+
+  // Mutation to update feature flags
+  const updateFeatureFlagMutation = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      return apiRequest(`/api/operations/feature-flags/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ enabled }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/feature-flags"] });
+      toast({
+        title: "Feature flag updated",
+        description: "The setting has been saved.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update feature flag",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Fetch Shopify credential validation (cached for 10 minutes on backend)
@@ -3039,6 +3094,51 @@ Please analyze this failure and help me understand:
                 {envInfo?.webhooks.environment || "unknown"}
               </Badge>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-feature-flags">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ToggleLeft className="h-5 w-5" />
+            Feature Flags
+          </CardTitle>
+          <CardDescription>Toggle system features on/off</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {featureFlagsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            ) : (
+              knownFeatureFlags.map((flagDef) => {
+                const isEnabled = getFeatureFlagState(flagDef.key);
+                const savedFlag = featureFlags?.find(f => f.key === flagDef.key);
+                return (
+                  <div key={flagDef.key} className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <p className="text-sm font-medium">{flagDef.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {flagDef.description}
+                      </p>
+                      {savedFlag?.updatedBy && (
+                        <p className="text-xs text-muted-foreground">
+                          Last updated by {savedFlag.updatedBy}
+                        </p>
+                      )}
+                    </div>
+                    <Switch
+                      data-testid={`switch-${flagDef.key}`}
+                      checked={isEnabled}
+                      disabled={updateFeatureFlagMutation.isPending}
+                      onCheckedChange={(checked) => {
+                        updateFeatureFlagMutation.mutate({ key: flagDef.key, enabled: checked });
+                      }}
+                    />
+                  </div>
+                );
+              })
+            )}
           </div>
         </CardContent>
       </Card>
