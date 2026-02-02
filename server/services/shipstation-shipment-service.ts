@@ -436,18 +436,20 @@ export class ShipStationShipmentService {
    * - Only updates if shipment status is "pending" (not yet shipped)
    * 
    * NOTE: ShipStation custom packages all have package_code="package". They are differentiated
-   * by dimensions. We use dimensions to uniquely identify the package type.
+   * by package_id (e.g., "se-168574") and name (e.g., "Poly Bagger").
    * 
    * @param shipmentId The ShipStation shipment ID (e.g., "se-924665462") - used for PUT URL
    * @param shipmentData The full ShipStation shipment payload - needed because PUT requires the entire object
-   * @param packageDimensions The dimensions to set on the package - uniquely identifies the package type
+   * @param packageInfo The package type info from packaging_types table
    * @param existingPackageName The current package name on the shipment - for guardrail: skip if already has a real package
    * @param shipmentStatus The current shipment status - for guardrail: only update "pending" shipments
    */
   async updateShipmentPackage(
     shipmentId: string,
     shipmentData: Record<string, any>,
-    packageDimensions: {
+    packageInfo: {
+      packageId: string;      // ShipStation package_id (e.g., "se-168574")
+      name: string;           // Package name (e.g., "Poly Bagger")
       length: number;
       width: number;
       height: number;
@@ -465,7 +467,7 @@ export class ShipStationShipmentService {
       console.log(`[ShipmentService] updateShipmentPackage called for ${shipmentId}`);
       console.log(`[ShipmentService] - existingPackageName: ${existingPackageName}`);
       console.log(`[ShipmentService] - shipmentStatus: ${shipmentStatus}`);
-      console.log(`[ShipmentService] - packageDimensions: ${JSON.stringify(packageDimensions)}`);
+      console.log(`[ShipmentService] - packageInfo: ${JSON.stringify(packageInfo)}`);
 
       // Guardrail 1: Check shipment status - must be "pending"
       if (shipmentStatus !== 'pending') {
@@ -489,20 +491,34 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: 'SHIPSTATION_API_KEY not configured' };
       }
 
-      // Build update payload with new package dimensions
-      // ShipStation custom packages all use package_code="package" - dimensions make them unique
+      // Build update payload with the full package info (package_id, name, dimensions)
+      // ShipStation custom packages use package_id to identify the specific package type
+      const packageDimensions = {
+        length: packageInfo.length,
+        width: packageInfo.width,
+        height: packageInfo.height,
+        unit: packageInfo.unit,
+      };
+      
       const updatePayload: any = {
         ...shipmentData,
         packages: shipmentData.packages?.map((pkg: any, index: number) => {
           if (index === 0) {
             return {
               ...pkg,
+              package_id: packageInfo.packageId,
               package_code: 'package',
+              name: packageInfo.name,
               dimensions: packageDimensions,
             };
           }
           return pkg;
-        }) || [{ package_code: 'package', dimensions: packageDimensions }],
+        }) || [{ 
+          package_id: packageInfo.packageId,
+          package_code: 'package',
+          name: packageInfo.name,
+          dimensions: packageDimensions,
+        }],
       };
 
       // Remove read-only fields that the API won't accept
@@ -517,13 +533,15 @@ export class ShipStationShipmentService {
       delete updatePayload.form_download;
       delete updatePayload.insurance_claim;
       
-      // Remove carrier/service fields to avoid "carrier_id required" validation error
-      // When service_code is set (e.g., "ups_ground") but carrier_id is null, ShipStation
-      // complains about needing carrier_id to disambiguate multiple carriers for that service.
-      // Since we're only updating package dimensions, we don't need carrier/service info.
-      delete updatePayload.carrier_id;
-      delete updatePayload.service_code;
-      delete updatePayload.carrier_code;
+      // Handle carrier_id validation issue:
+      // ShipStation requires carrier_id when service_code is set and multiple carriers support that service.
+      // If carrier_id is null but service_code is set, we need to clear service_code to avoid the validation error.
+      // This preserves the existing service if carrier_id is already set, otherwise clears both.
+      if (updatePayload.service_code && !updatePayload.carrier_id) {
+        console.log(`[ShipmentService] service_code "${updatePayload.service_code}" set but carrier_id is null, clearing service to avoid validation error`);
+        delete updatePayload.service_code;
+        delete updatePayload.carrier_code;
+      }
 
       // Handle null ship_from / warehouse_id (same pattern as updateShipmentNumber)
       if (updatePayload.ship_from === null && updatePayload.warehouse_id === null) {
@@ -544,7 +562,7 @@ export class ShipStationShipmentService {
         if (updatePayload.warehouse_id === null) delete updatePayload.warehouse_id;
       }
 
-      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with dimensions: ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with package: ${packageInfo.name} (${packageInfo.packageId}) ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
 
       const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
       const updateResponse = await fetch(updateUrl, {
@@ -562,7 +580,7 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
       }
 
-      console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package dimensions: ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+      console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package: ${packageInfo.name} (${packageInfo.packageId})`);
       return { success: true, updated: true };
 
     } catch (error: any) {

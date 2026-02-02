@@ -260,7 +260,16 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false }; // Not an error, just skip
         }
 
-        const packageDimensions = {
+        // Check if we have the ShipStation package_id (required for proper package assignment)
+        if (!packagingType.packageId) {
+          log(`Package sync: Packaging type ${packagingType.name} missing ShipStation package_id, skipping sync`);
+          return { success: true, shouldRetry: false };
+        }
+
+        // Build package info object with all required fields for ShipStation
+        const packageInfo = {
+          packageId: packagingType.packageId,  // ShipStation package_id (e.g., "se-168574")
+          name: packagingType.name,            // Package name (e.g., "Poly Bagger")
           length,
           width,
           height,
@@ -283,14 +292,14 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         const result = await shipmentService.updateShipmentPackage(
           shipment.shipmentId,
           shipmentData,
-          packageDimensions,
+          packageInfo,
           existingPackageName,
           shipment.shipmentStatus || 'pending'
         );
 
         if (result.success) {
           if (result.updated) {
-            log(`Package sync: Updated ShipStation package for ${orderNumber || shipmentId} - ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+            log(`Package sync: Updated ShipStation package for ${orderNumber || shipmentId} - ${packageInfo.name} (${packageInfo.length}x${packageInfo.width}x${packageInfo.height})`);
             sideEffectTriggeredCount++;
             // Clear any previous error flag since we succeeded
             await db.update(shipments)
