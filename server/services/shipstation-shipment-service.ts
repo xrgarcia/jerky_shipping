@@ -6,6 +6,23 @@
 import type { IStorage } from '../storage';
 import type { InsertShipment, Order } from '@shared/schema';
 import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo, extractPdfLabelUrl } from '../utils/shipstation-api';
+import { db } from '../db';
+import { featureFlags } from '@shared/schema';
+import { eq } from 'drizzle-orm';
+
+async function isFeatureFlagEnabled(key: string): Promise<boolean> {
+  try {
+    const [flag] = await db
+      .select({ enabled: featureFlags.enabled })
+      .from(featureFlags)
+      .where(eq(featureFlags.key, key))
+      .limit(1);
+    return flag?.enabled ?? false;
+  } catch (error) {
+    console.warn(`[ShipmentService] Feature flag check error for ${key}: ${error}`);
+    return false; // Default to disabled on error
+  }
+}
 
 export class ShipStationShipmentService {
   constructor(private storage: IStorage) {}
@@ -464,6 +481,13 @@ export class ShipStationShipmentService {
     error?: string;
   }> {
     try {
+      // Defense-in-depth: Check feature flag even if caller should have checked
+      const flagEnabled = await isFeatureFlagEnabled('auto_package_sync');
+      if (!flagEnabled) {
+        console.log(`[ShipmentService] updateShipmentPackage: Feature flag disabled, skipping API call for ${shipmentId}`);
+        return { success: true, updated: false, reason: 'Feature flag auto_package_sync is disabled' };
+      }
+
       console.log(`[ShipmentService] updateShipmentPackage called for ${shipmentId}`);
       console.log(`[ShipmentService] - existingPackageName: ${existingPackageName}`);
       console.log(`[ShipmentService] - shipmentStatus: ${shipmentStatus}`);

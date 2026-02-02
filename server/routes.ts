@@ -35,7 +35,7 @@ import { firestoreStorage } from "./firestore-storage";
 import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
-import { updateShipmentLifecycleBatch } from "./services/lifecycle-service";
+import { updateShipmentLifecycleBatch, queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -13511,6 +13511,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updatedShipments.length > 0) {
         const shipmentIds = updatedShipments.map(s => s.id);
         await updateShipmentLifecycleBatch(shipmentIds);
+        
+        // Queue lifecycle events with 'packaging' reason to trigger package sync side effect
+        // This enables the auto_package_sync feature to push dimensions to ShipStation
+        await queueLifecycleEvaluationBatch(
+          shipmentIds.map(id => ({ shipmentId: id })),
+          'packaging'
+        );
+        console.log(`[Fingerprints] Queued ${shipmentIds.length} lifecycle events with 'packaging' reason for package sync`);
       }
       
       // Re-run rate analysis for shipments that used fallback package details
