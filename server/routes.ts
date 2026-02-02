@@ -17,7 +17,7 @@ import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-web
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { verifySlashbinWebhook, isJobAlreadyProcessed, markJobAsProcessed } from "./utils/slashbin-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber, extractPdfLabelUrl } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync, enqueueLifecycleEvent } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -5453,6 +5453,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error forcing 90-day unified resync:", error);
       res.status(500).json({ error: "Failed to force 90-day unified resync" });
+    }
+  });
+
+  // Trigger lifecycle event for a specific shipment by order number (for manual package sync)
+  app.post("/api/shipments/:orderNumber/trigger-lifecycle", requireAuth, async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      
+      // Find shipments by order number
+      const shipmentList = await storage.getShipmentsByOrderNumber(orderNumber);
+      
+      if (shipmentList.length === 0) {
+        return res.status(404).json({ error: `No shipments found for order ${orderNumber}` });
+      }
+      
+      // Queue lifecycle events for all matching shipments
+      const results = await Promise.all(shipmentList.map(async (shipment) => {
+        const enqueued = await enqueueLifecycleEvent({
+          shipmentId: shipment.id,
+          orderNumber: shipment.orderNumber || undefined,
+          reason: 'manual',
+          enqueuedAt: Date.now(),
+          retryCount: 0,
+        });
+        return { shipmentId: shipment.id, enqueued };
+      }));
+      
+      const queuedCount = results.filter(r => r.enqueued).length;
+      const skippedCount = results.filter(r => !r.enqueued).length;
+      
+      console.log(`[Lifecycle] Manual trigger for ${orderNumber}: ${queuedCount} queued, ${skippedCount} already in queue`);
+      
+      res.json({ 
+        success: true, 
+        message: `Lifecycle event queued for ${queuedCount} shipment(s)`,
+        queued: queuedCount,
+        skipped: skippedCount,
+        shipments: results
+      });
+    } catch (error) {
+      console.error("Error triggering lifecycle event:", error);
+      res.status(500).json({ error: "Failed to trigger lifecycle event" });
     }
   });
 
