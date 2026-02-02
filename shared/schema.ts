@@ -1738,3 +1738,23 @@ export const insertLifecycleRepairJobSchema = createInsertSchema(lifecycleRepair
 
 export type InsertLifecycleRepairJob = z.infer<typeof insertLifecycleRepairJobSchema>;
 export type LifecycleRepairJob = typeof lifecycleRepairJobs.$inferSelect;
+
+// Feature Flags - Runtime-toggleable feature switches for operations control
+export const featureFlags = pgTable("feature_flags", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+}, (table) => ({
+  keyIdx: index("feature_flags_key_idx").on(table.key),
+}));
+
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;

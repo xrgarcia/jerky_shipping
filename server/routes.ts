@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis, featureFlags } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -5269,6 +5269,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch environment info" });
     }
   });
+
+  // Feature Flags API - Get all feature flags
+  app.get("/api/operations/feature-flags", requireAuth, async (req, res) => {
+    try {
+      const flags = await db.select().from(featureFlags).orderBy(featureFlags.key);
+      res.json(flags);
+    } catch (error) {
+      console.error("Error fetching feature flags:", error);
+      res.status(500).json({ error: "Failed to fetch feature flags" });
+    }
+  });
+
+  // Feature Flags API - Update a feature flag
+  app.put("/api/operations/feature-flags/:key", requireAuth, async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { enabled } = req.body;
+      const user = req.user as { email: string } | undefined;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "enabled must be a boolean" });
+      }
+
+      // Upsert the feature flag
+      const result = await db
+        .insert(featureFlags)
+        .values({
+          key,
+          enabled,
+          description: getFeatureFlagDescription(key),
+          updatedBy: user?.email || 'unknown',
+        })
+        .onConflictDoUpdate({
+          target: featureFlags.key,
+          set: {
+            enabled,
+            updatedAt: new Date(),
+            updatedBy: user?.email || 'unknown',
+          },
+        })
+        .returning();
+
+      res.json(result[0]);
+    } catch (error) {
+      console.error("Error updating feature flag:", error);
+      res.status(500).json({ error: "Failed to update feature flag" });
+    }
+  });
+
+  // Helper function to get descriptions for known feature flags
+  function getFeatureFlagDescription(key: string): string {
+    const descriptions: Record<string, string> = {
+      'auto_package_sync': 'Automatically sync package dimensions to ShipStation when fingerprints with packaging types are assigned',
+    };
+    return descriptions[key] || '';
+  }
 
   app.post("/api/operations/purge-shopify-queue", requireAuth, async (req, res) => {
     try {
