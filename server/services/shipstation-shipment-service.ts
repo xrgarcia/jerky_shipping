@@ -516,6 +516,14 @@ export class ShipStationShipmentService {
       delete updatePayload.label_download;
       delete updatePayload.form_download;
       delete updatePayload.insurance_claim;
+      
+      // Remove carrier/service fields to avoid "carrier_id required" validation error
+      // When service_code is set (e.g., "ups_ground") but carrier_id is null, ShipStation
+      // complains about needing carrier_id to disambiguate multiple carriers for that service.
+      // Since we're only updating package dimensions, we don't need carrier/service info.
+      delete updatePayload.carrier_id;
+      delete updatePayload.service_code;
+      delete updatePayload.carrier_code;
 
       // Handle null ship_from / warehouse_id (same pattern as updateShipmentNumber)
       if (updatePayload.ship_from === null && updatePayload.warehouse_id === null) {
