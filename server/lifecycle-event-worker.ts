@@ -279,13 +279,13 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false };
         }
 
-        // Call updateShipmentPackage
+        // Call updateShipmentPackage - use shipmentStatus (ShipStation status), not status (internal lifecycle)
         const result = await shipmentService.updateShipmentPackage(
           shipment.shipmentId,
           shipmentData,
           packageDimensions,
           existingPackageName,
-          shipment.status || 'pending'
+          shipment.shipmentStatus || 'pending'
         );
 
         if (result.success) {
