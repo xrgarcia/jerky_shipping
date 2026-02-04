@@ -5374,6 +5374,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Shipping method not found" });
       }
       
+      // Invalidate the shipping method config cache
+      const { shippingMethodConfig } = await import('./services/shipping-method-config-service');
+      shippingMethodConfig.invalidateCache();
+      
       res.json(result[0]);
     } catch (error) {
       console.error("Error updating shipping method:", error);
@@ -5397,6 +5401,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       const newMethods = result.rows?.length || 0;
+      
+      // Invalidate the shipping method config cache if new methods were added
+      if (newMethods > 0) {
+        const { shippingMethodConfig } = await import('./services/shipping-method-config-service');
+        shippingMethodConfig.invalidateCache();
+      }
+      
       res.json({ success: true, newMethods });
     } catch (error) {
       console.error("Error syncing shipping methods:", error);
