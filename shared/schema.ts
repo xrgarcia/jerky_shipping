@@ -1769,6 +1769,7 @@ export const shippingMethods = pgTable("shipping_methods", {
   name: text("name").notNull().unique(), // The customer_shipping_method value (e.g., "ups_ground")
   allowRateCheck: boolean("allow_rate_check").notNull().default(true), // Whether to include in rate checker
   allowAssignment: boolean("allow_assignment").notNull().default(true), // Whether we can assign this method to shipments
+  allowChange: boolean("allow_change").notNull().default(true), // Whether rate checker can change the shipping method (if false, keeps customer's choice)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by"), // User who last modified this record

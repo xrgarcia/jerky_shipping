@@ -5353,7 +5353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { shippingMethods } = await import("@shared/schema");
       const { id } = req.params;
-      const { allowRateCheck, allowAssignment } = req.body;
+      const { allowRateCheck, allowAssignment, allowChange } = req.body;
       const user = req.user as { email: string } | undefined;
       
       const result = await db
@@ -5361,6 +5361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({
           allowRateCheck: allowRateCheck ?? undefined,
           allowAssignment: allowAssignment ?? undefined,
+          allowChange: allowChange ?? undefined,
           updatedAt: new Date(),
           updatedBy: user?.email || 'unknown',
         })

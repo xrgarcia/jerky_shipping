@@ -22,6 +22,7 @@ interface ShippingMethod {
   name: string;
   allowRateCheck: boolean;
   allowAssignment: boolean;
+  allowChange: boolean;
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
@@ -61,7 +62,7 @@ export default function ShippingMethods() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean }) => {
+    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean; allowChange?: boolean }) => {
       const { id, ...body } = data;
       return apiRequest("PUT", `/api/settings/shipping-methods/${id}`, body);
     },
@@ -105,7 +106,7 @@ export default function ShippingMethods() {
     },
   });
 
-  const handleToggle = (method: ShippingMethod, field: 'allowRateCheck' | 'allowAssignment', value: boolean) => {
+  const handleToggle = (method: ShippingMethod, field: 'allowRateCheck' | 'allowAssignment' | 'allowChange', value: boolean) => {
     setUpdatingId(method.id);
     updateMutation.mutate({
       id: method.id,
@@ -164,6 +165,7 @@ export default function ShippingMethods() {
                 <TableRow>
                   <TableHead>Method Name</TableHead>
                   <TableHead className="text-center">Allow Rate Check</TableHead>
+                  <TableHead className="text-center">Allow Change</TableHead>
                   <TableHead className="text-center">Allow Assignment</TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead>Updated By</TableHead>
@@ -191,6 +193,21 @@ export default function ShippingMethods() {
                           data-testid={`switch-rate-check-${method.id}`}
                         />
                         {method.allowRateCheck ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Switch
+                          checked={method.allowChange}
+                          onCheckedChange={(checked) => handleToggle(method, 'allowChange', checked)}
+                          disabled={updatingId === method.id}
+                          data-testid={`switch-allow-change-${method.id}`}
+                        />
+                        {method.allowChange ? (
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         ) : (
                           <XCircle className="h-4 w-4 text-muted-foreground" />
@@ -233,8 +250,12 @@ export default function ShippingMethods() {
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <div>
             <strong className="text-foreground">Allow Rate Check:</strong> When enabled, orders with this shipping method 
-            will be included in the rate checker service. Disable this for methods that should always use their 
-            original carrier selection.
+            will be included in the rate checker service. Disable this for methods that should always be excluded from rate comparisons.
+          </div>
+          <div>
+            <strong className="text-foreground">Allow Change:</strong> When enabled, the rate checker can switch orders to a 
+            different shipping method if a better rate is found. When disabled, the rate check runs but the customer's 
+            original shipping method is preserved.
           </div>
           <div>
             <strong className="text-foreground">Allow Assignment:</strong> When enabled, this shipping method can be 
