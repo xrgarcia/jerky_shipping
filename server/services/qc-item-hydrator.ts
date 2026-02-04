@@ -1119,6 +1119,134 @@ export async function repairUnsubstitutedVariants(limit: number = 50): Promise<{
 }
 
 /**
+ * Repair job: Find and re-hydrate shipments with missing weights that now have weights
+ * 
+ * PROBLEM: Shipments get fingerprint_status='missing_weight' when products in their
+ * QC items don't have weight data in skuvault_products at hydration time. Later,
+ * users add weights to the product catalog, but these shipments remain stuck.
+ * 
+ * DETECTION: Find shipments where:
+ * - fingerprint_status = 'missing_weight'
+ * - Has QC items with NULL/0 weight
+ * - The SKU now has valid weight in skuvault_products
+ * - Not yet shipped (no tracking number or ship date)
+ * 
+ * FIX: Delete the QC items and re-run hydration with the correct weights
+ */
+export async function repairMissingWeightShipments(limit: number = 50): Promise<{
+  shipmentsRepaired: number;
+  shipmentsSkipped: number;
+  skusWithNewWeights: string[];
+  errors: string[];
+}> {
+  const result = {
+    shipmentsRepaired: 0,
+    shipmentsSkipped: 0,
+    skusWithNewWeights: [] as string[],
+    errors: [] as string[],
+  };
+  
+  try {
+    // Find shipments with missing_weight status where SKUs now have weights
+    // These are shipments where:
+    // 1. fingerprint_status = 'missing_weight'
+    // 2. Have QC items with NULL or 0 weight
+    // 3. The SKU now has valid weight in skuvault_products
+    // 4. Not yet shipped
+    const affectedShipments = await db.execute(sql`
+      SELECT DISTINCT
+        s.id as "shipmentId",
+        s.order_number as "orderNumber",
+        array_agg(DISTINCT qc.sku) as "skusToRepair"
+      FROM shipments s
+      INNER JOIN shipment_qc_items qc ON qc.shipment_id = s.id
+      INNER JOIN skuvault_products sv ON sv.sku = qc.sku
+      WHERE s.fingerprint_status = 'missing_weight'
+        AND s.tracking_number IS NULL
+        AND s.ship_date IS NULL
+        AND (qc.weight_value IS NULL OR qc.weight_value = 0)
+        AND sv.weight_value IS NOT NULL 
+        AND sv.weight_value > 0
+      GROUP BY s.id, s.order_number
+      LIMIT ${limit}
+    `);
+    
+    const shipmentsToRepair = affectedShipments.rows as Array<{
+      shipmentId: string;
+      orderNumber: string;
+      skusToRepair: string[];
+    }>;
+    
+    if (shipmentsToRepair.length === 0) {
+      log('Repair missing weights: No shipments need repair');
+      return result;
+    }
+    
+    // Collect all unique SKUs that now have weights
+    const allSkus = new Set<string>();
+    for (const shipment of shipmentsToRepair) {
+      if (shipment.skusToRepair) {
+        shipment.skusToRepair.forEach(sku => allSkus.add(sku));
+      }
+    }
+    result.skusWithNewWeights = Array.from(allSkus);
+    
+    log(`Repair missing weights: Found ${shipmentsToRepair.length} shipments with ${result.skusWithNewWeights.length} SKUs that now have weights`);
+    
+    for (const shipment of shipmentsToRepair) {
+      try {
+        const { shipmentId, orderNumber } = shipment;
+        
+        // Delete all existing QC items for this shipment
+        await db
+          .delete(shipmentQcItems)
+          .where(eq(shipmentQcItems.shipmentId, shipmentId));
+        
+        // Clear fingerprint data so it gets recalculated
+        await db
+          .update(shipments)
+          .set({
+            fingerprintId: null,
+            fingerprintStatus: null,
+            packagingTypeId: null,
+            assignedStationId: null,
+            packagingDecisionType: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, shipmentId));
+        
+        // Re-hydrate the shipment (this will use the correct weights now)
+        const hydrationResult = await hydrateShipment(
+          shipmentId, 
+          orderNumber || 'unknown'
+        );
+        
+        if (hydrationResult.error) {
+          result.errors.push(`${orderNumber}: ${hydrationResult.error}`);
+          result.shipmentsSkipped++;
+        } else {
+          result.shipmentsRepaired++;
+          log(`Repaired weights in ${orderNumber}: ${hydrationResult.itemsCreated} items, fingerprint ${hydrationResult.fingerprintStatus}`);
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        result.errors.push(`${shipment.orderNumber}: ${errorMsg}`);
+        result.shipmentsSkipped++;
+      }
+    }
+    
+    log(`Repair missing weights complete: ${result.shipmentsRepaired} repaired, ${result.shipmentsSkipped} skipped, ${result.errors.length} errors`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(`Repair missing weights failed: ${errorMsg}`);
+    result.errors.push(`Fatal: ${errorMsg}`);
+  }
+  
+  return result;
+}
+
+/**
  * Centralized handler for when product collection assignments change
  * Called from any collection mutation (add/remove product, delete collection)
  * 

@@ -15,6 +15,7 @@ import {
   syncSkuvaultProducts,
   syncPhysicalLocations,
 } from './services/skuvault-products-sync-service';
+import { repairMissingWeightShipments } from './services/qc-item-hydrator';
 
 const log = (message: string) => console.log(`[skuvault-products-worker] ${message}`);
 
@@ -32,6 +33,10 @@ let workerStats = {
   lastLocationSyncAt: null as Date | null,
   lastLocationSyncUpdated: 0,
   lastLocationSyncBrands: 0,
+  // Weight repair stats
+  lastWeightRepairAt: null as Date | null,
+  lastWeightRepairCount: 0,
+  lastWeightRepairSkus: [] as string[],
 };
 
 /**
@@ -93,6 +98,22 @@ async function runSyncCheck(): Promise<void> {
       log(`Location sync completed with errors: ${locationResult.errors.join(', ')}`);
     }
     
+    // Run weight repair job to fix shipments that now have weights
+    log('Running weight repair job...');
+    const weightRepairResult = await repairMissingWeightShipments(100);
+    
+    workerStats.lastWeightRepairAt = new Date();
+    workerStats.lastWeightRepairCount = weightRepairResult.shipmentsRepaired;
+    workerStats.lastWeightRepairSkus = weightRepairResult.skusWithNewWeights;
+    
+    if (weightRepairResult.shipmentsRepaired > 0) {
+      log(`Weight repair completed: ${weightRepairResult.shipmentsRepaired} shipments repaired, SKUs: ${weightRepairResult.skusWithNewWeights.join(', ')}`);
+    } else if (weightRepairResult.errors.length > 0) {
+      log(`Weight repair completed with errors: ${weightRepairResult.errors.join(', ')}`);
+    } else {
+      log('Weight repair: No shipments needed repair');
+    }
+    
   } catch (error) {
     log(`Error during sync check: ${error}`);
     console.error('[skuvault-products-worker] Full error:', error);
@@ -109,6 +130,10 @@ export async function forceSync(): Promise<{
   productCount: number;
   stockCheckDate: string | null;
   duration: number;
+  weightRepair?: {
+    shipmentsRepaired: number;
+    skusWithNewWeights: string[];
+  };
 }> {
   if (workerStatus === 'running') {
     log('Worker is already running, cannot force sync');
@@ -133,7 +158,25 @@ export async function forceSync(): Promise<{
       workerStats.lastProductCount = result.productCount;
     }
     
-    return result;
+    // Also run weight repair after force sync
+    log('Running weight repair after force sync...');
+    const weightRepairResult = await repairMissingWeightShipments(100);
+    
+    workerStats.lastWeightRepairAt = new Date();
+    workerStats.lastWeightRepairCount = weightRepairResult.shipmentsRepaired;
+    workerStats.lastWeightRepairSkus = weightRepairResult.skusWithNewWeights;
+    
+    if (weightRepairResult.shipmentsRepaired > 0) {
+      log(`Weight repair completed: ${weightRepairResult.shipmentsRepaired} shipments repaired`);
+    }
+    
+    return {
+      ...result,
+      weightRepair: {
+        shipmentsRepaired: weightRepairResult.shipmentsRepaired,
+        skusWithNewWeights: weightRepairResult.skusWithNewWeights,
+      },
+    };
   } finally {
     workerStatus = 'sleeping';
   }
