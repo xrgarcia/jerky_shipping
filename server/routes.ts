@@ -12906,12 +12906,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { fingerprints: fingerprintsTable, fingerprintModels, shipments: shipmentsTable } = await import("@shared/schema");
       
-      // Fast query: count fingerprints with active shipments and packaging status
+      // Fast query: count fingerprints with active shipments (ready_to_session phase) and packaging status
+      // Only count fingerprints where at least one shipment is in 'ready_to_session' lifecycle phase
+      // This excludes on-hold orders, shipped orders, and orders without MOVE OVER tag
       const statsResult = await db.execute(sql`
         WITH active_fingerprints AS (
           SELECT DISTINCT f.id, fm.packaging_type_id IS NOT NULL as has_packaging
           FROM fingerprints f
-          INNER JOIN shipments s ON s.fingerprint_id = f.id
+          INNER JOIN shipments s ON s.fingerprint_id = f.id AND s.lifecycle_phase = 'ready_to_session'
           LEFT JOIN fingerprint_models fm ON fm.fingerprint_id = f.id
         )
         SELECT 
@@ -12935,11 +12937,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get fingerprints that need mapping (no packaging assigned)
+  // Only shows fingerprints with active orders (lifecycle_phase = 'ready_to_session')
   app.get("/api/fingerprints/needs-mapping", requireAuth, async (req, res) => {
     try {
       const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
       
-      // Get fingerprints WITHOUT packaging assignment that have active shipments
+      // Get fingerprints WITHOUT packaging assignment that have active shipments in 'ready_to_session' phase
+      // This excludes on-hold orders, shipped orders, and orders without MOVE OVER tag
       const fingerprintsWithStats = await db
         .select({
           id: fingerprintsTable.id,
@@ -12954,7 +12958,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shipmentCount: sql<number>`COUNT(DISTINCT ${shipmentsTable.id})`.as('shipment_count'),
         })
         .from(fingerprintsTable)
-        .innerJoin(shipmentsTable, eq(shipmentsTable.fingerprintId, fingerprintsTable.id))
+        .innerJoin(shipmentsTable, and(
+          eq(shipmentsTable.fingerprintId, fingerprintsTable.id),
+          eq(shipmentsTable.lifecyclePhase, 'ready_to_session')
+        ))
         .leftJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
         .where(isNull(fingerprintModels.packagingTypeId))
         .groupBy(
