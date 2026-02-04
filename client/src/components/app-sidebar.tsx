@@ -175,6 +175,11 @@ export function AppSidebar() {
       url: "/settings/excluded-skus",
       icon: AlertTriangle,
     },
+    {
+      title: "Shipping Methods",
+      url: "/settings/shipping-methods",
+      icon: Truck,
+    },
   ];
   
   // Reports submenu items

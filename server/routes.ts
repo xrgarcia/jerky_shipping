@@ -5336,6 +5336,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return descriptions[key] || '';
   }
 
+  // Shipping Methods API - List all shipping methods
+  app.get("/api/settings/shipping-methods", requireAuth, async (req, res) => {
+    try {
+      const { shippingMethods } = await import("@shared/schema");
+      const methods = await db.select().from(shippingMethods).orderBy(shippingMethods.name);
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      res.status(500).json({ error: "Failed to fetch shipping methods" });
+    }
+  });
+
+  // Shipping Methods API - Update a shipping method
+  app.put("/api/settings/shipping-methods/:id", requireAuth, async (req, res) => {
+    try {
+      const { shippingMethods } = await import("@shared/schema");
+      const { id } = req.params;
+      const { allowRateCheck, allowAssignment } = req.body;
+      const user = req.user as { email: string } | undefined;
+      
+      const result = await db
+        .update(shippingMethods)
+        .set({
+          allowRateCheck: allowRateCheck ?? undefined,
+          allowAssignment: allowAssignment ?? undefined,
+          updatedAt: new Date(),
+          updatedBy: user?.email || 'unknown',
+        })
+        .where(eq(shippingMethods.id, parseInt(id)))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Shipping method not found" });
+      }
+      
+      res.json(result[0]);
+    } catch (error) {
+      console.error("Error updating shipping method:", error);
+      res.status(500).json({ error: "Failed to update shipping method" });
+    }
+  });
+
+  // Shipping Methods API - Sync new methods from shipments
+  app.post("/api/settings/shipping-methods/sync", requireAuth, async (req, res) => {
+    try {
+      const { shippingMethods, shipments: shipmentsTable } = await import("@shared/schema");
+      
+      // Get all unique service codes from shipments that aren't already in shipping_methods
+      const result = await db.execute(sql`
+        INSERT INTO shipping_methods (name)
+        SELECT DISTINCT service_code 
+        FROM shipments 
+        WHERE service_code IS NOT NULL
+        ON CONFLICT (name) DO NOTHING
+        RETURNING name
+      `);
+      
+      const newMethods = result.rows?.length || 0;
+      res.json({ success: true, newMethods });
+    } catch (error) {
+      console.error("Error syncing shipping methods:", error);
+      res.status(500).json({ error: "Failed to sync shipping methods" });
+    }
+  });
+
   app.post("/api/operations/purge-shopify-queue", requireAuth, async (req, res) => {
     try {
       const clearedCount = await clearQueue();
