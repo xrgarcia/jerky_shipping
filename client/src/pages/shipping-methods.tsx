@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -28,6 +29,8 @@ interface ShippingMethod {
   allowRateCheck: boolean;
   allowAssignment: boolean;
   allowChange: boolean;
+  minAllowedWeight: string | null;
+  maxAllowedWeight: string | null;
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
@@ -67,7 +70,7 @@ export default function ShippingMethods() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean; allowChange?: boolean }) => {
+    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
       const { id, ...body } = data;
       return apiRequest("PUT", `/api/settings/shipping-methods/${id}`, body);
     },
@@ -116,6 +119,16 @@ export default function ShippingMethods() {
     updateMutation.mutate({
       id: method.id,
       [field]: value,
+    });
+  };
+
+  const handleWeightChange = (method: ShippingMethod, field: 'minAllowedWeight' | 'maxAllowedWeight', value: string) => {
+    const numValue = value.trim() === '' ? null : parseFloat(value);
+    if (value.trim() !== '' && (isNaN(numValue as number) || (numValue as number) < 0)) return;
+    setUpdatingId(method.id);
+    updateMutation.mutate({
+      id: method.id,
+      [field]: numValue,
     });
   };
 
@@ -208,6 +221,32 @@ export default function ShippingMethods() {
                       </Tooltip>
                     </div>
                   </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Min Weight (oz)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          Minimum package weight in ounces. Leave empty for no minimum limit.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Max Weight (oz)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          Maximum package weight in ounces. Leave empty for no maximum limit.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead>Updated By</TableHead>
                 </TableRow>
@@ -216,14 +255,9 @@ export default function ShippingMethods() {
                 {methods.map((method) => (
                   <TableRow key={method.id} data-testid={`row-method-${method.id}`}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {method.name}
-                        </Badge>
-                        <span className="text-muted-foreground text-sm">
-                          {formatMethodName(method.name)}
-                        </span>
-                      </div>
+                      <Badge variant="secondary" className="font-mono text-xs">
+                        {method.name}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -270,6 +304,32 @@ export default function ShippingMethods() {
                         )}
                       </div>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="No limit"
+                        className="w-24 text-center"
+                        defaultValue={method.minAllowedWeight || ''}
+                        onBlur={(e) => handleWeightChange(method, 'minAllowedWeight', e.target.value)}
+                        disabled={updatingId === method.id}
+                        data-testid={`input-min-weight-${method.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="No limit"
+                        className="w-24 text-center"
+                        defaultValue={method.maxAllowedWeight || ''}
+                        onBlur={(e) => handleWeightChange(method, 'maxAllowedWeight', e.target.value)}
+                        disabled={updatingId === method.id}
+                        data-testid={`input-max-weight-${method.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(method.updatedAt)}
                     </TableCell>
@@ -301,6 +361,10 @@ export default function ShippingMethods() {
           <div>
             <strong className="text-foreground">Allow Assignment:</strong> When enabled, this shipping method can be 
             assigned to shipments during fulfillment. Disable this for deprecated or restricted methods.
+          </div>
+          <div>
+            <strong className="text-foreground">Min/Max Weight:</strong> Optional weight limits in ounces. When set, this 
+            shipping method will only be considered for packages within this weight range. Leave empty for no limit.
           </div>
         </CardContent>
       </Card>

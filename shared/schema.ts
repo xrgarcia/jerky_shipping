@@ -1770,6 +1770,8 @@ export const shippingMethods = pgTable("shipping_methods", {
   allowRateCheck: boolean("allow_rate_check").notNull().default(true), // Whether to include in rate checker
   allowAssignment: boolean("allow_assignment").notNull().default(true), // Whether we can assign this method to shipments
   allowChange: boolean("allow_change").notNull().default(true), // Whether rate checker can change the shipping method (if false, keeps customer's choice)
+  minAllowedWeight: numeric("min_allowed_weight", { precision: 10, scale: 2 }), // Minimum weight in oz (nullable = no limit)
+  maxAllowedWeight: numeric("max_allowed_weight", { precision: 10, scale: 2 }), // Maximum weight in oz (nullable = no limit)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by"), // User who last modified this record
