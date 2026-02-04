@@ -14,7 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RefreshCw, Truck, CheckCircle, XCircle } from "lucide-react";
+import { RefreshCw, Truck, CheckCircle, XCircle, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface ShippingMethod {
@@ -164,9 +169,45 @@ export default function ShippingMethods() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Method Name</TableHead>
-                  <TableHead className="text-center">Allow Rate Check</TableHead>
-                  <TableHead className="text-center">Allow Change</TableHead>
-                  <TableHead className="text-center">Allow Assignment</TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Allow Rate Check
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          When enabled, orders with this shipping method will be included in the rate checker service.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Allow Change
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          When enabled, the rate checker can switch to a different method. When disabled, the customer's original choice is preserved.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Allow Assignment
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          When enabled, this shipping method can be assigned to shipments during fulfillment.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead>Updated By</TableHead>
                 </TableRow>
