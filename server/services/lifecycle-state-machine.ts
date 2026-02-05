@@ -75,7 +75,7 @@ export interface ShipmentLifecycleData {
   fulfillmentSessionId?: string | null;
   fingerprintId?: string | null;
   hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
-  rateAnalysisComplete?: boolean;   // Whether smart carrier rate analysis has been completed
+  rateCheckStatus?: string | null;  // Rate check status: 'pending' | 'complete' | 'failed' | 'skipped' | null
 }
 
 // Status codes that indicate package is on the dock (at the facility, awaiting carrier pickup)
@@ -202,7 +202,7 @@ export function deriveDecisionSubphase(shipment: {
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | null;
   sessionStatus?: string | null;
-  rateAnalysisComplete?: boolean;
+  rateCheckStatus?: string | null;
   shipmentId?: string | null;
   shipToPostalCode?: string | null;
   serviceCode?: string | null;
@@ -227,9 +227,11 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
-  // NEEDS_RATE_CHECK: All required data present but rate analysis not complete
-  // Uses centralized eligibility checker to validate all requirements
-  if (shipment.rateAnalysisComplete !== true) {
+  // NEEDS_RATE_CHECK: Rate check not yet complete or failed (can retry)
+  // Eligible statuses to proceed: 'complete', 'skipped'
+  // Statuses that stay in needs_rate_check: null, 'pending', 'failed'
+  const rateCheckComplete = shipment.rateCheckStatus === 'complete' || shipment.rateCheckStatus === 'skipped';
+  if (!rateCheckComplete) {
     const eligibility = RateCheckEligibility.checkBasicRequirements(shipment);
     if (eligibility.eligible) {
       return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
