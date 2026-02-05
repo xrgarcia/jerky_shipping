@@ -72,7 +72,7 @@ export interface ShipmentLifecycleData {
   shipmentStatus?: string | null;   // ShipStation shipment lifecycle status (on_hold, pending, etc.)
   fingerprintStatus?: string | null;
   packagingTypeId?: string | null;
-  fulfillmentSessionId?: string | null;
+  fulfillmentSessionId?: string | number | null; // Local fulfillment session ID
   fingerprintId?: string | null;
   hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
   rateCheckStatus?: string | null;  // Rate check status: 'pending' | 'complete' | 'failed' | 'skipped' | null
@@ -177,12 +177,22 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_PICK, subphase: null };
   }
 
-  // READY_TO_SESSION: Pending + MOVE OVER tag + no SkuVault session yet + not cancelled
+  // SESSION_CREATED: Has a local fulfillment session but no SkuVault session yet
+  // This means the session was built locally and is waiting to be pushed to SkuVault
+  if (shipment.fulfillmentSessionId && 
+      !shipment.sessionStatus &&
+      shipment.shipmentStatus === 'pending' &&
+      shipment.status !== 'cancelled') {
+    return { phase: LIFECYCLE_PHASES.SESSION_CREATED, subphase: null };
+  }
+
+  // READY_TO_SESSION: Pending + MOVE OVER tag + no SkuVault session yet + no local session + not cancelled
   // This is where fingerprinting and QC item explosion should happen
   // Also derive subphase so session builder can find orders that are ready (needs_session)
   if (shipment.shipmentStatus === 'pending' && 
       shipment.hasMoveOverTag === true && 
       !shipment.sessionStatus &&
+      !shipment.fulfillmentSessionId &&
       shipment.status !== 'cancelled') {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
@@ -249,6 +259,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
   const displayNames: Record<LifecyclePhase, string> = {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 'Ready to Fulfill',
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 'Ready to Session',
+    [LIFECYCLE_PHASES.SESSION_CREATED]: 'Session Created',
     [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 'Awaiting Decisions',
     [LIFECYCLE_PHASES.READY_TO_PICK]: 'Ready to Pick',
     [LIFECYCLE_PHASES.PICKING]: 'Picking',

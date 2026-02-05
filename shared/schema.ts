@@ -21,6 +21,7 @@ import { z } from "zod";
 export const LIFECYCLE_PHASES = {
   READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + MOVE OVER tag - waiting to be released from hold
   READY_TO_SESSION: 'ready_to_session',      // Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+  SESSION_CREATED: 'session_created',        // Local fulfillment session built, waiting for SkuVault push
   AWAITING_DECISIONS: 'awaiting_decisions',  // Has fingerprint, needs packing decisions
   READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
   PICKING: 'picking',                         // Actively being picked
@@ -56,7 +57,8 @@ export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_S
  */
 export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
   [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // When released from hold
-  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.AWAITING_DECISIONS], // After fingerprinting
+  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.SESSION_CREATED, LIFECYCLE_PHASES.AWAITING_DECISIONS], // After session built or fingerprinting
+  [LIFECYCLE_PHASES.SESSION_CREATED]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.READY_TO_SESSION], // SkuVault detects session, or session cancelled
   [LIFECYCLE_PHASES.AWAITING_DECISIONS]: [LIFECYCLE_PHASES.READY_TO_PICK],
   [LIFECYCLE_PHASES.READY_TO_PICK]: [LIFECYCLE_PHASES.PICKING, LIFECYCLE_PHASES.PICKING_ISSUES],
   [LIFECYCLE_PHASES.PICKING]: [LIFECYCLE_PHASES.PACKING_READY, LIFECYCLE_PHASES.PICKING_ISSUES],

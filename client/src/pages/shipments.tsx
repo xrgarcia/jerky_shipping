@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban } from "lucide-react";
+import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -41,6 +41,7 @@ interface LifecycleTabCounts {
   all: number;
   readyToFulfill: number;
   readyToSession: number;
+  sessionCreated: number;
   readyToPick: number;
   picking: number;
   packingReady: number;
@@ -49,7 +50,7 @@ interface LifecycleTabCounts {
 }
 
 type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'ready_to_session' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type LifecycleTab = 'ready_to_session' | 'session_created' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -97,6 +98,11 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
     title: "Ready to Session",
     description: "This order has all required information (fingerprint, packaging) and is ready to be added to a fulfillment session for picking.",
     nextSteps: "Use the Session Builder to create a new session including this order."
+  },
+  session_created: {
+    title: "Session Created",
+    description: "A local fulfillment session has been built for this order. It's waiting to be pushed to SkuVault for picking.",
+    nextSteps: "Release the session to the floor or push it to SkuVault. Once detected, it will move to Ready to Pick."
   },
   needs_categorization: {
     title: "Needs Categorization",
@@ -381,6 +387,16 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
           </Badge>
         );
         return wrapBadgeWithPopover('ready_to_session', badge);
+      }
+      
+      case 'session_created': {
+        const badge = (
+          <Badge className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <ListChecks className="h-3 w-3" />
+            Session Created
+          </Badge>
+        );
+        return wrapBadgeWithPopover('session_created', badge);
       }
       
       case 'awaiting_decisions':
@@ -900,7 +916,7 @@ export default function Shipments() {
 
   // Valid values for URL hydration
   const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
-  const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+  const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'session_created', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
   const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
 
   // Initialize state from URL params (runs when URL changes, including browser navigation)
@@ -1239,7 +1255,7 @@ export default function Shipments() {
     queryKey: ["/api/shipments/lifecycle-counts"],
   });
 
-  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToFulfill: 0, readyToSession: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
+  const lifecycleCounts = lifecycleCountsData || { all: 0, readyToFulfill: 0, readyToSession: 0, sessionCreated: 0, readyToPick: 0, picking: 0, packingReady: 0, onDock: 0, pickingIssues: 0 };
 
   // Fetch stations for the station filter dropdown
   const { data: stationsData } = useQuery<{ id: string; name: string; stationType: string }[]>({
@@ -1498,6 +1514,10 @@ export default function Shipments() {
       }
     } else {
       switch (activeLifecycleTab) {
+        case 'ready_to_session':
+          return 'Orders ready to be added to a fulfillment session';
+        case 'session_created':
+          return 'Orders assigned to a local session - waiting for SkuVault to detect and start picking';
         case 'ready_to_pick':
           return 'Orders ready to be picked - session created, waiting to start';
         case 'picking':
@@ -1584,7 +1604,7 @@ export default function Shipments() {
         {viewMode === 'lifecycle' ? (
           <Tabs value={activeLifecycleTab} onValueChange={handleTabChange} className="w-full">
             <div className="overflow-x-auto scrollbar-thin">
-              <TabsList className="grid grid-cols-6 w-max sm:w-full h-auto p-1 gap-1">
+              <TabsList className="grid grid-cols-7 w-max sm:w-full h-auto p-1 gap-1">
                 <TabsTrigger 
                   value="ready_to_session" 
                   className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[95px] sm:min-w-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
@@ -1595,6 +1615,17 @@ export default function Shipments() {
                     <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready to Session</span>
                   </div>
                   <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToSession} orders</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="session_created" 
+                  className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[90px] sm:min-w-0 data-[state=active]:bg-violet-600 data-[state=active]:text-white"
+                  data-testid="tab-lifecycle-session-created"
+                >
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <ListChecks className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Session Created</span>
+                  </div>
+                  <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.sessionCreated} orders</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ready_to_pick" 
@@ -2165,6 +2196,7 @@ export default function Shipments() {
                           <SelectItem value="all">All</SelectItem>
                           <SelectItem value="ready_to_fulfill">Ready to Fulfill</SelectItem>
                           <SelectItem value="ready_to_session">Ready to Session</SelectItem>
+                          <SelectItem value="session_created">Session Created</SelectItem>
                           <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
                           <SelectItem value="picking">Picking</SelectItem>

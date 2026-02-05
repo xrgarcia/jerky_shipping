@@ -207,7 +207,7 @@ export interface IStorage {
   getFilteredShipments(filters: ShipmentFilters): Promise<{ shipments: Shipment[], total: number }>;
   getFilteredShipmentsWithOrders(filters: ShipmentFilters): Promise<{ shipments: any[], total: number }>;
   getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }>;
-  getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
+  getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; sessionCreated: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }>;
   getDistinctStatuses(): Promise<string[]>;
   getDistinctStatusDescriptions(status?: string): Promise<string[]>;
   getDistinctShipmentStatuses(): Promise<Array<string | null>>;
@@ -1667,7 +1667,7 @@ export class DatabaseStorage implements IStorage {
    * │   "closed"          │  Has value  │  DE/SP/etc  │  Delivered         │  (excluded)  │
    * └───────────────────────────────────────────────────────────────────────────────────┘
    */
-  async getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
+  async getLifecycleTabCounts(): Promise<{ all: number; readyToFulfill: number; readyToSession: number; sessionCreated: number; readyToPick: number; picking: number; packingReady: number; onDock: number; pickingIssues: number }> {
     // All: Total count
     const allResult = await db
       .select({ count: count() })
@@ -1684,6 +1684,12 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipments)
       .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
+
+    // Session Created: Use lifecycle_phase as source of truth
+    const sessionCreatedResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(eq(shipments.lifecyclePhase, 'session_created'));
 
     // Ready to Pick: Use lifecycle_phase as source of truth
     const readyToPickResult = await db
@@ -1719,6 +1725,7 @@ export class DatabaseStorage implements IStorage {
       all: Number(allResult[0]?.count) || 0,
       readyToFulfill: Number(readyToFulfillResult[0]?.count) || 0,
       readyToSession: Number(readyToSessionResult[0]?.count) || 0,
+      sessionCreated: Number(sessionCreatedResult[0]?.count) || 0,
       readyToPick: Number(readyToPickResult[0]?.count) || 0,
       picking: Number(pickingResult[0]?.count) || 0,
       packingReady: Number(packingReadyResult[0]?.count) || 0,
