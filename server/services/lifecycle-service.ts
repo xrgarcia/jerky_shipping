@@ -13,7 +13,7 @@
  */
 
 import { db } from "../db";
-import { shipments, shipmentTags, shipmentRateAnalysis, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
+import { shipments, shipmentTags, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import {
   deriveLifecyclePhase,
@@ -91,14 +91,6 @@ export async function updateShipmentLifecycleFromData(
     .limit(1);
   const hasMoveOverTag = moveOverTag.length > 0;
 
-  // Check if rate analysis has been completed for this shipment
-  const rateAnalysis = await db
-    .select({ shipmentId: shipmentRateAnalysis.shipmentId })
-    .from(shipmentRateAnalysis)
-    .where(eq(shipmentRateAnalysis.shipmentId, shipment.shipmentId || ''))
-    .limit(1);
-  const rateAnalysisComplete = rateAnalysis.length > 0;
-
   // Merge any provided shipment data updates (for pre-save checks)
   const rawFulfillmentSessionId = shipmentData?.fulfillmentSessionId ?? shipment.fulfillmentSessionId;
   const effectiveData: ShipmentLifecycleData = {
@@ -111,7 +103,7 @@ export async function updateShipmentLifecycleFromData(
     fulfillmentSessionId: rawFulfillmentSessionId != null ? String(rawFulfillmentSessionId) : null,
     fingerprintId: shipmentData?.fingerprintId ?? shipment.fingerprintId,
     hasMoveOverTag,
-    rateAnalysisComplete,
+    rateCheckStatus: shipmentData?.rateCheckStatus ?? shipment.rateCheckStatus,
   };
 
   // Derive the correct lifecycle state

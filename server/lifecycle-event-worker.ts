@@ -160,6 +160,12 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
             })
             .where(eq(shipments.id, shipmentId));
           
+          // Re-evaluate lifecycle to advance subphase
+          await updateShipmentLifecycle(shipmentId, {
+            logTransition: true,
+            shipmentData: { rateCheckStatus: 'complete' },
+          });
+          
           log(`Side effect: Rate check completed for ${orderNumber || shipmentId}`);
           sideEffectTriggeredCount++;
           return true;
@@ -174,6 +180,12 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
             })
             .where(eq(shipments.id, shipmentId));
           
+          // Re-evaluate lifecycle (will remain in needs_rate_check for retry)
+          await updateShipmentLifecycle(shipmentId, {
+            logTransition: true,
+            shipmentData: { rateCheckStatus: 'failed' },
+          });
+          
           log(`Side effect: Rate check failed for ${orderNumber || shipmentId}: ${result.error}`, 'warn');
           return false;
         }
@@ -187,6 +199,12 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
             updatedAt: new Date(),
           })
           .where(eq(shipments.id, shipmentId));
+        
+        // Re-evaluate lifecycle (will remain in needs_rate_check for retry)
+        await updateShipmentLifecycle(shipmentId, {
+          logTransition: true,
+          shipmentData: { rateCheckStatus: 'failed' },
+        });
         
         log(`Side effect: Rate check error for ${shipmentId}: ${error.message}`, 'error');
         return false;
