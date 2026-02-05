@@ -1,0 +1,148 @@
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+database: 'neondb',
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+at Sn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:317:79)
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+},
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_events: [Object: null prototype] { error: [Function (anonymous)] },
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+port: 5432,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+},
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+keepalives_idle: 0
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+client_encoding: '',
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+connectionParameters: ConnectionParameters {
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+idle_in_transaction_session_timeout: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+lastBuffer: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+database: 'neondb',
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_eventsCount: 22,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+config: {
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_maxListeners: undefined,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+at WebSocket.emitClose (/home/runner/workspace/node_modules/ws/lib/websocket.js:272:10) {
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+binary: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_connected: true,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+query_timeout: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_types: TypeOverrides { _types: [Object], text: {}, binary: {} },
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+at WebSocket.onClose (/home/runner/workspace/node_modules/ws/lib/event-target.js:220:9)
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+isDomainSocket: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+[FATAL] Uncaught exception: Error: Connection terminated unexpectedly
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_Promise: [Function: Promise],
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_ending: true,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+at Object.onceWrapper (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:327:95)
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+keepalives: 1,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_eventsCount: 1,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+ssl: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+host: 'ep-raspy-bonus-afz5fn6v.c-2.us-west-2.aws.neon.tech',
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_connectionError: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+at S. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:971:58)
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_keepAlive: true,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+fallback_application_name: undefined,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_keepAliveInitialDelayMillis: 0,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+statement_timeout: false,
+2026-02-05 13:11:40.54
+f5e07a5e
+User
+_queryable: false,
