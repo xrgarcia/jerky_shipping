@@ -14326,6 +14326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not authenticated" });
       }
       
+      console.log(`[FulfillmentSessions] Build request from user ${userId}:`, JSON.stringify(req.body));
+      
       const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
       const { stationType, dryRun, orderNumbers } = req.body;
       
@@ -14334,6 +14336,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dryRun: dryRun === true,
         orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
       });
+      
+      console.log(`[FulfillmentSessions] Build result: ${result.sessionsCreated} sessions, ${result.shipmentsAssigned} assigned, ${result.shipmentsSkipped} skipped, errors: [${result.errors.join(', ')}]`);
       
       if (!result.success) {
         return res.status(400).json({

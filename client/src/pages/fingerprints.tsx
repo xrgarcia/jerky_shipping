@@ -75,6 +75,7 @@ import {
   Square,
   Copy,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -668,9 +669,9 @@ export default function Fingerprints() {
       return res.json() as Promise<BuildSessionsResult>;
     },
     onSuccess: (result) => {
-      if (result.success) {
+      if (result.success && result.shipmentsAssigned > 0) {
         setLastBuildResult(result);
-        setSelectedBuildOrderNumbers(new Set()); // Clear selection after build
+        setSelectedBuildOrderNumbers(new Set());
         toast({
           title: "Sessions Created",
           description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
@@ -679,6 +680,17 @@ export default function Fingerprints() {
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
         setActiveTab('live');
+      } else if (result.success && result.shipmentsAssigned === 0) {
+        setLastBuildResult(result);
+        toast({
+          title: "No Orders Assigned",
+          description: result.errors.length > 0 
+            ? result.errors.join(", ") 
+            : "No eligible orders found for session building. Orders may need packaging or station assignment first.",
+          variant: "destructive",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
       } else {
         toast({
           title: "Failed to build sessions",
@@ -2724,7 +2736,7 @@ export default function Fingerprints() {
               </div>
             </CardHeader>
             <CardContent>
-              {lastBuildResult && (
+              {lastBuildResult && lastBuildResult.shipmentsAssigned > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -2737,6 +2749,27 @@ export default function Fingerprints() {
                     variant="ghost"
                     size="sm"
                     className="mt-2 text-green-700 hover:text-green-800"
+                    onClick={() => setLastBuildResult(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+              {lastBuildResult && lastBuildResult.shipmentsAssigned === 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <span className="font-medium text-amber-800 dark:text-amber-200">No Orders Were Assigned</span>
+                  </div>
+                  <div className="text-sm text-amber-700 dark:text-amber-300">
+                    {lastBuildResult.errors.length > 0 
+                      ? lastBuildResult.errors.join(". ") 
+                      : "No eligible orders found. Orders may need packaging or station assignment first."}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-amber-700 hover:text-amber-800"
                     onClick={() => setLastBuildResult(null)}
                   >
                     Dismiss

@@ -504,8 +504,11 @@ export class FulfillmentSessionService {
     };
 
     try {
+      console.log(`[FulfillmentSession] buildSessions called - stationType: ${stationType || 'any'}, dryRun: ${dryRun}, orderNumbers: ${orderNumbers ? orderNumbers.join(',') : 'none'}`);
+      
       // 1. Find sessionable shipments
       let sessionableShipments = await this.findSessionableShipments(stationType);
+      console.log(`[FulfillmentSession] findSessionableShipments returned ${sessionableShipments.length} eligible shipments`);
       
       // Filter by specific order numbers if provided
       if (orderNumbers && orderNumbers.length > 0) {
@@ -515,6 +518,7 @@ export class FulfillmentSessionService {
       }
       
       if (sessionableShipments.length === 0) {
+        console.log(`[FulfillmentSession] No sessionable shipments found - returning early`);
         result.errors.push('No sessionable shipments found');
         return result;
       }
