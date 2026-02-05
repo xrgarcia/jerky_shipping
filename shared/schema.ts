@@ -367,6 +367,10 @@ export const shipments = pgTable("shipments", {
   lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
   decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
+  // Rate check tracking (automated rate optimization)
+  rateCheckStatus: text("rate_check_status"), // 'pending' | 'complete' | 'failed' | 'skipped' | null
+  rateCheckAttemptedAt: timestamp("rate_check_attempted_at"), // When rate check was last attempted
+  rateCheckError: text("rate_check_error"), // Error message if rate check failed
   fulfillmentSessionId: integer("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
   smartSessionSpot: integer("smart_session_spot"), // Cart position (1-28) within the smart session
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -423,6 +427,8 @@ export const shipments = pgTable("shipments", {
   lifecyclePhaseIdx: index("shipments_lifecycle_phase_idx").on(table.lifecyclePhase).where(sql`${table.lifecyclePhase} IS NOT NULL`),
   decisionSubphaseIdx: index("shipments_decision_subphase_idx").on(table.decisionSubphase).where(sql`${table.decisionSubphase} IS NOT NULL`),
   fulfillmentSessionIdIdx: index("shipments_fulfillment_session_id_idx").on(table.fulfillmentSessionId).where(sql`${table.fulfillmentSessionId} IS NOT NULL`),
+  // Rate check tracking index
+  rateCheckStatusIdx: index("shipments_rate_check_status_idx").on(table.rateCheckStatus).where(sql`${table.rateCheckStatus} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -507,6 +513,10 @@ export const insertShipmentSchema = createInsertSchema(shipments).omit({
   lifecyclePhase: z.string().nullish(),
   decisionSubphase: z.string().nullish(),
   lifecyclePhaseChangedAt: z.coerce.date().optional().or(z.null()),
+  // Rate check tracking
+  rateCheckStatus: z.string().nullish(),
+  rateCheckAttemptedAt: z.coerce.date().optional().or(z.null()),
+  rateCheckError: z.string().nullish(),
   fulfillmentSessionId: z.string().nullish(),
 });
 
