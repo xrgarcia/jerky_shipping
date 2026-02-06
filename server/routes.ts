@@ -17,7 +17,7 @@ import { verifyShopifyWebhook, reregisterAllWebhooks } from "./utils/shopify-web
 import { verifyShipStationWebhook } from "./utils/shipstation-webhook";
 import { verifySlashbinWebhook, isJobAlreadyProcessed, markJobAsProcessed } from "./utils/slashbin-webhook";
 import { fetchShipStationResource, getShipmentsByOrderNumber, getFulfillmentByTrackingNumber, getShipmentByShipmentId, getTrackingDetails, getShipmentsByDateRange, getLabelsForShipment, createLabelForExistingShipment, updateShipmentNumber, extractPdfLabelUrl } from "./utils/shipstation-api";
-import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync, enqueueLifecycleEvent } from "./utils/queue";
+import { enqueueWebhook, enqueueOrderId, dequeueWebhook, getQueueLength, clearQueue, enqueueShipmentSync, enqueueShipmentSyncBatch, getShipmentSyncQueueLength, clearShipmentSyncQueue, clearShopifyOrderSyncQueue, getOldestShopifyQueueMessage, getOldestShipmentSyncQueueMessage, getShopifyOrderSyncQueueLength, getOldestShopifyOrderSyncQueueMessage, enqueueSkuVaultQCSync, enqueueLifecycleEvent, enqueueLifecycleEventBatch } from "./utils/queue";
 import { extractActualOrderNumber, extractShopifyOrderPrices } from "./utils/shopify-utils";
 import { broadcastOrderUpdate, broadcastPrintQueueUpdate, broadcastQueueStatus, broadcastDesktopStationDeleted, broadcastDesktopStationUpdated, broadcastDesktopConfigUpdate, broadcastStationPrinterUpdate, getConnectedStationIds, broadcastDesktopPrintJob, broadcastDesktopJobUpdate } from "./websocket";
 import { ShipStationShipmentService } from "./services/shipstation-shipment-service";
@@ -2144,10 +2144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let skippedCount = 0;
       const errors: string[] = [];
       const phaseBreakdown: Record<string, number> = {};
+      const changedShipments: { id: string; orderNumber: string }[] = [];
       
       for (const shipment of shipmentsWithMoveOver) {
         try {
-          // Derive the lifecycle phase using the state machine
           const lifecycleData = {
             sessionStatus: shipment.sessionStatus,
             trackingNumber: shipment.trackingNumber,
@@ -2161,12 +2161,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             shipmentId: shipment.shipmentId,
             shipToPostalCode: shipment.shipToPostalCode,
             serviceCode: shipment.serviceCode,
-            hasMoveOverTag: true, // We already filtered for MOVE OVER tag
+            hasMoveOverTag: true,
           };
           
           const { phase, subphase } = deriveLifecyclePhase(lifecycleData);
           
-          // Only update if the phase has changed
           if (shipment.lifecyclePhase !== phase || shipment.decisionSubphase !== subphase) {
             await storage.updateShipment(shipment.id, {
               lifecyclePhase: phase,
@@ -2174,6 +2173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             updatedCount++;
             phaseBreakdown[phase] = (phaseBreakdown[phase] || 0) + 1;
+            changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
           } else {
             skippedCount++;
           }
@@ -2183,8 +2183,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      let enqueuedCount = 0;
+      if (changedShipments.length > 0) {
+        const events = changedShipments.map(s => ({
+          shipmentId: s.id,
+          orderNumber: s.orderNumber,
+          reason: 'backfill' as const,
+          enqueuedAt: Date.now(),
+        }));
+        enqueuedCount = await enqueueLifecycleEventBatch(events);
+        console.log(`[Backfill] Enqueued ${enqueuedCount}/${changedShipments.length} lifecycle events for side effects`);
+      }
+      
       console.log(`========== LIFECYCLE PHASE BACKFILL COMPLETE ==========`);
-      console.log(`Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}`);
+      console.log(`Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}, Enqueued: ${enqueuedCount}`);
       console.log(`Phase breakdown:`, phaseBreakdown);
       
       res.json({
@@ -2192,10 +2204,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalProcessed: shipmentsWithMoveOver.length,
         updatedCount,
         skippedCount,
+        enqueuedCount,
         errorCount: errors.length,
         phaseBreakdown,
-        errors: errors.slice(0, 10), // Return first 10 errors only
-        message: `Backfill complete: ${updatedCount} shipments updated, ${skippedCount} unchanged`,
+        errors: errors.slice(0, 10),
+        message: `Backfill complete: ${updatedCount} shipments updated, ${skippedCount} unchanged, ${enqueuedCount} enqueued for side effects`,
       });
     } catch (error: any) {
       console.error("Error during lifecycle phase backfill:", error);
@@ -11559,6 +11572,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Backfill] Found ${readyToSessionCandidates.length} shipments matching ready_to_session criteria`);
       
+      const changedShipments: { id: string; orderNumber: string }[] = [];
+      
       let readyToSessionUpdated = 0;
       for (const shipment of readyToSessionCandidates) {
         const state = deriveLifecyclePhase({
@@ -11575,6 +11590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
             .where(eq(shipments.id, shipment.id));
           readyToSessionUpdated++;
+          changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
         }
       }
       
@@ -11627,10 +11643,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
             .where(eq(shipments.id, shipment.id));
           readyToFulfillUpdated++;
+          changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
         }
       }
       
-      console.log(`[Backfill] Complete: ${readyToSessionUpdated} ready_to_session, ${readyToFulfillUpdated} ready_to_fulfill updated`);
+      let enqueuedCount = 0;
+      if (changedShipments.length > 0) {
+        const events = changedShipments.map(s => ({
+          shipmentId: s.id,
+          orderNumber: s.orderNumber,
+          reason: 'backfill' as const,
+          enqueuedAt: Date.now(),
+        }));
+        enqueuedCount = await enqueueLifecycleEventBatch(events);
+        console.log(`[Backfill] Enqueued ${enqueuedCount}/${changedShipments.length} lifecycle events for side effects`);
+      }
+      
+      console.log(`[Backfill] Complete: ${readyToSessionUpdated} ready_to_session, ${readyToFulfillUpdated} ready_to_fulfill updated, ${enqueuedCount} enqueued`);
       
       res.json({
         success: true,
@@ -11638,6 +11667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         readyToSessionUpdated,
         readyToFulfillCandidates: readyToFulfillCandidates.length,
         readyToFulfillUpdated,
+        enqueuedCount,
       });
     } catch (error: any) {
       console.error("[Backfill] Error backfilling lifecycle phases:", error);
