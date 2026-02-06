@@ -37,6 +37,9 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **QC Completion Tracking**: `shipments.qc_completed` boolean flag and `qc_completed_at` timestamp.
 - **ShipStation Label Creation Endpoints**: Differentiates label creation for existing versus new shipments.
 - **Product Categorization**: Distinction between kits and assembled products based on SkuVault's QC Sale API behavior.
+  - **Kits** (product_category = 'kit'): Always exploded into component SKUs at hydration time. Kits are assembled at pick time by warehouse staff.
+  - **Assembled Products (APs)** (is_assembled_product = true, category != 'kit'): Only exploded into components when `available_quantity === 0`. APs are pre-assembled products (typically in a nice container or bag) that ship as-is when in stock. When out of stock, they must be built from components like kits.
+  - **Out-of-Stock Orders Are Sessionable**: Orders with out-of-stock SKUs show a warning on the Build tab but checkboxes remain enabled so warehouse staff can still add them to sessions.
 - **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog data, synced hourly from a GCP reporting database.
 - **Packaging Types Sync Worker**: Hourly sync from ShipStation `/v2/packages` endpoint, preserving local `id`, `is_active`, and `stationType` fields.
 - **Automated Package Assignment**: Two-table architecture where `fingerprints` stores order item signatures and `fingerprint_models` stores learned rules (fingerprint → packaging type). When a user assigns a packaging type via UI, the endpoint creates/updates the fingerprint_model AND directly updates all shipments with that fingerprint. The lifecycle event worker can also copy packagingTypeId from fingerprint_models to shipments when missing, then syncs dimensions to ShipStation (respecting status guardrails - only "pending" shipments can be updated).

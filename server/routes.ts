@@ -14137,15 +14137,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let reason = '';
         let actionTab: string | null = null;
 
-        // Check for unfulfillable SKUs first - this takes priority
+        // Check for unfulfillable SKUs - show warning but still allow sessioning
         const unfulfillableSkus = unfulfillableSkusByShipment.get(order.id) || [];
-        if (unfulfillableSkus.length > 0) {
-          // Show up to 3 SKUs, then "and X more"
+        const hasOutOfStockWarning = unfulfillableSkus.length > 0;
+        if (hasOutOfStockWarning) {
           const displaySkus = unfulfillableSkus.slice(0, 3);
           const remaining = unfulfillableSkus.length - 3;
           reason = `Out of stock: ${displaySkus.join(', ')}${remaining > 0 ? ` (+${remaining} more)` : ''}`;
-          actionTab = 'out_of_stock'; // Special action tab for out-of-stock - links to shipment details
-        } else if (!order.fingerprintId) {
+        }
+        
+        if (!order.fingerprintId) {
           // Order needs fingerprint - check why in priority order
           const uncategorizedSkus = uncategorizedSkusByShipment.get(order.id) || [];
           const missingWeightSkus = missingWeightSkusByShipment.get(order.id) || [];
@@ -14196,7 +14197,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Has fingerprint + packaging model + station = ready for session
           // We derive readiness from actual data fields, not the potentially-stale decisionSubphase column
           readyToSession = true;
-          reason = 'Ready for session';
+          if (!hasOutOfStockWarning) {
+            reason = 'Ready for session';
+          }
         }
 
         const stationInfo = order.assignedStationId ? stationsMap.get(order.assignedStationId) : null;
