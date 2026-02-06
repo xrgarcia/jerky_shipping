@@ -161,6 +161,11 @@ export function AppSidebar() {
       icon: Activity,
     },
     {
+      title: "Lifecycle Phases",
+      url: "/tools/lifecycle-phases",
+      icon: Layers,
+    },
+    {
       title: "Stations",
       url: "/stations",
       icon: Monitor,

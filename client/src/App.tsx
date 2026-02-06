@@ -31,6 +31,7 @@ import ShipmentsDLQReport from "@/pages/reports/shipments-dlq";
 import KitMappingsReport from "@/pages/reports/kit-mappings";
 import Sessions from "@/pages/sessions";
 import Operations from "@/pages/tools/operations";
+import LifecyclePhases from "@/pages/tools/lifecycle-phases";
 import PORecommendations from "@/pages/po-recommendations";
 import SessionOrders from "@/pages/session-orders";
 import CustomerService from "@/pages/customer-service";
@@ -103,6 +104,7 @@ function AppContent() {
       <Route path="/sessions" component={Sessions} />
       <Route path="/tools/backfill" component={Backfill} />
       <Route path="/tools/operations" component={Operations} />
+      <Route path="/tools/lifecycle-phases" component={LifecyclePhases} />
       <Route path="/print-queue" component={PrintQueue} />
       <Route path="/reports/shopify-sales" component={ShopifySalesReport} />
       <Route path="/reports/broken-shipments" component={BrokenShipmentsReport} />
