@@ -4956,6 +4956,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/lifecycle-worker-status", requireAuth, async (req, res) => {
+    try {
+      const { getLifecycleWorkerStatus } = await import("./lifecycle-event-worker");
+      const status = await getLifecycleWorkerStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error getting lifecycle worker status:", error.message);
+      res.status(500).json({ error: "Failed to get lifecycle worker status" });
+    }
+  });
+
+  app.get("/api/lifecycle-phase-counts", requireAuth, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          lifecycle_phase,
+          decision_subphase,
+          COUNT(*)::int as count
+        FROM shipments
+        WHERE lifecycle_phase IS NOT NULL
+        GROUP BY lifecycle_phase, decision_subphase
+        ORDER BY lifecycle_phase, decision_subphase
+      `);
+      res.json({ counts: result.rows });
+    } catch (error: any) {
+      console.error("Error getting lifecycle phase counts:", error.message);
+      res.status(500).json({ error: "Failed to get lifecycle phase counts" });
+    }
+  });
+
   // Operations Dashboard - Queue Management
   app.get("/api/operations/queue-stats", requireAuth, async (req, res) => {
     try {

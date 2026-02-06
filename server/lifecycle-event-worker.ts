@@ -85,6 +85,26 @@ let processedCount = 0;
 let sideEffectTriggeredCount = 0;
 let lastPollTime: Date | null = null;
 
+// Recent transitions ring buffer for monitoring
+const MAX_RECENT_TRANSITIONS = 100;
+interface RecentTransition {
+  timestamp: Date;
+  orderNumber: string;
+  shipmentId: string;
+  previousPhase: string | null;
+  previousSubphase: string | null;
+  newPhase: string;
+  newSubphase: string | null;
+  changed: boolean;
+  reason: string;
+  sideEffectTriggered: string | null;
+  sideEffectResult: 'success' | 'failed' | 'skipped' | null;
+}
+const recentTransitions: RecentTransition[] = [];
+let errorCount = 0;
+let lastErrorMessage: string | null = null;
+let lastErrorTime: Date | null = null;
+
 // Rate limit side effects to avoid overwhelming ShipStation API
 const RATE_CHECK_BATCH_SIZE = 5; // Process this many rate checks per cycle
 const POLL_INTERVAL_MS = 2000; // Check queue every 2 seconds
@@ -479,11 +499,43 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
       return false;
     }
 
+    // Record transition in ring buffer
+    const transition: RecentTransition = {
+      timestamp: new Date(),
+      orderNumber: event.orderNumber || 'unknown',
+      shipmentId: event.shipmentId,
+      previousPhase: result.previousPhase,
+      previousSubphase: result.previousSubphase,
+      newPhase: result.newPhase,
+      newSubphase: result.newSubphase,
+      changed: result.changed,
+      reason: event.reason,
+      sideEffectTriggered: null,
+      sideEffectResult: null,
+    };
+    
+    // Track side effect info
+    if (result.changed && result.newSubphase) {
+      const sideEffect = sideEffectsRegistry[result.newSubphase];
+      if (sideEffect?.enabled) {
+        transition.sideEffectTriggered = sideEffect.description;
+        transition.sideEffectResult = 'success';
+      }
+    }
+    
+    recentTransitions.unshift(transition);
+    if (recentTransitions.length > MAX_RECENT_TRANSITIONS) {
+      recentTransitions.pop();
+    }
+
     processedCount++;
     return true;
 
   } catch (error: any) {
     log(`Error processing event for ${orderRef}: ${error.message}`, 'error');
+    errorCount++;
+    lastErrorMessage = error.message;
+    lastErrorTime = new Date();
     return false;
   }
 }
@@ -592,6 +644,10 @@ export async function getLifecycleWorkerStatus(): Promise<{
   queueLength: number;
   inflightCount: number;
   lastPollTime: Date | null;
+  recentTransitions: RecentTransition[];
+  errorCount: number;
+  lastErrorMessage: string | null;
+  lastErrorTime: Date | null;
 }> {
   const [queueLength, inflightCount] = await Promise.all([
     getLifecycleQueueLength(),
@@ -606,6 +662,10 @@ export async function getLifecycleWorkerStatus(): Promise<{
     queueLength,
     inflightCount,
     lastPollTime,
+    recentTransitions,
+    errorCount,
+    lastErrorMessage,
+    lastErrorTime,
   };
 }
 
