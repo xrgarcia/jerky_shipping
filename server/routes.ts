@@ -2157,6 +2157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             packagingTypeId: shipment.packagingTypeId,
             fulfillmentSessionId: shipment.fulfillmentSessionId,
             fingerprintId: shipment.fingerprintId,
+            rateCheckStatus: shipment.rateCheckStatus,
+            shipmentId: shipment.shipmentId,
+            shipToPostalCode: shipment.shipToPostalCode,
+            serviceCode: shipment.serviceCode,
             hasMoveOverTag: true, // We already filtered for MOVE OVER tag
           };
           
@@ -11534,7 +11538,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintId: shipments.fingerprintId,
           packagingTypeId: shipments.packagingTypeId,
           fulfillmentSessionId: shipments.fulfillmentSessionId,
+          rateCheckStatus: shipments.rateCheckStatus,
+          shipmentId: shipments.shipmentId,
+          shipToPostalCode: shipments.shipToPostalCode,
+          serviceCode: shipments.serviceCode,
           currentPhase: shipments.lifecyclePhase,
+          currentSubphase: shipments.decisionSubphase,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
@@ -11557,7 +11566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasMoveOverTag: true,
         });
         
-        if (shipment.currentPhase !== state.phase) {
+        if (shipment.currentPhase !== state.phase || shipment.currentSubphase !== state.subphase) {
           await db
             .update(shipments)
             .set({
@@ -11582,7 +11591,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintId: shipments.fingerprintId,
           packagingTypeId: shipments.packagingTypeId,
           fulfillmentSessionId: shipments.fulfillmentSessionId,
+          rateCheckStatus: shipments.rateCheckStatus,
+          shipmentId: shipments.shipmentId,
+          shipToPostalCode: shipments.shipToPostalCode,
+          serviceCode: shipments.serviceCode,
           currentPhase: shipments.lifecyclePhase,
+          currentSubphase: shipments.decisionSubphase,
         })
         .from(shipments)
         .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
@@ -11604,7 +11618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasMoveOverTag: true,
         });
         
-        if (shipment.currentPhase !== state.phase) {
+        if (shipment.currentPhase !== state.phase || shipment.currentSubphase !== state.subphase) {
           await db
             .update(shipments)
             .set({
