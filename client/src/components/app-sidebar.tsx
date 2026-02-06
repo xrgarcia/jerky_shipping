@@ -146,6 +146,11 @@ export function AppSidebar() {
       url: "/downloads",
       icon: Download,
     },
+    {
+      title: "Lifecycle Phases",
+      url: "/tools/lifecycle-phases",
+      icon: Activity,
+    },
   ];
   
   // Settings submenu items
@@ -159,11 +164,6 @@ export function AppSidebar() {
       title: "Operations",
       url: "/tools/operations",
       icon: Activity,
-    },
-    {
-      title: "Lifecycle Phases",
-      url: "/tools/lifecycle-phases",
-      icon: Layers,
     },
     {
       title: "Stations",
