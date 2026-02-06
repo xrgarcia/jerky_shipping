@@ -1206,3 +1206,20 @@ export async function forceResyncWithDays(days: number): Promise<void> {
   // Trigger immediate poll
   triggerImmediatePoll();
 }
+
+export async function forceResyncToDate(date: Date): Promise<void> {
+  const midnight = new Date(date);
+  midnight.setUTCHours(0, 0, 0, 0);
+  const cursorValue = midnight.toISOString();
+  
+  console.log(`[UnifiedSync] Forcing resync to date: ${cursorValue}`);
+  
+  await updateCursor(cursorValue, {
+    forcedResyncAt: new Date().toISOString(),
+    reason: 'manual_trigger_all_time',
+    targetDate: cursorValue,
+  });
+  
+  await broadcastWorkerStatus();
+  triggerImmediatePoll();
+}
