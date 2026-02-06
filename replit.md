@@ -47,7 +47,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Two-Tier Inventory Tracking System**: `skuvault_products` table uses `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity` to prevent premature inventory deduction.
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations from a reporting database view.
 - **Shipping Cost Tracking**: Actual carrier costs from ShipStation labels API are stored in `shipments.shipping_cost` for cost analysis.
-- **Label-Based Tracking Status Sync**: Maintenance job in the unified sync worker that uses the V2 labels API to catch delivered shipments that webhooks missed. Two-step process: `GET /v2/labels?tracking_number={number}` to find the label_id, then `GET /v2/labels/{label_id}/track` to get `status_code` (DE, SP, IT, UN, EX, etc.). Only checks shipments in `in_transit` or `on_dock` with tracking numbers older than 14 days. Processes 5 per cycle (10 API calls), oldest first. Updates `status` field and triggers lifecycle re-evaluation when status changes.
+- **ETL-Based Tracking Status Sync**: The ETL service extracts tracking status naturally during sync by checking `status_code` on the shipment data, then falling back to `labels[0].tracking_status` from the labels array. No separate maintenance job needed — tracking status flows through the standard cursor-based poll cycle.
 - **Carrier Code Resolution**: Cached `getServiceCodeToCarrierMap()` provides service_code → carrier_id lookup (4-hour TTL with stale fallback) for `updateShipmentPackage` when carrier_id is missing.
 
 ## External Dependencies
