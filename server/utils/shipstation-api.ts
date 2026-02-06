@@ -1084,6 +1084,105 @@ export async function getCarriers(): Promise<ApiResponseWithRateLimit<any[]>> {
 }
 
 /**
+ * Get available services for a specific carrier from ShipStation
+ * Uses GET /v2/carriers/{carrier_id}/services endpoint with rate limit handling
+ */
+export async function getCarrierServices(carrierId: string): Promise<ApiResponseWithRateLimit<any[]>> {
+  if (!SHIPSTATION_API_KEY) {
+    throw new Error('SHIPSTATION_API_KEY environment variable is not set');
+  }
+
+  const url = `${SHIPSTATION_API_BASE}/v2/carriers/${encodeURIComponent(carrierId)}/services`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'api-key': SHIPSTATION_API_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const rateLimit = extractRateLimitInfo(response.headers);
+
+  if (response.status === 429) {
+    const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    console.log(`[ShipStation] Rate limited (429) for carrier services, waiting ${retryAfter}s before retry...`);
+    await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
+    return getCarrierServices(carrierId);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ShipStation carrier services API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const services = data.services || [];
+
+  return { data: services, rateLimit };
+}
+
+let serviceCodeToCarrierCache: Map<string, string> | null = null;
+let serviceCodeCacheTimestamp: number = 0;
+const SERVICE_CODE_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+/**
+ * Build and cache a service_code → carrier_id lookup map.
+ * Calls GET /v2/carriers then GET /v2/carriers/{id}/services for each.
+ * Cached for 4 hours since carrier/service mappings rarely change.
+ */
+export async function getServiceCodeToCarrierMap(): Promise<Map<string, string>> {
+  const now = Date.now();
+  if (serviceCodeToCarrierCache && (now - serviceCodeCacheTimestamp) < SERVICE_CODE_CACHE_TTL) {
+    return serviceCodeToCarrierCache;
+  }
+
+  console.log('[ShipStation] Building service_code → carrier_id lookup cache...');
+  const lookupMap = new Map<string, string>();
+
+  try {
+    const { data: carriers } = await getCarriers();
+    
+    for (const carrier of carriers) {
+      const carrierId = carrier.carrier_id;
+      if (!carrierId) continue;
+
+      try {
+        const { data: services } = await getCarrierServices(carrierId);
+        for (const service of services) {
+          if (service.service_code) {
+            lookupMap.set(service.service_code, carrierId);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[ShipStation] Failed to get services for carrier ${carrierId}: ${err.message}`);
+      }
+    }
+
+    serviceCodeToCarrierCache = lookupMap;
+    serviceCodeCacheTimestamp = now;
+    console.log(`[ShipStation] Cached ${lookupMap.size} service_code → carrier_id mappings from ${carriers.length} carriers`);
+  } catch (err: any) {
+    console.error(`[ShipStation] Failed to build service_code → carrier_id cache: ${err.message}`);
+    if (serviceCodeToCarrierCache) {
+      console.log('[ShipStation] Using stale cache as fallback');
+      return serviceCodeToCarrierCache;
+    }
+  }
+
+  return lookupMap;
+}
+
+/**
+ * Resolve the carrier_id for a given service_code using the cached lookup.
+ * Returns null if no matching carrier is found.
+ */
+export async function resolveCarrierIdFromServiceCode(serviceCode: string): Promise<string | null> {
+  const map = await getServiceCodeToCarrierMap();
+  return map.get(serviceCode) || null;
+}
+
+/**
  * Get rate estimates for a potential shipment (not yet created in ShipStation)
  * Uses POST /v2/rates endpoint with rate limit handling
  */
