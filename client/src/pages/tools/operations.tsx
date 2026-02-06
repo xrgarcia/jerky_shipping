@@ -1111,10 +1111,9 @@ function LifecycleBackfillButton() {
   const [selectedDays, setSelectedDays] = useState<number>(7);
   const [result, setResult] = useState<{
     success: boolean;
-    totalProcessed: number;
-    updatedCount: number;
-    skippedCount: number;
-    phaseBreakdown: Record<string, number>;
+    totalFound: number;
+    enqueuedCount: number;
+    message: string;
   } | null>(null);
 
   const backfillMutation = useMutation({
@@ -1127,8 +1126,8 @@ function LifecycleBackfillButton() {
       queryClient.invalidateQueries({ queryKey: ["/api/shipments/tab-counts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/shipments/lifecycle-counts"] });
       toast({
-        title: "Lifecycle Phase Backfill Complete",
-        description: `Updated ${data.updatedCount} shipments, ${data.skippedCount} unchanged`,
+        title: "Lifecycle Backfill Enqueued",
+        description: `Enqueued ${data.enqueuedCount} of ${data.totalFound} shipments for evaluation`,
       });
     },
     onError: (error: Error) => {
@@ -1157,8 +1156,8 @@ function LifecycleBackfillButton() {
           <AlertDialogHeader>
             <AlertDialogTitle>Backfill Lifecycle Phases?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will recalculate the lifecycle phase for shipments with the MOVE OVER tag using the current state machine logic. 
-              Select a time range to limit which shipments are processed.
+              This will enqueue shipments with the MOVE OVER tag for lifecycle evaluation by the worker. 
+              The worker will recalculate phases and trigger any needed side effects. Select a time range to limit scope.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
@@ -1180,16 +1179,9 @@ function LifecycleBackfillButton() {
           {result && (
             <div className="text-sm space-y-2 p-3 bg-muted rounded-md">
               <p className="font-medium">Last Run Results:</p>
-              <p>Processed: {result.totalProcessed} shipments</p>
-              <p>Updated: {result.updatedCount} | Unchanged: {result.skippedCount}</p>
-              {Object.keys(result.phaseBreakdown).length > 0 && (
-                <div>
-                  <p className="font-medium mt-2">Phase Breakdown:</p>
-                  {Object.entries(result.phaseBreakdown).map(([phase, count]) => (
-                    <p key={phase} className="text-xs">{phase}: {count}</p>
-                  ))}
-                </div>
-              )}
+              <p>Found: {result.totalFound} shipments</p>
+              <p>Enqueued: {result.enqueuedCount} for worker evaluation</p>
+              <p className="text-xs text-muted-foreground">{result.message}</p>
             </div>
           )}
           <AlertDialogFooter>

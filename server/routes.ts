@@ -11470,36 +11470,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Duplicate of primary backfill endpoint above - kept for backwards compatibility
-  // Just enqueues lifecycle events for the worker to process
-  app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
-    try {
-      console.log('[Backfill] Starting lifecycle backfill (duplicate endpoint)...');
-      
-      const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill();
-      console.log(`[Backfill] Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag`);
-      
-      const events = shipmentsWithMoveOver.map(s => ({
-        shipmentId: s.id,
-        orderNumber: s.orderNumber,
-        reason: 'backfill' as const,
-        enqueuedAt: Date.now(),
-      }));
-      
-      const enqueuedCount = await enqueueLifecycleEventBatch(events);
-      console.log(`[Backfill] Complete: ${enqueuedCount}/${shipmentsWithMoveOver.length} enqueued`);
-      
-      res.json({
-        success: true,
-        totalFound: shipmentsWithMoveOver.length,
-        enqueuedCount,
-        message: `Enqueued ${enqueuedCount} shipments for lifecycle evaluation by the worker`,
-      });
-    } catch (error: any) {
-      console.error("[Backfill] Error backfilling lifecycle phases:", error);
-      res.status(500).json({ error: "Failed to backfill lifecycle phases" });
-    }
-  });
 
   // Lookup specific kit components
   app.get("/api/kit-mappings/:sku", requireAuth, async (req, res) => {
