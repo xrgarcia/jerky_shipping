@@ -5518,6 +5518,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/operations/force-unified-resync-all", requireAuth, async (req, res) => {
+    try {
+      const { forceResyncToDate } = await import("./unified-shipment-sync-worker");
+      const oldest = await db
+        .select({ createdAt: shipments.createdAt })
+        .from(shipments)
+        .orderBy(shipments.createdAt)
+        .limit(1);
+
+      if (oldest.length === 0) {
+        return res.status(404).json({ error: "No shipments found" });
+      }
+
+      const oldestDate = oldest[0].createdAt;
+      await forceResyncToDate(oldestDate);
+      res.json({ success: true, message: `Cursor reset to ${oldestDate.toISOString().split('T')[0]}` });
+    } catch (error) {
+      console.error("Error forcing all-time unified resync:", error);
+      res.status(500).json({ error: "Failed to force all-time unified resync" });
+    }
+  });
+
   // Trigger lifecycle event for a specific shipment by order number (for manual package sync)
   app.post("/api/shipments/:orderNumber/trigger-lifecycle", requireAuth, async (req, res) => {
     try {
