@@ -3325,48 +3325,6 @@ Please analyze this failure and help me understand:
         </CardContent>
       </Card>
 
-      <Card data-testid="card-clear-order-data" className="border-destructive">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-            <Database className="h-5 w-5" />
-            Clear All Order Data
-          </CardTitle>
-          <CardDescription>Permanently delete all orders, items, shipments, and refunds</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="rounded-md bg-destructive/10 p-3 space-y-2">
-              <p className="text-sm font-medium text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Danger Zone
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This will permanently delete all data from the following tables:
-              </p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground ml-2">
-                <li>Orders</li>
-                <li>Order Items</li>
-                <li>Shipments</li>
-                <li>Order Refunds</li>
-              </ul>
-              <p className="text-sm font-semibold text-destructive">
-                This action cannot be undone!
-              </p>
-            </div>
-            <Button
-              data-testid="button-clear-order-data"
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowClearOrderDataDialog(true)}
-              className="w-full"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear All Order Data
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card data-testid="card-recalculate-fingerprints" className="border-destructive">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2 text-destructive">
@@ -3829,45 +3787,6 @@ Please analyze this failure and help me understand:
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={showClearOrderDataDialog} onOpenChange={setShowClearOrderDataDialog}>
-        <AlertDialogContent data-testid="dialog-clear-order-data-confirmation">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">Clear All Order Data?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                This will <strong className="text-destructive">permanently delete</strong> all data from the following tables:
-              </p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Orders</strong> - All order records</li>
-                <li><strong>Order Items</strong> - All line item details</li>
-                <li><strong>Shipments</strong> - All shipping information</li>
-                <li><strong>Order Refunds</strong> - All refund records</li>
-              </ul>
-              <div className="rounded-md bg-destructive/10 p-3 border border-destructive">
-                <p className="text-sm font-semibold text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  WARNING: This action cannot be undone!
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  All historical order data will be permanently lost.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-clear-order-data">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => clearOrderDataMutation.mutate()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-clear-order-data"
-              disabled={clearOrderDataMutation.isPending}
-            >
-              {clearOrderDataMutation.isPending ? "Clearing..." : "Clear All Order Data"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog 
         open={showRecalculateFingerprintsDialog} 
