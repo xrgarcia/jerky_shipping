@@ -567,6 +567,124 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
   return { processed, updated, errors };
 }
 
+const TRACKING_STATUS_SYNC_BATCH_SIZE = 10;
+const TRACKING_STATUS_MIN_AGE_DAYS = 14;
+
+const TERMINAL_TRACKING_STATUSES = ['DE', 'SP', 'UN', 'EX'];
+
+/**
+ * Sync tracking statuses for shipments stuck in in_transit or on_dock.
+ * 
+ * PURPOSE: Catch shipments whose tracking status wasn't updated by webhooks
+ * or the main poll cycle. Calls the dedicated GET /v2/tracking endpoint
+ * to get the current status_code and updates our database + triggers
+ * lifecycle re-evaluation when a terminal status is found.
+ * 
+ * CRITERIA:
+ * - lifecycle_phase IN ('in_transit', 'on_dock') — only non-terminal shipped shipments
+ * - tracking_number IS NOT NULL — need a tracking number to query
+ * - created_at older than 14 days — gives webhooks time to work first
+ * - Sorted oldest first — clears backlog from the bottom up
+ * 
+ * TRIGGERS: After main poll cycle when caught up (same as other maintenance jobs)
+ */
+async function syncTrackingStatuses(): Promise<{ processed: number; updated: number; errors: number; rateLimited: boolean }> {
+  const { LIFECYCLE_PHASES } = await import('@shared/schema');
+  const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
+  const { getTrackingStatus, deriveCarrierCodeFromServiceCode } = await import('./utils/shipstation-api');
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - TRACKING_STATUS_MIN_AGE_DAYS);
+
+  const shipmentsToCheck = await db
+    .select({
+      id: shipments.id,
+      orderNumber: shipments.orderNumber,
+      trackingNumber: shipments.trackingNumber,
+      serviceCode: shipments.serviceCode,
+      carrierCode: shipments.carrierCode,
+      status: shipments.status,
+      lifecyclePhase: shipments.lifecyclePhase,
+      createdAt: shipments.createdAt,
+    })
+    .from(shipments)
+    .where(
+      and(
+        or(
+          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.IN_TRANSIT),
+          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.ON_DOCK)
+        ),
+        sql`${shipments.trackingNumber} IS NOT NULL`,
+        lt(shipments.createdAt, cutoffDate)
+      )
+    )
+    .orderBy(shipments.createdAt)
+    .limit(TRACKING_STATUS_SYNC_BATCH_SIZE);
+
+  if (shipmentsToCheck.length === 0) {
+    return { processed: 0, updated: 0, errors: 0, rateLimited: false };
+  }
+
+  console.log(`[UnifiedSync] Tracking status sync: checking ${shipmentsToCheck.length} shipments (oldest first, 14+ days old)`);
+
+  let processed = 0;
+  let updated = 0;
+  let errors = 0;
+  let rateLimited = false;
+
+  for (const shipment of shipmentsToCheck) {
+    const carrierCode = shipment.carrierCode || deriveCarrierCodeFromServiceCode(shipment.serviceCode || '');
+    
+    if (!carrierCode) {
+      console.warn(`[UnifiedSync] Cannot derive carrier_code for shipment ${shipment.orderNumber} (service_code: ${shipment.serviceCode}), skipping`);
+      errors++;
+      continue;
+    }
+
+    processed++;
+
+    try {
+      const { data: trackingData } = await getTrackingStatus(carrierCode, shipment.trackingNumber!);
+
+      if (!trackingData) {
+        continue;
+      }
+
+      const statusCode = trackingData.status_code?.toUpperCase() || null;
+
+      if (statusCode && statusCode !== (shipment.status?.toUpperCase() || null)) {
+        await db
+          .update(shipments)
+          .set({
+            status: statusCode,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, shipment.id));
+
+        console.log(`[UnifiedSync] Tracking status update: ${shipment.orderNumber} status ${shipment.status} → ${statusCode} (phase: ${shipment.lifecyclePhase})`);
+
+        await queueLifecycleEvaluation(shipment.id, 'tracking_status_sync', shipment.orderNumber || undefined);
+        updated++;
+      }
+
+    } catch (err: any) {
+      if (err.message === 'TRACKING_RATE_LIMITED') {
+        console.log('[UnifiedSync] Hit rate limit during tracking status sync, stopping batch');
+        rateLimited = true;
+        break;
+      }
+      console.error(`[UnifiedSync] Error checking tracking for ${shipment.orderNumber}:`, err.message);
+      errors++;
+    }
+  }
+
+  if (updated > 0 || errors > 0) {
+    console.log(`[UnifiedSync] Tracking status sync complete: ${processed} checked, ${updated} updated, ${errors} errors`);
+  }
+
+  return { processed, updated, errors, rateLimited };
+}
+
 /**
  * Main poll cycle - fetches all shipments modified since cursor
  * 
