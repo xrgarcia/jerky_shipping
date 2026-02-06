@@ -81,15 +81,11 @@ export interface ShipmentLifecycleData {
   serviceCode?: string | null;      // Shipping service code (for rate check eligibility)
 }
 
-// Status codes that indicate package is on the dock (at the facility, awaiting carrier pickup)
-// NY = Not Yet in System (label printed, waiting for carrier)
-// AC = Accepted by Carrier (carrier just picked it up, may still be in their truck)
-const ON_DOCK_STATUSES = ['NY', 'AC'];
-// Status codes for in transit and delivered
-const IN_TRANSIT_STATUSES = ['IT'];
+// Status codes where tracking status (status field) takes precedence over shipmentStatus
 const DELIVERED_STATUSES = ['DE'];
-// Required shipmentStatus for on_dock phase
-const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
+const IN_TRANSIT_STATUSES = ['IT', 'SHIPPED'];
+const ON_DOCK_STATUSES = ['NY', 'AC', 'NEW'];
+const PROBLEM_STATUSES = ['SP', 'UN', 'EX'];
 
 /**
  * Determine the lifecycle phase based on shipment data
@@ -97,66 +93,66 @@ const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
  * This derives the phase from existing shipment fields for backwards compatibility
  * with shipments that don't yet have explicit lifecyclePhase set.
  * 
- * Phase priority (checked in order):
- * 1. DELIVERED - shipmentStatus='label_purchased' AND status='DE'
- * 2. IN_TRANSIT - shipmentStatus='label_purchased' AND status='IT'
- * 3. ON_DOCK - shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
- * 4. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag AND status != 'cancelled'
- * 5. PICKING_ISSUES - sessionStatus='inactive'
- * 6. PACKING_READY - sessionStatus='closed' AND trackingNumber IS NULL AND shipmentStatus='pending' AND status != 'cancelled'
- * 7. PICKING - sessionStatus='active'
- * 8. READY_TO_PICK - sessionStatus='new'
- * 9. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus AND status != 'cancelled'
- * 10. AWAITING_DECISIONS - Default fallback (needs categorization/fingerprint/packaging/session)
+ * KEY PRINCIPLE: Tracking status takes precedence over shipmentStatus.
+ * If tracking says delivered, that's the truth regardless of shipmentStatus.
  * 
- * Note: Status codes for tracking:
- * - NY = Not Yet in System (label created, waiting for carrier pickup)
- * - AC = Accepted by Carrier (carrier just picked it up)
- * - IT = In Transit (on the way to customer)
- * - DE = Delivered (customer received)
+ * Phase priority (checked in order):
+ * 1. CANCELLED - status='cancelled' (terminal, regardless of shipmentStatus)
+ * 2. DELIVERED - status='DE' (terminal, regardless of shipmentStatus)
+ * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
+ * 4. PROBLEM - status IN ('SP', 'UN', 'EX') (terminal, regardless of shipmentStatus)
+ * 5. ON_DOCK - status IN ('NY', 'AC', 'new') AND shipmentStatus='label_purchased'
+ * 6. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag
+ * 7. PICKING_ISSUES - sessionStatus='inactive'
+ * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
+ * 9. PICKING - sessionStatus='active'
+ * 10. READY_TO_PICK - sessionStatus='new'
+ * 11. SESSION_CREATED - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
+ * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND no session
+ * 13. AWAITING_DECISIONS - Default fallback
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
   const status = shipment.status?.toUpperCase();
   
+  // ========================================================================
+  // STATUS-BASED PHASES (tracking status takes precedence)
+  // ========================================================================
+  
   // CANCELLED: Order has been cancelled - terminal state
-  // Check this FIRST before any other phase evaluation
   if (status === 'CANCELLED') {
     return { phase: LIFECYCLE_PHASES.CANCELLED, subphase: null };
   }
   
   // DELIVERED: Package has been delivered
-  // Requires BOTH: shipmentStatus='label_purchased' AND status='DE'
-  // NO FALLBACK - must match these exact criteria
-  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
-      status && 
-      DELIVERED_STATUSES.includes(status)) {
+  if (status && DELIVERED_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.DELIVERED, subphase: null };
   }
   
-  // IN_TRANSIT: Package is on its way to customer
-  // Requires BOTH: shipmentStatus='label_purchased' AND status='IT'
-  // NO FALLBACK - must match these exact criteria
-  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
-      status && 
-      IN_TRANSIT_STATUSES.includes(status)) {
+  // IN_TRANSIT: Package is on its way to customer (includes legacy 'shipped' status)
+  if (status && IN_TRANSIT_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
   }
   
-  // ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
-  // Requires BOTH: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
-  // NO FALLBACK - must match these exact criteria
-  if (shipment.shipmentStatus === ON_DOCK_SHIPMENT_STATUS && 
+  // PROBLEM: Shipment has a carrier problem (SP/UN/EX) - terminal, becomes customer service issue
+  if (status && PROBLEM_STATUSES.includes(status)) {
+    return { phase: LIFECYCLE_PHASES.PROBLEM, subphase: null };
+  }
+  
+  // ON_DOCK: Label purchased, waiting for carrier pickup (NY/AC/new)
+  if (shipment.shipmentStatus === 'label_purchased' && 
       status && 
       ON_DOCK_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.ON_DOCK, subphase: null };
   }
 
+  // ========================================================================
+  // OPERATIONAL PHASES (based on shipmentStatus and session state)
+  // ========================================================================
+
   // READY_TO_FULFILL: On hold + MOVE OVER tag (regardless of session state)
   // This MUST be checked BEFORE session-based phases to properly reset orders that go back to on_hold
-  // Orders that were in packing_ready/picking but returned to on_hold should reset to ready_to_fulfill
   if (shipment.shipmentStatus === 'on_hold' && 
-      shipment.hasMoveOverTag === true && 
-      shipment.status !== 'cancelled') {
+      shipment.hasMoveOverTag === true) {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
   }
@@ -166,13 +162,10 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.PICKING_ISSUES, subphase: null };
   }
 
-  // PACKING_READY: Session closed, no tracking yet, shipment still pending, not cancelled
-  // Requires ALL: sessionStatus='closed' AND trackingNumber IS NULL AND shipmentStatus='pending' AND status != 'cancelled'
-  // NO FALLBACK - must match these exact criteria
+  // PACKING_READY: Session closed, no tracking yet, shipment still pending
   if (shipment.sessionStatus === 'closed' && 
       !shipment.trackingNumber &&
-      shipment.shipmentStatus === 'pending' &&
-      shipment.status !== 'cancelled') {
+      shipment.shipmentStatus === 'pending') {
     return { phase: LIFECYCLE_PHASES.PACKING_READY, subphase: null };
   }
 
@@ -187,27 +180,22 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   }
 
   // SESSION_CREATED: Has a local fulfillment session but no SkuVault session yet
-  // This means the session was built locally and is waiting to be pushed to SkuVault
   if (shipment.fulfillmentSessionId && 
       !shipment.sessionStatus &&
-      shipment.shipmentStatus === 'pending' &&
-      shipment.status !== 'cancelled') {
+      shipment.shipmentStatus === 'pending') {
     return { phase: LIFECYCLE_PHASES.SESSION_CREATED, subphase: null };
   }
 
-  // READY_TO_SESSION: Pending + MOVE OVER tag + no SkuVault session yet + no local session + not cancelled
-  // This is where fingerprinting and QC item explosion should happen
-  // Also derive subphase so session builder can find orders that are ready (needs_session)
+  // READY_TO_SESSION: Pending + MOVE OVER tag + no session
   if (shipment.shipmentStatus === 'pending' && 
       shipment.hasMoveOverTag === true && 
       !shipment.sessionStatus &&
-      !shipment.fulfillmentSessionId &&
-      shipment.status !== 'cancelled') {
+      !shipment.fulfillmentSessionId) {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
   }
 
-  // AWAITING_DECISIONS: Has fingerprint, determine which subphase
+  // AWAITING_DECISIONS: Default fallback - needs categorization/fingerprint/packaging/session
   const subphase = deriveDecisionSubphase(shipment);
   return { phase: LIFECYCLE_PHASES.AWAITING_DECISIONS, subphase };
 }
@@ -278,6 +266,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.IN_TRANSIT]: 'In Transit',
     [LIFECYCLE_PHASES.DELIVERED]: 'Delivered',
     [LIFECYCLE_PHASES.CANCELLED]: 'Cancelled',
+    [LIFECYCLE_PHASES.PROBLEM]: 'Problem',
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 'Picking Issues',
   };
   return displayNames[phase] || phase;
@@ -366,6 +355,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.IN_TRANSIT]: 95,
     [LIFECYCLE_PHASES.DELIVERED]: 100,
     [LIFECYCLE_PHASES.CANCELLED]: 100, // Terminal state
+    [LIFECYCLE_PHASES.PROBLEM]: 100, // Terminal state
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 50, // Same as picking (it's a branch)
   };
   
