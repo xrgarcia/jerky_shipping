@@ -972,6 +972,7 @@ export type LifecycleEventReason =
   | 'rate_check'        // Rate check completed
   | 'rate_analysis'     // Smart carrier rate analysis completed
   | 'lifecycle_repair'  // Lifecycle repair worker batch operation
+  | 'tracking_status_sync'  // Tracking status sync maintenance job
   | 'manual'            // Manual trigger from UI
   | 'backfill';         // Batch backfill operation
 

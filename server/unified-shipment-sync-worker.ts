@@ -993,6 +993,14 @@ async function runPollLoop(): Promise<boolean> {
       } catch (tagRefreshErr) {
         console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
       }
+      
+      // Sync tracking statuses for shipments stuck in in_transit/on_dock
+      // Uses dedicated GET /v2/tracking endpoint to catch deliveries webhooks missed
+      try {
+        await syncTrackingStatuses();
+      } catch (trackingSyncErr) {
+        console.error('[UnifiedSync] Tracking status sync error (non-fatal):', trackingSyncErr);
+      }
     }
     
     lastError = null;
