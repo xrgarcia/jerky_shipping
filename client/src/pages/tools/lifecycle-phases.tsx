@@ -352,11 +352,7 @@ function StateMachineTab({
       <PhaseBox phase="ready_to_session" count={getPhaseCount(counts, "ready_to_session")} isLoading={isLoading} />
       <DownArrow />
 
-      {/* session_created - inline, session built locally but not yet pushed to SkuVault */}
-      <PhaseBox phase="session_created" count={getPhaseCount(counts, "session_created")} isLoading={isLoading} />
-      <DownArrow />
-
-      {/* awaiting_decisions expanded */}
+      {/* awaiting_decisions expanded (includes session_created) */}
       <div
         className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 rounded-md p-3"
         data-testid="phase-box-awaiting_decisions"
@@ -384,6 +380,30 @@ function StateMachineTab({
               {i < SUBPHASE_ORDER.length - 1 && <RightArrow />}
             </div>
           ))}
+          <RightArrow />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="border border-green-300 dark:border-green-700 bg-green-100 dark:bg-green-900/40 rounded-md p-2 min-w-[100px] text-center"
+                data-testid="subphase-box-session_created"
+              >
+                <div className="text-xs font-medium text-foreground">Session Created</div>
+                <div className="mt-1">
+                  {isLoading ? (
+                    <Skeleton className="h-4 w-8 mx-auto" />
+                  ) : (
+                    <Badge variant="secondary" className="no-default-active-elevate text-xs" data-testid="subphase-count-session_created">
+                      {getPhaseCount(counts, "session_created")}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-medium">Session Created</p>
+              <p className="text-xs text-muted-foreground">Local session built, waiting for SkuVault push</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
