@@ -357,6 +357,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
   const phaseWeights: Record<LifecyclePhase, number> = {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 0,
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 5,
+    [LIFECYCLE_PHASES.SESSION_CREATED]: 10,
     [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 15,
     [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,
