@@ -515,37 +515,26 @@ export class ShipStationShipmentService {
         return { success: false, updated: false, error: 'SHIPSTATION_API_KEY not configured' };
       }
 
-      // Build update payload with the full package info (package_id, name, dimensions)
-      // ShipStation custom packages use package_id to identify the specific package type
-      const packageDimensions = {
-        length: packageInfo.length,
-        width: packageInfo.width,
-        height: packageInfo.height,
-        unit: packageInfo.unit,
-      };
+      // Build update payload with ONLY package_id (no package_code or dimensions)
+      // Per ShipStation support: package_code and dimensions take precedence over package_id.
+      // To use a custom package type, send ONLY package_id — ShipStation pulls dimensions
+      // from the custom package type definition automatically.
       
       const updatePayload: any = {
         ...shipmentData,
         packages: shipmentData.packages?.map((pkg: any, index: number) => {
           if (index === 0) {
             // Remove read-only shipment_package_id to allow package_id change
-            const { shipment_package_id, ...pkgWithoutId } = pkg;
+            // Remove package_code and dimensions so package_id takes effect
+            const { shipment_package_id, package_code, dimensions, name, package_name, ...pkgWithoutOverrides } = pkg;
             return {
-              ...pkgWithoutId,
+              ...pkgWithoutOverrides,
               package_id: packageInfo.packageId,
-              package_code: 'package',
-              name: packageInfo.name,           // V2 packages uses 'name'
-              package_name: packageInfo.name,   // V2 shipments uses 'package_name'
-              dimensions: packageDimensions,
             };
           }
           return pkg;
         }) || [{ 
           package_id: packageInfo.packageId,
-          package_code: 'package',
-          name: packageInfo.name,
-          package_name: packageInfo.name,
-          dimensions: packageDimensions,
         }],
       };
 
@@ -590,7 +579,7 @@ export class ShipStationShipmentService {
         if (updatePayload.warehouse_id === null) delete updatePayload.warehouse_id;
       }
 
-      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with package: ${packageInfo.name} (${packageInfo.packageId}) ${packageDimensions.length}x${packageDimensions.width}x${packageDimensions.height}`);
+      console.log(`[ShipmentService] PUT updating shipment ${shipmentId} with custom package_id: ${packageInfo.packageId} (${packageInfo.name})`);
       console.log(`[ShipmentService] Package payload:`, JSON.stringify(updatePayload.packages[0], null, 2));
 
       const updateUrl = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
