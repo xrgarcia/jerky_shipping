@@ -104,7 +104,7 @@ export default function ShipmentDetails() {
       "DE": { variant: "default", className: "bg-green-600 hover:bg-green-700 text-lg", label: "Delivered" },
       "IT": { variant: "default", className: "bg-blue-600 hover:bg-blue-700 text-lg", label: "In Transit" },
       "AC": { variant: "default", className: "bg-cyan-600 hover:bg-cyan-700 text-lg", label: "Accepted" },
-      "SP": { variant: "default", className: "bg-green-500 hover:bg-green-600 text-lg", label: "Delivered (Locker)" },
+      "SP": { variant: "outline", className: "border-orange-500 text-orange-700 dark:text-orange-400 text-lg", label: "Return to Sender" },
       "AT": { variant: "default", className: "bg-orange-500 hover:bg-orange-600 text-lg", label: "Attempted Delivery" },
       "EX": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400 text-lg", label: "Exception" },
       "UN": { variant: "outline", className: "border-gray-500 text-gray-700 dark:text-gray-400 text-lg", label: "Unknown" },
@@ -139,8 +139,7 @@ export default function ShipmentDetails() {
   // Derive hasMoveOverTag from tags array
   const hasMoveOverTag = tags?.some(tag => tag.name === 'MOVE OVER') ?? false;
 
-  // Lifecycle phases matching backend's deriveLifecyclePhase exactly
-  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'awaiting_decisions';
+  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'session_created' | 'awaiting_decisions' | 'cancelled' | 'problem';
   
   interface LifecycleInfo {
     phase: LifecyclePhase;
@@ -151,174 +150,110 @@ export default function ShipmentDetails() {
     colorClass: string;
     badgeClass: string;
     isException?: boolean;
+    isTerminal?: boolean;
     matchedFields: string[];
   }
 
-  const getLifecycleInfo = (shipment: ShipmentWithOrder): LifecycleInfo => {
-    const hasTracking = !!shipment.trackingNumber;
-    const sessionStatus = shipment.sessionStatus?.toLowerCase();
-    const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
-    const status = shipment.status?.toUpperCase();
-
-    // Priority order matches backend's deriveLifecyclePhase exactly
-
-    // 1. DELIVERED - shipmentStatus='label_purchased' AND status='DE'
-    if (shipmentStatus === 'label_purchased' && status === 'DE') {
-      return {
-        phase: 'delivered',
-        label: 'Delivered',
-        description: 'Package has been delivered to the customer',
-        whyThisStatus: 'The carrier confirmed delivery to the customer.',
-        whatHappensNext: 'Order complete! No further action needed.',
-        colorClass: 'bg-green-600',
-        badgeClass: 'bg-green-600 text-white',
-        matchedFields: ['shipmentStatus', 'status'],
-      };
-    }
-
-    // 2. IN_TRANSIT - shipmentStatus='label_purchased' AND status='IT'
-    if (shipmentStatus === 'label_purchased' && status === 'IT') {
-      return {
-        phase: 'in_transit',
-        label: 'In Transit',
-        description: 'Package is on its way to the customer',
-        whyThisStatus: 'The carrier has picked up the package and it\'s in transit.',
-        whatHappensNext: 'Waiting for carrier to deliver the package.',
-        colorClass: 'bg-blue-500',
-        badgeClass: 'bg-blue-500 text-white',
-        matchedFields: ['shipmentStatus', 'status'],
-      };
-    }
-
-    // 3. ON_DOCK - shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
-    if (shipmentStatus === 'label_purchased' && status && ['NY', 'AC'].includes(status)) {
-      return {
-        phase: 'on_dock',
-        label: 'On the Dock',
-        description: 'Packaged and waiting for carrier pickup',
-        whyThisStatus: 'Label was printed and package is ready. Waiting for carrier to pick it up.',
-        whatHappensNext: 'Carrier will pick up the package during their next visit.',
-        colorClass: 'bg-blue-600',
-        badgeClass: 'bg-blue-600 text-white',
-        matchedFields: ['shipmentStatus', 'status'],
-      };
-    }
-
-    // 4. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag
-    if (shipmentStatus === 'on_hold' && hasMoveOverTag && status !== 'CA') {
-      return {
-        phase: 'ready_to_fulfill',
-        label: 'Ready to Fulfill',
-        description: 'On hold in ShipStation, waiting to be released',
-        whyThisStatus: 'Order is tagged "MOVE OVER" but still on hold in ShipStation.',
-        whatHappensNext: 'ShipStation will release this order when the hold date passes.',
-        colorClass: 'bg-amber-600',
-        badgeClass: 'bg-amber-600 text-white',
-        matchedFields: ['shipmentStatus', 'hasMoveOverTag'],
-      };
-    }
-
-    // 5. PICKING_ISSUES - sessionStatus='inactive'
-    if (sessionStatus === 'inactive') {
-      return {
-        phase: 'picking_issues',
-        label: 'Picking Issues',
-        description: 'Problem during picking - needs supervisor attention',
-        whyThisStatus: 'The picker marked this session as inactive due to a problem.',
-        whatHappensNext: 'A supervisor needs to review and resolve the issue.',
-        colorClass: 'bg-red-600',
-        badgeClass: 'bg-red-600 text-white',
-        isException: true,
-        matchedFields: ['sessionStatus'],
-      };
-    }
-
-    // 6. PACKING_READY - sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'
-    if (sessionStatus === 'closed' && !hasTracking && shipmentStatus === 'pending' && status !== 'CA') {
-      return {
-        phase: 'packing_ready',
-        label: 'Packing Ready',
-        description: 'Picked and ready to be packed',
-        whyThisStatus: 'All items have been picked. Order is ready for QC and packing.',
-        whatHappensNext: 'A packer will scan and pack this order, then print the label.',
-        colorClass: 'bg-purple-600',
-        badgeClass: 'bg-purple-600 text-white',
-        matchedFields: ['sessionStatus', 'trackingNumber', 'shipmentStatus'],
-      };
-    }
-
-    // 7. PICKING - sessionStatus='active'
-    if (sessionStatus === 'active') {
-      return {
-        phase: 'picking',
-        label: 'Picking',
-        description: 'A picker is currently working on this order',
-        whyThisStatus: 'This order is in an active picking session.',
-        whatHappensNext: 'Picker will complete the pick, then it moves to packing.',
-        colorClass: 'bg-cyan-600',
-        badgeClass: 'bg-cyan-600 text-white',
-        matchedFields: ['sessionStatus'],
-      };
-    }
-
-    // 8. READY_TO_PICK - sessionStatus='new'
-    if (sessionStatus === 'new') {
-      return {
-        phase: 'ready_to_pick',
-        label: 'Ready to Pick',
-        description: 'In the pick queue, waiting for a picker',
-        whyThisStatus: 'This order is assigned to a session and waiting to be picked.',
-        whatHappensNext: 'A picker will start working on this session.',
-        colorClass: 'bg-yellow-600',
-        badgeClass: 'bg-yellow-600 text-white',
-        matchedFields: ['sessionStatus'],
-      };
-    }
-
-    // 9. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus
-    if (shipmentStatus === 'pending' && hasMoveOverTag && !sessionStatus && status !== 'CA') {
-      return {
-        phase: 'ready_to_session',
-        label: 'Ready to Session',
-        description: 'Released from hold, waiting to be added to a pick session',
-        whyThisStatus: 'Order is released and has the "MOVE OVER" tag, but not yet in a session.',
-        whatHappensNext: 'System will assign this order to a picking session.',
-        colorClass: 'bg-teal-600',
-        badgeClass: 'bg-teal-600 text-white',
-        matchedFields: ['shipmentStatus', 'hasMoveOverTag', 'sessionStatus'],
-      };
-    }
-
-    // 10. AWAITING_DECISIONS - fallback
-    return {
-      phase: 'awaiting_decisions',
-      label: 'Awaiting Decisions',
-      description: 'Missing required information before it can proceed',
-      whyThisStatus: `Status: ${shipmentStatus || 'unknown'}, Session: ${sessionStatus || 'none'}, MOVE OVER tag: ${hasMoveOverTag ? 'Yes' : 'No'}`,
-      whatHappensNext: 'System needs more information (fingerprint, packaging type, etc.).',
-      colorClass: 'bg-gray-500',
-      badgeClass: 'bg-gray-500 text-white',
-      matchedFields: [],
-    };
+  const LIFECYCLE_INFO_MAP: Record<string, Omit<LifecycleInfo, 'matchedFields'>> = {
+    delivered: {
+      phase: 'delivered', label: 'Delivered', description: 'Package has been delivered to the customer',
+      whyThisStatus: 'The carrier confirmed delivery.', whatHappensNext: 'Order complete! No further action needed.',
+      colorClass: 'bg-green-600', badgeClass: 'bg-green-600 text-white', isTerminal: true,
+    },
+    in_transit: {
+      phase: 'in_transit', label: 'In Transit', description: 'Package is on its way to the customer',
+      whyThisStatus: 'The carrier has picked up the package.', whatHappensNext: 'Waiting for carrier to deliver.',
+      colorClass: 'bg-blue-500', badgeClass: 'bg-blue-500 text-white',
+    },
+    on_dock: {
+      phase: 'on_dock', label: 'On the Dock', description: 'Packaged and waiting for carrier pickup',
+      whyThisStatus: 'Label printed, package ready.', whatHappensNext: 'Carrier will pick up during their next visit.',
+      colorClass: 'bg-blue-600', badgeClass: 'bg-blue-600 text-white',
+    },
+    cancelled: {
+      phase: 'cancelled', label: 'Cancelled', description: 'Order has been cancelled',
+      whyThisStatus: 'This order was cancelled.', whatHappensNext: 'No further action needed.',
+      colorClass: 'bg-red-600', badgeClass: 'bg-red-600 text-white', isTerminal: true,
+    },
+    problem: {
+      phase: 'problem', label: 'Problem', description: 'Shipment has a carrier problem (SP/UN/EX)',
+      whyThisStatus: 'The carrier reported a problem with this shipment.', whatHappensNext: 'Customer service needs to investigate.',
+      colorClass: 'bg-orange-700', badgeClass: 'bg-orange-700 text-white', isTerminal: true,
+    },
+    ready_to_fulfill: {
+      phase: 'ready_to_fulfill', label: 'Ready to Fulfill', description: 'On hold in ShipStation, waiting to be released',
+      whyThisStatus: 'Order is on hold with "MOVE OVER" tag.', whatHappensNext: 'Will be released when the hold date passes.',
+      colorClass: 'bg-amber-600', badgeClass: 'bg-amber-600 text-white',
+    },
+    picking_issues: {
+      phase: 'picking_issues', label: 'Picking Issues', description: 'Problem during picking - needs supervisor attention',
+      whyThisStatus: 'The picker marked this as inactive.', whatHappensNext: 'A supervisor needs to review.',
+      colorClass: 'bg-red-600', badgeClass: 'bg-red-600 text-white', isException: true,
+    },
+    packing_ready: {
+      phase: 'packing_ready', label: 'Packing Ready', description: 'Picked and ready to be packed',
+      whyThisStatus: 'All items picked, ready for QC and packing.', whatHappensNext: 'A packer will scan and pack this order.',
+      colorClass: 'bg-purple-600', badgeClass: 'bg-purple-600 text-white',
+    },
+    picking: {
+      phase: 'picking', label: 'Picking', description: 'A picker is currently working on this order',
+      whyThisStatus: 'This order is in an active picking session.', whatHappensNext: 'Picker will complete, then it moves to packing.',
+      colorClass: 'bg-cyan-600', badgeClass: 'bg-cyan-600 text-white',
+    },
+    ready_to_pick: {
+      phase: 'ready_to_pick', label: 'Ready to Pick', description: 'In the pick queue, waiting for a picker',
+      whyThisStatus: 'Assigned to a session, waiting to be picked.', whatHappensNext: 'A picker will start working on this session.',
+      colorClass: 'bg-yellow-600', badgeClass: 'bg-yellow-600 text-white',
+    },
+    session_created: {
+      phase: 'session_created', label: 'Session Created', description: 'Local session built, waiting to push to SkuVault',
+      whyThisStatus: 'Session has been created locally.', whatHappensNext: 'Will be pushed to SkuVault for picking.',
+      colorClass: 'bg-violet-600', badgeClass: 'bg-violet-600 text-white',
+    },
+    ready_to_session: {
+      phase: 'ready_to_session', label: 'Ready to Session', description: 'Waiting to be added to a pick session',
+      whyThisStatus: 'Order is released and ready for sessioning.', whatHappensNext: 'System will assign to a picking session.',
+      colorClass: 'bg-teal-600', badgeClass: 'bg-teal-600 text-white',
+    },
+    awaiting_decisions: {
+      phase: 'awaiting_decisions', label: 'Awaiting Decisions', description: 'Missing required information before it can proceed',
+      whyThisStatus: 'Needs more information (fingerprint, packaging type, etc.).', whatHappensNext: 'System will resolve automatically or needs manual input.',
+      colorClass: 'bg-gray-500', badgeClass: 'bg-gray-500 text-white',
+    },
   };
 
-  // The normal flow order (for the visual stepper)
-  const lifecycleFlowSteps: { phase: LifecyclePhase; label: string; description: string }[] = [
-    { phase: 'ready_to_fulfill', label: 'Ready to Fulfill', description: 'On hold, waiting to release' },
-    { phase: 'ready_to_session', label: 'Ready to Session', description: 'Waiting for pick session' },
-    { phase: 'ready_to_pick', label: 'Ready to Pick', description: 'In pick queue' },
-    { phase: 'picking', label: 'Picking', description: 'Being picked' },
-    { phase: 'packing_ready', label: 'Packing Ready', description: 'Ready to pack' },
-    { phase: 'on_dock', label: 'On the Dock', description: 'Waiting for carrier' },
-    { phase: 'in_transit', label: 'In Transit', description: 'On the way' },
-    { phase: 'delivered', label: 'Delivered', description: 'Complete' },
+  const getLifecycleInfo = (shipment: ShipmentWithOrder): LifecycleInfo => {
+    const phase = shipment.lifecyclePhase as string;
+    const info = LIFECYCLE_INFO_MAP[phase];
+    if (info) {
+      return { ...info, matchedFields: ['lifecyclePhase'] };
+    }
+    return { ...LIFECYCLE_INFO_MAP['awaiting_decisions'], matchedFields: [] };
+  };
+
+  const NORMAL_FLOW_STEPS: { phase: LifecyclePhase; label: string }[] = [
+    { phase: 'ready_to_fulfill', label: 'Ready to Fulfill' },
+    { phase: 'ready_to_session', label: 'Ready to Session' },
+    { phase: 'ready_to_pick', label: 'Ready to Pick' },
+    { phase: 'picking', label: 'Picking' },
+    { phase: 'packing_ready', label: 'Packing Ready' },
+    { phase: 'on_dock', label: 'On the Dock' },
+    { phase: 'in_transit', label: 'In Transit' },
   ];
 
-  // Exception states (shown separately)
-  const exceptionStates: { phase: LifecyclePhase; label: string; description: string }[] = [
-    { phase: 'picking_issues', label: 'Picking Issues', description: 'Needs supervisor attention' },
-    { phase: 'awaiting_decisions', label: 'Awaiting Decisions', description: 'Missing information' },
-  ];
+  const TERMINAL_STEPS: Record<string, { phase: LifecyclePhase; label: string }> = {
+    delivered: { phase: 'delivered', label: 'Delivered' },
+    cancelled: { phase: 'cancelled', label: 'Cancelled' },
+    problem: { phase: 'problem', label: 'Problem' },
+  };
+
+  const getLifecycleFlowSteps = (currentPhase: string) => {
+    const terminal = TERMINAL_STEPS[currentPhase];
+    if (terminal) {
+      return [...NORMAL_FLOW_STEPS, terminal];
+    }
+    return [...NORMAL_FLOW_STEPS, TERMINAL_STEPS['delivered']];
+  };
 
   // Legacy wrapper for backward compatibility
   const getWorkflowStepBadge = (shipment: ShipmentWithOrder): { badge: JSX.Element; step: string; reason: string; matchedFields: string[] } => {
@@ -440,7 +375,8 @@ export default function ShipmentDetails() {
           {(() => {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
-            const isExceptionState = currentInfo.isException || currentPhase === 'awaiting_decisions';
+            const isExceptionState = currentInfo.isException || currentPhase === 'awaiting_decisions' || currentPhase === 'session_created';
+            const lifecycleFlowSteps = getLifecycleFlowSteps(currentPhase);
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
             
             return (
