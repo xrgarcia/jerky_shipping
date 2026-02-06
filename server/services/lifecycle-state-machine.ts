@@ -12,12 +12,13 @@
  * IN_TRANSIT: Package is on its way to customer
  *             Requires: status IN ('IT', 'shipped') — tracking status takes precedence
  * DELIVERED: Package has been delivered to customer
- *            Requires: status='DE' — tracking status takes precedence
+ *            Requires: status IN ('DE', 'SP') — tracking status takes precedence
+ *            DE = Delivered to final address
+ *            SP = Service Point — delivered to a collection location (locker or pickup point)
  * CANCELLED: Order has been cancelled
  *            Requires: status='cancelled' — terminal state
  * PROBLEM: Shipment has a carrier problem — terminal, becomes customer service case
- *          Requires: status IN ('SP', 'UN', 'EX')
- *          SP = Return to Sender — package is being returned to the shipper
+ *          Requires: status IN ('UN', 'EX')
  *          UN = Unknown — carrier has no tracking information available
  *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
  * 
@@ -89,10 +90,10 @@ export interface ShipmentLifecycleData {
 }
 
 // Status codes where tracking status (status field) takes precedence over shipmentStatus
-const DELIVERED_STATUSES = ['DE'];
+const DELIVERED_STATUSES = ['DE', 'SP'];
 const IN_TRANSIT_STATUSES = ['IT', 'SHIPPED'];
 const ON_DOCK_STATUSES = ['NY', 'AC', 'NEW'];
-const PROBLEM_STATUSES = ['SP', 'UN', 'EX'];
+const PROBLEM_STATUSES = ['UN', 'EX'];
 
 /**
  * Determine the lifecycle phase based on shipment data
@@ -141,7 +142,7 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   }
   
   // PROBLEM: Shipment has a carrier problem - terminal, becomes customer service case
-  // SP = Return to Sender, UN = Unknown (no tracking info), EX = Exception (weather delay, damaged label, incorrect address)
+  // UN = Unknown (no tracking info), EX = Exception (weather delay, damaged label, incorrect address)
   if (status && PROBLEM_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.PROBLEM, subphase: null };
   }
