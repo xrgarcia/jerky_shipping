@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban, ListChecks } from "lucide-react";
+import { Search, Truck, Package, ChevronDown, ChevronUp, Filter, X, ArrowUpDown, ChevronLeft, ChevronRight, PackageOpen, Clock, MapPin, User, Mail, Phone, Scale, Hash, Boxes, Play, CheckCircle, Timer, AlertTriangle, Zap, Ban, ListChecks, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, ShipmentItem, ShipmentTag, ShipmentPackage } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -306,18 +306,7 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
     const hasTracking = !!shipment.trackingNumber;
     const status = shipment.status?.toUpperCase();
     
-    // Priority 1: Check for terminal states first (Delivered)
-    if (status === 'DE' || status === 'DELIVERED') {
-      const badge = (
-        <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-          <CheckCircle className="h-3 w-3" />
-          Delivered
-        </Badge>
-      );
-      return wrapBadgeWithPopover('delivered', badge);
-    }
-    
-    // Priority 2: Use stored lifecycle phase for proper badge display
+    // Use stored lifecycle phase for badge display
     switch (lifecyclePhase) {
       case 'ready_to_fulfill': {
         const badge = (
@@ -397,6 +386,46 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
           </Badge>
         );
         return wrapBadgeWithPopover('session_created', badge);
+      }
+      
+      case 'delivered': {
+        const badge = (
+          <Badge className="bg-green-700 hover:bg-green-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <CheckCircle className="h-3 w-3" />
+            Delivered
+          </Badge>
+        );
+        return wrapBadgeWithPopover('delivered', badge);
+      }
+      
+      case 'in_transit': {
+        const badge = (
+          <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <Truck className="h-3 w-3" />
+            In Transit
+          </Badge>
+        );
+        return wrapBadgeWithPopover('in_transit', badge);
+      }
+      
+      case 'cancelled': {
+        const badge = (
+          <Badge className="bg-red-600 hover:bg-red-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <XCircle className="h-3 w-3" />
+            Cancelled
+          </Badge>
+        );
+        return wrapBadgeWithPopover('cancelled', badge);
+      }
+      
+      case 'problem': {
+        const badge = (
+          <Badge className="bg-orange-700 hover:bg-orange-800 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+            <AlertTriangle className="h-3 w-3" />
+            Problem
+          </Badge>
+        );
+        return wrapBadgeWithPopover('problem', badge);
       }
       
       case 'awaiting_decisions':
