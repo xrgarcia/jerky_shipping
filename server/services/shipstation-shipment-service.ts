@@ -5,7 +5,7 @@
 
 import type { IStorage } from '../storage';
 import type { InsertShipment, Order } from '@shared/schema';
-import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo, extractPdfLabelUrl } from '../utils/shipstation-api';
+import { getShipmentsByOrderNumber, getLabelsForShipment, createLabel as createShipStationLabel, type RateLimitInfo, extractPdfLabelUrl, resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
 import { db } from '../db';
 import { featureFlags } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -550,14 +550,22 @@ export class ShipStationShipmentService {
       delete updatePayload.form_download;
       delete updatePayload.insurance_claim;
       
-      // Handle carrier_id validation issue:
-      // ShipStation requires carrier_id when service_code is set and multiple carriers support that service.
-      // If carrier_id is null but service_code is set, we need to clear service_code to avoid the validation error.
-      // This preserves the existing service if carrier_id is already set, otherwise clears both.
+      // Resolve carrier_id from service_code if missing.
+      // ShipStation requires carrier_id when service_code is set. Rather than deleting
+      // the service (which would lose the user's shipping method selection), we look up
+      // the correct carrier_id from our cached service_code → carrier_id map.
       if (updatePayload.service_code && !updatePayload.carrier_id) {
-        console.log(`[ShipmentService] service_code "${updatePayload.service_code}" set but carrier_id is null, clearing service to avoid validation error`);
-        delete updatePayload.service_code;
-        delete updatePayload.carrier_code;
+        try {
+          const resolvedCarrierId = await resolveCarrierIdFromServiceCode(updatePayload.service_code);
+          if (resolvedCarrierId) {
+            updatePayload.carrier_id = resolvedCarrierId;
+            console.log(`[ShipmentService] Resolved carrier_id "${resolvedCarrierId}" from service_code "${updatePayload.service_code}"`);
+          } else {
+            console.warn(`[ShipmentService] Could not resolve carrier_id for service_code "${updatePayload.service_code}", passing through as-is`);
+          }
+        } catch (err: any) {
+          console.warn(`[ShipmentService] Error resolving carrier_id for service_code "${updatePayload.service_code}": ${err.message}, passing through as-is`);
+        }
       }
 
       // Handle null ship_from / warehouse_id (same pattern as updateShipmentNumber)
