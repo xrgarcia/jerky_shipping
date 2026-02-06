@@ -118,6 +118,12 @@ const ON_DOCK_SHIPMENT_STATUS = 'label_purchased';
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
   const status = shipment.status?.toUpperCase();
   
+  // CANCELLED: Order has been cancelled - terminal state
+  // Check this FIRST before any other phase evaluation
+  if (status === 'CANCELLED') {
+    return { phase: LIFECYCLE_PHASES.CANCELLED, subphase: null };
+  }
+  
   // DELIVERED: Package has been delivered
   // Requires BOTH: shipmentStatus='label_purchased' AND status='DE'
   // NO FALLBACK - must match these exact criteria
@@ -271,6 +277,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.ON_DOCK]: 'On the Dock',
     [LIFECYCLE_PHASES.IN_TRANSIT]: 'In Transit',
     [LIFECYCLE_PHASES.DELIVERED]: 'Delivered',
+    [LIFECYCLE_PHASES.CANCELLED]: 'Cancelled',
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 'Picking Issues',
   };
   return displayNames[phase] || phase;
@@ -357,6 +364,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.ON_DOCK]: 90,
     [LIFECYCLE_PHASES.IN_TRANSIT]: 95,
     [LIFECYCLE_PHASES.DELIVERED]: 100,
+    [LIFECYCLE_PHASES.CANCELLED]: 100, // Terminal state
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 50, // Same as picking (it's a branch)
   };
   
