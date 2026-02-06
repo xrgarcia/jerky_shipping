@@ -10,9 +10,16 @@
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer
- *             Requires: shipmentStatus='label_purchased' AND status='IT'
+ *             Requires: status IN ('IT', 'shipped') — tracking status takes precedence
  * DELIVERED: Package has been delivered to customer
- *            Requires: shipmentStatus='label_purchased' AND status='DE'
+ *            Requires: status='DE' — tracking status takes precedence
+ * CANCELLED: Order has been cancelled
+ *            Requires: status='cancelled' — terminal state
+ * PROBLEM: Shipment has a carrier problem — terminal, becomes customer service case
+ *          Requires: status IN ('SP', 'UN', 'EX')
+ *          SP = Return to Sender — package is being returned to the shipper
+ *          UN = Unknown — carrier has no tracking information available
+ *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
  * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
@@ -133,7 +140,8 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.IN_TRANSIT, subphase: null };
   }
   
-  // PROBLEM: Shipment has a carrier problem (SP/UN/EX) - terminal, becomes customer service issue
+  // PROBLEM: Shipment has a carrier problem - terminal, becomes customer service case
+  // SP = Return to Sender, UN = Unknown (no tracking info), EX = Exception (weather delay, damaged label, incorrect address)
   if (status && PROBLEM_STATUSES.includes(status)) {
     return { phase: LIFECYCLE_PHASES.PROBLEM, subphase: null };
   }
