@@ -47,8 +47,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Two-Tier Inventory Tracking System**: `skuvault_products` table uses `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity` to prevent premature inventory deduction.
 - **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations from a reporting database view.
 - **Shipping Cost Tracking**: Actual carrier costs from ShipStation labels API are stored in `shipments.shipping_cost` for cost analysis.
-- **Tracking Status Sync Job**: Maintenance job in the unified sync worker that calls `GET /v2/tracking?carrier_code={code}&tracking_number={number}` for shipments stuck in `in_transit` or `on_dock` with tracking numbers older than 14 days. Updates `status` field with terminal codes (DE, SP, UN, EX) and triggers lifecycle re-evaluation. Processes 10 per cycle, oldest first, to gradually clear backlog while letting webhooks handle recent shipments.
-- **Carrier Code Resolution**: `deriveCarrierCodeFromServiceCode()` extracts carrier prefix from service_code (e.g., `usps_ground_advantage` → `usps`). Cached `getServiceCodeToCarrierMap()` provides service_code → carrier_id lookup (4-hour TTL with stale fallback) for `updateShipmentPackage` when carrier_id is missing.
+- **Carrier Code Resolution**: Cached `getServiceCodeToCarrierMap()` provides service_code → carrier_id lookup (4-hour TTL with stale fallback) for `updateShipmentPackage` when carrier_id is missing.
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
