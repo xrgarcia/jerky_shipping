@@ -128,6 +128,12 @@ const PHASE_META: Record<
     colorClass: "bg-emerald-200 dark:bg-emerald-900/40 border-emerald-400 dark:border-emerald-600",
     category: "shipping",
   },
+  cancelled: {
+    label: "Cancelled",
+    description: "Order cancelled - terminal state",
+    colorClass: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
+    category: "terminal",
+  },
   picking_issues: {
     label: "Picking Issues",
     description: "Exception requiring attention",
@@ -177,6 +183,7 @@ const MAIN_FLOW_ORDER = [
   "on_dock",
   "in_transit",
   "delivered",
+  "cancelled",
 ];
 
 const SUBPHASE_ORDER = [
@@ -419,8 +426,11 @@ function StateMachineTab({
       <PhaseBox phase="in_transit" count={getPhaseCount(counts, "in_transit")} isLoading={isLoading} />
       <DownArrow />
 
-      {/* delivered */}
-      <PhaseBox phase="delivered" count={getPhaseCount(counts, "delivered")} isLoading={isLoading} />
+      {/* Terminal states: delivered + cancelled */}
+      <div className="flex flex-wrap items-start gap-8 justify-center">
+        <PhaseBox phase="delivered" count={getPhaseCount(counts, "delivered")} isLoading={isLoading} />
+        <PhaseBox phase="cancelled" count={getPhaseCount(counts, "cancelled")} isLoading={isLoading} />
+      </div>
     </div>
   );
 }
