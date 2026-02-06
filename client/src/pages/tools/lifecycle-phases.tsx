@@ -352,49 +352,38 @@ function StateMachineTab({
       <PhaseBox phase="ready_to_session" count={getPhaseCount(counts, "ready_to_session")} isLoading={isLoading} />
       <DownArrow />
 
-      {/* Branch: session_created vs awaiting_decisions */}
-      <div className="flex flex-wrap items-start gap-8 justify-center">
-        <div className="flex flex-col items-center gap-0">
-          <BranchArrow label="session" />
-          <PhaseBox phase="session_created" count={getPhaseCount(counts, "session_created")} isLoading={isLoading} />
-          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-            <ArrowDown className="h-3 w-3" />
-            <span>or back</span>
-          </div>
-        </div>
+      {/* session_created - inline, session built locally but not yet pushed to SkuVault */}
+      <PhaseBox phase="session_created" count={getPhaseCount(counts, "session_created")} isLoading={isLoading} />
+      <DownArrow />
 
-        <div className="flex flex-col items-center gap-0">
-          <BranchArrow label="decisions" />
-          {/* awaiting_decisions expanded */}
-          <div
-            className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 rounded-md p-3"
-            data-testid="phase-box-awaiting_decisions"
-          >
-            <div className="text-sm font-medium text-center mb-2 text-foreground">
-              Awaiting Decisions
-              <span className="ml-2">
-                {isLoading ? (
-                  <Skeleton className="inline-block h-4 w-8" />
-                ) : (
-                  <Badge variant="secondary" className="no-default-active-elevate" data-testid="phase-count-awaiting_decisions">
-                    {getPhaseCount(counts, "awaiting_decisions")}
-                  </Badge>
-                )}
-              </span>
+      {/* awaiting_decisions expanded */}
+      <div
+        className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 rounded-md p-3"
+        data-testid="phase-box-awaiting_decisions"
+      >
+        <div className="text-sm font-medium text-center mb-2 text-foreground">
+          Awaiting Decisions
+          <span className="ml-2">
+            {isLoading ? (
+              <Skeleton className="inline-block h-4 w-8" />
+            ) : (
+              <Badge variant="secondary" className="no-default-active-elevate" data-testid="phase-count-awaiting_decisions">
+                {getPhaseCount(counts, "awaiting_decisions")}
+              </Badge>
+            )}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1 justify-center">
+          {SUBPHASE_ORDER.map((sub, i) => (
+            <div key={sub} className="flex items-center gap-1">
+              <SubphaseBox
+                subphase={sub}
+                count={getPhaseCount(counts, "awaiting_decisions", sub)}
+                isLoading={isLoading}
+              />
+              {i < SUBPHASE_ORDER.length - 1 && <RightArrow />}
             </div>
-            <div className="flex flex-wrap items-center gap-1 justify-center">
-              {SUBPHASE_ORDER.map((sub, i) => (
-                <div key={sub} className="flex items-center gap-1">
-                  <SubphaseBox
-                    subphase={sub}
-                    count={getPhaseCount(counts, "awaiting_decisions", sub)}
-                    isLoading={isLoading}
-                  />
-                  {i < SUBPHASE_ORDER.length - 1 && <RightArrow />}
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
