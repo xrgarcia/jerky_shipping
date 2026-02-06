@@ -30,6 +30,7 @@ export const LIFECYCLE_PHASES = {
   IN_TRANSIT: 'in_transit',                   // Package in transit to customer (status IT)
   DELIVERED: 'delivered',                     // Package delivered to customer (status DE)
   CANCELLED: 'cancelled',                    // Order cancelled - terminal state
+  PROBLEM: 'problem',                        // Shipment problem (SP/UN/EX) - terminal state, becomes customer service issue
   PICKING_ISSUES: 'picking_issues',          // Exception requiring supervisor attention
 } as const;
 
@@ -68,6 +69,7 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
   [LIFECYCLE_PHASES.IN_TRANSIT]: [LIFECYCLE_PHASES.DELIVERED], // Package delivered
   [LIFECYCLE_PHASES.DELIVERED]: [], // Terminal state
   [LIFECYCLE_PHASES.CANCELLED]: [], // Terminal state
+  [LIFECYCLE_PHASES.PROBLEM]: [], // Terminal state
   [LIFECYCLE_PHASES.PICKING_ISSUES]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.PICKING], // Can be resolved back
 };
 
