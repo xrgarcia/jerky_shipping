@@ -2195,14 +2195,18 @@ export default function Shipments() {
                         <SelectContent>
                           <SelectItem value="all">All</SelectItem>
                           <SelectItem value="ready_to_fulfill">Ready to Fulfill</SelectItem>
+                          <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
                           <SelectItem value="ready_to_session">Ready to Session</SelectItem>
                           <SelectItem value="session_created">Session Created</SelectItem>
-                          <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
                           <SelectItem value="picking">Picking</SelectItem>
-                          <SelectItem value="packing_ready">Packing Ready</SelectItem>
-                          <SelectItem value="on_dock">On Dock</SelectItem>
                           <SelectItem value="picking_issues">Picking Issues</SelectItem>
+                          <SelectItem value="packing_ready">Packing Ready</SelectItem>
+                          <SelectItem value="on_dock">On the Dock</SelectItem>
+                          <SelectItem value="in_transit">In Transit</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="problem">Problem</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
