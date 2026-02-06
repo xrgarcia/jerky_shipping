@@ -222,7 +222,19 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.READY_FOR_SKUVAULT;
   }
 
-  // NEEDS_SESSION: Has packaging but not in session yet
+  // NEEDS_RATE_CHECK: Rate check not yet complete or failed (can retry)
+  // Must be evaluated BEFORE NEEDS_SESSION so orders can't skip rate checking
+  // Eligible statuses to proceed: 'complete', 'skipped'
+  // Statuses that stay in needs_rate_check: null, 'pending', 'failed'
+  const rateCheckComplete = shipment.rateCheckStatus === 'complete' || shipment.rateCheckStatus === 'skipped';
+  if (!rateCheckComplete) {
+    const eligibility = RateCheckEligibility.checkBasicRequirements(shipment);
+    if (eligibility.eligible) {
+      return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
+    }
+  }
+
+  // NEEDS_SESSION: Has packaging, rate check done, but not in session yet
   if (shipment.packagingTypeId && !shipment.fulfillmentSessionId) {
     return DECISION_SUBPHASES.NEEDS_SESSION;
   }
@@ -235,17 +247,6 @@ export function deriveDecisionSubphase(shipment: {
   // NEEDS_FINGERPRINT: All SKUs categorized but no fingerprint yet
   if (shipment.fingerprintStatus === 'complete' && !shipment.fingerprintId) {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
-  }
-
-  // NEEDS_RATE_CHECK: Rate check not yet complete or failed (can retry)
-  // Eligible statuses to proceed: 'complete', 'skipped'
-  // Statuses that stay in needs_rate_check: null, 'pending', 'failed'
-  const rateCheckComplete = shipment.rateCheckStatus === 'complete' || shipment.rateCheckStatus === 'skipped';
-  if (!rateCheckComplete) {
-    const eligibility = RateCheckEligibility.checkBasicRequirements(shipment);
-    if (eligibility.eligible) {
-      return DECISION_SUBPHASES.NEEDS_RATE_CHECK;
-    }
   }
 
   // NEEDS_CATEGORIZATION: SKUs need collection assignment
