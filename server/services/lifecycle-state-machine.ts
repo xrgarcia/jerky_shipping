@@ -76,6 +76,9 @@ export interface ShipmentLifecycleData {
   fingerprintId?: string | null;
   hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
   rateCheckStatus?: string | null;  // Rate check status: 'pending' | 'complete' | 'failed' | 'skipped' | null
+  shipmentId?: string | null;       // ShipStation shipment ID (for rate check eligibility)
+  shipToPostalCode?: string | null; // Destination postal code (for rate check eligibility)
+  serviceCode?: string | null;      // Shipping service code (for rate check eligibility)
 }
 
 // Status codes that indicate package is on the dock (at the facility, awaiting carrier pickup)

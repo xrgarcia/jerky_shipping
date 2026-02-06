@@ -104,6 +104,9 @@ export async function updateShipmentLifecycleFromData(
     fingerprintId: shipmentData?.fingerprintId ?? shipment.fingerprintId,
     hasMoveOverTag,
     rateCheckStatus: shipmentData?.rateCheckStatus ?? shipment.rateCheckStatus,
+    shipmentId: shipmentData?.shipmentId ?? shipment.shipmentId,
+    shipToPostalCode: shipmentData?.shipToPostalCode ?? shipment.shipToPostalCode,
+    serviceCode: shipmentData?.serviceCode ?? shipment.serviceCode,
   };
 
   // Derive the correct lifecycle state
