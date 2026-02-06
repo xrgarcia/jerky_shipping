@@ -1,0 +1,158 @@
+chunk-RPCDYKBN.js?v=e69c7f2c:521 Warning: validateDOMNesting(...): <p> cannot appear as a descendant of <p>.
+    at p
+    at p
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:295:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:455:11
+    at _c9 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:158:12)
+    at div
+    at AlertDialogHeader (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:86:3)
+    at Slottable2 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:59:25)
+    at div
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:47:7
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PPBGONYK.js?v=e69c7f2c:29:5
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:247:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:170:58
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:161:64
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:17:13)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:408:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:246:22
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at DialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:123:11)
+    at AlertDialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:389:11)
+    at _c3 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:50:12)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Dialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:64:5)
+    at AlertDialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:373:11)
+    at div
+    at OperationsPage (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/pages/tools/operations.tsx?t=1770410243816:1800:41)
+    at Route (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:323:16)
+    at Switch (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:379:17)
+    at main
+    at div
+    at div
+    at div
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at SidebarProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/sidebar.tsx:59:3)
+    at AppContent (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/App.tsx?v=u6wMB1x5ng0QrmMK_cwmS:68:41)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at QueryClientProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=e69c7f2c:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=e69c7f2c:521Understand this error
+chunk-RPCDYKBN.js?v=e69c7f2c:521 Warning: validateDOMNesting(...): <ul> cannot appear as a descendant of <p>.
+    at ul
+    at p
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:295:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:455:11
+    at _c9 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:158:12)
+    at div
+    at AlertDialogHeader (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:86:3)
+    at Slottable2 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:59:25)
+    at div
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:47:7
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PPBGONYK.js?v=e69c7f2c:29:5
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:247:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:170:58
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:161:64
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:17:13)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:408:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:246:22
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at DialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:123:11)
+    at AlertDialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:389:11)
+    at _c3 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:50:12)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Dialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:64:5)
+    at AlertDialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:373:11)
+    at div
+    at OperationsPage (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/pages/tools/operations.tsx?t=1770410243816:1800:41)
+    at Route (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:323:16)
+    at Switch (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:379:17)
+    at main
+    at div
+    at div
+    at div
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at SidebarProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/sidebar.tsx:59:3)
+    at AppContent (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/App.tsx?v=u6wMB1x5ng0QrmMK_cwmS:68:41)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at QueryClientProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=e69c7f2c:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=e69c7f2c:521Understand this error
+chunk-RPCDYKBN.js?v=e69c7f2c:521 Warning: validateDOMNesting(...): <div> cannot appear as a descendant of <p>.
+    at div
+    at p
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:295:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:455:11
+    at _c9 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:158:12)
+    at div
+    at AlertDialogHeader (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:86:3)
+    at Slottable2 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:59:25)
+    at div
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:47:7
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PPBGONYK.js?v=e69c7f2c:29:5
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:247:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:170:58
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:161:64
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:17:13)
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:408:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:43:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LHPXHTGV.js?v=e69c7f2c:20:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-IWFJIMEQ.js?v=e69c7f2c:42:13
+    at https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-J6WPJBSO.js?v=e69c7f2c:246:22
+    at Presence (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WKSNYNSY.js?v=e69c7f2c:24:11)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at DialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:123:11)
+    at AlertDialogPortal (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:389:11)
+    at _c3 (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/alert-dialog.tsx:50:12)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at Dialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:64:5)
+    at AlertDialog (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js?v=e69c7f2c:373:11)
+    at div
+    at OperationsPage (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/pages/tools/operations.tsx?t=1770410243816:1800:41)
+    at Route (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:323:16)
+    at Switch (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=e69c7f2c:379:17)
+    at main
+    at div
+    at div
+    at div
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at SidebarProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/components/ui/sidebar.tsx:59:3)
+    at AppContent (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/src/App.tsx?v=u6wMB1x5ng0QrmMK_cwmS:68:41)
+    at Provider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=e69c7f2c:38:15)
+    at TooltipProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=e69c7f2c:67:5)
+    at QueryClientProvider (https://1f8cebf8-fa54-4dcf-bc3c-deca6dff5a67-00-29c45pwlm2dgg.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=e69c7f2c:2805:3)
+    at App
