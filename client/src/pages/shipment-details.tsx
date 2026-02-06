@@ -104,7 +104,7 @@ export default function ShipmentDetails() {
       "DE": { variant: "default", className: "bg-green-600 hover:bg-green-700 text-lg", label: "Delivered" },
       "IT": { variant: "default", className: "bg-blue-600 hover:bg-blue-700 text-lg", label: "In Transit" },
       "AC": { variant: "default", className: "bg-cyan-600 hover:bg-cyan-700 text-lg", label: "Accepted" },
-      "SP": { variant: "outline", className: "border-orange-500 text-orange-700 dark:text-orange-400 text-lg", label: "Return to Sender" },
+      "SP": { variant: "default", className: "bg-green-500 hover:bg-green-600 text-lg", label: "Delivered (Locker)" },
       "AT": { variant: "default", className: "bg-orange-500 hover:bg-orange-600 text-lg", label: "Attempted Delivery" },
       "EX": { variant: "outline", className: "border-red-500 text-red-700 dark:text-red-400 text-lg", label: "Exception" },
       "UN": { variant: "outline", className: "border-gray-500 text-gray-700 dark:text-gray-400 text-lg", label: "Unknown" },
@@ -255,6 +255,22 @@ export default function ShipmentDetails() {
     return [...NORMAL_FLOW_STEPS, TERMINAL_STEPS['delivered']];
   };
 
+  const inferLastReachedStep = (shipment: ShipmentWithOrder): number => {
+    const hasTracking = !!shipment.trackingNumber;
+    const sessionStatus = shipment.sessionStatus?.toLowerCase();
+    const shipmentStatus = shipment.shipmentStatus?.toLowerCase();
+
+    if (hasTracking && shipmentStatus === 'label_purchased') return 6;
+    if (shipmentStatus === 'label_purchased') return 5;
+    if (sessionStatus === 'closed') return 4;
+    if (sessionStatus === 'active') return 3;
+    if (sessionStatus === 'new') return 2;
+    if (sessionStatus) return 2;
+    if (shipmentStatus === 'pending') return 1;
+    if (shipmentStatus === 'on_hold') return 0;
+    return -1;
+  };
+
   // Legacy wrapper for backward compatibility
   const getWorkflowStepBadge = (shipment: ShipmentWithOrder): { badge: JSX.Element; step: string; reason: string; matchedFields: string[] } => {
     const info = getLifecycleInfo(shipment);
@@ -375,9 +391,12 @@ export default function ShipmentDetails() {
           {(() => {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
+            const isTerminal = currentInfo.isTerminal && currentPhase !== 'delivered';
             const isExceptionState = currentInfo.isException || currentPhase === 'awaiting_decisions' || currentPhase === 'session_created';
+            const isOffPath = isTerminal || isExceptionState;
             const lifecycleFlowSteps = getLifecycleFlowSteps(currentPhase);
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
+            const lastReachedIndex = isOffPath ? inferLastReachedStep(shipment) : currentIndex;
             
             return (
               <div className="space-y-3 border-t pt-4">
@@ -390,25 +409,30 @@ export default function ShipmentDetails() {
                 <div className="overflow-x-auto overflow-y-visible pt-4 pb-3">
                   <div className="flex items-start gap-1 min-w-max">
                     {lifecycleFlowSteps.map((step, index) => {
-                      const isPast = currentIndex > index;
-                      const isCurrent = currentPhase === step.phase;
-                      const isFuture = currentIndex < index && !isExceptionState;
-                      const isUnreachable = isExceptionState && currentIndex < index;
+                      const isTheTerminalStep = isTerminal && index === lifecycleFlowSteps.length - 1;
+                      const isPast = !isOffPath && currentIndex > index;
+                      const isCompleted = isOffPath && !isTheTerminalStep && index <= lastReachedIndex;
+                      const isCurrent = !isOffPath && currentPhase === step.phase;
+                      const isFuture = !isOffPath && currentIndex < index;
+                      const isSkipped = isOffPath && !isTheTerminalStep && index > lastReachedIndex;
                       
                       return (
                         <div key={step.phase} className="flex items-start">
                           <div className="flex flex-col items-center w-[70px]">
                             <div className={`
                               w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0
-                              ${isPast ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-600' : ''}
+                              ${isPast || isCompleted ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-600' : ''}
                               ${isCurrent ? 'bg-primary text-primary-foreground border-primary ring-4 ring-primary/20 scale-110' : ''}
                               ${isFuture ? 'bg-muted border-muted-foreground/30 text-muted-foreground' : ''}
-                              ${isUnreachable ? 'bg-muted/50 border-dashed border-muted-foreground/20 text-muted-foreground/50' : ''}
+                              ${isSkipped ? 'bg-muted/50 border-dashed border-muted-foreground/20 text-muted-foreground/50' : ''}
+                              ${isTheTerminalStep ? 'bg-red-100 dark:bg-red-900/30 border-red-500 text-red-600 ring-4 ring-red-500/20 scale-110' : ''}
                             `}>
-                              {isPast ? (
+                              {isPast || isCompleted ? (
                                 <CheckCircle2 className="h-5 w-5" />
                               ) : isCurrent ? (
                                 <CircleDot className="h-5 w-5" />
+                              ) : isTheTerminalStep ? (
+                                <AlertCircle className="h-5 w-5" />
                               ) : (
                                 <Circle className="h-5 w-5" />
                               )}
@@ -416,8 +440,9 @@ export default function ShipmentDetails() {
                             <span className={`
                               text-xs mt-2 text-center leading-tight h-8 flex items-start justify-center
                               ${isCurrent ? 'font-bold text-primary' : ''}
-                              ${isPast ? 'text-green-600 dark:text-green-500' : ''}
-                              ${isFuture || isUnreachable ? 'text-muted-foreground' : ''}
+                              ${isPast || isCompleted ? 'text-green-600 dark:text-green-500' : ''}
+                              ${isFuture || isSkipped ? 'text-muted-foreground' : ''}
+                              ${isTheTerminalStep ? 'font-bold text-red-600 dark:text-red-400' : ''}
                             `}>
                               {step.label}
                             </span>
@@ -425,7 +450,7 @@ export default function ShipmentDetails() {
                           {index < lifecycleFlowSteps.length - 1 && (
                             <ChevronRight className={`
                               h-4 w-4 mt-3 flex-shrink-0
-                              ${isPast ? 'text-green-500' : 'text-muted-foreground/30'}
+                              ${(isPast || isCompleted) && index < lastReachedIndex ? 'text-green-500' : 'text-muted-foreground/30'}
                             `} />
                           )}
                         </div>
