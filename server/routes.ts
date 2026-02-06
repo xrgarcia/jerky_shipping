@@ -2129,92 +2129,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This recalculates lifecycle_phase based on current shipment data
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
     try {
-      // Optional days filter from request body (1, 7, or 30 days)
       const { days } = req.body as { days?: number };
       const daysLabel = days ? `last ${days} days` : 'all time';
-      console.log(`========== LIFECYCLE PHASE BACKFILL STARTED (${daysLabel}) ==========`);
-      const { deriveLifecyclePhase } = await import('./services/lifecycle-state-machine');
+      console.log(`========== LIFECYCLE BACKFILL STARTED (${daysLabel}) ==========`);
       
-      // Fetch shipments with MOVE OVER tag that might need lifecycle phase updates
-      // If days is provided, filter to shipments created within that time range
       const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill(days);
-      console.log(`Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag for lifecycle backfill (${daysLabel})`);
+      console.log(`[Backfill] Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag (${daysLabel})`);
       
-      let updatedCount = 0;
-      let skippedCount = 0;
-      const errors: string[] = [];
-      const phaseBreakdown: Record<string, number> = {};
-      const changedShipments: { id: string; orderNumber: string }[] = [];
+      const events = shipmentsWithMoveOver.map(s => ({
+        shipmentId: s.id,
+        orderNumber: s.orderNumber,
+        reason: 'backfill' as const,
+        enqueuedAt: Date.now(),
+      }));
       
-      for (const shipment of shipmentsWithMoveOver) {
-        try {
-          const lifecycleData = {
-            sessionStatus: shipment.sessionStatus,
-            trackingNumber: shipment.trackingNumber,
-            status: shipment.status,
-            shipmentStatus: shipment.shipmentStatus,
-            fingerprintStatus: shipment.fingerprintStatus,
-            packagingTypeId: shipment.packagingTypeId,
-            fulfillmentSessionId: shipment.fulfillmentSessionId,
-            fingerprintId: shipment.fingerprintId,
-            rateCheckStatus: shipment.rateCheckStatus,
-            shipmentId: shipment.shipmentId,
-            shipToPostalCode: shipment.shipToPostalCode,
-            serviceCode: shipment.serviceCode,
-            hasMoveOverTag: true,
-          };
-          
-          const { phase, subphase } = deriveLifecyclePhase(lifecycleData);
-          
-          if (shipment.lifecyclePhase !== phase || shipment.decisionSubphase !== subphase) {
-            await storage.updateShipment(shipment.id, {
-              lifecyclePhase: phase,
-              decisionSubphase: subphase,
-            });
-            updatedCount++;
-            phaseBreakdown[phase] = (phaseBreakdown[phase] || 0) + 1;
-            changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
-          } else {
-            skippedCount++;
-          }
-        } catch (error: any) {
-          console.error(`Error updating lifecycle phase for shipment ${shipment.id}:`, error);
-          errors.push(`${shipment.id}: ${error.message}`);
-        }
-      }
-      
-      let enqueuedCount = 0;
-      if (changedShipments.length > 0) {
-        const events = changedShipments.map(s => ({
-          shipmentId: s.id,
-          orderNumber: s.orderNumber,
-          reason: 'backfill' as const,
-          enqueuedAt: Date.now(),
-        }));
-        enqueuedCount = await enqueueLifecycleEventBatch(events);
-        console.log(`[Backfill] Enqueued ${enqueuedCount}/${changedShipments.length} lifecycle events for side effects`);
-      }
-      
-      console.log(`========== LIFECYCLE PHASE BACKFILL COMPLETE ==========`);
-      console.log(`Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}, Enqueued: ${enqueuedCount}`);
-      console.log(`Phase breakdown:`, phaseBreakdown);
+      const enqueuedCount = await enqueueLifecycleEventBatch(events);
+      console.log(`========== LIFECYCLE BACKFILL COMPLETE: ${enqueuedCount}/${shipmentsWithMoveOver.length} enqueued ==========`);
       
       res.json({
         success: true,
-        totalProcessed: shipmentsWithMoveOver.length,
-        updatedCount,
-        skippedCount,
+        totalFound: shipmentsWithMoveOver.length,
         enqueuedCount,
-        errorCount: errors.length,
-        phaseBreakdown,
-        errors: errors.slice(0, 10),
-        message: `Backfill complete: ${updatedCount} shipments updated, ${skippedCount} unchanged, ${enqueuedCount} enqueued for side effects`,
+        message: `Enqueued ${enqueuedCount} shipments for lifecycle evaluation by the worker`,
       });
     } catch (error: any) {
-      console.error("Error during lifecycle phase backfill:", error);
+      console.error("Error during lifecycle backfill:", error);
       res.status(500).json({
         success: false,
-        error: error.message || "Failed to backfill lifecycle phases",
+        error: error.message || "Failed to enqueue lifecycle backfill",
       });
     }
   });
@@ -11528,146 +11470,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Backfill lifecycle phases for shipments affected by state machine changes
-  // This recalculates lifecycle_phase for all shipments matching ready_to_session and ready_to_fulfill criteria
+  // Duplicate of primary backfill endpoint above - kept for backwards compatibility
+  // Just enqueues lifecycle events for the worker to process
   app.post("/api/shipments/backfill-lifecycle-phases", requireAuth, async (req, res) => {
     try {
-      console.log('[Backfill] Starting lifecycle phase backfill...');
+      console.log('[Backfill] Starting lifecycle backfill (duplicate endpoint)...');
       
-      // Import lifecycle state machine
-      const { deriveLifecyclePhase } = await import('./services/lifecycle-state-machine');
-      const { LIFECYCLE_PHASES } = await import('@shared/schema');
+      const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill();
+      console.log(`[Backfill] Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag`);
       
-      // 1. Update shipments that should be ready_to_session (pending + MOVE OVER + no session)
-      const readyToSessionCandidates = await db
-        .select({
-          id: shipments.id,
-          orderNumber: shipments.orderNumber,
-          shipmentStatus: shipments.shipmentStatus,
-          sessionStatus: shipments.sessionStatus,
-          trackingNumber: shipments.trackingNumber,
-          status: shipments.status,
-          fingerprintStatus: shipments.fingerprintStatus,
-          fingerprintId: shipments.fingerprintId,
-          packagingTypeId: shipments.packagingTypeId,
-          fulfillmentSessionId: shipments.fulfillmentSessionId,
-          rateCheckStatus: shipments.rateCheckStatus,
-          shipmentId: shipments.shipmentId,
-          shipToPostalCode: shipments.shipToPostalCode,
-          serviceCode: shipments.serviceCode,
-          currentPhase: shipments.lifecyclePhase,
-          currentSubphase: shipments.decisionSubphase,
-        })
-        .from(shipments)
-        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
-        .where(
-          and(
-            eq(shipments.shipmentStatus, 'pending'),
-            eq(shipmentTags.name, 'MOVE OVER'),
-            isNull(shipments.sessionStatus),
-            isNull(shipments.trackingNumber),
-            ne(shipments.status, 'cancelled')
-          )
-        );
+      const events = shipmentsWithMoveOver.map(s => ({
+        shipmentId: s.id,
+        orderNumber: s.orderNumber,
+        reason: 'backfill' as const,
+        enqueuedAt: Date.now(),
+      }));
       
-      console.log(`[Backfill] Found ${readyToSessionCandidates.length} shipments matching ready_to_session criteria`);
-      
-      const changedShipments: { id: string; orderNumber: string }[] = [];
-      
-      let readyToSessionUpdated = 0;
-      for (const shipment of readyToSessionCandidates) {
-        const state = deriveLifecyclePhase({
-          ...shipment,
-          hasMoveOverTag: true,
-        });
-        
-        if (shipment.currentPhase !== state.phase || shipment.currentSubphase !== state.subphase) {
-          await db
-            .update(shipments)
-            .set({
-              lifecyclePhase: state.phase,
-              decisionSubphase: state.subphase,
-            })
-            .where(eq(shipments.id, shipment.id));
-          readyToSessionUpdated++;
-          changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
-        }
-      }
-      
-      // 2. Update shipments that should be ready_to_fulfill (on_hold + MOVE OVER + no session)
-      const readyToFulfillCandidates = await db
-        .select({
-          id: shipments.id,
-          orderNumber: shipments.orderNumber,
-          shipmentStatus: shipments.shipmentStatus,
-          sessionStatus: shipments.sessionStatus,
-          trackingNumber: shipments.trackingNumber,
-          status: shipments.status,
-          fingerprintStatus: shipments.fingerprintStatus,
-          fingerprintId: shipments.fingerprintId,
-          packagingTypeId: shipments.packagingTypeId,
-          fulfillmentSessionId: shipments.fulfillmentSessionId,
-          rateCheckStatus: shipments.rateCheckStatus,
-          shipmentId: shipments.shipmentId,
-          shipToPostalCode: shipments.shipToPostalCode,
-          serviceCode: shipments.serviceCode,
-          currentPhase: shipments.lifecyclePhase,
-          currentSubphase: shipments.decisionSubphase,
-        })
-        .from(shipments)
-        .innerJoin(shipmentTags, eq(shipments.id, shipmentTags.shipmentId))
-        .where(
-          and(
-            eq(shipments.shipmentStatus, 'on_hold'),
-            eq(shipmentTags.name, 'MOVE OVER'),
-            isNull(shipments.sessionStatus),
-            ne(shipments.status, 'cancelled')
-          )
-        );
-      
-      console.log(`[Backfill] Found ${readyToFulfillCandidates.length} shipments matching ready_to_fulfill criteria`);
-      
-      let readyToFulfillUpdated = 0;
-      for (const shipment of readyToFulfillCandidates) {
-        const state = deriveLifecyclePhase({
-          ...shipment,
-          hasMoveOverTag: true,
-        });
-        
-        if (shipment.currentPhase !== state.phase || shipment.currentSubphase !== state.subphase) {
-          await db
-            .update(shipments)
-            .set({
-              lifecyclePhase: state.phase,
-              decisionSubphase: state.subphase,
-            })
-            .where(eq(shipments.id, shipment.id));
-          readyToFulfillUpdated++;
-          changedShipments.push({ id: shipment.id, orderNumber: shipment.orderNumber });
-        }
-      }
-      
-      let enqueuedCount = 0;
-      if (changedShipments.length > 0) {
-        const events = changedShipments.map(s => ({
-          shipmentId: s.id,
-          orderNumber: s.orderNumber,
-          reason: 'backfill' as const,
-          enqueuedAt: Date.now(),
-        }));
-        enqueuedCount = await enqueueLifecycleEventBatch(events);
-        console.log(`[Backfill] Enqueued ${enqueuedCount}/${changedShipments.length} lifecycle events for side effects`);
-      }
-      
-      console.log(`[Backfill] Complete: ${readyToSessionUpdated} ready_to_session, ${readyToFulfillUpdated} ready_to_fulfill updated, ${enqueuedCount} enqueued`);
+      const enqueuedCount = await enqueueLifecycleEventBatch(events);
+      console.log(`[Backfill] Complete: ${enqueuedCount}/${shipmentsWithMoveOver.length} enqueued`);
       
       res.json({
         success: true,
-        readyToSessionCandidates: readyToSessionCandidates.length,
-        readyToSessionUpdated,
-        readyToFulfillCandidates: readyToFulfillCandidates.length,
-        readyToFulfillUpdated,
+        totalFound: shipmentsWithMoveOver.length,
         enqueuedCount,
+        message: `Enqueued ${enqueuedCount} shipments for lifecycle evaluation by the worker`,
       });
     } catch (error: any) {
       console.error("[Backfill] Error backfilling lifecycle phases:", error);
