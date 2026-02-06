@@ -28,7 +28,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
 - **Tag Refresh Job**: Periodic re-validation of ShipStation tags for specific shipment phases.
 - **Sessionable Order Status**: Lifecycle state machine treats `pending` shipment status as valid for `READY_TO_SESSION` phase.
-- **Lifecycle State Machine Documentation**: `server/services/lifecycle-state-machine.ts` is the single source of truth for order status determination.
+- **Lifecycle State Machine Documentation**: `server/services/lifecycle-state-machine.ts` is the single source of truth for order status determination. Key principle: tracking status takes precedence over shipmentStatus. Terminal states: `delivered`, `cancelled`, `problem` (SP/UN/EX carrier issues). Status `shipped` maps to `in_transit`. Status `new` with `label_purchased` maps to `on_dock`.
 - **Kit Explosion Race Condition Prevention**: Multi-layered approach using lazy-loading cache, hourly GCP sync, proactive hydration, and a repair job endpoint.
 - **Split/Merge Detection**: ETL service detects shipment item changes using a normalized "SKU:QTY" fingerprint, triggering re-hydration and fingerprint recalculation.
 - **Packing Completion Audit Logging**: All packing actions are logged to `packing_logs` table.
