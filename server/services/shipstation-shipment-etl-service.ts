@@ -135,19 +135,6 @@ export class ShipStationShipmentETLService {
       console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
       console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
       
-      // Protect carrier tracking statuses - only webhooks can set/update these
-      // Carrier statuses are 2-letter codes: AC, IT, DE, UN, EX, NY, SP
-      // ShipStation statuses that can be overwritten: new, shipped, pending, cancelled, label_purchased, on_hold
-      const EDITABLE_STATUSES = ['new', 'shipped', 'pending', 'cancelled', 'label_purchased', 'on_hold'];
-      const existingStatus = existing.status;
-      
-      if (existingStatus && !EDITABLE_STATUSES.includes(existingStatus)) {
-        // Existing status is a carrier code - preserve it, don't overwrite
-        console.log(`[ETL] Preserving carrier status '${existingStatus}' - skipping status update`);
-        delete (shipmentRecord as any).status;
-        delete (shipmentRecord as any).statusDescription;
-      }
-      
       const updatedShipment = await this.storage.updateShipment(existing.id, shipmentRecord);
       
       if (updatedShipment) {
@@ -802,31 +789,33 @@ export class ShipStationShipmentETLService {
     // Extract raw tracking status code (both camelCase and snake_case)
     const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
     if (trackingStatus) {
-      // Return the raw status code UPPERCASE to match production webhook behavior
       return String(trackingStatus).toUpperCase();
+    }
+    
+    // Check labels array for tracking_status (populated by label fetch step)
+    const labels = shipmentData.labels;
+    if (Array.isArray(labels) && labels.length > 0) {
+      const labelStatus = labels[0].tracking_status;
+      if (labelStatus && typeof labelStatus === 'string' && labelStatus.length <= 3) {
+        return labelStatus.toUpperCase();
+      }
     }
     
     // For shipments without tracking updates, use lifecycle status with proper fallbacks
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
-    // on_hold → 'pending' - awaiting warehouse processing
     if (shipmentStatus === 'on_hold') {
       return 'pending';
     }
     
-    // awaiting_shipment → 'pending' - pre-label state
     if (shipmentStatus === 'awaiting_shipment') {
       return 'pending';
     }
     
-    // cancelled → 'cancelled'
     if (shipmentStatus === 'cancelled') {
       return 'cancelled';
     }
     
-    // Default fallback for other states (including label_purchased)
-    // Only webhooks provide actual tracking status codes like AC, IT, DE
-    // Use 'new' as default - sync should never set carrier statuses
     return 'new';
   }
 
