@@ -2276,10 +2276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new rate analysis job with a preset
   app.post("/api/rate-analysis-jobs", requireAuth, async (req, res) => {
     try {
-      const { preset } = req.body as { preset: '1day' | '7days' | '30days' | '90days' | 'all' | 'eligible' };
+      const { preset } = req.body as { preset: '1day' | '7days' | '30days' | '90days' | '1year' | 'eligible' };
       
-      if (!preset || !['1day', '7days', '30days', '90days', 'all', 'eligible'].includes(preset)) {
-        return res.status(400).json({ error: 'Invalid preset. Must be: 1day, 7days, 30days, 90days, all, or eligible' });
+      if (!preset || !['1day', '7days', '30days', '90days', '1year', 'eligible'].includes(preset)) {
+        return res.status(400).json({ error: 'Invalid preset. Must be: 1day, 7days, 30days, 90days, 1year, or eligible' });
       }
       
       // Check if there's already an active job
@@ -2292,13 +2292,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Determine days back from preset
-      // 'eligible' and 'all' both use null (no date filter) - they rely on eligibility criteria only
+      // 'eligible' uses null (no date filter) - relies on eligibility criteria only
       const daysBackMap: Record<string, number | null> = {
         '1day': 1,
         '7days': 7,
         '30days': 30,
         '90days': 90,
-        'all': null,
+        '1year': 365,
         'eligible': null,
       };
       
@@ -5531,26 +5531,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/operations/force-unified-resync-all", requireAuth, async (req, res) => {
+  app.post("/api/operations/force-unified-resync-1year", requireAuth, async (req, res) => {
     try {
       const { forceResyncToDate } = await import("./unified-shipment-sync-worker");
-      const oldest = await db
-        .select({ orderDate: shipments.orderDate })
-        .from(shipments)
-        .where(sql`${shipments.orderDate} IS NOT NULL`)
-        .orderBy(shipments.orderDate)
-        .limit(1);
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      oneYearAgo.setUTCHours(0, 0, 0, 0);
 
-      if (oldest.length === 0) {
-        return res.status(404).json({ error: "No shipments with order dates found" });
-      }
-
-      const oldestDate = oldest[0].orderDate!;
-      await forceResyncToDate(oldestDate);
-      res.json({ success: true, message: `Cursor reset to ${oldestDate.toISOString().split('T')[0]}` });
+      await forceResyncToDate(oneYearAgo);
+      res.json({ success: true, message: `Cursor reset to ${oneYearAgo.toISOString().split('T')[0]}` });
     } catch (error) {
-      console.error("Error forcing all-time unified resync:", error);
-      res.status(500).json({ error: "Failed to force all-time unified resync" });
+      console.error("Error forcing 1-year unified resync:", error);
+      res.status(500).json({ error: "Failed to force 1-year unified resync" });
     }
   });
 

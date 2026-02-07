@@ -80,7 +80,7 @@ type BackfillJob = {
 
 type RateAnalysisJob = {
   id: string;
-  preset: '1day' | '7days' | '30days' | '90days' | 'all' | 'eligible';
+  preset: '1day' | '7days' | '30days' | '90days' | '1year' | 'eligible';
   daysBack: number | null;
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   shipmentsTotal: number;
@@ -576,7 +576,7 @@ function RateAnalysisJobsCard() {
     { value: '7days', label: 'Last 7 Days' },
     { value: '30days', label: 'Last 30 Days' },
     { value: '90days', label: 'Last 90 Days' },
-    { value: 'all', label: 'All Time' },
+    { value: '1year', label: 'Last 1 Year' },
   ];
   
   const activeJob = rateAnalysisData?.activeJob;
@@ -992,17 +992,17 @@ function UnifiedSyncButtons({
         onClick={async () => {
           setIsResyncAllLoading(true);
           try {
-            const res = await apiRequest('POST', '/api/operations/force-unified-resync-all');
+            const res = await apiRequest('POST', '/api/operations/force-unified-resync-1year');
             const data = await res.json();
             queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
             toast({
-              title: "All Time Resync Started",
-              description: data.message || "Cursor reset to oldest shipment date.",
+              title: "1 Year Resync Started",
+              description: data.message || "Cursor reset to 1 year ago.",
             });
           } catch (err) {
-            console.error('Failed to force all-time resync:', err);
+            console.error('Failed to force 1-year resync:', err);
             toast({
-              title: "Failed to force all-time resync",
+              title: "Failed to force 1-year resync",
               description: err instanceof Error ? err.message : "Unknown error",
               variant: "destructive",
             });
@@ -1011,10 +1011,10 @@ function UnifiedSyncButtons({
           }
         }}
         disabled={!credentialsConfigured || isResyncAllLoading}
-        data-testid="button-force-unified-resync-all"
+        data-testid="button-force-unified-resync-1year"
       >
         <RefreshCw className={cn("h-3 w-3 mr-1", isResyncAllLoading && "animate-spin")} />
-        {isResyncAllLoading ? "Resetting..." : "All Time"}
+        {isResyncAllLoading ? "Resetting..." : "1 Year"}
       </Button>
     </div>
   );
