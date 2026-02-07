@@ -45,7 +45,7 @@ const TRACKING_BACKFILL_BATCH_SIZE = 10; // Max shipments to backfill per poll c
 const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older than 2 days
 const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
 const MAX_SYNC_FAILURES_BEFORE_DEADLETTER = 3; // Dead-letter after this many failed attempts
-const MAX_POLL_DURATION_MS = 5 * 60 * 1000; // 5 minute maximum poll duration - self-healing timeout
+const MAX_POLL_DURATION_MS = 15 * 60 * 1000; // 15 minute maximum poll duration - self-healing timeout
 
 // Worker state
 let isPolling = false;
