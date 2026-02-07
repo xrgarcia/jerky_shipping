@@ -4967,6 +4967,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/operations/restart-lifecycle-worker", requireAuth, async (req, res) => {
+    try {
+      const { stopLifecycleWorker, startLifecycleWorker } = await import("./lifecycle-event-worker");
+      stopLifecycleWorker();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      startLifecycleWorker();
+      res.json({ success: true, message: "Lifecycle worker restarted" });
+    } catch (error: any) {
+      console.error("Error restarting lifecycle worker:", error.message);
+      res.status(500).json({ error: "Failed to restart lifecycle worker" });
+    }
+  });
+
   app.get("/api/lifecycle-phase-counts", requireAuth, async (req, res) => {
     try {
       const result = await db.execute(sql`

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -10,12 +11,16 @@ import {
   Cpu,
   Layers,
   Package,
+  RefreshCw,
   Truck,
   XCircle,
   Zap,
 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -472,6 +477,9 @@ function EventWorkerTab({
   counts: PhaseCount[] | undefined;
   countsLoading: boolean;
 }) {
+  const [isRestarting, setIsRestarting] = useState(false);
+  const { toast } = useToast();
+
   return (
     <div className="space-y-4 py-4" data-testid="event-worker-view">
       {/* Status Cards */}
@@ -489,9 +497,39 @@ function EventWorkerTab({
                 Running
               </Badge>
             ) : (
-              <Badge variant="destructive" className="no-default-active-elevate" data-testid="badge-worker-stopped">
-                Stopped
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="destructive" className="no-default-active-elevate" data-testid="badge-worker-stopped">
+                  Stopped
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setIsRestarting(true);
+                    try {
+                      await apiRequest('POST', '/api/operations/restart-lifecycle-worker');
+                      queryClient.invalidateQueries({ queryKey: ["/api/lifecycle-worker-status"] });
+                      toast({
+                        title: "Worker Restarted",
+                        description: "Lifecycle event worker has been restarted.",
+                      });
+                    } catch (err) {
+                      toast({
+                        title: "Failed to restart worker",
+                        description: err instanceof Error ? err.message : "Unknown error",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsRestarting(false);
+                    }
+                  }}
+                  disabled={isRestarting}
+                  data-testid="button-restart-lifecycle-worker"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRestarting ? "animate-spin" : ""}`} />
+                  {isRestarting ? "Restarting..." : "Restart"}
+                </Button>
+              </div>
             )}
             {workerStatus?.shuttingDown && (
               <p className="text-xs text-muted-foreground mt-1">Shutting down...</p>
