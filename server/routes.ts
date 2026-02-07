@@ -5522,16 +5522,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { forceResyncToDate } = await import("./unified-shipment-sync-worker");
       const oldest = await db
-        .select({ createdAt: shipments.createdAt })
+        .select({ orderDate: shipments.orderDate })
         .from(shipments)
-        .orderBy(shipments.createdAt)
+        .where(sql`${shipments.orderDate} IS NOT NULL`)
+        .orderBy(shipments.orderDate)
         .limit(1);
 
       if (oldest.length === 0) {
-        return res.status(404).json({ error: "No shipments found" });
+        return res.status(404).json({ error: "No shipments with order dates found" });
       }
 
-      const oldestDate = oldest[0].createdAt;
+      const oldestDate = oldest[0].orderDate!;
       await forceResyncToDate(oldestDate);
       res.json({ success: true, message: `Cursor reset to ${oldestDate.toISOString().split('T')[0]}` });
     } catch (error) {
