@@ -269,9 +269,12 @@ async function initializeAfterListen(storage: any) {
     const { startLifecycleRepairWorker } = await import("./lifecycle-repair-worker");
     startLifecycleRepairWorker();
     
-    // Start lifecycle event worker (event-driven state machine with side effects)
-    const { startLifecycleWorker } = await import("./lifecycle-event-worker");
-    startLifecycleWorker();
+    // TEMPORARILY DISABLED: Lifecycle worker stopped to prevent delivered→on_dock demotions during data repair
+    // const { startLifecycleWorker } = await import("./lifecycle-event-worker");
+    // startLifecycleWorker();
+    const { clearLifecycleQueue } = await import("./utils/queue");
+    const clearedCount = await clearLifecycleQueue();
+    console.log(`[lifecycle-worker] DISABLED - cleared ${clearedCount} queue items for data repair`);
     
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");

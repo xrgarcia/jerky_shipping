@@ -4980,6 +4980,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/operations/stop-lifecycle-worker", requireAuth, async (req, res) => {
+    try {
+      const { stopLifecycleWorker } = await import("./lifecycle-event-worker");
+      const { clearLifecycleQueue } = await import("./utils/queue");
+      stopLifecycleWorker();
+      const cleared = await clearLifecycleQueue();
+      res.json({ success: true, message: `Lifecycle worker stopped and ${cleared} queue items cleared` });
+    } catch (error: any) {
+      console.error("Error stopping lifecycle worker:", error.message);
+      res.status(500).json({ error: "Failed to stop lifecycle worker" });
+    }
+  });
+
   app.get("/api/lifecycle-phase-counts", requireAuth, async (req, res) => {
     try {
       const result = await db.execute(sql`
