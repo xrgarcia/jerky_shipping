@@ -479,6 +479,7 @@ export class ShipStationShipmentService {
     updated: boolean;
     reason?: string;
     error?: string;
+    isRateLimit?: boolean;
   }> {
     try {
       // Defense-in-depth: Check feature flag even if caller should have checked
@@ -602,8 +603,15 @@ export class ShipStationShipmentService {
 
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text();
-        console.error(`[ShipmentService] Failed to PUT shipment ${shipmentId}:`, updateResponse.status, errorText);
-        return { success: false, updated: false, error: `Failed to update shipment: ${updateResponse.status} ${errorText}` };
+        const isRateLimit = updateResponse.status === 429;
+        const errorPrefix = isRateLimit ? 'RATE_LIMITED' : `HTTP_${updateResponse.status}`;
+        console.error(`[ShipmentService] Failed to PUT shipment ${shipmentId}: ${errorPrefix}`, updateResponse.status, errorText);
+        return { 
+          success: false, 
+          updated: false, 
+          error: `${errorPrefix}: Failed to update shipment: ${updateResponse.status} ${errorText}`,
+          isRateLimit,
+        };
       }
 
       console.log(`[ShipmentService] Successfully updated shipment ${shipmentId} package: ${packageInfo.name} (${packageInfo.packageId})`);
