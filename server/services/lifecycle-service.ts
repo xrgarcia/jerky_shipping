@@ -13,7 +13,7 @@
  */
 
 import { db } from "../db";
-import { shipments, shipmentTags, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
+import { shipments, shipmentTags, LIFECYCLE_PHASES, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import {
   deriveLifecyclePhase,
@@ -112,9 +112,47 @@ export async function updateShipmentLifecycleFromData(
   // Derive the correct lifecycle state
   const derivedState = deriveLifecyclePhase(effectiveData);
   
+  // DEMOTION GUARD: Never move backwards from terminal/late-stage phases
+  // Tracking-derived phases (delivered, in_transit, problem) should never be
+  // demoted to on_dock or earlier operational phases. This prevents stale
+  // status='new' data from overwriting correct tracking-based phases.
+  const TERMINAL_PHASES: LifecyclePhase[] = [
+    LIFECYCLE_PHASES.DELIVERED,
+    LIFECYCLE_PHASES.IN_TRANSIT, 
+    LIFECYCLE_PHASES.PROBLEM,
+    LIFECYCLE_PHASES.CANCELLED,
+  ];
+  const EARLIER_PHASES: LifecyclePhase[] = [
+    LIFECYCLE_PHASES.ON_DOCK,
+    LIFECYCLE_PHASES.PACKING_READY,
+    LIFECYCLE_PHASES.PICKING,
+    LIFECYCLE_PHASES.PICKING_ISSUES,
+    LIFECYCLE_PHASES.READY_TO_PICK,
+    LIFECYCLE_PHASES.SESSION_CREATED,
+    LIFECYCLE_PHASES.AWAITING_DECISIONS,
+    LIFECYCLE_PHASES.READY_TO_SESSION,
+    LIFECYCLE_PHASES.READY_TO_FULFILL,
+  ];
+  const currentPhase = shipment.lifecyclePhase as LifecyclePhase | null;
+  if (currentPhase && TERMINAL_PHASES.includes(currentPhase) && EARLIER_PHASES.includes(derivedState.phase)) {
+    if (logTransition) {
+      console.log(`[Lifecycle] ${shipment.orderNumber}: BLOCKED demotion ${currentPhase} → ${derivedState.phase} (stale data)`);
+    }
+    return {
+      shipmentId: shipment.id,
+      orderNumber: shipment.orderNumber,
+      changed: false,
+      previousPhase: currentPhase,
+      previousSubphase: shipment.decisionSubphase as DecisionSubphase | null,
+      newPhase: currentPhase,
+      newSubphase: shipment.decisionSubphase as DecisionSubphase | null,
+      timestamp: new Date(),
+    };
+  }
+
   // Check if state changed
   const currentState = {
-    phase: shipment.lifecyclePhase as LifecyclePhase | null,
+    phase: currentPhase,
     subphase: shipment.decisionSubphase as DecisionSubphase | null,
   };
   
