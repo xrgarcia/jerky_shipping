@@ -227,8 +227,40 @@ export function deriveDecisionSubphase(shipment: {
   shipToPostalCode?: string | null;
   serviceCode?: string | null;
 }): DecisionSubphase {
+  // GUARD: Categorization and hydration must be complete before any downstream subphase.
+  // This prevents shipments with uncategorized SKUs from short-circuiting to later
+  // subphases (e.g. NEEDS_SESSION) just because they have leftover packaging/fingerprint
+  // data from a previous state.
+
+  // NEEDS_HYDRATION: No QC items created yet (fingerprintStatus is NULL or unrecognized)
+  // This is an automated step — the hydrator will create shipment_qc_items
+  if (!shipment.fingerprintStatus || !['complete', 'pending_categorization', 'missing_weight'].includes(shipment.fingerprintStatus)) {
+    return DECISION_SUBPHASES.NEEDS_HYDRATION;
+  }
+
+  // NEEDS_CATEGORIZATION: Hydrated but some SKUs not in a geometry collection
+  // Only when fingerprintStatus is explicitly 'pending_categorization' (set by the hydrator)
+  if (shipment.fingerprintStatus === 'pending_categorization') {
+    return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
+  }
+
+  // MISSING_WEIGHT: All SKUs categorized but some have missing weight data
+  // Blocks fingerprint calculation until weights are resolved (via catalog sync or manual entry)
+  if (shipment.fingerprintStatus === 'missing_weight') {
+    return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
+  }
+
+  // NEEDS_FINGERPRINT: All SKUs categorized but no fingerprint yet
+  if (shipment.fingerprintStatus === 'complete' && !shipment.fingerprintId) {
+    return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
+  }
+
+  // NEEDS_PACKAGING: Has fingerprint but no packaging assigned
+  if (shipment.fingerprintId && !shipment.packagingTypeId) {
+    return DECISION_SUBPHASES.NEEDS_PACKAGING;
+  }
+
   // NEEDS_RATE_CHECK: Rate check not yet complete or failed (can retry)
-  // Must be evaluated BEFORE NEEDS_SESSION so orders can't skip rate checking
   // Eligible statuses to proceed: 'complete', 'skipped'
   // Statuses that stay in needs_rate_check: null, 'pending', 'failed'
   const rateCheckComplete = shipment.rateCheckStatus === 'complete' || shipment.rateCheckStatus === 'skipped';
@@ -244,24 +276,7 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_SESSION;
   }
 
-  // NEEDS_PACKAGING: Has fingerprint but no packaging assigned
-  if (shipment.fingerprintId && !shipment.packagingTypeId) {
-    return DECISION_SUBPHASES.NEEDS_PACKAGING;
-  }
-
-  // NEEDS_FINGERPRINT: All SKUs categorized but no fingerprint yet
-  if (shipment.fingerprintStatus === 'complete' && !shipment.fingerprintId) {
-    return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
-  }
-
-  // NEEDS_CATEGORIZATION: Hydrated but some SKUs not in a geometry collection
-  // Only when fingerprintStatus is explicitly 'pending_categorization' (set by the hydrator)
-  if (shipment.fingerprintStatus === 'pending_categorization') {
-    return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
-  }
-
-  // NEEDS_HYDRATION: No QC items created yet (fingerprintStatus is NULL or any other unrecognized value)
-  // This is an automated step — the hydrator will create shipment_qc_items
+  // Fallback: shouldn't normally reach here, but default to hydration
   return DECISION_SUBPHASES.NEEDS_HYDRATION;
 }
 
