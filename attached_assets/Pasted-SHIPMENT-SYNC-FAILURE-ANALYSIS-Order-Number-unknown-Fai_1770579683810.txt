@@ -1,0 +1,257 @@
+SHIPMENT SYNC FAILURE ANALYSIS
+=====================================
+
+Order Number: unknown
+Failure ID: 1f1cc2d4-b1f1-4a26-a9bc-f1522a4fdead
+Failed At: 2/4/2026, 6:01:59 PM
+Created At: 2/4/2026, 6:01:59 PM
+Retry Count: 3
+Reason: unified_sync
+
+Error Message:
+column "rate_check_status" does not exist
+
+Request Data:
+{
+  "tags": [
+    {
+      "name": "All Orders",
+      "color": null,
+      "tag_id": 0
+    },
+    {
+      "name": "MOVE OVER",
+      "color": null,
+      "tag_id": 0
+    },
+    {
+      "name": "TikTok Order",
+      "color": null,
+      "tag_id": 0
+    }
+  ],
+  "zone": 6,
+  "items": [
+    {
+      "sku": "JCB-SOFT-3PK",
+      "upc": "",
+      "asin": null,
+      "name": "Kate's Soft & Tender Texture 3 Pack Bundle + Koozie",
+      "weight": {
+        "unit": "ounce",
+        "value": 7.5
+      },
+      "item_id": "1708186022",
+      "options": [
+        {
+          "name": "External SKU ID",
+          "value": "1729682806696743568"
+        }
+      ],
+      "quantity": 1,
+      "image_url": "https://cdn.shopify.com/s/files/1/1866/5947/files/F0CC4B1F-09D4-4AFF-8BA8-4E726D492BCD_3.jpg?v=1727987425",
+      "bundle_sku": null,
+      "product_id": "53902529",
+      "tax_amount": 0,
+      "unit_price": 40.96,
+      "sales_order_id": null,
+      "fullfilment_sku": null,
+      "shipping_amount": null,
+      "allocation_status": null,
+      "external_order_id": null,
+      "order_source_code": null,
+      "inventory_location": null,
+      "sales_order_item_id": null,
+      "external_order_item_id": "16935591903546"
+    },
+    {
+      "sku": "",
+      "upc": null,
+      "asin": null,
+      "name": "TikTok Shop Discount (Only Seller Discount)",
+      "weight": {
+        "unit": "ounce",
+        "value": 0
+      },
+      "item_id": "1708186023",
+      "options": [],
+      "quantity": 1,
+      "image_url": null,
+      "bundle_sku": null,
+      "product_id": null,
+      "tax_amount": null,
+      "unit_price": -7.99,
+      "sales_order_id": null,
+      "fullfilment_sku": null,
+      "shipping_amount": null,
+      "allocation_status": null,
+      "external_order_id": null,
+      "order_source_code": null,
+      "inventory_location": null,
+      "sales_order_item_id": null,
+      "external_order_item_id": "TikTok Shop Discount (Only Seller Discount)"
+    }
+  ],
+  "customs": null,
+  "is_gift": false,
+  "ship_to": {
+    "name": "Dianna Brown",
+    "email": "v4bdlxwge4yger5agxpuocnms6o2a@scs.tiktokw.us",
+    "phone": "+12032067567",
+    "geolocation": null,
+    "postal_code": "08043-4936",
+    "company_name": null,
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "75 CORNELL DR",
+    "address_line2": "",
+    "address_line3": null,
+    "city_locality": "VOORHEES",
+    "state_province": "NJ",
+    "address_residential_indicator": "yes"
+  },
+  "packages": [
+    {
+      "weight": {
+        "unit": "ounce",
+        "value": 8
+      },
+      "products": null,
+      "dimensions": {
+        "unit": "inch",
+        "width": 0,
+        "height": 0,
+        "length": 0
+      },
+      "package_id": "se-3",
+      "package_code": "package",
+      "package_name": "Package",
+      "insured_value": {
+        "amount": 0,
+        "currency": "usd"
+      },
+      "label_messages": {
+        "reference1": null,
+        "reference2": null,
+        "reference3": null
+      },
+      "content_description": null,
+      "external_package_id": null,
+      "shipment_package_id": null,
+      "dangerous_goods_package_info": null
+    }
+  ],
+  "store_id": "se-138162",
+  "tax_paid": {
+    "amount": 0,
+    "currency": "usd"
+  },
+  "is_return": false,
+  "return_to": {
+    "name": "JERKY. COM",
+    "email": "talktous@jerky.com",
+    "phone": "8779753759",
+    "postal_code": "73108",
+    "company_name": "Over 100 Kinds of Jerky",
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "4132 Will Rogers Pkwy  ",
+    "address_line2": "Suite #1000",
+    "address_line3": "",
+    "city_locality": "Oklahoma City",
+    "state_province": "OK",
+    "address_residential_indicator": "no"
+  },
+  "ship_date": null,
+  "ship_from": {
+    "name": "JERKY. COM",
+    "email": "talktous@jerky.com",
+    "phone": "8779753759",
+    "postal_code": "73108",
+    "company_name": "Over 100 Kinds of Jerky",
+    "country_code": "US",
+    "instructions": null,
+    "address_line1": "4132 Will Rogers Pkwy  ",
+    "address_line2": "Suite #1000",
+    "address_line3": "",
+    "city_locality": "Oklahoma City",
+    "state_province": "OK",
+    "address_residential_indicator": "no"
+  },
+  "carrier_id": "se-118080",
+  "created_at": "2026-02-04T23:46:21.037Z",
+  "amount_paid": {
+    "amount": 38.42,
+    "currency": "usd"
+  },
+  "modified_at": "2026-02-04T23:54:49.373Z",
+  "retail_rate": null,
+  "sender_info": null,
+  "shipment_id": "se-953193951",
+  "confirmation": "none",
+  "service_code": "usps_ground_advantage",
+  "ship_by_date": null,
+  "total_weight": {
+    "unit": "ounce",
+    "value": 8
+  },
+  "warehouse_id": "se-228129",
+  "assigned_user": null,
+  "shipping_paid": {
+    "amount": 5.45,
+    "currency": "usd"
+  },
+  "notes_for_gift": null,
+  "hold_until_date": "2027-02-04T08:00:00Z",
+  "shipment_number": "JK3825363125",
+  "shipment_status": "on_hold",
+  "advanced_options": {
+    "dry_ice": false,
+    "bill_to_name": null,
+    "bill_to_party": null,
+    "custom_field1": "none",
+    "custom_field2": "1",
+    "custom_field3": "576485799537382449, TikTok Shop",
+    "fedex_freight": null,
+    "freight_class": null,
+    "dry_ice_weight": null,
+    "non_machinable": false,
+    "bill_to_account": null,
+    "import_services": false,
+    "contains_alcohol": false,
+    "limited_quantity": false,
+    "override_holiday": false,
+    "saturday_delivery": false,
+    "event_notification": false,
+    "additional_handling": false,
+    "bill_to_postal_code": null,
+    "collect_on_delivery": null,
+    "delivered_duty_paid": false,
+    "own_document_upload": false,
+    "bill_to_country_code": null,
+    "bill_to_address_line1": null,
+    "delivery_as_addressed": false,
+    "third_party_consignee": false,
+    "return_pickup_attempts": null,
+    "guaranteed_duties_and_taxes": false,
+    "ancillary_endorsements_option": null
+  },
+  "notes_from_buyer": "Sales Channel: TikTok Shop - JerkyDotCom<br/>TikTok Order Number: 576485799537382449<br/>Seller Discount on Items: USD 7.99",
+  "shipping_rule_id": null,
+  "external_order_id": null,
+  "order_source_code": null,
+  "insurance_provider": "none",
+  "comparison_rate_type": null,
+  "external_shipment_id": "7004426371386-8019388727610",
+  "requested_shipment_service": "SEND_BY_SELLER",
+  "dangerous_goods_declaration": null
+}
+
+Response Data:
+null
+
+=====================================
+Please analyze this failure and help me understand:
+1. What caused this shipment sync to fail?
+2. Is this a data issue, API issue, or integration issue?
+3. What steps should I take to fix it?
