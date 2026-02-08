@@ -43,6 +43,7 @@ interface SmartSessionInfo {
     stationType: string | null;
   } | null;
   autoPackageStatus: 'feature_disabled' | 'no_fingerprint' | 'needs_geometry_collection' | 'needs_packaging_rule' | 'ready';
+  uncategorizedSkus?: { sku: string; description: string | null }[];
 }
 
 export default function ShipmentDetails() {
@@ -1106,7 +1107,21 @@ export default function ShipmentDetails() {
               ) : smartSessionInfo?.autoPackageStatus === 'no_fingerprint' ? (
                 <span className="text-sm text-muted-foreground">No fingerprint</span>
               ) : smartSessionInfo?.autoPackageStatus === 'needs_geometry_collection' ? (
-                <span className="text-sm text-muted-foreground">Needs geometry collection</span>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">Needs geometry collection</span>
+                  {smartSessionInfo?.uncategorizedSkus && smartSessionInfo.uncategorizedSkus.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {smartSessionInfo.uncategorizedSkus.map((item: { sku: string; description: string | null }) => (
+                        <div key={item.sku} className="text-xs bg-destructive/10 text-destructive rounded px-2 py-1">
+                          <span className="font-mono font-medium">{item.sku}</span>
+                          {item.description && (
+                            <span className="text-muted-foreground ml-1">— {item.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : smartSessionInfo?.autoPackageStatus === 'needs_packaging_rule' ? (
                 <span className="text-sm text-muted-foreground">Needs packaging rule</span>
               ) : (

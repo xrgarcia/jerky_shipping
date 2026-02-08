@@ -1105,10 +1105,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Derive auto package assignment readiness status
       const autoPackageSyncEnabled = featureFlagRow?.enabled ?? false;
       let autoPackageStatus: string;
+      let uncategorizedSkus: { sku: string; description: string | null }[] = [];
       if (!autoPackageSyncEnabled) {
         autoPackageStatus = 'feature_disabled';
       } else if (shipment.fingerprintStatus === 'pending_categorization') {
         autoPackageStatus = 'needs_geometry_collection';
+        const { productCollectionMappings } = await import("@shared/schema");
+        const qcItems = await db
+          .select({ sku: shipmentQcItems.sku, description: shipmentQcItems.description })
+          .from(shipmentQcItems)
+          .where(eq(shipmentQcItems.shipmentId, shipment.id));
+        const uniqueSkus = Array.from(new Set(qcItems.map(i => i.sku)));
+        if (uniqueSkus.length > 0) {
+          const mapped = await db
+            .select({ sku: productCollectionMappings.sku })
+            .from(productCollectionMappings)
+            .where(inArray(productCollectionMappings.sku, uniqueSkus));
+          const mappedSet = new Set(mapped.map(m => m.sku));
+          const seen = new Set<string>();
+          uncategorizedSkus = qcItems
+            .filter(i => !mappedSet.has(i.sku) && !seen.has(i.sku) && seen.add(i.sku))
+            .map(i => ({ sku: i.sku, description: i.description }));
+        }
       } else if (!shipment.fingerprintId || !fingerprint) {
         autoPackageStatus = 'no_fingerprint';
       } else {
@@ -1153,6 +1171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stationType: assignedStation.stationType,
         } : null,
         autoPackageStatus,
+        uncategorizedSkus: uncategorizedSkus.length > 0 ? uncategorizedSkus : undefined,
       });
     } catch (error) {
       console.error("Error fetching smart session info:", error);
