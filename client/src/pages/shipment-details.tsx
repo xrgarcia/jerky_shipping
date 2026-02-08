@@ -42,6 +42,7 @@ interface SmartSessionInfo {
     name: string;
     stationType: string | null;
   } | null;
+  autoPackageStatus: 'feature_disabled' | 'no_fingerprint' | 'needs_geometry_collection' | 'needs_packaging_rule' | 'ready';
 }
 
 export default function ShipmentDetails() {
@@ -1093,37 +1094,23 @@ export default function ShipmentDetails() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Station Type & Fingerprint Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Station Type */}
+          {/* Auto Package, Fingerprint & QC Station */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Auto Package Assignment */}
             <div className="bg-muted/50 rounded-lg p-4">
-              <p className="text-xs text-muted-foreground mb-1">Station Type</p>
-              {smartSessionInfo?.packagingType?.stationType ? (
-                <div className="flex items-center gap-2">
-                  <Badge className={
-                    smartSessionInfo.packagingType.stationType === 'bagging' 
-                      ? 'bg-purple-600 hover:bg-purple-700' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }>
-                    {smartSessionInfo.packagingType.stationType.replace(/_/g, ' ').toUpperCase()}
-                  </Badge>
-                </div>
-              ) : smartSessionInfo?.session?.stationType ? (
-                <Badge variant="secondary">
-                  {smartSessionInfo.session.stationType.replace(/_/g, ' ')}
-                </Badge>
+              <p className="text-xs text-muted-foreground mb-1">Auto Package Assignment</p>
+              {smartSessionInfo?.autoPackageStatus === 'ready' ? (
+                <Badge className="bg-green-600 dark:bg-green-700">Ready</Badge>
+              ) : smartSessionInfo?.autoPackageStatus === 'feature_disabled' ? (
+                <Badge variant="secondary">Feature disabled</Badge>
+              ) : smartSessionInfo?.autoPackageStatus === 'no_fingerprint' ? (
+                <span className="text-sm text-muted-foreground">No fingerprint</span>
+              ) : smartSessionInfo?.autoPackageStatus === 'needs_geometry_collection' ? (
+                <span className="text-sm text-muted-foreground">Needs geometry collection</span>
+              ) : smartSessionInfo?.autoPackageStatus === 'needs_packaging_rule' ? (
+                <span className="text-sm text-muted-foreground">Needs packaging rule</span>
               ) : (
-                <span className="text-muted-foreground">Not determined</span>
-              )}
-            </div>
-
-            {/* Packaging Type */}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <p className="text-xs text-muted-foreground mb-1">Packaging Type</p>
-              {smartSessionInfo?.packagingType ? (
-                <p className="font-medium">{smartSessionInfo.packagingType.name}</p>
-              ) : (
-                <span className="text-muted-foreground">Not assigned</span>
+                <span className="text-muted-foreground">Loading...</span>
               )}
             </div>
 

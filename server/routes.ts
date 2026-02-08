@@ -1083,7 +1083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch related entities in parallel
-      const [fingerprint, session, packagingType, assignedStation] = await Promise.all([
+      const [fingerprint, session, packagingType, assignedStation, featureFlagRow] = await Promise.all([
         shipment.fingerprintId 
           ? db.select().from(fingerprints).where(eq(fingerprints.id, shipment.fingerprintId)).then(r => r[0])
           : Promise.resolve(null),
@@ -1096,7 +1096,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shipment.assignedStationId 
           ? db.select().from(stations).where(eq(stations.id, shipment.assignedStationId)).then(r => r[0])
           : Promise.resolve(null),
+        db.select({ enabled: featureFlags.enabled })
+          .from(featureFlags)
+          .where(eq(featureFlags.key, 'auto_package_sync'))
+          .then(r => r[0]),
       ]);
+
+      // Derive auto package assignment readiness status
+      const autoPackageSyncEnabled = featureFlagRow?.enabled ?? false;
+      let autoPackageStatus: string;
+      if (!autoPackageSyncEnabled) {
+        autoPackageStatus = 'feature_disabled';
+      } else if (shipment.fingerprintStatus === 'pending_categorization') {
+        autoPackageStatus = 'needs_geometry_collection';
+      } else if (!shipment.fingerprintId || !fingerprint) {
+        autoPackageStatus = 'no_fingerprint';
+      } else {
+        // Check if a fingerprint model (learned rule) exists for this fingerprint
+        const [model] = await db
+          .select({ packagingTypeId: fingerprintModels.packagingTypeId })
+          .from(fingerprintModels)
+          .where(eq(fingerprintModels.fingerprintId, shipment.fingerprintId))
+          .limit(1);
+        if (!model?.packagingTypeId) {
+          autoPackageStatus = 'needs_packaging_rule';
+        } else {
+          autoPackageStatus = 'ready';
+        }
+      }
 
       res.json({
         fingerprint: fingerprint ? {
@@ -1125,6 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: assignedStation.name,
           stationType: assignedStation.stationType,
         } : null,
+        autoPackageStatus,
       });
     } catch (error) {
       console.error("Error fetching smart session info:", error);
