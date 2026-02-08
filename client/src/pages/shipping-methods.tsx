@@ -203,7 +203,7 @@ export default function ShippingMethods() {
                           <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          When enabled, the rate checker can switch to a different method. When disabled, the customer's original choice is preserved.
+                          When disabled, this method acts as a pass-through — the customer's shipping choice is always kept, no matter what the rate checker finds. When enabled, the rate checker can override it with a better option.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -354,9 +354,10 @@ export default function ShippingMethods() {
             will be included in the rate checker service. Disable this for methods that should always be excluded from rate comparisons.
           </div>
           <div>
-            <strong className="text-foreground">Allow Change:</strong> When enabled, the rate checker can switch orders to a 
-            different shipping method if a better rate is found. When disabled, the rate check runs but the customer's 
-            original shipping method is preserved.
+            <strong className="text-foreground">Allow Change:</strong> Controls whether the rate checker can override the customer's 
+            shipping choice. When disabled, this method acts as a pass-through — the customer's selected shipping method 
+            is always kept regardless of what rates the checker finds. When enabled, the rate checker may switch to a 
+            different method if a better rate is available.
           </div>
           <div>
             <strong className="text-foreground">Allow Assignment:</strong> When enabled, this shipping method can be 
