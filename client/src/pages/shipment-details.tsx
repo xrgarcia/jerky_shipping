@@ -1157,6 +1157,25 @@ export default function ShipmentDetails() {
                     </div>
                   )}
                 </div>
+              ) : shipment?.requiresManualPackage ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="destructive">Sync Failed</Badge>
+                  </div>
+                  <p className="text-xs text-destructive">
+                    {shipment.packageAssignmentError || 'Auto-sync to ShipStation failed after multiple attempts.'}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => syncPackageMutation.mutate()}
+                    disabled={syncPackageMutation.isPending}
+                    data-testid="button-retry-package-sync"
+                  >
+                    <RefreshCw className={`w-3 h-3 mr-1 ${syncPackageMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncPackageMutation.isPending ? 'Retrying...' : 'Retry Sync'}
+                  </Button>
+                </div>
               ) : smartSessionInfo?.autoPackageStatus === 'feature_disabled' ? (
                 <Badge variant="secondary">Feature disabled</Badge>
               ) : smartSessionInfo?.autoPackageStatus === 'no_fingerprint' ? (

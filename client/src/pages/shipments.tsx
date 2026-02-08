@@ -747,6 +747,12 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
                   DO NOT SHIP
                 </Badge>
               )}
+              {shipment.requiresManualPackage && (
+                <Badge variant="destructive" className="text-xs gap-1" data-testid={`badge-sync-failed-${shipment.orderNumber}`}>
+                  <AlertTriangle className="h-3 w-3" />
+                  Pkg Sync Failed
+                </Badge>
+              )}
               {/* Cancelled Badge */}
               {(shipment.status === 'cancelled' || shipment.shipmentStatus === 'cancelled') && (
                 <Badge className="bg-red-600 hover:bg-red-700 text-white text-xs gap-1" data-testid={`badge-cancelled-${shipment.orderNumber}`}>
