@@ -5,7 +5,7 @@ import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis, featureFlags } from "@shared/schema";
-import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, exists, type SQL } from "drizzle-orm";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
@@ -11832,6 +11832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE fingerprint_status = 'pending_categorization'
             AND tracking_number IS NULL
             AND ship_date IS NULL
+            AND lifecycle_phase NOT IN ('cancelled', 'delivered', 'in_transit', 'on_dock')
         )
         SELECT COUNT(DISTINCT qc.sku) as count
         FROM shipment_qc_items qc
@@ -11869,6 +11870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE fingerprint_status = 'pending_categorization'
               AND tracking_number IS NULL
               AND ship_date IS NULL
+              AND lifecycle_phase NOT IN ('cancelled', 'delivered', 'in_transit', 'on_dock')
           )
           SELECT 
             qc.sku,
@@ -11887,13 +11889,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `),
         
         // Query 2: Coverage stats - OPTIMIZED with same approach
-        // Excludes shipped orders
+        // Excludes shipped/cancelled/delivered orders
         db.execute(sql`
           WITH pending_shipments AS (
             SELECT id, order_date FROM shipments 
             WHERE fingerprint_status = 'pending_categorization'
               AND tracking_number IS NULL
               AND ship_date IS NULL
+              AND lifecycle_phase NOT IN ('cancelled', 'delivered', 'in_transit', 'on_dock')
           )
           SELECT 
             COUNT(DISTINCT qc.sku) as "totalProducts",
@@ -11941,7 +11944,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sku } = req.params;
       // Note: shipments and shipmentQcItems are already imported at top of file
       
-      // Get all shipments that contain this SKU (pending_categorization only)
       const shipmentsWithSku = await db
         .select({
           id: shipments.id,
@@ -11955,7 +11957,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(shipmentQcItems.sku, sku),
-            eq(shipments.fingerprintStatus, 'pending_categorization')
+            eq(shipments.fingerprintStatus, 'pending_categorization'),
+            notInArray(shipments.lifecyclePhase, ['cancelled', 'delivered', 'in_transit', 'on_dock'])
           )
         )
         .groupBy(shipments.id, shipments.orderNumber, shipments.orderDate, shipments.shipmentStatus, shipments.fingerprintStatus)
@@ -12182,11 +12185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add product to collection (this is the source of truth)
       const mappings = await storage.addProductsToCollection(collectionId, [sku], userId);
       
-      // Find all pending_categorization shipments that have this SKU
       const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
       
       const affectedShipments = await db
-        .selectDistinct({ shipmentId: shipmentQcItems.shipmentId })
+        .selectDistinct({ shipmentId: shipmentQcItems.shipmentId, orderNumber: shipmentsTable.orderNumber })
         .from(shipmentQcItems)
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .where(
@@ -12196,7 +12198,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
-      // Recalculate fingerprints for affected shipments
       const { calculateFingerprint } = await import('./services/qc-item-hydrator');
       let fingerprintsUpdated = 0;
       
@@ -12211,10 +12212,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Update lifecycle phase for all affected shipments
       if (affectedShipments.length > 0) {
-        const shipmentIds = affectedShipments.map(s => s.shipmentId);
-        await updateShipmentLifecycleBatch(shipmentIds);
+        const items = affectedShipments.map(s => ({ shipmentId: s.shipmentId, orderNumber: s.orderNumber || undefined }));
+        const queued = await queueLifecycleEvaluationBatch(items, 'categorization');
+        console.log(`[Packing Decisions] Categorized ${sku} → queued ${queued}/${affectedShipments.length} lifecycle events`);
       }
       
       console.log(`[Packing Decisions] Categorized ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${fingerprintsUpdated} now complete`);
@@ -12243,11 +12244,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add product to collection (this is the source of truth)
       const mappings = await storage.addProductsToCollection(collectionId, [sku], userId);
       
-      // Find all pending_categorization shipments that have this SKU
       const { shipmentQcItems, shipments: shipmentsTable } = await import("@shared/schema");
       
       const affectedShipments = await db
-        .selectDistinct({ shipmentId: shipmentQcItems.shipmentId })
+        .selectDistinct({ shipmentId: shipmentQcItems.shipmentId, orderNumber: shipmentsTable.orderNumber })
         .from(shipmentQcItems)
         .innerJoin(shipmentsTable, eq(shipmentQcItems.shipmentId, shipmentsTable.id))
         .where(
@@ -12257,8 +12257,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
-      // Recalculate fingerprints for affected shipments
-      // calculateFingerprint now uses product_collection_mappings as source of truth
       const { calculateFingerprint } = await import('./services/qc-item-hydrator');
       let fingerprintsUpdated = 0;
       
@@ -12273,10 +12271,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Update lifecycle phase for all affected shipments (fingerprint recalculation may have changed their status)
       if (affectedShipments.length > 0) {
-        const shipmentIds = affectedShipments.map(s => s.shipmentId);
-        await updateShipmentLifecycleBatch(shipmentIds);
+        const items = affectedShipments.map(s => ({ shipmentId: s.shipmentId, orderNumber: s.orderNumber || undefined }));
+        const queued = await queueLifecycleEvaluationBatch(items, 'categorization');
+        console.log(`[Packing Decisions] Assigned ${sku} → queued ${queued}/${affectedShipments.length} lifecycle events`);
       }
       
       console.log(`[Packing Decisions] Assigned ${sku} to collection ${collectionId}, recalculated ${affectedShipments.length} shipments, ${fingerprintsUpdated} now complete`);
