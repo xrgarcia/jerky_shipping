@@ -135,6 +135,20 @@ export class ShipStationShipmentETLService {
       console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
       console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
       
+      // GUARD: Preserve existing tracking-derived status when incoming data has no real tracking info
+      // The shipments list API (/v2/shipments) does NOT include tracking status_code — only tracking
+      // webhooks and the /v2/tracking endpoint provide it. During resync, we must not overwrite
+      // a real tracking status (DE, IT, SP, AC, EX, UN) with the fallback 'new' value.
+      const incomingHasRealTrackingStatus = this.hasRealTrackingStatus(shipmentData);
+      const existingStatus = existing.status?.toUpperCase();
+      const TRACKING_DERIVED_STATUSES = ['DE', 'SP', 'IT', 'AC', 'AT', 'EX', 'UN', 'SHIPPED', 'DELIVERED', 'IN_TRANSIT'];
+      
+      if (!incomingHasRealTrackingStatus && existingStatus && TRACKING_DERIVED_STATUSES.includes(existingStatus)) {
+        console.log(`[ETL] Preserving existing tracking status '${existing.status}' (incoming data has no tracking status_code)`);
+        shipmentRecord.status = existing.status;
+        shipmentRecord.statusDescription = existing.statusDescription || shipmentRecord.statusDescription;
+      }
+      
       const updatedShipment = await this.storage.updateShipment(existing.id, shipmentRecord);
       
       if (updatedShipment) {
@@ -778,6 +792,19 @@ export class ShipStationShipmentETLService {
    * 4. cancelled → 'cancelled'
    * 5. otherwise → 'shipped' (including label_purchased - only webhooks provide actual status codes)
    */
+  private hasRealTrackingStatus(shipmentData: any): boolean {
+    if (!shipmentData) return false;
+    if (this.isLabelVoided(shipmentData)) return true;
+    const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
+    if (trackingStatus) return true;
+    const labels = shipmentData.labels;
+    if (Array.isArray(labels) && labels.length > 0) {
+      const labelStatus = labels[0].tracking_status;
+      if (labelStatus && typeof labelStatus === 'string' && labelStatus.length <= 3) return true;
+    }
+    return false;
+  }
+
   private extractRawTrackingStatus(shipmentData: any): string {
     if (!shipmentData) return 'pending';
     
