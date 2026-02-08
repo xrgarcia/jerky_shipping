@@ -135,15 +135,14 @@ export class ShipStationShipmentETLService {
       console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
       console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
       
-      // GUARD: Preserve existing tracking-derived status when incoming data has no real tracking info
-      // The shipments list API (/v2/shipments) does NOT include tracking status_code — only tracking
+      // GUARD: Preserve existing carrier tracking status when incoming data has no real tracking info.
+      // The shipments list API (/v2/shipments) does NOT include tracking status_code — only
       // webhooks and the /v2/tracking endpoint provide it. During resync, we must not overwrite
-      // a real tracking status (DE, IT, SP, AC, EX, UN) with the fallback 'new' value.
+      // a real carrier code (DE, IT, SP, AC, AT, EX, UN) with the fallback 'new' value.
       const incomingHasRealTrackingStatus = this.hasRealTrackingStatus(shipmentData);
       const existingStatus = existing.status?.toUpperCase();
-      const TRACKING_DERIVED_STATUSES = ['DE', 'SP', 'IT', 'AC', 'AT', 'EX', 'UN', 'SHIPPED', 'DELIVERED', 'IN_TRANSIT'];
       
-      if (!incomingHasRealTrackingStatus && existingStatus && TRACKING_DERIVED_STATUSES.includes(existingStatus)) {
+      if (!incomingHasRealTrackingStatus && existingStatus && ShipStationShipmentETLService.VALID_CARRIER_CODES.has(existingStatus)) {
         console.log(`[ETL] Preserving existing tracking status '${existing.status}' (incoming data has no tracking status_code)`);
         shipmentRecord.status = existing.status;
         shipmentRecord.statusDescription = existing.statusDescription || shipmentRecord.statusDescription;
@@ -197,13 +196,22 @@ export class ShipStationShipmentETLService {
     const trackingNumber = this.extractTrackingNumber(shipmentData);
     const orderNumber = this.extractOrderNumber(shipmentData);
     
-    // Extract status information - use RAW tracking status to match production behavior
-    // This preserves ShipStation status codes like 'ac', 'it', 'de' instead of normalizing them
-    const status = this.extractRawTrackingStatus(shipmentData);
-    const statusDescription = this.extractStatusDescription(shipmentData);
+    let status = this.extractRawTrackingStatus(shipmentData);
+    let statusDescription = this.extractStatusDescription(shipmentData);
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
-    // Debug logging for shipmentStatus extraction
+    // CONSISTENCY RULE: If shipment_status provides more info than status, upgrade status.
+    // shipment_status is ShipStation's lifecycle; status is carrier tracking code.
+    // They must agree — shipment_status='delivered' means status must be 'DE'.
+    if (shipmentStatus === 'delivered' && status !== 'DE' && status !== 'SP') {
+      status = 'DE';
+      statusDescription = statusDescription || 'Package delivered';
+    }
+    if (shipmentStatus === 'cancelled' && status !== 'cancelled') {
+      status = 'cancelled';
+      statusDescription = statusDescription || 'Shipment cancelled';
+    }
+    
     if (shipmentStatus) {
       console.log(`[ETL] Extracted shipmentStatus: ${shipmentStatus} for order ${this.extractOrderNumber(shipmentData)}`);
     }
@@ -792,15 +800,38 @@ export class ShipStationShipmentETLService {
    * 4. cancelled → 'cancelled'
    * 5. otherwise → 'shipped' (including label_purchased - only webhooks provide actual status codes)
    */
+  private static readonly LABEL_STATUS_TO_CODE: Record<string, string> = {
+    'delivered': 'DE',
+    'in_transit': 'IT',
+    'accepted': 'AC',
+    'acceptance': 'AT',
+    'unknown': 'UN',
+    'exception': 'EX',
+    'service_point': 'SP',
+  };
+
+  private static readonly VALID_CARRIER_CODES = new Set([
+    'DE', 'SP', 'IT', 'AT', 'AC', 'UN', 'EX',
+  ]);
+
+  private normalizeTrackingCode(raw: string): string | null {
+    const upper = raw.toUpperCase();
+    if (ShipStationShipmentETLService.VALID_CARRIER_CODES.has(upper)) return upper;
+    const lower = raw.toLowerCase();
+    const mapped = ShipStationShipmentETLService.LABEL_STATUS_TO_CODE[lower];
+    if (mapped) return mapped;
+    return null;
+  }
+
   private hasRealTrackingStatus(shipmentData: any): boolean {
     if (!shipmentData) return false;
     if (this.isLabelVoided(shipmentData)) return true;
     const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
-    if (trackingStatus) return true;
+    if (trackingStatus && this.normalizeTrackingCode(String(trackingStatus))) return true;
     const labels = shipmentData.labels;
     if (Array.isArray(labels) && labels.length > 0) {
       const labelStatus = labels[0].tracking_status;
-      if (labelStatus && typeof labelStatus === 'string' && labelStatus.length <= 3) return true;
+      if (labelStatus && typeof labelStatus === 'string' && this.normalizeTrackingCode(labelStatus)) return true;
     }
     return false;
   }
@@ -808,27 +839,25 @@ export class ShipStationShipmentETLService {
   private extractRawTrackingStatus(shipmentData: any): string {
     if (!shipmentData) return 'pending';
     
-    // Check for voided shipments first
     if (this.isLabelVoided(shipmentData)) {
       return 'cancelled';
     }
     
-    // Extract raw tracking status code (both camelCase and snake_case)
     const trackingStatus = shipmentData.status_code || shipmentData.statusCode;
     if (trackingStatus) {
-      return String(trackingStatus).toUpperCase();
+      const normalized = this.normalizeTrackingCode(String(trackingStatus));
+      if (normalized) return normalized;
     }
     
-    // Check labels array for tracking_status (populated by label fetch step)
     const labels = shipmentData.labels;
     if (Array.isArray(labels) && labels.length > 0) {
       const labelStatus = labels[0].tracking_status;
-      if (labelStatus && typeof labelStatus === 'string' && labelStatus.length <= 3) {
-        return labelStatus.toUpperCase();
+      if (labelStatus && typeof labelStatus === 'string') {
+        const normalized = this.normalizeTrackingCode(labelStatus);
+        if (normalized) return normalized;
       }
     }
     
-    // For shipments without tracking updates, use lifecycle status with proper fallbacks
     const shipmentStatus = this.extractShipmentStatus(shipmentData);
     
     if (shipmentStatus === 'on_hold') {
