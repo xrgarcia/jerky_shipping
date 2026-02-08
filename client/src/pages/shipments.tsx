@@ -50,7 +50,7 @@ interface LifecycleTabCounts {
 }
 
 type WorkflowTab = 'ready_to_fulfill' | 'in_progress' | 'shipped' | 'all';
-type LifecycleTab = 'ready_to_session' | 'session_created' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
+type LifecycleTab = 'ready_to_session' | 'ready_for_skuvault' | 'ready_to_pick' | 'picking' | 'packing_ready' | 'on_dock' | 'picking_issues';
 type ViewMode = 'workflow' | 'lifecycle';
 
 interface CacheStatus {
@@ -99,10 +99,10 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
     description: "This order has all required information (fingerprint, packaging) and is ready to be added to a fulfillment session for picking.",
     nextSteps: "Use the Session Builder to create a new session including this order."
   },
-  session_created: {
-    title: "Session Created",
-    description: "A local fulfillment session has been built for this order. It's waiting to be pushed to SkuVault for picking.",
-    nextSteps: "Release the session to the floor or push it to SkuVault. Once detected, it will move to Ready to Pick."
+  ready_for_skuvault: {
+    title: "Ready for SkuVault",
+    description: "A local fulfillment session has been built for this order. It's waiting for SkuVault to create a wave picking session.",
+    nextSteps: "SkuVault will detect this session and create a wave pick. Once detected, it will move to Ready to Pick."
   },
   needs_hydration: {
     title: "Needs Hydration",
@@ -378,14 +378,14 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
         return wrapBadgeWithPopover('ready_to_session', badge);
       }
       
-      case 'session_created': {
+      case 'ready_for_skuvault': {
         const badge = (
           <Badge className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
             <ListChecks className="h-3 w-3" />
-            Session Created
+            Ready for SkuVault
           </Badge>
         );
-        return wrapBadgeWithPopover('session_created', badge);
+        return wrapBadgeWithPopover('ready_for_skuvault', badge);
       }
       
       case 'delivered': {
@@ -945,7 +945,7 @@ export default function Shipments() {
 
   // Valid values for URL hydration
   const validWorkflowTabs: WorkflowTab[] = ['ready_to_fulfill', 'in_progress', 'shipped', 'all'];
-  const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'session_created', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+  const validLifecycleTabs: LifecycleTab[] = ['ready_to_session', 'ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
   const validViewModes: ViewMode[] = ['workflow', 'lifecycle'];
 
   // Initialize state from URL params (runs when URL changes, including browser navigation)
@@ -1545,8 +1545,8 @@ export default function Shipments() {
       switch (activeLifecycleTab) {
         case 'ready_to_session':
           return 'Orders ready to be added to a fulfillment session';
-        case 'session_created':
-          return 'Orders assigned to a local session - waiting for SkuVault to detect and start picking';
+        case 'ready_for_skuvault':
+          return 'Orders in a local session - waiting for SkuVault to create wave picking session';
         case 'ready_to_pick':
           return 'Orders ready to be picked - session created, waiting to start';
         case 'picking':
@@ -1646,13 +1646,13 @@ export default function Shipments() {
                   <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.readyToSession} orders</span>
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="session_created" 
+                  value="ready_for_skuvault" 
                   className="flex flex-col gap-1 py-2 sm:py-3 px-2 sm:px-4 min-w-[90px] sm:min-w-0 data-[state=active]:bg-violet-600 data-[state=active]:text-white"
-                  data-testid="tab-lifecycle-session-created"
+                  data-testid="tab-lifecycle-ready-for-skuvault"
                 >
                   <div className="flex items-center gap-1 sm:gap-2">
                     <ListChecks className="h-4 w-4 flex-shrink-0" />
-                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Session Created</span>
+                    <span className="font-semibold text-[11px] sm:text-sm whitespace-nowrap">Ready for SkuVault</span>
                   </div>
                   <span className="text-[10px] sm:text-xs opacity-80">{lifecycleCounts.sessionCreated} orders</span>
                 </TabsTrigger>
@@ -2227,7 +2227,7 @@ export default function Shipments() {
                           <SelectItem value="ready_to_fulfill">Ready to Fulfill</SelectItem>
                           <SelectItem value="fulfillment_prep">Fulfillment Prep</SelectItem>
                           <SelectItem value="ready_to_session">Ready to Session</SelectItem>
-                          <SelectItem value="session_created">Session Created</SelectItem>
+                          <SelectItem value="ready_for_skuvault">Ready for SkuVault</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>
                           <SelectItem value="picking">Picking</SelectItem>
                           <SelectItem value="picking_issues">Picking Issues</SelectItem>

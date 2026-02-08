@@ -21,7 +21,7 @@ import { z } from "zod";
 export const LIFECYCLE_PHASES = {
   READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + MOVE OVER tag - waiting to be released from hold
   READY_TO_SESSION: 'ready_to_session',      // Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
-  SESSION_CREATED: 'session_created',        // Local fulfillment session built, waiting for SkuVault push
+  READY_FOR_SKUVAULT: 'ready_for_skuvault',  // Local fulfillment session built, waiting for SkuVault wave picking
   FULFILLMENT_PREP: 'fulfillment_prep',      // Hydration, fingerprinting, packaging, rate check, sessioning
   READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
   PICKING: 'picking',                         // Actively being picked
@@ -50,7 +50,7 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * needs_rate_check: Has packaging, rate check not yet done.
  * needs_session: Everything done, needs to be added to fulfillment session.
  * 
- * After sessioning, orders transition to SESSION_CREATED phase (waiting on SkuVault wave picking).
+ * After sessioning, orders transition to READY_FOR_SKUVAULT phase (waiting on SkuVault wave picking).
  */
 export const DECISION_SUBPHASES = {
   NEEDS_HYDRATION: 'needs_hydration',              // No QC items yet — needs hydrator to run (fingerprintStatus is NULL)
@@ -58,7 +58,7 @@ export const DECISION_SUBPHASES = {
   NEEDS_FINGERPRINT: 'needs_fingerprint',          // Fingerprint not yet calculated (fingerprintStatus = 'complete', no fingerprintId)
   NEEDS_PACKAGING: 'needs_packaging',              // Fingerprint has no packaging type mapping
   NEEDS_RATE_CHECK: 'needs_rate_check',            // Rate analysis pending - checking for cheaper shipping options
-  NEEDS_SESSION: 'needs_session',                  // Ready for sessioning but not yet grouped — terminal subphase before SESSION_CREATED
+  NEEDS_SESSION: 'needs_session',                  // Ready for sessioning but not yet grouped — terminal subphase before READY_FOR_SKUVAULT
 } as const;
 
 export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_SUBPHASES];
@@ -68,8 +68,8 @@ export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_S
  */
 export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
   [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // When released from hold
-  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.SESSION_CREATED, LIFECYCLE_PHASES.FULFILLMENT_PREP], // After session built or fingerprinting
-  [LIFECYCLE_PHASES.SESSION_CREATED]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.READY_TO_SESSION], // SkuVault detects session, or session cancelled
+  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.READY_FOR_SKUVAULT, LIFECYCLE_PHASES.FULFILLMENT_PREP], // After session built or fingerprinting
+  [LIFECYCLE_PHASES.READY_FOR_SKUVAULT]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.READY_TO_SESSION], // SkuVault detects session, or session cancelled
   [LIFECYCLE_PHASES.FULFILLMENT_PREP]: [LIFECYCLE_PHASES.READY_TO_PICK],
   [LIFECYCLE_PHASES.READY_TO_PICK]: [LIFECYCLE_PHASES.PICKING, LIFECYCLE_PHASES.PICKING_ISSUES],
   [LIFECYCLE_PHASES.PICKING]: [LIFECYCLE_PHASES.PACKING_READY, LIFECYCLE_PHASES.PICKING_ISSUES],
@@ -91,7 +91,7 @@ export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> 
   [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
   [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_RATE_CHECK, DECISION_SUBPHASES.NEEDS_SESSION], // Rate check may be skipped if not eligible
   [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_SESSION],
-  [DECISION_SUBPHASES.NEEDS_SESSION]: [], // Terminal subphase — after sessioning, exits to SESSION_CREATED phase
+  [DECISION_SUBPHASES.NEEDS_SESSION]: [], // Terminal subphase — after sessioning, exits to READY_FOR_SKUVAULT phase
 };
 
 // Users table for warehouse staff

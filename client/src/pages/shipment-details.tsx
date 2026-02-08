@@ -139,7 +139,7 @@ export default function ShipmentDetails() {
   // Derive hasMoveOverTag from tags array
   const hasMoveOverTag = tags?.some(tag => tag.name === 'MOVE OVER') ?? false;
 
-  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'session_created' | 'fulfillment_prep' | 'cancelled' | 'problem';
+  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'ready_for_skuvault' | 'fulfillment_prep' | 'cancelled' | 'problem';
   
   interface LifecycleInfo {
     phase: LifecyclePhase;
@@ -205,9 +205,9 @@ export default function ShipmentDetails() {
       whyThisStatus: 'Assigned to a session, waiting to be picked.', whatHappensNext: 'A picker will start working on this session.',
       colorClass: 'bg-yellow-600', badgeClass: 'bg-yellow-600 text-white',
     },
-    session_created: {
-      phase: 'session_created', label: 'Session Created', description: 'Local session built, waiting to push to SkuVault',
-      whyThisStatus: 'Session has been created locally.', whatHappensNext: 'Will be pushed to SkuVault for picking.',
+    ready_for_skuvault: {
+      phase: 'ready_for_skuvault', label: 'Ready for SkuVault', description: 'Local session built, waiting for SkuVault wave picking',
+      whyThisStatus: 'Session has been created locally.', whatHappensNext: 'SkuVault will create a wave picking session.',
       colorClass: 'bg-violet-600', badgeClass: 'bg-violet-600 text-white',
     },
     ready_to_session: {
@@ -392,7 +392,7 @@ export default function ShipmentDetails() {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
             const isTerminal = currentInfo.isTerminal && currentPhase !== 'delivered';
-            const isExceptionState = currentInfo.isException || currentPhase === 'fulfillment_prep' || currentPhase === 'session_created';
+            const isExceptionState = currentInfo.isException || currentPhase === 'fulfillment_prep' || currentPhase === 'ready_for_skuvault';
             const isOffPath = isTerminal || isExceptionState;
             const lifecycleFlowSteps = getLifecycleFlowSteps(currentPhase);
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);

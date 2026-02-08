@@ -115,7 +115,7 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
  * 9. PICKING - sessionStatus='active'
  * 10. READY_TO_PICK - sessionStatus='new'
- * 11. SESSION_CREATED - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
+ * 11. READY_FOR_SKUVAULT - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
  * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND no session
  * 13. FULFILLMENT_PREP - Default fallback
  */
@@ -188,11 +188,11 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_PICK, subphase: null };
   }
 
-  // SESSION_CREATED: Has a local fulfillment session but no SkuVault session yet
+  // READY_FOR_SKUVAULT: Has a local fulfillment session but no SkuVault session yet
   if (shipment.fulfillmentSessionId && 
       !shipment.sessionStatus &&
       shipment.shipmentStatus === 'pending') {
-    return { phase: LIFECYCLE_PHASES.SESSION_CREATED, subphase: null };
+    return { phase: LIFECYCLE_PHASES.READY_FOR_SKUVAULT, subphase: null };
   }
 
   // READY_TO_SESSION: Pending + MOVE OVER tag + no session
@@ -272,7 +272,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
   const displayNames: Record<LifecyclePhase, string> = {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 'Ready to Fulfill',
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 'Ready to Session',
-    [LIFECYCLE_PHASES.SESSION_CREATED]: 'Session Created',
+    [LIFECYCLE_PHASES.READY_FOR_SKUVAULT]: 'Ready for SkuVault',
     [LIFECYCLE_PHASES.FULFILLMENT_PREP]: 'Fulfillment Prep',
     [LIFECYCLE_PHASES.READY_TO_PICK]: 'Ready to Pick',
     [LIFECYCLE_PHASES.PICKING]: 'Picking',
@@ -361,7 +361,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
   const phaseWeights: Record<LifecyclePhase, number> = {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 0,
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 5,
-    [LIFECYCLE_PHASES.SESSION_CREATED]: 10,
+    [LIFECYCLE_PHASES.READY_FOR_SKUVAULT]: 10,
     [LIFECYCLE_PHASES.FULFILLMENT_PREP]: 15,
     [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,

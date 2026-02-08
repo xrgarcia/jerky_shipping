@@ -46,7 +46,7 @@ ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick �
 |--------|---------------------|------------------------|
 | **Source of Truth** | Duplicated SQL conditions in `storage.ts` | Single `lifecycle_phase` column computed by state machine |
 | **On Hold vs Pending** | Both mixed into "Ready to Session" | Separated: `ready_to_fulfill` (on_hold) → `ready_to_session` (pending) |
-| **Decision Tracking** | No subphases - orders just "ready" or not | Subphases track progression: `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_session` → session_created phase |
+| **Decision Tracking** | No subphases - orders just "ready" or not | Subphases track progression: `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_session` → ready_for_skuvault phase |
 | **On Dock Detection** | Only `status='AC'` (Accepted) | Both `NY` (Not Yet) and `AC` (Accepted) statuses |
 | **Packing Ready** | Required explicit `status != 'cancelled'` check | Relies on `sessionStatus='closed'` + `shipmentStatus='pending'` |
 | **Tab Count Queries** | Each query duplicated full logic | Queries filter by `lifecycle_phase` column directly |

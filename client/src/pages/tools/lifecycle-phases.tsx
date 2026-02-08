@@ -91,9 +91,9 @@ const PHASE_META: Record<
     colorClass: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
     category: "decision",
   },
-  session_created: {
-    label: "Session Created",
-    description: "Local session built, waiting for SkuVault push",
+  ready_for_skuvault: {
+    label: "Ready for SkuVault",
+    description: "Local session built, waiting for SkuVault wave picking",
     colorClass: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
     category: "active",
   },
@@ -187,7 +187,7 @@ const MAIN_FLOW_ORDER = [
   "ready_to_fulfill",
   "ready_to_session",
   "fulfillment_prep",
-  "session_created",
+  "ready_for_skuvault",
   "ready_to_pick",
   "picking",
   "packing_ready",
@@ -357,7 +357,7 @@ function StateMachineTab({
       <PhaseBox phase="ready_to_session" count={getPhaseCount(counts, "ready_to_session")} isLoading={isLoading} />
       <DownArrow />
 
-      {/* fulfillment_prep expanded (includes session_created) */}
+      {/* fulfillment_prep expanded (includes ready_for_skuvault) */}
       <div
         className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 rounded-md p-3"
         data-testid="phase-box-fulfillment_prep"
@@ -392,8 +392,8 @@ function StateMachineTab({
 
       <DownArrow />
 
-      {/* session_created */}
-      <PhaseBox phase="session_created" count={getPhaseCount(counts, "session_created")} isLoading={isLoading} />
+      {/* ready_for_skuvault */}
+      <PhaseBox phase="ready_for_skuvault" count={getPhaseCount(counts, "ready_for_skuvault")} isLoading={isLoading} />
       <DownArrow />
 
       {/* ready_to_pick */}

@@ -419,8 +419,8 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 | **Ship. Internal** | SKU categorized | Subphase: needs_categorization → needs_footprint |
 | **Ship. Internal** | Footprint calculated | Subphase: needs_footprint → needs_packaging |
 | **Ship. Internal** | Packaging assigned | Subphase: needs_packaging → needs_session |
-| **Ship. Internal** | Fulfillment session created | fulfillment_prep → session_created |
-| **SkuVault Push** | Session pushed to SkuVault | session_created → ready_to_pick |
+| **Ship. Internal** | Fulfillment session created | fulfillment_prep → ready_for_skuvault |
+| **SkuVault Push** | Session pushed to SkuVault | ready_for_skuvault → ready_to_pick |
 | **Firestore Sync** | Session status = 'active' | ready_to_pick → picking |
 | **Firestore Sync** | Session status = 'closed' | picking → packing_ready |
 | **Firestore Sync** | Session status = 'inactive' | Any → picking_issues |
