@@ -112,17 +112,15 @@ export async function updateShipmentLifecycleFromData(
   // Derive the correct lifecycle state
   const derivedState = deriveLifecyclePhase(effectiveData);
   
-  // DEMOTION GUARD: Never move backwards from terminal/late-stage phases
-  // Tracking-derived phases (delivered, in_transit, problem) should never be
-  // demoted to on_dock or earlier operational phases. This prevents stale
-  // status='new' data from overwriting correct tracking-based phases.
-  const TERMINAL_PHASES: LifecyclePhase[] = [
-    LIFECYCLE_PHASES.DELIVERED,
-    LIFECYCLE_PHASES.IN_TRANSIT, 
-    LIFECYCLE_PHASES.PROBLEM,
-    LIFECYCLE_PHASES.CANCELLED,
-  ];
-  const EARLIER_PHASES: LifecyclePhase[] = [
+  // DEMOTION GUARD: Prevent backwards transitions from late-stage phases
+  // This prevents stale status='new' data from overwriting correct tracking-based phases.
+  //
+  // Rules:
+  //   delivered, cancelled  → truly terminal, never go backwards
+  //   in_transit             → can go to delivered/problem, never back to on_dock or earlier
+  //   problem                → RECOVERABLE: can go to in_transit or delivered (exception resolved),
+  //                            but never back to on_dock or earlier operational phases
+  const PRE_SHIPPING_PHASES: LifecyclePhase[] = [
     LIFECYCLE_PHASES.ON_DOCK,
     LIFECYCLE_PHASES.PACKING_READY,
     LIFECYCLE_PHASES.PICKING,
@@ -134,7 +132,20 @@ export async function updateShipmentLifecycleFromData(
     LIFECYCLE_PHASES.READY_TO_FULFILL,
   ];
   const currentPhase = shipment.lifecyclePhase as LifecyclePhase | null;
-  if (currentPhase && TERMINAL_PHASES.includes(currentPhase) && EARLIER_PHASES.includes(derivedState.phase)) {
+  
+  let blocked = false;
+  if (currentPhase && PRE_SHIPPING_PHASES.includes(derivedState.phase)) {
+    if (
+      currentPhase === LIFECYCLE_PHASES.DELIVERED ||
+      currentPhase === LIFECYCLE_PHASES.CANCELLED ||
+      currentPhase === LIFECYCLE_PHASES.IN_TRANSIT ||
+      currentPhase === LIFECYCLE_PHASES.PROBLEM
+    ) {
+      blocked = true;
+    }
+  }
+  
+  if (blocked) {
     if (logTransition) {
       console.log(`[Lifecycle] ${shipment.orderNumber}: BLOCKED demotion ${currentPhase} → ${derivedState.phase} (stale data)`);
     }
@@ -144,7 +155,7 @@ export async function updateShipmentLifecycleFromData(
       changed: false,
       previousPhase: currentPhase,
       previousSubphase: shipment.decisionSubphase as DecisionSubphase | null,
-      newPhase: currentPhase,
+      newPhase: currentPhase!,
       newSubphase: shipment.decisionSubphase as DecisionSubphase | null,
       timestamp: new Date(),
     };
