@@ -5622,6 +5622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/shipments/:orderNumber/trigger-lifecycle", requireAuth, async (req, res) => {
     try {
       const { orderNumber } = req.params;
+      const validReasons = ['manual', 'packaging', 'fingerprint', 'categorization', 'rate_check'] as const;
+      const reason = validReasons.includes(req.body?.reason) ? req.body.reason : 'manual';
       
       // Find shipments by order number
       const shipmentList = await storage.getShipmentsByOrderNumber(orderNumber);
@@ -5635,7 +5637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const enqueued = await enqueueLifecycleEvent({
           shipmentId: shipment.id,
           orderNumber: shipment.orderNumber || undefined,
-          reason: 'manual',
+          reason,
           enqueuedAt: Date.now(),
           retryCount: 0,
         });

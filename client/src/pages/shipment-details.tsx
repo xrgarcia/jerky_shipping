@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box, ChevronRight, CircleDot, Circle, CheckCircle2, AlertCircle, TrendingDown, DollarSign } from "lucide-react";
+import { ArrowLeft, Truck, Package, MapPin, User, Mail, Phone, Clock, Copy, ExternalLink, Calendar, Weight, Gift, AlertTriangle, Boxes, Play, Timer, CheckCircle, FileText, Info, ShoppingCart, PackageCheck, Fingerprint, Hash, MapPinned, Box, ChevronRight, CircleDot, Circle, CheckCircle2, AlertCircle, TrendingDown, DollarSign, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment, Order, ShipmentItem, ShipmentTag, ShipmentPackage, ShipmentQcItem, ShipmentRateAnalysis } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -87,6 +88,30 @@ export default function ShipmentDetails() {
     queryKey: ['/api/shipments', shipmentId, 'rate-analysis'],
     enabled: !!shipmentId,
   });
+
+  const syncPackageMutation = useMutation({
+    mutationFn: async () => {
+      const orderNumber = shipment?.orderNumber;
+      if (!orderNumber) throw new Error("No order number");
+      return apiRequest("POST", `/api/shipments/${orderNumber}/trigger-lifecycle`, { reason: "packaging" });
+    },
+    onSuccess: () => {
+      toast({ title: "Package sync triggered", description: "The package will be pushed to ShipStation shortly." });
+      queryClient.invalidateQueries({ queryKey: ['/api/shipments', shipmentId, 'smart-session-info'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/shipments', shipmentId, 'packages'] });
+    },
+    onError: () => {
+      toast({ title: "Sync failed", description: "Could not trigger package sync. Try again.", variant: "destructive" });
+    },
+  });
+
+  const packageMatchesAssignment = (() => {
+    if (!smartSessionInfo?.packagingType?.name || !packages?.length) return null;
+    const assignedName = smartSessionInfo.packagingType.name;
+    const shipstationName = packages[0]?.packageName;
+    if (!shipstationName || shipstationName === 'Package') return false;
+    return assignedName.toLowerCase() === shipstationName.toLowerCase();
+  })();
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -1101,7 +1126,37 @@ export default function ShipmentDetails() {
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-xs text-muted-foreground mb-1">Auto Package Assignment</p>
               {smartSessionInfo?.autoPackageStatus === 'ready' ? (
-                <Badge className="bg-green-600 dark:bg-green-700">Ready</Badge>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className="bg-green-600 dark:bg-green-700">Ready</Badge>
+                    {smartSessionInfo?.packagingType && (
+                      <span className="text-xs text-muted-foreground">{smartSessionInfo.packagingType.name}</span>
+                    )}
+                  </div>
+                  {packageMatchesAssignment === false && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                        ShipStation shows "{packages?.[0]?.packageName || 'Package'}" — expected "{smartSessionInfo?.packagingType?.name}"
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncPackageMutation.mutate()}
+                        disabled={syncPackageMutation.isPending}
+                        data-testid="button-sync-package"
+                      >
+                        <RefreshCw className={`w-3 h-3 mr-1 ${syncPackageMutation.isPending ? 'animate-spin' : ''}`} />
+                        {syncPackageMutation.isPending ? 'Syncing...' : 'Sync'}
+                      </Button>
+                    </div>
+                  )}
+                  {packageMatchesAssignment === true && (
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                      <span className="text-xs text-green-600 dark:text-green-400">Synced to ShipStation</span>
+                    </div>
+                  )}
+                </div>
               ) : smartSessionInfo?.autoPackageStatus === 'feature_disabled' ? (
                 <Badge variant="secondary">Feature disabled</Badge>
               ) : smartSessionInfo?.autoPackageStatus === 'no_fingerprint' ? (
