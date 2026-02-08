@@ -13469,35 +13469,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Packaging Types] Updated: ${updated.name} (${updated.stationType || 'no station type'})`);
 
-      // If stationType actually changed, trigger lifecycle events for all fulfillment_prep shipments using this packaging type
+      // If stationType actually changed, update assignedStationId and trigger lifecycle events for all fulfillment_prep shipments
       const newStationType = (stationType || null) as string | null;
       if (stationType !== undefined && newStationType !== previousStationType) {
         try {
-          const affectedShipments = await db
-            .select({ id: shipments.id, orderNumber: shipments.orderNumber })
-            .from(shipments)
-            .where(
-              and(
-                eq(shipments.packagingTypeId, id),
-                eq(shipments.lifecyclePhase, 'fulfillment_prep'),
-                isNull(shipments.trackingNumber),
-                isNull(shipments.shipDate)
-              )
-            );
+          // Find matching active station for the new stationType
+          let newAssignedStationId: string | null = null;
+          if (newStationType) {
+            const [station] = await db
+              .select()
+              .from(stations)
+              .where(and(
+                eq(stations.stationType, newStationType),
+                eq(stations.isActive, true)
+              ))
+              .limit(1);
+            if (station) {
+              newAssignedStationId = station.id;
+              console.log(`[Packaging Types] Found station "${station.name}" (${station.stationType}) for new stationType`);
+            } else {
+              console.warn(`[Packaging Types] No active station found for stationType: ${newStationType}`);
+            }
+          }
 
-          if (affectedShipments.length > 0) {
-            const events = affectedShipments.map(s => ({
-              shipmentId: s.id,
-              orderNumber: s.orderNumber || undefined,
-              reason: 'packaging' as const,
-              enqueuedAt: Date.now(),
-              metadata: { trigger: 'station_type_change', packagingTypeId: id },
-            }));
-            const queued = await enqueueLifecycleEventBatch(events);
-            console.log(`[Packaging Types] Station type changed on "${updated.name}" (${previousStationType} → ${newStationType}) — queued ${queued} lifecycle events for ${affectedShipments.length} fulfillment_prep shipments`);
+          // Update assignedStationId on all pre-shipping shipments using this packaging type
+          // Both fulfillment_prep and ready_to_session are safe — neither has been sessioned yet
+          // If stationType was cleared (null), clear assignedStationId
+          // If stationType was set but no matching station exists, skip the update to preserve existing assignments
+          const shouldUpdateStations = newStationType === null || newAssignedStationId !== null;
+          if (shouldUpdateStations) {
+            const affectedShipments = await db
+              .update(shipments)
+              .set({ 
+                assignedStationId: newAssignedStationId,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(shipments.packagingTypeId, id),
+                  inArray(shipments.lifecyclePhase, ['fulfillment_prep', 'ready_to_session']),
+                  isNull(shipments.trackingNumber),
+                  isNull(shipments.shipDate)
+                )
+              )
+              .returning({ id: shipments.id, orderNumber: shipments.orderNumber });
+
+            if (affectedShipments.length > 0) {
+              const events = affectedShipments.map(s => ({
+                shipmentId: s.id,
+                orderNumber: s.orderNumber || undefined,
+                reason: 'packaging' as const,
+                enqueuedAt: Date.now(),
+                metadata: { trigger: 'station_type_change', packagingTypeId: id },
+              }));
+              const queued = await enqueueLifecycleEventBatch(events);
+              console.log(`[Packaging Types] Station type changed on "${updated.name}" (${previousStationType} → ${newStationType}) — updated ${affectedShipments.length} shipments (station: ${newAssignedStationId || 'cleared'}), queued ${queued} lifecycle events`);
+            }
           }
         } catch (lifecycleError) {
-          console.error("[Packaging Types] Error queuing lifecycle events after stationType change:", lifecycleError);
+          console.error("[Packaging Types] Error updating stations/lifecycle after stationType change:", lifecycleError);
         }
       }
 
