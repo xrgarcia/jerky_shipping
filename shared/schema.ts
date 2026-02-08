@@ -12,7 +12,7 @@ import { z } from "zod";
  * 
  * The complete journey of a shipment from order receipt to carrier pickup:
  * 
- * ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
  * ready_to_fulfill: On hold + MOVE OVER tag (waiting to be released from ShipStation hold)
@@ -22,7 +22,7 @@ export const LIFECYCLE_PHASES = {
   READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + MOVE OVER tag - waiting to be released from hold
   READY_TO_SESSION: 'ready_to_session',      // Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
   SESSION_CREATED: 'session_created',        // Local fulfillment session built, waiting for SkuVault push
-  AWAITING_DECISIONS: 'awaiting_decisions',  // Has fingerprint, needs packing decisions
+  FULFILLMENT_PREP: 'fulfillment_prep',      // Hydration, fingerprinting, packaging, rate check, sessioning
   READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
   PICKING: 'picking',                         // Actively being picked
   PACKING_READY: 'packing_ready',            // Picking complete, ready for packing
@@ -37,7 +37,7 @@ export const LIFECYCLE_PHASES = {
 export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHASES];
 
 /**
- * Decision Subphases (within AWAITING_DECISIONS)
+ * Decision Subphases (within FULFILLMENT_PREP)
  * 
  * The progression of packing decisions before orders can be sessioned:
  * 
@@ -68,9 +68,9 @@ export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_S
  */
 export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
   [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // When released from hold
-  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.SESSION_CREATED, LIFECYCLE_PHASES.AWAITING_DECISIONS], // After session built or fingerprinting
+  [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.SESSION_CREATED, LIFECYCLE_PHASES.FULFILLMENT_PREP], // After session built or fingerprinting
   [LIFECYCLE_PHASES.SESSION_CREATED]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.READY_TO_SESSION], // SkuVault detects session, or session cancelled
-  [LIFECYCLE_PHASES.AWAITING_DECISIONS]: [LIFECYCLE_PHASES.READY_TO_PICK],
+  [LIFECYCLE_PHASES.FULFILLMENT_PREP]: [LIFECYCLE_PHASES.READY_TO_PICK],
   [LIFECYCLE_PHASES.READY_TO_PICK]: [LIFECYCLE_PHASES.PICKING, LIFECYCLE_PHASES.PICKING_ISSUES],
   [LIFECYCLE_PHASES.PICKING]: [LIFECYCLE_PHASES.PACKING_READY, LIFECYCLE_PHASES.PICKING_ISSUES],
   [LIFECYCLE_PHASES.PACKING_READY]: [LIFECYCLE_PHASES.ON_DOCK],
@@ -83,7 +83,7 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
 };
 
 /**
- * Valid state transitions for decision subphases (within AWAITING_DECISIONS)
+ * Valid state transitions for decision subphases (within FULFILLMENT_PREP)
  */
 export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> = {
   [DECISION_SUBPHASES.NEEDS_HYDRATION]: [DECISION_SUBPHASES.NEEDS_CATEGORIZATION, DECISION_SUBPHASES.NEEDS_FINGERPRINT], // After hydration, goes to categorization or straight to fingerprint if all SKUs already categorized
@@ -92,7 +92,7 @@ export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> 
   [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_RATE_CHECK, DECISION_SUBPHASES.NEEDS_SESSION], // Rate check may be skipped if not eligible
   [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_SESSION],
   [DECISION_SUBPHASES.NEEDS_SESSION]: [DECISION_SUBPHASES.READY_FOR_SKUVAULT],
-  [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits AWAITING_DECISIONS phase
+  [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits FULFILLMENT_PREP phase
 };
 
 // Users table for warehouse staff
@@ -380,8 +380,8 @@ export const shipments = pgTable("shipments", {
   requiresManualPackage: boolean("requires_manual_package").default(false), // True when auto-assignment failed after retries
   packageAssignmentError: text("package_assignment_error"), // Error message explaining why auto-assignment failed
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
-  lifecyclePhase: text("lifecycle_phase"), // Current phase: awaiting_decisions, ready_to_pick, picking, packing_ready, on_dock, picking_issues
-  decisionSubphase: text("decision_subphase"), // Subphase within awaiting_decisions: needs_categorization, needs_fingerprint, needs_packaging, needs_session, ready_for_skuvault
+  lifecyclePhase: text("lifecycle_phase"), // Current phase: fulfillment_prep, ready_to_pick, picking, packing_ready, on_dock, picking_issues
+  decisionSubphase: text("decision_subphase"), // Subphase within fulfillment_prep: needs_hydration, needs_categorization, needs_fingerprint, needs_packaging, needs_rate_check, needs_session, ready_for_skuvault
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
   // Rate check tracking (automated rate optimization)
   rateCheckStatus: text("rate_check_status"), // 'pending' | 'complete' | 'failed' | 'skipped' | null

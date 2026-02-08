@@ -141,7 +141,7 @@ export interface ShipmentFilters {
   hasPackaging?: boolean; // Filter for shipments with/without packaging type
   assignedStationId?: string; // Filter by assigned station
   hasSession?: boolean; // Filter for shipments in/not in a fulfillment session
-  lifecyclePhaseFilter?: string; // Filter by lifecycle phase (awaiting_decisions, ready_to_pick, etc.)
+  lifecyclePhaseFilter?: string; // Filter by lifecycle phase (fulfillment_prep, ready_to_pick, etc.)
   sortBy?: 'shipDate' | 'createdAt' | 'trackingNumber' | 'status' | 'carrierCode' | 'orderDate';
   sortOrder?: 'asc' | 'desc';
   page?: number;

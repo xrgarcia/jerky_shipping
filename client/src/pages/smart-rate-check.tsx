@@ -112,7 +112,7 @@ const LIFECYCLE_PHASES = [
   { value: "all", label: "All Phases" },
   { value: "ready_to_fulfill", label: "Ready to Fulfill" },
   { value: "ready_to_session", label: "Ready to Session" },
-  { value: "awaiting_decisions", label: "Awaiting Decisions" },
+  { value: "fulfillment_prep", label: "Fulfillment Prep" },
   { value: "ready_to_pick", label: "Ready to Pick" },
   { value: "picking", label: "Picking" },
   { value: "packing_ready", label: "Packing Ready" },

@@ -12886,14 +12886,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { fingerprints: fingerprintsTable, fingerprintModels, shipments: shipmentsTable } = await import("@shared/schema");
       
       // Fast query: count fingerprints with active shipments and packaging status
-      // Only count fingerprints where at least one shipment is in 'ready_to_session' or 'awaiting_decisions' phase
+      // Only count fingerprints where at least one shipment is in 'ready_to_session' or 'fulfillment_prep' phase
       // This excludes on-hold orders (ready_to_fulfill), shipped orders, and delivered orders
       const statsResult = await db.execute(sql`
         WITH active_fingerprints AS (
           SELECT DISTINCT f.id, fm.packaging_type_id IS NOT NULL as has_packaging
           FROM fingerprints f
           INNER JOIN shipments s ON s.fingerprint_id = f.id 
-            AND s.lifecycle_phase IN ('ready_to_session', 'awaiting_decisions')
+            AND s.lifecycle_phase IN ('ready_to_session', 'fulfillment_prep')
           LEFT JOIN fingerprint_models fm ON fm.fingerprint_id = f.id
         )
         SELECT 
@@ -12917,13 +12917,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get fingerprints that need mapping (no packaging assigned)
-  // Only shows fingerprints with active orders (ready_to_session or awaiting_decisions phase)
+  // Only shows fingerprints with active orders (ready_to_session or fulfillment_prep phase)
   app.get("/api/fingerprints/needs-mapping", requireAuth, async (req, res) => {
     try {
       const { fingerprints: fingerprintsTable, fingerprintModels, packagingTypes, shipments: shipmentsTable, productCollections } = await import("@shared/schema");
       
       // Get fingerprints WITHOUT packaging assignment that have active shipments
-      // Includes 'ready_to_session' and 'awaiting_decisions' phases
+      // Includes 'ready_to_session' and 'fulfillment_prep' phases
       // This excludes on-hold orders (ready_to_fulfill), shipped orders, and delivered orders
       const fingerprintsWithStats = await db
         .select({
@@ -12941,7 +12941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(fingerprintsTable)
         .innerJoin(shipmentsTable, and(
           eq(shipmentsTable.fingerprintId, fingerprintsTable.id),
-          inArray(shipmentsTable.lifecyclePhase, ['ready_to_session', 'awaiting_decisions'])
+          inArray(shipmentsTable.lifecyclePhase, ['ready_to_session', 'fulfillment_prep'])
         ))
         .leftJoin(fingerprintModels, eq(fingerprintModels.fingerprintId, fingerprintsTable.id))
         .where(isNull(fingerprintModels.packagingTypeId))

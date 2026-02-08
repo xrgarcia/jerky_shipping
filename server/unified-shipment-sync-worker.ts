@@ -441,7 +441,7 @@ const TAG_REFRESH_BATCH_SIZE = 10; // Max shipments to refresh tags for per poll
  * PURPOSE: ShipStation's modified_at cursor doesn't update when ONLY tags change.
  * This means if a "MOVE OVER" tag is removed, our cursor-based sync won't catch it.
  * This job specifically re-fetches tags for shipments that are in lifecycle phases
- * where the MOVE OVER tag matters (ready_to_session, awaiting_decisions).
+ * where the MOVE OVER tag matters (ready_to_session, fulfillment_prep).
  * 
  * TRIGGERS: After main poll cycle when caught up (same as tracking backfill)
  * 
@@ -453,7 +453,7 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
   
   // Find shipments in phases where MOVE OVER tag matters:
   // - ready_to_session: On hold + MOVE OVER tag - fingerprinting happens here
-  // - awaiting_decisions: Has fingerprint, may still be sensitive to tag changes
+  // - fulfillment_prep: Has fingerprint, may still be sensitive to tag changes
   const shipmentsToRefresh = await db
     .select({
       id: shipments.id,
@@ -467,7 +467,7 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
         sql`${shipments.shipmentId} IS NOT NULL`,
         or(
           eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.READY_TO_SESSION),
-          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.AWAITING_DECISIONS)
+          eq(shipments.lifecyclePhase, LIFECYCLE_PHASES.FULFILLMENT_PREP)
         )
       )
     )

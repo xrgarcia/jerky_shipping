@@ -139,7 +139,7 @@ export default function ShipmentDetails() {
   // Derive hasMoveOverTag from tags array
   const hasMoveOverTag = tags?.some(tag => tag.name === 'MOVE OVER') ?? false;
 
-  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'session_created' | 'awaiting_decisions' | 'cancelled' | 'problem';
+  type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'session_created' | 'fulfillment_prep' | 'cancelled' | 'problem';
   
   interface LifecycleInfo {
     phase: LifecyclePhase;
@@ -215,8 +215,8 @@ export default function ShipmentDetails() {
       whyThisStatus: 'Order is released and ready for sessioning.', whatHappensNext: 'System will assign to a picking session.',
       colorClass: 'bg-teal-600', badgeClass: 'bg-teal-600 text-white',
     },
-    awaiting_decisions: {
-      phase: 'awaiting_decisions', label: 'Awaiting Decisions', description: 'Missing required information before it can proceed',
+    fulfillment_prep: {
+      phase: 'fulfillment_prep', label: 'Fulfillment Prep', description: 'Being prepared for fulfillment (hydration, fingerprinting, packaging, etc.)',
       whyThisStatus: 'Needs more information (fingerprint, packaging type, etc.).', whatHappensNext: 'System will resolve automatically or needs manual input.',
       colorClass: 'bg-gray-500', badgeClass: 'bg-gray-500 text-white',
     },
@@ -228,7 +228,7 @@ export default function ShipmentDetails() {
     if (info) {
       return { ...info, matchedFields: ['lifecyclePhase'] };
     }
-    return { ...LIFECYCLE_INFO_MAP['awaiting_decisions'], matchedFields: [] };
+    return { ...LIFECYCLE_INFO_MAP['fulfillment_prep'], matchedFields: [] };
   };
 
   const NORMAL_FLOW_STEPS: { phase: LifecyclePhase; label: string }[] = [
@@ -392,7 +392,7 @@ export default function ShipmentDetails() {
             const currentInfo = getLifecycleInfo(shipment);
             const currentPhase = currentInfo.phase;
             const isTerminal = currentInfo.isTerminal && currentPhase !== 'delivered';
-            const isExceptionState = currentInfo.isException || currentPhase === 'awaiting_decisions' || currentPhase === 'session_created';
+            const isExceptionState = currentInfo.isException || currentPhase === 'fulfillment_prep' || currentPhase === 'session_created';
             const isOffPath = isTerminal || isExceptionState;
             const lifecycleFlowSteps = getLifecycleFlowSteps(currentPhase);
             const currentIndex = lifecycleFlowSteps.findIndex(s => s.phase === currentPhase);
@@ -697,7 +697,7 @@ export default function ShipmentDetails() {
                       <li>PICKING: sessionStatus='active'</li>
                       <li>READY_TO_PICK: sessionStatus='new'</li>
                       <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus</li>
-                      <li>AWAITING_DECISIONS: fallback</li>
+                      <li>FULFILLMENT_PREP: fallback</li>
                     </ol>
                   </div>
                 </div>

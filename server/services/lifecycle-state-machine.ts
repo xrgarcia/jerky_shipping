@@ -2,7 +2,7 @@
  * Shipment Lifecycle State Machine
  * 
  * Manages the progression of shipments through their lifecycle phases:
- * ready_to_fulfill → ready_to_session → awaiting_decisions → ready_to_pick → picking → packing_ready → on_dock
+ * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
  * READY_TO_FULFILL: On hold + MOVE OVER tag - waiting to be released from ShipStation hold
@@ -22,7 +22,7 @@
  *          UN = Unknown — carrier has no tracking information available
  *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
  * 
- * Within AWAITING_DECISIONS, manages decision subphases:
+ * Within FULFILLMENT_PREP, manages decision subphases:
  * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session → ready_for_skuvault
  */
 
@@ -117,7 +117,7 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 10. READY_TO_PICK - sessionStatus='new'
  * 11. SESSION_CREATED - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
  * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND no session
- * 13. AWAITING_DECISIONS - Default fallback
+ * 13. FULFILLMENT_PREP - Default fallback
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
   const status = shipment.status?.toUpperCase();
@@ -204,9 +204,9 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
   }
 
-  // AWAITING_DECISIONS: Default fallback - needs categorization/fingerprint/packaging/session
+  // FULFILLMENT_PREP: Default fallback - needs categorization/fingerprint/packaging/session
   const subphase = deriveDecisionSubphase(shipment);
-  return { phase: LIFECYCLE_PHASES.AWAITING_DECISIONS, subphase };
+  return { phase: LIFECYCLE_PHASES.FULFILLMENT_PREP, subphase };
 }
 
 /**
@@ -278,7 +278,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 'Ready to Fulfill',
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 'Ready to Session',
     [LIFECYCLE_PHASES.SESSION_CREATED]: 'Session Created',
-    [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 'Awaiting Decisions',
+    [LIFECYCLE_PHASES.FULFILLMENT_PREP]: 'Fulfillment Prep',
     [LIFECYCLE_PHASES.READY_TO_PICK]: 'Ready to Pick',
     [LIFECYCLE_PHASES.PICKING]: 'Picking',
     [LIFECYCLE_PHASES.PACKING_READY]: 'Packing Ready',
@@ -314,7 +314,7 @@ export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
  */
 export function isModifiable(phase: LifecyclePhase): boolean {
   return phase === LIFECYCLE_PHASES.READY_TO_SESSION || 
-         phase === LIFECYCLE_PHASES.AWAITING_DECISIONS;
+         phase === LIFECYCLE_PHASES.FULFILLMENT_PREP;
 }
 
 /**
@@ -323,7 +323,7 @@ export function isModifiable(phase: LifecyclePhase): boolean {
 export function getNextPhase(phase: LifecyclePhase): LifecyclePhase | null {
   const happyPath: LifecyclePhase[] = [
     LIFECYCLE_PHASES.READY_TO_SESSION,
-    LIFECYCLE_PHASES.AWAITING_DECISIONS,
+    LIFECYCLE_PHASES.FULFILLMENT_PREP,
     LIFECYCLE_PHASES.READY_TO_PICK,
     LIFECYCLE_PHASES.PICKING,
     LIFECYCLE_PHASES.PACKING_READY,
@@ -369,7 +369,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.READY_TO_FULFILL]: 0,
     [LIFECYCLE_PHASES.READY_TO_SESSION]: 5,
     [LIFECYCLE_PHASES.SESSION_CREATED]: 10,
-    [LIFECYCLE_PHASES.AWAITING_DECISIONS]: 15,
+    [LIFECYCLE_PHASES.FULFILLMENT_PREP]: 15,
     [LIFECYCLE_PHASES.READY_TO_PICK]: 30,
     [LIFECYCLE_PHASES.PICKING]: 50,
     [LIFECYCLE_PHASES.PACKING_READY]: 75,
@@ -383,8 +383,8 @@ export function getLifecycleProgress(state: LifecycleState): number {
   
   let baseProgress = phaseWeights[phase];
   
-  // Within AWAITING_DECISIONS, add subphase progress (0-25%)
-  if (phase === LIFECYCLE_PHASES.AWAITING_DECISIONS && subphase) {
+  // Within FULFILLMENT_PREP, add subphase progress (0-25%)
+  if (phase === LIFECYCLE_PHASES.FULFILLMENT_PREP && subphase) {
     const subphaseWeights: Record<DecisionSubphase, number> = {
       [DECISION_SUBPHASES.NEEDS_HYDRATION]: 0,
       [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 3,

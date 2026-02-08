@@ -433,8 +433,8 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
         return wrapBadgeWithPopover('problem', badge);
       }
       
-      case 'awaiting_decisions':
-        // Show decision subphase within awaiting_decisions
+      case 'fulfillment_prep':
+        // Show decision subphase within fulfillment_prep
         switch (decisionSubphaseValue) {
           case 'needs_hydration': {
             const badge = (
@@ -494,7 +494,7 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
             const badge = (
               <Badge className="bg-gray-500 hover:bg-gray-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
                 <Clock className="h-3 w-3" />
-                Awaiting Decisions
+                Fulfillment Prep
               </Badge>
             );
             return wrapBadgeWithPopover('processing', badge);
@@ -2240,7 +2240,7 @@ export default function Shipments() {
                         <SelectContent>
                           <SelectItem value="all">All</SelectItem>
                           <SelectItem value="ready_to_fulfill">Ready to Fulfill</SelectItem>
-                          <SelectItem value="awaiting_decisions">Awaiting Decisions</SelectItem>
+                          <SelectItem value="fulfillment_prep">Fulfillment Prep</SelectItem>
                           <SelectItem value="ready_to_session">Ready to Session</SelectItem>
                           <SelectItem value="session_created">Session Created</SelectItem>
                           <SelectItem value="ready_to_pick">Ready to Pick</SelectItem>

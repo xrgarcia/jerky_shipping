@@ -85,9 +85,9 @@ const PHASE_META: Record<
     colorClass: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800",
     category: "pre",
   },
-  awaiting_decisions: {
-    label: "Awaiting Decisions",
-    description: "Has fingerprint, needs packing decisions",
+  fulfillment_prep: {
+    label: "Fulfillment Prep",
+    description: "Hydration, fingerprinting, packaging, rate check, sessioning",
     colorClass: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
     category: "decision",
   },
@@ -190,7 +190,7 @@ const SUBPHASE_META: Record<
 const MAIN_FLOW_ORDER = [
   "ready_to_fulfill",
   "ready_to_session",
-  "awaiting_decisions",
+  "fulfillment_prep",
   "session_created",
   "ready_to_pick",
   "picking",
@@ -362,19 +362,19 @@ function StateMachineTab({
       <PhaseBox phase="ready_to_session" count={getPhaseCount(counts, "ready_to_session")} isLoading={isLoading} />
       <DownArrow />
 
-      {/* awaiting_decisions expanded (includes session_created) */}
+      {/* fulfillment_prep expanded (includes session_created) */}
       <div
         className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 rounded-md p-3"
-        data-testid="phase-box-awaiting_decisions"
+        data-testid="phase-box-fulfillment_prep"
       >
         <div className="text-sm font-medium text-center mb-2 text-foreground">
-          Awaiting Decisions
+          Fulfillment Prep
           <span className="ml-2">
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-8" />
             ) : (
-              <Badge variant="secondary" className="no-default-active-elevate" data-testid="phase-count-awaiting_decisions">
-                {getPhaseCount(counts, "awaiting_decisions")}
+              <Badge variant="secondary" className="no-default-active-elevate" data-testid="phase-count-fulfillment_prep">
+                {getPhaseCount(counts, "fulfillment_prep")}
               </Badge>
             )}
           </span>
@@ -384,7 +384,7 @@ function StateMachineTab({
             <div key={sub} className="flex items-center gap-1">
               <SubphaseBox
                 subphase={sub}
-                count={getPhaseCount(counts, "awaiting_decisions", sub)}
+                count={getPhaseCount(counts, "fulfillment_prep", sub)}
                 isLoading={isLoading}
               />
               {i < SUBPHASE_ORDER.length - 1 && (
