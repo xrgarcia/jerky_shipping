@@ -104,6 +104,11 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
     description: "A local fulfillment session has been built for this order. It's waiting to be pushed to SkuVault for picking.",
     nextSteps: "Release the session to the floor or push it to SkuVault. Once detected, it will move to Ready to Pick."
   },
+  needs_hydration: {
+    title: "Needs Hydration",
+    description: "This order hasn't had its QC items created yet. The hydrator needs to run to create shipment_qc_items from the order's line items.",
+    nextSteps: "This is an automated step. The hydrator will create QC items automatically. If stuck, try re-syncing the shipment."
+  },
   needs_categorization: {
     title: "Needs Categorization",
     description: "One or more products in this order haven't been categorized yet. We need to know if items are kits (need QC explosion) or assembled products.",
@@ -431,6 +436,15 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
       case 'awaiting_decisions':
         // Show decision subphase within awaiting_decisions
         switch (decisionSubphaseValue) {
+          case 'needs_hydration': {
+            const badge = (
+              <Badge className="bg-slate-500 hover:bg-slate-600 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
+                <Clock className="h-3 w-3" />
+                Needs Hydration
+              </Badge>
+            );
+            return wrapBadgeWithPopover('needs_hydration', badge);
+          }
           case 'needs_categorization': {
             const badge = (
               <Badge className="bg-rose-600 hover:bg-rose-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
@@ -2133,9 +2147,11 @@ export default function Shipments() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="needs_hydration">Needs Hydration</SelectItem>
                           <SelectItem value="needs_categorization">Needs Categorization</SelectItem>
                           <SelectItem value="needs_fingerprint">Needs Fingerprint</SelectItem>
                           <SelectItem value="needs_packaging">Needs Packaging</SelectItem>
+                          <SelectItem value="needs_rate_check">Needs Rate Check</SelectItem>
                           <SelectItem value="needs_session">Needs Session</SelectItem>
                           <SelectItem value="ready_for_skuvault">Ready for SkuVault</SelectItem>
                         </SelectContent>

@@ -41,15 +41,24 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * 
  * The progression of packing decisions before orders can be sessioned:
  * 
- * needs_rate_check → needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
+ * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session → ready_for_skuvault
+ * 
+ * needs_hydration: No QC items created yet (fingerprintStatus is NULL). Automated step — hydrator creates shipment_qc_items.
+ * needs_categorization: Hydrated but some SKUs not in a geometry collection (fingerprintStatus = 'pending_categorization').
+ * needs_fingerprint: All SKUs categorized, fingerprint not yet calculated (fingerprintStatus = 'complete', no fingerprintId).
+ * needs_packaging: Fingerprint exists but no packaging type mapped.
+ * needs_rate_check: Has packaging, rate check not yet done.
+ * needs_session: Everything done, needs to be added to fulfillment session.
+ * ready_for_skuvault: In session, ready to push.
  */
 export const DECISION_SUBPHASES = {
-  NEEDS_RATE_CHECK: 'needs_rate_check',          // Rate analysis pending - checking for cheaper shipping options
-  NEEDS_CATEGORIZATION: 'needs_categorization',  // SKUs not yet assigned to collections
-  NEEDS_FINGERPRINT: 'needs_fingerprint',            // Fingerprint not yet calculated
-  NEEDS_PACKAGING: 'needs_packaging',            // Fingerprint has no packaging type mapping
-  NEEDS_SESSION: 'needs_session',                // Ready for sessioning but not yet grouped
-  READY_FOR_SKUVAULT: 'ready_for_skuvault',      // In session, ready to push to SkuVault
+  NEEDS_HYDRATION: 'needs_hydration',              // No QC items yet — needs hydrator to run (fingerprintStatus is NULL)
+  NEEDS_CATEGORIZATION: 'needs_categorization',    // SKUs not yet assigned to geometry collections (fingerprintStatus = 'pending_categorization')
+  NEEDS_FINGERPRINT: 'needs_fingerprint',          // Fingerprint not yet calculated (fingerprintStatus = 'complete', no fingerprintId)
+  NEEDS_PACKAGING: 'needs_packaging',              // Fingerprint has no packaging type mapping
+  NEEDS_RATE_CHECK: 'needs_rate_check',            // Rate analysis pending - checking for cheaper shipping options
+  NEEDS_SESSION: 'needs_session',                  // Ready for sessioning but not yet grouped
+  READY_FOR_SKUVAULT: 'ready_for_skuvault',        // In session, ready to push to SkuVault
 } as const;
 
 export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_SUBPHASES];
@@ -77,10 +86,11 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
  * Valid state transitions for decision subphases (within AWAITING_DECISIONS)
  */
 export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> = {
-  [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_CATEGORIZATION],
+  [DECISION_SUBPHASES.NEEDS_HYDRATION]: [DECISION_SUBPHASES.NEEDS_CATEGORIZATION, DECISION_SUBPHASES.NEEDS_FINGERPRINT], // After hydration, goes to categorization or straight to fingerprint if all SKUs already categorized
   [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: [DECISION_SUBPHASES.NEEDS_FINGERPRINT],
   [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
-  [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_SESSION],
+  [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_RATE_CHECK, DECISION_SUBPHASES.NEEDS_SESSION], // Rate check may be skipped if not eligible
+  [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_SESSION],
   [DECISION_SUBPHASES.NEEDS_SESSION]: [DECISION_SUBPHASES.READY_FOR_SKUVAULT],
   [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits AWAITING_DECISIONS phase
 };

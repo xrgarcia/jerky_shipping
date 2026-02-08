@@ -23,7 +23,7 @@
  *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
  * 
  * Within AWAITING_DECISIONS, manages decision subphases:
- * needs_categorization → needs_fingerprint → needs_packaging → needs_session → ready_for_skuvault
+ * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session → ready_for_skuvault
  */
 
 import {
@@ -211,12 +211,16 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
 
 /**
  * Determine the decision subphase based on shipment data
+ * 
+ * Each subphase maps to a specific, actionable condition — no catch-all defaults.
+ * The check order goes from most-advanced to least-advanced so shipments land
+ * in the furthest subphase they've reached.
  */
 export function deriveDecisionSubphase(shipment: {
   fingerprintStatus?: string | null;
   fingerprintId?: string | null;
   packagingTypeId?: string | null;
-  fulfillmentSessionId?: string | null;
+  fulfillmentSessionId?: string | number | null;
   sessionStatus?: string | null;
   rateCheckStatus?: string | null;
   shipmentId?: string | null;
@@ -255,8 +259,15 @@ export function deriveDecisionSubphase(shipment: {
     return DECISION_SUBPHASES.NEEDS_FINGERPRINT;
   }
 
-  // NEEDS_CATEGORIZATION: SKUs need collection assignment
-  return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
+  // NEEDS_CATEGORIZATION: Hydrated but some SKUs not in a geometry collection
+  // Only when fingerprintStatus is explicitly 'pending_categorization' (set by the hydrator)
+  if (shipment.fingerprintStatus === 'pending_categorization') {
+    return DECISION_SUBPHASES.NEEDS_CATEGORIZATION;
+  }
+
+  // NEEDS_HYDRATION: No QC items created yet (fingerprintStatus is NULL or any other unrecognized value)
+  // This is an automated step — the hydrator will create shipment_qc_items
+  return DECISION_SUBPHASES.NEEDS_HYDRATION;
 }
 
 /**
@@ -286,10 +297,11 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
  */
 export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
   const displayNames: Record<DecisionSubphase, string> = {
-    [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 'Needs Rate Check',
+    [DECISION_SUBPHASES.NEEDS_HYDRATION]: 'Needs Hydration',
     [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 'Needs Categorization',
     [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 'Needs Fingerprint',
     [DECISION_SUBPHASES.NEEDS_PACKAGING]: 'Needs Packaging',
+    [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 'Needs Rate Check',
     [DECISION_SUBPHASES.NEEDS_SESSION]: 'Needs Session',
     [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 'Ready for SkuVault',
   };
@@ -330,10 +342,11 @@ export function getNextPhase(phase: LifecyclePhase): LifecyclePhase | null {
  */
 export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | null {
   const happyPath: DecisionSubphase[] = [
-    DECISION_SUBPHASES.NEEDS_RATE_CHECK,
+    DECISION_SUBPHASES.NEEDS_HYDRATION,
     DECISION_SUBPHASES.NEEDS_CATEGORIZATION,
     DECISION_SUBPHASES.NEEDS_FINGERPRINT,
     DECISION_SUBPHASES.NEEDS_PACKAGING,
+    DECISION_SUBPHASES.NEEDS_RATE_CHECK,
     DECISION_SUBPHASES.NEEDS_SESSION,
     DECISION_SUBPHASES.READY_FOR_SKUVAULT,
   ];
@@ -373,10 +386,11 @@ export function getLifecycleProgress(state: LifecycleState): number {
   // Within AWAITING_DECISIONS, add subphase progress (0-25%)
   if (phase === LIFECYCLE_PHASES.AWAITING_DECISIONS && subphase) {
     const subphaseWeights: Record<DecisionSubphase, number> = {
-      [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 0,
-      [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 4,
-      [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 8,
-      [DECISION_SUBPHASES.NEEDS_PACKAGING]: 12,
+      [DECISION_SUBPHASES.NEEDS_HYDRATION]: 0,
+      [DECISION_SUBPHASES.NEEDS_CATEGORIZATION]: 3,
+      [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 6,
+      [DECISION_SUBPHASES.NEEDS_PACKAGING]: 9,
+      [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 12,
       [DECISION_SUBPHASES.NEEDS_SESSION]: 16,
       [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 20,
     };

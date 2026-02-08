@@ -157,13 +157,13 @@ const SUBPHASE_META: Record<
   string,
   { label: string; description: string }
 > = {
-  needs_rate_check: {
-    label: "Rate Check",
-    description: "Rate analysis pending",
+  needs_hydration: {
+    label: "Hydration",
+    description: "QC items not yet created \u2014 automated step",
   },
   needs_categorization: {
     label: "Categorize",
-    description: "SKUs not yet assigned to collections",
+    description: "SKUs not yet assigned to geometry collections",
   },
   needs_fingerprint: {
     label: "Fingerprint",
@@ -172,6 +172,10 @@ const SUBPHASE_META: Record<
   needs_packaging: {
     label: "Packaging",
     description: "No packaging type mapping",
+  },
+  needs_rate_check: {
+    label: "Rate Check",
+    description: "Rate analysis pending",
   },
   needs_session: {
     label: "Session",
@@ -199,10 +203,11 @@ const MAIN_FLOW_ORDER = [
 ];
 
 const SUBPHASE_ORDER = [
-  "needs_rate_check",
+  "needs_hydration",
   "needs_categorization",
   "needs_fingerprint",
   "needs_packaging",
+  "needs_rate_check",
   "needs_session",
   "ready_for_skuvault",
 ];
