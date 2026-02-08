@@ -14201,17 +14201,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (!order.assignedStationId) {
           // Packaging exists but no station
           if (!order.packagingStationType) {
-            // No station type on the packaging type itself - need to configure it on Package Types page
             reason = `Assign station type to packaging`;
-            actionTab = 'package_types';
           } else {
             const stationTypeLabel = order.packagingStationType === 'boxing_machine' ? 'Boxer' 
               : order.packagingStationType === 'poly_bag' ? 'Bagger' 
               : order.packagingStationType === 'hand_pack' ? 'Hand Pack' 
               : 'Unknown';
             reason = `Needs workstation assignment (${stationTypeLabel})`;
-            actionTab = 'packaging';
           }
+          actionTab = 'package_types';
         } else {
           // Has fingerprint + packaging model + station = ready for session
           // We derive readiness from actual data fields, not the potentially-stale decisionSubphase column
