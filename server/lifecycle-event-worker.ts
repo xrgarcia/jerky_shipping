@@ -48,7 +48,7 @@ import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
 import { storage } from './storage';
-import { shipments, packagingTypes, featureFlags, fingerprintModels } from '@shared/schema';
+import { shipments, packagingTypes, featureFlags, fingerprintModels, shipmentSyncFailures } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
 
@@ -64,6 +64,30 @@ async function isFeatureFlagEnabled(key: string): Promise<boolean> {
   } catch (error) {
     log(`Feature flag check error for ${key}: ${error}`, 'warn');
     return false; // Default to disabled on error
+  }
+}
+
+async function logPackageSyncFailureToDLQ(
+  shipmentId: string,
+  shipstationShipmentId: string | null,
+  orderNumber: string,
+  errorMessage: string,
+  retryCount: number,
+  metadata?: Record<string, any>
+): Promise<void> {
+  try {
+    await db.insert(shipmentSyncFailures).values({
+      shipstationShipmentId,
+      orderNumber,
+      reason: 'package_sync',
+      errorMessage,
+      requestData: metadata ?? null,
+      retryCount,
+      failedAt: new Date(),
+    });
+    log(`Package sync DLQ: Logged failure for ${orderNumber} (shipment ${shipmentId})`);
+  } catch (dlqError: any) {
+    log(`Package sync DLQ: Failed to log entry for ${orderNumber}: ${dlqError.message}`, 'error');
   }
 }
 
@@ -404,12 +428,14 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
               return { success: false, shouldRetry: false, shouldRequeue: true, error: errorMsg };
             } else {
               log(`Package sync: All retries exhausted on re-queued attempt for ${ref}, flagging for manual intervention`, 'error');
+              const failureMsg1 = `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}`;
               await db.update(shipments)
                 .set({ 
                   requiresManualPackage: true, 
-                  packageAssignmentError: `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}` 
+                  packageAssignmentError: failureMsg1
                 })
                 .where(eq(shipments.id, shipmentId));
+              await logPackageSyncFailureToDLQ(shipmentId, shipment.shipmentId, orderNumber || ref, failureMsg1, MAX_PACKAGE_SYNC_RETRIES * 2, { phase: 'requeued_api_error', isRateLimit });
               return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
             }
           }
@@ -429,12 +455,14 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
             return { success: false, shouldRetry: false, shouldRequeue: true, error: errorMsg };
           } else {
             log(`Package sync: All retries exhausted on re-queued attempt for ${ref}, flagging for manual intervention`, 'error');
+            const failureMsg2 = `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}`;
             await db.update(shipments)
               .set({ 
                 requiresManualPackage: true, 
-                packageAssignmentError: `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}` 
+                packageAssignmentError: failureMsg2
               })
               .where(eq(shipments.id, shipmentId));
+            await logPackageSyncFailureToDLQ(shipmentId, null, orderNumber || ref, failureMsg2, MAX_PACKAGE_SYNC_RETRIES * 2, { phase: 'requeued_exception' });
             return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
           }
         }
@@ -518,12 +546,14 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
         }
       } catch (requeueError: any) {
         log(`Failed to re-queue package sync for ${orderRef}: ${requeueError.message}, flagging for manual intervention`, 'error');
+        const failureMsg3 = `Re-queue failed: ${requeueError.message}`;
         await db.update(shipments)
           .set({ 
             requiresManualPackage: true, 
-            packageAssignmentError: `Re-queue failed: ${requeueError.message}` 
+            packageAssignmentError: failureMsg3
           })
           .where(eq(shipments.id, event.shipmentId));
+        await logPackageSyncFailureToDLQ(event.shipmentId, null, event.orderNumber || orderRef, failureMsg3, 0, { phase: 'requeue_failed' });
       }
       return true;
     }
