@@ -392,6 +392,10 @@ function StateMachineTab({
 
       <DownArrow />
 
+      {/* session_created */}
+      <PhaseBox phase="session_created" count={getPhaseCount(counts, "session_created")} isLoading={isLoading} />
+      <DownArrow />
+
       {/* ready_to_pick */}
       <PhaseBox phase="ready_to_pick" count={getPhaseCount(counts, "ready_to_pick")} isLoading={isLoading} />
       <DownArrow />
