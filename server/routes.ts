@@ -13438,6 +13438,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { name, stationType, packageCode, dimensionLength, dimensionWidth, dimensionHeight, isActive } = req.body;
 
+      // Fetch current value to detect actual stationType changes
+      let previousStationType: string | null = null;
+      if (stationType !== undefined) {
+        const [current] = await db
+          .select({ stationType: packagingTypes.stationType })
+          .from(packagingTypes)
+          .where(eq(packagingTypes.id, id));
+        previousStationType = current?.stationType ?? null;
+      }
+
       const updateData: Record<string, any> = { updatedAt: new Date() };
       if (name !== undefined) updateData.name = name.trim();
       if (stationType !== undefined) updateData.stationType = stationType || null;
@@ -13458,6 +13468,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`[Packaging Types] Updated: ${updated.name} (${updated.stationType || 'no station type'})`);
+
+      // If stationType actually changed, trigger lifecycle events for all fulfillment_prep shipments using this packaging type
+      const newStationType = (stationType || null) as string | null;
+      if (stationType !== undefined && newStationType !== previousStationType) {
+        try {
+          const affectedShipments = await db
+            .select({ id: shipments.id, orderNumber: shipments.orderNumber })
+            .from(shipments)
+            .where(
+              and(
+                eq(shipments.packagingTypeId, id),
+                eq(shipments.lifecyclePhase, 'fulfillment_prep'),
+                isNull(shipments.trackingNumber),
+                isNull(shipments.shipDate)
+              )
+            );
+
+          if (affectedShipments.length > 0) {
+            const events = affectedShipments.map(s => ({
+              shipmentId: s.id,
+              orderNumber: s.orderNumber || undefined,
+              reason: 'packaging' as const,
+              enqueuedAt: Date.now(),
+              metadata: { trigger: 'station_type_change', packagingTypeId: id },
+            }));
+            const queued = await enqueueLifecycleEventBatch(events);
+            console.log(`[Packaging Types] Station type changed on "${updated.name}" (${previousStationType} → ${newStationType}) — queued ${queued} lifecycle events for ${affectedShipments.length} fulfillment_prep shipments`);
+          }
+        } catch (lifecycleError) {
+          console.error("[Packaging Types] Error queuing lifecycle events after stationType change:", lifecycleError);
+        }
+      }
+
       res.json(updated);
     } catch (error: any) {
       console.error("[Packaging Types] Error updating:", error);
@@ -14156,13 +14199,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason = `Assign packaging to: ${fpName}`;
           actionTab = 'packaging';
         } else if (!order.assignedStationId) {
-          // Packaging exists but no station - show packaging type for context
-          const stationTypeLabel = order.packagingStationType === 'boxing_machine' ? 'Boxer' 
-            : order.packagingStationType === 'poly_bag' ? 'Bagger' 
-            : order.packagingStationType === 'hand_pack' ? 'Hand Pack' 
-            : 'Unknown';
-          reason = `Needs workstation assignment (${stationTypeLabel})`;
-          actionTab = 'packaging';
+          // Packaging exists but no station
+          if (!order.packagingStationType) {
+            // No station type on the packaging type itself - need to configure it on Package Types page
+            reason = `Assign station type to packaging`;
+            actionTab = 'package_types';
+          } else {
+            const stationTypeLabel = order.packagingStationType === 'boxing_machine' ? 'Boxer' 
+              : order.packagingStationType === 'poly_bag' ? 'Bagger' 
+              : order.packagingStationType === 'hand_pack' ? 'Hand Pack' 
+              : 'Unknown';
+            reason = `Needs workstation assignment (${stationTypeLabel})`;
+            actionTab = 'packaging';
+          }
         } else {
           // Has fingerprint + packaging model + station = ready for session
           // We derive readiness from actual data fields, not the potentially-stale decisionSubphase column
@@ -14230,6 +14279,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else {
                 actionUrl = '/fulfillment-prep/packaging/needs-mapping';
               }
+              break;
+            case 'package_types':
+              // Packaging type needs station type assignment - link to Package Types page
+              actionUrl = '/packaging-types';
               break;
             default:
               // No specific action - null URL
