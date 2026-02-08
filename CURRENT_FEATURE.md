@@ -393,7 +393,7 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 
 **Step 1: Define Lifecycle Enum & State Machine** ✅
 - [x] Create `shipmentLifecyclePhase` enum: `awaiting_decisions` | `ready_to_pick` | `picking` | `packing_ready` | `on_dock` | `picking_issues`
-- [x] Create `decisionSubphase` enum: `needs_categorization` | `needs_footprint` | `needs_packaging` | `needs_session` | `ready_for_skuvault`
+- [x] Create `decisionSubphase` enum: `needs_categorization` | `needs_footprint` | `needs_packaging` | `needs_session`
 - [x] Add `lifecyclePhase`, `decisionSubphase`, `lifecyclePhaseChangedAt`, `fulfillmentSessionId` fields to shipments table
 - [x] Create state machine logic for phase transitions (`server/services/lifecycle-state-machine.ts`)
 
@@ -419,8 +419,8 @@ A fulfillment session spans from packing decisions through to "On the Dock."
 | **Ship. Internal** | SKU categorized | Subphase: needs_categorization → needs_footprint |
 | **Ship. Internal** | Footprint calculated | Subphase: needs_footprint → needs_packaging |
 | **Ship. Internal** | Packaging assigned | Subphase: needs_packaging → needs_session |
-| **Ship. Internal** | Fulfillment session created | Subphase: needs_session → ready_for_skuvault |
-| **SkuVault Push** | Session pushed to SkuVault | awaiting_decisions → ready_to_pick |
+| **Ship. Internal** | Fulfillment session created | fulfillment_prep → session_created |
+| **SkuVault Push** | Session pushed to SkuVault | session_created → ready_to_pick |
 | **Firestore Sync** | Session status = 'active' | ready_to_pick → picking |
 | **Firestore Sync** | Session status = 'closed' | picking → packing_ready |
 | **Firestore Sync** | Session status = 'inactive' | Any → picking_issues |

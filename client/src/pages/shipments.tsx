@@ -129,11 +129,6 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
     description: "The order is ready for fulfillment but hasn't been added to a picking session yet.",
     nextSteps: "Include this order in a new fulfillment session using the Session Builder."
   },
-  ready_for_skuvault: {
-    title: "Ready for SkuVault",
-    description: "All prerequisites are met and the order is ready to be synced to SkuVault for wave picking.",
-    nextSteps: "The system will sync this to SkuVault automatically, or manually trigger a sync."
-  },
   delivered: {
     title: "Delivered",
     description: "The carrier has confirmed delivery to the customer's address. The order fulfillment is complete.",
@@ -480,15 +475,6 @@ function ShipmentCard({ shipment, tags, packages, cacheStatus }: { shipment: Shi
               </Badge>
             );
             return wrapBadgeWithPopover('needs_session', badge);
-          }
-          case 'ready_for_skuvault': {
-            const badge = (
-              <Badge className="bg-teal-600 hover:bg-teal-700 text-white text-xs gap-1" data-testid={`badge-workflow-${shipment.orderNumber}`}>
-                <CheckCircle className="h-3 w-3" />
-                Ready for SkuVault
-              </Badge>
-            );
-            return wrapBadgeWithPopover('ready_for_skuvault', badge);
           }
           default: {
             const badge = (
@@ -2153,7 +2139,6 @@ export default function Shipments() {
                           <SelectItem value="needs_packaging">Needs Packaging</SelectItem>
                           <SelectItem value="needs_rate_check">Needs Rate Check</SelectItem>
                           <SelectItem value="needs_session">Needs Session</SelectItem>
-                          <SelectItem value="ready_for_skuvault">Ready for SkuVault</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -181,10 +181,6 @@ const SUBPHASE_META: Record<
     label: "Session",
     description: "Ready for sessioning",
   },
-  ready_for_skuvault: {
-    label: "SkuVault",
-    description: "In session, ready to push",
-  },
 };
 
 const MAIN_FLOW_ORDER = [
@@ -209,7 +205,6 @@ const SUBPHASE_ORDER = [
   "needs_packaging",
   "needs_rate_check",
   "needs_session",
-  "ready_for_skuvault",
 ];
 
 function getPhaseCount(
@@ -388,38 +383,7 @@ function StateMachineTab({
                 isLoading={isLoading}
               />
               {i < SUBPHASE_ORDER.length - 1 && (
-                <>
-                  {/* Insert Session Created between Session (needs_session) and SkuVault (ready_for_skuvault) */}
-                  {SUBPHASE_ORDER[i] === "needs_session" && (
-                    <>
-                      <RightArrow />
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div
-                            className="border border-green-300 dark:border-green-700 bg-green-100 dark:bg-green-900/40 rounded-md p-2 min-w-[100px] text-center"
-                            data-testid="subphase-box-session_created"
-                          >
-                            <div className="text-xs font-medium text-foreground">Session Created</div>
-                            <div className="mt-1">
-                              {isLoading ? (
-                                <Skeleton className="h-4 w-8 mx-auto" />
-                              ) : (
-                                <Badge variant="secondary" className="no-default-active-elevate text-xs" data-testid="subphase-count-session_created">
-                                  {getPhaseCount(counts, "session_created")}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="font-medium">Session Created</p>
-                          <p className="text-xs text-muted-foreground">Local session built, waiting for SkuVault push</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </>
-                  )}
-                  <RightArrow />
-                </>
+                <RightArrow />
               )}
             </div>
           ))}

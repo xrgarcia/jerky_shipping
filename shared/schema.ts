@@ -41,7 +41,7 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * 
  * The progression of packing decisions before orders can be sessioned:
  * 
- * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session → ready_for_skuvault
+ * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session
  * 
  * needs_hydration: No QC items created yet (fingerprintStatus is NULL). Automated step — hydrator creates shipment_qc_items.
  * needs_categorization: Hydrated but some SKUs not in a geometry collection (fingerprintStatus = 'pending_categorization').
@@ -49,7 +49,8 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHAS
  * needs_packaging: Fingerprint exists but no packaging type mapped.
  * needs_rate_check: Has packaging, rate check not yet done.
  * needs_session: Everything done, needs to be added to fulfillment session.
- * ready_for_skuvault: In session, ready to push.
+ * 
+ * After sessioning, orders transition to SESSION_CREATED phase (waiting on SkuVault wave picking).
  */
 export const DECISION_SUBPHASES = {
   NEEDS_HYDRATION: 'needs_hydration',              // No QC items yet — needs hydrator to run (fingerprintStatus is NULL)
@@ -57,8 +58,7 @@ export const DECISION_SUBPHASES = {
   NEEDS_FINGERPRINT: 'needs_fingerprint',          // Fingerprint not yet calculated (fingerprintStatus = 'complete', no fingerprintId)
   NEEDS_PACKAGING: 'needs_packaging',              // Fingerprint has no packaging type mapping
   NEEDS_RATE_CHECK: 'needs_rate_check',            // Rate analysis pending - checking for cheaper shipping options
-  NEEDS_SESSION: 'needs_session',                  // Ready for sessioning but not yet grouped
-  READY_FOR_SKUVAULT: 'ready_for_skuvault',        // In session, ready to push to SkuVault
+  NEEDS_SESSION: 'needs_session',                  // Ready for sessioning but not yet grouped — terminal subphase before SESSION_CREATED
 } as const;
 
 export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_SUBPHASES];
@@ -91,8 +91,7 @@ export const DECISION_TRANSITIONS: Record<DecisionSubphase, DecisionSubphase[]> 
   [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: [DECISION_SUBPHASES.NEEDS_PACKAGING],
   [DECISION_SUBPHASES.NEEDS_PACKAGING]: [DECISION_SUBPHASES.NEEDS_RATE_CHECK, DECISION_SUBPHASES.NEEDS_SESSION], // Rate check may be skipped if not eligible
   [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: [DECISION_SUBPHASES.NEEDS_SESSION],
-  [DECISION_SUBPHASES.NEEDS_SESSION]: [DECISION_SUBPHASES.READY_FOR_SKUVAULT],
-  [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: [], // Exits FULFILLMENT_PREP phase
+  [DECISION_SUBPHASES.NEEDS_SESSION]: [], // Terminal subphase — after sessioning, exits to SESSION_CREATED phase
 };
 
 // Users table for warehouse staff
@@ -381,7 +380,7 @@ export const shipments = pgTable("shipments", {
   packageAssignmentError: text("package_assignment_error"), // Error message explaining why auto-assignment failed
   // Lifecycle tracking (Phase 6: Smart Shipping Engine)
   lifecyclePhase: text("lifecycle_phase"), // Current phase: fulfillment_prep, ready_to_pick, picking, packing_ready, on_dock, picking_issues
-  decisionSubphase: text("decision_subphase"), // Subphase within fulfillment_prep: needs_hydration, needs_categorization, needs_fingerprint, needs_packaging, needs_rate_check, needs_session, ready_for_skuvault
+  decisionSubphase: text("decision_subphase"), // Subphase within fulfillment_prep: needs_hydration, needs_categorization, needs_fingerprint, needs_packaging, needs_rate_check, needs_session
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
   // Rate check tracking (automated rate optimization)
   rateCheckStatus: text("rate_check_status"), // 'pending' | 'complete' | 'failed' | 'skipped' | null

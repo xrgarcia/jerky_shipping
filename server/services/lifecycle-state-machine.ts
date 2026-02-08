@@ -23,7 +23,7 @@
  *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
  * 
  * Within FULFILLMENT_PREP, manages decision subphases:
- * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session → ready_for_skuvault
+ * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session
  */
 
 import {
@@ -227,11 +227,6 @@ export function deriveDecisionSubphase(shipment: {
   shipToPostalCode?: string | null;
   serviceCode?: string | null;
 }): DecisionSubphase {
-  // READY_FOR_SKUVAULT: In fulfillment session, ready to push
-  if (shipment.fulfillmentSessionId && !shipment.sessionStatus) {
-    return DECISION_SUBPHASES.READY_FOR_SKUVAULT;
-  }
-
   // NEEDS_RATE_CHECK: Rate check not yet complete or failed (can retry)
   // Must be evaluated BEFORE NEEDS_SESSION so orders can't skip rate checking
   // Eligible statuses to proceed: 'complete', 'skipped'
@@ -303,7 +298,6 @@ export function getSubphaseDisplayName(subphase: DecisionSubphase): string {
     [DECISION_SUBPHASES.NEEDS_PACKAGING]: 'Needs Packaging',
     [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 'Needs Rate Check',
     [DECISION_SUBPHASES.NEEDS_SESSION]: 'Needs Session',
-    [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 'Ready for SkuVault',
   };
   return displayNames[subphase] || subphase;
 }
@@ -348,7 +342,6 @@ export function getNextSubphase(subphase: DecisionSubphase): DecisionSubphase | 
     DECISION_SUBPHASES.NEEDS_PACKAGING,
     DECISION_SUBPHASES.NEEDS_RATE_CHECK,
     DECISION_SUBPHASES.NEEDS_SESSION,
-    DECISION_SUBPHASES.READY_FOR_SKUVAULT,
   ];
   
   const currentIndex = happyPath.indexOf(subphase);
@@ -391,8 +384,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
       [DECISION_SUBPHASES.NEEDS_FINGERPRINT]: 6,
       [DECISION_SUBPHASES.NEEDS_PACKAGING]: 9,
       [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: 12,
-      [DECISION_SUBPHASES.NEEDS_SESSION]: 16,
-      [DECISION_SUBPHASES.READY_FOR_SKUVAULT]: 20,
+      [DECISION_SUBPHASES.NEEDS_SESSION]: 20,
     };
     baseProgress += subphaseWeights[subphase];
   }
