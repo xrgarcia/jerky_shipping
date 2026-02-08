@@ -178,8 +178,8 @@ const SUBPHASE_META: Record<
     description: "Rate analysis pending",
   },
   needs_session: {
-    label: "Session",
-    description: "Ready for sessioning",
+    label: "Build Sessions",
+    description: "All prep complete — ready to be grouped into a fulfillment session batch for warehouse picking",
   },
 };
 
