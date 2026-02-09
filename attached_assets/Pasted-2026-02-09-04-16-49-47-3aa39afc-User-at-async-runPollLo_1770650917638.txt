@@ -1,0 +1,212 @@
+2026-02-09 04:16:49.47
+3aa39afc
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:13295:20)
+2026-02-09 04:16:49.47
+3aa39afc
+User
+at async _ShipStationShipmentETLService.processShipment (file:///home/runner/workspace/dist/index.js:12196:9)
+2026-02-09 04:16:49.47
+3aa39afc
+User
+[ShipStationShipmentETL] Error processing items for shipment 206fec91-60d7-4152-91dc-8c1807dd4b14: Error: timeout exceeded when trying to connect
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:13295:20)
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at async DatabaseStorage.getShipmentsDeadLetter (file:///home/runner/workspace/dist/index.js:4097:24)
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:13148:32)
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-02-09 04:34:09.98
+3aa39afc
+User
+[UnifiedSync] Poll error: Error: timeout exceeded when trying to connect
+2026-02-09 04:34:09.98
+3aa39afc
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13338:27)
+2026-02-09 04:43:58.58
+3aa39afc
+User
+10:43:58 AM [lifecycle-worker] Error processing event for #JK3825363020: timeout exceeded when trying to connect
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async DatabaseStorage.upsertOrderItem (file:///home/runner/workspace/dist/index.js:2265:26)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+[ShopifyOrderETL] Error processing line item 16939451547962 for order 7005521903930: Error: timeout exceeded when trying to connect
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async Timeout.processQueue2 [as _onTimeout] (file:///home/runner/workspace/dist/index.js:18779:27)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async ShopifyOrderETLService.processOrder (file:///home/runner/workspace/dist/index.js:7440:9)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async ShopifyOrderETLService.processOrderLineItems (file:///home/runner/workspace/dist/index.js:7509:13)
+2026-02-09 04:46:59.18
+3aa39afc
+User
+at async processWebhookBatch (file:///home/runner/workspace/dist/index.js:18612:9)
+2026-02-09 04:54:43.18
+3aa39afc
+User
+[SkuVault QC] Request error: timeout of 30000ms exceeded
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at async syncPhysicalLocations (file:///home/runner/workspace/dist/index.js:17163:26)
+2026-02-09 04:54:43.48
+3aa39afc
+User
+}
+2026-02-09 04:54:43.48
+3aa39afc
+User
+statusCode: 500,
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at SkuVaultService.makeQCRequest (file:///home/runner/workspace/dist/index.js:9147:17)
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at async SkuVaultService.getInventoryByBrandAndWarehouse (file:///home/runner/workspace/dist/index.js:9719:28)
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at runNextTicks (node:internal/process/task_queues:64:3)
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at async runSyncCheck (file:///home/runner/workspace/dist/index.js:20421:28) {
+2026-02-09 04:54:43.48
+3aa39afc
+User
+details: undefined
+2026-02-09 04:54:43.48
+3aa39afc
+User
+[SkuVault Inventory] Error fetching inventory for brand Jerky.com: SkuVaultError: QC request failed: timeout of 30000ms exceeded
+2026-02-09 04:54:43.48
+3aa39afc
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+Error processing individual webhook: Error: timeout exceeded when trying to connect
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at async Timeout.processQueue2 [as _onTimeout] (file:///home/runner/workspace/dist/index.js:18779:27)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at async processWebhookBatch (file:///home/runner/workspace/dist/index.js:18689:36)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at async NeonPreparedQuery.execute (file:///home/runner/workspace/node_modules/drizzle-orm/neon-serverless/session.js:76:20)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1087:33
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at async DatabaseStorage.getShipmentByTrackingNumber (file:///home/runner/workspace/dist/index.js:2328:24)
+2026-02-09 04:58:01.08
+3aa39afc
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-02-09 04:58:03.38
+3aa39afc
+User
+[DB Retry] All retries exhausted: timeout exceeded when trying to connect
+2026-02-09 07:24:00.49
+3aa39afc
+User
+[UnifiedSync] Poll error: Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-02-09 07:24:00.49
+3aa39afc
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-02-09 07:24:00.49
+3aa39afc
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13292:16)
+2026-02-09 07:24:00.49
+3aa39afc
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-09 07:39:16.28
+3aa39afc
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13292:16)
+2026-02-09 07:39:16.28
+3aa39afc
+User
+[UnifiedSync] Poll error: Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-02-09 07:39:16.28
+3aa39afc
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-09 07:39:16.28
+3aa39afc
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-02-09 08:38:13.27
+3aa39afc
+User
+Received refund for unknown order 7029973811514 - skipping (order may not be synced yet)
