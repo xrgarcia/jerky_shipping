@@ -52,6 +52,7 @@ let isPolling = false;
 let lastPollTime: Date | null = null;
 let pollCount = 0;
 let errorCount = 0;
+let consecutiveErrors = 0;
 let lastError: string | null = null;
 let isRunning = false;
 let pollTimer: NodeJS.Timeout | null = null;
@@ -828,6 +829,29 @@ async function pollCycle(): Promise<{
 }
 
 /**
+ * DB health check — fast SELECT 1 with a 5-second race timeout.
+ * Returns true if the database is reachable, false otherwise.
+ * Uses Promise.race to enforce a 5-second limit so this never hangs
+ * even if the connection pool is exhausted.
+ */
+async function checkDbHealth(): Promise<boolean> {
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  try {
+    const healthCheckPromise = db.execute(sql`SELECT 1`);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error('DB health check timed out (5s)')), 5_000);
+    });
+    await Promise.race([healthCheckPromise, timeoutPromise]);
+    clearTimeout(timeoutHandle!);
+    return true;
+  } catch (err: any) {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+    console.error('[UnifiedSync] DB health check failed:', err.message);
+    return false;
+  }
+}
+
+/**
  * Main worker loop
  * Returns true if there are more pages to process (immediate follow-up needed)
  */
@@ -844,45 +868,54 @@ async function runPollLoop(): Promise<boolean> {
   let needsImmediateFollowup = false;
   
   try {
-    // Self-healing timeout: If pollCycle hangs (e.g., due to DB connection issues),
-    // forcefully abort after MAX_POLL_DURATION_MS to reset the isPolling flag
+    const dbHealthy = await checkDbHealth();
+    if (!dbHealthy) {
+      throw new Error('DB health check failed - skipping poll cycle');
+    }
+
+    let pollTimeoutHandle: NodeJS.Timeout | null = null;
+
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      pollTimeoutHandle = setTimeout(() => {
         reject(new Error(`Poll timeout exceeded (${MAX_POLL_DURATION_MS / 1000}s) - aborting to allow recovery`));
       }, MAX_POLL_DURATION_MS);
     });
     
-    const result = await Promise.race([pollCycle(), timeoutPromise]);
-    
-    console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
-    
-    // Flag for immediate follow-up if more pages remain
-    needsImmediateFollowup = result.hasMorePages;
-    
-    // Run maintenance jobs ONLY when we're caught up (not during catch-up)
-    // This prevents using API quota during high-priority sync
-    if (!needsImmediateFollowup && !result.hitRateLimit) {
-      try {
-        await backfillMissingTracking();
-      } catch (backfillErr) {
-        console.error('[UnifiedSync] Tracking backfill error (non-fatal):', backfillErr);
-      }
+    try {
+      const result = await Promise.race([pollCycle(), timeoutPromise]);
       
-      // Refresh tags for pre-session shipments to catch tag removals
-      // ShipStation's modified_at doesn't update when only tags change
-      try {
-        await refreshTagsForPreSessionShipments();
-      } catch (tagRefreshErr) {
-        console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
-      }
+      clearTimeout(pollTimeoutHandle!);
       
+      console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
+      
+      needsImmediateFollowup = result.hasMorePages;
+      
+      if (!needsImmediateFollowup && !result.hitRateLimit) {
+        try {
+          await backfillMissingTracking();
+        } catch (backfillErr) {
+          console.error('[UnifiedSync] Tracking backfill error (non-fatal):', backfillErr);
+        }
+        
+        try {
+          await refreshTagsForPreSessionShipments();
+        } catch (tagRefreshErr) {
+          console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
+        }
+        
+      }
+    } catch (innerErr) {
+      clearTimeout(pollTimeoutHandle!);
+      throw innerErr;
     }
     
     lastError = null;
+    consecutiveErrors = 0;
   } catch (err: any) {
     errorCount++;
+    consecutiveErrors++;
     lastError = err.message || 'Unknown error';
-    console.error('[UnifiedSync] Poll error:', err);
+    console.error(`[UnifiedSync] Poll error (consecutive: ${consecutiveErrors}):`, err);
   } finally {
     isPolling = false;
     // Broadcast updated status via WebSocket after each poll
@@ -893,12 +926,28 @@ async function runPollLoop(): Promise<boolean> {
 }
 
 /**
+ * Calculate backoff delay based on consecutive error count.
+ * Exponential backoff: 60s → 120s → 240s → 480s → 900s (capped at 15min)
+ */
+function getBackoffDelay(): number {
+  if (consecutiveErrors <= 0) return POLL_INTERVAL_MS;
+  const backoff = Math.min(
+    POLL_INTERVAL_MS * Math.pow(2, consecutiveErrors),
+    MAX_POLL_DURATION_MS
+  );
+  return backoff;
+}
+
+/**
  * Schedule next poll, checking for immediate trigger
  * Uses short delay when catching up or when webhook requested immediate poll
  * 
  * IMMEDIACY GUARANTEE: The immediatePolltrigger flag is checked HERE
  * (after poll completion) so webhooks received during polling trigger
  * another poll immediately, not after 60s.
+ * 
+ * BACKOFF: After consecutive errors, delay increases exponentially to avoid
+ * hammering a failing DB or API. Resets on first successful poll.
  */
 function scheduleNextPoll(immediateFollowup: boolean = false): void {
   if (!isRunning) return;
@@ -916,12 +965,17 @@ function scheduleNextPoll(immediateFollowup: boolean = false): void {
     immediatePolltrigger = false;
   }
   
-  // Use short delay for catch-up OR webhook trigger, normal interval otherwise
-  const shouldPollImmediately = immediateFollowup || webhookTriggered;
-  const delay = shouldPollImmediately ? 1000 : POLL_INTERVAL_MS; // 1s vs 60s
-  
-  if (immediateFollowup) {
-    console.log('[UnifiedSync] More pages remain, scheduling immediate follow-up poll');
+  let delay: number;
+  if (consecutiveErrors > 0 && !webhookTriggered) {
+    delay = getBackoffDelay();
+    console.log(`[UnifiedSync] Backing off after ${consecutiveErrors} consecutive errors, next poll in ${Math.round(delay / 1000)}s`);
+  } else if (immediateFollowup || webhookTriggered) {
+    delay = 1000;
+    if (immediateFollowup) {
+      console.log('[UnifiedSync] More pages remain, scheduling immediate follow-up poll');
+    }
+  } else {
+    delay = POLL_INTERVAL_MS;
   }
   
   pollTimer = setTimeout(async () => {
