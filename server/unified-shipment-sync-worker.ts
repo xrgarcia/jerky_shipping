@@ -696,6 +696,14 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
         continue;
       }
       
+      if (freshData.shipment_number && shipment.orderNumber && freshData.shipment_number !== shipment.orderNumber) {
+        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_number is now ${freshData.shipment_number} → marking as orphaned (merged into another order)`);
+        await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
+        await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
+        orphaned++;
+        continue;
+      }
+      
       console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} still exists in ShipStation, re-syncing through ETL`);
       try {
         await syncShipment(freshData);
