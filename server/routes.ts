@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis, featureFlags } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis, featureFlags, shipstationWriteQueue } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -5056,6 +5056,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error getting lifecycle phase counts:", error.message);
       res.status(500).json({ error: "Failed to get lifecycle phase counts" });
+    }
+  });
+
+  app.get("/api/write-queue/stats", requireAuth, async (req, res) => {
+    try {
+      const { getWriteQueueStats } = await import("./services/shipstation-write-queue");
+      const stats = await getWriteQueueStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error getting write queue stats:", error.message);
+      res.status(500).json({ error: "Failed to get write queue stats" });
+    }
+  });
+
+  app.get("/api/write-queue/jobs", requireAuth, async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const offset = (page - 1) * limit;
+      const statusFilter = req.query.status as string | undefined;
+      const reasonFilter = req.query.reason as string | undefined;
+      const sortBy = (req.query.sortBy as string) || "createdAt";
+      const sortOrder = (req.query.sortOrder as string) || "desc";
+
+      const conditions: SQL[] = [];
+      if (statusFilter && statusFilter !== "all") {
+        conditions.push(eq(shipstationWriteQueue.status, statusFilter));
+      }
+      if (reasonFilter && reasonFilter !== "all") {
+        conditions.push(eq(shipstationWriteQueue.reason, reasonFilter));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const sortColumnMap: Record<string, any> = {
+        createdAt: shipstationWriteQueue.createdAt,
+        id: shipstationWriteQueue.id,
+        status: shipstationWriteQueue.status,
+        retryCount: shipstationWriteQueue.retryCount,
+        completedAt: shipstationWriteQueue.completedAt,
+        processedAt: shipstationWriteQueue.processedAt,
+      };
+      const sortColumn = sortColumnMap[sortBy] || shipstationWriteQueue.createdAt;
+      const orderFn = sortOrder === "asc" ? asc : desc;
+
+      const [jobs, totalResult, reasonsResult] = await Promise.all([
+        db.select()
+          .from(shipstationWriteQueue)
+          .where(whereClause)
+          .orderBy(orderFn(sortColumn))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)::int` })
+          .from(shipstationWriteQueue)
+          .where(whereClause),
+        db.selectDistinct({ reason: shipstationWriteQueue.reason })
+          .from(shipstationWriteQueue),
+      ]);
+
+      const total = totalResult[0]?.count ?? 0;
+      const reasons = reasonsResult.map(r => r.reason);
+
+      res.json({
+        jobs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+        reasons,
+      });
+    } catch (error: any) {
+      console.error("Error getting write queue jobs:", error.message);
+      res.status(500).json({ error: "Failed to get write queue jobs" });
     }
   });
 

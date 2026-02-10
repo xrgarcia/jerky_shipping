@@ -1,17 +1,23 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import {
   Activity,
   AlertTriangle,
   ArrowDown,
   ArrowRight,
+  ArrowUpDown,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Cpu,
+  Inbox,
   Layers,
   Package,
   RefreshCw,
+  RotateCcw,
+  Skull,
   Truck,
   XCircle,
   Zap,
@@ -35,6 +41,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PhaseCount = {
@@ -750,6 +763,348 @@ function PhaseDistributionChart({ counts }: { counts: PhaseCount[] | undefined }
   );
 }
 
+type WriteQueueJob = {
+  id: number;
+  shipmentId: string;
+  patchPayload: Record<string, any>;
+  reason: string;
+  status: string;
+  retryCount: number;
+  maxRetries: number;
+  lastError: string | null;
+  nextRetryAt: string | null;
+  createdAt: string;
+  processedAt: string | null;
+  completedAt: string | null;
+  localShipmentId: string | null;
+  callbackAction: string | null;
+};
+
+type WriteQueueStats = {
+  queued: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  deadLetter: number;
+};
+
+type WriteQueueJobsResponse = {
+  jobs: WriteQueueJob[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  reasons: string[];
+};
+
+const STATUS_BADGE_MAP: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; className?: string; label: string }> = {
+  queued: { variant: "secondary", label: "Queued" },
+  processing: { variant: "default", className: "bg-blue-600", label: "Processing" },
+  completed: { variant: "default", className: "bg-green-600", label: "Completed" },
+  failed: { variant: "destructive", label: "Failed" },
+  dead_letter: { variant: "destructive", className: "bg-red-800 dark:bg-red-900", label: "Dead Letter" },
+};
+
+function PackageUpdatesTab() {
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [reasonFilter, setReasonFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const { data: stats, isLoading: statsLoading } = useQuery<WriteQueueStats>({
+    queryKey: ["/api/write-queue/stats"],
+    refetchInterval: 5000,
+  });
+
+  const { data: jobsData, isLoading: jobsLoading } = useQuery<WriteQueueJobsResponse>({
+    queryKey: ["/api/write-queue/jobs", page, statusFilter, reasonFilter, sortBy, sortOrder],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "25",
+        sortBy,
+        sortOrder,
+      });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (reasonFilter !== "all") params.set("reason", reasonFilter);
+      const res = await fetch(`/api/write-queue/jobs?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch write queue jobs");
+      return res.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const totalJobs = (stats?.queued ?? 0) + (stats?.processing ?? 0) + (stats?.completed ?? 0) + (stats?.failed ?? 0) + (stats?.deadLetter ?? 0);
+
+  function toggleSort(column: string) {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(1);
+  }
+
+  function SortableHeader({ column, children }: { column: string; children: React.ReactNode }) {
+    const isActive = sortBy === column;
+    return (
+      <TableHead
+        className="cursor-pointer select-none"
+        onClick={() => toggleSort(column)}
+        data-testid={`sort-${column}`}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          <ArrowUpDown className={`h-3 w-3 ${isActive ? "text-foreground" : "text-muted-foreground/50"}`} />
+        </div>
+      </TableHead>
+    );
+  }
+
+  return (
+    <div className="space-y-4 py-4" data-testid="package-updates-view">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card data-testid="card-wq-total">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-wq-total">{totalJobs}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-wq-queued">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Queued</CardTitle>
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <>
+                <div className="text-2xl font-bold" data-testid="text-wq-queued">{stats?.queued ?? 0}</div>
+                <p className="text-xs text-muted-foreground">{stats?.processing ?? 0} processing</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-wq-completed">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-wq-completed">{stats?.completed ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-wq-failed">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-wq-failed">{stats?.failed ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-wq-dead-letter">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Dead Letter</CardTitle>
+            <Skull className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-wq-dead-letter">{stats?.deadLetter ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card data-testid="card-wq-jobs">
+        <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 flex-wrap">
+          <CardTitle className="text-sm font-medium">Queue Jobs</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="queued">Queued</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="dead_letter">Dead Letter</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={reasonFilter} onValueChange={(v) => { setReasonFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[160px]" data-testid="select-reason-filter">
+                <SelectValue placeholder="Reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Reasons</SelectItem>
+                {jobsData?.reasons?.map((r) => (
+                  <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/write-queue/jobs"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/write-queue/stats"] });
+              }}
+              data-testid="button-refresh-wq"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {jobsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !jobsData?.jobs?.length ? (
+            <p className="text-sm text-muted-foreground">No jobs in the write queue</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableHeader column="id">ID</SortableHeader>
+                      <TableHead>Shipment ID</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <SortableHeader column="status">Status</SortableHeader>
+                      <SortableHeader column="retryCount">Retries</SortableHeader>
+                      <TableHead>Error</TableHead>
+                      <SortableHeader column="createdAt">Created</SortableHeader>
+                      <SortableHeader column="completedAt">Completed</SortableHeader>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobsData.jobs.map((job) => {
+                      const statusMeta = STATUS_BADGE_MAP[job.status] ?? { variant: "outline" as const, label: job.status };
+                      return (
+                        <TableRow key={job.id} data-testid={`row-wq-job-${job.id}`}>
+                          <TableCell className="font-mono text-xs" data-testid={`text-wq-id-${job.id}`}>
+                            #{job.id}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs max-w-[140px] truncate" title={job.shipmentId}>
+                            {job.shipmentId}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <Badge variant="outline" className="no-default-active-elevate text-xs">
+                              {job.reason.replace(/_/g, " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={statusMeta.variant}
+                              className={`no-default-active-elevate text-xs ${statusMeta.className ?? ""}`}
+                            >
+                              {statusMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-center">
+                            {job.retryCount}/{job.maxRetries}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px]">
+                            {job.lastError ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-destructive truncate block max-w-[200px] cursor-help">
+                                    {job.lastError}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-sm">
+                                  <p className="break-words text-xs">{job.lastError}</p>
+                                  {job.nextRetryAt && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Next retry: {format(new Date(job.nextRetryAt), "MMM d, h:mm:ss a")}
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {job.completedAt
+                              ? formatDistanceToNow(new Date(job.completedAt), { addSuffix: true })
+                              : job.processedAt
+                                ? <span className="text-blue-500">processing...</span>
+                                : "-"
+                            }
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {jobsData.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {((page - 1) * 25) + 1}-{Math.min(page * 25, jobsData.pagination.total)} of {jobsData.pagination.total}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => p - 1)}
+                      data-testid="button-wq-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm px-2">
+                      {page} / {jobsData.pagination.totalPages}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page >= jobsData.pagination.totalPages}
+                      onClick={() => setPage(p => p + 1)}
+                      data-testid="button-wq-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function LifecyclePhases() {
   const { data: countsData, isLoading: countsLoading } = useQuery<{
     counts: PhaseCount[];
@@ -782,6 +1137,9 @@ export default function LifecyclePhases() {
           <TabsTrigger value="event-worker" data-testid="tab-event-worker">
             Event Worker
           </TabsTrigger>
+          <TabsTrigger value="package-updates" data-testid="tab-package-updates">
+            Package Updates
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="state-machine">
@@ -795,6 +1153,10 @@ export default function LifecyclePhases() {
             counts={countsData?.counts}
             countsLoading={countsLoading}
           />
+        </TabsContent>
+
+        <TabsContent value="package-updates">
+          <PackageUpdatesTab />
         </TabsContent>
       </Tabs>
     </div>
