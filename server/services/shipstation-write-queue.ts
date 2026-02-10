@@ -204,6 +204,18 @@ async function resolveCarrierIfNeeded(payload: Record<string, any>): Promise<voi
   }
 }
 
+function fixPastShipDate(payload: Record<string, any>): void {
+  if (!payload.ship_date) return;
+  const shipDate = new Date(payload.ship_date);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  if (shipDate < today) {
+    const todayStr = today.toISOString().replace(/T.*/, 'T00:00:00Z');
+    log(`Fixing past ship_date ${payload.ship_date} → ${todayStr}`);
+    payload.ship_date = todayStr;
+  }
+}
+
 async function putShipment(shipmentId: string, payload: Record<string, any>): Promise<void> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY not configured');
@@ -294,6 +306,7 @@ async function processNextJob(): Promise<boolean> {
     const merged = applyPatch(currentShipment.data, patch);
     const cleaned = stripReadOnlyFields(merged);
     await resolveCarrierIfNeeded(cleaned);
+    fixPastShipDate(cleaned);
 
     await putShipment(job.shipmentId, cleaned);
 
