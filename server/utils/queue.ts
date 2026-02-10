@@ -973,7 +973,8 @@ export type LifecycleEventReason =
   | 'rate_analysis'     // Smart carrier rate analysis completed
   | 'lifecycle_repair'  // Lifecycle repair worker batch operation
   | 'manual'            // Manual trigger from UI
-  | 'backfill';         // Batch backfill operation
+  | 'backfill'          // Batch backfill operation
+  | 'stale_audit';      // Stale shipment audit detected orphaned/missing shipment
 
 export interface LifecycleEvent {
   shipmentId: string;           // Internal shipment UUID (primary key)

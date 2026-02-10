@@ -16,7 +16,7 @@
 
 import { db } from './db';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
-import { eq, sql, and, isNull, lt, or, count } from 'drizzle-orm';
+import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
 import { smartCarrierRateService } from './services/smart-carrier-rate-service';
 import { broadcastOrderUpdate, broadcastQueueStatus, type OrderEventType } from './websocket';
@@ -46,6 +46,9 @@ const TRACKING_BACKFILL_MIN_AGE_HOURS = 48; // Only backfill shipments older tha
 const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
 const MAX_SYNC_FAILURES_BEFORE_DEADLETTER = 3; // Dead-letter after this many failed attempts
 const MAX_POLL_DURATION_MS = 15 * 60 * 1000; // 15 minute maximum poll duration - self-healing timeout
+const STALE_AUDIT_BATCH_SIZE = 5; // Max shipments to audit per poll cycle (conservative to save rate limits)
+const STALE_AUDIT_MIN_AGE_HOURS = 48; // Only audit shipments not updated in 48+ hours
+const STALE_AUDIT_INTERVAL_MS = 15 * 60 * 1000; // Run stale audit at most every 15 minutes
 
 // Worker state
 let isPolling = false;
@@ -56,6 +59,7 @@ let consecutiveErrors = 0;
 let lastError: string | null = null;
 let isRunning = false;
 let pollTimer: NodeJS.Timeout | null = null;
+let lastStaleAuditTime: Date | null = null;
 
 // Webhook trigger for immediate poll
 let immediatePolltrigger = false;
@@ -569,6 +573,167 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
 }
 
 /**
+ * Stale Shipment Audit
+ * 
+ * Detects shipments that no longer exist in ShipStation (merged, deleted, voided).
+ * These are "orphaned" records — our DB still has them in pre-shipping phases but
+ * ShipStation has removed or merged them into other shipments.
+ * 
+ * When a shipment is found to be orphaned:
+ * - shipment_status is set to 'orphaned'
+ * - status is set to 'UN' (Unknown — no tracking info exists)
+ * - The lifecycle state machine maps orphaned → problem phase
+ * 
+ * Runs at most every STALE_AUDIT_INTERVAL_MS (15 min) to conserve rate limits.
+ * Processes STALE_AUDIT_BATCH_SIZE shipments per run.
+ */
+const PRE_SHIPPING_AUDIT_PHASES = [
+  'fulfillment_prep',
+  'ready_to_session', 
+  'ready_for_skuvault',
+  'ready_to_fulfill',
+  'ready_to_pick',
+];
+
+async function auditStaleShipments(): Promise<{ processed: number; orphaned: number; refreshed: number; errors: number }> {
+  if (lastStaleAuditTime && (Date.now() - lastStaleAuditTime.getTime()) < STALE_AUDIT_INTERVAL_MS) {
+    return { processed: 0, orphaned: 0, refreshed: 0, errors: 0 };
+  }
+  
+  lastStaleAuditTime = new Date();
+  
+  const cutoffDate = new Date();
+  cutoffDate.setHours(cutoffDate.getHours() - STALE_AUDIT_MIN_AGE_HOURS);
+  
+  const staleShipments = await db
+    .select({
+      id: shipments.id,
+      shipmentId: shipments.shipmentId,
+      orderNumber: shipments.orderNumber,
+      lifecyclePhase: shipments.lifecyclePhase,
+      updatedAt: shipments.updatedAt,
+    })
+    .from(shipments)
+    .where(
+      and(
+        inArray(shipments.lifecyclePhase, PRE_SHIPPING_AUDIT_PHASES),
+        sql`${shipments.shipmentId} IS NOT NULL`,
+        lt(shipments.updatedAt, cutoffDate),
+        sql`(${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('orphaned', 'cancelled'))`
+      )
+    )
+    .orderBy(shipments.updatedAt)
+    .limit(STALE_AUDIT_BATCH_SIZE);
+  
+  if (staleShipments.length === 0) {
+    return { processed: 0, orphaned: 0, refreshed: 0, errors: 0 };
+  }
+  
+  console.log(`[UnifiedSync] Stale audit: checking ${staleShipments.length} shipments stuck in pre-shipping phases for 48+ hours`);
+  
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+  if (!apiKey) {
+    console.error('[UnifiedSync] Cannot run stale audit - SHIPSTATION_API_KEY not configured');
+    return { processed: 0, orphaned: 0, refreshed: 0, errors: 0 };
+  }
+  
+  let processed = 0;
+  let orphaned = 0;
+  let refreshed = 0;
+  let errors = 0;
+  
+  const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
+  
+  for (const shipment of staleShipments) {
+    processed++;
+    
+    try {
+      const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipment.shipmentId!)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.status === 429) {
+        console.log('[UnifiedSync] Hit rate limit during stale audit, stopping batch');
+        break;
+      }
+      
+      if (response.status === 404) {
+        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → 404 Not Found → marking as orphaned`);
+        await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
+        await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
+        orphaned++;
+        continue;
+      }
+      
+      if (!response.ok) {
+        console.error(`[UnifiedSync] Stale audit: unexpected status ${response.status} for ${shipment.orderNumber}`);
+        errors++;
+        continue;
+      }
+      
+      const shipmentData = await response.json();
+      
+      if (!shipmentData || (Array.isArray(shipmentData.shipments) && shipmentData.shipments.length === 0)) {
+        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → empty response → marking as orphaned`);
+        await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
+        await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
+        orphaned++;
+        continue;
+      }
+      
+      const freshData = shipmentData.shipments ? shipmentData.shipments[0] : shipmentData;
+      
+      if (freshData.shipment_id && freshData.shipment_id !== shipment.shipmentId) {
+        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_id changed to ${freshData.shipment_id} → marking as orphaned (likely merged)`);
+        await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
+        await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
+        orphaned++;
+        continue;
+      }
+      
+      console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} still exists in ShipStation, re-syncing through ETL`);
+      try {
+        await syncShipment(freshData);
+        refreshed++;
+      } catch (syncErr: any) {
+        console.error(`[UnifiedSync] Stale audit: failed to re-sync ${shipment.orderNumber}:`, syncErr.message);
+        errors++;
+      }
+      
+    } catch (err: any) {
+      console.error(`[UnifiedSync] Stale audit error for ${shipment.orderNumber}:`, err.message);
+      errors++;
+    }
+  }
+  
+  if (orphaned > 0 || refreshed > 0) {
+    console.log(`[UnifiedSync] Stale audit complete: ${processed} checked, ${orphaned} orphaned, ${refreshed} refreshed, ${errors} errors`);
+  }
+  
+  return { processed, orphaned, refreshed, errors };
+}
+
+async function markShipmentOrphaned(shipmentDbId: string, orderNumber: string): Promise<void> {
+  const now = new Date();
+  await db
+    .update(shipments)
+    .set({
+      shipmentStatus: 'orphaned',
+      status: 'UN',
+      statusDescription: 'Shipment no longer exists in ShipStation (merged or deleted)',
+      updatedAt: now,
+    })
+    .where(eq(shipments.id, shipmentDbId));
+  
+  console.log(`[UnifiedSync] Marked ${orderNumber} as orphaned (shipmentStatus=orphaned, status=UN)`);
+}
+
+/**
  * Main poll cycle - fetches all shipments modified since cursor
  * 
  * DESIGN DECISIONS (crash-safety):
@@ -901,6 +1066,12 @@ async function runPollLoop(): Promise<boolean> {
           await refreshTagsForPreSessionShipments();
         } catch (tagRefreshErr) {
           console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
+        }
+        
+        try {
+          await auditStaleShipments();
+        } catch (auditErr) {
+          console.error('[UnifiedSync] Stale shipment audit error (non-fatal):', auditErr);
         }
         
       }

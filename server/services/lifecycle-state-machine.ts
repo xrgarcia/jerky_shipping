@@ -18,9 +18,10 @@
  * CANCELLED: Order has been cancelled
  *            Requires: status='cancelled' — terminal state
  * PROBLEM: Shipment has a carrier problem — terminal, becomes customer service case
- *          Requires: status IN ('UN', 'EX')
+ *          Requires: status IN ('UN', 'EX') OR shipmentStatus='orphaned'
  *          UN = Unknown — carrier has no tracking information available
  *          EX = Exception — an unexpected event (e.g., weather delay, damaged label, or incorrect address) has occurred
+ *          orphaned = Shipment no longer exists in ShipStation (merged into another shipment, deleted, etc.)
  * 
  * Within FULFILLMENT_PREP, manages decision subphases:
  * needs_hydration → needs_categorization → needs_fingerprint → needs_packaging → needs_rate_check → needs_session
@@ -105,6 +106,7 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * If tracking says delivered, that's the truth regardless of shipmentStatus.
  * 
  * Phase priority (checked in order):
+ * 0. PROBLEM - shipmentStatus='orphaned' (shipment no longer exists in ShipStation)
  * 1. CANCELLED - status='cancelled' (terminal, regardless of shipmentStatus)
  * 2. DELIVERED - status='DE' (terminal, regardless of shipmentStatus)
  * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
@@ -125,6 +127,11 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // ========================================================================
   // STATUS-BASED PHASES (tracking status takes precedence)
   // ========================================================================
+  
+  // ORPHANED: Shipment no longer exists in ShipStation (merged, deleted, etc.)
+  if (shipment.shipmentStatus === 'orphaned') {
+    return { phase: LIFECYCLE_PHASES.PROBLEM, subphase: null };
+  }
   
   // CANCELLED: Order has been cancelled - terminal state
   if (status === 'CANCELLED') {
