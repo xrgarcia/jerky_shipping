@@ -1,0 +1,212 @@
+2026-02-09 11:18:16.84
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:18:32.50
+3aa39afc
+User
+[UnifiedSync] Page 1: processed 1 shipments (0 errors so far)
+2026-02-09 11:18:32.50
+3aa39afc
+User
+[UnifiedSync] Poll complete: 1 processed, 0 errors, 1 pages
+2026-02-09 11:18:33.86
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:18:52.20
+3aa39afc
+User
+[UnifiedSync] Page 1: fetched labels, 1/1 have tracking
+2026-02-09 11:18:53.14
+3aa39afc
+User
+[UnifiedSync] Page 1: processed 1 shipments (0 errors so far)
+2026-02-09 11:18:53.14
+3aa39afc
+User
+[UnifiedSync] Poll complete: 1 processed, 0 errors, 1 pages
+2026-02-09 11:18:54.28
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:19:22.05
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:19:32.31
+3aa39afc
+User
+[UnifiedSync] Page 1: processed 1 shipments (0 errors so far)
+2026-02-09 11:19:32.31
+3aa39afc
+User
+[UnifiedSync] Poll complete: 1 processed, 0 errors, 1 pages
+2026-02-09 11:19:32.35
+3aa39afc
+User
+[UnifiedSync] More pages remain, scheduling immediate follow-up poll
+2026-02-09 11:19:33.35
+3aa39afc
+User
+[UnifiedSync] Poll already in progress, skipping
+2026-02-09 11:19:33.53
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:19:46.87
+3aa39afc
+User
+[UnifiedSync] Poll complete: 1 processed, 0 errors, 1 pages
+2026-02-09 11:19:46.87
+3aa39afc
+User
+[UnifiedSync] Page 1: processed 1 shipments (0 errors so far)
+2026-02-09 11:19:48.25
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:19:52.30
+3aa39afc
+User
+[UnifiedSync] Page 1: fetched labels, 1/1 have tracking
+2026-02-09 11:19:57.00
+3aa39afc
+User
+[UnifiedSync] Poll already in progress, skipping
+2026-02-09 11:19:57.12
+3aa39afc
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:20:18.84
+8eb81c9c
+User
+[UnifiedSync] Starting poll from cursor: 2026-02-09T17:16:17.497Z
+2026-02-09 11:20:30.00
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:20:31.09
+8eb81c9c
+User
+[UnifiedSync] Page 1: processed 7 shipments (0 errors so far)
+2026-02-09 11:20:31.13
+8eb81c9c
+User
+[UnifiedSync] Updated cursor to: 2026-02-09T17:19:47.200Z (with 30s safety overlap)
+2026-02-09 11:20:31.13
+8eb81c9c
+User
+[UnifiedSync] Poll complete: 7 processed, 0 errors, 1 pages
+2026-02-09 11:20:32.49
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:20:34.14
+8eb81c9c
+User
+[UnifiedSync] Worker started, polling every 60s
+2026-02-09 11:20:34.14
+8eb81c9c
+User
+[UnifiedSync] Webhook triggered immediate poll during last cycle
+2026-02-09 11:20:35.25
+8eb81c9c
+User
+[UnifiedSync] Starting poll from cursor: 2026-02-09T17:19:47.200Z
+2026-02-09 11:20:40.66
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:20:55.09
+8eb81c9c
+User
+[UnifiedSync] Page 1: processed 6 shipments (0 errors so far)
+2026-02-09 11:20:55.09
+8eb81c9c
+User
+[UnifiedSync] Poll complete: 6 processed, 0 errors, 1 pages
+2026-02-09 11:20:56.73
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:21:07.39
+8eb81c9c
+User
+[UnifiedSync] Forcing resync with 1-day lookback
+2026-02-09 11:21:07.48
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:21:09.15
+8eb81c9c
+User
+[UnifiedSync] Waking idle worker for immediate poll
+2026-02-09 11:21:09.15
+8eb81c9c
+User
+[UnifiedSync] Immediate poll requested
+2026-02-09 11:21:09.25
+8eb81c9c
+User
+[UnifiedSync] Starting poll from cursor: 2026-02-08T17:21:07.390Z
+2026-02-09 11:21:10.13
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:21:17.39
+3aa39afc
+User
+[UnifiedSync] Starting poll from cursor: 2026-02-08T17:21:07.390Z
+2026-02-09 11:21:19.27
+8eb81c9c
+User
+[UnifiedSync] Page 1: fetched labels, 2/100 have tracking
+2026-02-09 11:21:26.43
+3aa39afc
+User
+[UnifiedSync] Page 1: fetched labels, 2/100 have tracking
+2026-02-09 11:22:36.77
+3aa39afc
+User
+[UnifiedSync] Page 1: processed 100 shipments (0 errors so far)
+2026-02-09 11:22:43.62
+8eb81c9c
+User
+[UnifiedSync] Status check - credentialsConfigured: true error: null
+2026-02-09 11:24:14.05
+8eb81c9c
+User
+[UnifiedSync] Page 2: processed 100 shipments (0 errors so far)
+2026-02-09 11:24:24.93
+8eb81c9c
+User
+[UnifiedSync] Page 3: fetched labels, 29/100 have tracking
+2026-02-09 11:25:45.34
+8eb81c9c
+User
+[UnifiedSync] Page 3: processed 100 shipments (0 errors so far)
+2026-02-09 11:25:59.58
+8eb81c9c
+User
+[UnifiedSync] Page 4: fetched labels, 54/100 have tracking
+2026-02-09 11:27:14.80
+8eb81c9c
+User
+[UnifiedSync] Page 4: processed 100 shipments (0 errors so far)
+2026-02-09 11:27:27.14
+8eb81c9c
+User
+[UnifiedSync] Page 5: fetched labels, 95/100 have tracking
+2026-02-09 11:28:40.02
+8eb81c9c
+User
+[UnifiedSync] Page 5: processed 100 shipments (0 errors so far)
+2026-02-09 11:28:50.58
+8eb81c9c
+User
+[UnifiedSync] Page 6: fetched labels, 58/81 have tracking
+2026-02-09 11:28:50.58
+8eb81c9c
+User
+[UnifiedSync] Page 6: fetched labels, 58/81 have tracking
