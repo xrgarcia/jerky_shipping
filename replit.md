@@ -5,6 +5,7 @@ This application (ship.) is the warehouse fulfillment tool for jerky.com, integr
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
+Important: The production database is the source of truth. Tactical data fixes must be applied to production, not the development database. Development database changes have no effect on real operations. When fixing specific records or data issues, always target the production database.
 
 ## System Architecture
 ### UI/UX Decisions
