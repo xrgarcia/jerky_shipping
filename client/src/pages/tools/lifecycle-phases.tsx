@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import {
   Activity,
@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
 type PhaseCount = {
   lifecycle_phase: string;
@@ -807,12 +808,49 @@ const STATUS_BADGE_MAP: Record<string, { variant: "default" | "secondary" | "des
   dead_letter: { variant: "destructive", className: "bg-red-800 dark:bg-red-900", label: "Dead Letter" },
 };
 
+type FeatureFlag = {
+  id: number;
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+};
+
 function PackageUpdatesTab() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [reasonFilter, setReasonFilter] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const { toast } = useToast();
+
+  const { data: featureFlags, isLoading: featureFlagsLoading } = useQuery<FeatureFlag[]>({
+    queryKey: ["/api/operations/feature-flags"],
+  });
+
+  const autoPackageSyncFlag = featureFlags?.find(f => f.key === "auto_package_sync");
+  const isAutoPackageSyncEnabled = autoPackageSyncFlag?.enabled ?? false;
+
+  const updateFeatureFlagMutation = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      return apiRequest('PUT', `/api/operations/feature-flags/${key}`, { enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/feature-flags"] });
+      toast({
+        title: "Feature flag updated",
+        description: "The setting has been saved.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update feature flag",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery<WriteQueueStats>({
     queryKey: ["/api/write-queue/stats"],
@@ -867,6 +905,36 @@ function PackageUpdatesTab() {
 
   return (
     <div className="space-y-4 py-4" data-testid="package-updates-view">
+      <Card data-testid="card-auto-package-sync">
+        <CardContent className="pt-4 pb-4">
+          {featureFlagsLoading ? (
+            <Skeleton className="h-6 w-full" />
+          ) : (
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <p className="text-sm font-medium">Auto Package Sync</p>
+                <p className="text-sm text-muted-foreground">
+                  Automatically sync package dimensions to ShipStation when fingerprints with packaging types are assigned
+                </p>
+                {autoPackageSyncFlag?.updatedBy && (
+                  <p className="text-xs text-muted-foreground">
+                    Last updated by {autoPackageSyncFlag.updatedBy}
+                  </p>
+                )}
+              </div>
+              <Switch
+                data-testid="switch-auto_package_sync"
+                checked={isAutoPackageSyncEnabled}
+                disabled={updateFeatureFlagMutation.isPending}
+                onCheckedChange={(checked) => {
+                  updateFeatureFlagMutation.mutate({ key: "auto_package_sync", enabled: checked });
+                }}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card data-testid="card-wq-total">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
