@@ -277,6 +277,10 @@ async function initializeAfterListen(storage: any) {
     console.log(`[lifecycle-worker] Cleared ${clearedCount} stale queue items before starting`);
     startLifecycleWorker();
     
+    // Start ShipStation write queue worker (reliable, rate-limit-aware shipment writes)
+    const { startShipStationWriteQueueWorker } = await import("./services/shipstation-write-queue");
+    startShipStationWriteQueueWorker();
+    
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
     startPOCacheWarmer(21600000); // Warm cache every 6 hours

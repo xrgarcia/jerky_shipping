@@ -1812,3 +1812,36 @@ export const insertShippingMethodSchema = createInsertSchema(shippingMethods).om
 
 export type InsertShippingMethod = z.infer<typeof insertShippingMethodSchema>;
 export type ShippingMethod = typeof shippingMethods.$inferSelect;
+
+// ShipStation Write Queue - Reliable, rate-limit-aware queue for ShipStation shipment writes
+// Uses PATCH semantics: patchPayload contains only the fields that need to change
+// Worker does GET (fresh state) → merge patch → PUT (full payload) to avoid staleness
+export const shipstationWriteQueue = pgTable("shipstation_write_queue", {
+  id: serial("id").primaryKey(),
+  shipmentId: text("shipment_id").notNull(), // ShipStation shipment ID (e.g., "se-924665462")
+  patchPayload: jsonb("patch_payload").notNull(), // Only the fields to change (PATCH semantics)
+  reason: text("reason").notNull(), // Why this write was enqueued (e.g., "package_sync", "shipment_number_fix")
+  status: text("status").notNull().default("queued"), // queued | processing | completed | failed | dead_letter
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(5),
+  lastError: text("last_error"),
+  nextRetryAt: timestamp("next_retry_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  localShipmentId: text("local_shipment_id"), // Our DB shipment UUID for post-write callbacks
+  callbackAction: text("callback_action"), // Optional action to run after successful write (e.g., "clear_manual_package_flag")
+}, (table) => ({
+  statusIdx: index("ssw_queue_status_idx").on(table.status),
+  shipmentIdx: index("ssw_queue_shipment_idx").on(table.shipmentId),
+  nextRetryIdx: index("ssw_queue_next_retry_idx").on(table.nextRetryAt),
+  statusCreatedIdx: index("ssw_queue_status_created_idx").on(table.status, table.createdAt),
+}));
+
+export const insertShipstationWriteQueueSchema = createInsertSchema(shipstationWriteQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertShipstationWriteQueue = z.infer<typeof insertShipstationWriteQueueSchema>;
+export type ShipstationWriteQueue = typeof shipstationWriteQueue.$inferSelect;

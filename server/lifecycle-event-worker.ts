@@ -45,9 +45,7 @@ import {
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
-import { ShipStationShipmentService } from './services/shipstation-shipment-service';
 import { db } from './db';
-import { storage } from './storage';
 import { shipments, packagingTypes, featureFlags, fingerprintModels, shipmentSyncFailures } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
@@ -138,7 +136,6 @@ const SIDE_EFFECT_DELAY_MS = 500; // Delay between side effect executions
 
 // Shared service instances for reuse
 const rateService = new SmartCarrierRateService();
-const shipmentService = new ShipStationShipmentService(storage);
 
 /**
  * Side effect registry - maps state transitions to automated actions
@@ -395,79 +392,36 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
-        const result = await shipmentService.updateShipmentPackage(
-          shipment.shipmentId,
-          shipmentData,
-          packageInfo,
-          existingPackageName,
-          shipment.shipmentStatus || 'pending'
-        );
-
-        if (result.success) {
-          if (result.updated) {
-            log(`Package sync: Updated ShipStation package for ${ref} - ${packageInfo.name} (${packageInfo.length}x${packageInfo.width}x${packageInfo.height})`);
-            sideEffectTriggeredCount++;
-            await db.update(shipments)
-              .set({ requiresManualPackage: false, packageAssignmentError: null })
-              .where(eq(shipments.id, shipmentId));
-          } else {
-            log(`Package sync: Skipped ${ref}: ${result.reason}`);
-          }
+        if (shipment.shipmentStatus !== 'pending') {
+          log(`Package sync: Shipment ${ref} status is "${shipment.shipmentStatus}", not "pending", skipping`);
           return { success: true, shouldRetry: false, shouldRequeue: false };
-        } else {
-          const errorMsg = result.error || 'Unknown ShipStation error';
-          const isRateLimit = (result as any).isRateLimit === true;
-          const attemptLabel = `attempt ${retryCount + 1}/${MAX_PACKAGE_SYNC_RETRIES}${alreadyRequeued ? ' (requeued)' : ''}`;
-          log(`Package sync: Failed for ${ref} (${attemptLabel})${isRateLimit ? ' [RATE LIMITED]' : ''}: ${errorMsg}`, 'warn');
-          
-          const shouldRetry = retryCount < MAX_PACKAGE_SYNC_RETRIES - 1;
-          
-          if (!shouldRetry) {
-            if (!alreadyRequeued) {
-              log(`Package sync: All ${MAX_PACKAGE_SYNC_RETRIES} retries exhausted for ${ref}, scheduling one-time re-queue`, 'warn');
-              return { success: false, shouldRetry: false, shouldRequeue: true, error: errorMsg };
-            } else {
-              log(`Package sync: All retries exhausted on re-queued attempt for ${ref}, flagging for manual intervention`, 'error');
-              const failureMsg1 = `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}`;
-              await db.update(shipments)
-                .set({ 
-                  requiresManualPackage: true, 
-                  packageAssignmentError: failureMsg1
-                })
-                .where(eq(shipments.id, shipmentId));
-              await logPackageSyncFailureToDLQ(shipmentId, shipment.shipmentId, orderNumber || ref, failureMsg1, MAX_PACKAGE_SYNC_RETRIES * 2, { phase: 'requeued_api_error', isRateLimit });
-              return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
-            }
-          }
-          
-          return { success: false, shouldRetry, shouldRequeue: false, error: errorMsg };
         }
+
+        const patchPayload: Record<string, any> = {
+          packages: [{
+            package_id: packageInfo.packageId,
+            $remove: ['shipment_package_id', 'package_code', 'dimensions', 'name', 'package_name'],
+          }],
+        };
+
+        const { enqueueShipStationWrite } = await import('./services/shipstation-write-queue');
+        const jobId = await enqueueShipStationWrite({
+          shipmentId: shipment.shipmentId!,
+          patchPayload,
+          reason: 'package_sync',
+          localShipmentId: shipmentId,
+          callbackAction: 'clear_manual_package_flag',
+        });
+
+        log(`Package sync: Enqueued write job #${jobId} for ${ref} - ${packageInfo.name} (${packageInfo.packageId})`);
+        sideEffectTriggeredCount++;
+        return { success: true, shouldRetry: false, shouldRequeue: false };
+
       } catch (error: any) {
         const errorMsg = error.message || 'Unknown error';
-        const attemptLabel = `attempt ${retryCount + 1}/${MAX_PACKAGE_SYNC_RETRIES}${alreadyRequeued ? ' (requeued)' : ''}`;
-        log(`Package sync: Error for ${ref} (${attemptLabel}): ${errorMsg}`, 'error');
+        log(`Package sync: Error enqueuing for ${ref}: ${errorMsg}`, 'error');
         
-        const shouldRetry = retryCount < MAX_PACKAGE_SYNC_RETRIES - 1;
-        
-        if (!shouldRetry) {
-          if (!alreadyRequeued) {
-            log(`Package sync: All ${MAX_PACKAGE_SYNC_RETRIES} retries exhausted for ${ref}, scheduling one-time re-queue`, 'warn');
-            return { success: false, shouldRetry: false, shouldRequeue: true, error: errorMsg };
-          } else {
-            log(`Package sync: All retries exhausted on re-queued attempt for ${ref}, flagging for manual intervention`, 'error');
-            const failureMsg2 = `Failed after ${MAX_PACKAGE_SYNC_RETRIES * 2} total attempts (incl. re-queue): ${errorMsg}`;
-            await db.update(shipments)
-              .set({ 
-                requiresManualPackage: true, 
-                packageAssignmentError: failureMsg2
-              })
-              .where(eq(shipments.id, shipmentId));
-            await logPackageSyncFailureToDLQ(shipmentId, null, orderNumber || ref, failureMsg2, MAX_PACKAGE_SYNC_RETRIES * 2, { phase: 'requeued_exception' });
-            return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
-          }
-        }
-        
-        return { success: false, shouldRetry, shouldRequeue: false, error: errorMsg };
+        return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
       }
     },
   },
