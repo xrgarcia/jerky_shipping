@@ -5,6 +5,7 @@
 
 import { getShipmentByShipmentId, getFulfillmentByTrackingNumber, type RateLimitInfo } from './shipstation-api';
 import type { IStorage } from '../storage';
+import logger from "./logger";
 
 export interface TrackingData {
   tracking_number: string;
@@ -79,14 +80,7 @@ export async function linkTrackingToOrder(
     }
     
     // Log ALL fields from shipmentData to see what we're getting
-    console.log(`[DEBUG] ShipStation shipment data for ${trackingNumber}:`, JSON.stringify({
-      shipment_number: shipmentData.shipment_number,
-      orderNumber: shipmentData.orderNumber,
-      orderId: shipmentData.orderId,
-      orderKey: shipmentData.orderKey,
-      external_shipment_id: shipmentData.external_shipment_id,
-      order_number: shipmentData.order_number,
-    }, null, 2));
+    logger.debug(`[DEBUG] ShipStation shipment data for ${trackingNumber}`, { shipment_number: shipmentData.shipment_number, orderNumber: shipmentData.orderNumber, orderId: shipmentData.orderId, orderKey: shipmentData.orderKey, external_shipment_id: shipmentData.external_shipment_id, order_number: shipmentData.order_number });
     
     // Try to get order number from multiple sources in shipmentData
     let orderNumber = shipmentData.shipment_number || shipmentData.orderNumber || shipmentData.order_number;
@@ -142,10 +136,7 @@ export async function linkTrackingToOrder(
       try {
         console.log(`[DEBUG] Method 5: Calling fulfillment API for tracking ${trackingNumber}`);
         const fulfillmentData = await getFulfillmentByTrackingNumber(trackingNumber);
-        console.log(`[DEBUG] Fulfillment API response:`, JSON.stringify({
-          order_number: fulfillmentData?.order_number,
-          orderId: fulfillmentData?.orderId,
-        }, null, 2));
+        logger.debug(`[DEBUG] Fulfillment API response`, { order_number: fulfillmentData?.order_number, orderId: fulfillmentData?.orderId });
         if (fulfillmentData?.order_number) {
           order = await storage.getOrderByOrderNumber(fulfillmentData.order_number);
           if (order) {

@@ -36,6 +36,7 @@ import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
 import { updateShipmentLifecycleBatch, queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
+import logger from "./utils/logger";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -876,7 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shipments/tab-counts", requireAuth, async (req, res) => {
     try {
       const counts = await storage.getShipmentTabCounts();
-      console.log("[tab-counts] Returning counts:", JSON.stringify(counts));
+      logger.debug("[tab-counts] Returning counts", counts);
       res.json(counts);
     } catch (error) {
       console.error("Error fetching tab counts:", error);
@@ -1277,18 +1278,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Manual login to SkuVault
   app.post("/api/skuvault/login", requireAuth, async (req, res) => {
     try {
-      console.log("========== SKUVAULT LOGIN REQUEST ==========");
-      console.log("Timestamp:", new Date().toISOString());
-      console.log("User:", req.user?.email || 'Unknown');
-      console.log("IP:", req.ip || req.connection.remoteAddress);
-      console.log("Headers:", JSON.stringify({
-        'content-type': req.headers['content-type'],
-        'user-agent': req.headers['user-agent'],
-        'cookie': req.headers.cookie ? '***present***' : 'none',
-        'referer': req.headers.referer,
-      }, null, 2));
-      console.log("Body:", JSON.stringify(req.body));
-      console.log("============================================");
+      logger.info("[SkuVault] Login requested", { user: (req as any).user?.email || 'Unknown' });
+      logger.debug("[SkuVault] Login request details", { ip: req.ip || req.socket?.remoteAddress, headers: { contentType: req.headers['content-type'], userAgent: req.headers['user-agent'] }, body: req.body });
       
       console.log("Initiating manual SkuVault login...");
       const success = await skuVaultService.login();
@@ -2873,16 +2864,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/webhooks/shipstation/shipments", async (req, res) => {
     try {
       // Debug logging - critical for warehouse operations
-      console.log("========== SHIPSTATION WEBHOOK RECEIVED ==========");
-      console.log("Timestamp:", new Date().toISOString());
-      console.log("Headers:", JSON.stringify({
-        'x-shipengine-rsa-sha256-signature': req.headers['x-shipengine-rsa-sha256-signature'] ? 'present' : 'missing',
-        'x-shipengine-rsa-sha256-key-id': req.headers['x-shipengine-rsa-sha256-key-id'],
-        'x-shipengine-timestamp': req.headers['x-shipengine-timestamp'],
-        'content-type': req.headers['content-type'],
-      }, null, 2));
-      console.log("Body:", JSON.stringify(req.body, null, 2));
-      console.log("==================================================");
+      const trackingNumber = req.body.data?.tracking_number || 'unknown';
+      const statusCode = req.body.data?.status_code || 'unknown';
+      logger.info(`[Webhook] ShipStation ${req.body.resource_type}: tracking=${trackingNumber} status=${statusCode}`);
+      logger.debug("[Webhook] ShipStation full payload", { headers: { signature: req.headers['x-shipengine-rsa-sha256-signature'] ? 'present' : 'missing', keyId: req.headers['x-shipengine-rsa-sha256-key-id'], timestamp: req.headers['x-shipengine-timestamp'] }, body: req.body });
 
       // TODO: Fix ShipStation webhook signature verification (ASN1 encoding issue)
       // For now, skip verification to get shipments working
@@ -2901,7 +2886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedAt: new Date().toISOString(),
       };
 
-      console.log("Queuing webhook:", webhookData);
+      logger.debug("[Webhook] Queuing shipstation webhook", webhookData);
       await enqueueWebhook(webhookData);
 
       // Trigger immediate poll from unified sync worker (webhook as hint)

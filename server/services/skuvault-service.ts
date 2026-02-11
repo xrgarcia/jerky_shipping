@@ -11,6 +11,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import logger from "../utils/logger";
 import { CookieJar } from 'tough-cookie';
 import { wrapper } from 'axios-cookiejar-support';
 import { v4 as uuidv4 } from 'uuid';
@@ -1671,7 +1672,7 @@ export class SkuVaultService {
         console.log(`[SkuVault QC Sales] DEBUG: Found SaleIds:`, qcSales.map(s => s.SaleId).join(', '));
       } else {
         console.log(`[SkuVault QC Sales] DEBUG: Empty QcSales array - order may not be picked yet in SkuVault`);
-        console.log(`[SkuVault QC Sales] DEBUG: Full response Data:`, JSON.stringify(validatedResponse.Data));
+        logger.debug("[SkuVault QC Sales] Full response Data", { data: validatedResponse.Data });
       }
       
       // Extract the numeric part from shipmentId for matching (e.g., "se-933001024" -> "933001024")
@@ -1826,18 +1827,7 @@ export class SkuVaultService {
       if (qcSale.Items && qcSale.Items.length > 0) {
         console.log(`[SkuVault QC Sales] FULL ITEMS DEBUG for order ${orderNumber}:`);
         for (const item of qcSale.Items) {
-          console.log(`[SkuVault QC Sales] Item: ${JSON.stringify({
-            Sku: item.Sku,
-            Code: item.Code,
-            PartNumber: item.PartNumber,
-            Title: item.Title,
-            Quantity: item.Quantity,
-            IsKit: item.IsKit,
-            AlternateCodes: item.AlternateCodes,
-            AlternateSkus: item.AlternateSkus,
-            AllKitItemsAndSubstitutes: item.AllKitItemsAndSubstitutes,
-            KitProducts: item.KitProducts ? item.KitProducts.length + ' components' : null,
-          }, null, 2)}`);
+          logger.debug("[SkuVault QC Sales] Item", { sku: item.Sku, qty: item.Quantity, orderNumber });
         }
       }
       
@@ -1865,7 +1855,7 @@ export class SkuVaultService {
           const parsedData = typeof responseData === 'string' ? JSON.parse(responseData) : responseData;
           
           // Log the full response for debugging
-          console.log(`[SkuVault QC Sales] Parsed 404 response:`, JSON.stringify(parsedData, null, 2));
+          logger.debug("[SkuVault QC Sales] Parsed 404 response", { parsedData });
           
           // Validate the parsed response
           const { qcSalesResponseSchema } = await import('@shared/skuvault-types');

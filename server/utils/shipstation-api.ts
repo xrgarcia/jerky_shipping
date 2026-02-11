@@ -3,6 +3,8 @@
  * Uses API-Key header authentication for V2 API
  */
 
+import logger from "./logger";
+
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
 
@@ -269,17 +271,8 @@ export async function createLabelForExistingShipment(
   
   // DRY RUN MODE: Log the request but DO NOT return a fake label
   if (DRY_RUN_PRINT_LABELS) {
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] Label creation for EXISTING shipment (API call SKIPPED)');
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] URL:', url);
-    console.log('[ShipStation DRY RUN] Method: POST');
-    console.log('[ShipStation DRY RUN] shipment_id (in URL):', shipmentId);
-    console.log('[ShipStation DRY RUN] Request payload:');
-    console.log(JSON.stringify(requestPayload, null, 2));
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] Returning null - NO fake label URL will be created');
-    console.log('='.repeat(80));
+    logger.info(`[ShipStation DRY RUN] Label creation skipped for existing shipment ${shipmentId}`);
+    logger.debug("[ShipStation DRY RUN] Request payload", { url, shipmentId, payload: requestPayload });
     return null;
   }
   
@@ -335,16 +328,8 @@ export async function createNewShipmentWithLabel(shipmentData: any): Promise<any
   
   // DRY RUN MODE
   if (DRY_RUN_PRINT_LABELS) {
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] NEW shipment + label creation (API call SKIPPED)');
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] URL:', url);
-    console.log('[ShipStation DRY RUN] Method: POST');
-    console.log('[ShipStation DRY RUN] Full request payload:');
-    console.log(JSON.stringify(requestPayload, null, 2));
-    console.log('='.repeat(80));
-    console.log('[ShipStation DRY RUN] Returning null - NO fake label URL will be created');
-    console.log('='.repeat(80));
+    logger.info("[ShipStation DRY RUN] New shipment + label creation skipped");
+    logger.debug("[ShipStation DRY RUN] Request payload", { url, payload: requestPayload });
     return null;
   }
   
