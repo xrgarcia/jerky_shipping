@@ -991,13 +991,13 @@ export interface LifecycleEvent {
  */
 export async function enqueueLifecycleEvent(event: LifecycleEvent): Promise<boolean> {
   const redis = getRedisClient();
-  const dedupeKey = `lifecycle:${event.shipmentId}`;
+  const dedupeKey = `lifecycle:${event.shipmentId}:${event.reason}`;
   
   // Atomically add to in-flight set - returns 1 if added (new), 0 if already exists
   const added = await redis.sadd(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
   
   if (added === 0) {
-    return false; // Already queued/processing
+    return false; // Already queued/processing for this reason
   }
   
   // Set expiry on the set (1 hour as safety net)
@@ -1020,17 +1020,18 @@ export async function enqueueLifecycleEventBatch(events: LifecycleEvent[]): Prom
   const seenIds = new Set<string>();
   
   for (const event of events) {
-    // Skip duplicates within this batch
-    if (seenIds.has(event.shipmentId)) {
+    const compoundKey = `${event.shipmentId}:${event.reason}`;
+    // Skip duplicates within this batch (same shipment + reason)
+    if (seenIds.has(compoundKey)) {
       continue;
     }
     
-    const dedupeKey = `lifecycle:${event.shipmentId}`;
+    const dedupeKey = `lifecycle:${compoundKey}`;
     const added = await redis.sadd(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
     
     if (added === 1) {
       toEnqueue.push(event);
-      seenIds.add(event.shipmentId);
+      seenIds.add(compoundKey);
     }
   }
   
@@ -1063,10 +1064,12 @@ export async function dequeueLifecycleEvent(): Promise<LifecycleEvent | null> {
 /**
  * Mark a lifecycle event as completed (remove from in-flight set)
  */
-export async function completeLifecycleEvent(shipmentId: string): Promise<void> {
+export async function completeLifecycleEvent(shipmentId: string, reason: LifecycleEventReason): Promise<void> {
   const redis = getRedisClient();
-  const dedupeKey = `lifecycle:${shipmentId}`;
+  const dedupeKey = `lifecycle:${shipmentId}:${reason}`;
   await redis.srem(LIFECYCLE_INFLIGHT_KEY, dedupeKey);
+  // Clean up legacy key format (shipmentId-only) if it exists from pre-compound-key era
+  await redis.srem(LIFECYCLE_INFLIGHT_KEY, `lifecycle:${shipmentId}`);
 }
 
 /**
@@ -1077,7 +1080,8 @@ export async function retryLifecycleEvent(event: LifecycleEvent): Promise<boolea
   const retryCount = (event.retryCount || 0) + 1;
   
   if (retryCount > MAX_LIFECYCLE_RETRIES) {
-    console.error(`[LifecycleQueue] Max retries exceeded for shipment ${event.shipmentId}`);
+    const { default: logger } = await import('./logger');
+    logger.error(`[LifecycleQueue] Max retries exceeded for shipment ${event.shipmentId}`, { orderNumber: event.orderNumber, shipmentId: event.shipmentId, reason: event.reason });
     return false;
   }
   

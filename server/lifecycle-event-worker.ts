@@ -483,7 +483,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     // to prevent infinite loops (handler checks this flag and won't request another re-queue)
     if (needsRequeue) {
       try {
-        await completeLifecycleEvent(event.shipmentId);
+        await completeLifecycleEvent(event.shipmentId, event.reason);
         const requeuedEvent: LifecycleEvent = {
           shipmentId: event.shipmentId,
           orderNumber: event.orderNumber,
@@ -588,13 +588,13 @@ async function processQueue(): Promise<void> {
 
         if (success) {
           // Mark as complete - remove from in-flight set
-          await completeLifecycleEvent(event.shipmentId);
+          await completeLifecycleEvent(event.shipmentId, event.reason);
         } else {
           // Retry with backoff
           const retried = await retryLifecycleEvent(event);
           if (!retried) {
             // Max retries exceeded, mark as complete to remove from in-flight
-            await completeLifecycleEvent(event.shipmentId);
+            await completeLifecycleEvent(event.shipmentId, event.reason);
             log(`Event dropped after max retries: ${event.shipmentId}`, 'error', withOrder(event.orderNumber, event.shipmentId));
           }
         }

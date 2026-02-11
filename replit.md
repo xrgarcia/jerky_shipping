@@ -21,7 +21,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Centralized ETL Architecture**: Standardized data transformations for Shopify orders and ShipStation shipments.
 - **Worker Coordination System**: Redis-backed mutex for production-ready coordination of poll workers and backfill jobs.
 - **Dual Shipment Sync Architecture**: Combines cursor-based polling and a Webhook Processing Queue for real-time events.
-- **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects, decoupled evaluation, error isolation, rate limiting, and centralized observability.
+- **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects, decoupled evaluation, error isolation, rate limiting, and centralized observability. Deduplication uses compound key `shipmentId:reason` so the same shipment can have multiple events queued for different reasons (e.g., `packaging` won't be dropped if `shipment_sync` is already queued).
 - **Structured Logging**: Winston logger (`server/utils/logger.ts`) with `LOG_LEVEL` env var (default: `info`). Set to `debug` for full payload diagnostics. Uses `withOrder(orderNumber, shipmentId?, extras?)` helper for correlation context on every order-related log line.
 - **Correlation ID Standard**: All log lines that touch an order/shipment include standardized correlation IDs so you can trace an order's full journey by searching for its order number. Standard identifiers:
   - `orderNumber` — unique order identifier across all sales channels (DB field: `name`)
