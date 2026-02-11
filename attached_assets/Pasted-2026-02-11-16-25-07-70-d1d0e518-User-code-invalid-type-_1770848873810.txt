@@ -1,0 +1,148 @@
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"code": "invalid_type",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"code": "invalid_type",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+{
+2026-02-11 16:25:07.70
+d1d0e518
+User
+message: 'Expected object, received null'
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"received": "null",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"QcSales",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+addIssue: [Function (anonymous)],
+2026-02-11 16:25:07.70
+d1d0e518
+User
+errors: [
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"received": "null",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+at async file:///home/runner/workspace/dist/index.js:27573:24 {
+2026-02-11 16:25:07.70
+d1d0e518
+User
+0,
+2026-02-11 16:25:07.70
+d1d0e518
+User
+code: 'invalid_type',
+2026-02-11 16:25:07.70
+d1d0e518
+User
+code: 'invalid_type',
+2026-02-11 16:25:07.70
+d1d0e518
+User
+expected: 'object',
+2026-02-11 16:25:07.70
+d1d0e518
+User
+{
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"message": "Expected object, received null"
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"PassedItems",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"Data",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+addIssues: [Function (anonymous)],
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"expected": "object",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+message: 'Expected object, received null'
+2026-02-11 16:25:07.70
+d1d0e518
+User
+at ZodObject.parse (file:///home/runner/workspace/node_modules/zod/lib/index.mjs:663:22)
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"Data",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+}
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"PassedItems",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+0
+2026-02-11 16:25:07.70
+d1d0e518
+User
+0
+2026-02-11 16:25:07.70
+d1d0e518
+User
+at SkuVaultService.getQCSalesByOrderNumber (file:///home/runner/workspace/dist/index.js:8976:60)
+2026-02-11 16:25:07.70
+d1d0e518
+User
+{
+2026-02-11 16:25:07.70
+d1d0e518
+User
+[Packing Validation] QCSale lookup failed for order JK3825364364: Could not reach SkuVault: [
+2026-02-11 16:25:07.70
+d1d0e518
+User
+]
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"PassedItems",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"Data",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"received": "null",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"expected": "object",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"QcSales",
+2026-02-11 16:25:07.70
+d1d0e518
+User
+"message": "Expected object, received null"
