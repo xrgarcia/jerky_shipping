@@ -41,8 +41,9 @@ import {
 import { getProductsBatch, type ProductInfo } from './product-lookup';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import { storage } from '../storage';
+import logger, { withOrder } from '../utils/logger';
 
-const log = (message: string) => console.log(`[qc-item-hydrator] ${message}`);
+const log = (message: string) => logger.info(`[qc-item-hydrator] ${message}`);
 
 interface HydrationResult {
   shipmentId: string;
@@ -475,7 +476,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       
       // Skip excluded SKUs at top level (e.g., BUILDBAG, BUILDBOX, BUILDJAS as line items)
       if (excludedSkus.has(sku)) {
-        log(`Skipping excluded top-level SKU: ${sku} from order ${orderNumber}`);
+        logger.info(`[qc-item-hydrator] Skipping excluded top-level SKU: ${sku} from order ${orderNumber}`, withOrder(orderNumber, shipmentId));
         continue;
       }
       
@@ -495,7 +496,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       const shouldExplode = shouldExplodeAsKit || shouldExplodeAsOutOfStockAP;
       
       if (shouldExplodeAsOutOfStockAP && !shouldExplodeAsKit) {
-        log(`AP explosion (zero stock): ${sku} has qty=${quantityOnHand}, exploding into components`);
+        logger.info(`[qc-item-hydrator] AP explosion (zero stock): ${sku} has qty=${quantityOnHand}, exploding into components`, withOrder(orderNumber, shipmentId));
       }
       
       if (shouldExplode) {
@@ -504,7 +505,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
           for (const comp of components) {
             // Skip excluded SKUs (e.g., BUILDBAG, BUILDBOX, BUILDJAS)
             if (excludedSkus.has(comp.componentSku)) {
-              log(`Skipping excluded component SKU: ${comp.componentSku} from kit ${sku}`);
+              logger.info(`[qc-item-hydrator] Skipping excluded component SKU: ${comp.componentSku} from kit ${sku}`, withOrder(orderNumber, shipmentId));
               continue;
             }
             const totalQty = quantity * comp.componentQuantity;
@@ -535,7 +536,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
         // DEFENSIVE: If product not found in catalog, defer hydration
         // This prevents race condition where sync is running and catalog is incomplete
         if (!productInfo) {
-          log(`Product not found in catalog: ${sku} - deferring hydration for order ${orderNumber}`);
+          logger.info(`[qc-item-hydrator] Product not found in catalog: ${sku} - deferring hydration for order ${orderNumber}`, withOrder(orderNumber, shipmentId));
           return { 
             shipmentId, 
             orderNumber, 
@@ -557,7 +558,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
         });
         
         if (isVariant) {
-          log(`Variant substitution: ${sku} → ${fulfillSku} (qty: ${quantity})`);
+          logger.info(`[qc-item-hydrator] Variant substitution: ${sku} → ${fulfillSku} (qty: ${quantity})`, withOrder(orderNumber, shipmentId));
         }
       }
     }
@@ -693,7 +694,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    log(`Error hydrating shipment ${orderNumber}: ${errorMsg}`);
+    logger.info(`[qc-item-hydrator] Error hydrating shipment ${orderNumber}: ${errorMsg}`, withOrder(orderNumber, shipmentId));
     return { shipmentId, orderNumber, itemsCreated: 0, error: errorMsg };
   }
 }

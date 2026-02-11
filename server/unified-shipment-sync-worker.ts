@@ -14,6 +14,7 @@
  * - Rate-limit aware: Respects 40 calls/minute limit
  */
 
+import logger, { withOrder } from './utils/logger';
 import { db } from './db';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
@@ -280,12 +281,12 @@ async function fetchLabelsForShipments(shipmentsToEnrich: any[]): Promise<{
         if (response.status === 429) {
           const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
           if (retryCount < LABEL_FETCH_RETRY_MAX) {
-            console.log(`[UnifiedSync] Rate limited (429) fetching labels for ${shipmentId}, waiting ${retryAfter}s...`);
+            logger.info(`[UnifiedSync] Rate limited (429) fetching labels for ${shipmentId}, waiting ${retryAfter}s...`, withOrder(undefined, shipmentId));
             await new Promise(resolve => setTimeout(resolve, retryAfter * 1000 + 1000));
             retryCount++;
             continue;
           } else {
-            console.log('[UnifiedSync] Hit rate limit during label fetch, stopping batch');
+            logger.info('[UnifiedSync] Hit rate limit during label fetch, stopping batch');
             hitRateLimit = true;
             return { withTracking, errors, hitRateLimit };
           }
@@ -304,13 +305,13 @@ async function fetchLabelsForShipments(shipmentsToEnrich: any[]): Promise<{
           }
         } else {
           // Non-429 error
-          console.log(`[UnifiedSync] Failed to fetch labels for shipment ${shipmentId}: ${response.status}`);
+          logger.info(`[UnifiedSync] Failed to fetch labels for shipment ${shipmentId}: ${response.status}`, withOrder(undefined, shipmentId));
           errors++;
         }
         
         break; // Success or non-retryable error
       } catch (err: any) {
-        console.log(`[UnifiedSync] Error fetching labels for ${shipmentId}: ${err.message}`);
+        logger.info(`[UnifiedSync] Error fetching labels for ${shipmentId}: ${err.message}`, withOrder(undefined, shipmentId));
         errors++;
         break;
       }
@@ -365,7 +366,7 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
     return { processed: 0, updated: 0, errors: 0 };
   }
   
-  console.log(`[UnifiedSync] Backfilling tracking for ${shipmentsToBackfill.length} shipped shipments without tracking`);
+  logger.info(`[UnifiedSync] Backfilling tracking for ${shipmentsToBackfill.length} shipped shipments without tracking`);
   
   let processed = 0;
   let updated = 0;
@@ -394,7 +395,7 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
       });
       
       if (labelResponse.status === 429) {
-        console.log('[UnifiedSync] Hit rate limit during tracking backfill, stopping batch');
+        logger.info('[UnifiedSync] Hit rate limit during tracking backfill, stopping batch');
         break;
       }
       
@@ -420,7 +421,7 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
             .where(eq(shipments.id, shipment.id));
           
           updated++;
-          console.log(`[UnifiedSync] Backfilled tracking ${trackingNumber} for order ${shipment.orderNumber}`);
+          logger.info(`[UnifiedSync] Backfilled tracking ${trackingNumber} for order ${shipment.orderNumber}`, withOrder(shipment.orderNumber, shipment.shipmentId, { trackingNumber }));
         }
       }
       
@@ -431,7 +432,7 @@ async function backfillMissingTracking(): Promise<{ processed: number; updated: 
   }
   
   if (updated > 0 || errors > 0) {
-    console.log(`[UnifiedSync] Tracking backfill complete: ${processed} processed, ${updated} updated, ${errors} errors`);
+    logger.info(`[UnifiedSync] Tracking backfill complete: ${processed} processed, ${updated} updated, ${errors} errors`);
   }
   
   return { processed, updated, errors };
@@ -507,7 +508,7 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
       });
       
       if (response.status === 429) {
-        console.log('[UnifiedSync] Hit rate limit during tag refresh, stopping batch');
+        logger.info('[UnifiedSync] Hit rate limit during tag refresh, stopping batch');
         break;
       }
       
@@ -533,7 +534,7 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
       const hasMoveOverInShipStation = freshTagNames.has('MOVE OVER');
       
       if (hasMoveOverLocally !== hasMoveOverInShipStation) {
-        console.log(`[UnifiedSync] Tag change detected for ${shipment.orderNumber}: MOVE OVER ${hasMoveOverLocally ? 'removed' : 'added'} in ShipStation`);
+        logger.info(`[UnifiedSync] Tag change detected for ${shipment.orderNumber}: MOVE OVER ${hasMoveOverLocally ? 'removed' : 'added'} in ShipStation`, withOrder(shipment.orderNumber, shipment.shipmentId));
         
         // Update tags: delete all and re-insert from ShipStation
         await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipment.id));
@@ -566,7 +567,7 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
   }
   
   if (updated > 0) {
-    console.log(`[UnifiedSync] Tag refresh complete: ${processed} checked, ${updated} with tag changes, ${errors} errors`);
+    logger.info(`[UnifiedSync] Tag refresh complete: ${processed} checked, ${updated} with tag changes, ${errors} errors`);
   }
   
   return { processed, updated, errors };
@@ -629,7 +630,7 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
     return { processed: 0, orphaned: 0, refreshed: 0, errors: 0 };
   }
   
-  console.log(`[UnifiedSync] Stale audit: checking ${staleShipments.length} shipments stuck in pre-shipping phases for 48+ hours`);
+  logger.info(`[UnifiedSync] Stale audit: checking ${staleShipments.length} shipments stuck in pre-shipping phases for 48+ hours`);
   
   const apiKey = process.env.SHIPSTATION_API_KEY;
   if (!apiKey) {
@@ -658,12 +659,12 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
       });
       
       if (response.status === 429) {
-        console.log('[UnifiedSync] Hit rate limit during stale audit, stopping batch');
+        logger.info('[UnifiedSync] Hit rate limit during stale audit, stopping batch');
         break;
       }
       
       if (response.status === 404) {
-        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → 404 Not Found → marking as orphaned`);
+        logger.info(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → 404 Not Found → marking as orphaned`, withOrder(shipment.orderNumber, shipment.shipmentId));
         await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
         await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
         orphaned++;
@@ -679,7 +680,7 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
       const shipmentData = await response.json();
       
       if (!shipmentData || (Array.isArray(shipmentData.shipments) && shipmentData.shipments.length === 0)) {
-        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → empty response → marking as orphaned`);
+        logger.info(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → empty response → marking as orphaned`, withOrder(shipment.orderNumber, shipment.shipmentId));
         await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
         await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
         orphaned++;
@@ -689,7 +690,7 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
       const freshData = shipmentData.shipments ? shipmentData.shipments[0] : shipmentData;
       
       if (freshData.shipment_id && freshData.shipment_id !== shipment.shipmentId) {
-        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_id changed to ${freshData.shipment_id} → marking as orphaned (likely merged)`);
+        logger.info(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_id changed to ${freshData.shipment_id} → marking as orphaned (likely merged)`, withOrder(shipment.orderNumber, shipment.shipmentId));
         await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
         await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
         orphaned++;
@@ -697,14 +698,14 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
       }
       
       if (freshData.shipment_number && shipment.orderNumber && freshData.shipment_number !== shipment.orderNumber) {
-        console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_number is now ${freshData.shipment_number} → marking as orphaned (merged into another order)`);
+        logger.info(`[UnifiedSync] Stale audit: ${shipment.orderNumber} (${shipment.shipmentId}) → shipment_number is now ${freshData.shipment_number} → marking as orphaned (merged into another order)`, withOrder(shipment.orderNumber, shipment.shipmentId));
         await markShipmentOrphaned(shipment.id, shipment.orderNumber || 'unknown');
         await queueLifecycleEvaluation(shipment.id, 'stale_audit', shipment.orderNumber || undefined);
         orphaned++;
         continue;
       }
       
-      console.log(`[UnifiedSync] Stale audit: ${shipment.orderNumber} still exists in ShipStation, re-syncing through ETL`);
+      logger.info(`[UnifiedSync] Stale audit: ${shipment.orderNumber} still exists in ShipStation, re-syncing through ETL`, withOrder(shipment.orderNumber, shipment.shipmentId));
       try {
         await syncShipment(freshData);
         refreshed++;
@@ -720,7 +721,7 @@ async function auditStaleShipments(): Promise<{ processed: number; orphaned: num
   }
   
   if (orphaned > 0 || refreshed > 0) {
-    console.log(`[UnifiedSync] Stale audit complete: ${processed} checked, ${orphaned} orphaned, ${refreshed} refreshed, ${errors} errors`);
+    logger.info(`[UnifiedSync] Stale audit complete: ${processed} checked, ${orphaned} orphaned, ${refreshed} refreshed, ${errors} errors`);
   }
   
   return { processed, orphaned, refreshed, errors };
@@ -738,7 +739,7 @@ async function markShipmentOrphaned(shipmentDbId: string, orderNumber: string): 
     })
     .where(eq(shipments.id, shipmentDbId));
   
-  console.log(`[UnifiedSync] Marked ${orderNumber} as orphaned (shipmentStatus=orphaned, status=UN)`);
+  logger.info(`[UnifiedSync] Marked ${orderNumber} as orphaned (shipmentStatus=orphaned, status=UN)`, withOrder(orderNumber));
 }
 
 /**
@@ -765,7 +766,7 @@ async function pollCycle(): Promise<{
     const initialCursor = getInitialCursorValue();
     await updateCursor(initialCursor);
     cursor = { cursorValue: initialCursor, lastSyncedAt: new Date() };
-    console.log(`[UnifiedSync] Initialized cursor to ${initialCursor} (${LOOKBACK_HOURS}h lookback)`);
+    logger.info(`[UnifiedSync] Initialized cursor to ${initialCursor} (${LOOKBACK_HOURS}h lookback)`);
   }
   
   let currentPage = 1;
@@ -780,7 +781,7 @@ async function pollCycle(): Promise<{
   const successTimestamps: string[] = [];
   let earliestFailureTimestamp: string | null = null;
   
-  console.log(`[UnifiedSync] Starting poll from cursor: ${cursor.cursorValue}`);
+  logger.info(`[UnifiedSync] Starting poll from cursor: ${cursor.cursorValue}`);
   
   try {
     while (currentPage <= MAX_PAGES_PER_POLL) {
@@ -793,13 +794,13 @@ async function pollCycle(): Promise<{
         const labelResult = await fetchLabelsForShipments(pageResult.shipments);
         
         if (labelResult.hitRateLimit) {
-          console.log(`[UnifiedSync] Hit rate limit during label fetch on page ${currentPage}`);
+          logger.info(`[UnifiedSync] Hit rate limit during label fetch on page ${currentPage}`);
           hitRateLimit = true;
           // Still process what we have - some shipments may have tracking now
         }
         
         if (labelResult.withTracking > 0) {
-          console.log(`[UnifiedSync] Page ${currentPage}: fetched labels, ${labelResult.withTracking}/${pageResult.shipments.length} have tracking`);
+          logger.debug(`[UnifiedSync] Page ${currentPage}: fetched labels, ${labelResult.withTracking}/${pageResult.shipments.length} have tracking`);
         }
       }
       
@@ -862,7 +863,7 @@ async function pollCycle(): Promise<{
             
             if (failureCount >= MAX_SYNC_FAILURES_BEFORE_DEADLETTER) {
               // Dead-letter this shipment
-              console.log(`[UnifiedSync] Dead-lettering shipment ${shipmentId} after ${failureCount} failures`);
+              logger.info(`[UnifiedSync] Dead-lettering shipment ${shipmentId} after ${failureCount} failures`, withOrder(shipment.order_number, shipmentId));
               
               try {
                 // Insert into shipmentSyncFailures table
@@ -884,7 +885,7 @@ async function pollCycle(): Promise<{
                 // IMPORTANT: Dead-lettered shipments don't block cursor advancement
                 // Treat them as "processed" for cursor purposes
                 successTimestamps.push(modifiedAt);
-                console.log(`[UnifiedSync] Shipment ${shipmentId} moved to dead-letter queue, cursor can advance past it`);
+                logger.info(`[UnifiedSync] Shipment ${shipmentId} moved to dead-letter queue, cursor can advance past it`, withOrder(shipment.order_number, shipmentId));
               } catch (dlErr) {
                 console.error(`[UnifiedSync] Failed to dead-letter shipment ${shipmentId}:`, dlErr);
                 // If dead-lettering fails, still track as failure to block cursor
@@ -894,19 +895,19 @@ async function pollCycle(): Promise<{
               }
             } else {
               // Not yet at dead-letter threshold - track as failure to block cursor
-              console.log(`[UnifiedSync] Shipment ${shipmentId} failed (attempt ${failureCount}/${MAX_SYNC_FAILURES_BEFORE_DEADLETTER})`);
+              logger.info(`[UnifiedSync] Shipment ${shipmentId} failed (attempt ${failureCount}/${MAX_SYNC_FAILURES_BEFORE_DEADLETTER})`, withOrder(shipment.order_number, shipmentId));
               if (!earliestFailureTimestamp || modifiedAt < earliestFailureTimestamp) {
                 earliestFailureTimestamp = modifiedAt;
               }
             }
           } else {
             // No shipmentId or modifiedAt - can't track properly, just log
-            console.warn(`[UnifiedSync] Shipment missing ID or modified_at, cannot track failure`);
+            logger.info(`[UnifiedSync] Shipment missing ID or modified_at, cannot track failure`);
           }
         }
       }
       
-      console.log(`[UnifiedSync] Page ${currentPage}: processed ${pageResult.shipments.length} shipments (${totalErrored} errors so far)`);
+      logger.info(`[UnifiedSync] Page ${currentPage}: processed ${pageResult.shipments.length} shipments (${totalErrored} errors so far)`);
       
       // Check if we have more pages
       if (!pageResult.hasMore) {
@@ -916,7 +917,7 @@ async function pollCycle(): Promise<{
       // Check if we've hit MAX_PAGES - flag for immediate follow-up
       if (currentPage >= MAX_PAGES_PER_POLL) {
         hasMorePages = true;
-        console.log(`[UnifiedSync] Reached MAX_PAGES (${MAX_PAGES_PER_POLL}), more pages remain - will continue in next poll`);
+        logger.info(`[UnifiedSync] Reached MAX_PAGES (${MAX_PAGES_PER_POLL}), more pages remain - will continue in next poll`);
         break;
       }
       
@@ -924,7 +925,7 @@ async function pollCycle(): Promise<{
     }
   } catch (err: any) {
     if (err.message === 'RATE_LIMIT') {
-      console.log(`[UnifiedSync] Hit rate limit after ${pagesProcessed} pages`);
+      logger.info(`[UnifiedSync] Hit rate limit after ${pagesProcessed} pages`);
       hitRateLimit = true;
     } else {
       throw err;
@@ -953,7 +954,7 @@ async function pollCycle(): Promise<{
       const failureDate = new Date(earliestFailureTimestamp);
       failureDate.setSeconds(failureDate.getSeconds() - 1);
       latestSuccessTimestamp = failureDate.toISOString();
-      console.log(`[UnifiedSync] Capping cursor before earliest failure: ${earliestFailureTimestamp}`);
+      logger.info(`[UnifiedSync] Capping cursor before earliest failure: ${earliestFailureTimestamp}`);
     }
     
     const latestDate = new Date(latestSuccessTimestamp);
@@ -979,16 +980,16 @@ async function pollCycle(): Promise<{
         : hasMorePages 
           ? 'no overlap for catch-up' 
           : 'with 30s safety overlap';
-      console.log(`[UnifiedSync] Updated cursor to: ${safeCursor} (${overlapNote})`);
+      logger.info(`[UnifiedSync] Updated cursor to: ${safeCursor} (${overlapNote})`);
       newCursor = safeCursor;
     }
   } else if (earliestFailureTimestamp) {
     // All shipments failed - don't advance cursor at all
-    console.log(`[UnifiedSync] All ${totalErrored} shipments failed - cursor NOT advanced`);
+    logger.info(`[UnifiedSync] All ${totalErrored} shipments failed - cursor NOT advanced`);
   }
   
   if (totalErrored > 0) {
-    console.log(`[UnifiedSync] Warning: ${totalErrored} shipments failed to sync - will retry on next poll`);
+    logger.info(`[UnifiedSync] Warning: ${totalErrored} shipments failed to sync - will retry on next poll`);
   }
   
   return {
@@ -1030,7 +1031,7 @@ async function checkDbHealth(): Promise<boolean> {
  */
 async function runPollLoop(): Promise<boolean> {
   if (isPolling) {
-    console.log('[UnifiedSync] Poll already in progress, skipping');
+    logger.debug('[UnifiedSync] Poll already in progress, skipping');
     return false;
   }
   
@@ -1059,7 +1060,7 @@ async function runPollLoop(): Promise<boolean> {
       
       clearTimeout(pollTimeoutHandle!);
       
-      console.log(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
+      logger.info(`[UnifiedSync] Poll complete: ${result.shipmentsProcessed} processed, ${result.shipmentsErrored} errors, ${result.pagesProcessed} pages`);
       
       needsImmediateFollowup = result.hasMorePages;
       
@@ -1140,18 +1141,18 @@ function scheduleNextPoll(immediateFollowup: boolean = false): void {
   // Check if webhook requested immediate poll during our last cycle
   const webhookTriggered = immediatePolltrigger;
   if (webhookTriggered) {
-    console.log('[UnifiedSync] Webhook triggered immediate poll during last cycle');
+    logger.info('[UnifiedSync] Webhook triggered immediate poll during last cycle');
     immediatePolltrigger = false;
   }
   
   let delay: number;
   if (consecutiveErrors > 0 && !webhookTriggered) {
     delay = getBackoffDelay();
-    console.log(`[UnifiedSync] Backing off after ${consecutiveErrors} consecutive errors, next poll in ${Math.round(delay / 1000)}s`);
+    logger.info(`[UnifiedSync] Backing off after ${consecutiveErrors} consecutive errors, next poll in ${Math.round(delay / 1000)}s`);
   } else if (immediateFollowup || webhookTriggered) {
     delay = 1000;
     if (immediateFollowup) {
-      console.log('[UnifiedSync] More pages remain, scheduling immediate follow-up poll');
+      logger.info('[UnifiedSync] More pages remain, scheduling immediate follow-up poll');
     }
   } else {
     delay = POLL_INTERVAL_MS;
@@ -1168,15 +1169,15 @@ function scheduleNextPoll(immediateFollowup: boolean = false): void {
  */
 export async function startUnifiedShipmentSyncWorker(): Promise<void> {
   if (isRunning) {
-    console.log('[UnifiedSync] Worker already running');
+    logger.info('[UnifiedSync] Worker already running');
     return;
   }
   
   // Check credentials at startup and log for debugging
   const credentials = checkCredentialsConfigured();
-  console.log('[UnifiedSync] Credential check:', credentials.configured ? 'OK' : `MISSING - ${credentials.error}`);
+  logger.info('[UnifiedSync] Credential check:', credentials.configured ? 'OK' : `MISSING - ${credentials.error}`);
   
-  console.log('[UnifiedSync] Starting unified shipment sync worker');
+  logger.info('[UnifiedSync] Starting unified shipment sync worker');
   isRunning = true;
   
   // Run initial poll immediately
@@ -1185,14 +1186,14 @@ export async function startUnifiedShipmentSyncWorker(): Promise<void> {
   // Schedule subsequent polls (with immediate follow-up if needed)
   scheduleNextPoll(needsFollowup);
   
-  console.log(`[UnifiedSync] Worker started, polling every ${POLL_INTERVAL_MS / 1000}s`);
+  logger.info(`[UnifiedSync] Worker started, polling every ${POLL_INTERVAL_MS / 1000}s`);
 }
 
 /**
  * Stop the worker
  */
 export function stopUnifiedShipmentSyncWorker(): void {
-  console.log('[UnifiedSync] Stopping unified shipment sync worker');
+  logger.info('[UnifiedSync] Stopping unified shipment sync worker');
   isRunning = false;
   
   if (pollTimer) {
@@ -1210,15 +1211,15 @@ export function stopUnifiedShipmentSyncWorker(): void {
  */
 export function triggerImmediatePoll(): void {
   if (!isRunning) {
-    console.log('[UnifiedSync] Worker not running, cannot trigger immediate poll');
+    logger.info('[UnifiedSync] Worker not running, cannot trigger immediate poll');
     return;
   }
   
-  console.log('[UnifiedSync] Immediate poll requested');
+  logger.info('[UnifiedSync] Immediate poll requested');
   
   // If currently polling, just set the flag - the next schedule will see it
   if (isPolling) {
-    console.log('[UnifiedSync] Currently polling, will trigger again after completion');
+    logger.debug('[UnifiedSync] Currently polling, will trigger again after completion');
     immediatePolltrigger = true;
     return;
   }
@@ -1230,7 +1231,7 @@ export function triggerImmediatePoll(): void {
   }
   
   // Immediately start poll and reschedule after
-  console.log('[UnifiedSync] Waking idle worker for immediate poll');
+  logger.info('[UnifiedSync] Waking idle worker for immediate poll');
   runPollLoop().then((needsFollowup) => {
     // Check if another immediate trigger came in while we were polling
     const shouldFollowup = needsFollowup || immediatePolltrigger;
@@ -1260,7 +1261,7 @@ export async function getWorkerStatus(): Promise<WorkerStatus> {
   const credentials = checkCredentialsConfigured();
   
   // Debug log for credential check
-  console.log('[UnifiedSync] Status check - credentialsConfigured:', credentials.configured, 'error:', credentials.error);
+  logger.debug('[UnifiedSync] Status check - credentialsConfigured:', credentials.configured, 'error:', credentials.error);
   
   // If credentials are not configured, always show as error state
   const effectiveError = !credentials.configured 
@@ -1401,7 +1402,7 @@ export async function getSyncStats(): Promise<{
  * WARNING: This will re-sync all shipments from the lookback period
  */
 export async function forceFullResync(): Promise<void> {
-  console.log('[UnifiedSync] Forcing full resync');
+  logger.info('[UnifiedSync] Forcing full resync');
   
   const initialCursor = getInitialCursorValue();
   await updateCursor(initialCursor, {
@@ -1421,7 +1422,7 @@ export async function forceFullResync(): Promise<void> {
  * WARNING: This will re-sync all shipments from the specified lookback period
  */
 export async function forceResyncWithDays(days: number): Promise<void> {
-  console.log(`[UnifiedSync] Forcing resync with ${days}-day lookback`);
+  logger.info(`[UnifiedSync] Forcing resync with ${days}-day lookback`);
   
   const lookbackDate = new Date();
   lookbackDate.setDate(lookbackDate.getDate() - days);
@@ -1445,7 +1446,7 @@ export async function forceResyncToDate(date: Date): Promise<void> {
   midnight.setUTCHours(0, 0, 0, 0);
   const cursorValue = midnight.toISOString();
   
-  console.log(`[UnifiedSync] Forcing resync to date: ${cursorValue}`);
+  logger.info(`[UnifiedSync] Forcing resync to date: ${cursorValue}`);
   
   await updateCursor(cursorValue, {
     forcedResyncAt: new Date().toISOString(),

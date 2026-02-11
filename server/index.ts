@@ -274,7 +274,8 @@ async function initializeAfterListen(storage: any) {
     const { startLifecycleWorker } = await import("./lifecycle-event-worker");
     const { clearLifecycleQueue } = await import("./utils/queue");
     const clearedCount = await clearLifecycleQueue();
-    console.log(`[lifecycle-worker] Cleared ${clearedCount} stale queue items before starting`);
+    const { default: logger } = await import("./utils/logger");
+    logger.info(`[lifecycle-worker] Cleared ${clearedCount} stale queue items before starting`);
     startLifecycleWorker();
     
     // Start ShipStation write queue worker (reliable, rate-limit-aware shipment writes)

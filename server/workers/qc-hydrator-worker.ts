@@ -9,8 +9,9 @@
  */
 
 import { runHydration, getHydrationStatus, backfillFingerprints } from '../services/qc-item-hydrator';
+import logger from '../utils/logger';
 
-const log = (message: string) => console.log(`[qc-hydrator-worker] ${message}`);
+const log = (message: string) => logger.info(`[qc-hydrator-worker] ${message}`);
 
 // Worker state
 let workerStatus: 'sleeping' | 'running' = 'sleeping';

@@ -3,6 +3,7 @@ import { shipstationWriteQueue, shipments } from '@shared/schema';
 import type { InsertShipstationWriteQueue } from '@shared/schema';
 import { eq, and, lte, or, isNull, asc, sql } from 'drizzle-orm';
 import { resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
+import logger, { withOrder } from '../utils/logger';
 
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
@@ -29,11 +30,9 @@ let rateLimitRemaining = 40;
 let rateLimitResetAt = 0;
 let workerRunning = false;
 
-function log(msg: string, level: 'info' | 'warn' | 'error' = 'info') {
+function log(msg: string, level: 'info' | 'warn' | 'error' = 'info', ctx?: Record<string, any>) {
   const prefix = '[SSWriteQueue]';
-  if (level === 'error') console.error(`${prefix} ${msg}`);
-  else if (level === 'warn') console.warn(`${prefix} ${msg}`);
-  else console.log(`${prefix} ${msg}`);
+  logger[level](`${prefix} ${msg}`, ctx || {});
 }
 
 function extractRateLimitFromHeaders(headers: Headers) {
@@ -75,7 +74,7 @@ export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Pro
   };
 
   const [inserted] = await db.insert(shipstationWriteQueue).values(row).returning({ id: shipstationWriteQueue.id });
-  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`);
+  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`, 'info', withOrder(undefined, options.shipmentId));
   return inserted.id;
 }
 
@@ -261,10 +260,10 @@ async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect)
       await db.update(shipments)
         .set({ requiresManualPackage: false, packageAssignmentError: null })
         .where(eq(shipments.id, job.localShipmentId));
-      log(`Callback: Cleared manual package flag for shipment ${job.localShipmentId}`);
+      log(`Callback: Cleared manual package flag for shipment ${job.localShipmentId}`, 'info', withOrder(undefined, job.shipmentId));
     }
   } catch (err: any) {
-    log(`Callback action "${job.callbackAction}" failed for job #${job.id}: ${err.message}`, 'warn');
+    log(`Callback action "${job.callbackAction}" failed for job #${job.id}: ${err.message}`, 'warn', withOrder(undefined, job.shipmentId));
   }
 }
 
@@ -290,12 +289,23 @@ async function processNextJob(): Promise<boolean> {
 
   if (!job) return false;
 
+  let orderNumber: string | undefined;
+  if (job.localShipmentId) {
+    const [localShipment] = await db
+      .select({ orderNumber: shipments.orderNumber })
+      .from(shipments)
+      .where(eq(shipments.id, job.localShipmentId))
+      .limit(1);
+    orderNumber = localShipment?.orderNumber ?? undefined;
+  }
+  const jobCtx = withOrder(orderNumber, job.shipmentId);
+
   await db.update(shipstationWriteQueue)
     .set({ status: 'processing', processedAt: now })
     .where(eq(shipstationWriteQueue.id, job.id));
 
   try {
-    log(`Processing job #${job.id}: ${job.reason} for ${job.shipmentId} (attempt ${job.retryCount + 1}/${job.maxRetries})`);
+    log(`Processing job #${job.id}: ${job.reason} for ${job.shipmentId} (attempt ${job.retryCount + 1}/${job.maxRetries})`, 'info', jobCtx);
 
     const currentShipment = await fetchCurrentShipment(job.shipmentId);
     if (!currentShipment) {
@@ -314,7 +324,7 @@ async function processNextJob(): Promise<boolean> {
       .set({ status: 'completed', completedAt: new Date(), lastError: null })
       .where(eq(shipstationWriteQueue.id, job.id));
 
-    log(`Job #${job.id} completed successfully for ${job.shipmentId}`);
+    log(`Job #${job.id} completed successfully for ${job.shipmentId}`, 'info', jobCtx);
 
     await runCallbackAction(job);
     return true;
@@ -327,7 +337,7 @@ async function processNextJob(): Promise<boolean> {
     if (isRateLimit) {
       const waitMs = err.retryAfterSeconds * 1000 + 1000;
       const nextRetry = new Date(Date.now() + waitMs);
-      log(`Job #${job.id} rate limited, will retry at ${nextRetry.toISOString()} (not counting as failure)`, 'warn');
+      log(`Job #${job.id} rate limited, will retry at ${nextRetry.toISOString()} (not counting as failure)`, 'warn', jobCtx);
       await db.update(shipstationWriteQueue)
         .set({
           status: 'failed',
@@ -343,7 +353,7 @@ async function processNextJob(): Promise<boolean> {
     }
 
     if (newRetryCount >= job.maxRetries) {
-      log(`Job #${job.id} exhausted all ${job.maxRetries} retries, moving to dead letter: ${errorMsg}`, 'error');
+      log(`Job #${job.id} exhausted all ${job.maxRetries} retries, moving to dead letter: ${errorMsg}`, 'error', jobCtx);
       await db.update(shipstationWriteQueue)
         .set({
           status: 'dead_letter',
@@ -361,13 +371,13 @@ async function processNextJob(): Promise<boolean> {
             })
             .where(eq(shipments.id, job.localShipmentId));
         } catch (e) {
-          log(`Failed to flag shipment ${job.localShipmentId} for manual intervention: ${e}`, 'error');
+          log(`Failed to flag shipment ${job.localShipmentId} for manual intervention: ${e}`, 'error', jobCtx);
         }
       }
     } else {
       const backoffMs = calculateBackoffMs(newRetryCount);
       const nextRetry = new Date(Date.now() + backoffMs);
-      log(`Job #${job.id} failed (attempt ${newRetryCount}/${job.maxRetries}), retrying at ${nextRetry.toISOString()}: ${errorMsg}`, 'warn');
+      log(`Job #${job.id} failed (attempt ${newRetryCount}/${job.maxRetries}), retrying at ${nextRetry.toISOString()}: ${errorMsg}`, 'warn', jobCtx);
       await db.update(shipstationWriteQueue)
         .set({
           status: 'failed',

@@ -13,6 +13,7 @@
  */
 
 import { db } from "../db";
+import logger, { withOrder } from '../utils/logger';
 import { shipments, shipmentTags, LIFECYCLE_PHASES, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import {
@@ -147,7 +148,7 @@ export async function updateShipmentLifecycleFromData(
   
   if (blocked) {
     if (logTransition) {
-      console.log(`[Lifecycle] ${shipment.orderNumber}: BLOCKED demotion ${currentPhase} → ${derivedState.phase} (stale data)`);
+      logger.warn("[Lifecycle] BLOCKED demotion", withOrder(shipment.orderNumber, undefined, { currentPhase, derivedPhase: derivedState.phase }));
     }
     return {
       shipmentId: shipment.id,
@@ -196,7 +197,7 @@ export async function updateShipmentLifecycleFromData(
 
   // Log the transition
   if (logTransition && changed) {
-    console.log(formatTransition(result));
+    logger.info(formatTransition(result), withOrder(result.orderNumber || undefined, result.shipmentId || undefined, { phase: result.newPhase, subphase: result.newSubphase }));
   }
 
   return result;
@@ -234,7 +235,7 @@ export async function updateShipmentLifecycleBatch(
   // Log summary
   const changedCount = results.filter(r => r.changed).length;
   if (changedCount > 0) {
-    console.log(`[Lifecycle] Batch update: ${changedCount}/${results.length} shipments changed phases`);
+    logger.info(`[Lifecycle] Batch update: ${changedCount}/${results.length} shipments changed phases`);
   }
 
   return results;

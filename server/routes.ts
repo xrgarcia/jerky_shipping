@@ -36,7 +36,7 @@ import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
 import { updateShipmentLifecycleBatch, queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
-import logger from "./utils/logger";
+import logger, { withOrder } from "./utils/logger";
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -5707,7 +5707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const queuedCount = results.filter(r => r.enqueued).length;
       const skippedCount = results.filter(r => !r.enqueued).length;
       
-      console.log(`[Lifecycle] Manual trigger for ${orderNumber}: ${queuedCount} queued, ${skippedCount} already in queue`);
+      logger.info(`[Lifecycle] Manual trigger for ${orderNumber}: ${queuedCount} queued, ${skippedCount} already in queue`, withOrder(orderNumber));
       
       res.json({ 
         success: true, 
@@ -6416,13 +6416,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Try to lookup SkuVault SaleId for this order (cache for frontend)
       let saleId: string | null = null;
       try {
-        console.log(`[Packing] Looking up SkuVault SaleId for order: ${orderNumber}`);
+        logger.info(`[Packing] Looking up SkuVault SaleId for order: ${orderNumber}`, withOrder(orderNumber));
         const saleInfo = await skuVaultService.getSaleInformation(orderNumber);
         if (saleInfo?.SaleId) {
           saleId = saleInfo.SaleId;
-          console.log(`[Packing] Found SkuVault SaleId: ${saleId}`);
+          logger.info(`[Packing] Found SkuVault SaleId: ${saleId}`, withOrder(orderNumber, undefined, { saleId }));
         } else {
-          console.log(`[Packing] Order not found in SkuVault (may not be synced yet)`);
+          logger.info(`[Packing] Order not found in SkuVault (may not be synced yet)`, withOrder(orderNumber));
         }
       } catch (error: any) {
         console.warn(`[Packing] Failed to lookup SkuVault SaleId for ${orderNumber}:`, error.message);
@@ -6516,7 +6516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const session = await storage.createWebPackingSession(user.id, stationId, expiresAt);
       
-      console.log(`[Packing] User ${user.email} selected station ${station.name} (expires ${expiresAt.toISOString()})`);
+      logger.info(`[Packing] User ${user.email} selected station ${station.name} (expires ${expiresAt.toISOString()})`, withOrder(undefined, undefined, { user: user.email, station: station.name }));
       
       return res.json({
         session: {
@@ -7404,7 +7404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orderNumber } = req.params;
       const user = (req as any).user;
       
-      console.log(`[Packing] Manual cache refresh requested for order: ${orderNumber}`);
+      logger.info(`[Packing] Manual cache refresh requested for order: ${orderNumber}`, withOrder(orderNumber));
       
       // Verify the order exists and is in a valid state for refreshing
       const shipmentResults = await storage.getShipmentsByOrderNumber(orderNumber);
@@ -8098,7 +8098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!queued) {
         // Deduplication prevented queue - this is OK, means already queued recently
-        console.log(`[Packing] QC scan deduplicated: ${sku} for ${orderNumber}`);
+        logger.debug(`[Packing] QC scan deduplicated: ${sku} for ${orderNumber}`, withOrder(orderNumber, undefined, { sku }));
         return res.json({ 
           queued: false, 
           deduplicated: true,
@@ -8106,7 +8106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log(`[Packing] QC scan queued: ${sku} for ${orderNumber} by ${scannedBy}`);
+      logger.info(`[Packing] QC scan queued: ${sku} for ${orderNumber} by ${scannedBy}`, withOrder(orderNumber, undefined, { sku, scannedBy }));
       res.json({ 
         queued: true, 
         message: "QC sync queued for background processing" 
@@ -8631,7 +8631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stationPrinters = await storage.getPrintersByStation(webSession.stationId);
       const selectedPrinter = stationPrinters.length > 0 ? stationPrinters[0] : null;
       
-      console.log(`[Packing] Station ${webSession.stationId} printer: ${selectedPrinter?.name || 'none'}`);
+      logger.debug(`[Packing] Station ${webSession.stationId} printer: ${selectedPrinter?.name || 'none'}`, withOrder(undefined, undefined, { stationId: webSession.stationId }));
       
       // Get shipment
       shipment = await storage.getShipment(shipmentId);
@@ -8681,7 +8681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If skipLabel is true (QC-only completion for non-shippable orders), skip label handling entirely
       if (skipLabel && isNotShippable) {
-        console.log(`[Packing] Completing QC-only (no label) for non-shippable order ${orderNumber}`);
+        logger.info(`[Packing] Completing QC-only (no label) for non-shippable order ${orderNumber}`, withOrder(orderNumber, shipment?.id));
         
         // Log the QC-only completion
         await logPackingAction('boxing_completed_without_label', true, {
@@ -8697,7 +8697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           qcCompleted: true,
           qcCompletedAt: new Date(),
         });
-        console.log(`[Packing] Marked QC complete (no label) for shipment ${shipment.id} (order ${orderNumber})`);
+        logger.info(`[Packing] Marked QC complete (no label) for shipment ${shipment.id} (order ${orderNumber})`, withOrder(orderNumber, shipment.id));
         
         return res.json({
           success: true,
@@ -8714,7 +8714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let labelError: { code: string; message: string; shipStationError?: string; resolution: string } | null = null;
       
       if (!labelUrl && shipment.shipmentId) {
-        console.log(`[Packing] Shipment ${shipment.orderNumber} has no label URL - fetching from ShipStation...`);
+        logger.info(`[Packing] Shipment ${shipment.orderNumber} has no label URL - fetching from ShipStation...`, withOrder(shipment.orderNumber, shipment.shipmentId));
         
         try {
           // Step 1: Try to fetch existing labels from ShipStation
@@ -8724,7 +8724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const existingLabels = await getLabelsForShipment(shipment.shipmentId);
           
           if (existingLabels.length > 0) {
-            console.log(`[Packing] Found ${existingLabels.length} existing label(s) in ShipStation`);
+            logger.info(`[Packing] Found ${existingLabels.length} existing label(s) in ShipStation`, withOrder(shipment.orderNumber, shipment.shipmentId));
             const label = existingLabels[0];
             
             // CRITICAL: Extract PDF format only - SumatraPDF requires PDF, not ZPL
@@ -8742,7 +8742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 labelUrl, 
                 trackingNumber: trackingNumber || undefined 
               });
-              console.log(`[Packing] Saved label URL to shipment: ${labelUrl}`);
+              logger.info(`[Packing] Saved label URL to shipment: ${labelUrl}`, withOrder(shipment.orderNumber, shipment.shipmentId));
             }
           }
           
@@ -8750,7 +8750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Use POST /v2/labels/shipment/{shipment_id} - the correct endpoint for existing shipments
           // This attaches a label to the existing shipment without creating duplicates
           if (!labelUrl && shipment.shipmentId) {
-            console.log(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId}...`);
+            logger.info(`[Packing] No existing label found, creating label for existing shipment ${shipment.shipmentId}...`, withOrder(shipment.orderNumber, shipment.shipmentId));
             
             await logPackingAction('label_create_attempt', true, {
               requestData: { shipStationShipmentId: shipment.shipmentId, action: 'createLabelForExistingShipment' }
@@ -8761,7 +8761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Handle dry run mode - returns null when DRY_RUN is enabled
             if (labelData === null) {
-              console.log(`[Packing] DRY RUN mode - no label created, skipping print job for ${shipment.orderNumber}`);
+              logger.info(`[Packing] DRY RUN mode - no label created, skipping print job for ${shipment.orderNumber}`, withOrder(shipment.orderNumber, shipment.shipmentId));
               await logPackingAction('label_create_dry_run', true, {
                 responseData: { dryRun: true, message: 'Label creation skipped in dry run mode' }
               });
@@ -8789,7 +8789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 trackingNumber: trackingNumber || undefined,
                 shipmentStatus: 'label_created', // Update status when label is created
               });
-              console.log(`[Packing] Created and saved new label: ${labelUrl}, updated shipmentStatus to label_created`);
+              logger.info(`[Packing] Created and saved new label: ${labelUrl}, updated shipmentStatus to label_created`, withOrder(shipment.orderNumber, shipment.shipmentId));
               
               // CACHE INVALIDATION: For boxing workflow, label created means order is complete
               // For bagging workflow (skipCacheInvalidation=true), we keep the cache until QC scanning is done
@@ -8798,7 +8798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.warn(`[Packing] Cache invalidation error for ${shipment.orderNumber}:`, err.message);
                 });
               } else if (skipCacheInvalidation) {
-                console.log(`[Packing] Skipping cache invalidation for ${shipment.orderNumber} (bagging workflow - QC scans pending)`);
+                logger.debug(`[Packing] Skipping cache invalidation for ${shipment.orderNumber} (bagging workflow - QC scans pending)`, withOrder(shipment.orderNumber, shipment.shipmentId));
               }
             }
           }
@@ -8930,7 +8930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         job: printJob 
       });
       
-      console.log(`[Packing] Created print job ${printJob.id} for station ${webSession.stationId}`);
+      logger.info(`[Packing] Created print job ${printJob.id} for station ${webSession.stationId}`, withOrder(orderNumber, shipment?.shipmentId, { printJobId: printJob.id, stationId: webSession.stationId }));
       
       // Log successful completion
       await logPackingAction('complete_order_success', true, {
@@ -8950,9 +8950,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           qcCompleted: true,
           qcCompletedAt: new Date(),
         });
-        console.log(`[Packing] Marked QC complete for shipment ${shipment.id} (order ${orderNumber})`);
+        logger.info(`[Packing] Marked QC complete for shipment ${shipment.id} (order ${orderNumber})`, withOrder(orderNumber, shipment.id));
       } else {
-        console.log(`[Packing] Skipping QC complete mark for ${orderNumber} (bagging workflow - QC scans pending)`);
+        logger.debug(`[Packing] Skipping QC complete mark for ${orderNumber} (bagging workflow - QC scans pending)`, withOrder(orderNumber, shipment?.shipmentId));
       }
       
       res.json({ 
@@ -9019,7 +9019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
       
-      console.log(`[Bagging] Logged packing_completed event for order ${orderNumber}`);
+      logger.info(`[Bagging] Logged packing_completed event for order ${orderNumber}`, withOrder(orderNumber, shipmentId));
       
       // Log to packing_logs table for audit trail (matches boxing workflow logging)
       try {
@@ -9040,7 +9040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           station: "bagging",
           stationId: stationId || null,
         });
-        console.log(`[Bagging] Logged packing_log for order ${orderNumber}`);
+        logger.info(`[Bagging] Logged packing_log for order ${orderNumber}`, withOrder(orderNumber, shipmentId));
       } catch (logError) {
         console.error(`[Bagging] Failed to create packing_log for ${orderNumber}:`, logError);
       }
@@ -9051,7 +9051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           qcCompleted: true,
           qcCompletedAt: new Date(),
         });
-        console.log(`[Bagging] Marked QC complete for shipment ${shipmentId} (order ${orderNumber})`);
+        logger.info(`[Bagging] Marked QC complete for shipment ${shipmentId} (order ${orderNumber})`, withOrder(orderNumber, shipmentId));
       }
       
       // BAGGING WORKFLOW: Now that QC is complete, invalidate the warm cache
@@ -9060,7 +9060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invalidateCacheForOrder(orderNumber).catch(err => {
           console.warn(`[Bagging] Cache invalidation error for ${orderNumber}:`, err.message);
         });
-        console.log(`[Bagging] Invalidated cache for order ${orderNumber} (QC complete)`);
+        logger.info(`[Bagging] Invalidated cache for order ${orderNumber} (QC complete)`, withOrder(orderNumber, shipmentId));
       }
       
       res.json({ 
@@ -9129,7 +9129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stationPrinters = await storage.getPrintersByStation(webSession.stationId);
       const selectedPrinter = stationPrinters.length > 0 ? stationPrinters[0] : null;
       
-      console.log(`[Packing] Reprint label requested for order ${orderNumber || shipment.orderNumber} at station ${webSession.stationId}`);
+      logger.info(`[Packing] Reprint label requested for order ${orderNumber || shipment.orderNumber} at station ${webSession.stationId}`, withOrder(orderNumber || shipment.orderNumber, shipment.shipmentId, { stationId: webSession.stationId }));
       
       // CHECK FOR VOIDED LABEL - If voided, create new label instead of reprinting old one
       // Check database status OR raw shipment data for voided flag
@@ -9161,7 +9161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       if (isLabelVoided()) {
-        console.log(`[Packing] Label is VOIDED for order ${shipment.orderNumber} - creating NEW label instead of reprinting`);
+        logger.info(`[Packing] Label is VOIDED for order ${shipment.orderNumber} - creating NEW label instead of reprinting`, withOrder(shipment.orderNumber, shipment.shipmentId));
         
         // Get the shipment ID for creating new label on existing shipment
         const shipStationShipmentId = shipment.shipmentId;
@@ -9177,7 +9177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        console.log(`[Packing] Creating new label for voided shipment ${shipStationShipmentId}...`);
+        logger.info(`[Packing] Creating new label for voided shipment ${shipStationShipmentId}...`, withOrder(shipment.orderNumber, shipStationShipmentId));
         
         let newLabelUrl: string | null = null;
         let newTrackingNumber: string | null = null;
@@ -9202,7 +9202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           newLabelUrl = extractPdfLabelUrl(labelData.label_download);
           newTrackingNumber = labelData.tracking_number || null;
           
-          console.log(`[Packing] New label created: ${newLabelUrl}, tracking: ${newTrackingNumber}`);
+          logger.info(`[Packing] New label created: ${newLabelUrl}, tracking: ${newTrackingNumber}`, withOrder(shipment.orderNumber, shipStationShipmentId, { trackingNumber: newTrackingNumber }));
         } catch (labelError: any) {
           console.error(`[Packing] Failed to create new label for voided order:`, labelError);
           return res.status(422).json({
@@ -9264,15 +9264,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trackingNumber: newTrackingNumber,
           status: 'shipped', // Reset to shipped status
         });
-        console.log(`[Packing] Updated shipment with new label URL and tracking number`);
+        logger.info(`[Packing] Updated shipment with new label URL and tracking number`, withOrder(shipment.orderNumber, shipStationShipmentId));
         
         // Invalidate QC cache for this order (so fresh data is fetched)
         try {
           const { qcSaleCache } = await import("./services/qcsale-cache-warmer");
           await qcSaleCache.invalidate(shipment.orderNumber);
-          console.log(`[Packing] Invalidated QC cache for voided order ${shipment.orderNumber}`);
+          logger.info(`[Packing] Invalidated QC cache for voided order ${shipment.orderNumber}`, withOrder(shipment.orderNumber, shipStationShipmentId));
         } catch (err) {
-          console.log(`[Packing] Cache invalidation skipped:`, err);
+          logger.debug(`[Packing] Cache invalidation skipped`, withOrder(shipment.orderNumber, shipStationShipmentId));
         }
         
         // Log the new label creation (replacing voided label)
@@ -9292,7 +9292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
         
-        console.log(`[Packing] Created new label for voided order ${shipment.orderNumber}, print job: ${printJob.id}`);
+        logger.info(`[Packing] Created new label for voided order ${shipment.orderNumber}, print job: ${printJob.id}`, withOrder(shipment.orderNumber, shipStationShipmentId, { printJobId: printJob.id }));
         
         return res.json({ 
           success: true, 
@@ -9348,7 +9348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
       
-      console.log(`[Packing] Created reprint job ${printJob.id} for order ${shipment.orderNumber}`);
+      logger.info(`[Packing] Created reprint job ${printJob.id} for order ${shipment.orderNumber}`, withOrder(shipment.orderNumber, shipment.shipmentId, { printJobId: printJob.id }));
       
       res.json({ 
         success: true, 

@@ -11,7 +11,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import logger from "../utils/logger";
+import logger, { withOrder } from "../utils/logger";
 import { CookieJar } from 'tough-cookie';
 import { wrapper } from 'axios-cookiejar-support';
 import { v4 as uuidv4 } from 'uuid';
@@ -143,7 +143,7 @@ class LockoutCache {
       const ttlSeconds = durationMinutes * 60;
       
       await redis.set(this.REDIS_KEY, endTime.toString(), { ex: ttlSeconds });
-      console.log(`[SkuVault] Lockout set for ${durationMinutes} minutes (until ${new Date(endTime).toISOString()})`);
+      logger.info(`[SkuVault] Lockout set for ${durationMinutes} minutes (until ${new Date(endTime).toISOString()})`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.warn(`[SkuVault] Redis unavailable for lockout cache (lockout will not persist): ${errorMsg}`);
@@ -521,7 +521,7 @@ function parseLockoutDuration(errorText: string): number | null {
   
   // Fallback: Look for "temporarily locked" or "account is locked" without explicit duration
   if (errorText.match(/temporarily\s+locked/i) || errorText.match(/account\s+(is\s+)?locked/i)) {
-    console.log('[SkuVault] Generic lockout message detected, assuming 30 minutes');
+    logger.info('[SkuVault] Generic lockout message detected, assuming 30 minutes');
     return 30;
   }
   
@@ -589,7 +589,7 @@ export class SkuVaultService {
     
     if (timeSinceLastRequest < this.RATE_LIMIT_DELAY_MS) {
       const delayNeeded = this.RATE_LIMIT_DELAY_MS - timeSinceLastRequest;
-      console.log(`[SkuVault] Rate limiting: waiting ${delayNeeded}ms before next request`);
+      logger.info(`[SkuVault] Rate limiting: waiting ${delayNeeded}ms before next request`);
       await new Promise(resolve => setTimeout(resolve, delayNeeded));
     }
     
@@ -603,11 +603,11 @@ export class SkuVaultService {
    */
   async initializeAuthentication(): Promise<void> {
     try {
-      console.log('[SkuVault] Initializing authentication...');
+      logger.info('[SkuVault] Initializing authentication...');
       
       // Always check if we have a valid cached token (even if credentials missing)
       if (await this.tokenCache.isValid()) {
-        console.log('[SkuVault] Found valid token in Redis, marking as authenticated');
+        logger.info('[SkuVault] Found valid token in Redis, marking as authenticated');
         this.isAuthenticated = true;
         return;
       }
@@ -619,9 +619,9 @@ export class SkuVaultService {
       }
 
       // No valid token, perform initial login
-      console.log('[SkuVault] No valid token found, performing initial login...');
+      logger.info('[SkuVault] No valid token found, performing initial login...');
       await this.ensureAuthenticated();
-      console.log('[SkuVault] Authentication initialization complete');
+      logger.info('[SkuVault] Authentication initialization complete');
     } catch (error) {
       console.error('[SkuVault] Failed to initialize authentication:', error);
       // Don't throw - let individual requests handle re-authentication
@@ -649,13 +649,13 @@ export class SkuVaultService {
     
     // Reset flag if token is missing from Redis
     if (this.isAuthenticated) {
-      console.log('[SkuVault] isAuthenticated flag was true but token missing from Redis, re-authenticating...');
+      logger.info('[SkuVault] isAuthenticated flag was true but token missing from Redis, re-authenticating...');
       this.isAuthenticated = false;
     }
 
     // If there's already a login in progress, wait for it
     if (this.loginMutex) {
-      console.log('[SkuVault] Login already in progress, waiting...');
+      logger.info('[SkuVault] Login already in progress, waiting...');
       await this.loginMutex;
       return;
     }
@@ -680,11 +680,11 @@ export class SkuVaultService {
    */
   async login(): Promise<boolean> {
     try {
-      console.log('[SkuVault] Starting login process...');
+      logger.info('[SkuVault] Starting login process...');
 
       // Check if we have a valid cached token
       if (await this.tokenCache.isValid()) {
-        console.log('[SkuVault] Using cached token');
+        logger.info('[SkuVault] Using cached token');
         this.isAuthenticated = true;
         return true;
       }
@@ -720,9 +720,9 @@ export class SkuVaultService {
         const csrfMatch = loginPageResponse.data.match(/name="__RequestVerificationToken"[^>]*value="([^"]+)"/);
         if (csrfMatch) {
           formData.__RequestVerificationToken = csrfMatch[1];
-          console.log('[SkuVault] Found CSRF token in login form');
+          logger.debug('[SkuVault] Found CSRF token in login form');
         } else {
-          console.log('[SkuVault] No CSRF token found in login form');
+          logger.debug('[SkuVault] No CSRF token found in login form');
         }
       }
 
@@ -748,8 +748,8 @@ export class SkuVaultService {
         }
       );
 
-      console.log('[SkuVault] Login response status:', loginResponse.status);
-      console.log('[SkuVault] Login response URL:', loginResponse.request?.res?.responseUrl || 'N/A');
+      logger.debug(`[SkuVault] Login response status: ${loginResponse.status}`);
+      logger.debug(`[SkuVault] Login response URL: ${loginResponse.request?.res?.responseUrl || 'N/A'}`);
 
       // Check for successful login indicators
       const responseUrl = loginResponse.request?.res?.responseUrl || this.config.loginUrl;
@@ -757,9 +757,7 @@ export class SkuVaultService {
       const hasSuccessfulRedirect = responseUrl.includes('dashboard') || responseUrl.includes('main');
       const hasMountPoint = responseHtml.includes('<div id="mount-point">');
       
-      console.log('[SkuVault] Login success indicators:');
-      console.log('  - Redirected to dashboard/main:', hasSuccessfulRedirect);
-      console.log('  - Has mount-point div:', hasMountPoint);
+      logger.debug(`[SkuVault] Login success indicators: redirected=${hasSuccessfulRedirect}, mountPoint=${hasMountPoint}`);
 
       if (!hasSuccessfulRedirect && !hasMountPoint) {
         console.error('[SkuVault] Login appears to have failed - no success indicators found');
@@ -772,7 +770,7 @@ export class SkuVaultService {
       
       try {
         const cookies = await this.cookieJar.getCookies(this.config.loginUrl);
-        console.log(`[SkuVault] Found ${cookies.length} cookies in jar`);
+        logger.debug(`[SkuVault] Found ${cookies.length} cookies in jar`);
         
         for (const cookie of cookies) {
           if (cookie.key === 'sv-t') {
@@ -781,7 +779,7 @@ export class SkuVaultService {
             // Validate token is long enough (should be > 100 chars)
             if (tokenValue && tokenValue.length > 100) {
               authToken = tokenValue;
-              console.log(`[SkuVault] Extracted sv-t token from jar (${tokenValue.length} chars)`);
+              logger.debug(`[SkuVault] Extracted sv-t token from jar (${tokenValue.length} chars)`);
               break;
             } else {
               console.warn(`[SkuVault] sv-t cookie found but too short (${tokenValue.length} chars)`);
@@ -820,7 +818,7 @@ export class SkuVaultService {
         const lockoutDuration = parseLockoutDuration(errorMessage || responseText);
         if (lockoutDuration) {
           await this.lockoutCache.setLockout(lockoutDuration);
-          console.log(`[SkuVault] Account locked out for ${lockoutDuration} minutes`);
+          logger.warn(`[SkuVault] Account locked out for ${lockoutDuration} minutes`);
           throw new SkuVaultError(
             errorMessage || `Account locked out for ${lockoutDuration} minutes. Please try again later.`,
             429,
@@ -847,7 +845,7 @@ export class SkuVaultService {
       // Store token and mark as authenticated
       await this.tokenCache.set(authToken);
       this.isAuthenticated = true;
-      console.log('[SkuVault] Login successful, token cached in Redis');
+      logger.info('[SkuVault] Login successful, token cached in Redis');
       
       return true;
 
@@ -891,7 +889,7 @@ export class SkuVaultService {
       }
       
       // Token not available - trigger authentication
-      console.log(`[SkuVault] Token unavailable in getApiHeaders, triggering re-authentication (attempt ${attempt}/${MAX_RETRIES})`);
+      logger.info(`[SkuVault] Token unavailable in getApiHeaders, triggering re-authentication (attempt ${attempt}/${MAX_RETRIES})`);
       
       try {
         // Reset flag and trigger fresh login
@@ -916,7 +914,7 @@ export class SkuVaultService {
       
       // Wait before next retry
       if (attempt < MAX_RETRIES) {
-        console.log(`[SkuVault] Waiting ${RETRY_DELAY_MS}ms before retry...`);
+        logger.info(`[SkuVault] Waiting ${RETRY_DELAY_MS}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
       }
     }
@@ -951,7 +949,7 @@ export class SkuVaultService {
       
       // If 401, clear token and retry once with re-authentication (using mutex)
       if (axiosError.response?.status === 401) {
-        console.log('[SkuVault] Received 401, re-authenticating...');
+        logger.info('[SkuVault] Received 401, re-authenticating...');
         await this.tokenCache.clear();
         this.isAuthenticated = false;
         
@@ -1030,8 +1028,8 @@ export class SkuVaultService {
         };
       }
 
-      console.log('[SkuVault] Fetching sessions with filters:', JSON.stringify(filters, null, 2));
-      console.log('[SkuVault] Request payload to SkuVault API:', JSON.stringify(requestData, null, 2));
+      logger.debug('[SkuVault] Fetching sessions with filters:', JSON.stringify(filters, null, 2));
+      logger.debug('[SkuVault] Request payload to SkuVault API:', JSON.stringify(requestData, null, 2));
 
       const response = await this.makeAuthenticatedRequest<any>(
         'POST',
@@ -1046,12 +1044,11 @@ export class SkuVaultService {
       const sessions = validatedResponse.lists || [];
       
       // Log response details for debugging
-      console.log(`[SkuVault] Successfully fetched ${sessions.length} sessions`);
+      logger.info(`[SkuVault] Successfully fetched ${sessions.length} sessions`, withOrder(filters?.orderNumber));
       if (sessions.length > 0 && filters?.orderNumber) {
-        console.log('[SkuVault] Session match details for order search:');
+        logger.info('[SkuVault] Session match details for order search:', withOrder(filters?.orderNumber));
         sessions.forEach((session: any) => {
-          // Log the entire session object to see all fields returned by SkuVault
-          console.log(`  - Session ${session.sequenceId}:`, JSON.stringify(session, null, 2));
+          logger.debug(`[SkuVault]   - Session ${session.sequenceId}:`, JSON.stringify(session, null, 2));
         });
       }
       
@@ -1103,7 +1100,7 @@ export class SkuVaultService {
 
     try {
       const url = `${this.config.apiBaseUrl}/wavepicking/get/${picklistId}/directions`;
-      console.log(`[SkuVault] Fetching directions for picklist ${picklistId}`);
+      logger.info(`[SkuVault] Fetching directions for picklist ${picklistId}`);
       
       const response = await this.makeAuthenticatedRequest<any>('GET', url);
       
@@ -1117,8 +1114,8 @@ export class SkuVaultService {
       const orderIds = orders.map((order: any) => order.id).filter(Boolean);
       const sessionId = response?.picklist?.sequenceId;
       
-      console.log(`[SkuVault] Successfully fetched directions for picklist ${picklistId} (Session ${sessionId})`);
-      console.log(`[SkuVault] This session contains ${orderIds.length} order(s):`, orderIds);
+      logger.info(`[SkuVault] Successfully fetched directions for picklist ${picklistId} (Session ${sessionId})`, withOrder(undefined, undefined, { sessionId }));
+      logger.info(`[SkuVault] This session contains ${orderIds.length} order(s): ${JSON.stringify(orderIds)}`, withOrder(undefined, undefined, { sessionId }));
       
       return response;
 
@@ -2148,7 +2145,7 @@ export class SkuVaultService {
    * Clears existing token and performs fresh login
    */
   async rotateToken(): Promise<void> {
-    console.log('[SkuVault] Manual token rotation requested');
+    logger.info('[SkuVault] Manual token rotation requested');
     
     // Clear existing token
     await this.tokenCache.clear();
@@ -2157,7 +2154,7 @@ export class SkuVaultService {
     // Perform fresh login
     await this.ensureAuthenticated();
     
-    console.log('[SkuVault] Token rotation complete');
+    logger.info('[SkuVault] Token rotation complete');
   }
 
   /**
@@ -2166,7 +2163,7 @@ export class SkuVaultService {
   async logout(): Promise<void> {
     await this.tokenCache.clear();
     this.isAuthenticated = false;
-    console.log('[SkuVault] Logged out, token cleared from Redis');
+    logger.info('[SkuVault] Logged out, token cleared from Redis');
   }
 }
 

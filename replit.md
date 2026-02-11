@@ -22,43 +22,40 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Worker Coordination System**: Redis-backed mutex for production-ready coordination of poll workers and backfill jobs.
 - **Dual Shipment Sync Architecture**: Combines cursor-based polling and a Webhook Processing Queue for real-time events.
 - **Event-Driven Lifecycle Architecture**: Redis-backed queue system for reliable lifecycle state transitions with automated side effects, decoupled evaluation, error isolation, rate limiting, and centralized observability.
+- **Structured Logging**: Winston logger (`server/utils/logger.ts`) with `LOG_LEVEL` env var (default: `info`). Set to `debug` for full payload diagnostics. Uses `withOrder(orderNumber, shipmentId?, extras?)` helper for correlation context on every order-related log line.
+- **Correlation ID Standard**: All log lines that touch an order/shipment include standardized correlation IDs so you can trace an order's full journey by searching for its order number. Standard identifiers:
+  - `orderNumber` — unique order identifier across all sales channels (DB field: `name`)
+  - `shipmentId` — ShipStation's unique shipment identifier (e.g. `se-123456`)
+  - `sessionId` — SkuVault wave picking session ID
+  - `localSessionId` — this system's session ID (groups orders for picking/packing)
+  - `sku` — unique product identifier across all sales channels
+  - `trackingNumber` — carrier tracking number for labeled shipments
+  - `fingerprintId` — item-signature ID for packaging assignment
+  - `workstationId` — packing station handling the order
+  - `user` — warehouse staff member email performing the action
+  - `queueItemId` — ShipStation write queue entry ID
+  - `lifecyclePhase` / `subphase` — current pipeline position
 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics.
 - **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
-- **Tag Refresh Job**: Periodic re-validation of ShipStation tags for specific shipment phases.
-- **Sessionable Order Status**: Lifecycle state machine treats `pending` shipment status as valid for `READY_TO_SESSION` phase.
-- **Lifecycle State Machine Documentation**: `server/services/lifecycle-state-machine.ts` is the single source of truth for order status determination. Key principle: tracking status takes precedence over shipmentStatus. Terminal states: `delivered`, `cancelled`, `problem`. Delivered status codes: DE (Delivered to final address), SP (Service Point — delivered to a collection location like a locker or pickup point). Problem status codes: UN (Unknown — carrier has no tracking info), EX (Exception — unexpected event like weather delay, damaged label, or incorrect address). Status `new` with `label_purchased` maps to `on_dock`.
-- **Decision Subphase Chain** (updated 2026-02-08): Within `fulfillment_prep`, the progression is: `needs_hydration` → `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_rate_check` → `needs_session`. **Evaluation order matches progression order** — early subphases (hydration, categorization) are checked first and act as hard gates, preventing shipments from short-circuiting to later subphases (e.g. `needs_session`) when they have stale packaging/fingerprint data from a previous state. Each subphase is explicitly tied to a real condition — no catch-all defaults. `needs_hydration` = fingerprintStatus is NULL or unrecognized (no QC items yet, automated step). `needs_categorization` = fingerprintStatus is 'pending_categorization' (hydrated but SKUs not in geometry collections). `needs_fingerprint` = fingerprintStatus is 'complete' but no fingerprintId, OR fingerprintStatus is 'missing_weight' (blocks until weights resolved). `needs_packaging` = has fingerprint but no packaging type. `needs_rate_check` = has packaging but rate check not done. `needs_session` = everything ready, needs fulfillment session (terminal subphase). After sessioning, orders transition to `ready_for_skuvault` phase (waiting on SkuVault wave picking).
-- **Kit Explosion Race Condition Prevention**: Multi-layered approach using lazy-loading cache, hourly GCP sync, proactive hydration, and a repair job endpoint.
-- **Split/Merge Detection**: ETL service detects shipment item changes using a normalized "SKU:QTY" fingerprint, triggering re-hydration and fingerprint recalculation.
-- **Packing Completion Audit Logging**: All packing actions are logged to `packing_logs` table.
-- **Packing Error Handling**: Structured error responses with `{code, message, resolution}` for user guidance.
-- **Voided Label Handling**: Automatic new label creation, PDF validation, printing to requesting worker, audit logging, and QC cache invalidation.
-- **QC Completion Tracking**: `shipments.qc_completed` boolean flag and `qc_completed_at` timestamp.
-- **ShipStation Label Creation Endpoints**: Differentiates label creation for existing versus new shipments.
-- **Product Categorization**: Distinction between kits and assembled products based on SkuVault's QC Sale API behavior.
-  - **Kits** (product_category = 'kit'): Always exploded into component SKUs at hydration time. Kits are assembled at pick time by warehouse staff.
-  - **Assembled Products (APs)** (is_assembled_product = true, category != 'kit'): Only exploded into components when `available_quantity === 0`. APs are pre-assembled products (typically in a nice container or bag) that ship as-is when in stock. When out of stock, they must be built from components like kits.
-  - **Out-of-Stock Orders Are Sessionable**: Orders with out-of-stock SKUs show a warning on the Build tab but checkboxes remain enabled so warehouse staff can still add them to sessions.
-- **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog data, synced hourly from a GCP reporting database.
-- **Packaging Types Sync Worker**: Hourly sync from ShipStation `/v2/packages` endpoint, preserving local `id`, `is_active`, and `stationType` fields.
-- **Automated Package Assignment**: Two-table architecture where `fingerprints` stores order item signatures and `fingerprint_models` stores learned rules (fingerprint → packaging type). When a user assigns a packaging type via UI, the endpoint creates/updates the fingerprint_model AND directly updates all shipments with that fingerprint. The lifecycle event worker can also copy packagingTypeId from fingerprint_models to shipments when missing, then syncs dimensions to ShipStation (respecting status guardrails - only "pending" shipments can be updated).
-- **Fingerprint Needs-Mapping Filter**: The Packaging tab only shows fingerprints needing assignment for shipments in `lifecycle_phase IN ('ready_to_session', 'fulfillment_prep')`. This excludes on-hold orders (ready_to_fulfill), shipped orders, and delivered orders from the actionable queue.
-- **Two-Tier Inventory Tracking System**: `skuvault_products` table uses `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity` to prevent premature inventory deduction.
-- **PO Recommendations Page (`/po-recommendations`)**: Displays inventory forecasts, holiday planning, supplier filtering, and lead time considerations from a reporting database view.
-- **Shipping Cost Tracking**: Actual carrier costs from ShipStation labels API are stored in `shipments.shipping_cost` for cost analysis.
-- **Two Status Fields Contract** (documented 2026-02-08, updated 2026-02-10):
-  - `shipment_status` — ShipStation's own lifecycle status for the shipment record. Valid values: `on_hold` (initial state, new orders), `pending` (released from hold, awaiting shipment), `label_purchased` (label printed, on its way), `cancelled` (order cancelled), `delivered` (ShipStation marks delivered), `orphaned` (shipment no longer exists in ShipStation — merged into another shipment or deleted).
-  - `status` — Carrier tracking status code. Valid values: `DE` (delivered), `SP` (service point delivery), `IT` (in transit), `AT` (acceptance scan), `AC` (accepted), `UN` (unknown), `EX` (exception/problem), `new` (label purchased but no carrier scan yet), `pending` (pre-label state), `cancelled` (voided/cancelled).
-  - **Consistency Rule**: The ETL enforces consistency between these two fields. If `shipment_status` provides more information than `status`, the ETL upgrades `status` to match (e.g. `shipment_status='delivered'` forces `status='DE'`). The `status` field must always be a valid 2-letter carrier code or one of the pre-tracking values (`new`, `pending`, `cancelled`) — never full words like `shipped`.
-- **ETL-Based Tracking Status Sync**: The ETL service extracts tracking status naturally during sync by checking `status_code` on the shipment data, then falling back to `labels[0].tracking_status` from the labels array. No separate maintenance job needed — tracking status flows through the standard cursor-based poll cycle.
-- **Lifecycle Demotion Guard** (added 2026-02-08): `lifecycle-service.ts` prevents backward phase transitions from late-stage phases to pre-shipping phases. `delivered` and `cancelled` are truly terminal. `in_transit` can advance to `delivered` or `problem` but never back to `on_dock`. `problem` is recoverable — can move to `in_transit` or `delivered` when carrier resolves the exception, but never back to pre-shipping phases.
-- **Stale Shipment Audit** (added 2026-02-10): Maintenance job in the unified sync worker that runs every 15 minutes. Finds shipments stuck in pre-shipping phases (`fulfillment_prep`, `ready_to_session`, `ready_for_skuvault`, `ready_to_fulfill`, `ready_to_pick`) for 48+ hours, fetches each from ShipStation by shipment_id. If ShipStation returns 404 or empty (shipment merged/deleted), marks as `shipmentStatus='orphaned'`, `status='UN'`. The lifecycle state machine maps `orphaned` → `problem` phase. Processes 5 shipments per batch to conserve rate limits.
-- **Carrier Code Resolution**: Cached `getServiceCodeToCarrierMap()` provides service_code → carrier_id lookup (4-hour TTL with stale fallback) for `updateShipmentPackage` when carrier_id is missing.
-- **Structured Logging** (added 2026-02-11): Winston logger (`server/utils/logger.ts`) replaces verbose `console.log` dumps. `LOG_LEVEL` env var (default: `info`) controls verbosity — set to `debug` for full payload diagnostics. Info level shows concise one-line summaries; debug level preserves full request/response payloads for troubleshooting. All `console.error` calls left untouched.
-- **ShipStation Write Queue** (added 2026-02-10): PostgreSQL-backed queue (`shipstation_write_queue` table) for reliable, rate-limit-aware ShipStation shipment writes. Uses PATCH semantics — messages contain only fields to change; worker does GET (fresh state) → merge patch → PUT (full payload) to avoid staleness. Features: FIFO ordering by `createdAt`, exponential backoff (5s base, max 5 min), rate limit errors don't count as retries, dead-lettering after max retries, stale-job recovery on startup, and optional callback actions (e.g., clearing manual package flags). Controlled by `auto_package_sync` feature flag — no writes enqueued when disabled. Status flow: `queued` → `processing` → `completed` / `failed` / `dead_letter`. Implementation: `server/services/shipstation-write-queue.ts`.
+- **Lifecycle State Machine**: `server/services/lifecycle-state-machine.ts` is the single source of truth for order status determination, with clear definitions for phases, subphases, and terminal states. Prevents backward phase transitions.
+- **Decision Subphase Chain**: Within `fulfillment_prep`, a defined progression (`needs_hydration` → `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_rate_check` → `needs_session`) ensures proper evaluation order and hard gates for data integrity.
+- **Kit Explosion Race Condition Prevention**: Multi-layered approach using caching, GCP sync, proactive hydration, and repair jobs.
+- **Split/Merge Detection**: ETL service detects shipment item changes, triggering re-hydration and fingerprint recalculation.
+- **Packing Completion Audit Logging**: All packing actions are logged.
+- **Packing Error Handling**: Structured error responses with `{code, message, resolution}`.
+- **Voided Label Handling**: Automatic new label creation, PDF validation, printing, and audit logging.
+- **Product Categorization**: Distinction between kits (exploded into components at hydration) and assembled products (exploded only when out of stock).
+- **Master Products Page (`/skuvault-products`)**: Local single source of truth for product catalog, synced hourly.
+- **Automated Package Assignment**: Two-table architecture (`fingerprints` and `fingerprint_models`) for learning and applying packaging rules.
+- **Two-Tier Inventory Tracking System**: `skuvault_products` table uses `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity`.
+- **Shipping Cost Tracking**: Actual carrier costs stored in `shipments.shipping_cost`.
+- **Two Status Fields Contract**: `shipment_status` (ShipStation's lifecycle) and `status` (carrier tracking code) are consistently managed by the ETL.
+- **ETL-Based Tracking Status Sync**: Tracking status is extracted during natural sync cycles.
+- **Stale Shipment Audit**: Maintenance job to identify and handle shipments stuck in pre-shipping phases or orphaned in ShipStation.
+- **ShipStation Write Queue**: PostgreSQL-backed queue for reliable, rate-limit-aware ShipStation shipment writes with PATCH semantics, exponential backoff, and dead-lettering.
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.

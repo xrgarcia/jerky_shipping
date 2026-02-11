@@ -42,6 +42,7 @@ import {
   type LifecycleEvent,
   type LifecycleEventReason,
 } from './utils/queue';
+import logger, { withOrder } from './utils/logger';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
@@ -83,21 +84,20 @@ async function logPackageSyncFailureToDLQ(
       retryCount,
       failedAt: new Date(),
     });
-    log(`Package sync DLQ: Logged failure for ${orderNumber} (shipment ${shipmentId})`);
+    log(`Package sync DLQ: Logged failure for ${orderNumber} (shipment ${shipmentId})`, 'info', withOrder(orderNumber, shipmentId));
   } catch (dlqError: any) {
-    log(`Package sync DLQ: Failed to log entry for ${orderNumber}: ${dlqError.message}`, 'error');
+    log(`Package sync DLQ: Failed to log entry for ${orderNumber}: ${dlqError.message}`, 'error', withOrder(orderNumber, shipmentId));
   }
 }
 
-function log(message: string, level: 'info' | 'warn' | 'error' = 'info') {
-  const timestamp = new Date().toLocaleTimeString();
-  const prefix = `${timestamp} [lifecycle-worker]`;
+function log(message: string, level: 'info' | 'warn' | 'error' = 'info', ctx?: Record<string, any>) {
+  const prefix = '[lifecycle-worker]';
   if (level === 'error') {
     console.error(`${prefix} ${message}`);
   } else if (level === 'warn') {
     console.warn(`${prefix} ${message}`);
   } else {
-    console.log(`${prefix} ${message}`);
+    logger.info(`${prefix} ${message}`, ctx || {});
   }
 }
 
@@ -438,7 +438,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     const result = await updateShipmentLifecycle(event.shipmentId, { logTransition: true });
     
     if (!result) {
-      log(`Shipment not found: ${event.shipmentId}`, 'warn');
+      log(`Shipment not found: ${event.shipmentId}`, 'warn', withOrder(event.orderNumber, event.shipmentId));
       return true; // Don't retry if shipment doesn't exist
     }
 
@@ -447,7 +447,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
       const sideEffect = sideEffectsRegistry[result.newSubphase];
       
       if (sideEffect?.enabled) {
-        log(`Triggering side effect for ${orderRef}: ${sideEffect.description}`);
+        log(`Triggering side effect for ${orderRef}: ${sideEffect.description}`, 'info', withOrder(event.orderNumber, event.shipmentId, { subphase: result.newSubphase }));
         
         // Add small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, SIDE_EFFECT_DELAY_MS));
@@ -461,7 +461,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     let needsRequeue = false;
     for (const reasonEffect of reasonSideEffects) {
       if (reasonEffect.enabled && reasonEffect.reasons.includes(event.reason)) {
-        log(`Triggering reason-based side effect for ${orderRef}: ${reasonEffect.description}`);
+        log(`Triggering reason-based side effect for ${orderRef}: ${reasonEffect.description}`, 'info', withOrder(event.orderNumber, event.shipmentId));
         
         await new Promise(resolve => setTimeout(resolve, SIDE_EFFECT_DELAY_MS));
         
@@ -595,7 +595,7 @@ async function processQueue(): Promise<void> {
           if (!retried) {
             // Max retries exceeded, mark as complete to remove from in-flight
             await completeLifecycleEvent(event.shipmentId);
-            log(`Event dropped after max retries: ${event.shipmentId}`, 'error');
+            log(`Event dropped after max retries: ${event.shipmentId}`, 'error', withOrder(event.orderNumber, event.shipmentId));
           }
         }
 

@@ -15,6 +15,7 @@ import { db } from '../db';
 import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
+import logger, { withOrder } from '../utils/logger';
 
 export class ShipStationShipmentETLService {
   constructor(private readonly storage: IStorage) {}
@@ -56,11 +57,11 @@ export class ShipStationShipmentETLService {
         // 2. The existing shipment has the same ShipStation shipmentId as the incoming data
         if (!matchingShipmentId || matchingShipmentId === String(shipmentId)) {
           existing = trackingMatch;
-          console.log(`[ETL] Found existing shipment ${existing.id} by tracking number ${trackingNumber} (shipmentId: ${matchingShipmentId || 'null'})`);
+          logger.info(`[ETL] Found existing shipment ${existing.id} by tracking number ${trackingNumber} (shipmentId: ${matchingShipmentId || 'null'})`, withOrder(orderNumber, String(shipmentId), { trackingNumber }));
         } else {
           // Different shipmentIds with same tracking - likely label re-generation scenario
           // Fall through to shipmentId lookup to find the correct record
-          console.log(`[ETL] Tracking match ${trackingMatch.id} has different shipmentId (${matchingShipmentId} vs ${shipmentId}), continuing to shipmentId lookup`);
+          logger.info(`[ETL] Tracking match ${trackingMatch.id} has different shipmentId (${matchingShipmentId} vs ${shipmentId}), continuing to shipmentId lookup`, withOrder(orderNumber, String(shipmentId), { trackingNumber }));
         }
       }
     }
@@ -69,7 +70,7 @@ export class ShipStationShipmentETLService {
     if (!existing) {
       existing = await this.storage.getShipmentByShipmentId(String(shipmentId));
       if (existing) {
-        console.log(`[ETL] Found existing shipment ${existing.id} by ShipStation ID ${shipmentId}`);
+        logger.info(`[ETL] Found existing shipment ${existing.id} by ShipStation ID ${shipmentId}`, withOrder(orderNumber, String(shipmentId)));
       }
     }
     
@@ -88,7 +89,7 @@ export class ShipStationShipmentETLService {
         s.sessionStatus === 'closed'
       );
       if (sessionDerivedShipment) {
-        console.log(`[ETL] Found session-derived shipment ${sessionDerivedShipment.id} by orderNumber ${orderNumber} (sessionStatus=closed), linking to ShipStation ID ${shipmentId}`);
+        logger.info(`[ETL] Found session-derived shipment ${sessionDerivedShipment.id} by orderNumber ${orderNumber} (sessionStatus=closed), linking to ShipStation ID ${shipmentId}`, withOrder(orderNumber, String(shipmentId)));
         existing = sessionDerivedShipment;
       }
     }
@@ -104,7 +105,7 @@ export class ShipStationShipmentETLService {
         } else {
           // Existing link is wrong or order was deleted - re-lookup
           if (linkedOrder && orderNumber) {
-            console.log(`[ETL] Fixing incorrect order link: shipment ${orderNumber} was linked to order ${linkedOrder.orderNumber}, re-looking up`);
+            logger.info(`[ETL] Fixing incorrect order link: shipment ${orderNumber} was linked to order ${linkedOrder.orderNumber}, re-looking up`, withOrder(orderNumber, String(shipmentId)));
           }
           if (orderNumber) {
             const correctOrder = await this.storage.getOrderByOrderNumber(orderNumber);
@@ -131,9 +132,9 @@ export class ShipStationShipmentETLService {
     let finalShipmentId: string;
     
     if (existing) {
-      console.log(`[ETL] Updating existing shipment ${existing.id} (ShipStation ID: ${shipmentId})`);
-      console.log(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`);
-      console.log(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`);
+      logger.info(`[ETL] Updating existing shipment ${existing.id} (ShipStation ID: ${shipmentId})`, withOrder(orderNumber, String(shipmentId)));
+      logger.debug(`[ETL] Fresh hold_until_date: ${shipmentData?.hold_until_date || 'null'}`, withOrder(orderNumber, String(shipmentId)));
+      logger.debug(`[ETL] Cached hold_until_date: ${(existing.shipmentData as any)?.hold_until_date || 'null'}`, withOrder(orderNumber, String(shipmentId)));
       
       // GUARD: Preserve existing carrier tracking status when incoming data has no real tracking info.
       // The shipments list API (/v2/shipments) does NOT include tracking status_code — only
@@ -143,7 +144,7 @@ export class ShipStationShipmentETLService {
       const existingStatus = existing.status?.toUpperCase();
       
       if (!incomingHasRealTrackingStatus && existingStatus && ShipStationShipmentETLService.VALID_CARRIER_CODES.has(existingStatus)) {
-        console.log(`[ETL] Preserving existing tracking status '${existing.status}' (incoming data has no tracking status_code)`);
+        logger.debug(`[ETL] Preserving existing tracking status '${existing.status}' (incoming data has no tracking status_code)`, withOrder(orderNumber, String(shipmentId)));
         shipmentRecord.status = existing.status;
         shipmentRecord.statusDescription = existing.statusDescription || shipmentRecord.statusDescription;
       }
@@ -152,7 +153,7 @@ export class ShipStationShipmentETLService {
       
       if (updatedShipment) {
         const updatedHoldDate = (updatedShipment.shipmentData as any)?.hold_until_date || 'null';
-        console.log(`[ETL] Update succeeded - new hold_until_date in DB: ${updatedHoldDate}`);
+        logger.debug(`[ETL] Update succeeded - new hold_until_date in DB: ${updatedHoldDate}`, withOrder(orderNumber, String(shipmentId)));
       } else {
         console.warn(`[ETL] WARNING: updateShipment returned undefined for ${existing.id}`);
       }
@@ -161,7 +162,7 @@ export class ShipStationShipmentETLService {
     } else {
       // Check for null order_number before creating - dead-letter if missing
       if (!orderNumber) {
-        console.log(`[ETL] Dead-lettering shipment ${shipmentId} - no order_number in ShipStation data`);
+        logger.info(`[ETL] Dead-lettering shipment ${shipmentId} - no order_number in ShipStation data`, withOrder(null, String(shipmentId)));
         await this.storage.upsertShipmentsDeadLetter({
           shipmentId: String(shipmentId),
           data: shipmentData,
@@ -213,7 +214,7 @@ export class ShipStationShipmentETLService {
     }
     
     if (shipmentStatus) {
-      console.log(`[ETL] Extracted shipmentStatus: ${shipmentStatus} for order ${this.extractOrderNumber(shipmentData)}`);
+      logger.info(`[ETL] Extracted shipmentStatus: ${shipmentStatus} for order ${orderNumber}`, withOrder(orderNumber, shipmentId?.toString()));
     }
     
     // Extract carrier and service
@@ -287,9 +288,7 @@ export class ShipStationShipmentETLService {
       const itemsChanged = existingItems.length > 0 && existingFingerprint !== incomingFingerprint;
 
       if (itemsChanged) {
-        console.log(`[ShipStationShipmentETL] ITEM CHANGE DETECTED for shipment ${shipmentId}`);
-        console.log(`[ShipStationShipmentETL]   Old items: ${existingFingerprint}`);
-        console.log(`[ShipStationShipmentETL]   New items: ${incomingFingerprint}`);
+        logger.info(`[ETL] ITEM CHANGE DETECTED for shipment ${shipmentId}`, withOrder(orderNumber, String(shipmentId), { oldItems: existingFingerprint, newItems: incomingFingerprint }));
 
         // Invalidate QC items - delete existing ones so hydrator will re-run
         const deletedQcItems = await db
@@ -298,7 +297,7 @@ export class ShipStationShipmentETLService {
           .returning({ id: shipmentQcItems.id });
 
         if (deletedQcItems.length > 0) {
-          console.log(`[ShipStationShipmentETL]   Deleted ${deletedQcItems.length} QC items for re-hydration`);
+          logger.info(`[ETL] Deleted ${deletedQcItems.length} QC items for re-hydration`, withOrder(orderNumber, String(shipmentId)));
         }
 
         // Reset fingerprint so it gets recalculated
@@ -307,7 +306,7 @@ export class ShipStationShipmentETLService {
           .set({ fingerprintId: null })
           .where(eq(shipments.id, shipmentId));
 
-        console.log(`[ShipStationShipmentETL]   Reset fingerprintId for re-calculation`);
+        logger.info(`[ETL] Reset fingerprintId for re-calculation`, withOrder(orderNumber, String(shipmentId)));
       }
 
       // Delete existing entries for this shipment (ensure clean state)
@@ -381,7 +380,7 @@ export class ShipStationShipmentETLService {
           const hasTagId = tag.tag_id !== null && tag.tag_id !== undefined;
           
           if (!hasName && !hasTagId) {
-            console.log(`[ShipStationShipmentETL] Skipping tag with null name and tagId for shipment ${shipmentId}`);
+            logger.debug(`[ETL] Skipping tag with null name and tagId`, withOrder(orderNumber, String(shipmentId)));
             return false;
           }
           
@@ -695,7 +694,7 @@ export class ShipStationShipmentETLService {
     const orderNumber = this.extractOrderNumber(shipmentData);
     const topLevelStatus = shipmentData.shipment_status || shipmentData.shipmentStatus;
     if (!topLevelStatus && orderNumber && orderNumber.startsWith('JK')) {
-      console.log(`[ETL] [DEBUG] No top-level shipment_status for ${orderNumber}. Keys:`, Object.keys(shipmentData).slice(0, 20).join(', '));
+      logger.debug(`[ETL] No top-level shipment_status for ${orderNumber}. Keys: ${Object.keys(shipmentData).slice(0, 20).join(', ')}`, withOrder(orderNumber));
     }
     
     // Check top-level fields first
