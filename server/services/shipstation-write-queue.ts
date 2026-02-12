@@ -4,6 +4,7 @@ import type { InsertShipstationWriteQueue } from '@shared/schema';
 import { eq, and, lte, or, isNull, asc, sql } from 'drizzle-orm';
 import { resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
 import logger, { withOrder } from '../utils/logger';
+import { withSpan } from '../utils/tracing';
 
 const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY;
 const SHIPSTATION_API_BASE = 'https://api.shipstation.com';
@@ -46,6 +47,19 @@ function extractRateLimitFromHeaders(headers: Headers) {
 function calculateBackoffMs(retryCount: number): number {
   const backoff = EXPONENTIAL_BACKOFF_BASE_MS * Math.pow(2, retryCount);
   return Math.min(backoff, MAX_BACKOFF_MS);
+}
+
+interface ShipStationError {
+  error_type?: string;
+  error_code?: string;
+  message?: string;
+}
+
+function parseShipStationErrors(body: any): string {
+  if (!body) return 'No response body';
+  const errors: ShipStationError[] = body.errors;
+  if (!Array.isArray(errors) || errors.length === 0) return 'No error details';
+  return errors.map(e => `[${e.error_type || 'unknown'}/${e.error_code || 'unknown'}] ${e.message || 'no message'}`).join('; ');
 }
 
 export interface EnqueueWriteOptions {
@@ -104,11 +118,18 @@ export async function getWriteQueueStats(): Promise<{
   return stats;
 }
 
-async function fetchCurrentShipment(shipmentId: string): Promise<{ data: any; headers: Headers } | null> {
+interface FetchResult {
+  data: any;
+  headers: Headers;
+  statusCode: number;
+}
+
+async function fetchCurrentShipment(shipmentId: string, orderNumber?: string): Promise<FetchResult | null> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY not configured');
   }
 
+  const ctx = withOrder(orderNumber, shipmentId);
   const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   const response = await fetch(url, {
     method: 'GET',
@@ -122,20 +143,33 @@ async function fetchCurrentShipment(shipmentId: string): Promise<{ data: any; he
 
   if (response.status === 429) {
     const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    log(`GET ${shipmentId} → 429 rate limited (retry after ${retryAfter}s)`, 'warn', ctx);
     throw new RateLimitError(`Rate limited on GET`, retryAfter);
   }
 
   if (response.status === 404) {
+    log(`GET ${shipmentId} → 404 not found`, 'warn', ctx);
     return null;
   }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`GET shipment failed: ${response.status} ${errorText}`);
+    let errorDetail: string;
+    try {
+      const body = await response.json();
+      const requestId = body.request_id;
+      errorDetail = parseShipStationErrors(body);
+      log(`GET ${shipmentId} → ${response.status}: ${errorDetail}${requestId ? ` (request_id: ${requestId})` : ''}`, 'error', ctx);
+    } catch {
+      const text = await response.text();
+      errorDetail = text.slice(0, 200);
+      log(`GET ${shipmentId} → ${response.status}: ${errorDetail}`, 'error', ctx);
+    }
+    throw new Error(`GET shipment failed: ${response.status} ${errorDetail}`);
   }
 
+  log(`GET ${shipmentId} → ${response.status} OK`, 'info', ctx);
   const data = await response.json();
-  return { data, headers: response.headers };
+  return { data, headers: response.headers, statusCode: response.status };
 }
 
 function applyPatch(currentShipment: Record<string, any>, patch: Record<string, any>): Record<string, any> {
@@ -215,11 +249,17 @@ function fixPastShipDate(payload: Record<string, any>): void {
   }
 }
 
-async function putShipment(shipmentId: string, payload: Record<string, any>): Promise<void> {
+interface PutResult {
+  statusCode: number;
+  requestId?: string;
+}
+
+async function putShipment(shipmentId: string, payload: Record<string, any>, orderNumber?: string): Promise<PutResult> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY not configured');
   }
 
+  const ctx = withOrder(orderNumber, shipmentId);
   const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipmentId)}`;
   const response = await fetch(url, {
     method: 'PUT',
@@ -234,13 +274,42 @@ async function putShipment(shipmentId: string, payload: Record<string, any>): Pr
 
   if (response.status === 429) {
     const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+    log(`PUT ${shipmentId} → 429 rate limited (retry after ${retryAfter}s)`, 'warn', ctx);
     throw new RateLimitError(`Rate limited on PUT`, retryAfter);
   }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`PUT shipment failed: ${response.status} ${errorText}`);
+    let errorDetail: string;
+    let requestId: string | undefined;
+    try {
+      const body = await response.json();
+      requestId = body.request_id;
+      errorDetail = parseShipStationErrors(body);
+      log(`PUT ${shipmentId} → ${response.status}: ${errorDetail}${requestId ? ` (request_id: ${requestId})` : ''}`, 'error', ctx);
+    } catch {
+      const text = await response.text();
+      errorDetail = text.slice(0, 200);
+      log(`PUT ${shipmentId} → ${response.status}: ${errorDetail}`, 'error', ctx);
+    }
+    throw new Error(`PUT shipment failed: ${response.status} ${errorDetail}`);
   }
+
+  let requestId: string | undefined;
+  try {
+    const body = await response.json();
+    requestId = body.request_id;
+    const errors: ShipStationError[] = body.errors;
+    if (Array.isArray(errors) && errors.length > 0) {
+      const errorSummary = parseShipStationErrors(body);
+      log(`PUT ${shipmentId} → ${response.status} OK with warnings: ${errorSummary}${requestId ? ` (request_id: ${requestId})` : ''}`, 'warn', ctx);
+    } else {
+      log(`PUT ${shipmentId} → ${response.status} OK${requestId ? ` (request_id: ${requestId})` : ''}`, 'info', ctx);
+    }
+  } catch {
+    log(`PUT ${shipmentId} → ${response.status} OK (no response body)`, 'info', ctx);
+  }
+
+  return { statusCode: response.status, requestId };
 }
 
 class RateLimitError extends Error {
@@ -252,18 +321,19 @@ class RateLimitError extends Error {
   }
 }
 
-async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect): Promise<void> {
+async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect, orderNumber?: string): Promise<void> {
   if (!job.callbackAction || !job.localShipmentId) return;
 
+  const ctx = withOrder(orderNumber, job.shipmentId);
   try {
     if (job.callbackAction === 'clear_manual_package_flag') {
       await db.update(shipments)
         .set({ requiresManualPackage: false, packageAssignmentError: null })
         .where(eq(shipments.id, job.localShipmentId));
-      log(`Callback: Cleared manual package flag for shipment ${job.localShipmentId}`, 'info', withOrder(undefined, job.shipmentId));
+      log(`Callback: Cleared manual package flag for shipment ${job.localShipmentId}`, 'info', ctx);
     }
   } catch (err: any) {
-    log(`Callback action "${job.callbackAction}" failed for job #${job.id}: ${err.message}`, 'warn', withOrder(undefined, job.shipmentId));
+    log(`Callback action "${job.callbackAction}" failed for job #${job.id}: ${err.message}`, 'warn', ctx);
   }
 }
 
@@ -298,98 +368,101 @@ async function processNextJob(): Promise<boolean> {
       .limit(1);
     orderNumber = localShipment?.orderNumber ?? undefined;
   }
-  const jobCtx = withOrder(orderNumber, job.shipmentId);
 
-  await db.update(shipstationWriteQueue)
-    .set({ status: 'processing', processedAt: now })
-    .where(eq(shipstationWriteQueue.id, job.id));
-
-  try {
-    log(`Processing job #${job.id}: ${job.reason} for ${job.shipmentId} (attempt ${job.retryCount + 1}/${job.maxRetries})`, 'info', jobCtx);
-
-    const currentShipment = await fetchCurrentShipment(job.shipmentId);
-    if (!currentShipment) {
-      throw new Error(`Shipment ${job.shipmentId} not found in ShipStation`);
-    }
-
-    const patch = job.patchPayload as Record<string, any>;
-    const merged = applyPatch(currentShipment.data, patch);
-    const cleaned = stripReadOnlyFields(merged);
-    await resolveCarrierIfNeeded(cleaned);
-    fixPastShipDate(cleaned);
-
-    await putShipment(job.shipmentId, cleaned);
+  return withSpan('shipstation_writes', 'write_queue', 'process_job', async (span) => {
+    const jobCtx = withOrder(orderNumber, job.shipmentId, { queueItemId: String(job.id) });
 
     await db.update(shipstationWriteQueue)
-      .set({ status: 'completed', completedAt: new Date(), lastError: null })
+      .set({ status: 'processing', processedAt: now })
       .where(eq(shipstationWriteQueue.id, job.id));
 
-    log(`Job #${job.id} completed successfully for ${job.shipmentId}`, 'info', jobCtx);
+    try {
+      log(`Processing job #${job.id}: ${job.reason} for ${job.shipmentId} (attempt ${job.retryCount + 1}/${job.maxRetries})`, 'info', jobCtx);
 
-    await runCallbackAction(job);
-    return true;
+      const currentShipment = await fetchCurrentShipment(job.shipmentId, orderNumber);
+      if (!currentShipment) {
+        throw new Error(`Shipment ${job.shipmentId} not found in ShipStation (404)`);
+      }
 
-  } catch (err: any) {
-    const isRateLimit = err instanceof RateLimitError;
-    const newRetryCount = isRateLimit ? job.retryCount : job.retryCount + 1;
-    const errorMsg = err.message || 'Unknown error';
+      const patch = job.patchPayload as Record<string, any>;
+      const merged = applyPatch(currentShipment.data, patch);
+      const cleaned = stripReadOnlyFields(merged);
+      await resolveCarrierIfNeeded(cleaned);
+      fixPastShipDate(cleaned);
 
-    if (isRateLimit) {
-      const waitMs = err.retryAfterSeconds * 1000 + 1000;
-      const nextRetry = new Date(Date.now() + waitMs);
-      log(`Job #${job.id} rate limited, will retry at ${nextRetry.toISOString()} (not counting as failure)`, 'warn', jobCtx);
+      const putResult = await putShipment(job.shipmentId, cleaned, orderNumber);
+
       await db.update(shipstationWriteQueue)
-        .set({
-          status: 'failed',
-          lastError: `RATE_LIMITED: ${errorMsg}`,
-          retryCount: newRetryCount,
-          nextRetryAt: nextRetry,
-        })
+        .set({ status: 'completed', completedAt: new Date(), lastError: null })
         .where(eq(shipstationWriteQueue.id, job.id));
 
-      rateLimitRemaining = 0;
-      rateLimitResetAt = Date.now() + waitMs;
+      log(`Job #${job.id} completed: ${job.reason} → ${putResult.statusCode} OK`, 'info', jobCtx);
+
+      await runCallbackAction(job, orderNumber);
+      return true;
+
+    } catch (err: any) {
+      const isRateLimit = err instanceof RateLimitError;
+      const newRetryCount = isRateLimit ? job.retryCount : job.retryCount + 1;
+      const errorMsg = err.message || 'Unknown error';
+
+      if (isRateLimit) {
+        const waitMs = err.retryAfterSeconds * 1000 + 1000;
+        const nextRetry = new Date(Date.now() + waitMs);
+        log(`Job #${job.id} rate limited, will retry at ${nextRetry.toISOString()} (not counting as failure)`, 'warn', jobCtx);
+        await db.update(shipstationWriteQueue)
+          .set({
+            status: 'failed',
+            lastError: `RATE_LIMITED: ${errorMsg}`,
+            retryCount: newRetryCount,
+            nextRetryAt: nextRetry,
+          })
+          .where(eq(shipstationWriteQueue.id, job.id));
+
+        rateLimitRemaining = 0;
+        rateLimitResetAt = Date.now() + waitMs;
+        return true;
+      }
+
+      if (newRetryCount >= job.maxRetries) {
+        log(`Job #${job.id} exhausted all ${job.maxRetries} retries, moving to dead letter: ${errorMsg}`, 'error', jobCtx);
+        await db.update(shipstationWriteQueue)
+          .set({
+            status: 'dead_letter',
+            lastError: errorMsg,
+            retryCount: newRetryCount,
+          })
+          .where(eq(shipstationWriteQueue.id, job.id));
+
+        if (job.localShipmentId) {
+          try {
+            await db.update(shipments)
+              .set({
+                requiresManualPackage: true,
+                packageAssignmentError: `Write queue failed after ${job.maxRetries} attempts: ${errorMsg}`,
+              })
+              .where(eq(shipments.id, job.localShipmentId));
+          } catch (e) {
+            log(`Failed to flag shipment ${job.localShipmentId} for manual intervention: ${e}`, 'error', jobCtx);
+          }
+        }
+      } else {
+        const backoffMs = calculateBackoffMs(newRetryCount);
+        const nextRetry = new Date(Date.now() + backoffMs);
+        log(`Job #${job.id} failed (attempt ${newRetryCount}/${job.maxRetries}), retrying at ${nextRetry.toISOString()}: ${errorMsg}`, 'warn', jobCtx);
+        await db.update(shipstationWriteQueue)
+          .set({
+            status: 'failed',
+            lastError: errorMsg,
+            retryCount: newRetryCount,
+            nextRetryAt: nextRetry,
+          })
+          .where(eq(shipstationWriteQueue.id, job.id));
+      }
+
       return true;
     }
-
-    if (newRetryCount >= job.maxRetries) {
-      log(`Job #${job.id} exhausted all ${job.maxRetries} retries, moving to dead letter: ${errorMsg}`, 'error', jobCtx);
-      await db.update(shipstationWriteQueue)
-        .set({
-          status: 'dead_letter',
-          lastError: errorMsg,
-          retryCount: newRetryCount,
-        })
-        .where(eq(shipstationWriteQueue.id, job.id));
-
-      if (job.localShipmentId) {
-        try {
-          await db.update(shipments)
-            .set({
-              requiresManualPackage: true,
-              packageAssignmentError: `Write queue failed after ${job.maxRetries} attempts: ${errorMsg}`,
-            })
-            .where(eq(shipments.id, job.localShipmentId));
-        } catch (e) {
-          log(`Failed to flag shipment ${job.localShipmentId} for manual intervention: ${e}`, 'error', jobCtx);
-        }
-      }
-    } else {
-      const backoffMs = calculateBackoffMs(newRetryCount);
-      const nextRetry = new Date(Date.now() + backoffMs);
-      log(`Job #${job.id} failed (attempt ${newRetryCount}/${job.maxRetries}), retrying at ${nextRetry.toISOString()}: ${errorMsg}`, 'warn', jobCtx);
-      await db.update(shipstationWriteQueue)
-        .set({
-          status: 'failed',
-          lastError: errorMsg,
-          retryCount: newRetryCount,
-          nextRetryAt: nextRetry,
-        })
-        .where(eq(shipstationWriteQueue.id, job.id));
-    }
-
-    return true;
-  }
+  }, { orderNumber, shipmentId: job.shipmentId, queueItemId: String(job.id) });
 }
 
 async function shouldWaitForRateLimit(): Promise<boolean> {
