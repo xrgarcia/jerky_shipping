@@ -1,0 +1,166 @@
+2026-02-12 10:08:57.13
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: pending for order JK3825364482
+2026-02-12 10:08:57.13
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: pending for order JK3825364482
+2026-02-12 10:11:00.29
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:11:00.29
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:11:23.91
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:11:55.94
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:11:55.94
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:12:19.52
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:13:29.14
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:13:55.67
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:13:55.67
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 10:15:04.75
+d1d0e518
+User
+[ETL] Extracted shipmentStatus: on_hold for order JK3825364482
+2026-02-12 13:25:52.67
+52333fc6
+User
+7:25:52 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:52.67
+52333fc6
+User
+7:25:52 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:52.72
+52333fc6
+User
+7:25:52 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:52.72
+52333fc6
+User
+7:25:52 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:52.72
+52333fc6
+User
+7:25:52 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:52.72
+52333fc6
+User
+7:25:52 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:54.24
+60257958
+User
+7:25:54 PM [info][Lifecycle] JK3825364482: ready_to_fulfill/needs_hydration → ready_to_session/needs_hydration {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0","phase":"ready_to_session","subphase":"needs_hydration"}
+2026-02-12 13:25:56.57
+60257958
+User
+7:25:56 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:56.62
+60257958
+User
+7:25:56 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:25:56.62
+60257958
+User
+7:25:56 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.52
+60257958
+User
+7:26:09 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.52
+60257958
+User
+7:26:09 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.57
+60257958
+User
+7:26:09 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.57
+60257958
+User
+7:26:09 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.57
+60257958
+User
+7:26:09 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:09.57
+60257958
+User
+7:26:09 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:21.68
+60257958
+User
+7:26:21 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:21.72
+60257958
+User
+7:26:21 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:21.72
+60257958
+User
+7:26:21 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:30.85
+60257958
+User
+7:26:30 PM [info][ETL] Found existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 by ShipStation ID se-955527043 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:30.90
+60257958
+User
+7:26:30 PM [info][ETL] Updating existing shipment 628a2740-91c3-4f78-abfd-3221518103b0 (ShipStation ID: se-955527043) {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:30.90
+60257958
+User
+7:26:30 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825364482 {"orderNumber":"JK3825364482","shipmentId":"se-955527043"}
+2026-02-12 13:26:32.49
+60257958
+User
+7:26:32 PM [info][lifecycle-worker] Triggering side effect for #JK3825364482: Auto-run smart carrier rate analysis {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0","subphase":"needs_rate_check"}
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825364482: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0"}
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825364482: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0"}
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][lifecycle-worker] Side effect: Rate check completed for JK3825364482
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][Lifecycle] JK3825364482: ready_to_session/needs_rate_check → ready_to_session/needs_session {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0","phase":"ready_to_session","subphase":"needs_session"}
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][lifecycle-worker] Side effect: Rate check completed for JK3825364482
+2026-02-12 13:26:36.13
+60257958
+User
+7:26:36 PM [info][Lifecycle] JK3825364482: ready_to_session/needs_rate_check → ready_to_session/needs_session {"orderNumber":"JK3825364482","shipmentId":"628a2740-91c3-4f78-abfd-3221518103b0","phase":"ready_to_session","subphase":"needs_session"}
+Wrap
+Colors
