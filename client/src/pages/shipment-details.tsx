@@ -534,7 +534,7 @@ export default function ShipmentDetails() {
           )}
 
           {/* Collapsible Lifecycle Details */}
-          <details className="group border-t pt-4" open>
+          <details className="group border-t pt-4">
             <summary className="cursor-pointer flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
               <span className="font-medium">Lifecycle Details</span>
@@ -640,18 +640,18 @@ export default function ShipmentDetails() {
                     {hasSubphases && subphase ? (
                       <>
                         {/* Decision Subphase Stepper */}
-                        <div className="space-y-4" data-testid="decision-subphase-stepper">
-                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                        <div className="space-y-5" data-testid="decision-subphase-stepper">
+                          <div className="flex items-center gap-2 overflow-x-auto pb-2">
                             {DECISION_STEPS.map((step, i) => {
                               const isCurrent = i === currentStepIndex;
                               const isComplete = i < currentStepIndex;
                               const isFuture = i > currentStepIndex;
                               return (
-                                <div key={step.key} className="flex items-center gap-1.5 flex-shrink-0">
+                                <div key={step.key} className="flex items-center gap-2 flex-shrink-0">
                                   {i > 0 && (
-                                    <div className={`w-4 h-0.5 ${isComplete ? 'bg-green-500 dark:bg-green-400' : 'bg-border'}`} />
+                                    <div className={`w-6 h-0.5 ${isComplete ? 'bg-green-500 dark:bg-green-400' : 'bg-border'}`} />
                                   )}
-                                  <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                  <div className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                                     isCurrent
                                       ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 ring-2 ring-amber-400 dark:ring-amber-600'
                                       : isComplete
@@ -687,7 +687,7 @@ export default function ShipmentDetails() {
                                   </div>
                                 </div>
                                 {explanation.fields.length > 0 && (
-                                  <div className="flex flex-wrap gap-2 pt-1">
+                                  <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2">
                                     {explanation.fields.map((f, i) => (
                                       <div key={i} className="flex items-center gap-1.5 text-xs">
                                         <span className="text-muted-foreground">{f.label}:</span>
