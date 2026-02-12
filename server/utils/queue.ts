@@ -962,19 +962,26 @@ const LIFECYCLE_INFLIGHT_KEY = 'lifecycle:inflight';
 const MAX_LIFECYCLE_RETRIES = 3;
 
 export type LifecycleEventReason = 
-  | 'webhook'           // ShipStation webhook triggered update
-  | 'webhook_tracking'  // ShipStation tracking webhook update
-  | 'shipment_sync'     // Unified shipment sync worker
-  | 'categorization'    // Product categorized
-  | 'fingerprint'       // Fingerprint assigned
-  | 'packaging'         // Packaging type assigned
-  | 'session'           // Added to fulfillment session
-  | 'rate_check'        // Rate check completed
-  | 'rate_analysis'     // Smart carrier rate analysis completed
-  | 'lifecycle_repair'  // Lifecycle repair worker batch operation
-  | 'manual'            // Manual trigger from UI
-  | 'backfill'          // Batch backfill operation
-  | 'stale_audit';      // Stale shipment audit detected orphaned/missing shipment
+  | 'webhook'              // ShipStation webhook triggered update
+  | 'webhook_tracking'     // ShipStation tracking webhook update
+  | 'shipment_sync'        // Unified shipment sync worker
+  | 'categorization'       // Product categorized
+  | 'fingerprint'          // Fingerprint assigned
+  | 'packaging'            // Packaging type assigned
+  | 'packaging_model_assign'   // Packaging type assigned to a fingerprint model
+  | 'packaging_bulk_assign'    // Bulk packaging assignment across multiple fingerprint models
+  | 'session'              // Added to fulfillment session (legacy)
+  | 'session_create'       // New fulfillment session created with shipments
+  | 'session_add'          // Shipments added to existing fulfillment session
+  | 'session_release'      // Session released to floor (status → ready)
+  | 'session_release_bulk' // Multiple sessions bulk-released to floor
+  | 'session_delete'       // Fulfillment session deleted, shipments unlinked
+  | 'rate_check'           // Rate check completed
+  | 'rate_analysis'        // Smart carrier rate analysis completed
+  | 'lifecycle_repair'     // Lifecycle repair worker batch operation
+  | 'manual'               // Manual trigger from UI
+  | 'backfill'             // Batch backfill operation
+  | 'stale_audit';         // Stale shipment audit detected orphaned/missing shipment
 
 export interface LifecycleEvent {
   shipmentId: string;           // Internal shipment UUID (primary key)

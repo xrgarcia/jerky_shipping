@@ -1,0 +1,148 @@
+2026-02-12 14:36:41.39
+60257958
+User
+8:36:41 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:36:41.39
+60257958
+User
+8:36:41 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:36:41.39
+60257958
+User
+8:36:41 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:00.42
+60257958
+User
+8:37:00 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:00.42
+60257958
+User
+8:37:00 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:00.48
+60257958
+User
+8:37:00 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:00.48
+60257958
+User
+8:37:00 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:00.48
+60257958
+User
+8:37:00 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:00.48
+60257958
+User
+8:37:00 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:28.81
+60257958
+User
+8:37:28 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:28.81
+60257958
+User
+8:37:28 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:28.85
+60257958
+User
+8:37:28 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:28.85
+60257958
+User
+8:37:28 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:28.85
+60257958
+User
+8:37:28 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:31.35
+60257958
+User
+8:37:31 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:31.35
+60257958
+User
+8:37:31 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:31.40
+60257958
+User
+8:37:31 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:31.40
+60257958
+User
+8:37:31 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:31.40
+60257958
+User
+8:37:31 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:45.47
+60257958
+User
+8:37:45 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:45.47
+60257958
+User
+8:37:45 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:45.52
+60257958
+User
+8:37:45 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:45.52
+60257958
+User
+8:37:45 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:45.52
+60257958
+User
+8:37:45 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:45.52
+60257958
+User
+8:37:45 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:53.18
+60257958
+User
+8:37:53 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:53.18
+60257958
+User
+8:37:53 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:37:53.23
+60257958
+User
+8:37:53 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:53.23
+60257958
+User
+8:37:53 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:53.23
+60257958
+User
+8:37:53 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:37:53.23
+60257958
+User
+8:37:53 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:38:54.35
+60257958
+User
+8:38:54 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:38:54.35
+60257958
+User
+8:38:54 PM [info][ETL] Found existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a by tracking number 9434650106151029093026 (shipmentId: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051","trackingNumber":"9434650106151029093026"}
+2026-02-12 14:38:54.39
+60257958
+User
+8:38:54 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:38:54.39
+60257958
+User
+8:38:54 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:38:54.39
+60257958
+User
+8:38:54 PM [info][ETL] Updating existing shipment 6751e008-d54a-41ed-90e3-4792def6c20a (ShipStation ID: se-955499051) {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
+2026-02-12 14:38:54.39
+60257958
+User
+8:38:54 PM [info][ETL] Extracted shipmentStatus: label_purchased for order JK3825364475 {"orderNumber":"JK3825364475","shipmentId":"se-955499051"}
