@@ -981,6 +981,8 @@ export type LifecycleEventReason =
   | 'skuvault_session_clear'  // SkuVault session cleared (orphan cleanup) via Firestore sync
   | 'rate_check'           // Rate check completed
   | 'rate_analysis'        // Smart carrier rate analysis completed
+  | 'rate_check_queue_complete'  // Rate check queue worker completed successfully
+  | 'package_assignment_complete' // Package auto-assigned from fingerprint model
   | 'lifecycle_repair'     // Lifecycle repair worker batch operation
   | 'manual'               // Manual trigger from UI
   | 'manual_package_sync'  // Manual package sync trigger from shipment details UI

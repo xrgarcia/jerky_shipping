@@ -165,6 +165,13 @@ async function processNextJob(): Promise<boolean> {
           })
           .where(eq(shipments.id, job.localShipmentId));
 
+        try {
+          const { queueLifecycleEvaluation } = await import('./lifecycle-service');
+          await queueLifecycleEvaluation(job.localShipmentId, 'rate_check_queue_complete', orderNumber);
+        } catch (lcErr: any) {
+          log(`Job #${job.id} lifecycle re-eval failed (non-fatal): ${lcErr.message}`, 'warn', jobCtx);
+        }
+
         log(`Job #${job.id} completed: rate check successful`, 'info', jobCtx);
         return true;
       } else {

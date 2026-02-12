@@ -423,6 +423,19 @@ export async function calculateFingerprint(shipmentId: string): Promise<Fingerpr
     .set(updateData)
     .where(eq(shipments.id, shipmentId));
   
+  if (packagingTypeId) {
+    try {
+      const [shipmentRow] = await db
+        .select({ orderNumber: shipments.orderNumber })
+        .from(shipments)
+        .where(eq(shipments.id, shipmentId))
+        .limit(1);
+      await queueLifecycleEvaluation(shipmentId, 'package_assignment_complete', shipmentRow?.orderNumber || undefined);
+    } catch (lcErr: any) {
+      log(`Package assignment lifecycle re-eval failed (non-fatal) for ${shipmentId}: ${(lcErr as Error).message}`);
+    }
+  }
+  
   return { status: 'complete', fingerprintId, isNew };
 }
 
