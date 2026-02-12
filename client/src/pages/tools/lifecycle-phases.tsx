@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   Cpu,
+  Eye,
   Inbox,
   Layers,
   Package,
@@ -27,6 +28,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -779,6 +787,9 @@ type WriteQueueJob = {
   completedAt: string | null;
   localShipmentId: string | null;
   callbackAction: string | null;
+  orderNumber: string | null;
+  httpStatusCode: number | null;
+  httpResponse: any | null;
 };
 
 type WriteQueueStats = {
@@ -823,6 +834,7 @@ function PackageUpdatesTab() {
   const [reasonFilter, setReasonFilter] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [responseDialogJob, setResponseDialogJob] = useState<WriteQueueJob | null>(null);
   const { toast } = useToast();
 
   const { data: featureFlags, isLoading: featureFlagsLoading } = useQuery<FeatureFlag[]>({
@@ -1060,13 +1072,16 @@ function PackageUpdatesTab() {
                   <TableHeader>
                     <TableRow>
                       <SortableHeader column="id">ID</SortableHeader>
+                      <TableHead>Order</TableHead>
                       <TableHead>Shipment ID</TableHead>
                       <TableHead>Reason</TableHead>
                       <SortableHeader column="status">Status</SortableHeader>
+                      <TableHead>HTTP</TableHead>
                       <SortableHeader column="retryCount">Retries</SortableHeader>
                       <TableHead>Error</TableHead>
                       <SortableHeader column="createdAt">Created</SortableHeader>
                       <SortableHeader column="completedAt">Completed</SortableHeader>
+                      <TableHead>Resp</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1076,6 +1091,9 @@ function PackageUpdatesTab() {
                         <TableRow key={job.id} data-testid={`row-wq-job-${job.id}`}>
                           <TableCell className="font-mono text-xs" data-testid={`text-wq-id-${job.id}`}>
                             #{job.id}
+                          </TableCell>
+                          <TableCell className="text-xs font-mono whitespace-nowrap" data-testid={`text-wq-order-${job.id}`}>
+                            {job.orderNumber ?? <span className="text-muted-foreground">-</span>}
                           </TableCell>
                           <TableCell className="font-mono text-xs max-w-[140px] truncate" title={job.shipmentId}>
                             {job.shipmentId}
@@ -1092,6 +1110,18 @@ function PackageUpdatesTab() {
                             >
                               {statusMeta.label}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono text-center" data-testid={`text-wq-http-${job.id}`}>
+                            {job.httpStatusCode != null ? (
+                              <Badge
+                                variant={job.httpStatusCode >= 200 && job.httpStatusCode < 300 ? "outline" : "destructive"}
+                                className="no-default-active-elevate text-xs font-mono"
+                              >
+                                {job.httpStatusCode}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-xs text-center">
                             {job.retryCount}/{job.maxRetries}
@@ -1127,6 +1157,20 @@ function PackageUpdatesTab() {
                                 ? <span className="text-blue-500">processing...</span>
                                 : "-"
                             }
+                          </TableCell>
+                          <TableCell>
+                            {job.httpResponse != null ? (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setResponseDialogJob(job)}
+                                data-testid={`button-wq-response-${job.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1169,6 +1213,36 @@ function PackageUpdatesTab() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={responseDialogJob !== null} onOpenChange={(open) => { if (!open) setResponseDialogJob(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-wq-response">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-mono">
+              Job #{responseDialogJob?.id} Response
+              {responseDialogJob?.httpStatusCode != null && (
+                <Badge
+                  variant={responseDialogJob.httpStatusCode >= 200 && responseDialogJob.httpStatusCode < 300 ? "outline" : "destructive"}
+                  className="no-default-active-elevate text-xs font-mono ml-2"
+                >
+                  {responseDialogJob.httpStatusCode}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {responseDialogJob?.orderNumber && <span className="font-mono">{responseDialogJob.orderNumber}</span>}
+              {responseDialogJob?.orderNumber && responseDialogJob?.shipmentId && " / "}
+              {responseDialogJob?.shipmentId && <span className="font-mono">{responseDialogJob.shipmentId}</span>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 rounded-md border bg-muted/50 p-4">
+            <pre className="text-xs font-mono whitespace-pre-wrap break-words" data-testid="text-wq-response-json">
+              {responseDialogJob?.httpResponse != null
+                ? JSON.stringify(responseDialogJob.httpResponse, null, 2)
+                : "No response data"}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
