@@ -284,7 +284,7 @@ const MAX_PACKAGE_SYNC_RETRIES = 3;
 const reasonSideEffects: ReasonSideEffectConfig[] = [
   {
     enabled: true,
-    reasons: ['fingerprint', 'packaging'],
+    reasons: ['fingerprint', 'packaging', 'packaging_model_assign', 'packaging_bulk_assign'],
     description: 'Sync package dimensions to ShipStation when packaging type is determined',
     supportsRetry: true,
     handler: async (shipmentId: string, orderNumber?: string, retryCount: number = 0, metadata?: Record<string, any>): Promise<ReasonSideEffectResult> => {
