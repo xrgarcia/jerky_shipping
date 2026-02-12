@@ -165,12 +165,6 @@ async function processNextJob(): Promise<boolean> {
           })
           .where(eq(shipments.id, job.localShipmentId));
 
-        const { updateShipmentLifecycle } = await import('./lifecycle-state-machine');
-        await updateShipmentLifecycle(job.localShipmentId, {
-          logTransition: true,
-          shipmentData: { rateCheckStatus: 'complete' },
-        });
-
         log(`Job #${job.id} completed: rate check successful`, 'info', jobCtx);
         return true;
       } else {
@@ -211,12 +205,6 @@ async function processNextJob(): Promise<boolean> {
               updatedAt: new Date(),
             })
             .where(eq(shipments.id, job.localShipmentId));
-
-          const { updateShipmentLifecycle } = await import('./lifecycle-state-machine');
-          await updateShipmentLifecycle(job.localShipmentId, {
-            logTransition: true,
-            shipmentData: { rateCheckStatus: 'failed' },
-          });
         } else {
           const backoffMs = calculateBackoffMs(newRetryCount);
           const nextRetry = new Date(Date.now() + backoffMs);
@@ -229,14 +217,6 @@ async function processNextJob(): Promise<boolean> {
               nextRetryAt: nextRetry,
             })
             .where(eq(rateCheckQueue.id, job.id));
-
-          await db.update(shipments)
-            .set({
-              rateCheckStatus: 'failed',
-              rateCheckError: errorMsg,
-              updatedAt: new Date(),
-            })
-            .where(eq(shipments.id, job.localShipmentId));
         }
 
         return true;
@@ -280,12 +260,6 @@ async function processNextJob(): Promise<boolean> {
             updatedAt: new Date(),
           })
           .where(eq(shipments.id, job.localShipmentId));
-
-        const { updateShipmentLifecycle } = await import('./lifecycle-state-machine');
-        await updateShipmentLifecycle(job.localShipmentId, {
-          logTransition: true,
-          shipmentData: { rateCheckStatus: 'failed' },
-        });
       } else {
         const backoffMs = calculateBackoffMs(newRetryCount);
         const nextRetry = new Date(Date.now() + backoffMs);
@@ -298,14 +272,6 @@ async function processNextJob(): Promise<boolean> {
             nextRetryAt: nextRetry,
           })
           .where(eq(rateCheckQueue.id, job.id));
-
-        await db.update(shipments)
-          .set({
-            rateCheckStatus: 'failed',
-            rateCheckError: errorMsg,
-            updatedAt: new Date(),
-          })
-          .where(eq(shipments.id, job.localShipmentId));
       }
 
       return true;
