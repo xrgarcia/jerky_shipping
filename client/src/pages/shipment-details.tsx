@@ -572,41 +572,47 @@ export default function ShipmentDetails() {
                 const notMatchedClass = 'bg-muted';
                 
                 return (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Lifecycle Phase</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('lifecyclePhase') ? matchedClass : notMatchedClass}`}>
+                        {shipment.lifecyclePhase || 'null'}
+                      </code>
+                      {isMatched('lifecyclePhase') && <p className="text-xs text-green-600" data-testid="text-lifecycle-matched">matched</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Decision Subphase</p>
+                      <code className={`text-sm font-mono px-2 py-1 rounded block ${shipment.decisionSubphase ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : notMatchedClass}`} data-testid="text-decision-subphase">
+                        {shipment.decisionSubphase || 'null'}
+                      </code>
+                    </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
                       <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
                         {shipment.shipmentStatus || 'null'}
                       </code>
-                      {isMatched('shipmentStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                      {isMatched('shipmentStatus') && <p className="text-xs text-green-600">matched</p>}
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
                       <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
                         {shipment.status || 'null'}
                       </code>
-                      {isMatched('status') && <p className="text-xs text-green-600">✓ matched</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Status</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('sessionStatus') ? matchedClass : notMatchedClass}`}>
-                        {shipment.sessionStatus || 'null'}
-                      </code>
-                      {isMatched('sessionStatus') && <p className="text-xs text-green-600">✓ matched</p>}
+                      {isMatched('status') && <p className="text-xs text-green-600">matched</p>}
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">MOVE OVER Tag</p>
                       <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('hasMoveOverTag') ? matchedClass : (hasMoveOverTag ? 'bg-green-100 dark:bg-green-900/30' : notMatchedClass)}`}>
                         {hasMoveOverTag ? 'YES' : 'NO'}
                       </code>
-                      {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">✓ matched</p>}
+                      {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">matched</p>}
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
                       <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
                         {shipment.trackingNumber ? 'YES' : 'NO'}
                       </code>
-                      {isMatched('trackingNumber') && <p className="text-xs text-green-600">✓ matched</p>}
+                      {isMatched('trackingNumber') && <p className="text-xs text-green-600">matched</p>}
                     </div>
                   </div>
                 );
@@ -1318,6 +1324,44 @@ export default function ShipmentDetails() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Lifecycle Rate Check Status */}
+          <div className="flex items-center gap-3 flex-wrap mb-4 pb-4 border-b" data-testid="rate-check-lifecycle-status">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Rate Check Status</p>
+              <Badge
+                variant={
+                  shipment.rateCheckStatus === 'complete' ? 'default' :
+                  shipment.rateCheckStatus === 'failed' ? 'destructive' :
+                  'secondary'
+                }
+                className={
+                  shipment.rateCheckStatus === 'complete' ? 'bg-green-600 dark:bg-green-700 text-white' :
+                  shipment.rateCheckStatus === 'skipped' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' :
+                  shipment.rateCheckStatus === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300' :
+                  shipment.rateCheckStatus === 'failed' ? '' :
+                  ''
+                }
+                data-testid="badge-rate-check-status"
+              >
+                {shipment.rateCheckStatus || 'not started'}
+              </Badge>
+            </div>
+            {shipment.rateCheckAttemptedAt && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Attempted</p>
+                <span className="text-sm" data-testid="text-rate-check-attempted">{formatRelativeTime(shipment.rateCheckAttemptedAt)}</span>
+              </div>
+            )}
+            {shipment.rateCheckError && (
+              <div className="space-y-1 flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Error</p>
+                <code className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded block truncate" data-testid="text-rate-check-error">
+                  {shipment.rateCheckError}
+                </code>
+              </div>
+            )}
+          </div>
+
           {rateAnalysisData?.rateAnalysis ? (
             (() => {
               const analysis = rateAnalysisData.rateAnalysis;
