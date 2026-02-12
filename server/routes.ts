@@ -5693,7 +5693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/shipments/:orderNumber/trigger-lifecycle", requireAuth, async (req, res) => {
     try {
       const { orderNumber } = req.params;
-      const validReasons = ['manual', 'packaging', 'fingerprint', 'categorization', 'rate_check'] as const;
+      const validReasons = ['manual', 'packaging', 'fingerprint', 'categorization', 'rate_check', 'manual_package_sync'] as const;
       const reason = validReasons.includes(req.body?.reason) ? req.body.reason : 'manual';
       
       // Find shipments by order number

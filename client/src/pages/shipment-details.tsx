@@ -93,7 +93,7 @@ export default function ShipmentDetails() {
     mutationFn: async () => {
       const orderNumber = shipment?.orderNumber;
       if (!orderNumber) throw new Error("No order number");
-      return apiRequest("POST", `/api/shipments/${orderNumber}/trigger-lifecycle`, { reason: "packaging" });
+      return apiRequest("POST", `/api/shipments/${orderNumber}/trigger-lifecycle`, { reason: "manual_package_sync" });
     },
     onSuccess: () => {
       toast({ title: "Package sync triggered", description: "The package will be pushed to ShipStation shortly." });

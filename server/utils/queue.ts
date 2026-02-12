@@ -983,6 +983,7 @@ export type LifecycleEventReason =
   | 'rate_analysis'        // Smart carrier rate analysis completed
   | 'lifecycle_repair'     // Lifecycle repair worker batch operation
   | 'manual'               // Manual trigger from UI
+  | 'manual_package_sync'  // Manual package sync trigger from shipment details UI
   | 'backfill'             // Batch backfill operation
   | 'stale_audit';         // Stale shipment audit detected orphaned/missing shipment
 
