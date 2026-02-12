@@ -540,7 +540,7 @@ export default function ShipmentDetails() {
               <span className="font-medium">Lifecycle Details</span>
             </summary>
             
-            <div className="pt-5 space-y-6">
+            <div className="pt-5 px-4 space-y-6">
               {(() => {
                 const phase = shipment.lifecyclePhase as string;
                 const subphase = shipment.decisionSubphase as string | null;
