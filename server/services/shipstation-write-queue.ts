@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { shipstationWriteQueue, shipments } from '@shared/schema';
+import { shipstationWriteQueue, shipments, packagingTypes } from '@shared/schema';
 import type { InsertShipstationWriteQueue } from '@shared/schema';
 import { eq, and, lte, or, isNull, asc, sql } from 'drizzle-orm';
 import { resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
