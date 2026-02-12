@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import {
@@ -14,6 +14,7 @@ import {
   Cpu,
   Eye,
   Inbox,
+  Search,
   Layers,
   Package,
   RefreshCw,
@@ -35,6 +36,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -834,8 +836,18 @@ function PackageUpdatesTab() {
   const [reasonFilter, setReasonFilter] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderSearchDebounced, setOrderSearchDebounced] = useState("");
   const [responseDialogJob, setResponseDialogJob] = useState<WriteQueueJob | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setOrderSearchDebounced(orderSearch);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [orderSearch]);
 
   const { data: featureFlags, isLoading: featureFlagsLoading } = useQuery<FeatureFlag[]>({
     queryKey: ["/api/operations/feature-flags"],
@@ -870,7 +882,7 @@ function PackageUpdatesTab() {
   });
 
   const { data: jobsData, isLoading: jobsLoading } = useQuery<WriteQueueJobsResponse>({
-    queryKey: ["/api/write-queue/jobs", page, statusFilter, reasonFilter, sortBy, sortOrder],
+    queryKey: ["/api/write-queue/jobs", page, statusFilter, reasonFilter, sortBy, sortOrder, orderSearchDebounced],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -880,6 +892,7 @@ function PackageUpdatesTab() {
       });
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (reasonFilter !== "all") params.set("reason", reasonFilter);
+      if (orderSearchDebounced.trim()) params.set("orderNumber", orderSearchDebounced.trim());
       const res = await fetch(`/api/write-queue/jobs?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch write queue jobs");
       return res.json();
@@ -1016,6 +1029,16 @@ function PackageUpdatesTab() {
         <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 flex-wrap">
           <CardTitle className="text-sm font-medium">Queue Jobs</CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search order..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                className="pl-8 w-[180px]"
+                data-testid="input-order-search"
+              />
+            </div>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
               <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Status" />
