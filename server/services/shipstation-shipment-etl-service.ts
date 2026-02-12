@@ -16,6 +16,7 @@ import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcIt
 import { eq, inArray } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import logger, { withOrder } from '../utils/logger';
+import { withSpan } from '../utils/tracing';
 
 export class ShipStationShipmentETLService {
   constructor(private readonly storage: IStorage) {}
@@ -28,6 +29,7 @@ export class ShipStationShipmentETLService {
    * Returns a result object with the shipment ID or skip information
    */
   async processShipment(shipmentData: any, orderId: string | null = null): Promise<{ id: string; skipped?: false } | { id: null; skipped: true; reason: string }> {
+    return withSpan('shipment_sync', 'etl_transform', 'process_shipment', async (span) => {
     // Validate shipment ID first
     const shipmentId = this.extractShipmentId(shipmentData);
     if (!shipmentId) {
@@ -185,6 +187,7 @@ export class ShipStationShipmentETLService {
     await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
     
     return { id: finalShipmentId };
+    }, { shipmentId: shipmentData?.shipment_id || shipmentData?.shipmentId });
   }
 
   /**

@@ -37,6 +37,7 @@ import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
 import { updateShipmentLifecycleBatch, queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
 import logger, { withOrder } from "./utils/logger";
+import { tagCurrentSpan } from './utils/tracing';
 
 // Initialize the shipment service
 const shipmentService = new ShipStationShipmentService(storage);
@@ -2698,6 +2699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shopify webhook endpoint - receives order updates and queues them
   app.post("/api/webhooks/shopify/orders", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'shopify_orders', { orderNumber: req.body?.name || req.body?.order_number });
       const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
       const shopifySecret = process.env.SHOPIFY_API_SECRET;
       const topic = req.headers['x-shopify-topic'] as string;
@@ -2742,6 +2744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shopify product webhook endpoint - receives product updates and queues them
   app.post("/api/webhooks/shopify/products", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'shopify_products');
       const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
       const shopifySecret = process.env.SHOPIFY_API_SECRET;
       const topic = req.headers['x-shopify-topic'] as string;
@@ -2786,6 +2789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shopify refund webhook endpoint - receives refund events
   app.post("/api/webhooks/shopify/refunds", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'shopify_refunds');
       const hmacHeader = req.headers['x-shopify-hmac-sha256'] as string;
       const shopifySecret = process.env.SHOPIFY_API_SECRET;
       const topic = req.headers['x-shopify-topic'] as string;
@@ -2863,6 +2867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ShipStation webhook endpoint - receives shipment updates and queues them
   app.post("/api/webhooks/shipstation/shipments", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'shipstation_track', { trackingNumber: req.body?.data?.tracking_number, shipmentId: req.body?.data?.shipment_id });
       // Debug logging - critical for warehouse operations
       const trackingNumber = req.body.data?.tracking_number || 'unknown';
       const statusCode = req.body.data?.status_code || 'unknown';
@@ -2908,6 +2913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Slashbin webhook endpoint - receives transformed kit mappings
   app.post("/api/webhooks/slashbin/kitMappings", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'slashbin_kit_mappings');
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
       const jobId = req.headers['x-slashbin-job-id'] as string;
       
@@ -2965,6 +2971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Slashbin webhook endpoint - receives Shopify orders from Slashbin
   app.post("/api/webhooks/slashbin/shopifyOrders", async (req, res) => {
     try {
+      tagCurrentSpan('webhooks', 'slashbin_orders');
       // Extract headers
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
       const jobId = req.headers['x-slashbin-job-id'] as string;

@@ -15,6 +15,7 @@
  */
 
 import logger, { withOrder } from './utils/logger';
+import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { db } from './db';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
@@ -142,6 +143,7 @@ async function syncShipment(shipmentData: any): Promise<{ id: string | null; ski
   const modifiedAt = shipmentData.modified_at ? new Date(shipmentData.modified_at) : now;
   
   // Use existing ETL service - handles full upsert including items and tags
+  tagCurrentSpan('shipment_sync', 'etl_transform', { shipmentId: shipmentData.shipment_id });
   const result = await shipStationShipmentETL.processShipment(shipmentData, null);
   
   // If shipment was skipped (e.g., dead-lettered), return early without error
@@ -152,6 +154,7 @@ async function syncShipment(shipmentData: any): Promise<{ id: string | null; ski
   const shipmentDbId = result.id;
   
   // Update sync tracking timestamps and fetch shipment data for rate analysis
+  tagCurrentSpan('shipment_sync', 'shipment_upsert', { shipmentId: shipmentData.shipment_id, orderNumber: shipmentData.order_number });
   const [updatedShipment] = await db
     .update(shipments)
     .set({
@@ -1056,7 +1059,9 @@ async function runPollLoop(): Promise<boolean> {
     });
     
     try {
-      const result = await Promise.race([pollCycle(), timeoutPromise]);
+      const result = await withSpan('shipment_sync', 'unified_polling', 'poll_shipments', async (span) => {
+        return await Promise.race([pollCycle(), timeoutPromise]);
+      });
       
       clearTimeout(pollTimeoutHandle!);
       

@@ -45,6 +45,7 @@ import {
 import logger, { withOrder } from './utils/logger';
 import { updateShipmentLifecycle } from './services/lifecycle-service';
 import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
+import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { db } from './db';
 import { shipments, packagingTypes, featureFlags, fingerprintModels, shipmentSyncFailures } from '@shared/schema';
@@ -433,6 +434,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
 async function processEvent(event: LifecycleEvent): Promise<boolean> {
   const orderRef = event.orderNumber ? `#${event.orderNumber}` : event.shipmentId;
   
+  return withSpan('lifecycle', 'state_evaluation', 'process_event', async (span) => {
   try {
     // Run the state machine to update lifecycle
     const result = await updateShipmentLifecycle(event.shipmentId, { logTransition: true });
@@ -447,6 +449,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
       const sideEffect = sideEffectsRegistry[result.newSubphase];
       
       if (sideEffect?.enabled) {
+        tagCurrentSpan('lifecycle', 'side_effects', { shipmentId: event.shipmentId, orderNumber: event.orderNumber });
         log(`Triggering side effect for ${orderRef}: ${sideEffect.description}`, 'info', withOrder(event.orderNumber, event.shipmentId, { subphase: result.newSubphase }));
         
         // Add small delay to avoid rate limiting
@@ -555,6 +558,7 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     lastErrorTime = new Date();
     return false;
   }
+  }, { shipmentId: event.shipmentId, orderNumber: event.orderNumber });
 }
 
 /**

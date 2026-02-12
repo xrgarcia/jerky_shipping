@@ -2,6 +2,7 @@ import { db } from "./db";
 import { shipments, shipmentRateAnalysis, rateAnalysisJobs } from "@shared/schema";
 import { eq, and, isNotNull, isNull, gte, desc, inArray } from "drizzle-orm";
 import { smartCarrierRateService } from "./services/smart-carrier-rate-service";
+import { withSpan } from './utils/tracing';
 
 const BATCH_SIZE = 50;
 const DELAY_BETWEEN_SHIPMENTS_MS = 200;
@@ -67,6 +68,7 @@ async function getShipmentsForJob(daysBack: number | null): Promise<typeof shipm
 }
 
 async function processJob(jobId: string): Promise<void> {
+  return withSpan('rate_check', 'batch_runner', 'process_job', async (span) => {
   log(`Processing rate analysis job ${jobId}`);
   
   try {
@@ -204,6 +206,7 @@ async function processJob(jobId: string): Promise<void> {
       })
       .where(eq(rateAnalysisJobs.id, jobId));
   }
+  });
 }
 
 async function pollForJobs(): Promise<void> {

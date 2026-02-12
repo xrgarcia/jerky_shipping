@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import { getCarriers, getRatesEstimate } from '../utils/shipstation-api';
 import { RateCheckEligibility } from './rate-check-eligibility';
+import { withSpan } from '../utils/tracing';
 
 const FULFILLMENT_CENTER = {
   address: "4132 Will Rogers Pkwy",
@@ -264,6 +265,7 @@ export class SmartCarrierRateService {
    * Analyze and save rate analysis for a shipment
    */
   async analyzeAndSave(shipment: Shipment): Promise<RateAnalysisResult> {
+    return withSpan('rate_check', 'smart_carrier_analysis', 'analyze_shipment', async (span) => {
     const result = await this.analyzeShipment(shipment);
     
     if (!result.success || !result.analysis) {
@@ -311,6 +313,7 @@ export class SmartCarrierRateService {
       console.error(`[SmartCarrierRate] Error saving analysis for ${shipment.shipmentId}:`, error);
       return { success: false, error: `Failed to save: ${error.message}` };
     }
+    }, { shipmentId: shipment.shipmentId || undefined, orderNumber: shipment.orderNumber || undefined });
   }
   
   /**
