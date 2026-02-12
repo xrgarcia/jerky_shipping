@@ -14030,10 +14030,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignedStationId: shipments.assignedStationId,
           decisionSubphase: shipments.decisionSubphase,
           lifecyclePhase: shipments.lifecyclePhase,
+          shipmentStatus: shipments.shipmentStatus,
+          shipmentData: shipments.shipmentData,
           fingerprintModelId: fingerprintModels.id,
           fingerprintDisplayName: fingerprints.displayName,
           fingerprintSignature: fingerprints.signature,
           packagingStationType: packagingTypes.stationType,
+          packagingTypeName: packagingTypes.name,
           shipToName: shipments.shipToName,
           shipToAddressLine1: shipments.shipToAddressLine1,
           shipToCity: shipments.shipToCity,
@@ -14387,6 +14390,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        let needsPackageSync = false;
+        if (order.packagingTypeName && order.shipmentStatus === 'pending') {
+          const sd = order.shipmentData as Record<string, any> | null;
+          const existingPkgName = sd?.packages?.[0]?.name || sd?.packages?.[0]?.package_name || null;
+          const isDefaultPackage = !existingPkgName || existingPkgName.toLowerCase() === 'package';
+          if (isDefaultPackage) {
+            needsPackageSync = true;
+          }
+        }
+
         return {
           orderNumber: order.orderNumber,
           shipmentId: order.shipmentId,
@@ -14399,6 +14412,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stationType: stationInfo?.stationType || null,
           tags: orderTags,
           duplicateOf,
+          needsPackageSync,
+          packagingTypeName: order.packagingTypeName || null,
         };
       });
 

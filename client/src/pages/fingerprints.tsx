@@ -287,6 +287,8 @@ interface ReadyToSessionOrder {
   stationType: string | null;
   tags: { name: string; color: string | null }[];
   duplicateOf: string | null;
+  needsPackageSync: boolean;
+  packagingTypeName: string | null;
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -656,6 +658,63 @@ export default function Fingerprints() {
         ...prev,
         [`cat-${variables.sku}`]: { type: 'error', message: 'Failed' }
       }));
+    },
+  });
+
+  const [syncingPackageOrders, setSyncingPackageOrders] = useState<Set<string>>(new Set());
+
+  const syncPackageMutation = useMutation({
+    mutationFn: async (orderNumber: string) => {
+      setSyncingPackageOrders(prev => new Set(prev).add(orderNumber));
+      return apiRequest("POST", `/api/shipments/${orderNumber}/trigger-lifecycle`, { reason: "manual_package_sync" });
+    },
+    onSuccess: (_data, orderNumber) => {
+      setSyncingPackageOrders(prev => {
+        const next = new Set(prev);
+        next.delete(orderNumber);
+        return next;
+      });
+      toast({ title: "Package sync triggered", description: `Package will be pushed to ShipStation for ${orderNumber}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+    },
+    onError: (_error, orderNumber) => {
+      setSyncingPackageOrders(prev => {
+        const next = new Set(prev);
+        next.delete(orderNumber);
+        return next;
+      });
+      toast({ title: "Sync failed", description: `Could not trigger package sync for ${orderNumber}`, variant: "destructive" });
+    },
+  });
+
+  const syncAllPackagesMutation = useMutation({
+    mutationFn: async (orderNumbers: string[]) => {
+      setSyncingPackageOrders(new Set(orderNumbers));
+      const results: { orderNumber: string; success: boolean }[] = [];
+      for (const on of orderNumbers) {
+        try {
+          await apiRequest("POST", `/api/shipments/${on}/trigger-lifecycle`, { reason: "manual_package_sync" });
+          results.push({ orderNumber: on, success: true });
+        } catch {
+          results.push({ orderNumber: on, success: false });
+        }
+        setSyncingPackageOrders(prev => {
+          const next = new Set(prev);
+          next.delete(on);
+          return next;
+        });
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      setSyncingPackageOrders(new Set());
+      const succeeded = results.filter(r => r.success).length;
+      toast({ title: "Bulk package sync triggered", description: `Sync queued for ${succeeded} of ${results.length} orders` });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+    },
+    onError: () => {
+      setSyncingPackageOrders(new Set());
+      toast({ title: "Bulk sync failed", description: "Could not trigger package sync", variant: "destructive" });
     },
   });
 
@@ -2109,6 +2168,22 @@ export default function Fingerprints() {
                       </Badge>
                     </div>
                   )}
+                  {(() => {
+                    const needsSyncOrders = readyToSessionOrdersData?.orders.filter(o => o.needsPackageSync) || [];
+                    if (needsSyncOrders.length === 0) return null;
+                    return (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => syncAllPackagesMutation.mutate(needsSyncOrders.map(o => o.orderNumber))}
+                        disabled={syncAllPackagesMutation.isPending}
+                        data-testid="button-sync-all-packages"
+                      >
+                        <Package className={`h-4 w-4 mr-1 ${syncAllPackagesMutation.isPending ? 'animate-spin' : ''}`} />
+                        {syncAllPackagesMutation.isPending ? 'Syncing...' : `Sync ${needsSyncOrders.length} Packages`}
+                      </Button>
+                    );
+                  })()}
                   <Button
                     variant="outline"
                     size="sm"
@@ -2417,6 +2492,7 @@ export default function Fingerprints() {
                         </th>
                         <th className="text-center py-3 px-3 font-medium text-sm bg-card">Ready to Session</th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">Reason</th>
+                        <th className="text-center py-3 px-3 font-medium text-sm bg-card">Pkg Sync</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2533,6 +2609,24 @@ export default function Fingerprints() {
                               <span className={order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
                                 {order.reason}
                               </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {order.needsPackageSync ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => syncPackageMutation.mutate(order.orderNumber)}
+                                disabled={syncingPackageOrders.has(order.orderNumber)}
+                                data-testid={`button-sync-package-${order.orderNumber}`}
+                              >
+                                <RefreshCw className={`w-3 h-3 mr-1 ${syncingPackageOrders.has(order.orderNumber) ? 'animate-spin' : ''}`} />
+                                {syncingPackageOrders.has(order.orderNumber) ? 'Syncing' : 'Sync'}
+                              </Button>
+                            ) : order.packagingTypeName ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
                             )}
                           </td>
                         </tr>
