@@ -1254,7 +1254,7 @@ export default function ShipmentDetails() {
                       <span className="text-xs text-muted-foreground">{smartSessionInfo.packagingType.name}</span>
                     )}
                   </div>
-                  {shipment?.lifecyclePhase === 'fulfillment_prep' && packageMatchesAssignment === false && (
+                  {shipment?.shipmentStatus === 'pending' && packageMatchesAssignment === false && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-amber-600 dark:text-amber-400">
                         ShipStation shows "{packages?.[0]?.packageName || 'Package'}" — expected "{smartSessionInfo?.packagingType?.name}"
@@ -1271,7 +1271,7 @@ export default function ShipmentDetails() {
                       </Button>
                     </div>
                   )}
-                  {shipment?.lifecyclePhase === 'fulfillment_prep' && packageMatchesAssignment === true && (
+                  {packageMatchesAssignment === true && (
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
                       <span className="text-xs text-green-600 dark:text-green-400">Synced to ShipStation</span>
