@@ -1831,6 +1831,9 @@ export const shipstationWriteQueue = pgTable("shipstation_write_queue", {
   completedAt: timestamp("completed_at"),
   localShipmentId: text("local_shipment_id"), // Our DB shipment UUID for post-write callbacks
   callbackAction: text("callback_action"), // Optional action to run after successful write (e.g., "clear_manual_package_flag")
+  orderNumber: text("order_number"), // Denormalized for correlation without joining shipments
+  httpStatusCode: integer("http_status_code"), // ShipStation PUT response status code
+  httpResponse: jsonb("http_response"), // ShipStation PUT response body
 }, (table) => ({
   statusIdx: index("ssw_queue_status_idx").on(table.status),
   shipmentIdx: index("ssw_queue_shipment_idx").on(table.shipmentId),
