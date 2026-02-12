@@ -185,6 +185,11 @@ export function AppSidebar() {
       url: "/settings/shipping-methods",
       icon: Truck,
     },
+    {
+      title: "Services",
+      url: "/settings/services",
+      icon: Activity,
+    },
   ];
   
   // Reports submenu items

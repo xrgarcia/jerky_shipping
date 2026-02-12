@@ -46,6 +46,7 @@ import SmartSessions from "@/pages/smart-sessions";
 import SmartRateCheck from "@/pages/smart-rate-check";
 import ExcludedSkus from "@/pages/excluded-skus";
 import ShippingMethods from "@/pages/shipping-methods";
+import Services from "@/pages/services";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -127,6 +128,7 @@ function AppContent() {
       <Route path="/desktop-config" component={DesktopConfig} />
       <Route path="/settings/excluded-skus" component={ExcludedSkus} />
       <Route path="/settings/shipping-methods" component={ShippingMethods} />
+      <Route path="/settings/services" component={Services} />
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
