@@ -1096,7 +1096,6 @@ function PackageUpdatesTab() {
                     <TableRow>
                       <SortableHeader column="id">ID</SortableHeader>
                       <TableHead>Order</TableHead>
-                      <TableHead>Shipment ID</TableHead>
                       <TableHead>Reason</TableHead>
                       <SortableHeader column="status">Status</SortableHeader>
                       <TableHead>HTTP</TableHead>
@@ -1117,9 +1116,6 @@ function PackageUpdatesTab() {
                           </TableCell>
                           <TableCell className="text-xs font-mono whitespace-nowrap" data-testid={`text-wq-order-${job.id}`}>
                             {job.orderNumber ?? <span className="text-muted-foreground">-</span>}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs max-w-[140px] truncate" title={job.shipmentId}>
-                            {job.shipmentId}
                           </TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="no-default-active-elevate text-xs">
@@ -1303,7 +1299,7 @@ export default function LifecyclePhases() {
             Event Worker
           </TabsTrigger>
           <TabsTrigger value="package-updates" data-testid="tab-package-updates">
-            Package Updates
+            Shipment Updates
           </TabsTrigger>
         </TabsList>
 
