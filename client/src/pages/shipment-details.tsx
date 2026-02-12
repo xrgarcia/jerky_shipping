@@ -534,93 +534,201 @@ export default function ShipmentDetails() {
           )}
 
           {/* Collapsible Lifecycle Details */}
-          <details className="group border-t pt-4">
+          <details className="group border-t pt-4" open>
             <summary className="cursor-pointer flex items-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
               <span className="font-medium">Lifecycle Details</span>
             </summary>
             
             <div className="pt-4 space-y-6">
-              {/* Why This Status & What Happens Next */}
               {(() => {
+                const phase = shipment.lifecyclePhase as string;
+                const subphase = shipment.decisionSubphase as string | null;
+                const hasSubphases = phase === 'fulfillment_prep' || phase === 'ready_to_session' || phase === 'ready_to_fulfill';
                 const info = getLifecycleInfo(shipment);
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold text-sm">Why This Status?</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{info.whyThisStatus}</p>
-                    </div>
-                    <div className="bg-primary/5 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Play className="h-4 w-4 text-primary" />
-                        <span className="font-semibold text-sm">What Happens Next?</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{info.whatHappensNext}</p>
-                    </div>
-                  </div>
-                );
-              })()}
 
-              {/* Current Status Values */}
-              {(() => {
-                const info = getLifecycleInfo(shipment);
-                const isMatched = (field: string) => info.matchedFields.includes(field);
-                const matchedClass = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500';
-                const notMatchedClass = 'bg-muted';
-                
+                const DECISION_STEPS = [
+                  { key: 'needs_hydration', label: 'Hydrate', description: 'Create QC items from shipment line items' },
+                  { key: 'needs_categorization', label: 'Categorize', description: 'Assign SKUs to geometry collections' },
+                  { key: 'needs_fingerprint', label: 'Fingerprint', description: 'Calculate item signature for packaging' },
+                  { key: 'needs_packaging', label: 'Package', description: 'Assign packaging type from fingerprint' },
+                  { key: 'needs_rate_check', label: 'Rate Check', description: 'Compare shipping rates for savings' },
+                  { key: 'needs_session', label: 'Session', description: 'Group into a fulfillment batch' },
+                ];
+
+                const currentStepIndex = subphase ? DECISION_STEPS.findIndex(s => s.key === subphase) : -1;
+
+                const getSubphaseExplanation = () => {
+                  if (!subphase) return null;
+                  switch (subphase) {
+                    case 'needs_hydration':
+                      return {
+                        why: 'QC items have not been created yet for this shipment.',
+                        detail: 'The hydrator runs automatically and will create shipment_qc_items from the line items. This is typically resolved within seconds.',
+                        fields: [
+                          { label: 'Fingerprint Status', value: shipment.fingerprintStatus || 'null', warn: !shipment.fingerprintStatus },
+                        ],
+                      };
+                    case 'needs_categorization':
+                      return {
+                        why: 'Some SKUs in this shipment are not assigned to a geometry collection.',
+                        detail: smartSessionInfo?.uncategorizedSkus?.length
+                          ? `${smartSessionInfo.uncategorizedSkus.length} SKU(s) need categorization. Go to Master Products to assign them.`
+                          : 'The hydrator found uncategorized SKUs. Assign them in Master Products.',
+                        fields: [
+                          { label: 'Fingerprint Status', value: shipment.fingerprintStatus || 'null', warn: shipment.fingerprintStatus === 'pending_categorization' },
+                          ...(smartSessionInfo?.uncategorizedSkus?.map(s => ({ label: 'Uncategorized SKU', value: s.sku, warn: true })) || []),
+                        ],
+                      };
+                    case 'needs_fingerprint':
+                      return {
+                        why: shipment.fingerprintStatus === 'missing_weight'
+                          ? 'All SKUs are categorized but some are missing weight data, which blocks fingerprint calculation.'
+                          : 'All SKUs are categorized but no fingerprint has been calculated yet.',
+                        detail: shipment.fingerprintStatus === 'missing_weight'
+                          ? 'Weight data is synced from the product catalog. Check Master Products for items with missing weights.'
+                          : 'The fingerprint calculator runs automatically during lifecycle evaluation.',
+                        fields: [
+                          { label: 'Fingerprint Status', value: shipment.fingerprintStatus || 'null', warn: true },
+                          { label: 'Fingerprint ID', value: shipment.fingerprintId || 'null', warn: !shipment.fingerprintId },
+                        ],
+                      };
+                    case 'needs_packaging':
+                      return {
+                        why: 'This shipment has a fingerprint but no packaging type has been assigned.',
+                        detail: smartSessionInfo?.autoPackageStatus === 'needs_packaging_rule'
+                          ? 'No packaging rule exists for this fingerprint. Create one in Packaging Rules.'
+                          : 'The auto-packager will attempt to match a packaging rule to this fingerprint.',
+                        fields: [
+                          { label: 'Fingerprint ID', value: shipment.fingerprintId || 'null', warn: false },
+                          { label: 'Fingerprint', value: smartSessionInfo?.fingerprint?.displayName || smartSessionInfo?.fingerprint?.signature || 'unknown', warn: false },
+                          { label: 'Packaging Type', value: smartSessionInfo?.packagingType?.name || 'none', warn: !shipment.packagingTypeId },
+                          { label: 'Auto-Package Status', value: smartSessionInfo?.autoPackageStatus || 'unknown', warn: smartSessionInfo?.autoPackageStatus !== 'ready' },
+                        ],
+                      };
+                    case 'needs_rate_check':
+                      return {
+                        why: 'Packaging is assigned but the shipping rate check has not completed.',
+                        detail: shipment.rateCheckStatus === 'failed'
+                          ? `Rate check failed${shipment.rateCheckError ? `: ${shipment.rateCheckError}` : '. Will retry on next lifecycle evaluation.'}`
+                          : shipment.rateCheckStatus === 'pending'
+                          ? 'Rate check is currently running. Waiting for results.'
+                          : 'Rate check has not been triggered yet. The lifecycle worker will trigger it.',
+                        fields: [
+                          { label: 'Rate Check Status', value: shipment.rateCheckStatus || 'not started', warn: shipment.rateCheckStatus !== 'complete' && shipment.rateCheckStatus !== 'skipped' },
+                          ...(shipment.rateCheckAttemptedAt ? [{ label: 'Last Attempted', value: formatRelativeTime(shipment.rateCheckAttemptedAt) || '—', warn: false }] : []),
+                          ...(shipment.rateCheckError ? [{ label: 'Error', value: shipment.rateCheckError, warn: true }] : []),
+                        ],
+                      };
+                    case 'needs_session':
+                      return {
+                        why: 'All preparation is complete. This order is ready to be grouped into a fulfillment session.',
+                        detail: 'The session builder will batch this with similar orders for warehouse picking.',
+                        fields: [
+                          { label: 'Fingerprint', value: smartSessionInfo?.fingerprint?.displayName || smartSessionInfo?.fingerprint?.signature || 'set', warn: false },
+                          { label: 'Packaging', value: smartSessionInfo?.packagingType?.name || 'assigned', warn: false },
+                          { label: 'Rate Check', value: shipment.rateCheckStatus || 'n/a', warn: false },
+                        ],
+                      };
+                    default:
+                      return null;
+                  }
+                };
+
                 return (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Lifecycle Phase</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('lifecyclePhase') ? matchedClass : notMatchedClass}`}>
-                        {shipment.lifecyclePhase || 'null'}
-                      </code>
-                      {isMatched('lifecyclePhase') && <p className="text-xs text-green-600" data-testid="text-lifecycle-matched">matched</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Decision Subphase</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${shipment.decisionSubphase ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : notMatchedClass}`} data-testid="text-decision-subphase">
-                        {shipment.decisionSubphase || 'null'}
-                      </code>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Shipment Status</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('shipmentStatus') ? matchedClass : notMatchedClass}`}>
-                        {shipment.shipmentStatus || 'null'}
-                      </code>
-                      {isMatched('shipmentStatus') && <p className="text-xs text-green-600">matched</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Tracking Status</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('status') ? matchedClass : notMatchedClass}`}>
-                        {shipment.status || 'null'}
-                      </code>
-                      {isMatched('status') && <p className="text-xs text-green-600">matched</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">MOVE OVER Tag</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('hasMoveOverTag') ? matchedClass : (hasMoveOverTag ? 'bg-green-100 dark:bg-green-900/30' : notMatchedClass)}`}>
-                        {hasMoveOverTag ? 'YES' : 'NO'}
-                      </code>
-                      {isMatched('hasMoveOverTag') && <p className="text-xs text-green-600">matched</p>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Has Tracking #</p>
-                      <code className={`text-sm font-mono px-2 py-1 rounded block ${isMatched('trackingNumber') ? matchedClass : (shipment.trackingNumber ? 'bg-muted' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400')}`}>
-                        {shipment.trackingNumber ? 'YES' : 'NO'}
-                      </code>
-                      {isMatched('trackingNumber') && <p className="text-xs text-green-600">matched</p>}
-                    </div>
-                  </div>
+                  <>
+                    {hasSubphases && subphase ? (
+                      <>
+                        {/* Decision Subphase Stepper */}
+                        <div className="space-y-4" data-testid="decision-subphase-stepper">
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                            {DECISION_STEPS.map((step, i) => {
+                              const isCurrent = i === currentStepIndex;
+                              const isComplete = i < currentStepIndex;
+                              const isFuture = i > currentStepIndex;
+                              return (
+                                <div key={step.key} className="flex items-center gap-1.5 flex-shrink-0">
+                                  {i > 0 && (
+                                    <div className={`w-4 h-0.5 ${isComplete ? 'bg-green-500 dark:bg-green-400' : 'bg-border'}`} />
+                                  )}
+                                  <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                    isCurrent
+                                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 ring-2 ring-amber-400 dark:ring-amber-600'
+                                      : isComplete
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                      : 'bg-muted text-muted-foreground'
+                                  }`} data-testid={`step-${step.key}`}>
+                                    {isComplete ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    ) : isCurrent ? (
+                                      <CircleDot className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                    ) : (
+                                      <Circle className="h-3.5 w-3.5 flex-shrink-0" />
+                                    )}
+                                    {step.label}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Current Step Detail Card */}
+                          {(() => {
+                            const explanation = getSubphaseExplanation();
+                            if (!explanation) return null;
+                            const currentStep = DECISION_STEPS[currentStepIndex];
+                            return (
+                              <div className="rounded-md border bg-card p-4 space-y-3" data-testid="subphase-detail-card">
+                                <div className="flex items-start gap-3">
+                                  <AlertCircle className="h-4 w-4 text-amber-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                  <div className="space-y-1 min-w-0">
+                                    <p className="text-sm font-semibold">{explanation.why}</p>
+                                    <p className="text-sm text-muted-foreground">{explanation.detail}</p>
+                                  </div>
+                                </div>
+                                {explanation.fields.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    {explanation.fields.map((f, i) => (
+                                      <div key={i} className="flex items-center gap-1.5 text-xs">
+                                        <span className="text-muted-foreground">{f.label}:</span>
+                                        <code className={`font-mono px-1.5 py-0.5 rounded ${
+                                          f.warn
+                                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                                            : 'bg-muted text-foreground'
+                                        }`}>{f.value}</code>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-muted/50 rounded-md p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-semibold text-sm">Why This Status?</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{info.whyThisStatus}</p>
+                        </div>
+                        <div className="bg-primary/5 rounded-md p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Play className="h-4 w-4 text-primary" />
+                            <span className="font-semibold text-sm">What Happens Next?</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{info.whatHappensNext}</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 );
               })()}
 
               {/* Label Preview & Session Info Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Label Section */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -648,7 +756,6 @@ export default function ShipmentDetails() {
                   )}
                 </div>
 
-                {/* Session Info */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Boxes className="h-4 w-4 text-muted-foreground" />
@@ -690,15 +797,22 @@ export default function ShipmentDetails() {
                 </div>
               </div>
 
-              {/* Technical Details (Nested Collapsible) */}
+              {/* Technical Details (for debugging) */}
               <details className="border-t pt-4">
                 <summary className="cursor-pointer flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground">
                   <Play className="h-4 w-4" />
                   <span className="font-semibold">Technical Details (for debugging)</span>
                 </summary>
                 <div className="mt-3 space-y-3">
-                  {/* Current field values */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">lifecyclePhase:</span>
+                      <code className="block font-mono">{shipment.lifecyclePhase || 'null'}</code>
+                    </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">decisionSubphase:</span>
+                      <code className="block font-mono">{shipment.decisionSubphase || 'null'}</code>
+                    </div>
                     <div className="bg-muted/50 rounded p-2">
                       <span className="text-muted-foreground">shipmentStatus:</span>
                       <code className="block font-mono">{shipment.shipmentStatus || 'null'}</code>
@@ -715,22 +829,45 @@ export default function ShipmentDetails() {
                       <span className="text-muted-foreground">hasMoveOverTag:</span>
                       <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
                     </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">fingerprintStatus:</span>
+                      <code className="block font-mono">{shipment.fingerprintStatus || 'null'}</code>
+                    </div>
+                    <div className="bg-muted/50 rounded p-2">
+                      <span className="text-muted-foreground">rateCheckStatus:</span>
+                      <code className="block font-mono">{shipment.rateCheckStatus || 'null'}</code>
+                    </div>
                   </div>
                   
-                  {/* All lifecycle phases reference */}
                   <div className="text-xs">
                     <p className="text-muted-foreground mb-2">Lifecycle phase priority (checked in order):</p>
                     <ol className="list-decimal list-inside space-y-1 text-muted-foreground font-mono">
-                      <li>DELIVERED: shipmentStatus='label_purchased' AND status='DE'</li>
-                      <li>IN_TRANSIT: shipmentStatus='label_purchased' AND status='IT'</li>
-                      <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')</li>
+                      <li>PROBLEM: shipmentStatus='orphaned'</li>
+                      <li>CANCELLED: status='cancelled'</li>
+                      <li>DELIVERED: status='DE' or 'SP'</li>
+                      <li>IN_TRANSIT: status='IT' or 'SHIPPED'</li>
+                      <li>PROBLEM: status IN ('UN', 'EX')</li>
+                      <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC', 'NEW')</li>
                       <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasMoveOverTag</li>
                       <li>PICKING_ISSUES: sessionStatus='inactive'</li>
                       <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
                       <li>PICKING: sessionStatus='active'</li>
                       <li>READY_TO_PICK: sessionStatus='new'</li>
-                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus</li>
+                      <li>READY_FOR_SKUVAULT: has fulfillmentSessionId AND !sessionStatus AND shipmentStatus='pending'</li>
+                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus AND !fulfillmentSessionId</li>
                       <li>FULFILLMENT_PREP: fallback</li>
+                    </ol>
+                  </div>
+
+                  <div className="text-xs">
+                    <p className="text-muted-foreground mb-2">Decision subphase chain:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground font-mono">
+                      <li>NEEDS_HYDRATION: !fingerprintStatus or not in ['complete', 'pending_categorization', 'missing_weight']</li>
+                      <li>NEEDS_CATEGORIZATION: fingerprintStatus='pending_categorization'</li>
+                      <li>NEEDS_FINGERPRINT: fingerprintStatus='missing_weight' OR (fingerprintStatus='complete' AND !fingerprintId)</li>
+                      <li>NEEDS_PACKAGING: has fingerprintId AND !packagingTypeId</li>
+                      <li>NEEDS_RATE_CHECK: rateCheckStatus not in ['complete', 'skipped'] AND eligible</li>
+                      <li>NEEDS_SESSION: has packagingTypeId AND !fulfillmentSessionId</li>
                     </ol>
                   </div>
                 </div>
