@@ -69,6 +69,7 @@ export interface EnqueueWriteOptions {
   localShipmentId?: string;
   callbackAction?: string;
   maxRetries?: number;
+  orderNumber?: string;
 }
 
 export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Promise<number> {
@@ -81,6 +82,7 @@ export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Pro
     maxRetries: options.maxRetries ?? 5,
     localShipmentId: options.localShipmentId ?? null,
     callbackAction: options.callbackAction ?? null,
+    orderNumber: options.orderNumber ?? null,
     lastError: null,
     nextRetryAt: null,
     processedAt: null,
@@ -88,7 +90,7 @@ export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Pro
   };
 
   const [inserted] = await db.insert(shipstationWriteQueue).values(row).returning({ id: shipstationWriteQueue.id });
-  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`, 'info', withOrder(undefined, options.shipmentId));
+  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`, 'info', withOrder(options.orderNumber, options.shipmentId));
   return inserted.id;
 }
 
@@ -252,6 +254,7 @@ function fixPastShipDate(payload: Record<string, any>): void {
 interface PutResult {
   statusCode: number;
   requestId?: string;
+  responseBody?: any;
 }
 
 async function putShipment(shipmentId: string, payload: Record<string, any>, orderNumber?: string): Promise<PutResult> {
@@ -281,26 +284,32 @@ async function putShipment(shipmentId: string, payload: Record<string, any>, ord
   if (!response.ok) {
     let errorDetail: string;
     let requestId: string | undefined;
+    let errorBody: any;
     try {
-      const body = await response.json();
-      requestId = body.request_id;
-      errorDetail = parseShipStationErrors(body);
+      errorBody = await response.json();
+      requestId = errorBody.request_id;
+      errorDetail = parseShipStationErrors(errorBody);
       log(`PUT ${shipmentId} → ${response.status}: ${errorDetail}${requestId ? ` (request_id: ${requestId})` : ''}`, 'error', ctx);
     } catch {
       const text = await response.text();
       errorDetail = text.slice(0, 200);
+      errorBody = { raw: errorDetail };
       log(`PUT ${shipmentId} → ${response.status}: ${errorDetail}`, 'error', ctx);
     }
-    throw new Error(`PUT shipment failed: ${response.status} ${errorDetail}`);
+    const err = new Error(`PUT shipment failed: ${response.status} ${errorDetail}`);
+    (err as any).statusCode = response.status;
+    (err as any).responseBody = errorBody;
+    throw err;
   }
 
   let requestId: string | undefined;
+  let responseBody: any;
   try {
-    const body = await response.json();
-    requestId = body.request_id;
-    const errors: ShipStationError[] = body.errors;
+    responseBody = await response.json();
+    requestId = responseBody.request_id;
+    const errors: ShipStationError[] = responseBody.errors;
     if (Array.isArray(errors) && errors.length > 0) {
-      const errorSummary = parseShipStationErrors(body);
+      const errorSummary = parseShipStationErrors(responseBody);
       log(`PUT ${shipmentId} → ${response.status} OK with warnings: ${errorSummary}${requestId ? ` (request_id: ${requestId})` : ''}`, 'warn', ctx);
     } else {
       log(`PUT ${shipmentId} → ${response.status} OK${requestId ? ` (request_id: ${requestId})` : ''}`, 'info', ctx);
@@ -309,7 +318,7 @@ async function putShipment(shipmentId: string, payload: Record<string, any>, ord
     log(`PUT ${shipmentId} → ${response.status} OK (no response body)`, 'info', ctx);
   }
 
-  return { statusCode: response.status, requestId };
+  return { statusCode: response.status, requestId, responseBody };
 }
 
 class RateLimitError extends Error {
@@ -359,14 +368,19 @@ async function processNextJob(): Promise<boolean> {
 
   if (!job) return false;
 
-  let orderNumber: string | undefined;
-  if (job.localShipmentId) {
+  let orderNumber: string | undefined = job.orderNumber ?? undefined;
+  if (!orderNumber && job.localShipmentId) {
     const [localShipment] = await db
       .select({ orderNumber: shipments.orderNumber })
       .from(shipments)
       .where(eq(shipments.id, job.localShipmentId))
       .limit(1);
     orderNumber = localShipment?.orderNumber ?? undefined;
+    if (orderNumber) {
+      await db.update(shipstationWriteQueue)
+        .set({ orderNumber })
+        .where(eq(shipstationWriteQueue.id, job.id));
+    }
   }
 
   return withSpan('shipstation_writes', 'write_queue', 'process_job', async (span) => {
@@ -393,7 +407,13 @@ async function processNextJob(): Promise<boolean> {
       const putResult = await putShipment(job.shipmentId, cleaned, orderNumber);
 
       await db.update(shipstationWriteQueue)
-        .set({ status: 'completed', completedAt: new Date(), lastError: null })
+        .set({
+          status: 'completed',
+          completedAt: new Date(),
+          lastError: null,
+          httpStatusCode: putResult.statusCode,
+          httpResponse: putResult.responseBody ?? null,
+        })
         .where(eq(shipstationWriteQueue.id, job.id));
 
       log(`Job #${job.id} completed: ${job.reason} → ${putResult.statusCode} OK`, 'info', jobCtx);
@@ -405,6 +425,8 @@ async function processNextJob(): Promise<boolean> {
       const isRateLimit = err instanceof RateLimitError;
       const newRetryCount = isRateLimit ? job.retryCount : job.retryCount + 1;
       const errorMsg = err.message || 'Unknown error';
+      const errStatusCode: number | undefined = err.statusCode;
+      const errResponseBody: any = err.responseBody ?? null;
 
       if (isRateLimit) {
         const waitMs = err.retryAfterSeconds * 1000 + 1000;
@@ -416,6 +438,7 @@ async function processNextJob(): Promise<boolean> {
             lastError: `RATE_LIMITED: ${errorMsg}`,
             retryCount: newRetryCount,
             nextRetryAt: nextRetry,
+            httpStatusCode: 429,
           })
           .where(eq(shipstationWriteQueue.id, job.id));
 
@@ -431,6 +454,8 @@ async function processNextJob(): Promise<boolean> {
             status: 'dead_letter',
             lastError: errorMsg,
             retryCount: newRetryCount,
+            httpStatusCode: errStatusCode ?? null,
+            httpResponse: errResponseBody,
           })
           .where(eq(shipstationWriteQueue.id, job.id));
 
@@ -456,6 +481,8 @@ async function processNextJob(): Promise<boolean> {
             lastError: errorMsg,
             retryCount: newRetryCount,
             nextRetryAt: nextRetry,
+            httpStatusCode: errStatusCode ?? null,
+            httpResponse: errResponseBody,
           })
           .where(eq(shipstationWriteQueue.id, job.id));
       }

@@ -412,6 +412,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           reason: 'package_sync',
           localShipmentId: shipmentId,
           callbackAction: 'clear_manual_package_flag',
+          orderNumber: shipment.orderNumber ?? undefined,
         });
 
         log(`Package sync: Enqueued write job #${jobId} for ${ref} - ${packageInfo.name} (${packageInfo.packageId})`);
