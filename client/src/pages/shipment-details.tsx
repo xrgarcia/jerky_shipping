@@ -311,7 +311,7 @@ export default function ShipmentDetails() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-8">
         <div className="text-center py-12">
           <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
           <p className="text-muted-foreground text-lg">Loading shipment...</p>
@@ -345,7 +345,7 @@ export default function ShipmentDetails() {
   }) ?? false;
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-6">
       {/* Navigation */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => setLocation("/shipments")} data-testid="button-back">
