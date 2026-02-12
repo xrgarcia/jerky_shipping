@@ -65,3 +65,4 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Google OAuth**: For authentication, restricted to @jerky.com Google Workspace domain.
 - **Neon Database**: Serverless PostgreSQL database for primary data storage.
 - **GCP PostgreSQL**: Separate reporting database used for purchase order recommendations and inventory forecasting analytics.
+- **Honeycomb**: Distributed tracing and metrics via OpenTelemetry (`server/instrumentation.ts`). Auto-instruments Express HTTP, pg database queries, and outbound HTTP. Service name: `ship-warehouse`.
