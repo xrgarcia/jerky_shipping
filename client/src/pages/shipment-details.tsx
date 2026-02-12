@@ -540,7 +540,7 @@ export default function ShipmentDetails() {
               <span className="font-medium">Lifecycle Details</span>
             </summary>
             
-            <div className="pt-4 space-y-6">
+            <div className="pt-6 space-y-6">
               {(() => {
                 const phase = shipment.lifecyclePhase as string;
                 const subphase = shipment.decisionSubphase as string | null;
@@ -727,49 +727,27 @@ export default function ShipmentDetails() {
                 );
               })()}
 
-              {/* Label Preview & Session Info Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold">Shipping Label</span>
-                  </div>
-                  {shipment.labelUrl ? (
+              {/* Session Info - only shown for ready_to_pick and beyond */}
+              {(() => {
+                const sessionPhases = ['ready_to_pick', 'picking', 'picking_issues', 'packing_ready', 'ready_for_skuvault', 'on_dock', 'in_transit', 'delivered'];
+                const phase = shipment.lifecyclePhase as string;
+                if (!sessionPhases.includes(phase)) return null;
+                return (
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
-                        Label Available
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(shipment.labelUrl!, '_blank')}
-                        data-testid="button-view-label"
-                      >
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        View Label
-                      </Button>
+                      <Boxes className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">Session Info</span>
                     </div>
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      No Label Generated
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Boxes className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold">Session Info</span>
+                    <div className="flex flex-wrap gap-2">
+                      {shipment.sessionId ? (
+                        <Badge variant="secondary">Session: {shipment.sessionId}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">No Session</Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {shipment.sessionId ? (
-                      <Badge variant="secondary">Session: {shipment.sessionId}</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground">No Session</Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Timestamps */}
               <div className="border-t pt-4">
