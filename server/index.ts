@@ -282,6 +282,10 @@ async function initializeAfterListen(storage: any) {
     // Start ShipStation write queue worker (reliable, rate-limit-aware shipment writes)
     const { startShipStationWriteQueueWorker } = await import("./services/shipstation-write-queue");
     startShipStationWriteQueueWorker();
+
+    // Start rate check queue worker (reliable, rate-limit-aware rate checking)
+    const { startRateCheckQueueWorker } = await import("./services/rate-check-queue");
+    startRateCheckQueueWorker();
     
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");

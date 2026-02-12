@@ -1848,3 +1848,36 @@ export const insertShipstationWriteQueueSchema = createInsertSchema(shipstationW
 
 export type InsertShipstationWriteQueue = z.infer<typeof insertShipstationWriteQueueSchema>;
 export type ShipstationWriteQueue = typeof shipstationWriteQueue.$inferSelect;
+
+export const rateCheckQueue = pgTable("rate_check_queue", {
+  id: serial("id").primaryKey(),
+  shipmentId: text("shipment_id").notNull(),
+  localShipmentId: text("local_shipment_id").notNull(),
+  orderNumber: text("order_number"),
+  serviceCode: text("service_code"),
+  destinationPostalCode: text("destination_postal_code"),
+  status: text("status").notNull().default("queued"),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(5),
+  lastError: text("last_error"),
+  nextRetryAt: timestamp("next_retry_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  httpStatusCode: integer("http_status_code"),
+  httpResponse: jsonb("http_response"),
+}, (table) => ({
+  statusIdx: index("rcq_status_idx").on(table.status),
+  shipmentIdx: index("rcq_shipment_idx").on(table.shipmentId),
+  nextRetryIdx: index("rcq_next_retry_idx").on(table.nextRetryAt),
+  statusCreatedIdx: index("rcq_status_created_idx").on(table.status, table.createdAt),
+  orderNumberIdx: index("rcq_order_number_idx").on(table.orderNumber),
+}));
+
+export const insertRateCheckQueueSchema = createInsertSchema(rateCheckQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRateCheckQueue = z.infer<typeof insertRateCheckQueueSchema>;
+export type RateCheckQueue = typeof rateCheckQueue.$inferSelect;

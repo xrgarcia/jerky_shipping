@@ -151,10 +151,9 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
   // When a shipment needs a rate check, automatically run one
   [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: {
     enabled: true,
-    description: 'Auto-run smart carrier rate analysis',
+    description: 'Enqueue rate check to dedicated queue',
     handler: async (shipmentId: string, orderNumber?: string): Promise<boolean> => {
       try {
-        // Load the shipment
         const [shipment] = await db
           .select()
           .from(shipments)
@@ -166,90 +165,30 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
           return false;
         }
 
-        // Skip if already complete or skipped
         if (shipment.rateCheckStatus === 'complete' || shipment.rateCheckStatus === 'skipped') {
           log(`Side effect: Rate check already ${shipment.rateCheckStatus} for ${orderNumber || shipmentId}`);
           return true;
         }
 
-        // Skip if already pending (avoid duplicate processing)
         if (shipment.rateCheckStatus === 'pending') {
           log(`Side effect: Rate check already pending for ${orderNumber || shipmentId}`);
           return true;
         }
 
-        // Mark as pending before starting
-        await db
-          .update(shipments)
-          .set({
-            rateCheckStatus: 'pending',
-            rateCheckAttemptedAt: new Date(),
-            rateCheckError: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(shipments.id, shipmentId));
-
-        // Run rate analysis
-        const result = await rateService.analyzeAndSave(shipment);
-        
-        if (result.success) {
-          // Mark as complete
-          await db
-            .update(shipments)
-            .set({
-              rateCheckStatus: 'complete',
-              rateCheckError: null,
-              updatedAt: new Date(),
-            })
-            .where(eq(shipments.id, shipmentId));
-          
-          // Re-evaluate lifecycle to advance subphase
-          await updateShipmentLifecycle(shipmentId, {
-            logTransition: true,
-            shipmentData: { rateCheckStatus: 'complete' },
-          });
-          
-          log(`Side effect: Rate check completed for ${orderNumber || shipmentId}`);
-          sideEffectTriggeredCount++;
-          return true;
-        } else {
-          // Mark as failed with error
-          await db
-            .update(shipments)
-            .set({
-              rateCheckStatus: 'failed',
-              rateCheckError: result.error || 'Unknown error',
-              updatedAt: new Date(),
-            })
-            .where(eq(shipments.id, shipmentId));
-          
-          // Re-evaluate lifecycle (will remain in needs_rate_check for retry)
-          await updateShipmentLifecycle(shipmentId, {
-            logTransition: true,
-            shipmentData: { rateCheckStatus: 'failed' },
-          });
-          
-          log(`Side effect: Rate check failed for ${orderNumber || shipmentId}: ${result.error}`, 'warn');
-          return false;
-        }
-      } catch (error: any) {
-        // Mark as failed with error
-        await db
-          .update(shipments)
-          .set({
-            rateCheckStatus: 'failed',
-            rateCheckError: error.message || 'Exception during rate check',
-            updatedAt: new Date(),
-          })
-          .where(eq(shipments.id, shipmentId));
-        
-        // Re-evaluate lifecycle (will remain in needs_rate_check for retry)
-        await updateShipmentLifecycle(shipmentId, {
-          logTransition: true,
-          shipmentData: { rateCheckStatus: 'failed' },
+        const { enqueueRateCheck } = await import('./services/rate-check-queue');
+        const jobId = await enqueueRateCheck({
+          shipmentId: shipment.shipmentId!,
+          localShipmentId: shipmentId,
+          orderNumber: orderNumber,
+          serviceCode: shipment.serviceCode ?? undefined,
+          destinationPostalCode: shipment.shipToPostalCode ?? undefined,
         });
-        
-        log(`Side effect: Rate check error for ${shipmentId}: ${error.message}`, 'error');
+
+        log(`Side effect: Enqueued rate check job #${jobId} for ${orderNumber || shipmentId}`);
+        sideEffectTriggeredCount++;
+        return true;
+      } catch (error: any) {
+        log(`Side effect: Error enqueuing rate check for ${shipmentId}: ${error.message}`, 'error');
         return false;
       }
     },
