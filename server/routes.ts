@@ -5069,6 +5069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offset = (page - 1) * limit;
       const statusFilter = req.query.status as string | undefined;
       const reasonFilter = req.query.reason as string | undefined;
+      const orderNumberFilter = req.query.orderNumber as string | undefined;
       const sortBy = (req.query.sortBy as string) || "createdAt";
       const sortOrder = (req.query.sortOrder as string) || "desc";
 
@@ -5078,6 +5079,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (reasonFilter && reasonFilter !== "all") {
         conditions.push(eq(shipstationWriteQueue.reason, reasonFilter));
+      }
+      if (orderNumberFilter && orderNumberFilter.trim()) {
+        conditions.push(ilike(shipstationWriteQueue.orderNumber, `%${orderNumberFilter.trim()}%`));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
