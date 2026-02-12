@@ -5,7 +5,7 @@ import { eq, and, isNull, inArray, isNotNull, exists, sql, notExists } from 'dri
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
 import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmentContext, type ShipmentContext } from './services/qcsale-cache-warmer';
-import { updateShipmentLifecycle } from './services/lifecycle-service';
+import { queueLifecycleEvaluation } from './services/lifecycle-service';
 import { hydrateShipment, calculateFingerprint } from './services/qc-item-hydrator';
 import { getRedisClient } from './utils/queue';
 
@@ -306,10 +306,7 @@ async function syncSessionToShipment(session: SkuVaultOrderSession): Promise<boo
       })
       .where(eq(shipments.id, shipment.id));
 
-    // Update lifecycle phase based on new session status
-    await updateShipmentLifecycle(shipment.id, {
-      shipmentData: { sessionStatus: normalizedSessionStatus }
-    });
+    await queueLifecycleEvaluation(shipment.id, 'skuvault_session_sync', shipment.orderNumber || undefined);
 
     // INVENTORY ALLOCATION: When a shipment gets its first session, move inventory from pending → allocated
     // This ensures inventory is "committed" only when the warehouse manager builds a session
@@ -445,10 +442,7 @@ async function detectClosedSessionTransitions(
         })
         .where(eq(shipments.id, shipment.id));
 
-      // Update lifecycle phase based on new session status
-      await updateShipmentLifecycle(shipment.id, {
-        shipmentData: { sessionStatus: 'closed' }
-      });
+      await queueLifecycleEvaluation(shipment.id, 'skuvault_session_close', shipment.orderNumber || undefined);
 
       // CACHE WARMING DISABLED: Bypassing cache entirely - packing pages go direct to SkuVault API
       // if (orderNumber) {
@@ -822,10 +816,7 @@ async function clearStaleSessionData(
         })
         .where(eq(shipments.id, shipment.id));
 
-      // Update lifecycle since session data changed
-      await updateShipmentLifecycle(shipment.id, {
-        shipmentData: { sessionStatus: null }
-      });
+      await queueLifecycleEvaluation(shipment.id, 'skuvault_session_clear', shipment.orderNumber || undefined);
 
       clearedCount++;
     }

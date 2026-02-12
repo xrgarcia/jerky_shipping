@@ -976,6 +976,9 @@ export type LifecycleEventReason =
   | 'session_release'      // Session released to floor (status → ready)
   | 'session_release_bulk' // Multiple sessions bulk-released to floor
   | 'session_delete'       // Fulfillment session deleted, shipments unlinked
+  | 'skuvault_session_sync'   // SkuVault session assigned/updated via Firestore sync
+  | 'skuvault_session_close'  // SkuVault session closed via Firestore sync
+  | 'skuvault_session_clear'  // SkuVault session cleared (orphan cleanup) via Firestore sync
   | 'rate_check'           // Rate check completed
   | 'rate_analysis'        // Smart carrier rate analysis completed
   | 'lifecycle_repair'     // Lifecycle repair worker batch operation

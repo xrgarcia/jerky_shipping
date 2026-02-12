@@ -35,7 +35,7 @@ import { firestoreStorage } from "./firestore-storage";
 import type { SkuVaultOrderSessionFilters } from "@shared/firestore-schema";
 import { refreshStaleJobsMetrics } from "./print-queue-worker";
 import { transformPrintJobForDesktop } from "./print-job-transform";
-import { updateShipmentLifecycleBatch, queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
+import { queueLifecycleEvaluationBatch } from "./services/lifecycle-service";
 import logger, { withOrder } from "./utils/logger";
 import { tagCurrentSpan } from './utils/tracing';
 
@@ -13703,18 +13703,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(shipmentsTable.fingerprintId, fingerprintId))
         .returning({ id: shipmentsTable.id });
       
-      // Update lifecycle phase for all affected shipments (they may move from needs_packaging to needs_session)
       if (updatedShipments.length > 0) {
         const shipmentIds = updatedShipments.map(s => s.id);
-        await updateShipmentLifecycleBatch(shipmentIds);
-        
-        // Queue lifecycle events with 'packaging' reason to trigger package sync side effect
-        // This enables the auto_package_sync feature to push dimensions to ShipStation
         await queueLifecycleEvaluationBatch(
           shipmentIds.map(id => ({ shipmentId: id })),
-          'packaging'
+          'packaging_model_assign'
         );
-        console.log(`[Fingerprints] Queued ${shipmentIds.length} lifecycle events with 'packaging' reason for package sync`);
+        console.log(`[Fingerprints] Queued ${shipmentIds.length} lifecycle events with 'packaging_model_assign' reason`);
       }
       
       // Re-run rate analysis for shipments that used fallback package details
@@ -13874,9 +13869,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allShipmentIds.push(...updatedShipments.map(s => s.id));
       }
       
-      // Update lifecycle phase for all affected shipments
       if (allShipmentIds.length > 0) {
-        await updateShipmentLifecycleBatch(allShipmentIds);
+        await queueLifecycleEvaluationBatch(
+          allShipmentIds.map(id => ({ shipmentId: id })),
+          'packaging_bulk_assign'
+        );
+        console.log(`[Bulk Assign] Queued ${allShipmentIds.length} lifecycle events with 'packaging_bulk_assign' reason`);
       }
       
       console.log(`[Bulk Assign] Assigned packaging ${packagingType.name} to ${totalFingerprintsAssigned} fingerprints, updated ${totalShipmentsUpdated} shipments`);
@@ -14769,7 +14767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/fulfillment-sessions/:id", requireAuth, async (req, res) => {
     try {
       const { fulfillmentSessions, shipments: shipmentsTable } = await import("@shared/schema");
-      const { updateShipmentLifecycleBatch } = await import("./services/lifecycle-service");
+      const { queueLifecycleEvaluationBatch } = await import("./services/lifecycle-service");
       const sessionId = parseInt(req.params.id, 10);
       
       if (isNaN(sessionId)) {
@@ -14804,10 +14802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Session not found" });
       }
       
-      // Recalculate lifecycle phase for unlinked shipments using central service
       if (shipmentIds.length > 0) {
-        await updateShipmentLifecycleBatch(shipmentIds);
-        console.log(`[FulfillmentSessions] Deleted session ${sessionId}, recalculated lifecycle for ${shipmentIds.length} shipments`);
+        await queueLifecycleEvaluationBatch(
+          shipmentIds.map(id => ({ shipmentId: id })),
+          'session_delete'
+        );
+        console.log(`[FulfillmentSessions] Deleted session ${sessionId}, queued lifecycle events for ${shipmentIds.length} shipments with 'session_delete' reason`);
       } else {
         console.log(`[FulfillmentSessions] Deleted session ${sessionId} (no shipments linked)`);
       }

@@ -26,7 +26,7 @@ import {
   type FulfillmentSessionStatus,
 } from "@shared/schema";
 import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
-import { updateShipmentLifecycleBatch } from "./lifecycle-service";
+import { queueLifecycleEvaluationBatch } from "./lifecycle-service";
 import { skuVaultService } from "./skuvault-service";
 
 // ============================================================================
@@ -812,8 +812,11 @@ export class FulfillmentSessionService {
       })
       .where(eq(fulfillmentSessions.id, sessionId));
 
-    // Update lifecycle phase for linked shipments
-    await updateShipmentLifecycleBatch(validIds);
+    await queueLifecycleEvaluationBatch(
+      validIds.map(id => ({ shipmentId: id })),
+      'session_add'
+    );
+    console.log(`[FulfillmentSession] Queued ${validIds.length} lifecycle events with 'session_add' reason`);
     
     // Fetch and match SkuVault sale IDs for the added shipments
     const saleIdResult = await fetchAndMatchSaleIds(validIds);
@@ -1000,9 +1003,7 @@ export class FulfillmentSessionService {
       return null;
     }
 
-    // When session moves to 'ready' (released to floor), recalculate lifecycle for linked shipments
     if (newStatus === 'ready') {
-      const { updateShipmentLifecycleBatch } = await import("./lifecycle-service");
       const linkedShipments = await db
         .select({ id: shipments.id })
         .from(shipments)
@@ -1010,8 +1011,11 @@ export class FulfillmentSessionService {
       
       if (linkedShipments.length > 0) {
         const shipmentIds = linkedShipments.map(s => s.id);
-        await updateShipmentLifecycleBatch(shipmentIds);
-        console.log(`[FulfillmentSession] Session ${sessionId} released to floor - recalculated lifecycle for ${shipmentIds.length} shipments`);
+        await queueLifecycleEvaluationBatch(
+          shipmentIds.map(id => ({ shipmentId: id })),
+          'session_release'
+        );
+        console.log(`[FulfillmentSession] Session ${sessionId} released to floor - queued lifecycle for ${shipmentIds.length} shipments with 'session_release' reason`);
       }
     }
 
@@ -1056,9 +1060,7 @@ export class FulfillmentSessionService {
       .where(inArray(fulfillmentSessions.id, sessionIds))
       .returning({ id: fulfillmentSessions.id });
 
-    // When sessions move to 'ready' (released to floor), recalculate lifecycle for linked shipments
     if (newStatus === 'ready' && results.length > 0) {
-      const { updateShipmentLifecycleBatch } = await import("./lifecycle-service");
       const updatedSessionIds = results.map(r => r.id);
       
       const linkedShipments = await db
@@ -1068,8 +1070,11 @@ export class FulfillmentSessionService {
       
       if (linkedShipments.length > 0) {
         const shipmentIds = linkedShipments.map(s => s.id);
-        await updateShipmentLifecycleBatch(shipmentIds);
-        console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - recalculated lifecycle for ${shipmentIds.length} shipments`);
+        await queueLifecycleEvaluationBatch(
+          shipmentIds.map(id => ({ shipmentId: id })),
+          'session_release_bulk'
+        );
+        console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - queued lifecycle for ${shipmentIds.length} shipments with 'session_release_bulk' reason`);
       }
     }
 
@@ -1346,8 +1351,11 @@ export class FulfillmentSessionService {
         spot++;
       }
 
-      // Update lifecycle phase for linked shipments
-      await updateShipmentLifecycleBatch(validIds);
+      await queueLifecycleEvaluationBatch(
+        validIds.map(id => ({ shipmentId: id })),
+        'session_create'
+      );
+      console.log(`[FulfillmentSession] Queued ${validIds.length} lifecycle events with 'session_create' reason`);
       
       // Fetch and match SkuVault sale IDs for the newly sessioned shipments
       const saleIdResult = await fetchAndMatchSaleIds(validIds);
