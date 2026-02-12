@@ -108,6 +108,16 @@ async function processJob(jobId: string): Promise<void> {
       
       for (const shipment of batch) {
         try {
+          await db
+            .update(shipments)
+            .set({
+              rateCheckStatus: 'pending',
+              rateCheckAttemptedAt: new Date(),
+              rateCheckError: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(shipments.id, shipment.id));
+
           const result = await smartCarrierRateService.analyzeAndSave(shipment);
           if (result.success && result.analysis) {
             analyzed++;
@@ -115,18 +125,41 @@ async function processJob(jobId: string): Promise<void> {
             if (savings > 0) {
               totalSavings += savings;
             }
+            await db
+              .update(shipments)
+              .set({
+                rateCheckStatus: 'complete',
+                rateCheckError: null,
+                updatedAt: new Date(),
+              })
+              .where(eq(shipments.id, shipment.id));
           } else {
             failed++;
-            // Log the first few failures in detail for debugging
             if (failed <= 3) {
               log(`Failed shipment ${shipment.shipmentId}: ${result.error}`);
             }
+            await db
+              .update(shipments)
+              .set({
+                rateCheckStatus: 'failed',
+                rateCheckError: result.error || 'Unknown error',
+                updatedAt: new Date(),
+              })
+              .where(eq(shipments.id, shipment.id));
           }
         } catch (error: any) {
           failed++;
           if (failed <= 3) {
             log(`Exception analyzing shipment ${shipment.shipmentId}: ${error.message}`);
           }
+          await db
+            .update(shipments)
+            .set({
+              rateCheckStatus: 'failed',
+              rateCheckError: error.message || 'Exception during rate check',
+              updatedAt: new Date(),
+            })
+            .where(eq(shipments.id, shipment.id));
         }
         
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_SHIPMENTS_MS));
