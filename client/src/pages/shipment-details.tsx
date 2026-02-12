@@ -641,7 +641,7 @@ export default function ShipmentDetails() {
                       <>
                         {/* Decision Subphase Stepper */}
                         <div className="space-y-5" data-testid="decision-subphase-stepper">
-                          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                          <div className="flex items-center gap-2 overflow-x-auto overflow-y-visible p-2">
                             {DECISION_STEPS.map((step, i) => {
                               const isCurrent = i === currentStepIndex;
                               const isComplete = i < currentStepIndex;
