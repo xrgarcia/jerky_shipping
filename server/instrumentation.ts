@@ -5,8 +5,14 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
+import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 
 const HONEYCOMB_API_KEY = process.env.HONEYCOMB_API_KEY;
+const OTEL_DEBUG = process.env.OTEL_DEBUG === 'true';
+
+if (OTEL_DEBUG) {
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+}
 
 if (!HONEYCOMB_API_KEY) {
   console.warn('[OpenTelemetry] HONEYCOMB_API_KEY not set — tracing disabled');
@@ -47,6 +53,23 @@ if (!HONEYCOMB_API_KEY) {
 
   sdk.start();
   console.log('[OpenTelemetry] Tracing initialized → Honeycomb (ship-warehouse)');
+
+  const verifyExport = async () => {
+    try {
+      const response = await fetch('https://api.honeycomb.io/1/auth', {
+        headers: { 'X-Honeycomb-Team': HONEYCOMB_API_KEY },
+      });
+      if (response.ok) {
+        const data = await response.json() as any;
+        console.log(`[OpenTelemetry] Honeycomb auth verified — team: ${data.team?.slug || 'unknown'}, environment: ${data.environment?.slug || 'unknown'}`);
+      } else {
+        console.error(`[OpenTelemetry] Honeycomb auth FAILED — status ${response.status}. Check HONEYCOMB_API_KEY.`);
+      }
+    } catch (err: any) {
+      console.error(`[OpenTelemetry] Honeycomb connectivity check failed: ${err.message}`);
+    }
+  };
+  verifyExport();
 
   process.on('SIGTERM', () => {
     sdk.shutdown().then(() => {
