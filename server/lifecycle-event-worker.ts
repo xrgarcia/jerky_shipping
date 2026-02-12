@@ -179,7 +179,7 @@ const sideEffectsRegistry: Record<string, SideEffectConfig> = {
         const jobId = await enqueueRateCheck({
           shipmentId: shipment.shipmentId!,
           localShipmentId: shipmentId,
-          orderNumber: orderNumber,
+          orderNumber: orderNumber || shipment.orderNumber || undefined,
           serviceCode: shipment.serviceCode ?? undefined,
           destinationPostalCode: shipment.shipToPostalCode ?? undefined,
         });
