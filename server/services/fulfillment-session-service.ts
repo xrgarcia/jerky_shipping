@@ -812,11 +812,15 @@ export class FulfillmentSessionService {
       })
       .where(eq(fulfillmentSessions.id, sessionId));
 
+    const addedShipmentRows = await db
+      .select({ id: shipments.id, orderNumber: shipments.orderNumber })
+      .from(shipments)
+      .where(inArray(shipments.id, validIds));
     await queueLifecycleEvaluationBatch(
-      validIds.map(id => ({ shipmentId: id })),
+      addedShipmentRows.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
       'session_add'
     );
-    console.log(`[FulfillmentSession] Queued ${validIds.length} lifecycle events with 'session_add' reason`);
+    console.log(`[FulfillmentSession] Queued ${addedShipmentRows.length} lifecycle events with 'session_add' reason`);
     
     // Fetch and match SkuVault sale IDs for the added shipments
     const saleIdResult = await fetchAndMatchSaleIds(validIds);
@@ -1005,17 +1009,16 @@ export class FulfillmentSessionService {
 
     if (newStatus === 'ready') {
       const linkedShipments = await db
-        .select({ id: shipments.id })
+        .select({ id: shipments.id, orderNumber: shipments.orderNumber })
         .from(shipments)
         .where(eq(shipments.fulfillmentSessionId, sessionId));
       
       if (linkedShipments.length > 0) {
-        const shipmentIds = linkedShipments.map(s => s.id);
         await queueLifecycleEvaluationBatch(
-          shipmentIds.map(id => ({ shipmentId: id })),
+          linkedShipments.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
           'session_release'
         );
-        console.log(`[FulfillmentSession] Session ${sessionId} released to floor - queued lifecycle for ${shipmentIds.length} shipments with 'session_release' reason`);
+        console.log(`[FulfillmentSession] Session ${sessionId} released to floor - queued lifecycle for ${linkedShipments.length} shipments with 'session_release' reason`);
       }
     }
 
@@ -1064,17 +1067,16 @@ export class FulfillmentSessionService {
       const updatedSessionIds = results.map(r => r.id);
       
       const linkedShipments = await db
-        .select({ id: shipments.id })
+        .select({ id: shipments.id, orderNumber: shipments.orderNumber })
         .from(shipments)
         .where(inArray(shipments.fulfillmentSessionId, updatedSessionIds));
       
       if (linkedShipments.length > 0) {
-        const shipmentIds = linkedShipments.map(s => s.id);
         await queueLifecycleEvaluationBatch(
-          shipmentIds.map(id => ({ shipmentId: id })),
+          linkedShipments.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
           'session_release_bulk'
         );
-        console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - queued lifecycle for ${shipmentIds.length} shipments with 'session_release_bulk' reason`);
+        console.log(`[FulfillmentSession] Bulk released ${results.length} sessions to floor - queued lifecycle for ${linkedShipments.length} shipments with 'session_release_bulk' reason`);
       }
     }
 
@@ -1351,11 +1353,15 @@ export class FulfillmentSessionService {
         spot++;
       }
 
+      const createdShipmentRows = await db
+        .select({ id: shipments.id, orderNumber: shipments.orderNumber })
+        .from(shipments)
+        .where(inArray(shipments.id, validIds));
       await queueLifecycleEvaluationBatch(
-        validIds.map(id => ({ shipmentId: id })),
+        createdShipmentRows.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
         'session_create'
       );
-      console.log(`[FulfillmentSession] Queued ${validIds.length} lifecycle events with 'session_create' reason`);
+      console.log(`[FulfillmentSession] Queued ${createdShipmentRows.length} lifecycle events with 'session_create' reason`);
       
       // Fetch and match SkuVault sale IDs for the newly sessioned shipments
       const saleIdResult = await fetchAndMatchSaleIds(validIds);

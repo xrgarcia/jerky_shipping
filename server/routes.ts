@@ -13773,15 +13773,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(shipmentsTable)
         .set(updateData)
         .where(eq(shipmentsTable.fingerprintId, fingerprintId))
-        .returning({ id: shipmentsTable.id });
+        .returning({ id: shipmentsTable.id, orderNumber: shipmentsTable.orderNumber });
       
       if (updatedShipments.length > 0) {
-        const shipmentIds = updatedShipments.map(s => s.id);
         await queueLifecycleEvaluationBatch(
-          shipmentIds.map(id => ({ shipmentId: id })),
+          updatedShipments.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
           'packaging_model_assign'
         );
-        console.log(`[Fingerprints] Queued ${shipmentIds.length} lifecycle events with 'packaging_model_assign' reason`);
+        console.log(`[Fingerprints] Queued ${updatedShipments.length} lifecycle events with 'packaging_model_assign' reason`);
       }
       
       // Re-run rate analysis for shipments that used fallback package details
@@ -13886,7 +13885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let totalFingerprintsAssigned = 0;
       let totalShipmentsUpdated = 0;
-      const allShipmentIds: string[] = [];
+      const allUpdatedShipments: Array<{ id: string; orderNumber: string | null }> = [];
       
       // Process each fingerprint
       for (const fingerprintId of fingerprintIds) {
@@ -13935,18 +13934,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .update(shipmentsTable)
           .set(updateData)
           .where(eq(shipmentsTable.fingerprintId, fingerprintId))
-          .returning({ id: shipmentsTable.id });
+          .returning({ id: shipmentsTable.id, orderNumber: shipmentsTable.orderNumber });
         
         totalShipmentsUpdated += updatedShipments.length;
-        allShipmentIds.push(...updatedShipments.map(s => s.id));
+        allUpdatedShipments.push(...updatedShipments);
       }
       
-      if (allShipmentIds.length > 0) {
+      if (allUpdatedShipments.length > 0) {
         await queueLifecycleEvaluationBatch(
-          allShipmentIds.map(id => ({ shipmentId: id })),
+          allUpdatedShipments.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
           'packaging_bulk_assign'
         );
-        console.log(`[Bulk Assign] Queued ${allShipmentIds.length} lifecycle events with 'packaging_bulk_assign' reason`);
+        console.log(`[Bulk Assign] Queued ${allUpdatedShipments.length} lifecycle events with 'packaging_bulk_assign' reason`);
       }
       
       console.log(`[Bulk Assign] Assigned packaging ${packagingType.name} to ${totalFingerprintsAssigned} fingerprints, updated ${totalShipmentsUpdated} shipments`);
@@ -14863,11 +14862,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get shipment IDs before unlinking (needed for lifecycle recalculation)
       const linkedShipments = await db
-        .select({ id: shipmentsTable.id })
+        .select({ id: shipmentsTable.id, orderNumber: shipmentsTable.orderNumber })
         .from(shipmentsTable)
         .where(eq(shipmentsTable.fulfillmentSessionId, sessionId));
-      
-      const shipmentIds = linkedShipments.map(s => s.id);
       
       // Unlink all shipments from this session (clear session reference and spot)
       await db
@@ -14889,12 +14886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Session not found" });
       }
       
-      if (shipmentIds.length > 0) {
+      if (linkedShipments.length > 0) {
         await queueLifecycleEvaluationBatch(
-          shipmentIds.map(id => ({ shipmentId: id })),
+          linkedShipments.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
           'session_delete'
         );
-        console.log(`[FulfillmentSessions] Deleted session ${sessionId}, queued lifecycle events for ${shipmentIds.length} shipments with 'session_delete' reason`);
+        console.log(`[FulfillmentSessions] Deleted session ${sessionId}, queued lifecycle events for ${linkedShipments.length} shipments with 'session_delete' reason`);
       } else {
         console.log(`[FulfillmentSessions] Deleted session ${sessionId} (no shipments linked)`);
       }
