@@ -54,6 +54,7 @@ interface HydrationResult {
   uncategorizedSkuCount?: number;
   missingWeightSkuCount?: number;
   error?: string;
+  terminal?: boolean;
 }
 
 interface HydrationStats {
@@ -456,7 +457,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       .where(eq(shipmentItems.shipmentId, shipmentId));
     
     if (items.length === 0) {
-      return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found' };
+      return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found', terminal: true };
     }
     
     // Get excluded SKUs set for filtering kit components (e.g., BUILDBAG, BUILDBOX)
@@ -577,7 +578,14 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
     }
     
     if (itemsToProcess.length === 0) {
-      return { shipmentId, orderNumber, itemsCreated: 0, error: 'No items to insert after processing' };
+      const totalItems = items.length;
+      const nullSkuCount = items.filter(i => !i.sku || i.sku.trim() === '').length;
+      const allSkusNull = nullSkuCount === totalItems;
+      const errorMsg = allSkusNull
+        ? `All ${totalItems} line item(s) have null/empty SKUs - cannot hydrate`
+        : `No items to insert after processing (${totalItems} items, ${nullSkuCount} null SKUs, rest excluded)`;
+      logger.warn(`[qc-item-hydrator] ${errorMsg}`, withOrder(orderNumber, shipmentId));
+      return { shipmentId, orderNumber, itemsCreated: 0, error: errorMsg, terminal: allSkusNull };
     }
     
     // Phase 2.5: Aggregate items by SKU to sum quantities
@@ -744,6 +752,24 @@ export async function runHydration(batchSize: number = 50): Promise<HydrationSta
       if (result.error) {
         stats.errors.push(`${result.orderNumber}: ${result.error}`);
         stats.shipmentsSkipped++;
+        
+        if (result.terminal) {
+          logger.warn(`[qc-item-hydrator] Terminal hydration error for ${result.orderNumber} - inserting sentinel QC item to prevent retry loop`, withOrder(result.orderNumber, shipment.id));
+          try {
+            await db.insert(shipmentQcItems).values({
+              id: crypto.randomUUID(),
+              shipmentId: shipment.id,
+              sku: 'HYDRATION_FAILED',
+              description: `Hydration failed: ${result.error}`,
+              quantityExpected: 0,
+              quantityScanned: 0,
+              isKitComponent: false,
+            }).onConflictDoNothing();
+            await queueLifecycleEvaluation(shipment.id, 'fingerprint', result.orderNumber);
+          } catch (sentinelErr: any) {
+            logger.error(`[qc-item-hydrator] Failed to insert sentinel for ${result.orderNumber}: ${sentinelErr.message}`, withOrder(result.orderNumber, shipment.id));
+          }
+        }
       } else {
         stats.shipmentsProcessed++;
         stats.totalItemsCreated += result.itemsCreated;
