@@ -270,6 +270,12 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
               })
               .where(eq(shipments.id, shipmentId));
             packagingTypeIdToSync = model.packagingTypeId;
+
+            const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
+            const requeued = await queueLifecycleEvaluation(shipmentId, 'package_assignment_complete', orderNumber);
+            if (requeued) {
+              log(`Package sync: Re-queued lifecycle evaluation after auto-assigning packagingTypeId for ${orderNumber || shipmentId}`);
+            }
           }
         }
         
