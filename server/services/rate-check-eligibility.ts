@@ -12,7 +12,7 @@ import { db } from '../db';
 import { fingerprints, fingerprintModels, packagingTypes } from '@shared/schema';
 import type { Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { shippingMethodConfig } from './shipping-method-config-service';
+import { customerShippingMethodConfig } from './shipping-method-config-service';
 
 export interface EligibilityResult {
   eligible: boolean;
@@ -77,7 +77,7 @@ export class RateCheckEligibility {
    * This is an async check that queries the shipping method config service.
    */
   static async checkShippingMethodConfig(serviceCode: string): Promise<EligibilityResult> {
-    const canRateCheck = await shippingMethodConfig.canPerformRateCheck(serviceCode);
+    const canRateCheck = await customerShippingMethodConfig.canPerformRateCheck(serviceCode);
     if (!canRateCheck) {
       return { eligible: false, reason: `Shipping method "${serviceCode}" has rate checking disabled` };
     }

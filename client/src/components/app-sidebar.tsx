@@ -181,8 +181,8 @@ export function AppSidebar() {
       icon: AlertTriangle,
     },
     {
-      title: "Shipping Methods",
-      url: "/settings/shipping-methods",
+      title: "Customer Shipping Methods",
+      url: "/settings/customer-shipping-methods",
       icon: Truck,
     },
     {

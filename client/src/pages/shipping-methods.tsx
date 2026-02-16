@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-interface ShippingMethod {
+interface CustomerShippingMethod {
   id: number;
   name: string;
   allowRateCheck: boolean;
@@ -61,31 +61,31 @@ function formatDate(dateValue: string | Date | null | undefined): string {
   }
 }
 
-export default function ShippingMethods() {
+export default function CustomerShippingMethods() {
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  const { data: methods, isLoading } = useQuery<ShippingMethod[]>({
-    queryKey: ["/api/settings/shipping-methods"],
+  const { data: methods, isLoading } = useQuery<CustomerShippingMethod[]>({
+    queryKey: ["/api/settings/customer-shipping-methods"],
   });
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
       const { id, ...body } = data;
-      return apiRequest("PUT", `/api/settings/shipping-methods/${id}`, body);
+      return apiRequest("PUT", `/api/settings/customer-shipping-methods/${id}`, body);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/shipping-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customer-shipping-methods"] });
       toast({
         title: "Updated",
-        description: "Shipping method settings saved.",
+        description: "Customer shipping method settings saved.",
       });
       setUpdatingId(null);
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update shipping method",
+        description: error.message || "Failed to update customer shipping method",
         variant: "destructive",
       });
       setUpdatingId(null);
@@ -94,27 +94,27 @@ export default function ShippingMethods() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/settings/shipping-methods/sync");
+      return apiRequest("POST", "/api/settings/customer-shipping-methods/sync");
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/shipping-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/customer-shipping-methods"] });
       toast({
         title: "Sync Complete",
         description: data.newMethods > 0 
-          ? `Added ${data.newMethods} new shipping method(s).`
-          : "No new shipping methods found.",
+          ? `Added ${data.newMethods} new customer shipping method(s).`
+          : "No new customer shipping methods found.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to sync shipping methods",
+        description: error.message || "Failed to sync customer shipping methods",
         variant: "destructive",
       });
     },
   });
 
-  const handleToggle = (method: ShippingMethod, field: 'allowRateCheck' | 'allowAssignment' | 'allowChange', value: boolean) => {
+  const handleToggle = (method: CustomerShippingMethod, field: 'allowRateCheck' | 'allowAssignment' | 'allowChange', value: boolean) => {
     setUpdatingId(method.id);
     updateMutation.mutate({
       id: method.id,
@@ -122,7 +122,7 @@ export default function ShippingMethods() {
     });
   };
 
-  const handleWeightChange = (method: ShippingMethod, field: 'minAllowedWeight' | 'maxAllowedWeight', value: string) => {
+  const handleWeightChange = (method: CustomerShippingMethod, field: 'minAllowedWeight' | 'maxAllowedWeight', value: string) => {
     const numValue = value.trim() === '' ? null : parseFloat(value);
     if (value.trim() !== '' && (isNaN(numValue as number) || (numValue as number) < 0)) return;
     setUpdatingId(method.id);
@@ -150,8 +150,8 @@ export default function ShippingMethods() {
         <div className="flex items-center gap-3">
           <Truck className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Shipping Methods</h1>
-            <p className="text-muted-foreground">Configure rate checking and assignment permissions</p>
+            <h1 className="text-2xl font-bold">Customer Shipping Methods</h1>
+            <p className="text-muted-foreground">Configure rate checking and assignment permissions for customer shipping methods</p>
           </div>
         </div>
         <Button
@@ -175,7 +175,7 @@ export default function ShippingMethods() {
         <CardContent>
           {!methods || methods.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No shipping methods found. Click "Sync New Methods" to populate from existing shipments.
+              No customer shipping methods found. Click "Sync New Methods" to populate from existing shipments.
             </div>
           ) : (
             <Table>

@@ -1,19 +1,19 @@
 /**
- * Shipping Method Config Service
+ * Customer Shipping Method Config Service
  * 
- * Centralized configuration service for shipping method settings.
+ * Centralized configuration service for customer shipping method settings.
  * Single source of truth for rate checker behavior, assignment rules, and weight limits.
  * 
  * Usage:
- *   const config = ShippingMethodConfigService.getInstance();
+ *   const config = CustomerShippingMethodConfigService.getInstance();
  *   if (await config.canPerformRateCheck('ups_ground')) { ... }
  */
 
 import { db } from '../db';
-import { shippingMethods } from '@shared/schema';
+import { customerShippingMethods } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-export interface ShippingMethodConfig {
+export interface CustomerShippingMethodConfig {
   name: string;
   allowRateCheck: boolean;
   allowAssignment: boolean;
@@ -27,27 +27,27 @@ export interface WeightLimits {
   maxOz: number | null;
 }
 
-export class ShippingMethodConfigService {
-  private static instance: ShippingMethodConfigService;
+export class CustomerShippingMethodConfigService {
+  private static instance: CustomerShippingMethodConfigService;
 
   private constructor() {}
 
-  static getInstance(): ShippingMethodConfigService {
-    if (!ShippingMethodConfigService.instance) {
-      ShippingMethodConfigService.instance = new ShippingMethodConfigService();
+  static getInstance(): CustomerShippingMethodConfigService {
+    if (!CustomerShippingMethodConfigService.instance) {
+      CustomerShippingMethodConfigService.instance = new CustomerShippingMethodConfigService();
     }
-    return ShippingMethodConfigService.instance;
+    return CustomerShippingMethodConfigService.instance;
   }
 
   /**
-   * Get full configuration for a shipping method
+   * Get full configuration for a customer shipping method
    * Returns null if method is not in the database (unknown methods are allowed by default)
    */
-  async getMethodConfig(serviceName: string): Promise<ShippingMethodConfig | null> {
+  async getCustomerMethodConfig(serviceName: string): Promise<CustomerShippingMethodConfig | null> {
     const [method] = await db
       .select()
-      .from(shippingMethods)
-      .where(eq(shippingMethods.name, serviceName))
+      .from(customerShippingMethods)
+      .where(eq(customerShippingMethods.name, serviceName))
       .limit(1);
 
     if (!method) {
@@ -65,11 +65,11 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Check if rate checking is allowed for this shipping method.
+   * Check if rate checking is allowed for this customer shipping method.
    * Unknown methods default to allowed.
    */
   async canPerformRateCheck(serviceName: string): Promise<boolean> {
-    const config = await this.getMethodConfig(serviceName);
+    const config = await this.getCustomerMethodConfig(serviceName);
     if (!config) {
       return true;
     }
@@ -77,11 +77,11 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Check if the rate checker is allowed to change this shipping method.
+   * Check if the rate checker is allowed to change this customer shipping method.
    * Unknown methods default to allowed.
    */
-  async canChangeMethod(serviceName: string): Promise<boolean> {
-    const config = await this.getMethodConfig(serviceName);
+  async canChangeCustomerMethod(serviceName: string): Promise<boolean> {
+    const config = await this.getCustomerMethodConfig(serviceName);
     if (!config) {
       return true;
     }
@@ -89,11 +89,11 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Check if this shipping method can be assigned to shipments.
+   * Check if this customer shipping method can be assigned to shipments.
    * Unknown methods default to allowed.
    */
-  async canAssignMethod(serviceName: string): Promise<boolean> {
-    const config = await this.getMethodConfig(serviceName);
+  async canAssignCustomerMethod(serviceName: string): Promise<boolean> {
+    const config = await this.getCustomerMethodConfig(serviceName);
     if (!config) {
       return true;
     }
@@ -101,10 +101,10 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Get weight limits for a shipping method.
+   * Get weight limits for a customer shipping method.
    */
-  async getWeightLimits(serviceName: string): Promise<WeightLimits> {
-    const config = await this.getMethodConfig(serviceName);
+  async getCustomerMethodWeightLimits(serviceName: string): Promise<WeightLimits> {
+    const config = await this.getCustomerMethodConfig(serviceName);
     if (!config) {
       return { minOz: null, maxOz: null };
     }
@@ -115,10 +115,10 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Check if a package weight is within the allowed limits for a shipping method.
+   * Check if a package weight is within the allowed limits for a customer shipping method.
    */
   async isWeightAllowed(serviceName: string, weightOz: number): Promise<boolean> {
-    const limits = await this.getWeightLimits(serviceName);
+    const limits = await this.getCustomerMethodWeightLimits(serviceName);
     
     if (limits.minOz !== null && weightOz < limits.minOz) {
       return false;
@@ -132,10 +132,10 @@ export class ShippingMethodConfigService {
   }
 
   /**
-   * Get all configured shipping methods
+   * Get all configured customer shipping methods
    */
-  async getAllMethods(): Promise<ShippingMethodConfig[]> {
-    const methods = await db.select().from(shippingMethods);
+  async getAllCustomerMethods(): Promise<CustomerShippingMethodConfig[]> {
+    const methods = await db.select().from(customerShippingMethods);
     return methods.map(m => ({
       name: m.name,
       allowRateCheck: m.allowRateCheck,
@@ -148,4 +148,4 @@ export class ShippingMethodConfigService {
 }
 
 // Export singleton instance for convenience
-export const shippingMethodConfig = ShippingMethodConfigService.getInstance();
+export const customerShippingMethodConfig = CustomerShippingMethodConfigService.getInstance();

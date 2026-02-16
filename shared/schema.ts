@@ -1787,9 +1787,9 @@ export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({
 export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 
-// Shipping Methods - Configuration for rate checking and assignment permissions
+// Customer Shipping Methods - Configuration for rate checking and assignment permissions
 // Each unique customer_shipping_method from shipments gets an entry here
-export const shippingMethods = pgTable("shipping_methods", {
+export const customerShippingMethods = pgTable("customer_shipping_methods", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(), // The customer_shipping_method value (e.g., "ups_ground")
   allowRateCheck: boolean("allow_rate_check").notNull().default(true), // Whether to include in rate checker
@@ -1801,17 +1801,17 @@ export const shippingMethods = pgTable("shipping_methods", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by"), // User who last modified this record
 }, (table) => ({
-  nameIdx: index("shipping_methods_name_idx").on(table.name),
+  nameIdx: index("customer_shipping_methods_name_idx").on(table.name),
 }));
 
-export const insertShippingMethodSchema = createInsertSchema(shippingMethods).omit({
+export const insertCustomerShippingMethodSchema = createInsertSchema(customerShippingMethods).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertShippingMethod = z.infer<typeof insertShippingMethodSchema>;
-export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type InsertCustomerShippingMethod = z.infer<typeof insertCustomerShippingMethodSchema>;
+export type CustomerShippingMethod = typeof customerShippingMethods.$inferSelect;
 
 // ShipStation Write Queue - Reliable, rate-limit-aware queue for ShipStation shipment writes
 // Uses PATCH semantics: patchPayload contains only the fields that need to change
