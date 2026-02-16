@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -35,9 +36,17 @@ interface CustomerShippingMethod {
   updatedBy: string | null;
 }
 
+interface RateCheckShippingMethod {
+  id: number;
+  name: string;
+  allowRateCheck: boolean;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
 function formatDate(dateValue: string | Date | null | undefined): string {
   if (!dateValue) return "N/A";
-  
   try {
     const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
     return date.toLocaleString('en-US', {
@@ -53,7 +62,7 @@ function formatDate(dateValue: string | Date | null | undefined): string {
   }
 }
 
-export default function CustomerShippingMethods() {
+function CustomerMethodsTab() {
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
@@ -68,89 +77,56 @@ export default function CustomerShippingMethods() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customer-shipping-methods"] });
-      toast({
-        title: "Updated",
-        description: "Customer shipping method settings saved.",
-      });
+      toast({ title: "Updated", description: "Customer shipping method settings saved." });
       setUpdatingId(null);
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update customer shipping method",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to update", variant: "destructive" });
       setUpdatingId(null);
     },
   });
 
   const syncMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/settings/customer-shipping-methods/sync");
-    },
+    mutationFn: async () => apiRequest("POST", "/api/settings/customer-shipping-methods/sync"),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/customer-shipping-methods"] });
       toast({
         title: "Sync Complete",
-        description: data.newMethods > 0 
-          ? `Added ${data.newMethods} new customer shipping method(s).`
-          : "No new customer shipping methods found.",
+        description: data.newMethods > 0 ? `Added ${data.newMethods} new customer shipping method(s).` : "No new customer shipping methods found.",
       });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to sync customer shipping methods",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to sync", variant: "destructive" });
     },
   });
 
   const handleToggle = (method: CustomerShippingMethod, field: 'allowAssignment' | 'allowChange', value: boolean) => {
     setUpdatingId(method.id);
-    updateMutation.mutate({
-      id: method.id,
-      [field]: value,
-    });
+    updateMutation.mutate({ id: method.id, [field]: value });
   };
 
   const handleWeightChange = (method: CustomerShippingMethod, field: 'minAllowedWeight' | 'maxAllowedWeight', value: string) => {
     const numValue = value.trim() === '' ? null : parseFloat(value);
     if (value.trim() !== '' && (isNaN(numValue as number) || (numValue as number) < 0)) return;
     setUpdatingId(method.id);
-    updateMutation.mutate({
-      id: method.id,
-      [field]: numValue,
-    });
+    updateMutation.mutate({ id: method.id, [field]: numValue });
   };
 
   if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-64" />
-        </div>
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
+    return <Skeleton className="h-[400px] w-full" />;
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Truck className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Customer Shipping Methods</h1>
-            <p className="text-muted-foreground">Configure assignment permissions and weight limits for customer shipping methods</p>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          These are the shipping methods customers selected on their orders. Control assignment permissions and weight limits.
+        </p>
         <Button
           variant="outline"
           onClick={() => syncMutation.mutate()}
           disabled={syncMutation.isPending}
-          data-testid="button-sync-methods"
+          data-testid="button-sync-customer-methods"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
           Sync New Methods
@@ -158,15 +134,9 @@ export default function CustomerShippingMethods() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Method Configuration</CardTitle>
-          <CardDescription>
-            Control which shipping methods can be assigned to shipments and their weight limits
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {!methods || methods.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-state">
+            <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-customer-methods">
               No customer shipping methods found. Click "Sync New Methods" to populate from existing shipments.
             </div>
           ) : (
@@ -182,7 +152,7 @@ export default function CustomerShippingMethods() {
                           <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          When disabled, this method acts as a pass-through — the customer's shipping choice is always kept, no matter what the rate checker finds. When enabled, the rate checker can override it with a better option.
+                          When disabled, this method acts as a pass-through — the customer's shipping choice is always kept. When enabled, the rate checker can override it with a better option.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -232,7 +202,7 @@ export default function CustomerShippingMethods() {
               </TableHeader>
               <TableBody>
                 {methods.map((method) => (
-                  <TableRow key={method.id} data-testid={`row-method-${method.id}`}>
+                  <TableRow key={method.id} data-testid={`row-customer-method-${method.id}`}>
                     <TableCell>
                       <Badge variant="secondary" className="font-mono text-xs">
                         {method.name}
@@ -307,28 +277,165 @@ export default function CustomerShippingMethods() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function RateCheckMethodsTab() {
+  const { toast } = useToast();
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const { data: methods, isLoading } = useQuery<RateCheckShippingMethod[]>({
+    queryKey: ["/api/settings/rate-check-shipping-methods"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: number; allowRateCheck: boolean }) => {
+      const { id, ...body } = data;
+      return apiRequest("PUT", `/api/settings/rate-check-shipping-methods/${id}`, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/rate-check-shipping-methods"] });
+      toast({ title: "Updated", description: "Rate check shipping method settings saved." });
+      setUpdatingId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update", variant: "destructive" });
+      setUpdatingId(null);
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/settings/rate-check-shipping-methods/sync"),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/rate-check-shipping-methods"] });
+      toast({
+        title: "Sync Complete",
+        description: data.newMethods > 0 ? `Added ${data.newMethods} new rate check shipping method(s).` : "No new rate check shipping methods found.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to sync", variant: "destructive" });
+    },
+  });
+
+  const handleToggle = (method: RateCheckShippingMethod, value: boolean) => {
+    setUpdatingId(method.id);
+    updateMutation.mutate({ id: method.id, allowRateCheck: value });
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-[400px] w-full" />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          These are the candidate shipping methods the rate checker can recommend. Toggle which ones are allowed.
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          data-testid="button-sync-rate-methods"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+          Sync New Methods
+        </Button>
+      </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>About These Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <strong className="text-foreground">Allow Change:</strong> Controls whether the rate checker can override the customer's 
-            shipping choice. When disabled, this method acts as a pass-through — the customer's selected shipping method 
-            is always kept regardless of what rates the checker finds. When enabled, the rate checker may switch to a 
-            different method if a better rate is available.
-          </div>
-          <div>
-            <strong className="text-foreground">Allow Assignment:</strong> When enabled, this shipping method can be 
-            assigned to shipments during fulfillment. Disable this for deprecated or restricted methods.
-          </div>
-          <div>
-            <strong className="text-foreground">Min/Max Weight:</strong> Optional weight limits in ounces. When set, this 
-            shipping method will only be considered for packages within this weight range. Leave empty for no limit.
-          </div>
+        <CardContent className="pt-6">
+          {!methods || methods.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-rate-methods">
+              No rate check shipping methods found. Click "Sync New Methods" to populate from rate analysis data.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Method Name</TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Allow Rate Check
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          When enabled, this shipping method can be selected as a candidate by the rate checker. Disable to exclude it from rate comparisons.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
+                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Updated By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {methods.map((method) => (
+                  <TableRow key={method.id} data-testid={`row-rate-method-${method.id}`}>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-mono text-xs">
+                        {method.name}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Switch
+                          checked={method.allowRateCheck}
+                          onCheckedChange={(checked) => handleToggle(method, checked)}
+                          disabled={updatingId === method.id}
+                          data-testid={`switch-rate-check-${method.id}`}
+                        />
+                        {method.allowRateCheck ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(method.updatedAt)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {method.updatedBy || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+export default function ShippingMethods() {
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <Truck className="h-8 w-8 text-primary" />
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Shipping Methods</h1>
+          <p className="text-muted-foreground">Manage customer shipping methods and rate checker candidates</p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="customer" className="w-full">
+        <TabsList>
+          <TabsTrigger value="customer" data-testid="tab-customer-methods">Customer Methods</TabsTrigger>
+          <TabsTrigger value="rate-check" data-testid="tab-rate-check-methods">Rate Check Methods</TabsTrigger>
+        </TabsList>
+        <TabsContent value="customer" className="mt-6">
+          <CustomerMethodsTab />
+        </TabsContent>
+        <TabsContent value="rate-check" className="mt-6">
+          <RateCheckMethodsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

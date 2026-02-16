@@ -45,8 +45,7 @@ import SkuvaultProducts from "@/pages/skuvault-products";
 import SmartSessions from "@/pages/smart-sessions";
 import SmartRateCheck from "@/pages/smart-rate-check";
 import ExcludedSkus from "@/pages/excluded-skus";
-import CustomerShippingMethods from "@/pages/shipping-methods";
-import RateCheckShippingMethods from "@/pages/rate-check-shipping-methods";
+import ShippingMethods from "@/pages/shipping-methods";
 import Services from "@/pages/services";
 import type { User } from "@shared/schema";
 
@@ -128,8 +127,7 @@ function AppContent() {
       <Route path="/stations" component={Stations} />
       <Route path="/desktop-config" component={DesktopConfig} />
       <Route path="/settings/excluded-skus" component={ExcludedSkus} />
-      <Route path="/settings/customer-shipping-methods" component={CustomerShippingMethods} />
-      <Route path="/settings/rate-check-shipping-methods" component={RateCheckShippingMethods} />
+      <Route path="/settings/shipping-methods" component={ShippingMethods} />
       <Route path="/settings/services" component={Services} />
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />

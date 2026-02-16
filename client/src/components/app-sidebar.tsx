@@ -181,14 +181,9 @@ export function AppSidebar() {
       icon: AlertTriangle,
     },
     {
-      title: "Customer Shipping Methods",
-      url: "/settings/customer-shipping-methods",
+      title: "Shipping Methods",
+      url: "/settings/shipping-methods",
       icon: Truck,
-    },
-    {
-      title: "Rate Check Methods",
-      url: "/settings/rate-check-shipping-methods",
-      icon: Zap,
     },
     {
       title: "Services",
