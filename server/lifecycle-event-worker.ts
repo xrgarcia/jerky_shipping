@@ -244,7 +244,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           .limit(1);
 
         if (!shipment) {
-          log(`Package sync: Shipment not found ${shipmentId}`, 'warn');
+          log(`Package sync: Shipment not found ${shipmentId}`, 'warn', withOrder(orderNumber, shipmentId));
           return { success: false, shouldRetry: false, shouldRequeue: false, error: 'Shipment not found' };
         }
 
@@ -280,8 +280,8 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         }
         
         if (!packagingTypeIdToSync) {
-          log(`Package sync: No packagingTypeId set for ${ref}, skipping`);
-          return { success: true, shouldRetry: false, shouldRequeue: false };
+          log(`Package sync: No packagingTypeId set for ${ref} — event reason '${metadata?.reason || 'unknown'}' expected packaging to exist`, 'warn', withOrder(orderNumber, shipmentId));
+          return { success: false, shouldRetry: false, shouldRequeue: false, error: `No packagingTypeId set for ${ref}` };
         }
 
         const [packagingType] = await db
@@ -291,18 +291,18 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           .limit(1);
 
         if (!packagingType) {
-          log(`Package sync: Packaging type not found ${packagingTypeIdToSync}`, 'warn');
+          log(`Package sync: Packaging type not found ${packagingTypeIdToSync}`, 'warn', withOrder(orderNumber, shipmentId));
           return { success: false, shouldRetry: false, shouldRequeue: false, error: `Packaging type ${packagingTypeIdToSync} not found` };
         }
 
         if (!packagingType.dimensionLength || !packagingType.dimensionWidth || !packagingType.dimensionHeight) {
-          log(`Package sync: Packaging type ${packagingType.name} missing dimensions, skipping ShipStation sync`);
-          return { success: true, shouldRetry: false, shouldRequeue: false };
+          log(`Package sync: Packaging type "${packagingType.name}" missing dimensions (L:${packagingType.dimensionLength}, W:${packagingType.dimensionWidth}, H:${packagingType.dimensionHeight}) — cannot sync to ShipStation`, 'warn', withOrder(orderNumber, shipmentId));
+          return { success: false, shouldRetry: false, shouldRequeue: false, error: `Packaging type "${packagingType.name}" missing dimensions` };
         }
 
         const shipmentData = shipment.shipmentData as Record<string, any> | null;
         if (!shipmentData) {
-          log(`Package sync: No shipmentData for ${ref}, cannot sync to ShipStation`);
+          log(`Package sync: No shipmentData for ${ref}, cannot sync to ShipStation`, 'warn', withOrder(orderNumber, shipmentId));
           return { success: false, shouldRetry: retryCount < MAX_PACKAGE_SYNC_RETRIES, shouldRequeue: false, error: 'No shipmentData available' };
         }
 
@@ -311,13 +311,13 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         const height = parseFloat(packagingType.dimensionHeight);
 
         if (!isFinite(length) || !isFinite(width) || !isFinite(height)) {
-          log(`Package sync: Invalid dimensions for ${packagingType.name} (L:${packagingType.dimensionLength}, W:${packagingType.dimensionWidth}, H:${packagingType.dimensionHeight}), skipping`);
-          return { success: true, shouldRetry: false, shouldRequeue: false };
+          log(`Package sync: Invalid/unparseable dimensions for "${packagingType.name}" (L:${packagingType.dimensionLength}, W:${packagingType.dimensionWidth}, H:${packagingType.dimensionHeight}) — cannot sync to ShipStation`, 'warn', withOrder(orderNumber, shipmentId));
+          return { success: false, shouldRetry: false, shouldRequeue: false, error: `Invalid dimensions for "${packagingType.name}"` };
         }
 
         if (!packagingType.packageId) {
-          log(`Package sync: Packaging type ${packagingType.name} missing ShipStation package_id, skipping sync`);
-          return { success: true, shouldRetry: false, shouldRequeue: false };
+          log(`Package sync: Packaging type "${packagingType.name}" missing ShipStation package_id — packaging type needs to be configured in ShipStation first`, 'warn', withOrder(orderNumber, shipmentId));
+          return { success: false, shouldRetry: false, shouldRequeue: false, error: `Packaging type "${packagingType.name}" missing ShipStation package_id` };
         }
 
         const packageInfo = {
@@ -334,12 +334,12 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         
         const isDefaultPackage = !existingPackageName || existingPackageName.toLowerCase() === 'package';
         if (!isDefaultPackage) {
-          log(`Package sync: Shipment ${ref} has custom package "${existingPackageName}" set, skipping`);
+          log(`Package sync: Shipment ${ref} has custom package "${existingPackageName}" set, skipping`, 'info', withOrder(orderNumber, shipmentId));
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
         if (shipment.shipmentStatus !== 'pending') {
-          log(`Package sync: Shipment ${ref} status is "${shipment.shipmentStatus}", not "pending", skipping`);
+          log(`Package sync: Shipment ${ref} status is "${shipment.shipmentStatus}", not "pending", skipping`, 'info', withOrder(orderNumber, shipmentId));
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
@@ -360,13 +360,13 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           orderNumber: shipment.orderNumber ?? undefined,
         });
 
-        log(`Package sync: Enqueued write job #${jobId} for ${ref} - ${packageInfo.name} (${packageInfo.packageId})`);
+        log(`Package sync: Enqueued write job #${jobId} for ${ref} - ${packageInfo.name} (${packageInfo.packageId})`, 'info', withOrder(orderNumber, shipmentId));
         sideEffectTriggeredCount++;
         return { success: true, shouldRetry: false, shouldRequeue: false };
 
       } catch (error: any) {
         const errorMsg = error.message || 'Unknown error';
-        log(`Package sync: Error enqueuing for ${ref}: ${errorMsg}`, 'error');
+        log(`Package sync: Unexpected error for ${ref}: ${errorMsg}`, 'error', withOrder(orderNumber, shipmentId));
         
         return { success: false, shouldRetry: false, shouldRequeue: false, error: errorMsg };
       }
