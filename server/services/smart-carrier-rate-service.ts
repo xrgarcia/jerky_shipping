@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import { getCarriers, getRatesEstimate } from '../utils/shipstation-api';
 import { RateCheckEligibility } from './rate-check-eligibility';
+import { customerShippingMethodConfig } from './shipping-method-config-service';
 import { withSpan } from '../utils/tracing';
 
 const FULFILLMENT_CENTER = {
@@ -184,6 +185,16 @@ export class SmartCarrierRateService {
         r.delivery_days !== undefined &&
         r.delivery_days !== null
       );
+      
+      // Filter out candidate methods that are disallowed in rate_check_shipping_methods
+      const disallowedMethods = await customerShippingMethodConfig.getDisallowedRateCheckMethods();
+      if (disallowedMethods.size > 0) {
+        const beforeCount = eligibleRates.length;
+        eligibleRates = eligibleRates.filter(r => !disallowedMethods.has(r.service_code));
+        if (eligibleRates.length < beforeCount) {
+          console.log(`[SmartCarrierRate] Filtered out ${beforeCount - eligibleRates.length} disallowed candidate method(s) for ${shipmentId}`);
+        }
+      }
       
       // If we have a customer delivery expectation, filter by it
       if (customerDeliveryDays) {

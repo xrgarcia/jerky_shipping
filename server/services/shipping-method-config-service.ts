@@ -2,20 +2,22 @@
  * Customer Shipping Method Config Service
  * 
  * Centralized configuration service for customer shipping method settings.
- * Single source of truth for rate checker behavior, assignment rules, and weight limits.
+ * Single source of truth for assignment rules and weight limits.
+ * 
+ * Rate check candidate filtering is handled by the rate_check_shipping_methods table,
+ * not by customer shipping method config.
  * 
  * Usage:
  *   const config = CustomerShippingMethodConfigService.getInstance();
- *   if (await config.canPerformRateCheck('ups_ground')) { ... }
+ *   if (await config.canChangeCustomerMethod('ups_ground')) { ... }
  */
 
 import { db } from '../db';
-import { customerShippingMethods } from '@shared/schema';
+import { customerShippingMethods, rateCheckShippingMethods } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 export interface CustomerShippingMethodConfig {
   name: string;
-  allowRateCheck: boolean;
   allowAssignment: boolean;
   allowChange: boolean;
   minAllowedWeight: number | null;
@@ -56,7 +58,6 @@ export class CustomerShippingMethodConfigService {
 
     return {
       name: method.name,
-      allowRateCheck: method.allowRateCheck,
       allowAssignment: method.allowAssignment,
       allowChange: method.allowChange,
       minAllowedWeight: method.minAllowedWeight ? parseFloat(method.minAllowedWeight) : null,
@@ -65,15 +66,16 @@ export class CustomerShippingMethodConfigService {
   }
 
   /**
-   * Check if rate checking is allowed for this customer shipping method.
-   * Unknown methods default to allowed.
+   * Get set of service codes that are disallowed for rate check candidates.
+   * Used by the smart carrier rate service to filter out disallowed candidate methods.
+   * Methods not in the table default to allowed.
    */
-  async canPerformRateCheck(serviceName: string): Promise<boolean> {
-    const config = await this.getCustomerMethodConfig(serviceName);
-    if (!config) {
-      return true;
-    }
-    return config.allowRateCheck;
+  async getDisallowedRateCheckMethods(): Promise<Set<string>> {
+    const methods = await db
+      .select({ name: rateCheckShippingMethods.name })
+      .from(rateCheckShippingMethods)
+      .where(eq(rateCheckShippingMethods.allowRateCheck, false));
+    return new Set(methods.map(m => m.name));
   }
 
   /**
@@ -138,7 +140,6 @@ export class CustomerShippingMethodConfigService {
     const methods = await db.select().from(customerShippingMethods);
     return methods.map(m => ({
       name: m.name,
-      allowRateCheck: m.allowRateCheck,
       allowAssignment: m.allowAssignment,
       allowChange: m.allowChange,
       minAllowedWeight: m.minAllowedWeight ? parseFloat(m.minAllowedWeight) : null,

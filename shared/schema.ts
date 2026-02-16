@@ -1792,7 +1792,6 @@ export type FeatureFlag = typeof featureFlags.$inferSelect;
 export const customerShippingMethods = pgTable("customer_shipping_methods", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(), // The customer_shipping_method value (e.g., "ups_ground")
-  allowRateCheck: boolean("allow_rate_check").notNull().default(true), // Whether to include in rate checker
   allowAssignment: boolean("allow_assignment").notNull().default(true), // Whether we can assign this method to shipments
   allowChange: boolean("allow_change").notNull().default(true), // Whether rate checker can change the shipping method (if false, keeps customer's choice)
   minAllowedWeight: numeric("min_allowed_weight", { precision: 10, scale: 2 }), // Minimum weight in oz (nullable = no limit)

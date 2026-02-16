@@ -12,7 +12,6 @@ import { db } from '../db';
 import { fingerprints, fingerprintModels, packagingTypes } from '@shared/schema';
 import type { Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { customerShippingMethodConfig } from './shipping-method-config-service';
 
 export interface EligibilityResult {
   eligible: boolean;
@@ -73,34 +72,18 @@ export class RateCheckEligibility {
   }
 
   /**
-   * Check if the shipping method is configured to allow rate checking.
-   * This is an async check that queries the shipping method config service.
-   */
-  static async checkShippingMethodConfig(serviceCode: string): Promise<EligibilityResult> {
-    const canRateCheck = await customerShippingMethodConfig.canPerformRateCheck(serviceCode);
-    if (!canRateCheck) {
-      return { eligible: false, reason: `Shipping method "${serviceCode}" has rate checking disabled` };
-    }
-    return { eligible: true };
-  }
-
-  /**
    * Full async validation including package data lookup.
    * Used by the rate service before making API calls.
    * Returns package details if eligible.
+   * 
+   * Note: Rate check candidate filtering (which service codes can be recommended)
+   * is handled by the smart-carrier-rate-service using the rate_check_shipping_methods table,
+   * not here at the eligibility gate.
    */
   static async checkWithPackageData(shipment: Shipment): Promise<PackageDataResult> {
     const basicCheck = this.checkBasicRequirements(shipment);
     if (!basicCheck.eligible) {
       return basicCheck;
-    }
-
-    // Check shipping method configuration
-    if (shipment.serviceCode) {
-      const configCheck = await this.checkShippingMethodConfig(shipment.serviceCode);
-      if (!configCheck.eligible) {
-        return configCheck;
-      }
     }
 
     try {

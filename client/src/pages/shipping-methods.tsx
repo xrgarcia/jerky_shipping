@@ -26,7 +26,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 interface CustomerShippingMethod {
   id: number;
   name: string;
-  allowRateCheck: boolean;
   allowAssignment: boolean;
   allowChange: boolean;
   minAllowedWeight: string | null;
@@ -34,13 +33,6 @@ interface CustomerShippingMethod {
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
-}
-
-function formatMethodName(name: string): string {
-  return name
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 }
 
 function formatDate(dateValue: string | Date | null | undefined): string {
@@ -70,7 +62,7 @@ export default function CustomerShippingMethods() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowAssignment?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
+    mutationFn: async (data: { id: number; allowAssignment?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
       const { id, ...body } = data;
       return apiRequest("PUT", `/api/settings/customer-shipping-methods/${id}`, body);
     },
@@ -114,7 +106,7 @@ export default function CustomerShippingMethods() {
     },
   });
 
-  const handleToggle = (method: CustomerShippingMethod, field: 'allowRateCheck' | 'allowAssignment' | 'allowChange', value: boolean) => {
+  const handleToggle = (method: CustomerShippingMethod, field: 'allowAssignment' | 'allowChange', value: boolean) => {
     setUpdatingId(method.id);
     updateMutation.mutate({
       id: method.id,
@@ -150,8 +142,8 @@ export default function CustomerShippingMethods() {
         <div className="flex items-center gap-3">
           <Truck className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Customer Shipping Methods</h1>
-            <p className="text-muted-foreground">Configure rate checking and assignment permissions for customer shipping methods</p>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Customer Shipping Methods</h1>
+            <p className="text-muted-foreground">Configure assignment permissions and weight limits for customer shipping methods</p>
           </div>
         </div>
         <Button
@@ -169,12 +161,12 @@ export default function CustomerShippingMethods() {
         <CardHeader>
           <CardTitle>Method Configuration</CardTitle>
           <CardDescription>
-            Control which shipping methods are included in rate checking and can be assigned to shipments
+            Control which shipping methods can be assigned to shipments and their weight limits
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!methods || methods.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-state">
               No customer shipping methods found. Click "Sync New Methods" to populate from existing shipments.
             </div>
           ) : (
@@ -182,19 +174,6 @@ export default function CustomerShippingMethods() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Method Name</TableHead>
-                  <TableHead className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      Allow Rate Check
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs">
-                          When enabled, orders with this shipping method will be included in the rate checker service.
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableHead>
                   <TableHead className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       Allow Change
@@ -258,21 +237,6 @@ export default function CustomerShippingMethods() {
                       <Badge variant="secondary" className="font-mono text-xs">
                         {method.name}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Switch
-                          checked={method.allowRateCheck}
-                          onCheckedChange={(checked) => handleToggle(method, 'allowRateCheck', checked)}
-                          disabled={updatingId === method.id}
-                          data-testid={`switch-rate-check-${method.id}`}
-                        />
-                        {method.allowRateCheck ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -349,10 +313,6 @@ export default function CustomerShippingMethods() {
           <CardTitle>About These Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <strong className="text-foreground">Allow Rate Check:</strong> When enabled, orders with this shipping method 
-            will be included in the rate checker service. Disable this for methods that should always be excluded from rate comparisons.
-          </div>
           <div>
             <strong className="text-foreground">Allow Change:</strong> Controls whether the rate checker can override the customer's 
             shipping choice. When disabled, this method acts as a pass-through — the customer's selected shipping method 
