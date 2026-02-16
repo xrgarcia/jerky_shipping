@@ -5655,9 +5655,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         INSERT INTO rate_check_shipping_methods (name)
-        SELECT DISTINCT smart_shipping_method 
-        FROM shipment_rate_analysis 
-        WHERE smart_shipping_method IS NOT NULL
+        SELECT DISTINCT rate->>'service' AS service
+        FROM shipment_rate_analysis,
+             jsonb_array_elements(all_rates_checked) AS rate
+        WHERE all_rates_checked IS NOT NULL
+          AND rate->>'service' IS NOT NULL
         ON CONFLICT (name) DO NOTHING
         RETURNING name
       `);
