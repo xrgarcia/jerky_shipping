@@ -5609,6 +5609,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate Check Shipping Methods API - List all rate check shipping methods
+  app.get("/api/settings/rate-check-shipping-methods", requireAuth, async (req, res) => {
+    try {
+      const { rateCheckShippingMethods } = await import("@shared/schema");
+      const methods = await db.select().from(rateCheckShippingMethods).orderBy(rateCheckShippingMethods.name);
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching rate check shipping methods:", error);
+      res.status(500).json({ error: "Failed to fetch rate check shipping methods" });
+    }
+  });
+
+  // Rate Check Shipping Methods API - Update a rate check shipping method
+  app.put("/api/settings/rate-check-shipping-methods/:id", requireAuth, async (req, res) => {
+    try {
+      const { rateCheckShippingMethods } = await import("@shared/schema");
+      const { id } = req.params;
+      const { allowRateCheck } = req.body;
+      const user = req.user as { email: string } | undefined;
+      
+      const result = await db
+        .update(rateCheckShippingMethods)
+        .set({
+          allowRateCheck: allowRateCheck ?? undefined,
+          updatedAt: new Date(),
+          updatedBy: user?.email || 'unknown',
+        })
+        .where(eq(rateCheckShippingMethods.id, parseInt(id)))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Rate check shipping method not found" });
+      }
+      
+      res.json(result[0]);
+    } catch (error) {
+      console.error("Error updating rate check shipping method:", error);
+      res.status(500).json({ error: "Failed to update rate check shipping method" });
+    }
+  });
+
+  // Rate Check Shipping Methods API - Sync new methods from shipment_rate_analysis
+  app.post("/api/settings/rate-check-shipping-methods/sync", requireAuth, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO rate_check_shipping_methods (name)
+        SELECT DISTINCT smart_shipping_method 
+        FROM shipment_rate_analysis 
+        WHERE smart_shipping_method IS NOT NULL
+        ON CONFLICT (name) DO NOTHING
+        RETURNING name
+      `);
+      
+      const newMethods = result.rows?.length || 0;
+      res.json({ success: true, newMethods });
+    } catch (error) {
+      console.error("Error syncing rate check shipping methods:", error);
+      res.status(500).json({ error: "Failed to sync rate check shipping methods" });
+    }
+  });
+
   app.post("/api/operations/purge-shopify-queue", requireAuth, async (req, res) => {
     try {
       const clearedCount = await clearQueue();

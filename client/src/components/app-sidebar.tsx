@@ -32,7 +32,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch, DollarSign, Inbox } from "lucide-react";
+import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch, DollarSign, Inbox, Zap } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -184,6 +184,11 @@ export function AppSidebar() {
       title: "Customer Shipping Methods",
       url: "/settings/customer-shipping-methods",
       icon: Truck,
+    },
+    {
+      title: "Rate Check Methods",
+      url: "/settings/rate-check-shipping-methods",
+      icon: Zap,
     },
     {
       title: "Services",

@@ -1813,6 +1813,28 @@ export const insertCustomerShippingMethodSchema = createInsertSchema(customerShi
 export type InsertCustomerShippingMethod = z.infer<typeof insertCustomerShippingMethodSchema>;
 export type CustomerShippingMethod = typeof customerShippingMethods.$inferSelect;
 
+// Rate Check Shipping Methods - Candidate shipping methods from rate checker analysis
+// Each unique smart_shipping_method from shipment_rate_analysis gets an entry here
+export const rateCheckShippingMethods = pgTable("rate_check_shipping_methods", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  allowRateCheck: boolean("allow_rate_check").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+}, (table) => ({
+  nameIdx: index("rate_check_shipping_methods_name_idx").on(table.name),
+}));
+
+export const insertRateCheckShippingMethodSchema = createInsertSchema(rateCheckShippingMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRateCheckShippingMethod = z.infer<typeof insertRateCheckShippingMethodSchema>;
+export type RateCheckShippingMethod = typeof rateCheckShippingMethods.$inferSelect;
+
 // ShipStation Write Queue - Reliable, rate-limit-aware queue for ShipStation shipment writes
 // Uses PATCH semantics: patchPayload contains only the fields that need to change
 // Worker does GET (fresh state) → merge patch → PUT (full payload) to avoid staleness
