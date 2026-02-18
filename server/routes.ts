@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -2969,131 +2969,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Slashbin webhook endpoint - receives Shopify messages from Slashbin
+  // Routes by topic: products/updated, orders/updated
   app.post("/api/webhooks/slashbin/shopifyMessages", async (req, res) => {
     try {
-      tagCurrentSpan('webhooks', 'slashbin_orders');
-      // Extract headers
+      tagCurrentSpan('webhooks', 'slashbin_messages');
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
       const jobId = req.headers['x-slashbin-job-id'] as string;
       
-      // Get signing secret
       const signingSecret = process.env.SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY;
       
       if (!signingSecret) {
-        console.error("[Slashbin/ShopifyOrders] SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY not configured");
+        console.error("[Slashbin/Messages] SLASHBIN_SHOPIFY_ORDERS_SIGNING_KEY not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
-      // Verify signature
       const rawBody = req.rawBody as Buffer;
       if (!verifySlashbinWebhook(rawBody, signatureHeader, signingSecret)) {
-        console.error("[Slashbin/ShopifyOrders] HMAC FAILED - sig:", signatureHeader ? 'present' : 'missing', "body:", rawBody?.length || 0, "bytes");
+        console.error("[Slashbin/Messages] HMAC FAILED - sig:", signatureHeader ? 'present' : 'missing', "body:", rawBody?.length || 0, "bytes");
         return res.status(401).json({ error: "Webhook verification failed" });
       }
       
-      // Check idempotency - avoid processing duplicate webhooks
       const payloadJobId = req.body.slashbin_job_id || jobId;
       if (payloadJobId && isJobAlreadyProcessed(payloadJobId)) {
         return res.status(200).json({ success: true, message: "Already processed" });
       }
       
-      // Process Shopify order payload - structure uses snake_case from Slashbin
-      const orderPayload = req.body.payload;
-      if (!orderPayload || !orderPayload.order_number) {
-        console.error("[Slashbin/ShopifyOrders] HMAC OK, Parse FAILED - missing order_number. Keys:", orderPayload ? Object.keys(orderPayload) : 'null');
-        return res.status(400).json({ error: "Invalid payload: missing order_number" });
+      const topic = req.body.topic as string | undefined;
+      const payload = req.body.payload;
+      
+      if (!payload) {
+        console.error("[Slashbin/Messages] Missing payload field");
+        return res.status(400).json({ error: "Missing payload" });
       }
       
-      const orderNumber = orderPayload.order_number;
-      const items = orderPayload.order_items || [];
-      
-      // Upsert order data into slashbin_orders table (mapping snake_case to camelCase)
-      const orderData = {
-        orderNumber: orderPayload.order_number,
-        orderTotal: orderPayload.order_total?.toString() || null,
-        orderDate: orderPayload.order_date ? new Date(orderPayload.order_date) : null,
-        buyerEmail: orderPayload.buyer_email || null,
-        taxTotal: orderPayload.tax_total?.toString() || null,
-        subTotal: orderPayload.sub_total?.toString() || null,
-        shippingCost: orderPayload.shipping_cost?.toString() || null,
-        discountTotal: orderPayload.discount_total?.toString() || null,
-        tags: orderPayload.tags || null,
-        refundTotal: orderPayload.refund_total?.toString() || null,
-        notes: orderPayload.notes || null,
-        shippingMethod: orderPayload.shipping_method || null,
-        orderStatus: orderPayload.order_status || null,
-        salesChannel: orderPayload.sales_channel || null,
-        // Flattened shipping fields (from payload.shipping)
-        shippingFirstName: orderPayload.shipping?.first_name || null,
-        shippingLastName: orderPayload.shipping?.last_name || null,
-        shippingAddress1: orderPayload.shipping?.address1 || null,
-        shippingAddress2: orderPayload.shipping?.address2 || null,
-        shippingCity: orderPayload.shipping?.city || null,
-        shippingProvince: orderPayload.shipping?.province || null,
-        shippingProvinceCode: orderPayload.shipping?.province_code || null,
-        shippingZip: orderPayload.shipping?.zip || null,
-        shippingCountry: orderPayload.shipping?.country || null,
-        shippingCountryCode: orderPayload.shipping?.country_code || null,
-        shippingPhone: orderPayload.shipping?.phone || null,
-        shippingCompany: orderPayload.shipping?.company || null,
-        // Flattened customer fields
-        customerId: orderPayload.customer?.id?.toString() || orderPayload.customer?.customer_id?.toString() || null,
-        customerEmail: orderPayload.customer?.email || null,
-        customerFirstName: orderPayload.customer?.first_name || null,
-        customerLastName: orderPayload.customer?.last_name || null,
-        customerPhone: orderPayload.customer?.phone || null,
-        customerCreatedAt: orderPayload.customer?.created_at ? new Date(orderPayload.customer.created_at) : null,
-        customerCurrency: orderPayload.customer?.currency || null,
-        customerProvince: orderPayload.customer?.province || null,
-        customerCountry: orderPayload.customer?.country || null,
-        customerAddress1: orderPayload.customer?.address1 || null,
-        customerCity: orderPayload.customer?.city || null,
-        customerZip: orderPayload.customer?.zip || null,
-        updatedAt: new Date(),
-      };
-      
-      // Upsert the order (insert or update on conflict)
-      await db.insert(slashbinOrders)
-        .values(orderData)
-        .onConflictDoUpdate({
-          target: slashbinOrders.orderNumber,
-          set: {
-            ...orderData,
-            updatedAt: new Date(),
-          },
-        });
-      
-      // Delete existing items for this order, then insert new ones
-      await db.delete(slashbinOrderItems).where(eq(slashbinOrderItems.orderNumber, orderNumber));
-      
-      if (items.length > 0) {
-        const itemsToInsert = items.map((item: any) => ({
-          orderNumber,
-          sku: item.sku || '',
-          productName: item.product_name || null,
-          qty: item.qty || null,
-          fulfillmentStatus: item.fulfillment_status || null,
-          price: item.price?.toString() || null,
-          productBrand: item.product_brand || null,
-          weight: item.weight?.toString() || null,
-          tax: item.tax?.toString() || null,
-          subtotal: item.subtotal?.toString() || null,
-          productId: item.product_id?.toString() || null,
-        }));
+      const resolvedTopic = topic || (payload.order_number ? "orders/updated" : undefined);
+      if (!resolvedTopic) {
+        console.error("[Slashbin/Messages] Cannot determine topic. Keys:", Object.keys(req.body));
+        return res.status(400).json({ error: "Missing topic field and cannot infer from payload" });
+      }
+
+      let result: Record<string, unknown> = {};
+
+      if (resolvedTopic === "orders/updated") {
+        // Process Shopify order payload
+        if (!payload.order_number) {
+          console.error("[Slashbin/Messages] orders/updated - missing order_number. Keys:", Object.keys(payload));
+          return res.status(400).json({ error: "Invalid payload: missing order_number" });
+        }
         
-        await db.insert(slashbinOrderItems).values(itemsToInsert);
+        const orderNumber = payload.order_number;
+        const items = payload.order_items || [];
+        
+        const orderData = {
+          orderNumber: payload.order_number,
+          orderTotal: payload.order_total?.toString() || null,
+          orderDate: payload.order_date ? new Date(payload.order_date) : null,
+          buyerEmail: payload.buyer_email || null,
+          taxTotal: payload.tax_total?.toString() || null,
+          subTotal: payload.sub_total?.toString() || null,
+          shippingCost: payload.shipping_cost?.toString() || null,
+          discountTotal: payload.discount_total?.toString() || null,
+          tags: payload.tags || null,
+          refundTotal: payload.refund_total?.toString() || null,
+          notes: payload.notes || null,
+          shippingMethod: payload.shipping_method || null,
+          orderStatus: payload.order_status || null,
+          salesChannel: payload.sales_channel || null,
+          shippingFirstName: payload.shipping?.first_name || null,
+          shippingLastName: payload.shipping?.last_name || null,
+          shippingAddress1: payload.shipping?.address1 || null,
+          shippingAddress2: payload.shipping?.address2 || null,
+          shippingCity: payload.shipping?.city || null,
+          shippingProvince: payload.shipping?.province || null,
+          shippingProvinceCode: payload.shipping?.province_code || null,
+          shippingZip: payload.shipping?.zip || null,
+          shippingCountry: payload.shipping?.country || null,
+          shippingCountryCode: payload.shipping?.country_code || null,
+          shippingPhone: payload.shipping?.phone || null,
+          shippingCompany: payload.shipping?.company || null,
+          customerId: payload.customer?.id?.toString() || payload.customer?.customer_id?.toString() || null,
+          customerEmail: payload.customer?.email || null,
+          customerFirstName: payload.customer?.first_name || null,
+          customerLastName: payload.customer?.last_name || null,
+          customerPhone: payload.customer?.phone || null,
+          customerCreatedAt: payload.customer?.created_at ? new Date(payload.customer.created_at) : null,
+          customerCurrency: payload.customer?.currency || null,
+          customerProvince: payload.customer?.province || null,
+          customerCountry: payload.customer?.country || null,
+          customerAddress1: payload.customer?.address1 || null,
+          customerCity: payload.customer?.city || null,
+          customerZip: payload.customer?.zip || null,
+          updatedAt: new Date(),
+        };
+        
+        await db.insert(slashbinOrders)
+          .values(orderData)
+          .onConflictDoUpdate({
+            target: slashbinOrders.orderNumber,
+            set: {
+              ...orderData,
+              updatedAt: new Date(),
+            },
+          });
+        
+        await db.delete(slashbinOrderItems).where(eq(slashbinOrderItems.orderNumber, orderNumber));
+        
+        if (items.length > 0) {
+          const itemsToInsert = items.map((item: any) => ({
+            orderNumber,
+            sku: item.sku || '',
+            productName: item.product_name || null,
+            qty: item.qty || null,
+            fulfillmentStatus: item.fulfillment_status || null,
+            price: item.price?.toString() || null,
+            productBrand: item.product_brand || null,
+            weight: item.weight?.toString() || null,
+            tax: item.tax?.toString() || null,
+            subtotal: item.subtotal?.toString() || null,
+            productId: item.product_id?.toString() || null,
+          }));
+          
+          await db.insert(slashbinOrderItems).values(itemsToInsert);
+        }
+        
+        result = { orderNumber, itemCount: items.length };
+
+      } else if (resolvedTopic === "products/updated") {
+        // Process Shopify product payload
+        const productId = payload.product_id?.toString();
+        if (!productId) {
+          console.error("[Slashbin/Messages] products/updated - missing product_id. Keys:", Object.keys(payload));
+          return res.status(400).json({ error: "Invalid payload: missing product_id" });
+        }
+        
+        const productData = {
+          id: productId,
+          title: payload.product_title || "Untitled",
+          imageUrl: payload.product_image_src || null,
+          status: payload.product_status || "active",
+          tags: payload.tags || null,
+          shopifyCreatedAt: payload.product_created_at ? new Date(payload.product_created_at) : new Date(),
+          shopifyUpdatedAt: payload.product_updated_at ? new Date(payload.product_updated_at) : new Date(),
+          updatedAt: new Date(),
+          lastSyncedAt: new Date(),
+        };
+        
+        await db.insert(slashbinProducts)
+          .values(productData)
+          .onConflictDoUpdate({
+            target: slashbinProducts.id,
+            set: {
+              ...productData,
+            },
+          });
+        
+        const variants = payload.variants || [];
+        let variantCount = 0;
+        
+        if (variants.length > 0) {
+          for (const variant of variants) {
+            const variantId = variant.variant_id?.toString();
+            if (!variantId) continue;
+            
+            const variantData = {
+              id: variantId,
+              productId,
+              sku: variant.sku || null,
+              barCode: variant.barcode || null,
+              title: variant.title || "Untitled",
+              imageUrl: variant.image_id ? `shopify:image:${variant.image_id}` : null,
+              price: variant.price?.toString() || "0",
+              inventoryQuantity: variant.inventory_quantity ?? 0,
+              shopifyCreatedAt: variant.variant_created_at ? new Date(variant.variant_created_at) : new Date(),
+              shopifyUpdatedAt: variant.variant_updated_at ? new Date(variant.variant_updated_at) : new Date(),
+              updatedAt: new Date(),
+            };
+            
+            await db.insert(slashbinProductVariants)
+              .values(variantData)
+              .onConflictDoUpdate({
+                target: slashbinProductVariants.id,
+                set: {
+                  ...variantData,
+                },
+              });
+            
+            variantCount++;
+          }
+        }
+        
+        console.log(`[Slashbin/Messages] Upserted product ${productId} with ${variantCount} variants`);
+        result = { productId, variantCount };
+
+      } else {
+        console.log(`[Slashbin/Messages] Unknown topic: ${resolvedTopic}, ignoring`);
+        if (payloadJobId) markJobAsProcessed(payloadJobId);
+        return res.status(200).json({ success: true, message: `Unknown topic: ${resolvedTopic}, ignored` });
       }
       
-      // Mark job as processed for idempotency
       if (payloadJobId) {
         markJobAsProcessed(payloadJobId);
       }
       
-      // Return 200 to acknowledge receipt
-      res.status(200).json({ success: true, jobId: payloadJobId, orderNumber, itemCount: items.length });
+      res.status(200).json({ success: true, topic: resolvedTopic, jobId: payloadJobId, ...result });
       
     } catch (error: any) {
-      console.error("[Slashbin/ShopifyOrders] Error:", error.message);
+      console.error("[Slashbin/Messages] Error:", error.message);
       res.status(500).json({ error: "Failed to process webhook" });
     }
   });

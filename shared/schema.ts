@@ -1369,6 +1369,58 @@ export const insertSlashbinOrderItemSchema = createInsertSchema(slashbinOrderIte
 export type InsertSlashbinOrderItem = z.infer<typeof insertSlashbinOrderItemSchema>;
 export type SlashbinOrderItem = typeof slashbinOrderItems.$inferSelect;
 
+// Slashbin Products - Shopify products received via Slashbin webhooks
+export const slashbinProducts = pgTable("slashbin_products", {
+  id: varchar("id").primaryKey(), // Shopify product ID
+  title: text("title").notNull(),
+  imageUrl: text("image_url"),
+  status: text("status").notNull().default("active"), // active, archived, draft
+  tags: text("tags"), // Comma-separated product tags
+  shopifyCreatedAt: timestamp("shopify_created_at").notNull(),
+  shopifyUpdatedAt: timestamp("shopify_updated_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const insertSlashbinProductSchema = createInsertSchema(slashbinProducts).omit({
+  createdAt: true,
+  updatedAt: true,
+  lastSyncedAt: true,
+});
+
+export type InsertSlashbinProduct = z.infer<typeof insertSlashbinProductSchema>;
+export type SlashbinProduct = typeof slashbinProducts.$inferSelect;
+
+// Slashbin Product Variants - Shopify product variants received via Slashbin webhooks
+export const slashbinProductVariants = pgTable("slashbin_product_variants", {
+  id: varchar("id").primaryKey(), // Shopify variant ID
+  productId: varchar("product_id").notNull().references(() => slashbinProducts.id),
+  sku: text("sku"),
+  barCode: text("bar_code"),
+  title: text("title").notNull(),
+  imageUrl: text("image_url"),
+  price: text("price").notNull(),
+  inventoryQuantity: integer("inventory_quantity").notNull().default(0),
+  shopifyCreatedAt: timestamp("shopify_created_at").notNull(),
+  shopifyUpdatedAt: timestamp("shopify_updated_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => ({
+  skuIdx: index("slashbin_product_variants_sku_idx").on(table.sku).where(sql`${table.deletedAt} IS NULL`),
+  barCodeIdx: index("slashbin_product_variants_bar_code_idx").on(table.barCode).where(sql`${table.deletedAt} IS NULL`),
+}));
+
+export const insertSlashbinProductVariantSchema = createInsertSchema(slashbinProductVariants).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSlashbinProductVariant = z.infer<typeof insertSlashbinProductVariantSchema>;
+export type SlashbinProductVariant = typeof slashbinProductVariants.$inferSelect;
+
 // ============================================================================
 // PHASE 3: SMART SHIPPING ENGINE - FINGERPRINT DETECTION & LEARNING
 // ============================================================================
