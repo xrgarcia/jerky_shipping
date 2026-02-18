@@ -56,6 +56,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **ETL-Based Tracking Status Sync**: Tracking status is extracted during natural sync cycles.
 - **Stale Shipment Audit**: Maintenance job to identify and handle shipments stuck in pre-shipping phases or orphaned in ShipStation.
 - **ShipStation Write Queue**: PostgreSQL-backed queue for reliable, rate-limit-aware ShipStation shipment writes with PATCH semantics, exponential backoff, and dead-lettering.
+- **QC Explosion Queue**: PostgreSQL-backed queue (`qc_explosion_queue` table) for queue-driven QC hydration, replacing the former 60-second blind timer worker. Triggered by the lifecycle state machine's `needs_hydration` side effect. Features: deduplication, exponential backoff retry (handles race condition where ETL writes shipment before items), dead-lettering, lifecycle re-evaluation on success, and monitoring via the QC Explosion tab on the Lifecycle Phases page.
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.
