@@ -2968,8 +2968,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Slashbin webhook endpoint - receives Shopify orders from Slashbin
-  app.post("/api/webhooks/slashbin/shopifyOrders", async (req, res) => {
+  // Slashbin webhook endpoint - receives Shopify messages from Slashbin
+  app.post("/api/webhooks/slashbin/shopifyMessages", async (req, res) => {
     try {
       tagCurrentSpan('webhooks', 'slashbin_orders');
       // Extract headers
