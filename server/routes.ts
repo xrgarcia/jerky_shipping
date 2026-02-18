@@ -2970,7 +2970,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Slashbin webhook endpoint - receives Shopify messages from Slashbin
   // Routes by topic: products/updated, orders/updated
-  app.post("/api/webhooks/slashbin/shopifyMessages", async (req, res) => {
+  // Both paths supported during migration: shopifyMessages (new) and shopifyOrders (legacy)
+  const slashbinMessageHandler: import("express").RequestHandler = async (req, res) => {
     try {
       tagCurrentSpan('webhooks', 'slashbin_messages');
       const signatureHeader = req.headers['x-slashbin-signature'] as string | undefined;
@@ -3177,7 +3178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Slashbin/Messages] Error:", error.message);
       res.status(500).json({ error: "Failed to process webhook" });
     }
-  });
+  };
+  app.post("/api/webhooks/slashbin/shopifyMessages", slashbinMessageHandler);
+  app.post("/api/webhooks/slashbin/shopifyOrders", slashbinMessageHandler);
 
   // Worker endpoint - processes queued webhooks (requires authentication)
   app.post("/api/worker/process-webhooks", requireAuth, async (req, res) => {
