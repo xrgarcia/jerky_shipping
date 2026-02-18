@@ -753,7 +753,7 @@ async function markShipmentOrphaned(shipmentDbId: string, orderNumber: string): 
  *    the cursor to prevent infinite loops, but log failures for later retry.
  * 2. When MAX_PAGES is reached, we advance cursor to processed point and flag
  *    that more pages remain - caller should schedule immediate follow-up.
- * 3. 60-second overlap on cursor protects against clock drift and concurrent modifications.
+ * 3. 120-second overlap on cursor protects against clock drift and concurrent modifications.
  */
 async function pollCycle(): Promise<{
   shipmentsProcessed: number;
@@ -941,7 +941,7 @@ async function pollCycle(): Promise<{
   // 
   // OVERLAP STRATEGY:
   // - When catching up (hasMorePages): NO overlap to ensure forward progress
-  // - When fully caught up: 60-second overlap for safety
+  // - When fully caught up: 120-second overlap for safety
   // - When failures exist: cursor stops just before the earliest failure
   let newCursor: string | null = null;
   
@@ -964,7 +964,7 @@ async function pollCycle(): Promise<{
     
     // Only apply overlap when fully caught up and no failures
     if (!hasMorePages && !earliestFailureTimestamp) {
-      latestDate.setSeconds(latestDate.getSeconds() - 60);
+      latestDate.setSeconds(latestDate.getSeconds() - 120);
     }
     const safeCursor = latestDate.toISOString();
     
@@ -982,7 +982,7 @@ async function pollCycle(): Promise<{
         ? 'capped before failure'
         : hasMorePages 
           ? 'no overlap for catch-up' 
-          : 'with 60s safety overlap';
+          : 'with 120s safety overlap';
       logger.info(`[UnifiedSync] Updated cursor to: ${safeCursor} (${overlapNote})`);
       newCursor = safeCursor;
     }
