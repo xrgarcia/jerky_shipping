@@ -1,0 +1,101 @@
+{
+  "product_id": 9831252295994,
+  "product_title": "Limited Edition Flavors from our Test Kitchen",
+  "product_status": "active",
+  "product_created_at": "2025-03-11T18:46:19.000Z",
+  "product_updated_at": "2026-02-18T21:45:04.000Z",
+  "product_image_src": "https://cdn.shopify.com/s/files/1/1866/5947/files/Prime_Rib_TK_Bag_5f58a3d4-fd8a-4967-891f-db6e2dbf48d4.png?v=1747238562",
+  "variants": [
+    {
+      "variant_id": 50772754792762,
+      "sku": "JCB-BEJ-130-16",
+      "price": 8.99,
+      "image_id": 51956409106746,
+      "variant_created_at": "2025-03-11T18:46:19.000Z",
+      "variant_updated_at": "2026-02-18T19:20:42.000Z",
+      "title": "Prime Rib Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51134079828282,
+      "sku": "JCB-TRI-1-16",
+      "price": 8.99,
+      "image_id": 51956415791418,
+      "variant_created_at": "2025-04-10T21:29:47.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Original Tri-Tip Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51134083268922,
+      "sku": "JCB-TRI-8-16",
+      "price": 8.99,
+      "image_id": 51956415824186,
+      "variant_created_at": "2025-04-10T21:30:47.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Honey Teriyaki Tri-Tip Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51134085955898,
+      "sku": "JCB-TRI-30-16",
+      "price": 8.99,
+      "image_id": 51956415856954,
+      "variant_created_at": "2025-04-10T21:32:03.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Chipotle Bourbon Tri-Tip Beef Jerky - 2.5oz."
+    },
+    {
+      "variant_id": 51268686020922,
+      "sku": "JCB-TRI-SD-3PK",
+      "price": 25.97,
+      "image_id": null,
+      "variant_created_at": "2025-05-07T16:29:57.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Tri-Tip Beef Jerky Bundle (All 3 Flavors)"
+    },
+    {
+      "variant_id": 51268762599738,
+      "sku": "JCB-BSJ-2-16",
+      "price": 8.99,
+      "image_id": 52062001987898,
+      "variant_created_at": "2025-05-07T16:52:48.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Teriyaki Brisket Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51268765090106,
+      "sku": "JCB-BSJ-3-16",
+      "price": 8.99,
+      "image_id": 52062007034170,
+      "variant_created_at": "2025-05-07T16:53:52.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Black Pepper Brisket Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51268769218874,
+      "sku": "JCB-BSJ-4-16",
+      "price": 8.99,
+      "image_id": 52062013587770,
+      "variant_created_at": "2025-05-07T16:54:52.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Sweet & Spicy Brisket Beef Jerky - 2.5 oz."
+    },
+    {
+      "variant_id": 51268774101306,
+      "sku": "JCB-BRISK-SD-3PK",
+      "price": 25.97,
+      "image_id": null,
+      "variant_created_at": "2025-05-07T16:56:13.000Z",
+      "variant_updated_at": "2026-02-18T21:45:04.000Z",
+      "title": "Brisket Beef Jerky Bundle (All 3 Flavors)"
+    },
+    {
+      "variant_id": 51443426099514,
+      "sku": "JCB-BEJ-145-16",
+      "price": 8.99,
+      "image_id": 52611291414842,
+      "variant_created_at": "2025-06-13T18:02:45.000Z",
+      "variant_updated_at": "2026-02-18T18:31:44.000Z",
+      "title": "Garlic Black Pepper Beef Jerky 2.5 oz."
+    }
+  ],
+  "tags": "beef, beef jerky, easier to chew, jerky, somewhere in the middle"
+}
