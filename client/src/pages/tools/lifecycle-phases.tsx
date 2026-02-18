@@ -2053,14 +2053,14 @@ export default function LifecyclePhases() {
           <TabsTrigger value="event-worker" data-testid="tab-event-worker">
             Event Worker
           </TabsTrigger>
+          <TabsTrigger value="qc-explosion" data-testid="tab-qc-explosion">
+            QC Explosion
+          </TabsTrigger>
           <TabsTrigger value="package-updates" data-testid="tab-package-updates">
             Shipment Updates
           </TabsTrigger>
           <TabsTrigger value="rate-checker" data-testid="tab-rate-checker">
             Rate Checker
-          </TabsTrigger>
-          <TabsTrigger value="qc-explosion" data-testid="tab-qc-explosion">
-            QC Explosion
           </TabsTrigger>
         </TabsList>
 
@@ -2077,16 +2077,16 @@ export default function LifecyclePhases() {
           />
         </TabsContent>
 
+        <TabsContent value="qc-explosion">
+          <QcExplosionTab />
+        </TabsContent>
+
         <TabsContent value="package-updates">
           <PackageUpdatesTab />
         </TabsContent>
 
         <TabsContent value="rate-checker">
           <RateCheckerTab />
-        </TabsContent>
-
-        <TabsContent value="qc-explosion">
-          <QcExplosionTab />
         </TabsContent>
       </Tabs>
     </div>
