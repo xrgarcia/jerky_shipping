@@ -286,6 +286,10 @@ async function initializeAfterListen(storage: any) {
     // Start rate check queue worker (reliable, rate-limit-aware rate checking)
     const { startRateCheckQueueWorker } = await import("./services/rate-check-queue");
     startRateCheckQueueWorker();
+
+    // Start QC explosion queue worker (queue-driven hydration via lifecycle side effects)
+    const { startQcExplosionQueueWorker } = await import("./services/qc-explosion-queue");
+    startQcExplosionQueueWorker();
     
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
@@ -310,9 +314,9 @@ async function initializeAfterListen(storage: any) {
       }
     }, 3600000); // Sync kit mappings every 1 hour
     
-    // Start QC item hydrator worker (populates shipment_qc_items for Ready to Fulfill orders)
-    const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
-    startQCHydratorWorker(60000); // Hydrate QC items every 1 minute
+    // QC item hydrator worker DISABLED — replaced by queue-driven QC explosion via lifecycle side effects
+    // const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
+    // startQCHydratorWorker(60000); // Hydrate QC items every 1 minute
     
     // Start print queue worker (processes label fetching for queued print jobs)
     const { startPrintQueueWorker } = await import("./print-queue-worker");

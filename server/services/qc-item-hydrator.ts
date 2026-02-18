@@ -457,7 +457,7 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       .where(eq(shipmentItems.shipmentId, shipmentId));
     
     if (items.length === 0) {
-      return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found', terminal: true };
+      return { shipmentId, orderNumber, itemsCreated: 0, error: 'No shipment items found - will retry', terminal: false };
     }
     
     // Get excluded SKUs set for filtering kit components (e.g., BUILDBAG, BUILDBOX)

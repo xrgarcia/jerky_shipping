@@ -987,7 +987,8 @@ export type LifecycleEventReason =
   | 'manual'               // Manual trigger from UI
   | 'manual_package_sync'  // Manual package sync trigger from shipment details UI
   | 'backfill'             // Batch backfill operation
-  | 'stale_audit';         // Stale shipment audit detected orphaned/missing shipment
+  | 'stale_audit'          // Stale shipment audit detected orphaned/missing shipment
+  | 'qc_explosion_complete'; // QC explosion queue worker completed successfully
 
 export interface LifecycleEvent {
   shipmentId: string;           // Internal shipment UUID (primary key)

@@ -148,6 +148,42 @@ interface SideEffectConfig {
 }
 
 const sideEffectsRegistry: Record<string, SideEffectConfig> = {
+  [DECISION_SUBPHASES.NEEDS_HYDRATION]: {
+    enabled: true,
+    description: 'Enqueue QC explosion to dedicated queue',
+    handler: async (shipmentId: string, orderNumber?: string): Promise<boolean> => {
+      try {
+        const [shipment] = await db
+          .select({ id: shipments.id, fingerprintStatus: shipments.fingerprintStatus, orderNumber: shipments.orderNumber })
+          .from(shipments)
+          .where(eq(shipments.id, shipmentId))
+          .limit(1);
+
+        if (!shipment) {
+          log(`Side effect: Shipment not found ${shipmentId}`, 'warn');
+          return false;
+        }
+
+        if (shipment.fingerprintStatus && ['complete', 'pending_categorization', 'missing_weight'].includes(shipment.fingerprintStatus)) {
+          log(`Side effect: QC explosion already done (fingerprintStatus=${shipment.fingerprintStatus}) for ${orderNumber || shipmentId}`);
+          return true;
+        }
+
+        const { enqueueQcExplosion } = await import('./services/qc-explosion-queue');
+        const jobId = await enqueueQcExplosion({
+          shipmentId,
+          orderNumber: orderNumber || shipment.orderNumber || undefined,
+        });
+
+        log(`Side effect: Enqueued QC explosion job #${jobId} for ${orderNumber || shipmentId}`);
+        sideEffectTriggeredCount++;
+        return true;
+      } catch (error: any) {
+        log(`Side effect: Error enqueuing QC explosion for ${shipmentId}: ${error.message}`, 'error');
+        return false;
+      }
+    },
+  },
   // When a shipment needs a rate check, automatically run one
   [DECISION_SUBPHASES.NEEDS_RATE_CHECK]: {
     enabled: true,
