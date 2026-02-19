@@ -2998,6 +2998,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const topic = req.body.topic as string | undefined;
       const payload = req.body.payload;
       
+      // Debug logging to capture full Slashbin payload structure
+      const bodyKeys = Object.keys(req.body);
+      const payloadKeys = payload ? Object.keys(payload) : [];
+      console.log(`[Slashbin/Messages] Incoming webhook - topic: ${topic || 'NONE'}, bodyKeys: [${bodyKeys.join(', ')}], payloadKeys: [${payloadKeys.join(', ')}], path: ${req.path}`);
+      if (payload) {
+        // Log a truncated version of the payload for inspection (first 2000 chars)
+        const payloadStr = JSON.stringify(payload);
+        console.log(`[Slashbin/Messages] Payload (${payloadStr.length} chars): ${payloadStr.substring(0, 2000)}${payloadStr.length > 2000 ? '...[truncated]' : ''}`);
+      }
+      
       if (!payload) {
         console.error("[Slashbin/Messages] Missing payload field");
         return res.status(400).json({ error: "Missing payload" });
@@ -3095,7 +3105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         result = { orderNumber, itemCount: items.length };
 
-      } else if (resolvedTopic === "products/updated") {
+      } else if (resolvedTopic === "products/updated" || resolvedTopic === "products/update") {
         // Process Shopify product payload
         const productId = payload.product_id?.toString();
         if (!productId) {
