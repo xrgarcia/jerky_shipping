@@ -178,8 +178,8 @@ export class ShipStationShipmentETLService {
     }
     
     // Process normalized items, tags, and packages
-    await this.processShipmentItems(finalShipmentId, shipmentData);
-    await this.processShipmentTags(finalShipmentId, shipmentData);
+    await this.processShipmentItems(finalShipmentId, shipmentData, orderNumber);
+    await this.processShipmentTags(finalShipmentId, shipmentData, orderNumber);
     await this.processShipmentPackages(finalShipmentId, shipmentData);
     
     // Queue lifecycle evaluation for async processing
@@ -266,7 +266,7 @@ export class ShipStationShipmentETLService {
    * Deletes existing entries and re-creates from current shipmentData
    * IMPORTANT: Detects item changes (split/merge) and invalidates QC items when items change
    */
-  async processShipmentItems(shipmentId: string, shipmentData: any): Promise<void> {
+  async processShipmentItems(shipmentId: string, shipmentData: any, orderNumber?: string | null): Promise<void> {
     if (!shipmentData || !shipmentData.items || !Array.isArray(shipmentData.items)) {
       return;
     }
@@ -363,7 +363,7 @@ export class ShipStationShipmentETLService {
    * Deletes existing entries and re-creates from current shipmentData
    * Preserves tags with tagId even if name is missing (ShipStation legacy auto-tagging)
    */
-  async processShipmentTags(shipmentId: string, shipmentData: any): Promise<void> {
+  async processShipmentTags(shipmentId: string, shipmentData: any, orderNumber?: string | null): Promise<void> {
     if (!shipmentData || !shipmentData.tags || !Array.isArray(shipmentData.tags)) {
       return;
     }
