@@ -182,9 +182,49 @@ export class ShipStationShipmentETLService {
     await this.processShipmentTags(finalShipmentId, shipmentData, orderNumber);
     await this.processShipmentPackages(finalShipmentId, shipmentData);
     
-    // Queue lifecycle evaluation for async processing
-    // This enables side effects (like auto rate check) to be triggered reliably
-    await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
+    // GATE: Only queue lifecycle evaluation when the shipment is ready for processing.
+    // ShipStation automation rules (Product Defaults, On Hold, Move Over Tag) take
+    // several minutes to run after a shipment is first imported. If we trigger lifecycle
+    // evaluation too early, the package sync PUT fires before automation completes,
+    // causing race conditions (e.g., writing back null service_code).
+    //
+    // The warehouse workflow is:
+    //   1. Order imported → pending
+    //   2. ShipStation automation puts it on_hold (e.g., "On Hold 365 days" rule)
+    //   3. Warehouse manager releases the hold → status returns to pending
+    //   4. THAT is when lifecycle evaluation should begin
+    //
+    // Rules:
+    //   - Shipment already has a lifecycle phase → always evaluate (continue in-progress work)
+    //   - Previous status was on_hold, new status is pending → evaluate (manager released hold)
+    //   - Shipment has been pending for 10+ minutes without lifecycle phase → evaluate (fallback
+    //     for orders that never hit on_hold, e.g., automation disabled or manual changes)
+    //   - Otherwise (new shipment or still in initial setup) → skip evaluation
+    const previousStatus = existing?.shipmentStatus;
+    const newStatus = shipmentRecord.shipmentStatus;
+    const hasLifecyclePhase = existing?.lifecyclePhase != null;
+    const isHoldRelease = previousStatus === 'on_hold' && newStatus === 'pending';
+
+    const AUTOMATION_GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes
+    const shipmentAge = existing?.createdAt
+      ? Date.now() - new Date(existing.createdAt).getTime()
+      : 0;
+    const isPendingPastGracePeriod = !hasLifecyclePhase
+      && newStatus === 'pending'
+      && previousStatus === 'pending'
+      && shipmentAge > AUTOMATION_GRACE_PERIOD_MS;
+
+    if (hasLifecyclePhase || isHoldRelease || isPendingPastGracePeriod) {
+      await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
+      if (isHoldRelease && !hasLifecyclePhase) {
+        logger.info(`[ETL] Hold released for ${orderNumber} (on_hold → pending) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
+      }
+      if (isPendingPastGracePeriod) {
+        logger.info(`[ETL] Fallback: ${orderNumber} has been pending for ${Math.round(shipmentAge / 60000)}min without on_hold — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
+      }
+    } else {
+      logger.info(`[ETL] Skipping lifecycle evaluation for ${orderNumber} — shipment still in initial setup (status: ${newStatus}, previous: ${previousStatus || 'new'})`, withOrder(orderNumber, String(shipmentId)));
+    }
     
     return { id: finalShipmentId };
     }, { shipmentId: shipmentData?.shipment_id || shipmentData?.shipmentId });

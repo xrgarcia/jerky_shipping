@@ -39,7 +39,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics.
-- **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling.
+- **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling. Lifecycle evaluation is gated in the ETL: new shipments skip lifecycle evaluation until their hold is released (on_hold → pending transition), which is the warehouse manager's signal that the order is ready to work. This prevents race conditions where the pipeline (QC explosion, package sync) fires before ShipStation's automation rules complete (~4 min after import). Fallback: if a shipment stays pending for 10+ minutes without ever hitting on_hold, lifecycle evaluation fires anyway.
 - **Lifecycle State Machine**: `server/services/lifecycle-state-machine.ts` is the single source of truth for order status determination, with clear definitions for phases, subphases, and terminal states. Prevents backward phase transitions.
 - **Decision Subphase Chain**: Within `fulfillment_prep`, a defined progression (`needs_hydration` → `needs_categorization` → `needs_fingerprint` → `needs_packaging` → `needs_rate_check` → `needs_session`) ensures proper evaluation order and hard gates for data integrity.
 - **Kit Explosion Race Condition Prevention**: Multi-layered approach using caching, GCP sync, proactive hydration, and repair jobs.
