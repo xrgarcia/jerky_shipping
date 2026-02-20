@@ -1,0 +1,180 @@
+2026-02-19 16:36:18.97
+724a541b
+User
+10:36:18 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:26.44
+724a541b
+User
+10:36:26 PM [info][lifecycle-worker] Triggering side effect for #JK3825365339: Enqueue QC explosion to dedicated queue {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c","subphase":"needs_hydration"}
+2026-02-19 16:36:26.44
+724a541b
+User
+10:36:26 PM [info][Lifecycle] JK3825365339: null → fulfillment_prep/needs_hydration {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c","phase":"fulfillment_prep","subphase":"needs_hydration"}
+2026-02-19 16:36:27.11
+724a541b
+User
+10:36:27 PM [info][QcExplosionQueue] Enqueued QC explosion job #30 for JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c"}
+2026-02-19 16:36:27.11
+724a541b
+User
+10:36:27 PM [info][lifecycle-worker] Side effect: Enqueued QC explosion job #30 for JK3825365339
+2026-02-19 16:36:39.39
+724a541b
+User
+10:36:39 PM [info][QcExplosionQueue] Job #30 completed: 1 items created, fingerprint=complete {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c","queueItemId":"30"}
+2026-02-19 16:36:44.71
+724a541b
+User
+10:36:44 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:44.77
+724a541b
+User
+10:36:44 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:44.77
+724a541b
+User
+10:36:44 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:46.84
+724a541b
+User
+10:36:46 PM [info][Lifecycle] JK3825365339: fulfillment_prep/needs_hydration → fulfillment_prep/needs_session {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c","phase":"fulfillment_prep","subphase":"needs_session"}
+2026-02-19 16:36:46.95
+724a541b
+User
+10:36:46 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825365339: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c"}
+2026-02-19 16:36:47.72
+724a541b
+User
+10:36:47 PM [info][lifecycle-worker] Package sync: Enqueued write job #1183 for JK3825365339 - Poly Bagger (se-168574) {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c"}
+2026-02-19 16:36:47.72
+724a541b
+User
+10:36:47 PM [info][SSWriteQueue] Enqueued write job #1183 for se-958126062 (package_sync) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:49.79
+724a541b
+User
+10:36:49 PM [info][SSWriteQueue] Processing job #1183: package_sync for se-958126062 (attempt 1/5) {"orderNumber":"JK3825365339","shipmentId":"se-958126062","queueItemId":"1183"}
+2026-02-19 16:36:50.52
+724a541b
+User
+10:36:50 PM [info][SSWriteQueue] PUT se-958126062 → 200 OK {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:36:50.63
+724a541b
+User
+10:36:50 PM [info][SSWriteQueue] Callback: Cleared manual package flag for shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:06.03
+724a541b
+User
+10:37:06 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:24.68
+724a541b
+User
+10:37:24 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:24.73
+724a541b
+User
+10:37:24 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:24.73
+724a541b
+User
+10:37:24 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:36.78
+724a541b
+User
+10:37:36 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:36.78
+724a541b
+User
+10:37:36 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:49.93
+724a541b
+User
+10:37:49 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:49.98
+724a541b
+User
+10:37:49 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:37:49.98
+724a541b
+User
+10:37:49 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:40:13.88
+724a541b
+User
+10:40:13 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:40:13.93
+724a541b
+User
+10:40:13 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:40:13.93
+724a541b
+User
+10:40:13 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:40:21.02
+724a541b
+User
+10:40:21 PM [info][Lifecycle] JK3825365339: fulfillment_prep/needs_session → ready_to_fulfill/needs_session {"orderNumber":"JK3825365339","shipmentId":"c15caf5d-e247-45fa-89f8-f1ec8945ee0c","phase":"ready_to_fulfill","subphase":"needs_session"}
+2026-02-19 16:41:35.21
+724a541b
+User
+10:41:35 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:41:35.27
+724a541b
+User
+10:41:35 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:41:35.27
+724a541b
+User
+10:41:35 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:42:53.77
+724a541b
+User
+10:42:53 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:42:53.82
+724a541b
+User
+10:42:53 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:42:53.82
+724a541b
+User
+10:42:53 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:44:12.67
+724a541b
+User
+10:44:12 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:44:12.72
+724a541b
+User
+10:44:12 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:44:12.72
+724a541b
+User
+10:44:12 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:45:00.14
+724a541b
+User
+10:45:00 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:45:42.20
+724a541b
+User
+10:45:42 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:45:42.25
+724a541b
+User
+10:45:42 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:45:42.25
+724a541b
+User
+10:45:42 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:47:01.39
+724a541b
+User
+10:47:01 PM [info][ETL] Found existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c by ShipStation ID se-958126062 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:47:01.45
+724a541b
+User
+10:47:01 PM [info][ETL] Updating existing shipment c15caf5d-e247-45fa-89f8-f1ec8945ee0c (ShipStation ID: se-958126062) {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
+2026-02-19 16:47:01.45
+724a541b
+User
+10:47:01 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825365339 {"orderNumber":"JK3825365339","shipmentId":"se-958126062"}
