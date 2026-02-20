@@ -1,0 +1,214 @@
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+[ShipStationShipmentETL] Error processing items for shipment 3041e043-07e6-4f29-9b90-67339f4705bc: ReferenceError: orderNumber is not defined
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:13119:22)
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:13120:16
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:12533:18)
+2026-02-19 12:59:35.32
+d91cf3e8
+User
+at _ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:11964:100)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at _ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:11964:100)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:13119:22)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:12533:18)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:13120:16
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13191:27)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+[ShipStationShipmentETL] Error processing items for shipment 3041e043-07e6-4f29-9b90-67339f4705bc: ReferenceError: orderNumber is not defined
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12966:30)
+2026-02-19 13:00:36.60
+d91cf3e8
+User
+at async withSpan.shipmentId (file:///home/runner/workspace/dist/index.js:11884:11)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:12533:18)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async runPollLoop (file:///home/runner/workspace/dist/index.js:13119:22)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at _ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:11964:100)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12966:30)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+[ShipStationShipmentETL] Error processing items for shipment 3041e043-07e6-4f29-9b90-67339f4705bc: ReferenceError: orderNumber is not defined
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:13120:16
+2026-02-19 13:02:37.80
+d91cf3e8
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13191:27)
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at async pollCycle (file:///home/runner/workspace/dist/index.js:12966:30)
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at _ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:11964:100)
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at async syncShipment (file:///home/runner/workspace/dist/index.js:12533:18)
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:11323:22
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at async withSpan.shipmentId (file:///home/runner/workspace/dist/index.js:11884:11)
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at async file:///home/runner/workspace/dist/index.js:13120:16
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+[ShipStationShipmentETL] Error processing items for shipment 3041e043-07e6-4f29-9b90-67339f4705bc: ReferenceError: orderNumber is not defined
+2026-02-19 13:05:11.65
+d91cf3e8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-19 13:06:31.51
+d91cf3e8
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-19 13:06:31.51
+d91cf3e8
+User
+at _ShipStationShipmentETLService.processShipmentItems (file:///home/runner/workspace/dist/index.js:11964:100)
+2026-02-19 13:06:31.51
+d91cf3e8
+User
+[ShipStationShipmentETL] Error processing items for shipment 3041e043-07e6-4f29-9b90-67339f4705bc: ReferenceError: orderNumber is not defined
+2026-02-19 15:20:31.64
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365334 — event reason 'unknown' expected packaging to exist
+2026-02-19 16:36:32.07
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365342 — event reason 'unknown' expected packaging to exist
+2026-02-19 16:36:43.90
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365347 — event reason 'unknown' expected packaging to exist
+2026-02-19 17:56:39.51
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365349 — event reason 'unknown' expected packaging to exist
+2026-02-19 17:57:07.12
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365348 — event reason 'unknown' expected packaging to exist
+2026-02-19 17:57:24.33
+724a541b
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825365362 — event reason 'unknown' expected packaging to exist
+2026-02-20 08:07:36.54
+724a541b
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-20 08:07:36.54
+724a541b
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13191:16)
+2026-02-20 08:07:36.54
+724a541b
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-02-20 08:07:36.54
+724a541b
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-02-20 08:22:39.03
+724a541b
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-02-20 08:22:39.03
+724a541b
+User
+[UnifiedSync] Poll error (consecutive: 2): Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-02-20 08:22:39.03
+724a541b
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-20 08:22:39.03
+724a541b
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13191:16)
+Wrap
+Colors
