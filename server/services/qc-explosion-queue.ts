@@ -6,8 +6,8 @@ import logger, { withOrder } from '../utils/logger';
 import { hydrateShipment, calculateFingerprint } from './qc-item-hydrator';
 
 const POLL_INTERVAL_MS = 5000;
-const EXPONENTIAL_BACKOFF_BASE_MS = 5000;
-const MAX_BACKOFF_MS = 300000;
+const EXPONENTIAL_BACKOFF_BASE_MS = 30000;
+const MAX_BACKOFF_MS = 1800000;
 
 let workerRunning = false;
 
@@ -52,7 +52,7 @@ export async function enqueueQcExplosion(options: EnqueueQcExplosionOptions): Pr
     orderNumber: options.orderNumber ?? null,
     status: 'queued',
     retryCount: 0,
-    maxRetries: options.maxRetries ?? 5,
+    maxRetries: options.maxRetries ?? 8,
     lastError: null,
     nextRetryAt: null,
     processedAt: null,
@@ -193,6 +193,7 @@ async function processNextJob(): Promise<boolean> {
           status: 'dead_letter',
           lastError: errorMsg,
           retryCount: newRetryCount,
+          completedAt: new Date(),
         })
         .where(eq(qcExplosionQueue.id, job.id));
     } else {

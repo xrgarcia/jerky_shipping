@@ -5367,6 +5367,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/qc-explosion-queue/retry/:id", requireAuth, async (req, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const [job] = await db.select()
+        .from(qcExplosionQueue)
+        .where(eq(qcExplosionQueue.id, jobId))
+        .limit(1);
+
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (job.status !== 'dead_letter' && job.status !== 'failed') {
+        return res.status(400).json({ error: `Job is in '${job.status}' status, can only retry dead_letter or failed jobs` });
+      }
+
+      await db.update(qcExplosionQueue)
+        .set({
+          status: 'queued',
+          retryCount: 0,
+          lastError: null,
+          nextRetryAt: null,
+          processedAt: null,
+          completedAt: null,
+          itemsCreated: null,
+          fingerprintStatus: null,
+          fingerprintIsNew: null,
+        })
+        .where(eq(qcExplosionQueue.id, jobId));
+
+      logger.info(`[QcExplosionQueue] Manually retried job #${jobId} for ${job.orderNumber || job.shipmentId}`);
+      res.json({ success: true, jobId });
+    } catch (error: any) {
+      console.error("Error retrying QC explosion job:", error.message);
+      res.status(500).json({ error: "Failed to retry QC explosion job" });
+    }
+  });
+
+  app.post("/api/qc-explosion-queue/retry-all-dead", requireAuth, async (req, res) => {
+    try {
+      const result = await db.update(qcExplosionQueue)
+        .set({
+          status: 'queued',
+          retryCount: 0,
+          lastError: null,
+          nextRetryAt: null,
+          processedAt: null,
+          completedAt: null,
+          itemsCreated: null,
+          fingerprintStatus: null,
+          fingerprintIsNew: null,
+        })
+        .where(eq(qcExplosionQueue.status, 'dead_letter'))
+        .returning({ id: qcExplosionQueue.id });
+
+      logger.info(`[QcExplosionQueue] Manually retried all ${result.length} dead-lettered jobs`);
+      res.json({ success: true, retriedCount: result.length });
+    } catch (error: any) {
+      console.error("Error retrying all dead QC explosion jobs:", error.message);
+      res.status(500).json({ error: "Failed to retry all dead QC explosion jobs" });
+    }
+  });
+
   // Operations Dashboard - Queue Management
   app.get("/api/operations/queue-stats", requireAuth, async (req, res) => {
     try {

@@ -1711,6 +1711,8 @@ function QcExplosionTab() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [orderSearch, setOrderSearch] = useState("");
   const [orderSearchDebounced, setOrderSearchDebounced] = useState("");
+  const [deadLetterModalOpen, setDeadLetterModalOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -1741,6 +1743,54 @@ function QcExplosionTab() {
       return res.json();
     },
     refetchInterval: 5000,
+  });
+
+  const { data: deadLetterData, isLoading: deadLetterLoading } = useQuery<QcExplosionJobsResponse>({
+    queryKey: ["/api/qc-explosion-queue/jobs", "dead_letter_modal"],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "100",
+        status: "dead_letter",
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+      const res = await fetch(`/api/qc-explosion-queue/jobs?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch dead-lettered jobs");
+      return res.json();
+    },
+    enabled: deadLetterModalOpen,
+    refetchInterval: deadLetterModalOpen ? 5000 : false,
+  });
+
+  const retryJobMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      await apiRequest("POST", `/api/qc-explosion-queue/retry/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/stats"] });
+      toast({ title: "Job re-queued", description: "The job has been sent back for processing." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Retry failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const retryAllDeadMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/qc-explosion-queue/retry-all-dead");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/stats"] });
+      toast({ title: "All dead-lettered jobs re-queued", description: `${data.retriedCount} job(s) sent back for processing.` });
+      if (data.retriedCount > 0) setDeadLetterModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Retry all failed", description: error.message, variant: "destructive" });
+    },
   });
 
   const totalJobs = (stats?.queued ?? 0) + (stats?.processing ?? 0) + (stats?.completed ?? 0) + (stats?.failed ?? 0) + (stats?.deadLetter ?? 0);
@@ -1825,14 +1875,23 @@ function QcExplosionTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-qce-dead-letter">
+        <Card
+          data-testid="card-qce-dead-letter"
+          className={`${(stats?.deadLetter ?? 0) > 0 ? "cursor-pointer hover-elevate border-destructive/50" : ""}`}
+          onClick={() => { if ((stats?.deadLetter ?? 0) > 0) setDeadLetterModalOpen(true); }}
+        >
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dead Letter</CardTitle>
-            <Skull className="h-4 w-4 text-muted-foreground" />
+            <Skull className={`h-4 w-4 ${(stats?.deadLetter ?? 0) > 0 ? "text-destructive" : "text-muted-foreground"}`} />
           </CardHeader>
           <CardContent>
             {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <div className="text-2xl font-bold" data-testid="text-qce-dead-letter">{stats?.deadLetter ?? 0}</div>
+              <div className={`text-2xl font-bold ${(stats?.deadLetter ?? 0) > 0 ? "text-destructive" : ""}`} data-testid="text-qce-dead-letter">
+                {stats?.deadLetter ?? 0}
+              </div>
+            )}
+            {(stats?.deadLetter ?? 0) > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">Click to view</p>
             )}
           </CardContent>
         </Card>
@@ -2017,6 +2076,99 @@ function QcExplosionTab() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={deadLetterModalOpen} onOpenChange={setDeadLetterModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Skull className="h-5 w-5 text-destructive" />
+              Dead-Lettered QC Explosion Jobs
+            </DialogTitle>
+            <DialogDescription>
+              These jobs failed all retry attempts. Review the errors and retry individually or all at once.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deadLetterLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : !deadLetterData?.jobs?.length ? (
+            <p className="text-sm text-muted-foreground py-4">No dead-lettered jobs found.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm text-muted-foreground">
+                  {deadLetterData.jobs.length} dead-lettered job{deadLetterData.jobs.length !== 1 ? "s" : ""}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => retryAllDeadMutation.mutate()}
+                  disabled={retryAllDeadMutation.isPending}
+                  data-testid="button-retry-all-dead"
+                >
+                  <RotateCcw className={`h-3 w-3 mr-1 ${retryAllDeadMutation.isPending ? "animate-spin" : ""}`} />
+                  {retryAllDeadMutation.isPending ? "Retrying..." : "Retry All"}
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Error</TableHead>
+                      <TableHead>Retries</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Failed</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deadLetterData.jobs.map((job) => (
+                      <TableRow key={job.id} data-testid={`row-dead-letter-${job.id}`}>
+                        <TableCell className="font-mono text-xs">#{job.id}</TableCell>
+                        <TableCell className="text-xs font-mono whitespace-nowrap">
+                          {job.orderNumber ?? <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[300px]">
+                          <span className="text-destructive break-words">{job.lastError || "-"}</span>
+                        </TableCell>
+                        <TableCell className="text-xs text-center">{job.retryCount}/{job.maxRetries}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(job.createdAt), "MMM d, h:mm a")}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {job.completedAt
+                            ? formatDistanceToNow(new Date(job.completedAt), { addSuffix: true })
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => retryJobMutation.mutate(job.id)}
+                            disabled={retryJobMutation.isPending}
+                            data-testid={`button-retry-dead-${job.id}`}
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Retry
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
