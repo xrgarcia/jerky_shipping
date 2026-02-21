@@ -3,6 +3,8 @@ export enum TimeRangePreset {
   LAST_60_DAYS = 'last_60_days',
   LAST_90_DAYS = 'last_90_days',
   LAST_12_MONTHS = 'last_12_months',
+  YEAR_TO_DATE = 'year_to_date',
+  CURRENT_MONTH = 'current_month',
   CUSTOM = 'custom',
 }
 
@@ -11,6 +13,8 @@ export const TIME_RANGE_LABELS: Record<TimeRangePreset, string> = {
   [TimeRangePreset.LAST_60_DAYS]: 'Last 60 Days',
   [TimeRangePreset.LAST_90_DAYS]: 'Last 90 Days',
   [TimeRangePreset.LAST_12_MONTHS]: 'Last 12 Months',
+  [TimeRangePreset.YEAR_TO_DATE]: 'Year to Date',
+  [TimeRangePreset.CURRENT_MONTH]: 'Current Month',
   [TimeRangePreset.CUSTOM]: 'Custom Range',
 };
 

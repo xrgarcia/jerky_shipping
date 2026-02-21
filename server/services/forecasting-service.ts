@@ -44,6 +44,18 @@ export class ForecastingService {
       };
     }
     const now = new Date();
+    if (params.preset === TimeRangePreset.YEAR_TO_DATE) {
+      return {
+        startDate: new Date(now.getFullYear(), 0, 1),
+        endDate: now,
+      };
+    }
+    if (params.preset === TimeRangePreset.CURRENT_MONTH) {
+      return {
+        startDate: new Date(now.getFullYear(), now.getMonth(), 1),
+        endDate: now,
+      };
+    }
     const days = TIME_RANGE_DAYS[params.preset] ?? 30;
     return {
       startDate: subDays(now, days),
