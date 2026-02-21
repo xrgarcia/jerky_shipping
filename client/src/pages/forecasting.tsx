@@ -1092,6 +1092,27 @@ export default function Forecasting() {
               onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
             />
           )}
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Category</span>
+            <Select
+              value={activeFilters.category ?? '__all__'}
+              onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
+            >
+              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
+                {filterCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <TimeRangeSelector value={preset} onChange={setPreset} />
           {preset === TimeRangePreset.CUSTOM && (
             <DateRangePicker
@@ -1101,6 +1122,24 @@ export default function Forecasting() {
               onEndChange={setCustomEnd}
             />
           )}
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Peak Season</span>
+            <Select
+              value={activeFilters.isPeakSeason ?? 'either'}
+              onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
+            >
+              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
+                <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
+                <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {!channelsLoading && allChannels.length > 0 && (
             <ChannelFilter
               channels={allChannels}
@@ -1127,26 +1166,6 @@ export default function Forecasting() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Category</span>
-            <Select
-              value={activeFilters.category ?? '__all__'}
-              onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
-                {filterCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Event Type</span>
             <Select
               value={activeFilters.eventType ?? '__all__'}
@@ -1162,23 +1181,6 @@ export default function Forecasting() {
                     {et}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Peak Season</span>
-            <Select
-              value={activeFilters.isPeakSeason ?? 'either'}
-              onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
-            >
-              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
-                <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
-                <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
               </SelectContent>
             </Select>
           </div>
