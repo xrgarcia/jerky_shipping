@@ -15,12 +15,18 @@ import type {
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
 import { subDays, format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { getRedisClient } from '../utils/queue';
 
 const CACHE_TTL_SECONDS = 3600;
+const CST_TIMEZONE = 'America/Chicago';
 
 function formatDate(d: Date): string {
   return format(d, 'yyyy-MM-dd');
+}
+
+function nowCentral(): Date {
+  return toZonedTime(new Date(), CST_TIMEZONE);
 }
 
 function buildCacheKey(prefix: string, params?: ForecastingSalesParams): string {
@@ -89,7 +95,7 @@ export class ForecastingService {
         endDate: new Date(params.endDate + 'T23:59:59'),
       };
     }
-    const now = new Date();
+    const now = nowCentral();
     if (params.preset === TimeRangePreset.YEAR_TO_DATE) {
       return {
         startDate: new Date(now.getFullYear(), 0, 1),
