@@ -289,15 +289,23 @@ export default function Forecasting() {
 
   const activeChannels = selectedChannels ?? allChannels;
 
+  const hookChannels = selectedChannels === null ? null : selectedChannels;
+
   const { data: salesResponse, isLoading: salesLoading } = useSalesData(
     preset,
-    activeChannels,
+    hookChannels,
   );
+
+  const displayChannels = selectedChannels === null
+    ? (salesResponse?.data
+        ? [...new Set(salesResponse.data.map((d) => d.salesChannel))].sort()
+        : allChannels)
+    : activeChannels;
 
   const chartData = useMemo(() => {
     if (!salesResponse?.data) return [];
-    return buildChartData(salesResponse.data, activeChannels);
-  }, [salesResponse?.data, activeChannels]);
+    return buildChartData(salesResponse.data, displayChannels);
+  }, [salesResponse?.data, displayChannels]);
 
   const handleChannelChange = (channels: string[]) => {
     setSelectedChannels(channels);
@@ -338,7 +346,7 @@ export default function Forecasting() {
         <CardContent>
           <SalesChart
             data={chartData}
-            channels={activeChannels}
+            channels={displayChannels}
             isLoading={salesLoading || channelsLoading}
           />
         </CardContent>

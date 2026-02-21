@@ -13,16 +13,19 @@ export function useSalesChannels() {
 
 export function useSalesData(
   preset: TimeRangePreset,
-  selectedChannels: string[],
+  selectedChannels: string[] | null,
 ) {
   const channelsParam =
-    selectedChannels.length > 0 ? selectedChannels.join(",") : undefined;
+    selectedChannels && selectedChannels.length > 0
+      ? selectedChannels.join(",")
+      : undefined;
+
+  const queryString = channelsParam
+    ? `?preset=${preset}&channels=${channelsParam}`
+    : `?preset=${preset}`;
 
   return useQuery<ForecastingSalesResponse>({
-    queryKey: [
-      "/api/forecasting/sales",
-      `?preset=${preset}${channelsParam ? `&channels=${channelsParam}` : ""}`,
-    ],
-    enabled: selectedChannels.length > 0,
+    queryKey: ["/api/forecasting/sales", queryString],
+    enabled: selectedChannels === null || selectedChannels.length > 0,
   });
 }

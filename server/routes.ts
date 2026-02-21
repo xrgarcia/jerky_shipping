@@ -15853,18 +15853,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { TimeRangePreset } = await import('@shared/forecasting-types');
       const { forecastingService } = await import('./services/forecasting-service');
 
-      const preset = req.query.preset as string;
-      const validPresets = Object.values(TimeRangePreset) as string[];
-      if (!preset || !validPresets.includes(preset)) {
-        res.status(400).json({ error: `Invalid preset. Must be one of: ${validPresets.join(', ')}` });
+      const forecastingSalesQuerySchema = z.object({
+        preset: z.nativeEnum(TimeRangePreset),
+        channels: z.string().optional(),
+      });
+
+      const parsed = forecastingSalesQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid query parameters", details: parsed.error.flatten() });
         return;
       }
 
-      const channelsParam = req.query.channels as string | undefined;
+      const { preset, channels: channelsParam } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSalesData({
-        preset: preset as any,
+        preset,
         channels,
       });
       res.json(result);
