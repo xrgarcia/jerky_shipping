@@ -28,11 +28,17 @@ export interface SalesDataPoint {
   totalQuantity: number;
 }
 
+export type BooleanFilter = 'true' | 'false' | 'either';
+
 export interface ForecastingSalesParams {
   preset: TimeRangePreset;
   channels?: string[];
   startDate?: string;
   endDate?: string;
+  isAssembledProduct?: BooleanFilter;
+  category?: string;
+  eventType?: string;
+  isPeakSeason?: BooleanFilter;
 }
 
 export interface ForecastingSalesResponse {
@@ -47,4 +53,9 @@ export interface ForecastingSalesResponse {
 
 export interface ForecastingChannelsResponse {
   channels: string[];
+}
+
+export interface ForecastingFilterOptionsResponse {
+  categories: string[];
+  eventTypes: string[];
 }

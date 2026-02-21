@@ -4,6 +4,7 @@ import type {
   ForecastingSalesParams,
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
+  ForecastingFilterOptionsResponse,
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -38,45 +39,63 @@ export class ForecastingService {
     };
   }
 
+  async getFilterOptions(): Promise<ForecastingFilterOptionsResponse> {
+    const [catRows, eventRows] = await Promise.all([
+      reportingSql`SELECT DISTINCT category FROM sales_metrics_lookup WHERE category IS NOT NULL ORDER BY category`,
+      reportingSql`SELECT DISTINCT event_type FROM sales_metrics_lookup WHERE event_type IS NOT NULL ORDER BY event_type`,
+    ]);
+    return {
+      categories: catRows.map((r: any) => r.category as string),
+      eventTypes: eventRows.map((r: any) => r.event_type as string),
+    };
+  }
+
   async getSalesData(params: ForecastingSalesParams): Promise<ForecastingSalesResponse> {
     const { preset, channels } = params;
     const { startDate, endDate } = this.computeDateRange(params);
 
-    let rows: Array<{
+    const assembledFilter = params.isAssembledProduct && params.isAssembledProduct !== 'either'
+      ? reportingSql`AND is_assembled_product = ${params.isAssembledProduct === 'true'}`
+      : reportingSql``;
+
+    const categoryFilter = params.category
+      ? reportingSql`AND category = ${params.category}`
+      : reportingSql``;
+
+    const eventTypeFilter = params.eventType
+      ? reportingSql`AND event_type = ${params.eventType}`
+      : reportingSql``;
+
+    const peakSeasonFilter = params.isPeakSeason && params.isPeakSeason !== 'either'
+      ? reportingSql`AND is_peak_season = ${params.isPeakSeason === 'true'}`
+      : reportingSql``;
+
+    const channelFilter = channels && channels.length > 0
+      ? reportingSql`AND sales_channel IN ${reportingSql(channels)}`
+      : reportingSql``;
+
+    const rows: Array<{
       order_day: string;
       sales_channel: string;
       total_revenue: string;
       total_quantity: string;
-    }>;
-
-    if (channels && channels.length > 0) {
-      rows = await reportingSql`
-        SELECT
-          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
-          sales_channel,
-          COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
-          COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
-        FROM sales_metrics_lookup
-        WHERE order_date >= ${startDate}
-          AND order_date <= ${endDate}
-          AND sales_channel IN ${reportingSql(channels)}
-        GROUP BY 1, 2
-        ORDER BY 1, 2
-      `;
-    } else {
-      rows = await reportingSql`
-        SELECT
-          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
-          sales_channel,
-          COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
-          COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
-        FROM sales_metrics_lookup
-        WHERE order_date >= ${startDate}
-          AND order_date <= ${endDate}
-        GROUP BY 1, 2
-        ORDER BY 1, 2
-      `;
-    }
+    }> = await reportingSql`
+      SELECT
+        (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+        sales_channel,
+        COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
+        COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+      GROUP BY 1, 2
+      ORDER BY 1, 2
+    `;
 
     const data: SalesDataPoint[] = rows.map((row) => ({
       orderDate: typeof row.order_day === 'string'

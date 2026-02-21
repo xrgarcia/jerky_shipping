@@ -31,7 +31,9 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions } from "@/hooks/use-forecasting";
+import type { SalesDataFilters } from "@/hooks/use-forecasting";
+import type { BooleanFilter } from "@shared/forecasting-types";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
 
@@ -286,12 +288,18 @@ function formatDateParam(date: Date): string {
   return format(date, "yyyy-MM-dd");
 }
 
+const BOOLEAN_FILTER_VALUES: BooleanFilter[] = ['either', 'true', 'false'];
+
 function parseUrlParams(search: string) {
   const params = new URLSearchParams(search);
   const range = params.get("range");
   const channels = params.get("channels");
   const startDate = params.get("start");
   const endDate = params.get("end");
+  const isAssembledProduct = params.get("assembled");
+  const category = params.get("category");
+  const eventType = params.get("eventType");
+  const isPeakSeason = params.get("peak");
   return {
     range: range && Object.values(TimeRangePreset).includes(range as TimeRangePreset)
       ? (range as TimeRangePreset)
@@ -299,23 +307,46 @@ function parseUrlParams(search: string) {
     channels: channels !== null ? channels.split(",").filter(Boolean) : null,
     startDate: startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : null,
     endDate: endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate) ? endDate : null,
+    isAssembledProduct: isAssembledProduct && BOOLEAN_FILTER_VALUES.includes(isAssembledProduct as BooleanFilter)
+      ? (isAssembledProduct as BooleanFilter)
+      : null,
+    category: category || null,
+    eventType: eventType || null,
+    isPeakSeason: isPeakSeason && BOOLEAN_FILTER_VALUES.includes(isPeakSeason as BooleanFilter)
+      ? (isPeakSeason as BooleanFilter)
+      : null,
   };
 }
 
-function buildSearchString(
-  range: TimeRangePreset,
-  channels: string[] | null,
-  startDate?: string,
-  endDate?: string,
-): string {
+interface UrlBuildParams {
+  range: TimeRangePreset;
+  channels: string[] | null;
+  startDate?: string;
+  endDate?: string;
+  filters?: SalesDataFilters;
+}
+
+function buildSearchString(p: UrlBuildParams): string {
   const params = new URLSearchParams();
-  params.set("range", range);
-  if (channels !== null) {
-    params.set("channels", channels.join(","));
+  params.set("range", p.range);
+  if (p.channels !== null) {
+    params.set("channels", p.channels.join(","));
   }
-  if (range === TimeRangePreset.CUSTOM && startDate && endDate) {
-    params.set("start", startDate);
-    params.set("end", endDate);
+  if (p.range === TimeRangePreset.CUSTOM && p.startDate && p.endDate) {
+    params.set("start", p.startDate);
+    params.set("end", p.endDate);
+  }
+  if (p.filters?.isAssembledProduct && p.filters.isAssembledProduct !== 'either') {
+    params.set("assembled", p.filters.isAssembledProduct);
+  }
+  if (p.filters?.category) {
+    params.set("category", p.filters.category);
+  }
+  if (p.filters?.eventType) {
+    params.set("eventType", p.filters.eventType);
+  }
+  if (p.filters?.isPeakSeason && p.filters.isPeakSeason !== 'either') {
+    params.set("peak", p.filters.isPeakSeason);
   }
   return params.toString();
 }
@@ -380,6 +411,13 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
   );
 }
 
+const DEFAULT_FILTERS: SalesDataFilters = {
+  isAssembledProduct: 'either',
+  category: undefined,
+  eventType: undefined,
+  isPeakSeason: 'either',
+};
+
 export default function Forecasting() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
@@ -417,55 +455,83 @@ export default function Forecasting() {
     { debounceMs: 300 },
   );
 
+  const {
+    value: savedFilters,
+    setValue: setSavedFilters,
+  } = useUserPreference<SalesDataFilters>(
+    "forecasting",
+    "salesFilters",
+    DEFAULT_FILTERS,
+    { debounceMs: 300 },
+  );
+
   const preset = urlParams.range ?? savedPreset;
   const selectedChannels = hasUrlParams ? (urlParams.channels ?? null) : savedChannels;
 
   const customStartDate = urlParams.startDate ?? savedCustomDates.start;
   const customEndDate = urlParams.endDate ?? savedCustomDates.end;
 
-  const updateUrl = useCallback((
-    range: TimeRangePreset,
-    channels: string[] | null,
-    start?: string,
-    end?: string,
-  ) => {
-    const qs = buildSearchString(range, channels, start, end);
+  const activeFilters: SalesDataFilters = useMemo(() => ({
+    isAssembledProduct: urlParams.isAssembledProduct ?? savedFilters.isAssembledProduct ?? 'either',
+    category: urlParams.category ?? savedFilters.category,
+    eventType: urlParams.eventType ?? savedFilters.eventType,
+    isPeakSeason: urlParams.isPeakSeason ?? savedFilters.isPeakSeason ?? 'either',
+  }), [urlParams, savedFilters]);
+
+  const buildUrl = useCallback((overrides: Partial<{
+    range: TimeRangePreset;
+    channels: string[] | null;
+    start: string;
+    end: string;
+    filters: SalesDataFilters;
+  }> = {}) => {
+    const r = overrides.range ?? preset;
+    const ch = overrides.channels !== undefined ? overrides.channels : selectedChannels;
+    const s = overrides.start ?? customStartDate;
+    const e = overrides.end ?? customEndDate;
+    const f = overrides.filters ?? activeFilters;
+    const qs = buildSearchString({
+      range: r,
+      channels: ch,
+      startDate: r === TimeRangePreset.CUSTOM ? s : undefined,
+      endDate: r === TimeRangePreset.CUSTOM ? e : undefined,
+      filters: f,
+    });
     setLocation(`/forecasting?${qs}`, { replace: true });
-  }, [setLocation]);
+  }, [preset, selectedChannels, customStartDate, customEndDate, activeFilters, setLocation]);
 
   const setPreset = useCallback((newPreset: TimeRangePreset) => {
     setSavedPreset(newPreset);
-    if (newPreset === TimeRangePreset.CUSTOM) {
-      updateUrl(newPreset, selectedChannels, customStartDate, customEndDate);
-    } else {
-      updateUrl(newPreset, selectedChannels);
-    }
-  }, [setSavedPreset, updateUrl, selectedChannels, customStartDate, customEndDate]);
+    buildUrl({ range: newPreset });
+  }, [setSavedPreset, buildUrl]);
 
   const setChannels = useCallback((channels: string[]) => {
     setSavedChannels(channels);
-    if (preset === TimeRangePreset.CUSTOM) {
-      updateUrl(preset, channels, customStartDate, customEndDate);
-    } else {
-      updateUrl(preset, channels);
-    }
-  }, [setSavedChannels, updateUrl, preset, customStartDate, customEndDate]);
+    buildUrl({ channels });
+  }, [setSavedChannels, buildUrl]);
 
   const setCustomStart = useCallback((date: string) => {
-    const newDates = { start: date, end: customEndDate };
-    setSavedCustomDates(newDates);
-    updateUrl(TimeRangePreset.CUSTOM, selectedChannels, date, customEndDate);
-  }, [setSavedCustomDates, updateUrl, selectedChannels, customEndDate]);
+    setSavedCustomDates({ start: date, end: customEndDate });
+    buildUrl({ range: TimeRangePreset.CUSTOM, start: date });
+  }, [setSavedCustomDates, buildUrl, customEndDate]);
 
   const setCustomEnd = useCallback((date: string) => {
-    const newDates = { start: customStartDate, end: date };
-    setSavedCustomDates(newDates);
-    updateUrl(TimeRangePreset.CUSTOM, selectedChannels, customStartDate, date);
-  }, [setSavedCustomDates, updateUrl, selectedChannels, customStartDate]);
+    setSavedCustomDates({ start: customStartDate, end: date });
+    buildUrl({ range: TimeRangePreset.CUSTOM, end: date });
+  }, [setSavedCustomDates, buildUrl, customStartDate]);
+
+  const updateFilter = useCallback(<K extends keyof SalesDataFilters>(key: K, value: SalesDataFilters[K]) => {
+    const newFilters = { ...activeFilters, [key]: value };
+    setSavedFilters(newFilters);
+    buildUrl({ filters: newFilters });
+  }, [activeFilters, setSavedFilters, buildUrl]);
 
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
+  const { data: filterOptionsData } = useFilterOptions();
 
   const allChannels = channelsData?.channels ?? [];
+  const filterCategories = filterOptionsData?.categories ?? [];
+  const filterEventTypes = filterOptionsData?.eventTypes ?? [];
 
   const activeChannels = selectedChannels ?? allChannels;
 
@@ -476,6 +542,7 @@ export default function Forecasting() {
     hookChannels,
     preset === TimeRangePreset.CUSTOM ? customStartDate : undefined,
     preset === TimeRangePreset.CUSTOM ? customEndDate : undefined,
+    activeFilters,
   );
 
   const displayChannels = selectedChannels === null
@@ -519,6 +586,82 @@ export default function Forecasting() {
               onChange={handleChannelChange}
             />
           )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Assembled</span>
+          <Select
+            value={activeFilters.isAssembledProduct ?? 'either'}
+            onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
+          >
+            <SelectTrigger className="w-[150px]" data-testid="select-assembled">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
+              <SelectItem value="true" data-testid="option-assembled-true">True</SelectItem>
+              <SelectItem value="false" data-testid="option-assembled-false">False</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Category</span>
+          <Select
+            value={activeFilters.category ?? '__all__'}
+            onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
+          >
+            <SelectTrigger className="w-[180px]" data-testid="select-category">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
+              {filterCategories.map((cat) => (
+                <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Event Type</span>
+          <Select
+            value={activeFilters.eventType ?? '__all__'}
+            onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
+          >
+            <SelectTrigger className="w-[180px]" data-testid="select-event-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
+              {filterEventTypes.map((et) => (
+                <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
+                  {et}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Peak Season</span>
+          <Select
+            value={activeFilters.isPeakSeason ?? 'either'}
+            onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
+          >
+            <SelectTrigger className="w-[150px]" data-testid="select-peak-season">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
+              <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
+              <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

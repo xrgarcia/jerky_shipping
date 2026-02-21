@@ -15848,16 +15848,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/forecasting/filter-options", async (_req: Request, res: Response) => {
+    try {
+      const { forecastingService } = await import('./services/forecasting-service');
+      const result = await forecastingService.getFilterOptions();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching filter options:", error);
+      res.status(500).json({ error: "Failed to fetch filter options: " + error.message });
+    }
+  });
+
   app.get("/api/forecasting/sales", async (req: Request, res: Response) => {
     try {
       const { TimeRangePreset } = await import('@shared/forecasting-types');
       const { forecastingService } = await import('./services/forecasting-service');
+
+      const booleanFilterSchema = z.enum(['true', 'false', 'either']).optional();
 
       const forecastingSalesQuerySchema = z.object({
         preset: z.nativeEnum(TimeRangePreset),
         channels: z.string().optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        isAssembledProduct: booleanFilterSchema,
+        category: z.string().optional(),
+        eventType: z.string().optional(),
+        isPeakSeason: booleanFilterSchema,
       });
 
       const parsed = forecastingSalesQuerySchema.safeParse(req.query);
@@ -15866,7 +15883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, startDate, endDate } = parsed.data;
+      const { preset, channels: channelsParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSalesData({
@@ -15874,6 +15891,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         channels,
         startDate,
         endDate,
+        isAssembledProduct,
+        category,
+        eventType,
+        isPeakSeason,
       });
       res.json(result);
     } catch (error: any) {
