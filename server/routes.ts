@@ -15859,6 +15859,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/forecasting/products", async (_req: Request, res: Response) => {
+    try {
+      const { forecastingService } = await import('./services/forecasting-service');
+      const result = await forecastingService.getProducts();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching products:", error);
+      res.status(500).json({ error: "Failed to fetch products: " + error.message });
+    }
+  });
+
   app.get("/api/forecasting/sales", async (req: Request, res: Response) => {
     try {
       const { TimeRangePreset } = await import('@shared/forecasting-types');
@@ -15869,6 +15880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forecastingSalesQuerySchema = z.object({
         preset: z.nativeEnum(TimeRangePreset),
         channels: z.string().optional(),
+        skus: z.string().optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
@@ -15883,12 +15895,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
+      const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSalesData({
         preset,
         channels,
+        skus,
         startDate,
         endDate,
         isAssembledProduct,
@@ -15913,6 +15927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const querySchema = z.object({
         preset: z.nativeEnum(TimeRangePreset),
         channels: z.string().optional(),
+        skus: z.string().optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
@@ -15927,12 +15942,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
+      const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getRevenueTimeSeries({
         preset,
         channels,
+        skus,
         startDate,
         endDate,
         isAssembledProduct,
@@ -15957,6 +15974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const querySchema = z.object({
         preset: z.nativeEnum(TimeRangePreset),
         channels: z.string().optional(),
+        skus: z.string().optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
@@ -15971,12 +15989,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
+      const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSummaryMetrics({
         preset,
         channels,
+        skus,
         startDate,
         endDate,
         isAssembledProduct,

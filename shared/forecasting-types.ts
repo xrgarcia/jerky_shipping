@@ -34,9 +34,20 @@ export interface SalesDataPoint {
 
 export type BooleanFilter = 'true' | 'false' | 'either';
 
+export interface ForecastingProduct {
+  sku: string;
+  title: string;
+  category: string | null;
+}
+
+export interface ForecastingProductsResponse {
+  products: ForecastingProduct[];
+}
+
 export interface ForecastingSalesParams {
   preset: TimeRangePreset;
   channels?: string[];
+  skus?: string[];
   startDate?: string;
   endDate?: string;
   isAssembledProduct?: BooleanFilter;

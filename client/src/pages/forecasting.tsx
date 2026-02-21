@@ -15,7 +15,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart, Activity, ShieldCheck } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart, Activity, ShieldCheck, Search } from "lucide-react";
+import type { ForecastingProduct } from "@shared/forecasting-types";
 import {
   LineChart,
   Line,
@@ -31,7 +33,7 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
 import type { SalesDataFilters } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
@@ -165,6 +167,127 @@ function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+interface ProductFilterProps {
+  products: ForecastingProduct[];
+  selected: string[];
+  onChange: (skus: string[]) => void;
+}
+
+function ProductFilter({ products, selected, onChange }: ProductFilterProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    const q = searchQuery.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [products, searchQuery]);
+
+  const toggleSku = (sku: string) => {
+    if (selected.includes(sku)) {
+      onChange(selected.filter((s) => s !== sku));
+    } else {
+      onChange([...selected, sku]);
+    }
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  const label =
+    selected.length === 0
+      ? "All Products"
+      : selected.length === 1
+        ? products.find((p) => p.sku === selected[0])?.title ?? selected[0]
+        : `${selected.length} Products`;
+
+  return (
+    <Popover onOpenChange={(open) => {
+      if (open) {
+        setTimeout(() => inputRef.current?.focus(), 0);
+      } else {
+        setSearchQuery("");
+      }
+    }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-[200px] sm:w-[240px] justify-between"
+          data-testid="button-product-filter"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-2" align="start">
+        <div className="relative mb-2">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            placeholder="Search title, SKU, or category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 text-sm"
+            data-testid="input-product-search"
+          />
+        </div>
+        {selected.length > 0 && (
+          <>
+            <button
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate active-elevate-2"
+              onClick={clearAll}
+              data-testid="button-clear-products"
+            >
+              <X className="h-3 w-3" />
+              <span>Clear selection ({selected.length})</span>
+            </button>
+            <div className="my-1 h-px bg-border" />
+          </>
+        )}
+        <div className="max-h-[280px] overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+              No products found
+            </div>
+          ) : (
+            filtered.map((product) => {
+              const isSelected = selected.includes(product.sku);
+              return (
+                <button
+                  key={product.sku}
+                  className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
+                  onClick={() => toggleSku(product.sku)}
+                  data-testid={`button-product-${product.sku}`}
+                >
+                  <div
+                    className={`flex h-4 w-4 mt-0.5 items-center justify-center rounded-sm border shrink-0 ${
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="truncate w-full text-left">{product.title}</span>
+                    <span className="text-xs text-muted-foreground truncate w-full text-left">{product.sku}</span>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -659,6 +782,7 @@ function parseUrlParams(search: string) {
   const category = params.get("category");
   const eventType = params.get("eventType");
   const isPeakSeason = params.get("peak");
+  const skus = params.get("skus");
   return {
     range: range && Object.values(TimeRangePreset).includes(range as TimeRangePreset)
       ? (range as TimeRangePreset)
@@ -674,6 +798,7 @@ function parseUrlParams(search: string) {
     isPeakSeason: isPeakSeason && BOOLEAN_FILTER_VALUES.includes(isPeakSeason as BooleanFilter)
       ? (isPeakSeason as BooleanFilter)
       : null,
+    skus: skus ? skus.split(",").filter(Boolean) : null,
   };
 }
 
@@ -706,6 +831,9 @@ function buildSearchString(p: UrlBuildParams): string {
   }
   if (p.filters?.isPeakSeason && p.filters.isPeakSeason !== 'either') {
     params.set("peak", p.filters.isPeakSeason);
+  }
+  if (p.filters?.skus && p.filters.skus.length > 0) {
+    params.set("skus", p.filters.skus.join(","));
   }
   return params.toString();
 }
@@ -774,6 +902,7 @@ const DEFAULT_FILTERS: SalesDataFilters = {
   isAssembledProduct: 'either',
   category: undefined,
   eventType: undefined,
+  skus: undefined,
   isPeakSeason: 'either',
 };
 
@@ -835,6 +964,7 @@ export default function Forecasting() {
     category: urlParams.category ?? savedFilters.category,
     eventType: urlParams.eventType ?? savedFilters.eventType,
     isPeakSeason: urlParams.isPeakSeason ?? savedFilters.isPeakSeason ?? 'either',
+    skus: urlParams.skus ?? savedFilters.skus,
   }), [urlParams, savedFilters]);
 
   const buildUrl = useCallback((overrides: Partial<{
@@ -887,8 +1017,10 @@ export default function Forecasting() {
 
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
   const { data: filterOptionsData } = useFilterOptions();
+  const { data: productsData } = useProducts();
 
   const allChannels = channelsData?.channels ?? [];
+  const allProducts = productsData?.products ?? [];
   const filterCategories = filterOptionsData?.categories ?? [];
   const filterEventTypes = filterOptionsData?.eventTypes ?? [];
 
@@ -945,6 +1077,13 @@ export default function Forecasting() {
           </h1>
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          {allProducts.length > 0 && (
+            <ProductFilter
+              products={allProducts}
+              selected={activeFilters.skus ?? []}
+              onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
+            />
+          )}
           <TimeRangeSelector value={preset} onChange={setPreset} />
           {preset === TimeRangePreset.CUSTOM && (
             <DateRangePicker

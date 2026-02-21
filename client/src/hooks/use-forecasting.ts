@@ -4,6 +4,7 @@ import type {
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
   ForecastingFilterOptionsResponse,
+  ForecastingProductsResponse,
   RevenueTimeSeriesResponse,
   SummaryMetricsResponse,
   BooleanFilter,
@@ -23,11 +24,18 @@ export function useFilterOptions() {
   });
 }
 
+export function useProducts() {
+  return useQuery<ForecastingProductsResponse>({
+    queryKey: ["/api/forecasting/products"],
+  });
+}
+
 export interface SalesDataFilters {
   isAssembledProduct?: BooleanFilter;
   category?: string;
   eventType?: string;
   isPeakSeason?: BooleanFilter;
+  skus?: string[];
 }
 
 function buildFilterParams(
@@ -63,6 +71,10 @@ function buildFilterParams(
 
   if (filters?.isPeakSeason && filters.isPeakSeason !== 'either') {
     params.set("isPeakSeason", filters.isPeakSeason);
+  }
+
+  if (filters?.skus && filters.skus.length > 0) {
+    params.set("skus", filters.skus.join(","));
   }
 
   return `?${params.toString()}`;

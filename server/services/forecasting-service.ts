@@ -5,6 +5,7 @@ import type {
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
   ForecastingFilterOptionsResponse,
+  ForecastingProductsResponse,
   RevenueTimeSeriesPoint,
   RevenueTimeSeriesResponse,
   SummaryMetrics,
@@ -33,7 +34,10 @@ export class ForecastingService {
     const channelFilter = params.channels && params.channels.length > 0
       ? reportingSql`AND sales_channel IN ${reportingSql(params.channels)}`
       : reportingSql``;
-    return { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter };
+    const skuFilter = params.skus && params.skus.length > 0
+      ? reportingSql`AND sku IN ${reportingSql(params.skus)}`
+      : reportingSql``;
+    return { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter, skuFilter };
   }
 
   private computeDateRange(params: ForecastingSalesParams): { startDate: Date; endDate: Date } {
@@ -88,7 +92,7 @@ export class ForecastingService {
   async getSalesData(params: ForecastingSalesParams): Promise<ForecastingSalesResponse> {
     const { preset, channels } = params;
     const { startDate, endDate } = this.computeDateRange(params);
-    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter, skuFilter } = this.buildFilters(params);
 
     const rows: Array<{
       order_day: string;
@@ -105,6 +109,7 @@ export class ForecastingService {
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
         ${channelFilter}
+        ${skuFilter}
         ${assembledFilter}
         ${categoryFilter}
         ${eventTypeFilter}
@@ -135,7 +140,7 @@ export class ForecastingService {
   async getRevenueTimeSeries(params: ForecastingSalesParams): Promise<RevenueTimeSeriesResponse> {
     const { preset } = params;
     const { startDate, endDate } = this.computeDateRange(params);
-    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter, skuFilter } = this.buildFilters(params);
 
     const rows: Array<{
       order_day: string;
@@ -154,6 +159,7 @@ export class ForecastingService {
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
         ${channelFilter}
+        ${skuFilter}
         ${assembledFilter}
         ${categoryFilter}
         ${eventTypeFilter}
@@ -184,7 +190,7 @@ export class ForecastingService {
   async getSummaryMetrics(params: ForecastingSalesParams): Promise<SummaryMetricsResponse> {
     const { preset } = params;
     const { startDate, endDate } = this.computeDateRange(params);
-    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter, skuFilter } = this.buildFilters(params);
 
     const rows: Array<{
       total_revenue: string;
@@ -201,6 +207,7 @@ export class ForecastingService {
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
         ${channelFilter}
+        ${skuFilter}
         ${assembledFilter}
         ${categoryFilter}
         ${eventTypeFilter}
@@ -211,7 +218,8 @@ export class ForecastingService {
       (params.isAssembledProduct && params.isAssembledProduct !== 'either') ||
       params.category ||
       params.eventType ||
-      (params.isPeakSeason && params.isPeakSeason !== 'either')
+      (params.isPeakSeason && params.isPeakSeason !== 'either') ||
+      (params.skus && params.skus.length > 0)
     );
 
     let totalOrders = 0;
@@ -244,6 +252,7 @@ export class ForecastingService {
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
         ${channelFilter}
+        ${skuFilter}
         ${assembledFilter}
         ${categoryFilter}
         ${eventTypeFilter}
@@ -285,6 +294,27 @@ export class ForecastingService {
         startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
         endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
       },
+    };
+  }
+
+  async getProducts(): Promise<ForecastingProductsResponse> {
+    const rows: Array<{
+      sku: string;
+      title: string;
+      category: string | null;
+    }> = await reportingSql`
+      SELECT DISTINCT sku, title, category
+      FROM sales_metrics_lookup
+      WHERE sku IS NOT NULL AND sku != ''
+      ORDER BY title ASC, sku ASC
+    `;
+
+    return {
+      products: rows.map((r) => ({
+        sku: r.sku,
+        title: r.title || r.sku,
+        category: r.category,
+      })),
     };
   }
 }
