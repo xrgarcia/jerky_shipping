@@ -198,7 +198,7 @@ export class SmartCarrierRateService {
       
       // Filter out candidate methods whose weight limits don't match the package weight
       const weightLimits = await customerShippingMethodConfig.getRateCheckMethodWeightLimits();
-      if (weightLimits.size > 0 && eligibility.weightOz) {
+      if (weightLimits.size > 0 && eligibility.weightOz != null) {
         const packageWeightOz = eligibility.weightOz;
         const beforeCount = eligibleRates.length;
         eligibleRates = eligibleRates.filter(r => {

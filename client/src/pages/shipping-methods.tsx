@@ -40,6 +40,8 @@ interface RateCheckShippingMethod {
   id: number;
   name: string;
   allowRateCheck: boolean;
+  minAllowedWeight: string | null;
+  maxAllowedWeight: string | null;
   createdAt: string;
   updatedAt: string;
   updatedBy: string | null;
@@ -290,7 +292,7 @@ function RateCheckMethodsTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; allowRateCheck: boolean }) => {
+    mutationFn: async (data: { id: number; allowRateCheck?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
       const { id, ...body } = data;
       return apiRequest("PUT", `/api/settings/rate-check-shipping-methods/${id}`, body);
     },
@@ -322,6 +324,13 @@ function RateCheckMethodsTab() {
   const handleToggle = (method: RateCheckShippingMethod, value: boolean) => {
     setUpdatingId(method.id);
     updateMutation.mutate({ id: method.id, allowRateCheck: value });
+  };
+
+  const handleWeightChange = (method: RateCheckShippingMethod, field: 'minAllowedWeight' | 'maxAllowedWeight', value: string) => {
+    const numValue = value.trim() === '' ? null : parseFloat(value);
+    if (value.trim() !== '' && (isNaN(numValue as number) || (numValue as number) < 0)) return;
+    setUpdatingId(method.id);
+    updateMutation.mutate({ id: method.id, [field]: numValue });
   };
 
   if (isLoading) {
@@ -369,6 +378,32 @@ function RateCheckMethodsTab() {
                       </Tooltip>
                     </div>
                   </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Min Weight (oz)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          Minimum package weight in ounces for this method. Packages lighter than this won't use this method. Leave empty for no minimum.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      Max Weight (oz)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          Maximum package weight in ounces for this method. Packages heavier than this won't use this method. Leave empty for no maximum.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead>Updated By</TableHead>
                 </TableRow>
@@ -395,6 +430,34 @@ function RateCheckMethodsTab() {
                           <XCircle className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        key={`min-${method.id}-${method.minAllowedWeight}-${method.updatedAt}`}
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="No limit"
+                        className="w-24 text-center"
+                        defaultValue={method.minAllowedWeight || ''}
+                        onBlur={(e) => handleWeightChange(method, 'minAllowedWeight', e.target.value)}
+                        disabled={updatingId === method.id || !method.allowRateCheck}
+                        data-testid={`input-rate-min-weight-${method.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        key={`max-${method.id}-${method.maxAllowedWeight}-${method.updatedAt}`}
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="No limit"
+                        className="w-24 text-center"
+                        defaultValue={method.maxAllowedWeight || ''}
+                        onBlur={(e) => handleWeightChange(method, 'maxAllowedWeight', e.target.value)}
+                        disabled={updatingId === method.id || !method.allowRateCheck}
+                        data-testid={`input-rate-max-weight-${method.id}`}
+                      />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(method.updatedAt)}
