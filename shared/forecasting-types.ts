@@ -97,6 +97,11 @@ export interface ChannelGrowthFactor {
   yoyGrowthFactor: number;
 }
 
+export interface ChannelTrendFactor {
+  channel: string;
+  trendFactor: number;
+}
+
 export interface SummaryMetrics {
   totalRevenue: number;
   totalUnits: number;
@@ -106,7 +111,7 @@ export interface SummaryMetrics {
   yoyRevenueChangePct: number | null;
   yoyUnitsChangePct: number | null;
   yoyGrowthByChannel: ChannelGrowthFactor[];
-  trendFactor: number | null;
+  trendByChannel: ChannelTrendFactor[];
   confidenceLevel: 'critical' | 'warning' | 'normal' | null;
 }
 

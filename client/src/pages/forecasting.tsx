@@ -1247,14 +1247,38 @@ export default function Forecasting() {
             )}
           </CardContent>
         </Card>
-        <MetricCard
-          title="Trend (2wk/4wk)"
-          value={summaryResponse?.data.trendFactor}
-          formatter={(v) => `${(v * 100).toFixed(1)}%`}
-          icon={Activity}
-          changeValue={summaryResponse?.data.trendFactor != null ? summaryResponse.data.trendFactor - 0.5 : null}
-          isLoading={summaryLoading}
-        />
+        <Card data-testid="metric-card-trend">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-sm text-muted-foreground">Trend (2wk/4wk)</span>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {summaryLoading ? (
+              <div className="flex items-center gap-2 h-7 sm:h-8">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : summaryResponse?.data.trendByChannel && summaryResponse.data.trendByChannel.length > 0 ? (
+              <div className="space-y-1">
+                {summaryResponse.data.trendByChannel.map((item, idx) => {
+                  const pct = item.trendFactor * 100;
+                  const isAboveAvg = item.trendFactor >= 0.5;
+                  return (
+                    <div key={item.channel} className="flex items-center justify-between gap-2">
+                      <span className="text-xs truncate" style={{ color: getChannelColor(item.channel, idx) }}>
+                        {item.channel}
+                      </span>
+                      <span className={`text-xs font-semibold whitespace-nowrap ${isAboveAvg ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-lg sm:text-2xl font-semibold text-muted-foreground">—</div>
+            )}
+          </CardContent>
+        </Card>
         <Card data-testid="metric-card-confidence">
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2 mb-1">
