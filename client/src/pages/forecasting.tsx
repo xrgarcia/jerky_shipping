@@ -1217,10 +1217,10 @@ export default function Forecasting() {
         />
         <MetricCard
           title="YoY Growth"
-          value={summaryResponse?.data.yoyGrowthFactor}
-          formatter={(v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`}
-          icon={summaryResponse?.data.yoyGrowthFactor != null && summaryResponse.data.yoyGrowthFactor >= 0 ? TrendingUp : TrendingDown}
-          changeValue={summaryResponse?.data.yoyGrowthFactor}
+          value={summaryResponse?.data.yoyGrowthFactor != null ? (summaryResponse.data.yoyGrowthFactor - 1) * 100 : null}
+          formatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
+          icon={summaryResponse?.data.yoyGrowthFactor != null && summaryResponse.data.yoyGrowthFactor >= 1 ? TrendingUp : TrendingDown}
+          changeValue={summaryResponse?.data.yoyGrowthFactor != null ? (summaryResponse.data.yoyGrowthFactor - 1) * 100 : null}
           isLoading={summaryLoading}
         />
         <MetricCard
