@@ -5874,13 +5874,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { customerShippingMethods } = await import("@shared/schema");
       const { id } = req.params;
-      const { allowAssignment, allowChange, minAllowedWeight, maxAllowedWeight } = req.body;
+      const { allowRateCheck, allowChange, minAllowedWeight, maxAllowedWeight } = req.body;
       const user = req.user as { email: string } | undefined;
       
       const result = await db
         .update(customerShippingMethods)
         .set({
-          allowAssignment: allowAssignment ?? undefined,
+          allowRateCheck: allowRateCheck ?? undefined,
           allowChange: allowChange ?? undefined,
           minAllowedWeight: minAllowedWeight !== undefined ? (minAllowedWeight === null ? null : String(minAllowedWeight)) : undefined,
           maxAllowedWeight: maxAllowedWeight !== undefined ? (maxAllowedWeight === null ? null : String(maxAllowedWeight)) : undefined,

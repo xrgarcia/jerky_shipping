@@ -27,7 +27,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 interface CustomerShippingMethod {
   id: number;
   name: string;
-  allowAssignment: boolean;
+  allowRateCheck: boolean;
   allowChange: boolean;
   minAllowedWeight: string | null;
   maxAllowedWeight: string | null;
@@ -73,7 +73,7 @@ function CustomerMethodsTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; allowAssignment?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
+    mutationFn: async (data: { id: number; allowRateCheck?: boolean; allowChange?: boolean; minAllowedWeight?: number | null; maxAllowedWeight?: number | null }) => {
       const { id, ...body } = data;
       return apiRequest("PUT", `/api/settings/customer-shipping-methods/${id}`, body);
     },
@@ -102,7 +102,7 @@ function CustomerMethodsTab() {
     },
   });
 
-  const handleToggle = (method: CustomerShippingMethod, field: 'allowAssignment' | 'allowChange', value: boolean) => {
+  const handleToggle = (method: CustomerShippingMethod, field: 'allowRateCheck' | 'allowChange', value: boolean) => {
     setUpdatingId(method.id);
     updateMutation.mutate({ id: method.id, [field]: value });
   };
@@ -161,13 +161,13 @@ function CustomerMethodsTab() {
                   </TableHead>
                   <TableHead className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      Allow Assignment
+                      Allow Rate Check
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          When enabled, this shipping method can be assigned to shipments during fulfillment.
+                          When enabled, the rate checker will evaluate shipments with this method. When disabled, shipments with this method are skipped entirely.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -228,12 +228,12 @@ function CustomerMethodsTab() {
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Switch
-                          checked={method.allowAssignment}
-                          onCheckedChange={(checked) => handleToggle(method, 'allowAssignment', checked)}
+                          checked={method.allowRateCheck}
+                          onCheckedChange={(checked) => handleToggle(method, 'allowRateCheck', checked)}
                           disabled={updatingId === method.id}
-                          data-testid={`switch-assignment-${method.id}`}
+                          data-testid={`switch-rate-check-customer-${method.id}`}
                         />
-                        {method.allowAssignment ? (
+                        {method.allowRateCheck ? (
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         ) : (
                           <XCircle className="h-4 w-4 text-muted-foreground" />

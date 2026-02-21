@@ -18,7 +18,7 @@ import { eq } from 'drizzle-orm';
 
 export interface CustomerShippingMethodConfig {
   name: string;
-  allowAssignment: boolean;
+  allowRateCheck: boolean;
   allowChange: boolean;
   minAllowedWeight: number | null;
   maxAllowedWeight: number | null;
@@ -58,7 +58,7 @@ export class CustomerShippingMethodConfigService {
 
     return {
       name: method.name,
-      allowAssignment: method.allowAssignment,
+      allowRateCheck: method.allowRateCheck,
       allowChange: method.allowChange,
       minAllowedWeight: method.minAllowedWeight ? parseFloat(method.minAllowedWeight) : null,
       maxAllowedWeight: method.maxAllowedWeight ? parseFloat(method.maxAllowedWeight) : null,
@@ -117,15 +117,15 @@ export class CustomerShippingMethodConfigService {
   }
 
   /**
-   * Check if this customer shipping method can be assigned to shipments.
+   * Check if the rate checker should run on shipments with this customer shipping method.
    * Unknown methods default to allowed.
    */
-  async canAssignCustomerMethod(serviceName: string): Promise<boolean> {
+  async canRateCheckCustomerMethod(serviceName: string): Promise<boolean> {
     const config = await this.getCustomerMethodConfig(serviceName);
     if (!config) {
       return true;
     }
-    return config.allowAssignment;
+    return config.allowRateCheck;
   }
 
   /**
@@ -166,7 +166,7 @@ export class CustomerShippingMethodConfigService {
     const methods = await db.select().from(customerShippingMethods);
     return methods.map(m => ({
       name: m.name,
-      allowAssignment: m.allowAssignment,
+      allowRateCheck: m.allowRateCheck,
       allowChange: m.allowChange,
       minAllowedWeight: m.minAllowedWeight ? parseFloat(m.minAllowedWeight) : null,
       maxAllowedWeight: m.maxAllowedWeight ? parseFloat(m.maxAllowedWeight) : null,
