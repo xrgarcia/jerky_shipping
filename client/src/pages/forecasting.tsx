@@ -1216,7 +1216,7 @@ export default function Forecasting() {
           isLoading={summaryLoading}
         />
         <MetricCard
-          title="YoY Growth"
+          title="YoY Growth (Period)"
           value={summaryResponse?.data.yoyGrowthFactor != null ? (summaryResponse.data.yoyGrowthFactor - 1) * 100 : null}
           formatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
           icon={summaryResponse?.data.yoyGrowthFactor != null && summaryResponse.data.yoyGrowthFactor >= 1 ? TrendingUp : TrendingDown}
