@@ -5387,6 +5387,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `Job is in '${job.status}' status, can only retry dead_letter or failed jobs` });
       }
 
+      const RETRYABLE_PHASES = ['fulfillment_prep', 'ready_to_pick'];
+      const [shipment] = await db.select({ lifecyclePhase: shipments.lifecyclePhase })
+        .from(shipments)
+        .where(eq(shipments.id, job.shipmentId))
+        .limit(1);
+
+      const currentPhase = shipment?.lifecyclePhase || null;
+      if (!currentPhase || !RETRYABLE_PHASES.includes(currentPhase)) {
+        return res.status(400).json({
+          error: `Cannot retry — order is in '${currentPhase || 'unknown'}' phase. Retry is only allowed for orders in fulfillment_prep or ready_to_pick.`,
+          phase: currentPhase,
+        });
+      }
+
       await db.update(qcExplosionQueue)
         .set({
           status: 'queued',
@@ -5409,9 +5423,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/qc-explosion-queue/dead-letters", requireAuth, async (req, res) => {
+    try {
+      const deadJobs = await db.select({
+        id: qcExplosionQueue.id,
+        shipmentId: qcExplosionQueue.shipmentId,
+        orderNumber: qcExplosionQueue.orderNumber,
+        status: qcExplosionQueue.status,
+        retryCount: qcExplosionQueue.retryCount,
+        maxRetries: qcExplosionQueue.maxRetries,
+        lastError: qcExplosionQueue.lastError,
+        createdAt: qcExplosionQueue.createdAt,
+        completedAt: qcExplosionQueue.completedAt,
+        lifecyclePhase: shipments.lifecyclePhase,
+      })
+        .from(qcExplosionQueue)
+        .leftJoin(shipments, eq(qcExplosionQueue.shipmentId, shipments.id))
+        .where(eq(qcExplosionQueue.status, 'dead_letter'))
+        .orderBy(desc(qcExplosionQueue.createdAt))
+        .limit(100);
+
+      const RETRYABLE_PHASES = ['fulfillment_prep', 'ready_to_pick'];
+      const jobs = deadJobs.map(j => ({
+        ...j,
+        canRetry: !!(j.lifecyclePhase && RETRYABLE_PHASES.includes(j.lifecyclePhase)),
+        retryBlockedReason: !j.lifecyclePhase
+          ? 'Shipment not found'
+          : !RETRYABLE_PHASES.includes(j.lifecyclePhase)
+            ? `Order is in '${j.lifecyclePhase}' phase`
+            : null,
+      }));
+
+      res.json({ jobs });
+    } catch (error: any) {
+      console.error("Error fetching dead-lettered QC explosion jobs:", error.message);
+      res.status(500).json({ error: "Failed to fetch dead-lettered jobs" });
+    }
+  });
+
   app.post("/api/qc-explosion-queue/retry-all-dead", requireAuth, async (req, res) => {
     try {
-      const result = await db.update(qcExplosionQueue)
+      const RETRYABLE_PHASES = ['fulfillment_prep', 'ready_to_pick'];
+
+      const deadJobs = await db.select({
+        id: qcExplosionQueue.id,
+        shipmentId: qcExplosionQueue.shipmentId,
+        orderNumber: qcExplosionQueue.orderNumber,
+      })
+        .from(qcExplosionQueue)
+        .where(eq(qcExplosionQueue.status, 'dead_letter'));
+
+      if (deadJobs.length === 0) {
+        return res.json({ success: true, retriedCount: 0, skippedCount: 0 });
+      }
+
+      const shipmentIds = [...new Set(deadJobs.map(j => j.shipmentId))];
+      const shipmentPhases = await db.select({ id: shipments.id, lifecyclePhase: shipments.lifecyclePhase })
+        .from(shipments)
+        .where(inArray(shipments.id, shipmentIds));
+
+      const phaseMap = new Map(shipmentPhases.map(s => [s.id, s.lifecyclePhase]));
+
+      const eligibleJobIds = deadJobs
+        .filter(j => {
+          const phase = phaseMap.get(j.shipmentId);
+          return phase && RETRYABLE_PHASES.includes(phase);
+        })
+        .map(j => j.id);
+
+      if (eligibleJobIds.length === 0) {
+        return res.json({ success: true, retriedCount: 0, skippedCount: deadJobs.length });
+      }
+
+      await db.update(qcExplosionQueue)
         .set({
           status: 'queued',
           retryCount: 0,
@@ -5423,11 +5507,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fingerprintStatus: null,
           fingerprintIsNew: null,
         })
-        .where(eq(qcExplosionQueue.status, 'dead_letter'))
-        .returning({ id: qcExplosionQueue.id });
+        .where(inArray(qcExplosionQueue.id, eligibleJobIds));
 
-      logger.info(`[QcExplosionQueue] Manually retried all ${result.length} dead-lettered jobs`);
-      res.json({ success: true, retriedCount: result.length });
+      const skippedCount = deadJobs.length - eligibleJobIds.length;
+      logger.info(`[QcExplosionQueue] Manually retried ${eligibleJobIds.length} eligible dead-lettered jobs (${skippedCount} skipped — not in retryable phase)`);
+      res.json({ success: true, retriedCount: eligibleJobIds.length, skippedCount });
     } catch (error: any) {
       console.error("Error retrying all dead QC explosion jobs:", error.message);
       res.status(500).json({ error: "Failed to retry all dead QC explosion jobs" });

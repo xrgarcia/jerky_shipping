@@ -1745,31 +1745,41 @@ function QcExplosionTab() {
     refetchInterval: 5000,
   });
 
-  const { data: deadLetterData, isLoading: deadLetterLoading } = useQuery<QcExplosionJobsResponse>({
-    queryKey: ["/api/qc-explosion-queue/jobs", "dead_letter_modal"],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        page: "1",
-        limit: "100",
-        status: "dead_letter",
-        sortBy: "createdAt",
-        sortOrder: "desc",
-      });
-      const res = await fetch(`/api/qc-explosion-queue/jobs?${params}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch dead-lettered jobs");
-      return res.json();
-    },
+  interface DeadLetterJob {
+    id: number;
+    shipmentId: string;
+    orderNumber: string | null;
+    status: string;
+    retryCount: number;
+    maxRetries: number;
+    lastError: string | null;
+    createdAt: string;
+    completedAt: string | null;
+    lifecyclePhase: string | null;
+    canRetry: boolean;
+    retryBlockedReason: string | null;
+  }
+
+  const { data: deadLetterData, isLoading: deadLetterLoading } = useQuery<{ jobs: DeadLetterJob[] }>({
+    queryKey: ["/api/qc-explosion-queue/dead-letters"],
     enabled: deadLetterModalOpen,
     refetchInterval: deadLetterModalOpen ? 5000 : false,
   });
+
+  const retryableCount = deadLetterData?.jobs?.filter(j => j.canRetry).length ?? 0;
+
+  function invalidateQcExplosionQueries() {
+    queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/dead-letters"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/jobs"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/stats"] });
+  }
 
   const retryJobMutation = useMutation({
     mutationFn: async (jobId: number) => {
       await apiRequest("POST", `/api/qc-explosion-queue/retry/${jobId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/stats"] });
+      invalidateQcExplosionQueries();
       toast({ title: "Job re-queued", description: "The job has been sent back for processing." });
     },
     onError: (error: any) => {
@@ -1783,10 +1793,12 @@ function QcExplosionTab() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/qc-explosion-queue/stats"] });
-      toast({ title: "All dead-lettered jobs re-queued", description: `${data.retriedCount} job(s) sent back for processing.` });
-      if (data.retriedCount > 0) setDeadLetterModalOpen(false);
+      invalidateQcExplosionQueries();
+      const msg = data.skippedCount > 0
+        ? `${data.retriedCount} retried, ${data.skippedCount} skipped (not in retryable phase)`
+        : `${data.retriedCount} job(s) sent back for processing.`;
+      toast({ title: "Retry all complete", description: msg });
+      if (data.retriedCount > 0 && data.skippedCount === 0) setDeadLetterModalOpen(false);
     },
     onError: (error: any) => {
       toast({ title: "Retry all failed", description: error.message, variant: "destructive" });
@@ -2102,17 +2114,22 @@ function QcExplosionTab() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-sm text-muted-foreground">
                   {deadLetterData.jobs.length} dead-lettered job{deadLetterData.jobs.length !== 1 ? "s" : ""}
+                  {retryableCount > 0 && retryableCount < deadLetterData.jobs.length && (
+                    <span> ({retryableCount} retryable)</span>
+                  )}
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => retryAllDeadMutation.mutate()}
-                  disabled={retryAllDeadMutation.isPending}
-                  data-testid="button-retry-all-dead"
-                >
-                  <RotateCcw className={`h-3 w-3 mr-1 ${retryAllDeadMutation.isPending ? "animate-spin" : ""}`} />
-                  {retryAllDeadMutation.isPending ? "Retrying..." : "Retry All"}
-                </Button>
+                {retryableCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => retryAllDeadMutation.mutate()}
+                    disabled={retryAllDeadMutation.isPending}
+                    data-testid="button-retry-all-dead"
+                  >
+                    <RotateCcw className={`h-3 w-3 mr-1 ${retryAllDeadMutation.isPending ? "animate-spin" : ""}`} />
+                    {retryAllDeadMutation.isPending ? "Retrying..." : `Retry All Eligible (${retryableCount})`}
+                  </Button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -2121,10 +2138,10 @@ function QcExplosionTab() {
                     <TableRow>
                       <TableHead>ID</TableHead>
                       <TableHead>Order</TableHead>
+                      <TableHead>Phase</TableHead>
                       <TableHead>Error</TableHead>
                       <TableHead>Retries</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead>Failed</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2135,30 +2152,46 @@ function QcExplosionTab() {
                         <TableCell className="text-xs font-mono whitespace-nowrap">
                           {job.orderNumber ?? <span className="text-muted-foreground">-</span>}
                         </TableCell>
-                        <TableCell className="text-xs max-w-[300px]">
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <Badge
+                            variant={job.canRetry ? "outline" : "secondary"}
+                            className="no-default-active-elevate text-xs"
+                          >
+                            {job.lifecyclePhase || "unknown"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[250px]">
                           <span className="text-destructive break-words">{job.lastError || "-"}</span>
                         </TableCell>
                         <TableCell className="text-xs text-center">{job.retryCount}/{job.maxRetries}</TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                           {format(new Date(job.createdAt), "MMM d, h:mm a")}
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {job.completedAt
-                            ? formatDistanceToNow(new Date(job.completedAt), { addSuffix: true })
-                            : "-"
-                          }
-                        </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => retryJobMutation.mutate(job.id)}
-                            disabled={retryJobMutation.isPending}
-                            data-testid={`button-retry-dead-${job.id}`}
-                          >
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                            Retry
-                          </Button>
+                          {job.canRetry ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => retryJobMutation.mutate(job.id)}
+                              disabled={retryJobMutation.isPending}
+                              data-testid={`button-retry-dead-${job.id}`}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Retry
+                            </Button>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-xs text-muted-foreground cursor-help">
+                                  <XCircle className="h-4 w-4 inline mr-1" />
+                                  No retry
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <p className="text-xs">{job.retryBlockedReason}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
