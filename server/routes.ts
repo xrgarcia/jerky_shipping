@@ -15947,6 +15947,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Chart Notes CRUD
+  app.get("/api/chart-notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const querySchema = z.object({
+        chartType: z.string(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      });
+      const parsed = querySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid query parameters", details: parsed.error.flatten() });
+        return;
+      }
+      const notes = await storage.getChartNotes(parsed.data.chartType, parsed.data.startDate, parsed.data.endDate);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch chart notes" });
+    }
+  });
+
+  app.post("/api/chart-notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const bodySchema = z.object({
+        chartType: z.string().max(50),
+        noteDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        content: z.string().min(1).max(2000),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+        return;
+      }
+      const user = (req as any).user;
+      const note = await storage.createChartNote({
+        chartType: parsed.data.chartType,
+        noteDate: parsed.data.noteDate,
+        content: parsed.data.content,
+        authorEmail: user.email,
+      });
+      res.status(201).json(note);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create chart note" });
+    }
+  });
+
+  app.patch("/api/chart-notes/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        res.status(400).json({ error: "Invalid note ID" });
+        return;
+      }
+      const bodySchema = z.object({
+        content: z.string().min(1).max(2000),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+        return;
+      }
+      const note = await storage.updateChartNote(id, parsed.data.content);
+      if (!note) {
+        res.status(404).json({ error: "Note not found" });
+        return;
+      }
+      res.json(note);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update chart note" });
+    }
+  });
+
+  app.delete("/api/chart-notes/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        res.status(400).json({ error: "Invalid note ID" });
+        return;
+      }
+      const deleted = await storage.deleteChartNote(id);
+      if (!deleted) {
+        res.status(404).json({ error: "Note not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete chart note" });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;

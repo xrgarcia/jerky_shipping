@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type {
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
@@ -7,6 +8,7 @@ import type {
   BooleanFilter,
 } from "@shared/forecasting-types";
 import { TimeRangePreset } from "@shared/forecasting-types";
+import type { ChartNote } from "@shared/schema";
 
 export function useSalesChannels() {
   return useQuery<ForecastingChannelsResponse>({
@@ -96,5 +98,56 @@ export function useRevenueTimeSeries(
     enabled:
       (selectedChannels === null || selectedChannels.length > 0) &&
       (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),
+  });
+}
+
+export function useChartNotes(chartType: string, startDate?: string, endDate?: string) {
+  const params = new URLSearchParams();
+  if (chartType) params.set("chartType", chartType);
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  const qs = `?${params.toString()}`;
+
+  return useQuery<ChartNote[]>({
+    queryKey: ["/api/chart-notes", qs],
+    enabled: !!chartType && !!startDate && !!endDate,
+  });
+}
+
+export function useCreateChartNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { chartType: string; noteDate: string; content: string }) => {
+      const res = await apiRequest("POST", "/api/chart-notes", data);
+      return res.json() as Promise<ChartNote>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/chart-notes"] });
+    },
+  });
+}
+
+export function useUpdateChartNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, content }: { id: number; content: string }) => {
+      const res = await apiRequest("PATCH", `/api/chart-notes/${id}`, { content });
+      return res.json() as Promise<ChartNote>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/chart-notes"] });
+    },
+  });
+}
+
+export function useDeleteChartNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/chart-notes/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/chart-notes"] });
+    },
   });
 }

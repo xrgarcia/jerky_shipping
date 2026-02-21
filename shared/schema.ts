@@ -2007,3 +2007,24 @@ export const insertUserPreferenceSchema = createInsertSchema(userPreferences).om
 
 export type InsertUserPreference = z.infer<typeof insertUserPreferenceSchema>;
 export type UserPreference = typeof userPreferences.$inferSelect;
+
+export const chartNotes = pgTable("chart_notes", {
+  id: serial("id").primaryKey(),
+  chartType: varchar("chart_type", { length: 50 }).notNull(),
+  noteDate: varchar("note_date", { length: 10 }).notNull(),
+  content: text("content").notNull(),
+  authorEmail: varchar("author_email", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  chartTypeDateIdx: index("chart_notes_type_date_idx").on(table.chartType, table.noteDate),
+}));
+
+export const insertChartNoteSchema = createInsertSchema(chartNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertChartNote = z.infer<typeof insertChartNoteSchema>;
+export type ChartNote = typeof chartNotes.$inferSelect;

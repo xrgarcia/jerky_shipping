@@ -100,6 +100,9 @@ import {
   skuvaultProducts,
   type UserPreference,
   userPreferences,
+  type ChartNote,
+  type InsertChartNote,
+  chartNotes,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -462,6 +465,12 @@ export interface IStorage {
   getUserPreference(userId: string, namespace: string, key: string): Promise<UserPreference | undefined>;
   upsertUserPreference(userId: string, namespace: string, key: string, value: unknown): Promise<UserPreference>;
   deleteUserPreference(userId: string, namespace: string, key: string): Promise<boolean>;
+
+  // Chart Notes
+  getChartNotes(chartType: string, startDate: string, endDate: string): Promise<ChartNote[]>;
+  createChartNote(note: InsertChartNote): Promise<ChartNote>;
+  updateChartNote(id: number, content: string): Promise<ChartNote | undefined>;
+  deleteChartNote(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4023,6 +4032,46 @@ export class DatabaseStorage implements IStorage {
         eq(userPreferences.namespace, namespace),
         eq(userPreferences.key, key),
       ))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Chart Notes
+  async getChartNotes(chartType: string, startDate: string, endDate: string): Promise<ChartNote[]> {
+    return db
+      .select()
+      .from(chartNotes)
+      .where(
+        and(
+          eq(chartNotes.chartType, chartType),
+          gte(chartNotes.noteDate, startDate),
+          lte(chartNotes.noteDate, endDate),
+        )
+      )
+      .orderBy(asc(chartNotes.noteDate), asc(chartNotes.createdAt));
+  }
+
+  async createChartNote(note: InsertChartNote): Promise<ChartNote> {
+    const result = await db.insert(chartNotes).values({
+      ...note,
+      updatedAt: new Date(),
+    }).returning();
+    return result[0];
+  }
+
+  async updateChartNote(id: number, content: string): Promise<ChartNote | undefined> {
+    const result = await db
+      .update(chartNotes)
+      .set({ content, updatedAt: new Date() })
+      .where(eq(chartNotes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChartNote(id: number): Promise<boolean> {
+    const result = await db
+      .delete(chartNotes)
+      .where(eq(chartNotes.id, id))
       .returning();
     return result.length > 0;
   }

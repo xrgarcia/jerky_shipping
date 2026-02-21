@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useSearch, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { TrendingUp, ChevronDown, Check, Loader2, CalendarIcon } from "lucide-react";
+import { TrendingUp, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -31,9 +31,10 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
 import type { SalesDataFilters } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
+import type { ChartNote } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
 
@@ -294,9 +295,182 @@ interface DualLineChartProps {
   line2Color: string;
   valueFormatter: (v: number) => string;
   isLoading: boolean;
+  chartType: string;
+  startDate?: string;
+  endDate?: string;
 }
 
-function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2Label, line2Color, valueFormatter, isLoading }: DualLineChartProps) {
+function ChartNotesPopover({
+  notes,
+  date,
+  dateLabel,
+  chartType,
+  position,
+  onClose,
+}: {
+  notes: ChartNote[];
+  date: string;
+  dateLabel: string;
+  chartType: string;
+  position: { x: number; y: number };
+  onClose: () => void;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [newContent, setNewContent] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const createNote = useCreateChartNote();
+  const updateNote = useUpdateChartNote();
+  const deleteNote = useDeleteChartNote();
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handler);
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handler);
+    };
+  }, [onClose]);
+
+  const handleAdd = () => {
+    if (!newContent.trim()) return;
+    createNote.mutate({ chartType, noteDate: date, content: newContent.trim() }, {
+      onSuccess: () => setNewContent(""),
+    });
+  };
+
+  const handleUpdate = (id: number) => {
+    if (!editContent.trim()) return;
+    updateNote.mutate({ id, content: editContent.trim() }, {
+      onSuccess: () => setEditingId(null),
+    });
+  };
+
+  return (
+    <div
+      ref={popoverRef}
+      className="absolute z-50"
+      style={{ left: position.x, top: position.y }}
+    >
+      <div className="bg-card border rounded-md shadow-lg w-72 p-3" data-testid="chart-notes-popover">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-sm font-medium">{dateLabel}</span>
+          <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-close-notes">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {notes.length > 0 && (
+          <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+            {notes.map((note) => (
+              <div key={note.id} className="text-sm border rounded-md p-2 space-y-1" data-testid={`chart-note-${note.id}`}>
+                {editingId === note.id ? (
+                  <div className="space-y-1">
+                    <textarea
+                      className="w-full text-sm border rounded-md p-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={2}
+                      data-testid="input-edit-note"
+                    />
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} data-testid="button-cancel-edit">
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={() => handleUpdate(note.id)} disabled={updateNote.isPending} data-testid="button-save-edit">
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="whitespace-pre-wrap">{note.content}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground truncate">
+                        {note.authorEmail.split("@")[0]}
+                      </span>
+                      <div className="flex gap-0.5 shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => { setEditingId(note.id); setEditContent(note.content); }}
+                          data-testid={`button-edit-note-${note.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => deleteNote.mutate(note.id)}
+                          disabled={deleteNote.isPending}
+                          data-testid={`button-delete-note-${note.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <textarea
+            className="w-full text-sm border rounded-md p-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+            placeholder="Add a note..."
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            rows={2}
+            data-testid="input-new-note"
+          />
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={handleAdd}
+            disabled={!newContent.trim() || createNote.isPending}
+            data-testid="button-add-note"
+          >
+            <MessageSquarePlus className="h-4 w-4 mr-1" />
+            Add Note
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2Label, line2Color, valueFormatter, isLoading, chartType, startDate, endDate }: DualLineChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedPoint, setSelectedPoint] = useState<{
+    date: string;
+    dateLabel: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const { data: notes } = useChartNotes(chartType, startDate, endDate);
+
+  const notesByDate = useMemo(() => {
+    const map: Record<string, ChartNote[]> = {};
+    if (notes) {
+      for (const note of notes) {
+        if (!map[note.noteDate]) map[note.noteDate] = [];
+        map[note.noteDate].push(note);
+      }
+    }
+    return map;
+  }, [notes]);
+
+  const datesWithNotes = useMemo(() => new Set(Object.keys(notesByDate)), [notesByDate]);
+
   if (isLoading) {
     return (
       <div className="flex h-[350px] items-center justify-center">
@@ -316,55 +490,112 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
   const chartData = data.map((d) => ({
     dateLabel: format(parseISO(d.date), "MMM d"),
     fullDate: format(parseISO(d.date), "MMM d, yyyy"),
+    isoDate: d.date,
+    hasNote: datesWithNotes.has(d.date),
     [line1Label]: d[line1Key],
     [line2Label]: d[line2Key],
   }));
 
+  const handleChartClick = (chartState: any) => {
+    if (!chartState || !chartState.activePayload || chartState.activePayload.length === 0) return;
+    const payload = chartState.activePayload[0].payload;
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!containerRect) return;
+
+    const clickX = chartState.chartX ?? 0;
+    const clickY = chartState.chartY ?? 0;
+
+    const popoverX = Math.min(clickX, containerRect.width - 300);
+    const popoverY = Math.max(0, clickY - 20);
+
+    setSelectedPoint({
+      date: payload.isoDate,
+      dateLabel: payload.fullDate,
+      x: popoverX,
+      y: popoverY,
+    });
+  };
+
+  const renderAnnotationDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!payload?.hasNote) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill="hsl(var(--primary))"
+        stroke="hsl(var(--background))"
+        strokeWidth={2}
+        style={{ cursor: "pointer" }}
+      />
+    );
+  };
+
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-        <XAxis
-          dataKey="dateLabel"
-          tick={{ fontSize: 12 }}
-          interval="preserveStartEnd"
+    <div className="relative" ref={containerRef}>
+      <ResponsiveContainer width="100%" height={350}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          onClick={handleChartClick}
+          style={{ cursor: "crosshair" }}
+        >
+          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+          <XAxis
+            dataKey="dateLabel"
+            tick={{ fontSize: 12 }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tickFormatter={(v: number) => valueFormatter(v)}
+            tick={{ fontSize: 12 }}
+            width={80}
+          />
+          <Tooltip
+            formatter={(value: number, name: string) => [valueFormatter(value), name]}
+            labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
+              payload?.[0]?.payload?.fullDate ?? _label
+            }
+            contentStyle={{
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--border))",
+              backgroundColor: "hsl(var(--card))",
+              color: "hsl(var(--card-foreground))",
+            }}
+          />
+          <Legend />
+          <Line
+            type="monotone"
+            dataKey={line1Label}
+            stroke={line1Color}
+            strokeWidth={2}
+            dot={renderAnnotationDot}
+            activeDot={{ r: 6, style: { cursor: "pointer" } }}
+            connectNulls
+          />
+          <Line
+            type="monotone"
+            dataKey={line2Label}
+            stroke={line2Color}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 6, style: { cursor: "pointer" } }}
+            connectNulls
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      {selectedPoint && (
+        <ChartNotesPopover
+          notes={notesByDate[selectedPoint.date] ?? []}
+          date={selectedPoint.date}
+          dateLabel={selectedPoint.dateLabel}
+          chartType={chartType}
+          position={{ x: selectedPoint.x, y: selectedPoint.y }}
+          onClose={() => setSelectedPoint(null)}
         />
-        <YAxis
-          tickFormatter={(v: number) => valueFormatter(v)}
-          tick={{ fontSize: 12 }}
-          width={80}
-        />
-        <Tooltip
-          formatter={(value: number, name: string) => [valueFormatter(value), name]}
-          labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
-            payload?.[0]?.payload?.fullDate ?? _label
-          }
-          contentStyle={{
-            borderRadius: "var(--radius)",
-            border: "1px solid hsl(var(--border))",
-            backgroundColor: "hsl(var(--card))",
-            color: "hsl(var(--card-foreground))",
-          }}
-        />
-        <Legend />
-        <Line
-          type="monotone"
-          dataKey={line1Label}
-          stroke={line1Color}
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-        <Line
-          type="monotone"
-          dataKey={line2Label}
-          stroke={line2Color}
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-      </LineChart>
-    </ResponsiveContainer>
+      )}
+    </div>
   );
 }
 
@@ -780,6 +1011,8 @@ export default function Forecasting() {
           ? parseISO(timeSeriesResponse.params.endDate).getFullYear()
           : new Date().getFullYear();
         const priorYear = endYear - 1;
+        const tsStart = timeSeriesResponse?.params?.startDate;
+        const tsEnd = timeSeriesResponse?.params?.endDate;
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -804,6 +1037,9 @@ export default function Forecasting() {
                   line2Color="#FF9900"
                   valueFormatter={formatCurrency}
                   isLoading={timeSeriesLoading}
+                  chartType="revenue_yoy"
+                  startDate={tsStart}
+                  endDate={tsEnd}
                 />
               </CardContent>
             </Card>
@@ -830,6 +1066,9 @@ export default function Forecasting() {
                   line2Color="#FF9900"
                   valueFormatter={(v) => v.toLocaleString()}
                   isLoading={timeSeriesLoading}
+                  chartType="units_yoy"
+                  startDate={tsStart}
+                  endDate={tsEnd}
                 />
               </CardContent>
             </Card>
