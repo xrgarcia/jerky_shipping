@@ -515,13 +515,13 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
   };
 
   const renderAnnotationDot = (props: any) => {
-    const { cx, cy, payload } = props;
+    const { cx, payload } = props;
     if (!payload?.hasNote) return null;
     return (
       <circle
         cx={cx}
-        cy={cy}
-        r={5}
+        cy={10}
+        r={4}
         fill="hsl(var(--primary))"
         stroke="hsl(var(--background))"
         strokeWidth={2}
@@ -535,7 +535,7 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
     <ResponsiveContainer width="100%" height="100%">
       <LineChart
         data={chartData}
-        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         onClick={handleChartClick}
         style={{ cursor: "crosshair" }}
       >
@@ -814,13 +814,13 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
   };
 
   const renderAnnotationDot = (props: any) => {
-    const { cx, cy, payload } = props;
+    const { cx, payload } = props;
     if (!payload?.hasNote) return null;
     return (
       <circle
         cx={cx}
-        cy={cy}
-        r={5}
+        cy={10}
+        r={4}
         fill="hsl(var(--primary))"
         stroke="hsl(var(--background))"
         strokeWidth={2}
@@ -834,7 +834,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
           onClick={handleChartClick}
           style={{ cursor: "crosshair" }}
         >
