@@ -16,7 +16,8 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Backend**: Express.js with Node.js and TypeScript, exposing a RESTful API. Drizzle ORM for database interactions.
 - **Authentication**: Google OAuth (restricted to @jerky.com domain) with secure HTTP-only session cookies.
 - **Data Storage**: PostgreSQL (Neon serverless) with Drizzle Kit for migrations.
-- **Core Features**: Order management, packing page supporting boxing/bagging workflows, workstation guard system, shipment management, order backfill system, reporting & analytics, operations dashboard, print queue system, desktop printing via Electron, web-based stations management, real-time updates via WebSockets, and customizable saved views.
+- **Core Features**: Order management, packing page supporting boxing/bagging workflows, workstation guard system, shipment management, order backfill system, reporting & analytics, operations dashboard, print queue system, desktop printing via Electron, web-based stations management, real-time updates via WebSockets, customizable saved views, and sales forecasting.
+- **User Preferences System**: Generic namespace/key/JSONB-based `user_preferences` table with unique constraint on (userId, namespace, key). Reusable `useUserPreference<T>` hook (`client/src/hooks/use-user-preference.ts`) with debounced auto-save. API routes at `/api/user-preferences/:namespace/:key`. Used by Forecasting page to persist time range and channel selections. Available site-wide for any feature needing per-user settings.
 - **Monorepo Structure**: Client, server, and shared code co-located.
 - **Centralized ETL Architecture**: Standardized data transformations for Shopify orders and ShipStation shipments.
 - **Worker Coordination System**: Redis-backed mutex for production-ready coordination of poll workers and backfill jobs.
