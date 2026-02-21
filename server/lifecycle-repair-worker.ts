@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { shipments, lifecycleRepairJobs } from "@shared/schema";
-import { eq, or, and, ne } from "drizzle-orm";
+import { eq, or, and, ne, inArray } from "drizzle-orm";
 import { queueLifecycleEvaluation } from "./services/lifecycle-service";
 
 const BATCH_SIZE = 100;
@@ -28,7 +28,7 @@ async function getStaleShipments(): Promise<typeof shipments.$inferSelect[]> {
     .from(shipments)
     .where(
       and(
-        eq(shipments.lifecyclePhase, 'on_dock'),
+        inArray(shipments.lifecyclePhase, ['on_dock', 'packing_ready']),
         or(
           ne(shipments.status, 'pending'),
           ne(shipments.shipmentStatus, 'pending')

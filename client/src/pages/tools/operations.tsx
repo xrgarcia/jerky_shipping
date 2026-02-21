@@ -756,7 +756,7 @@ function LifecycleRepairJobsCard() {
           Lifecycle Phase Repair
         </CardTitle>
         <CardDescription>
-          Repair stale lifecycle phases for shipments stuck in 'on_dock' but with carrier status indicating delivery/transit.
+          Repair stale lifecycle phases for shipments stuck in 'on_dock' or 'packing_ready' but with carrier status indicating delivery/transit.
         </CardDescription>
       </CardHeader>
       <CardContent>

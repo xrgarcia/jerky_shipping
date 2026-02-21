@@ -12005,7 +12005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Repair stale lifecycle phases - fixes shipments where stored phase doesn't match derived phase
-  // Primary use case: on_dock shipments that should be delivered/in_transit based on carrier status
+  // Primary use case: on_dock or packing_ready shipments that should be delivered/in_transit based on carrier status
   app.post("/api/admin/repair-lifecycle-phases", requireAuth, async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 1000;
@@ -12016,7 +12016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import lifecycle functions
       const { deriveLifecyclePhase, LIFECYCLE_PHASES } = await import('./services/lifecycle-state-machine');
       
-      // Find shipments where stored phase is on_dock but status indicates different phase
+      // Find shipments where stored phase is on_dock or packing_ready but status indicates different phase
       // These are stale - the status was updated by webhooks but lifecycle wasn't recalculated
       const staleShipments = await db
         .select({
@@ -12031,18 +12031,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(shipments)
         .where(
           and(
-            eq(shipments.lifecyclePhase, 'on_dock'),
+            inArray(shipments.lifecyclePhase, ['on_dock', 'packing_ready']),
             or(
-              // Carrier codes that indicate NOT on_dock
+              // Carrier codes that indicate NOT on_dock/packing_ready
               inArray(shipments.status, ['DE', 'IT', 'SP', 'UN', 'EX']),
-              // ShipStation statuses that shouldn't be on_dock
+              // ShipStation statuses that shouldn't be on_dock/packing_ready
               inArray(shipments.status, ['shipped', 'cancelled'])
             )
           )
         )
         .limit(limit);
       
-      console.log(`[Repair] Found ${staleShipments.length} stale on_dock shipments`);
+      console.log(`[Repair] Found ${staleShipments.length} stale on_dock/packing_ready shipments`);
       
       if (dryRun) {
         // Group by status for summary
