@@ -95,23 +95,23 @@ export class ForecastingService {
         endDate: new Date(params.endDate + 'T23:59:59'),
       };
     }
-    const now = nowCentral();
+    const yesterday = subDays(nowCentral(), 1);
     if (params.preset === TimeRangePreset.YEAR_TO_DATE) {
       return {
-        startDate: new Date(now.getFullYear(), 0, 1),
-        endDate: now,
+        startDate: new Date(yesterday.getFullYear(), 0, 1),
+        endDate: yesterday,
       };
     }
     if (params.preset === TimeRangePreset.CURRENT_MONTH) {
       return {
-        startDate: new Date(now.getFullYear(), now.getMonth(), 1),
-        endDate: now,
+        startDate: new Date(yesterday.getFullYear(), yesterday.getMonth(), 1),
+        endDate: yesterday,
       };
     }
     const days = TIME_RANGE_DAYS[params.preset] ?? 30;
     return {
-      startDate: subDays(now, days),
-      endDate: now,
+      startDate: subDays(yesterday, days),
+      endDate: yesterday,
     };
   }
 
