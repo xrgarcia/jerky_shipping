@@ -392,9 +392,35 @@ interface SalesChartProps {
   data: ChartDataRow[];
   channels: string[];
   isLoading: boolean;
+  chartType: string;
+  startDate?: string;
+  endDate?: string;
 }
 
-function SalesChart({ data, channels, isLoading }: SalesChartProps) {
+function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }: SalesChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedPoint, setSelectedPoint] = useState<{
+    date: string;
+    dateLabel: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const { data: notes } = useChartNotes(chartType, startDate, endDate);
+
+  const notesByDate = useMemo(() => {
+    const map: Record<string, ChartNote[]> = {};
+    if (notes) {
+      for (const note of notes) {
+        if (!map[note.noteDate]) map[note.noteDate] = [];
+        map[note.noteDate].push(note);
+      }
+    }
+    return map;
+  }, [notes]);
+
+  const datesWithNotes = useMemo(() => new Set(Object.keys(notesByDate)), [notesByDate]);
+
   if (isLoading) {
     return (
       <div className="flex h-[250px] sm:h-[350px] lg:h-[400px] items-center justify-center">
@@ -411,10 +437,57 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
     );
   }
 
+  const chartData = data.map((row) => ({
+    ...row,
+    fullDate: (() => { try { return format(parseISO(row.date), "MMM d, yyyy"); } catch { return row.date; } })(),
+    hasNote: datesWithNotes.has(row.date),
+  }));
+
+  const handleChartClick = (chartState: any) => {
+    if (!chartState || !chartState.activePayload || chartState.activePayload.length === 0) return;
+    const payload = chartState.activePayload[0].payload;
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!containerRect) return;
+
+    const clickX = chartState.chartX ?? 0;
+    const clickY = chartState.chartY ?? 0;
+
+    const popoverX = Math.min(clickX, containerRect.width - 300);
+    const popoverY = Math.max(0, clickY - 20);
+
+    setSelectedPoint({
+      date: payload.date,
+      dateLabel: payload.fullDate,
+      x: popoverX,
+      y: popoverY,
+    });
+  };
+
+  const renderAnnotationDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!payload?.hasNote) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill="hsl(var(--primary))"
+        stroke="hsl(var(--background))"
+        strokeWidth={2}
+        style={{ cursor: "pointer" }}
+      />
+    );
+  };
+
   return (
-    <div className="h-[250px] sm:h-[350px] lg:h-[400px]">
+    <div className="relative h-[250px] sm:h-[350px] lg:h-[400px]" ref={containerRef}>
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <LineChart
+        data={chartData}
+        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        onClick={handleChartClick}
+        style={{ cursor: "crosshair" }}
+      >
         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
         <XAxis
           dataKey="dateLabel"
@@ -428,7 +501,9 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
         />
         <Tooltip
           formatter={(value: number, name: string) => [formatCurrency(value), name]}
-          labelFormatter={(label: string) => label}
+          labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
+            payload?.[0]?.payload?.fullDate ?? _label
+          }
           contentStyle={{
             borderRadius: "var(--radius)",
             border: "1px solid hsl(var(--border))",
@@ -444,12 +519,23 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
             dataKey={channel}
             stroke={getChannelColor(channel, idx)}
             strokeWidth={2}
-            dot={false}
+            dot={idx === 0 ? renderAnnotationDot : false}
+            activeDot={{ r: 6, style: { cursor: "pointer" } }}
             connectNulls
           />
         ))}
       </LineChart>
     </ResponsiveContainer>
+    {selectedPoint && (
+      <ChartNotesPopover
+        notes={notesByDate[selectedPoint.date] ?? []}
+        date={selectedPoint.date}
+        dateLabel={selectedPoint.dateLabel}
+        chartType={chartType}
+        position={{ x: selectedPoint.x, y: selectedPoint.y }}
+        onClose={() => setSelectedPoint(null)}
+      />
+    )}
     </div>
   );
 }
@@ -1341,6 +1427,9 @@ export default function Forecasting() {
             data={chartData}
             channels={displayChannels}
             isLoading={salesLoading || channelsLoading}
+            chartType="sales_by_channel"
+            startDate={salesResponse?.params?.startDate}
+            endDate={salesResponse?.params?.endDate}
           />
         </CardContent>
       </Card>
