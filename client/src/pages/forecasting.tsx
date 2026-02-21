@@ -429,7 +429,7 @@ function NotesTooltipContent({
               <MessageSquarePlus className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
               <div className="min-w-0">
                 <p className="text-xs leading-snug whitespace-pre-wrap">{note.content}</p>
-                <span className="text-[10px] text-muted-foreground">{note.authorEmail.split("@")[0]}</span>
+                <span className="text-[10px] text-muted-foreground">{note.authorEmail.split("@")[0]} · {format(new Date(note.createdAt), "MMM d, h:mm a")}</span>
               </div>
             </div>
           ))}
@@ -690,7 +690,7 @@ function ChartNotesPopover({
                     <p className="whitespace-pre-wrap">{note.content}</p>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-muted-foreground truncate">
-                        {note.authorEmail.split("@")[0]}
+                        {note.authorEmail.split("@")[0]} · {format(new Date(note.createdAt), "MMM d, h:mm a")}
                       </span>
                       <div className="flex gap-0.5 shrink-0">
                         <Button
