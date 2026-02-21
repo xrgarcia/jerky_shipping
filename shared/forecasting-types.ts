@@ -92,6 +92,23 @@ export interface RevenueTimeSeriesResponse {
   };
 }
 
+export interface KitTimeSeriesPoint {
+  date: string;
+  kitDailyRevenue: number;
+  yoyKitDailyRevenue: number;
+  kitDailyQuantity: number;
+  yoyKitDailyQuantity: number;
+}
+
+export interface KitTimeSeriesResponse {
+  data: KitTimeSeriesPoint[];
+  params: {
+    preset: TimeRangePreset;
+    startDate: string;
+    endDate: string;
+  };
+}
+
 export interface ChannelGrowthFactor {
   channel: string;
   yoyGrowthFactor: number;
