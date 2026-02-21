@@ -1007,10 +1007,10 @@ export default function Forecasting() {
       </Card>
 
       {(() => {
-        const endYear = timeSeriesResponse?.params
-          ? parseISO(timeSeriesResponse.params.endDate).getFullYear()
+        const currentYear = timeSeriesResponse?.params
+          ? parseISO(timeSeriesResponse.params.startDate).getFullYear()
           : new Date().getFullYear();
-        const priorYear = endYear - 1;
+        const priorYear = currentYear - 1;
         const tsStart = timeSeriesResponse?.params?.startDate;
         const tsEnd = timeSeriesResponse?.params?.endDate;
         return (
@@ -1030,7 +1030,7 @@ export default function Forecasting() {
                 <DualLineChart
                   data={timeSeriesResponse?.data ?? []}
                   line1Key="dailyRevenue"
-                  line1Label={`Revenue ${endYear}`}
+                  line1Label={`Revenue ${currentYear}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyRevenue"
                   line2Label={`Revenue ${priorYear}`}
@@ -1059,7 +1059,7 @@ export default function Forecasting() {
                 <DualLineChart
                   data={timeSeriesResponse?.data ?? []}
                   line1Key="dailyQuantity"
-                  line1Label={`Units ${endYear}`}
+                  line1Label={`Units ${currentYear}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyQuantity"
                   line2Label={`Units ${priorYear}`}
