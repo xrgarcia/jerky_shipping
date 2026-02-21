@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart, Activity, ShieldCheck } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -1036,7 +1036,7 @@ export default function Forecasting() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <MetricCard
           title="Total Revenue"
           value={summaryResponse?.data.totalRevenue}
@@ -1074,6 +1074,45 @@ export default function Forecasting() {
           changeValue={summaryResponse?.data.yoyUnitsChangePct}
           isLoading={summaryLoading}
         />
+        <MetricCard
+          title="YoY Growth"
+          value={summaryResponse?.data.yoyGrowthFactor}
+          formatter={(v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`}
+          icon={summaryResponse?.data.yoyGrowthFactor != null && summaryResponse.data.yoyGrowthFactor >= 0 ? TrendingUp : TrendingDown}
+          changeValue={summaryResponse?.data.yoyGrowthFactor}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="Trend (2wk/4wk)"
+          value={summaryResponse?.data.trendFactor}
+          formatter={(v) => `${(v * 100).toFixed(1)}%`}
+          icon={Activity}
+          changeValue={summaryResponse?.data.trendFactor != null ? summaryResponse.data.trendFactor - 0.5 : null}
+          isLoading={summaryLoading}
+        />
+        <Card data-testid="metric-card-confidence">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-sm text-muted-foreground">Confidence</span>
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {summaryLoading ? (
+              <div className="flex items-center gap-2 h-8">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : summaryResponse?.data.confidenceLevel != null ? (
+              <div className={`text-2xl font-semibold capitalize ${
+                summaryResponse.data.confidenceLevel === 'normal' ? 'text-green-600 dark:text-green-400' :
+                summaryResponse.data.confidenceLevel === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
+                'text-red-600 dark:text-red-400'
+              }`}>
+                {summaryResponse.data.confidenceLevel}
+              </div>
+            ) : (
+              <div className="text-2xl font-semibold text-muted-foreground">—</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

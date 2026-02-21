@@ -89,6 +89,9 @@ export interface SummaryMetrics {
   yoyTotalUnits: number;
   yoyRevenueChangePct: number | null;
   yoyUnitsChangePct: number | null;
+  yoyGrowthFactor: number | null;
+  trendFactor: number | null;
+  confidenceLevel: 'critical' | 'warning' | 'normal' | null;
 }
 
 export interface SummaryMetricsResponse {

@@ -234,6 +234,26 @@ export class ForecastingService {
       ordersAvailable = false;
     }
 
+    const latestIndicatorRows: Array<{
+      yoy_growth_factor: string | null;
+      trend_factor: string | null;
+      confidence_level: string | null;
+    }> = await reportingSql`
+      SELECT yoy_growth_factor, trend_factor, confidence_level
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+      ORDER BY order_date DESC
+      LIMIT 1
+    `;
+
+    const latestIndicator = latestIndicatorRows[0] ?? null;
+
     const row = rows[0];
     const totalRevenue = parseFloat(row.total_revenue) || 0;
     const totalUnits = parseFloat(row.total_units) || 0;
@@ -256,6 +276,9 @@ export class ForecastingService {
         yoyTotalUnits,
         yoyRevenueChangePct,
         yoyUnitsChangePct,
+        yoyGrowthFactor: latestIndicator?.yoy_growth_factor != null ? parseFloat(latestIndicator.yoy_growth_factor) : null,
+        trendFactor: latestIndicator?.trend_factor != null ? parseFloat(latestIndicator.trend_factor) : null,
+        confidenceLevel: latestIndicator?.confidence_level as 'critical' | 'warning' | 'normal' | null ?? null,
       },
       params: {
         preset,
