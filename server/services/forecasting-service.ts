@@ -135,9 +135,9 @@ export class ForecastingService {
       SELECT
         (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
         COALESCE(SUM(daily_sales_revenue), 0) AS daily_revenue,
-        COALESCE(SUM(yoy_revenue_sold), 0) AS yoy_revenue,
+        COALESCE(SUM(yoy_daily_sales_revenue), 0) AS yoy_revenue,
         COALESCE(SUM(daily_sales_quantity), 0) AS daily_quantity,
-        COALESCE(SUM(yoy_units_sold), 0) AS yoy_quantity
+        COALESCE(SUM(yoy_daily_sales_quantity), 0) AS yoy_quantity
       FROM sales_metrics_lookup
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
@@ -183,8 +183,8 @@ export class ForecastingService {
       SELECT
         COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
         COALESCE(SUM(daily_sales_quantity), 0) AS total_units,
-        COALESCE(SUM(yoy_revenue_sold), 0) AS yoy_total_revenue,
-        COALESCE(SUM(yoy_units_sold), 0) AS yoy_total_units
+        COALESCE(SUM(yoy_daily_sales_revenue), 0) AS yoy_total_revenue,
+        COALESCE(SUM(yoy_daily_sales_quantity), 0) AS yoy_total_units
       FROM sales_metrics_lookup
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
