@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
+import { useSearch, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -280,10 +281,37 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
   );
 }
 
+function parseUrlParams(search: string) {
+  const params = new URLSearchParams(search);
+  const range = params.get("range");
+  const channels = params.get("channels");
+  return {
+    range: range && Object.values(TimeRangePreset).includes(range as TimeRangePreset)
+      ? (range as TimeRangePreset)
+      : null,
+    channels: channels !== null ? channels.split(",").filter(Boolean) : null,
+  };
+}
+
+function buildSearchString(range: TimeRangePreset, channels: string[] | null): string {
+  const params = new URLSearchParams();
+  params.set("range", range);
+  if (channels !== null) {
+    params.set("channels", channels.join(","));
+  }
+  return params.toString();
+}
+
 export default function Forecasting() {
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
+
+  const urlParams = useMemo(() => parseUrlParams(searchString), [searchString]);
+  const hasUrlParams = urlParams.range !== null || urlParams.channels !== null;
+
   const {
-    value: preset,
-    setValue: setPreset,
+    value: savedPreset,
+    setValue: setSavedPreset,
     isInitialized: presetReady,
   } = useUserPreference<TimeRangePreset>(
     "forecasting",
@@ -303,20 +331,38 @@ export default function Forecasting() {
     { debounceMs: 300 },
   );
 
+  const preset = urlParams.range ?? savedPreset;
+  const selectedChannels = hasUrlParams ? (urlParams.channels ?? null) : savedChannels;
+
+  const updateUrl = useCallback((range: TimeRangePreset, channels: string[] | null) => {
+    const qs = buildSearchString(range, channels);
+    setLocation(`/forecasting?${qs}`, { replace: true });
+  }, [setLocation]);
+
+  const setPreset = useCallback((newPreset: TimeRangePreset) => {
+    setSavedPreset(newPreset);
+    updateUrl(newPreset, selectedChannels);
+  }, [setSavedPreset, updateUrl, selectedChannels]);
+
+  const setChannels = useCallback((channels: string[]) => {
+    setSavedChannels(channels);
+    updateUrl(preset, channels);
+  }, [setSavedChannels, updateUrl, preset]);
+
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
 
   const allChannels = channelsData?.channels ?? [];
 
-  const activeChannels = savedChannels ?? allChannels;
+  const activeChannels = selectedChannels ?? allChannels;
 
-  const hookChannels = savedChannels === null ? null : savedChannels;
+  const hookChannels = selectedChannels === null ? null : selectedChannels;
 
   const { data: salesResponse, isLoading: salesLoading } = useSalesData(
     preset,
     hookChannels,
   );
 
-  const displayChannels = savedChannels === null
+  const displayChannels = selectedChannels === null
     ? (salesResponse?.data
         ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
         : allChannels)
@@ -328,7 +374,7 @@ export default function Forecasting() {
   }, [salesResponse?.data, displayChannels]);
 
   const handleChannelChange = (channels: string[]) => {
-    setSavedChannels(channels);
+    setChannels(channels);
   };
 
   return (
