@@ -1289,13 +1289,25 @@ export default function Forecasting() {
               <div className="flex items-center gap-2 h-7 sm:h-8">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
-            ) : summaryResponse?.data.confidenceLevel != null ? (
-              <div className={`text-lg sm:text-2xl font-semibold uppercase ${
-                summaryResponse.data.confidenceLevel.toLowerCase() === 'normal' ? 'text-green-600 dark:text-green-400' :
-                summaryResponse.data.confidenceLevel.toLowerCase() === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
-                'text-red-600 dark:text-red-400'
-              }`}>
-                {summaryResponse.data.confidenceLevel}
+            ) : summaryResponse?.data.confidenceByChannel && summaryResponse.data.confidenceByChannel.length > 0 ? (
+              <div className="space-y-1">
+                {summaryResponse.data.confidenceByChannel.map((item, idx) => {
+                  const colorClass = item.confidenceLevel === 'normal'
+                    ? 'text-green-600 dark:text-green-400'
+                    : item.confidenceLevel === 'warning'
+                    ? 'text-yellow-600 dark:text-yellow-400'
+                    : 'text-red-600 dark:text-red-400';
+                  return (
+                    <div key={item.channel} className="flex items-center justify-between gap-2">
+                      <span className="text-xs truncate" style={{ color: getChannelColor(item.channel, idx) }}>
+                        {item.channel}
+                      </span>
+                      <span className={`text-xs font-semibold uppercase whitespace-nowrap ${colorClass}`}>
+                        {item.confidenceLevel}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-lg sm:text-2xl font-semibold text-muted-foreground">—</div>

@@ -102,6 +102,11 @@ export interface ChannelTrendFactor {
   trendFactor: number;
 }
 
+export interface ChannelConfidence {
+  channel: string;
+  confidenceLevel: 'critical' | 'warning' | 'normal';
+}
+
 export interface SummaryMetrics {
   totalRevenue: number;
   totalUnits: number;
@@ -112,7 +117,7 @@ export interface SummaryMetrics {
   yoyUnitsChangePct: number | null;
   yoyGrowthByChannel: ChannelGrowthFactor[];
   trendByChannel: ChannelTrendFactor[];
-  confidenceLevel: 'critical' | 'warning' | 'normal' | null;
+  confidenceByChannel: ChannelConfidence[];
 }
 
 export interface SummaryMetricsResponse {

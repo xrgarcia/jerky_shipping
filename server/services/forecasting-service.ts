@@ -242,25 +242,6 @@ export class ForecastingService {
       ordersAvailable = false;
     }
 
-    const latestIndicatorRows: Array<{
-      confidence_level: string | null;
-    }> = await reportingSql`
-      SELECT confidence_level
-      FROM sales_metrics_lookup
-      WHERE order_date >= ${startDate}
-        AND order_date <= ${endDate}
-        ${channelFilter}
-        ${skuFilter}
-        ${assembledFilter}
-        ${categoryFilter}
-        ${eventTypeFilter}
-        ${peakSeasonFilter}
-      ORDER BY order_date DESC
-      LIMIT 1
-    `;
-
-    const latestIndicator = latestIndicatorRows[0] ?? null;
-
     const channelGrowthRows: Array<{
       sales_channel: string;
       yoy_growth_factor: string | null;
@@ -301,6 +282,26 @@ export class ForecastingService {
       ORDER BY sales_channel, order_date DESC
     `;
 
+    const channelConfidenceRows: Array<{
+      sales_channel: string;
+      confidence_level: string | null;
+    }> = await reportingSql`
+      SELECT DISTINCT ON (sales_channel)
+        sales_channel,
+        confidence_level
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${skuFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+        AND confidence_level IS NOT NULL
+      ORDER BY sales_channel, order_date DESC
+    `;
+
     const row = rows[0];
     const totalRevenue = parseFloat(row.total_revenue) || 0;
     const totalUnits = parseFloat(row.total_units) || 0;
@@ -335,7 +336,12 @@ export class ForecastingService {
             channel: r.sales_channel,
             trendFactor: parseFloat(r.trend_factor!),
           })),
-        confidenceLevel: latestIndicator?.confidence_level as 'critical' | 'warning' | 'normal' | null ?? null,
+        confidenceByChannel: channelConfidenceRows
+          .filter((r) => r.confidence_level != null)
+          .map((r) => ({
+            channel: r.sales_channel,
+            confidenceLevel: r.confidence_level!.toLowerCase() as 'critical' | 'warning' | 'normal',
+          })),
       },
       params: {
         preset,
