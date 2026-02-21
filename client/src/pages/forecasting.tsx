@@ -1093,6 +1093,14 @@ export default function Forecasting() {
             />
           )}
 
+          {!channelsLoading && allChannels.length > 0 && (
+            <ChannelFilter
+              channels={allChannels}
+              selected={activeChannels}
+              onChange={handleChannelChange}
+            />
+          )}
+
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Category</span>
             <Select
@@ -1124,6 +1132,26 @@ export default function Forecasting() {
           )}
 
           <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Event Type</span>
+            <Select
+              value={activeFilters.eventType ?? '__all__'}
+              onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
+            >
+              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
+                {filterEventTypes.map((et) => (
+                  <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
+                    {et}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Peak Season</span>
             <Select
               value={activeFilters.isPeakSeason ?? 'either'}
@@ -1140,14 +1168,6 @@ export default function Forecasting() {
             </Select>
           </div>
 
-          {!channelsLoading && allChannels.length > 0 && (
-            <ChannelFilter
-              channels={allChannels}
-              selected={activeChannels}
-              onChange={handleChannelChange}
-            />
-          )}
-
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Assembled</span>
             <Select
@@ -1161,26 +1181,6 @@ export default function Forecasting() {
                 <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
                 <SelectItem value="true" data-testid="option-assembled-true">True</SelectItem>
                 <SelectItem value="false" data-testid="option-assembled-false">False</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Event Type</span>
-            <Select
-              value={activeFilters.eventType ?? '__all__'}
-              onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
-                {filterEventTypes.map((et) => (
-                  <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
-                    {et}
-                  </SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>
