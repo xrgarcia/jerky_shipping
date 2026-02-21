@@ -131,15 +131,15 @@ function MetricCard({
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
         {isLoading ? (
-          <div className="flex items-center gap-2 h-8">
+          <div className="flex items-center gap-2 h-7 sm:h-8">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : value != null ? (
-          <div className={`text-2xl font-semibold ${isPositive ? 'text-green-600 dark:text-green-400' : ''} ${isNegative ? 'text-red-600 dark:text-red-400' : ''}`}>
+          <div className={`text-lg sm:text-2xl font-semibold truncate ${isPositive ? 'text-green-600 dark:text-green-400' : ''} ${isNegative ? 'text-red-600 dark:text-red-400' : ''}`}>
             {formatter(value)}
           </div>
         ) : (
-          <div className="text-2xl font-semibold text-muted-foreground">—</div>
+          <div className="text-lg sm:text-2xl font-semibold text-muted-foreground">—</div>
         )}
       </CardContent>
     </Card>
@@ -272,7 +272,7 @@ interface SalesChartProps {
 function SalesChart({ data, channels, isLoading }: SalesChartProps) {
   if (isLoading) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
+      <div className="flex h-[250px] sm:h-[350px] lg:h-[400px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -280,14 +280,15 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+      <div className="flex h-[250px] sm:h-[350px] lg:h-[400px] items-center justify-center text-muted-foreground">
         No sales data available for the selected filters.
       </div>
     );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={400}>
+    <div className="h-[250px] sm:h-[350px] lg:h-[400px]">
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
         <XAxis
@@ -324,6 +325,7 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
         ))}
       </LineChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -515,7 +517,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
 
   if (isLoading) {
     return (
-      <div className="flex h-[350px] items-center justify-center">
+      <div className="flex h-[200px] sm:h-[280px] lg:h-[350px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -523,7 +525,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+      <div className="flex h-[200px] sm:h-[280px] lg:h-[350px] items-center justify-center text-muted-foreground">
         No data available for the selected filters.
       </div>
     );
@@ -575,8 +577,8 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
   };
 
   return (
-    <div className="relative" ref={containerRef}>
-      <ResponsiveContainer width="100%" height={350}>
+    <div className="relative h-[200px] sm:h-[280px] lg:h-[350px]" ref={containerRef}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -934,11 +936,11 @@ export default function Forecasting() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 overflow-auto">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <TrendingUp className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">
+          <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
             Forecasting
           </h1>
         </div>
@@ -966,7 +968,7 @@ export default function Forecasting() {
               value={activeFilters.isAssembledProduct ?? 'either'}
               onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
             >
-              <SelectTrigger className="w-[150px]" data-testid="select-assembled">
+              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-assembled">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -983,7 +985,7 @@ export default function Forecasting() {
               value={activeFilters.category ?? '__all__'}
               onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
             >
-              <SelectTrigger className="w-[180px]" data-testid="select-category">
+              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1003,7 +1005,7 @@ export default function Forecasting() {
               value={activeFilters.eventType ?? '__all__'}
               onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
             >
-              <SelectTrigger className="w-[180px]" data-testid="select-event-type">
+              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1023,7 +1025,7 @@ export default function Forecasting() {
               value={activeFilters.isPeakSeason ?? 'either'}
               onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
             >
-              <SelectTrigger className="w-[150px]" data-testid="select-peak-season">
+              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1036,7 +1038,7 @@ export default function Forecasting() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
         <MetricCard
           title="Total Revenue"
           value={summaryResponse?.data.totalRevenue}
@@ -1097,11 +1099,11 @@ export default function Forecasting() {
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
             </div>
             {summaryLoading ? (
-              <div className="flex items-center gap-2 h-8">
+              <div className="flex items-center gap-2 h-7 sm:h-8">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : summaryResponse?.data.confidenceLevel != null ? (
-              <div className={`text-2xl font-semibold capitalize ${
+              <div className={`text-lg sm:text-2xl font-semibold capitalize ${
                 summaryResponse.data.confidenceLevel === 'normal' ? 'text-green-600 dark:text-green-400' :
                 summaryResponse.data.confidenceLevel === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
                 'text-red-600 dark:text-red-400'
@@ -1109,7 +1111,7 @@ export default function Forecasting() {
                 {summaryResponse.data.confidenceLevel}
               </div>
             ) : (
-              <div className="text-2xl font-semibold text-muted-foreground">—</div>
+              <div className="text-lg sm:text-2xl font-semibold text-muted-foreground">—</div>
             )}
           </CardContent>
         </Card>
