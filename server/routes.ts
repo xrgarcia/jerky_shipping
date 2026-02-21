@@ -15903,6 +15903,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/forecasting/revenue-timeseries", async (req: Request, res: Response) => {
+    try {
+      const { TimeRangePreset } = await import('@shared/forecasting-types');
+      const { forecastingService } = await import('./services/forecasting-service');
+
+      const booleanFilterSchema = z.enum(['true', 'false', 'either']).optional();
+
+      const querySchema = z.object({
+        preset: z.nativeEnum(TimeRangePreset),
+        channels: z.string().optional(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        isAssembledProduct: booleanFilterSchema,
+        category: z.string().optional(),
+        eventType: z.string().optional(),
+        isPeakSeason: booleanFilterSchema,
+      });
+
+      const parsed = querySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid query parameters", details: parsed.error.flatten() });
+        return;
+      }
+
+      const { preset, channels: channelsParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
+
+      const result = await forecastingService.getRevenueTimeSeries({
+        preset,
+        channels,
+        startDate,
+        endDate,
+        isAssembledProduct,
+        category,
+        eventType,
+        isPeakSeason,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching revenue timeseries:", error);
+      res.status(500).json({ error: "Failed to fetch revenue timeseries: " + error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;

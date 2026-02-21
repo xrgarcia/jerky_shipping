@@ -5,6 +5,8 @@ import type {
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
   ForecastingFilterOptionsResponse,
+  RevenueTimeSeriesPoint,
+  RevenueTimeSeriesResponse,
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -13,6 +15,25 @@ import { subDays } from 'date-fns';
 const CST_TIMEZONE = 'America/Chicago';
 
 export class ForecastingService {
+  private buildFilters(params: ForecastingSalesParams) {
+    const assembledFilter = params.isAssembledProduct && params.isAssembledProduct !== 'either'
+      ? reportingSql`AND is_assembled_product = ${params.isAssembledProduct === 'true'}`
+      : reportingSql``;
+    const categoryFilter = params.category
+      ? reportingSql`AND category = ${params.category}`
+      : reportingSql``;
+    const eventTypeFilter = params.eventType
+      ? reportingSql`AND event_type = ${params.eventType}`
+      : reportingSql``;
+    const peakSeasonFilter = params.isPeakSeason && params.isPeakSeason !== 'either'
+      ? reportingSql`AND is_peak_season = ${params.isPeakSeason === 'true'}`
+      : reportingSql``;
+    const channelFilter = params.channels && params.channels.length > 0
+      ? reportingSql`AND sales_channel IN ${reportingSql(params.channels)}`
+      : reportingSql``;
+    return { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter };
+  }
+
   private computeDateRange(params: ForecastingSalesParams): { startDate: Date; endDate: Date } {
     if (params.preset === TimeRangePreset.CUSTOM && params.startDate && params.endDate) {
       return {
@@ -53,26 +74,7 @@ export class ForecastingService {
   async getSalesData(params: ForecastingSalesParams): Promise<ForecastingSalesResponse> {
     const { preset, channels } = params;
     const { startDate, endDate } = this.computeDateRange(params);
-
-    const assembledFilter = params.isAssembledProduct && params.isAssembledProduct !== 'either'
-      ? reportingSql`AND is_assembled_product = ${params.isAssembledProduct === 'true'}`
-      : reportingSql``;
-
-    const categoryFilter = params.category
-      ? reportingSql`AND category = ${params.category}`
-      : reportingSql``;
-
-    const eventTypeFilter = params.eventType
-      ? reportingSql`AND event_type = ${params.eventType}`
-      : reportingSql``;
-
-    const peakSeasonFilter = params.isPeakSeason && params.isPeakSeason !== 'either'
-      ? reportingSql`AND is_peak_season = ${params.isPeakSeason === 'true'}`
-      : reportingSql``;
-
-    const channelFilter = channels && channels.length > 0
-      ? reportingSql`AND sales_channel IN ${reportingSql(channels)}`
-      : reportingSql``;
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
 
     const rows: Array<{
       order_day: string;
@@ -113,6 +115,49 @@ export class ForecastingService {
         startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
         endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
         channels: channels ?? [],
+      },
+    };
+  }
+  async getRevenueTimeSeries(params: ForecastingSalesParams): Promise<RevenueTimeSeriesResponse> {
+    const { preset } = params;
+    const { startDate, endDate } = this.computeDateRange(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
+
+    const rows: Array<{
+      order_day: string;
+      daily_revenue: string;
+      yoy_revenue: string;
+    }> = await reportingSql`
+      SELECT
+        (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+        COALESCE(SUM(daily_sales_revenue), 0) AS daily_revenue,
+        COALESCE(SUM(yoy_revenue_sold), 0) AS yoy_revenue
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+      GROUP BY 1
+      ORDER BY 1
+    `;
+
+    const data: RevenueTimeSeriesPoint[] = rows.map((row) => ({
+      date: typeof row.order_day === 'string'
+        ? row.order_day
+        : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
+      dailyRevenue: parseFloat(row.daily_revenue) || 0,
+      yoyRevenue: parseFloat(row.yoy_revenue) || 0,
+    }));
+
+    return {
+      data,
+      params: {
+        preset,
+        startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+        endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
       },
     };
   }

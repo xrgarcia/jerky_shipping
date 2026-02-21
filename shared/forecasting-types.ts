@@ -59,3 +59,18 @@ export interface ForecastingFilterOptionsResponse {
   categories: string[];
   eventTypes: string[];
 }
+
+export interface RevenueTimeSeriesPoint {
+  date: string;
+  dailyRevenue: number;
+  yoyRevenue: number;
+}
+
+export interface RevenueTimeSeriesResponse {
+  data: RevenueTimeSeriesPoint[];
+  params: {
+    preset: TimeRangePreset;
+    startDate: string;
+    endDate: string;
+  };
+}

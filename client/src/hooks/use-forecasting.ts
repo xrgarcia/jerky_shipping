@@ -3,6 +3,7 @@ import type {
   ForecastingSalesResponse,
   ForecastingChannelsResponse,
   ForecastingFilterOptionsResponse,
+  RevenueTimeSeriesResponse,
   BooleanFilter,
 } from "@shared/forecasting-types";
 import { TimeRangePreset } from "@shared/forecasting-types";
@@ -26,13 +27,13 @@ export interface SalesDataFilters {
   isPeakSeason?: BooleanFilter;
 }
 
-export function useSalesData(
+function buildFilterParams(
   preset: TimeRangePreset,
   selectedChannels: string[] | null,
   customStartDate?: string,
   customEndDate?: string,
   filters?: SalesDataFilters,
-) {
+): string {
   const params = new URLSearchParams();
   params.set("preset", preset);
 
@@ -61,10 +62,37 @@ export function useSalesData(
     params.set("isPeakSeason", filters.isPeakSeason);
   }
 
-  const queryString = `?${params.toString()}`;
+  return `?${params.toString()}`;
+}
+
+export function useSalesData(
+  preset: TimeRangePreset,
+  selectedChannels: string[] | null,
+  customStartDate?: string,
+  customEndDate?: string,
+  filters?: SalesDataFilters,
+) {
+  const queryString = buildFilterParams(preset, selectedChannels, customStartDate, customEndDate, filters);
 
   return useQuery<ForecastingSalesResponse>({
     queryKey: ["/api/forecasting/sales", queryString],
+    enabled:
+      (selectedChannels === null || selectedChannels.length > 0) &&
+      (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),
+  });
+}
+
+export function useRevenueTimeSeries(
+  preset: TimeRangePreset,
+  selectedChannels: string[] | null,
+  customStartDate?: string,
+  customEndDate?: string,
+  filters?: SalesDataFilters,
+) {
+  const queryString = buildFilterParams(preset, selectedChannels, customStartDate, customEndDate, filters);
+
+  return useQuery<RevenueTimeSeriesResponse>({
+    queryKey: ["/api/forecasting/revenue-timeseries", queryString],
     enabled:
       (selectedChannels === null || selectedChannels.length > 0) &&
       (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),

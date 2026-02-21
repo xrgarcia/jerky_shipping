@@ -30,8 +30,8 @@ import {
   TimeRangePreset,
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
-import type { SalesDataPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions } from "@/hooks/use-forecasting";
+import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
+import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries } from "@/hooks/use-forecasting";
 import type { SalesDataFilters } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
 import { useUserPreference } from "@/hooks/use-user-preference";
@@ -279,6 +279,72 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
             connectNulls
           />
         ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+interface SingleLineChartProps {
+  data: RevenueTimeSeriesPoint[];
+  dataKey: keyof RevenueTimeSeriesPoint;
+  color: string;
+  isLoading: boolean;
+}
+
+function SingleLineChart({ data, dataKey, color, isLoading }: SingleLineChartProps) {
+  if (isLoading) {
+    return (
+      <div className="flex h-[350px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+        No data available for the selected filters.
+      </div>
+    );
+  }
+
+  const chartData = data.map((d) => ({
+    ...d,
+    dateLabel: format(parseISO(d.date), "MMM d"),
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={350}>
+      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+        <XAxis
+          dataKey="dateLabel"
+          tick={{ fontSize: 12 }}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          tickFormatter={(v: number) => formatCurrency(v)}
+          tick={{ fontSize: 12 }}
+          width={80}
+        />
+        <Tooltip
+          formatter={(value: number) => [formatCurrency(value)]}
+          labelFormatter={(label: string) => label}
+          contentStyle={{
+            borderRadius: "var(--radius)",
+            border: "1px solid hsl(var(--border))",
+            backgroundColor: "hsl(var(--card))",
+            color: "hsl(var(--card-foreground))",
+          }}
+        />
+        <Line
+          type="monotone"
+          dataKey={dataKey}
+          stroke={color}
+          strokeWidth={2}
+          dot={false}
+          connectNulls
+        />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -545,6 +611,14 @@ export default function Forecasting() {
     activeFilters,
   );
 
+  const { data: timeSeriesResponse, isLoading: timeSeriesLoading } = useRevenueTimeSeries(
+    preset,
+    hookChannels,
+    preset === TimeRangePreset.CUSTOM ? customStartDate : undefined,
+    preset === TimeRangePreset.CUSTOM ? customEndDate : undefined,
+    activeFilters,
+  );
+
   const displayChannels = selectedChannels === null
     ? (salesResponse?.data
         ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
@@ -682,6 +756,50 @@ export default function Forecasting() {
           />
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-base font-medium" data-testid="text-daily-revenue-title">
+              Total Daily Sales Revenue
+            </CardTitle>
+            {timeSeriesResponse?.params && (
+              <span className="text-sm text-muted-foreground" data-testid="text-daily-revenue-range">
+                {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent>
+            <SingleLineChart
+              data={timeSeriesResponse?.data ?? []}
+              dataKey="dailyRevenue"
+              color="hsl(var(--primary))"
+              isLoading={timeSeriesLoading}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-base font-medium" data-testid="text-yoy-revenue-title">
+              Year-over-Year Revenue
+            </CardTitle>
+            {timeSeriesResponse?.params && (
+              <span className="text-sm text-muted-foreground" data-testid="text-yoy-revenue-range">
+                {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+              </span>
+            )}
+          </CardHeader>
+          <CardContent>
+            <SingleLineChart
+              data={timeSeriesResponse?.data ?? []}
+              dataKey="yoyRevenue"
+              color="#FF9900"
+              isLoading={timeSeriesLoading}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
