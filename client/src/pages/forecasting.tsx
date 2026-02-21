@@ -298,7 +298,7 @@ export default function Forecasting() {
 
   const displayChannels = selectedChannels === null
     ? (salesResponse?.data
-        ? [...new Set(salesResponse.data.map((d) => d.salesChannel))].sort()
+        ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
         : allChannels)
     : activeChannels;
 

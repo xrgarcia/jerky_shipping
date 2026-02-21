@@ -28,7 +28,7 @@ export class ForecastingService {
       ORDER BY sales_channel
     `;
     return {
-      channels: rows.map((r: { sales_channel: string }) => r.sales_channel),
+      channels: rows.map((r: any) => r.sales_channel as string),
     };
   }
 
