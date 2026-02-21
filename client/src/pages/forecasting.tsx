@@ -388,6 +388,57 @@ function ChannelFilter({ channels, selected, onChange }: ChannelFilterProps) {
   );
 }
 
+function NotesTooltipContent({
+  active,
+  payload,
+  notesByDate,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string; payload?: Record<string, any> }>;
+  notesByDate: Record<string, ChartNote[]>;
+  valueFormatter: (v: number) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const dataPayload = payload[0]?.payload;
+  const dateLabel = dataPayload?.fullDate ?? dataPayload?.dateLabel ?? "";
+  const isoDate = dataPayload?.isoDate ?? dataPayload?.date ?? "";
+  const dateNotes = isoDate ? notesByDate[isoDate] ?? [] : [];
+
+  return (
+    <div
+      className="rounded-md border p-2.5 text-sm shadow-md"
+      style={{
+        backgroundColor: "hsl(var(--card))",
+        color: "hsl(var(--card-foreground))",
+        borderColor: "hsl(var(--border))",
+        maxWidth: 280,
+      }}
+    >
+      <p className="font-medium mb-1">{dateLabel}</p>
+      {payload.map((entry, idx) => (
+        <div key={idx} className="flex items-center justify-between gap-3">
+          <span style={{ color: entry.color }}>{entry.name}</span>
+          <span className="font-medium">{valueFormatter(entry.value)}</span>
+        </div>
+      ))}
+      {dateNotes.length > 0 && (
+        <div className="mt-2 pt-2 border-t space-y-1" style={{ borderColor: "hsl(var(--border))" }}>
+          {dateNotes.map((note) => (
+            <div key={note.id} className="flex items-start gap-1.5">
+              <MessageSquarePlus className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-xs leading-snug whitespace-pre-wrap">{note.content}</p>
+                <span className="text-[10px] text-muted-foreground">{note.authorEmail.split("@")[0]}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface SalesChartProps {
   data: ChartDataRow[];
   channels: string[];
@@ -500,16 +551,7 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
           width={80}
         />
         <Tooltip
-          formatter={(value: number, name: string) => [formatCurrency(value), name]}
-          labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
-            payload?.[0]?.payload?.fullDate ?? _label
-          }
-          contentStyle={{
-            borderRadius: "var(--radius)",
-            border: "1px solid hsl(var(--border))",
-            backgroundColor: "hsl(var(--card))",
-            color: "hsl(var(--card-foreground))",
-          }}
+          content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={formatCurrency} />}
         />
         <Legend />
         {channels.map((channel, idx) => (
@@ -808,16 +850,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
             width={80}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [valueFormatter(value), name]}
-            labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
-              payload?.[0]?.payload?.fullDate ?? _label
-            }
-            contentStyle={{
-              borderRadius: "var(--radius)",
-              border: "1px solid hsl(var(--border))",
-              backgroundColor: "hsl(var(--card))",
-              color: "hsl(var(--card-foreground))",
-            }}
+            content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={valueFormatter} />}
           />
           <Legend />
           <Line
