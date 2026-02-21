@@ -5941,16 +5941,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { rateCheckShippingMethods } = await import("@shared/schema");
       const { id } = req.params;
-      const { allowRateCheck } = req.body;
+      const { allowRateCheck, minAllowedWeight, maxAllowedWeight } = req.body;
       const user = req.user as { email: string } | undefined;
+      
+      const updateData: Record<string, any> = {
+        updatedAt: new Date(),
+        updatedBy: user?.email || 'unknown',
+      };
+      if (allowRateCheck !== undefined) updateData.allowRateCheck = allowRateCheck;
+      if (minAllowedWeight !== undefined) updateData.minAllowedWeight = minAllowedWeight === null ? null : String(minAllowedWeight);
+      if (maxAllowedWeight !== undefined) updateData.maxAllowedWeight = maxAllowedWeight === null ? null : String(maxAllowedWeight);
       
       const result = await db
         .update(rateCheckShippingMethods)
-        .set({
-          allowRateCheck: allowRateCheck ?? undefined,
-          updatedAt: new Date(),
-          updatedBy: user?.email || 'unknown',
-        })
+        .set(updateData)
         .where(eq(rateCheckShippingMethods.id, parseInt(id)))
         .returning();
       

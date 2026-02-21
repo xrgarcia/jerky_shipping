@@ -79,6 +79,32 @@ export class CustomerShippingMethodConfigService {
   }
 
   /**
+   * Get weight limits for all rate check shipping methods that have them configured.
+   * Returns a map of method name → { minOz, maxOz }.
+   * Methods without weight limits are not included in the map (meaning no filtering).
+   */
+  async getRateCheckMethodWeightLimits(): Promise<Map<string, WeightLimits>> {
+    const methods = await db
+      .select({
+        name: rateCheckShippingMethods.name,
+        minAllowedWeight: rateCheckShippingMethods.minAllowedWeight,
+        maxAllowedWeight: rateCheckShippingMethods.maxAllowedWeight,
+      })
+      .from(rateCheckShippingMethods)
+      .where(eq(rateCheckShippingMethods.allowRateCheck, true));
+
+    const limitsMap = new Map<string, WeightLimits>();
+    for (const m of methods) {
+      const minOz = m.minAllowedWeight ? parseFloat(m.minAllowedWeight) : null;
+      const maxOz = m.maxAllowedWeight ? parseFloat(m.maxAllowedWeight) : null;
+      if (minOz !== null || maxOz !== null) {
+        limitsMap.set(m.name, { minOz, maxOz });
+      }
+    }
+    return limitsMap;
+  }
+
+  /**
    * Check if the rate checker is allowed to change this customer shipping method.
    * Unknown methods default to allowed.
    */

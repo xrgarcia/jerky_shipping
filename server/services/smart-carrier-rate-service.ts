@@ -196,6 +196,23 @@ export class SmartCarrierRateService {
         }
       }
       
+      // Filter out candidate methods whose weight limits don't match the package weight
+      const weightLimits = await customerShippingMethodConfig.getRateCheckMethodWeightLimits();
+      if (weightLimits.size > 0 && eligibility.weightOz) {
+        const packageWeightOz = eligibility.weightOz;
+        const beforeCount = eligibleRates.length;
+        eligibleRates = eligibleRates.filter(r => {
+          const limits = weightLimits.get(r.service_code);
+          if (!limits) return true;
+          if (limits.minOz !== null && packageWeightOz < limits.minOz) return false;
+          if (limits.maxOz !== null && packageWeightOz > limits.maxOz) return false;
+          return true;
+        });
+        if (eligibleRates.length < beforeCount) {
+          console.log(`[SmartCarrierRate] Filtered out ${beforeCount - eligibleRates.length} candidate method(s) outside weight range (${packageWeightOz.toFixed(2)}oz) for ${shipmentId}`);
+        }
+      }
+      
       // If we have a customer delivery expectation, filter by it
       if (customerDeliveryDays) {
         eligibleRates = eligibleRates.filter(r => r.delivery_days! <= customerDeliveryDays!);

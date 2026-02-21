@@ -1870,6 +1870,8 @@ export const rateCheckShippingMethods = pgTable("rate_check_shipping_methods", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   allowRateCheck: boolean("allow_rate_check").notNull().default(true),
+  minAllowedWeight: numeric("min_allowed_weight", { precision: 10, scale: 2 }),
+  maxAllowedWeight: numeric("max_allowed_weight", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by"),
