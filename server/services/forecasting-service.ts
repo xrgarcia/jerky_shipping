@@ -37,7 +37,7 @@ export class ForecastingService {
     const { startDate, endDate } = this.computeDateRange(preset);
 
     let rows: Array<{
-      order_date: string;
+      order_day: string;
       sales_channel: string;
       total_revenue: string;
       total_quantity: string;
@@ -46,7 +46,7 @@ export class ForecastingService {
     if (channels && channels.length > 0) {
       rows = await reportingSql`
         SELECT
-          DATE(order_date AT TIME ZONE ${CST_TIMEZONE}) AS order_date,
+          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
           sales_channel,
           COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
           COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
@@ -54,28 +54,28 @@ export class ForecastingService {
         WHERE order_date >= ${startDate}
           AND order_date <= ${endDate}
           AND sales_channel IN ${reportingSql(channels)}
-        GROUP BY DATE(order_date AT TIME ZONE ${CST_TIMEZONE}), sales_channel
-        ORDER BY order_date, sales_channel
+        GROUP BY 1, 2
+        ORDER BY 1, 2
       `;
     } else {
       rows = await reportingSql`
         SELECT
-          DATE(order_date AT TIME ZONE ${CST_TIMEZONE}) AS order_date,
+          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
           sales_channel,
           COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
           COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
         FROM sales_metrics_lookup
         WHERE order_date >= ${startDate}
           AND order_date <= ${endDate}
-        GROUP BY DATE(order_date AT TIME ZONE ${CST_TIMEZONE}), sales_channel
-        ORDER BY order_date, sales_channel
+        GROUP BY 1, 2
+        ORDER BY 1, 2
       `;
     }
 
     const data: SalesDataPoint[] = rows.map((row) => ({
-      orderDate: typeof row.order_date === 'string'
-        ? row.order_date
-        : formatInTimeZone(new Date(row.order_date), CST_TIMEZONE, 'yyyy-MM-dd'),
+      orderDate: typeof row.order_day === 'string'
+        ? row.order_day
+        : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
       salesChannel: row.sales_channel,
       totalRevenue: parseFloat(row.total_revenue) || 0,
       totalQuantity: parseFloat(row.total_quantity) || 0,
