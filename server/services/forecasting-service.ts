@@ -243,11 +243,10 @@ export class ForecastingService {
     }
 
     const latestIndicatorRows: Array<{
-      yoy_growth_factor: string | null;
       trend_factor: string | null;
       confidence_level: string | null;
     }> = await reportingSql`
-      SELECT yoy_growth_factor, trend_factor, confidence_level
+      SELECT trend_factor, confidence_level
       FROM sales_metrics_lookup
       WHERE order_date >= ${startDate}
         AND order_date <= ${endDate}
@@ -262,6 +261,26 @@ export class ForecastingService {
     `;
 
     const latestIndicator = latestIndicatorRows[0] ?? null;
+
+    const channelGrowthRows: Array<{
+      sales_channel: string;
+      yoy_growth_factor: string | null;
+    }> = await reportingSql`
+      SELECT DISTINCT ON (sales_channel)
+        sales_channel,
+        yoy_growth_factor
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${skuFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+        AND yoy_growth_factor IS NOT NULL
+      ORDER BY sales_channel, order_date DESC
+    `;
 
     const row = rows[0];
     const totalRevenue = parseFloat(row.total_revenue) || 0;
@@ -285,7 +304,12 @@ export class ForecastingService {
         yoyTotalUnits,
         yoyRevenueChangePct,
         yoyUnitsChangePct,
-        yoyGrowthFactor: latestIndicator?.yoy_growth_factor != null ? parseFloat(latestIndicator.yoy_growth_factor) : null,
+        yoyGrowthByChannel: channelGrowthRows
+          .filter((r) => r.yoy_growth_factor != null)
+          .map((r) => ({
+            channel: r.sales_channel,
+            yoyGrowthFactor: parseFloat(r.yoy_growth_factor!),
+          })),
         trendFactor: latestIndicator?.trend_factor != null ? parseFloat(latestIndicator.trend_factor) : null,
         confidenceLevel: latestIndicator?.confidence_level as 'critical' | 'warning' | 'normal' | null ?? null,
       },

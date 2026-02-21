@@ -92,6 +92,11 @@ export interface RevenueTimeSeriesResponse {
   };
 }
 
+export interface ChannelGrowthFactor {
+  channel: string;
+  yoyGrowthFactor: number;
+}
+
 export interface SummaryMetrics {
   totalRevenue: number;
   totalUnits: number;
@@ -100,7 +105,7 @@ export interface SummaryMetrics {
   yoyTotalUnits: number;
   yoyRevenueChangePct: number | null;
   yoyUnitsChangePct: number | null;
-  yoyGrowthFactor: number | null;
+  yoyGrowthByChannel: ChannelGrowthFactor[];
   trendFactor: number | null;
   confidenceLevel: 'critical' | 'warning' | 'normal' | null;
 }

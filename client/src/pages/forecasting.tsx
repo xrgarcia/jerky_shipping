@@ -1215,14 +1215,38 @@ export default function Forecasting() {
           changeValue={summaryResponse?.data.yoyUnitsChangePct}
           isLoading={summaryLoading}
         />
-        <MetricCard
-          title="YoY Growth (Period)"
-          value={summaryResponse?.data.yoyGrowthFactor != null ? (summaryResponse.data.yoyGrowthFactor - 1) * 100 : null}
-          formatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
-          icon={summaryResponse?.data.yoyGrowthFactor != null && summaryResponse.data.yoyGrowthFactor >= 1 ? TrendingUp : TrendingDown}
-          changeValue={summaryResponse?.data.yoyGrowthFactor != null ? (summaryResponse.data.yoyGrowthFactor - 1) * 100 : null}
-          isLoading={summaryLoading}
-        />
+        <Card data-testid="metric-card-yoy-growth">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-sm text-muted-foreground">YoY Growth (Period)</span>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {summaryLoading ? (
+              <div className="flex items-center gap-2 h-7 sm:h-8">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : summaryResponse?.data.yoyGrowthByChannel && summaryResponse.data.yoyGrowthByChannel.length > 0 ? (
+              <div className="space-y-1">
+                {summaryResponse.data.yoyGrowthByChannel.map((item, idx) => {
+                  const changePct = (item.yoyGrowthFactor - 1) * 100;
+                  const isPositive = changePct >= 0;
+                  return (
+                    <div key={item.channel} className="flex items-center justify-between gap-2">
+                      <span className="text-xs truncate" style={{ color: getChannelColor(item.channel, idx) }}>
+                        {item.channel}
+                      </span>
+                      <span className={`text-xs font-semibold whitespace-nowrap ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {isPositive ? '+' : ''}{changePct.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-lg sm:text-2xl font-semibold text-muted-foreground">—</div>
+            )}
+          </CardContent>
+        </Card>
         <MetricCard
           title="Trend (2wk/4wk)"
           value={summaryResponse?.data.trendFactor}
