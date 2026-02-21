@@ -142,6 +142,25 @@ export class SmartCarrierRateService {
     const shipmentId = shipment.shipmentId!;
     const customerMethod = shipment.serviceCode!;
     
+    // Gate: check if the customer's shipping method is configured for rate checking
+    const canRateCheck = await customerShippingMethodConfig.canRateCheckCustomerMethod(customerMethod);
+    if (!canRateCheck) {
+      return { success: false, error: `Customer method "${customerMethod}" has rate checking disabled` };
+    }
+    
+    // Gate: check if the package weight is within the customer method's allowed range
+    if (eligibility.weightOz != null) {
+      const weightAllowed = await customerShippingMethodConfig.isWeightAllowed(customerMethod, eligibility.weightOz);
+      if (!weightAllowed) {
+        const limits = await customerShippingMethodConfig.getCustomerMethodWeightLimits(customerMethod);
+        const rangeDesc = [
+          limits.minOz != null ? `min ${limits.minOz}oz` : null,
+          limits.maxOz != null ? `max ${limits.maxOz}oz` : null,
+        ].filter(Boolean).join(', ');
+        return { success: false, error: `Package weight ${eligibility.weightOz.toFixed(2)}oz outside customer method limits (${rangeDesc})` };
+      }
+    }
+    
     try {
       console.log(`[SmartCarrierRate] Using package for ${shipmentId}: ${eligibility.weightOz?.toFixed(2)}oz, ${eligibility.packagingName}`);
       
