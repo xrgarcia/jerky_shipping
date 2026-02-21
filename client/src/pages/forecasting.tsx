@@ -315,6 +315,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
 
   const chartData = data.map((d) => ({
     dateLabel: format(parseISO(d.date), "MMM d"),
+    fullDate: format(parseISO(d.date), "MMM d, yyyy"),
     [line1Label]: d[line1Key],
     [line2Label]: d[line2Key],
   }));
@@ -335,7 +336,9 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
         />
         <Tooltip
           formatter={(value: number, name: string) => [valueFormatter(value), name]}
-          labelFormatter={(label: string) => label}
+          labelFormatter={(_label: string, payload: Array<{ payload?: { fullDate?: string } }>) =>
+            payload?.[0]?.payload?.fullDate ?? _label
+          }
           contentStyle={{
             borderRadius: "var(--radius)",
             border: "1px solid hsl(var(--border))",
@@ -772,59 +775,67 @@ export default function Forecasting() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-base font-medium" data-testid="text-revenue-yoy-title">
-              Total Daily Sales Revenue (YoY)
-            </CardTitle>
-            {timeSeriesResponse?.params && (
-              <span className="text-sm text-muted-foreground" data-testid="text-revenue-yoy-range">
-                {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
-              </span>
-            )}
-          </CardHeader>
-          <CardContent>
-            <DualLineChart
-              data={timeSeriesResponse?.data ?? []}
-              line1Key="dailyRevenue"
-              line1Label="Daily Revenue"
-              line1Color="hsl(var(--primary))"
-              line2Key="yoyRevenue"
-              line2Label="YoY Revenue"
-              line2Color="#FF9900"
-              valueFormatter={formatCurrency}
-              isLoading={timeSeriesLoading}
-            />
-          </CardContent>
-        </Card>
+      {(() => {
+        const endYear = timeSeriesResponse?.params
+          ? parseISO(timeSeriesResponse.params.endDate).getFullYear()
+          : new Date().getFullYear();
+        const priorYear = endYear - 1;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-base font-medium" data-testid="text-revenue-yoy-title">
+                  Total Daily Sales Revenue (YoY)
+                </CardTitle>
+                {timeSeriesResponse?.params && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-revenue-yoy-range">
+                    {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent>
+                <DualLineChart
+                  data={timeSeriesResponse?.data ?? []}
+                  line1Key="dailyRevenue"
+                  line1Label={`Revenue ${endYear}`}
+                  line1Color="hsl(var(--primary))"
+                  line2Key="yoyRevenue"
+                  line2Label={`Revenue ${priorYear}`}
+                  line2Color="#FF9900"
+                  valueFormatter={formatCurrency}
+                  isLoading={timeSeriesLoading}
+                />
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-base font-medium" data-testid="text-units-yoy-title">
-              Total Units Sold (YoY)
-            </CardTitle>
-            {timeSeriesResponse?.params && (
-              <span className="text-sm text-muted-foreground" data-testid="text-units-yoy-range">
-                {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
-              </span>
-            )}
-          </CardHeader>
-          <CardContent>
-            <DualLineChart
-              data={timeSeriesResponse?.data ?? []}
-              line1Key="dailyQuantity"
-              line1Label="Daily Units"
-              line1Color="hsl(var(--primary))"
-              line2Key="yoyQuantity"
-              line2Label="YoY Units"
-              line2Color="#FF9900"
-              valueFormatter={(v) => v.toLocaleString()}
-              isLoading={timeSeriesLoading}
-            />
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-base font-medium" data-testid="text-units-yoy-title">
+                  Total Units Sold (YoY)
+                </CardTitle>
+                {timeSeriesResponse?.params && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-units-yoy-range">
+                    {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent>
+                <DualLineChart
+                  data={timeSeriesResponse?.data ?? []}
+                  line1Key="dailyQuantity"
+                  line1Label={`Units ${endYear}`}
+                  line1Color="hsl(var(--primary))"
+                  line2Key="yoyQuantity"
+                  line2Label={`Units ${priorYear}`}
+                  line2Color="#FF9900"
+                  valueFormatter={(v) => v.toLocaleString()}
+                  isLoading={timeSeriesLoading}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
     </div>
   );
 }
