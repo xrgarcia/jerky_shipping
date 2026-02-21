@@ -7,6 +7,8 @@ import type {
   ForecastingFilterOptionsResponse,
   RevenueTimeSeriesPoint,
   RevenueTimeSeriesResponse,
+  SummaryMetrics,
+  SummaryMetricsResponse,
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -160,6 +162,89 @@ export class ForecastingService {
 
     return {
       data,
+      params: {
+        preset,
+        startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+        endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+      },
+    };
+  }
+  async getSummaryMetrics(params: ForecastingSalesParams): Promise<SummaryMetricsResponse> {
+    const { preset } = params;
+    const { startDate, endDate } = this.computeDateRange(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter } = this.buildFilters(params);
+
+    const rows: Array<{
+      total_revenue: string;
+      total_units: string;
+      yoy_total_revenue: string;
+      yoy_total_units: string;
+    }> = await reportingSql`
+      SELECT
+        COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
+        COALESCE(SUM(daily_sales_quantity), 0) AS total_units,
+        COALESCE(SUM(yoy_revenue_sold), 0) AS yoy_total_revenue,
+        COALESCE(SUM(yoy_units_sold), 0) AS yoy_total_units
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+    `;
+
+    const hasExtraFilters = !!(
+      (params.isAssembledProduct && params.isAssembledProduct !== 'either') ||
+      params.category ||
+      params.eventType ||
+      (params.isPeakSeason && params.isPeakSeason !== 'either')
+    );
+
+    let totalOrders = 0;
+    let ordersAvailable = true;
+    if (!hasExtraFilters) {
+      try {
+        const orderRows: Array<{ total_orders: string }> = await reportingSql`
+          SELECT COUNT(DISTINCT order_number) AS total_orders
+          FROM orders
+          WHERE order_date >= ${startDate}
+            AND order_date <= ${endDate}
+            ${channelFilter}
+        `;
+        totalOrders = parseInt(orderRows[0]?.total_orders) || 0;
+      } catch (e) {
+        console.warn("[Forecasting] Could not fetch order count from orders table:", (e as Error).message);
+        ordersAvailable = false;
+      }
+    } else {
+      ordersAvailable = false;
+    }
+
+    const row = rows[0];
+    const totalRevenue = parseFloat(row.total_revenue) || 0;
+    const totalUnits = parseFloat(row.total_units) || 0;
+    const yoyTotalRevenue = parseFloat(row.yoy_total_revenue) || 0;
+    const yoyTotalUnits = parseFloat(row.yoy_total_units) || 0;
+
+    const yoyRevenueChangePct = yoyTotalRevenue > 0
+      ? ((totalRevenue - yoyTotalRevenue) / yoyTotalRevenue) * 100
+      : null;
+    const yoyUnitsChangePct = yoyTotalUnits > 0
+      ? ((totalUnits - yoyTotalUnits) / yoyTotalUnits) * 100
+      : null;
+
+    return {
+      data: {
+        totalRevenue,
+        totalUnits,
+        totalOrders: ordersAvailable ? totalOrders : null,
+        yoyTotalRevenue,
+        yoyTotalUnits,
+        yoyRevenueChangePct,
+        yoyUnitsChangePct,
+      },
       params: {
         preset,
         startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),

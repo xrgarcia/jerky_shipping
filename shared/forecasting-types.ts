@@ -76,3 +76,22 @@ export interface RevenueTimeSeriesResponse {
     endDate: string;
   };
 }
+
+export interface SummaryMetrics {
+  totalRevenue: number;
+  totalUnits: number;
+  totalOrders: number | null;
+  yoyTotalRevenue: number;
+  yoyTotalUnits: number;
+  yoyRevenueChangePct: number | null;
+  yoyUnitsChangePct: number | null;
+}
+
+export interface SummaryMetricsResponse {
+  data: SummaryMetrics;
+  params: {
+    preset: TimeRangePreset;
+    startDate: string;
+    endDate: string;
+  };
+}

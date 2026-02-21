@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { TrendingUp, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -31,7 +31,7 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions, useRevenueTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
 import type { SalesDataFilters } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
@@ -102,6 +102,48 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
+}
+
+function MetricCard({
+  title,
+  value,
+  formatter,
+  icon: Icon,
+  changeValue,
+  isLoading,
+}: {
+  title: string;
+  value: number | null | undefined;
+  formatter: (v: number) => string;
+  icon: React.ComponentType<{ className?: string }>;
+  changeValue?: number | null;
+  isLoading: boolean;
+}) {
+  const isChange = changeValue !== undefined;
+  const isPositive = isChange && changeValue != null && changeValue >= 0;
+  const isNegative = isChange && changeValue != null && changeValue < 0;
+
+  return (
+    <Card data-testid={`metric-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-sm text-muted-foreground">{title}</span>
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+        {isLoading ? (
+          <div className="flex items-center gap-2 h-8">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : value != null ? (
+          <div className={`text-2xl font-semibold ${isPositive ? 'text-green-600 dark:text-green-400' : ''} ${isNegative ? 'text-red-600 dark:text-red-400' : ''}`}>
+            {formatter(value)}
+          </div>
+        ) : (
+          <div className="text-2xl font-semibold text-muted-foreground">—</div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 interface TimeRangeSelectorProps {
@@ -868,6 +910,14 @@ export default function Forecasting() {
     activeFilters,
   );
 
+  const { data: summaryResponse, isLoading: summaryLoading } = useSummaryMetrics(
+    preset,
+    hookChannels,
+    preset === TimeRangePreset.CUSTOM ? customStartDate : undefined,
+    preset === TimeRangePreset.CUSTOM ? customEndDate : undefined,
+    activeFilters,
+  );
+
   const displayChannels = selectedChannels === null
     ? (salesResponse?.data
         ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
@@ -984,6 +1034,46 @@ export default function Forecasting() {
             </Select>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <MetricCard
+          title="Total Revenue"
+          value={summaryResponse?.data.totalRevenue}
+          formatter={formatCurrency}
+          icon={DollarSign}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="Total Units Sold"
+          value={summaryResponse?.data.totalUnits}
+          formatter={(v) => v.toLocaleString()}
+          icon={Package}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="Total Orders"
+          value={summaryResponse?.data.totalOrders}
+          formatter={(v) => v.toLocaleString()}
+          icon={ShoppingCart}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="YoY Revenue"
+          value={summaryResponse?.data.yoyRevenueChangePct}
+          formatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
+          icon={summaryResponse?.data.yoyRevenueChangePct != null && summaryResponse.data.yoyRevenueChangePct >= 0 ? TrendingUp : TrendingDown}
+          changeValue={summaryResponse?.data.yoyRevenueChangePct}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="YoY Units"
+          value={summaryResponse?.data.yoyUnitsChangePct}
+          formatter={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
+          icon={summaryResponse?.data.yoyUnitsChangePct != null && summaryResponse.data.yoyUnitsChangePct >= 0 ? TrendingUp : TrendingDown}
+          changeValue={summaryResponse?.data.yoyUnitsChangePct}
+          isLoading={summaryLoading}
+        />
       </div>
 
       <Card>

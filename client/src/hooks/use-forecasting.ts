@@ -5,6 +5,7 @@ import type {
   ForecastingChannelsResponse,
   ForecastingFilterOptionsResponse,
   RevenueTimeSeriesResponse,
+  SummaryMetricsResponse,
   BooleanFilter,
 } from "@shared/forecasting-types";
 import { TimeRangePreset } from "@shared/forecasting-types";
@@ -95,6 +96,23 @@ export function useRevenueTimeSeries(
 
   return useQuery<RevenueTimeSeriesResponse>({
     queryKey: ["/api/forecasting/revenue-timeseries", queryString],
+    enabled:
+      (selectedChannels === null || selectedChannels.length > 0) &&
+      (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),
+  });
+}
+
+export function useSummaryMetrics(
+  preset: TimeRangePreset,
+  selectedChannels: string[] | null,
+  customStartDate?: string,
+  customEndDate?: string,
+  filters?: SalesDataFilters,
+) {
+  const queryString = buildFilterParams(preset, selectedChannels, customStartDate, customEndDate, filters);
+
+  return useQuery<SummaryMetricsResponse>({
+    queryKey: ["/api/forecasting/summary-metrics", queryString],
     enabled:
       (selectedChannels === null || selectedChannels.length > 0) &&
       (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),
