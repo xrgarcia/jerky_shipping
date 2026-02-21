@@ -15835,6 +15835,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== FORECASTING ROUTES ==========
+  
+  app.get("/api/forecasting/channels", async (_req: Request, res: Response) => {
+    try {
+      const { forecastingService } = await import('./services/forecasting-service');
+      const result = await forecastingService.getDistinctChannels();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching channels:", error);
+      res.status(500).json({ error: "Failed to fetch sales channels: " + error.message });
+    }
+  });
+
+  app.get("/api/forecasting/sales", async (req: Request, res: Response) => {
+    try {
+      const { TimeRangePreset } = await import('@shared/forecasting-types');
+      const { forecastingService } = await import('./services/forecasting-service');
+
+      const preset = req.query.preset as string;
+      const validPresets = Object.values(TimeRangePreset) as string[];
+      if (!preset || !validPresets.includes(preset)) {
+        res.status(400).json({ error: `Invalid preset. Must be one of: ${validPresets.join(', ')}` });
+        return;
+      }
+
+      const channelsParam = req.query.channels as string | undefined;
+      const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
+
+      const result = await forecastingService.getSalesData({
+        preset: preset as any,
+        channels,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching sales data:", error);
+      res.status(500).json({ error: "Failed to fetch sales data: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
