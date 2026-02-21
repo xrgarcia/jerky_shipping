@@ -214,34 +214,6 @@ export class ForecastingService {
         ${peakSeasonFilter}
     `;
 
-    const hasExtraFilters = !!(
-      (params.isAssembledProduct && params.isAssembledProduct !== 'either') ||
-      params.category ||
-      params.eventType ||
-      (params.isPeakSeason && params.isPeakSeason !== 'either') ||
-      (params.skus && params.skus.length > 0)
-    );
-
-    let totalOrders = 0;
-    let ordersAvailable = true;
-    if (!hasExtraFilters) {
-      try {
-        const orderRows: Array<{ total_orders: string }> = await reportingSql`
-          SELECT COUNT(DISTINCT order_number) AS total_orders
-          FROM orders
-          WHERE order_date >= ${startDate}
-            AND order_date <= ${endDate}
-            ${channelFilter}
-        `;
-        totalOrders = parseInt(orderRows[0]?.total_orders) || 0;
-      } catch (e) {
-        console.warn("[Forecasting] Could not fetch order count from orders table:", (e as Error).message);
-        ordersAvailable = false;
-      }
-    } else {
-      ordersAvailable = false;
-    }
-
     const channelGrowthRows: Array<{
       sales_channel: string;
       yoy_growth_factor: string | null;
@@ -319,7 +291,6 @@ export class ForecastingService {
       data: {
         totalRevenue,
         totalUnits,
-        totalOrders: ordersAvailable ? totalOrders : null,
         yoyTotalRevenue,
         yoyTotalUnits,
         yoyRevenueChangePct,

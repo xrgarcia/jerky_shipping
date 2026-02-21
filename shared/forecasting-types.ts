@@ -110,7 +110,6 @@ export interface ChannelConfidence {
 export interface SummaryMetrics {
   totalRevenue: number;
   totalUnits: number;
-  totalOrders: number | null;
   yoyTotalRevenue: number;
   yoyTotalUnits: number;
   yoyRevenueChangePct: number | null;

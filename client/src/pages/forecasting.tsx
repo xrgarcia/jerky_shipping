@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, ShoppingCart, Activity, ShieldCheck, Search } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search } from "lucide-react";
 import type { ForecastingProduct } from "@shared/forecasting-types";
 import {
   LineChart,
@@ -1190,13 +1190,6 @@ export default function Forecasting() {
           value={summaryResponse?.data.totalUnits}
           formatter={(v) => v.toLocaleString()}
           icon={Package}
-          isLoading={summaryLoading}
-        />
-        <MetricCard
-          title="Total Orders"
-          value={summaryResponse?.data.totalOrders}
-          formatter={(v) => v.toLocaleString()}
-          icon={ShoppingCart}
           isLoading={summaryLoading}
         />
         <MetricCard
