@@ -229,7 +229,7 @@ function ProductFilter({ products, selected, onChange }: ProductFilterProps) {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-2" align="start">
-        <div className="relative mb-2">
+        <div className="relative mb-2" onKeyDown={(e) => e.stopPropagation()}>
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             ref={inputRef}

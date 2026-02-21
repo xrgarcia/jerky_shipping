@@ -303,10 +303,11 @@ export class ForecastingService {
       title: string;
       category: string | null;
     }> = await reportingSql`
-      SELECT DISTINCT sku, title, category
+      SELECT sku, MAX(title) AS title, MAX(category) AS category
       FROM sales_metrics_lookup
       WHERE sku IS NOT NULL AND sku != ''
-      ORDER BY title ASC, sku ASC
+      GROUP BY sku
+      ORDER BY MAX(title) ASC, sku ASC
     `;
 
     return {
