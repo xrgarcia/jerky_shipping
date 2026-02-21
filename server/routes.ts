@@ -15878,6 +15878,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { namespace } = req.params;
+      const prefs = await storage.getUserPreferencesByNamespace(user.id, namespace);
+      const result: Record<string, unknown> = {};
+      for (const pref of prefs) {
+        result[pref.key] = pref.value;
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  app.get("/api/user-preferences/:namespace/:key", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { namespace, key } = req.params;
+      const pref = await storage.getUserPreference(user.id, namespace, key);
+      if (!pref) {
+        return res.status(404).json({ error: "Preference not found" });
+      }
+      res.json({ value: pref.value });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch preference" });
+    }
+  });
+
+  app.put("/api/user-preferences/:namespace/:key", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { namespace, key } = req.params;
+      const bodySchema = z.object({ value: z.unknown() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Request body must include 'value'" });
+      }
+      const pref = await storage.upsertUserPreference(user.id, namespace, key, parsed.data.value);
+      res.json({ value: pref.value });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to save preference" });
+    }
+  });
+
+  app.delete("/api/user-preferences/:namespace/:key", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { namespace, key } = req.params;
+      const deleted = await storage.deleteUserPreference(user.id, namespace, key);
+      res.json({ deleted });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete preference" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -1987,3 +1987,23 @@ export const insertQcExplosionQueueSchema = createInsertSchema(qcExplosionQueue)
 
 export type InsertQcExplosionQueue = z.infer<typeof insertQcExplosionQueueSchema>;
 export type QcExplosionQueue = typeof qcExplosionQueue.$inferSelect;
+
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  namespace: text("namespace").notNull(),
+  key: text("key").notNull(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userNamespaceKeyIdx: uniqueIndex("user_prefs_user_ns_key_idx").on(table.userId, table.namespace, table.key),
+  namespaceIdx: index("user_prefs_namespace_idx").on(table.userId, table.namespace),
+}));
+
+export const insertUserPreferenceSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertUserPreference = z.infer<typeof insertUserPreferenceSchema>;
+export type UserPreference = typeof userPreferences.$inferSelect;

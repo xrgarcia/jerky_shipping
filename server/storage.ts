@@ -98,6 +98,8 @@ import {
   type InsertLifecycleRepairJob,
   lifecycleRepairJobs,
   skuvaultProducts,
+  type UserPreference,
+  userPreferences,
 } from "@shared/schema";
 
 export interface OrderFilters {
@@ -454,6 +456,12 @@ export interface IStorage {
   getShipmentsDeadLetter(shipmentId: string): Promise<ShipmentsDeadLetter | undefined>;
   getAllShipmentsDeadLetters(limit?: number): Promise<ShipmentsDeadLetter[]>;
   deleteShipmentsDeadLetter(shipmentId: string): Promise<boolean>;
+
+  // User Preferences
+  getUserPreferencesByNamespace(userId: string, namespace: string): Promise<UserPreference[]>;
+  getUserPreference(userId: string, namespace: string, key: string): Promise<UserPreference | undefined>;
+  upsertUserPreference(userId: string, namespace: string, key: string, value: unknown): Promise<UserPreference>;
+  deleteUserPreference(userId: string, namespace: string, key: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3972,6 +3980,49 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(shipmentsDeadLetters)
       .where(eq(shipmentsDeadLetters.shipmentId, shipmentId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getUserPreferencesByNamespace(userId: string, namespace: string): Promise<UserPreference[]> {
+    return db
+      .select()
+      .from(userPreferences)
+      .where(and(eq(userPreferences.userId, userId), eq(userPreferences.namespace, namespace)));
+  }
+
+  async getUserPreference(userId: string, namespace: string, key: string): Promise<UserPreference | undefined> {
+    const result = await db
+      .select()
+      .from(userPreferences)
+      .where(and(
+        eq(userPreferences.userId, userId),
+        eq(userPreferences.namespace, namespace),
+        eq(userPreferences.key, key),
+      ));
+    return result[0];
+  }
+
+  async upsertUserPreference(userId: string, namespace: string, key: string, value: unknown): Promise<UserPreference> {
+    const result = await db
+      .insert(userPreferences)
+      .values({ userId, namespace, key, value })
+      .onConflictDoUpdate({
+        target: [userPreferences.userId, userPreferences.namespace, userPreferences.key],
+        set: { value, updatedAt: new Date() },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async deleteUserPreference(userId: string, namespace: string, key: string): Promise<boolean> {
+    const result = await db
+      .delete(userPreferences)
+      .where(and(
+        eq(userPreferences.userId, userId),
+        eq(userPreferences.namespace, namespace),
+        eq(userPreferences.key, key),
+      ))
       .returning();
     return result.length > 0;
   }

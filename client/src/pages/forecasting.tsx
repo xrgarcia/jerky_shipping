@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ import {
 } from "@shared/forecasting-types";
 import type { SalesDataPoint } from "@shared/forecasting-types";
 import { useSalesData, useSalesChannels } from "@/hooks/use-forecasting";
+import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO } from "date-fns";
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -280,23 +281,42 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
 }
 
 export default function Forecasting() {
-  const [preset, setPreset] = useState<TimeRangePreset>(TimeRangePreset.LAST_30_DAYS);
-  const [selectedChannels, setSelectedChannels] = useState<string[] | null>(null);
+  const {
+    value: preset,
+    setValue: setPreset,
+    isInitialized: presetReady,
+  } = useUserPreference<TimeRangePreset>(
+    "forecasting",
+    "timeRange",
+    TimeRangePreset.LAST_30_DAYS,
+    { debounceMs: 300 },
+  );
+
+  const {
+    value: savedChannels,
+    setValue: setSavedChannels,
+    isInitialized: channelsReady,
+  } = useUserPreference<string[] | null>(
+    "forecasting",
+    "selectedChannels",
+    null,
+    { debounceMs: 300 },
+  );
 
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
 
   const allChannels = channelsData?.channels ?? [];
 
-  const activeChannels = selectedChannels ?? allChannels;
+  const activeChannels = savedChannels ?? allChannels;
 
-  const hookChannels = selectedChannels === null ? null : selectedChannels;
+  const hookChannels = savedChannels === null ? null : savedChannels;
 
   const { data: salesResponse, isLoading: salesLoading } = useSalesData(
     preset,
     hookChannels,
   );
 
-  const displayChannels = selectedChannels === null
+  const displayChannels = savedChannels === null
     ? (salesResponse?.data
         ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
         : allChannels)
@@ -308,7 +328,7 @@ export default function Forecasting() {
   }, [salesResponse?.data, displayChannels]);
 
   const handleChannelChange = (channels: string[]) => {
-    setSelectedChannels(channels);
+    setSavedChannels(channels);
   };
 
   return (
