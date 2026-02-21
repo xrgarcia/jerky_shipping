@@ -14,7 +14,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { TrendingUp, ChevronDown, Check, Loader2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { TrendingUp, ChevronDown, Check, Loader2, CalendarIcon } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -32,7 +33,7 @@ import {
 import type { SalesDataPoint } from "@shared/forecasting-types";
 import { useSalesData, useSalesChannels } from "@/hooks/use-forecasting";
 import { useUserPreference } from "@/hooks/use-user-preference";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 
 const CHANNEL_COLORS: Record<string, string> = {
   "amazon.us": "#FF9900",
@@ -281,25 +282,102 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
   );
 }
 
+function formatDateParam(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 function parseUrlParams(search: string) {
   const params = new URLSearchParams(search);
   const range = params.get("range");
   const channels = params.get("channels");
+  const startDate = params.get("start");
+  const endDate = params.get("end");
   return {
     range: range && Object.values(TimeRangePreset).includes(range as TimeRangePreset)
       ? (range as TimeRangePreset)
       : null,
     channels: channels !== null ? channels.split(",").filter(Boolean) : null,
+    startDate: startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : null,
+    endDate: endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate) ? endDate : null,
   };
 }
 
-function buildSearchString(range: TimeRangePreset, channels: string[] | null): string {
+function buildSearchString(
+  range: TimeRangePreset,
+  channels: string[] | null,
+  startDate?: string,
+  endDate?: string,
+): string {
   const params = new URLSearchParams();
   params.set("range", range);
   if (channels !== null) {
     params.set("channels", channels.join(","));
   }
+  if (range === TimeRangePreset.CUSTOM && startDate && endDate) {
+    params.set("start", startDate);
+    params.set("end", endDate);
+  }
   return params.toString();
+}
+
+interface DateRangePickerProps {
+  startDate: string | undefined;
+  endDate: string | undefined;
+  onStartChange: (date: string) => void;
+  onEndChange: (date: string) => void;
+}
+
+function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: DateRangePickerProps) {
+  const startValue = startDate ? parseISO(startDate) : undefined;
+  const endValue = endDate ? parseISO(endDate) : undefined;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-[150px] justify-start text-left font-normal"
+            data-testid="button-start-date"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {startDate ? format(parseISO(startDate), "MMM d, yyyy") : "Start date"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={startValue}
+            onSelect={(day) => day && onStartChange(formatDateParam(day))}
+            disabled={(date) => date > new Date() || (endValue ? date > endValue : false)}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      <span className="text-muted-foreground text-sm">to</span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-[150px] justify-start text-left font-normal"
+            data-testid="button-end-date"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {endDate ? format(parseISO(endDate), "MMM d, yyyy") : "End date"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={endValue}
+            onSelect={(day) => day && onEndChange(formatDateParam(day))}
+            disabled={(date) => date > new Date() || (startValue ? date < startValue : false)}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 export default function Forecasting() {
@@ -312,7 +390,6 @@ export default function Forecasting() {
   const {
     value: savedPreset,
     setValue: setSavedPreset,
-    isInitialized: presetReady,
   } = useUserPreference<TimeRangePreset>(
     "forecasting",
     "timeRange",
@@ -323,7 +400,6 @@ export default function Forecasting() {
   const {
     value: savedChannels,
     setValue: setSavedChannels,
-    isInitialized: channelsReady,
   } = useUserPreference<string[] | null>(
     "forecasting",
     "selectedChannels",
@@ -331,23 +407,61 @@ export default function Forecasting() {
     { debounceMs: 300 },
   );
 
+  const {
+    value: savedCustomDates,
+    setValue: setSavedCustomDates,
+  } = useUserPreference<{ start?: string; end?: string }>(
+    "forecasting",
+    "customDateRange",
+    { start: formatDateParam(subDays(new Date(), 30)), end: formatDateParam(new Date()) },
+    { debounceMs: 300 },
+  );
+
   const preset = urlParams.range ?? savedPreset;
   const selectedChannels = hasUrlParams ? (urlParams.channels ?? null) : savedChannels;
 
-  const updateUrl = useCallback((range: TimeRangePreset, channels: string[] | null) => {
-    const qs = buildSearchString(range, channels);
+  const customStartDate = urlParams.startDate ?? savedCustomDates.start;
+  const customEndDate = urlParams.endDate ?? savedCustomDates.end;
+
+  const updateUrl = useCallback((
+    range: TimeRangePreset,
+    channels: string[] | null,
+    start?: string,
+    end?: string,
+  ) => {
+    const qs = buildSearchString(range, channels, start, end);
     setLocation(`/forecasting?${qs}`, { replace: true });
   }, [setLocation]);
 
   const setPreset = useCallback((newPreset: TimeRangePreset) => {
     setSavedPreset(newPreset);
-    updateUrl(newPreset, selectedChannels);
-  }, [setSavedPreset, updateUrl, selectedChannels]);
+    if (newPreset === TimeRangePreset.CUSTOM) {
+      updateUrl(newPreset, selectedChannels, customStartDate, customEndDate);
+    } else {
+      updateUrl(newPreset, selectedChannels);
+    }
+  }, [setSavedPreset, updateUrl, selectedChannels, customStartDate, customEndDate]);
 
   const setChannels = useCallback((channels: string[]) => {
     setSavedChannels(channels);
-    updateUrl(preset, channels);
-  }, [setSavedChannels, updateUrl, preset]);
+    if (preset === TimeRangePreset.CUSTOM) {
+      updateUrl(preset, channels, customStartDate, customEndDate);
+    } else {
+      updateUrl(preset, channels);
+    }
+  }, [setSavedChannels, updateUrl, preset, customStartDate, customEndDate]);
+
+  const setCustomStart = useCallback((date: string) => {
+    const newDates = { start: date, end: customEndDate };
+    setSavedCustomDates(newDates);
+    updateUrl(TimeRangePreset.CUSTOM, selectedChannels, date, customEndDate);
+  }, [setSavedCustomDates, updateUrl, selectedChannels, customEndDate]);
+
+  const setCustomEnd = useCallback((date: string) => {
+    const newDates = { start: customStartDate, end: date };
+    setSavedCustomDates(newDates);
+    updateUrl(TimeRangePreset.CUSTOM, selectedChannels, customStartDate, date);
+  }, [setSavedCustomDates, updateUrl, selectedChannels, customStartDate]);
 
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
 
@@ -360,6 +474,8 @@ export default function Forecasting() {
   const { data: salesResponse, isLoading: salesLoading } = useSalesData(
     preset,
     hookChannels,
+    preset === TimeRangePreset.CUSTOM ? customStartDate : undefined,
+    preset === TimeRangePreset.CUSTOM ? customEndDate : undefined,
   );
 
   const displayChannels = selectedChannels === null
@@ -388,6 +504,14 @@ export default function Forecasting() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <TimeRangeSelector value={preset} onChange={setPreset} />
+          {preset === TimeRangePreset.CUSTOM && (
+            <DateRangePicker
+              startDate={customStartDate}
+              endDate={customEndDate}
+              onStartChange={setCustomStart}
+              onEndChange={setCustomEnd}
+            />
+          )}
           {!channelsLoading && allChannels.length > 0 && (
             <ChannelFilter
               channels={allChannels}

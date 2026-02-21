@@ -14,18 +14,27 @@ export function useSalesChannels() {
 export function useSalesData(
   preset: TimeRangePreset,
   selectedChannels: string[] | null,
+  customStartDate?: string,
+  customEndDate?: string,
 ) {
-  const channelsParam =
-    selectedChannels && selectedChannels.length > 0
-      ? selectedChannels.join(",")
-      : undefined;
+  const params = new URLSearchParams();
+  params.set("preset", preset);
 
-  const queryString = channelsParam
-    ? `?preset=${preset}&channels=${channelsParam}`
-    : `?preset=${preset}`;
+  if (selectedChannels && selectedChannels.length > 0) {
+    params.set("channels", selectedChannels.join(","));
+  }
+
+  if (preset === TimeRangePreset.CUSTOM && customStartDate && customEndDate) {
+    params.set("startDate", customStartDate);
+    params.set("endDate", customEndDate);
+  }
+
+  const queryString = `?${params.toString()}`;
 
   return useQuery<ForecastingSalesResponse>({
     queryKey: ["/api/forecasting/sales", queryString],
-    enabled: selectedChannels === null || selectedChannels.length > 0,
+    enabled:
+      (selectedChannels === null || selectedChannels.length > 0) &&
+      (preset !== TimeRangePreset.CUSTOM || (!!customStartDate && !!customEndDate)),
   });
 }

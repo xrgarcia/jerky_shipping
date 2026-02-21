@@ -3,6 +3,7 @@ export enum TimeRangePreset {
   LAST_60_DAYS = 'last_60_days',
   LAST_90_DAYS = 'last_90_days',
   LAST_12_MONTHS = 'last_12_months',
+  CUSTOM = 'custom',
 }
 
 export const TIME_RANGE_LABELS: Record<TimeRangePreset, string> = {
@@ -10,9 +11,10 @@ export const TIME_RANGE_LABELS: Record<TimeRangePreset, string> = {
   [TimeRangePreset.LAST_60_DAYS]: 'Last 60 Days',
   [TimeRangePreset.LAST_90_DAYS]: 'Last 90 Days',
   [TimeRangePreset.LAST_12_MONTHS]: 'Last 12 Months',
+  [TimeRangePreset.CUSTOM]: 'Custom Range',
 };
 
-export const TIME_RANGE_DAYS: Record<TimeRangePreset, number> = {
+export const TIME_RANGE_DAYS: Record<string, number> = {
   [TimeRangePreset.LAST_30_DAYS]: 30,
   [TimeRangePreset.LAST_60_DAYS]: 60,
   [TimeRangePreset.LAST_90_DAYS]: 90,
@@ -29,6 +31,8 @@ export interface SalesDataPoint {
 export interface ForecastingSalesParams {
   preset: TimeRangePreset;
   channels?: string[];
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface ForecastingSalesResponse {

@@ -12,9 +12,15 @@ import { subDays } from 'date-fns';
 const CST_TIMEZONE = 'America/Chicago';
 
 export class ForecastingService {
-  private computeDateRange(preset: TimeRangePreset): { startDate: Date; endDate: Date } {
+  private computeDateRange(params: ForecastingSalesParams): { startDate: Date; endDate: Date } {
+    if (params.preset === TimeRangePreset.CUSTOM && params.startDate && params.endDate) {
+      return {
+        startDate: new Date(params.startDate),
+        endDate: new Date(params.endDate + 'T23:59:59'),
+      };
+    }
     const now = new Date();
-    const days = TIME_RANGE_DAYS[preset];
+    const days = TIME_RANGE_DAYS[params.preset] ?? 30;
     return {
       startDate: subDays(now, days),
       endDate: now,
@@ -34,7 +40,7 @@ export class ForecastingService {
 
   async getSalesData(params: ForecastingSalesParams): Promise<ForecastingSalesResponse> {
     const { preset, channels } = params;
-    const { startDate, endDate } = this.computeDateRange(preset);
+    const { startDate, endDate } = this.computeDateRange(params);
 
     let rows: Array<{
       order_day: string;

@@ -15856,6 +15856,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forecastingSalesQuerySchema = z.object({
         preset: z.nativeEnum(TimeRangePreset),
         channels: z.string().optional(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       });
 
       const parsed = forecastingSalesQuerySchema.safeParse(req.query);
@@ -15864,12 +15866,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam } = parsed.data;
+      const { preset, channels: channelsParam, startDate, endDate } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSalesData({
         preset,
         channels,
+        startDate,
+        endDate,
       });
       res.json(result);
     } catch (error: any) {
