@@ -8,6 +8,8 @@ import type {
   ForecastingProductsResponse,
   RevenueTimeSeriesPoint,
   RevenueTimeSeriesResponse,
+  KitTimeSeriesPoint,
+  KitTimeSeriesResponse,
   SummaryMetrics,
   SummaryMetricsResponse,
 } from '@shared/forecasting-types';
@@ -187,6 +189,57 @@ export class ForecastingService {
       },
     };
   }
+  async getKitTimeSeries(params: ForecastingSalesParams): Promise<KitTimeSeriesResponse> {
+    const { preset } = params;
+    const { startDate, endDate } = this.computeDateRange(params);
+    const { assembledFilter, categoryFilter, eventTypeFilter, peakSeasonFilter, channelFilter, skuFilter } = this.buildFilters(params);
+
+    const rows: Array<{
+      order_day: string;
+      kit_revenue: string;
+      yoy_kit_revenue: string;
+      kit_quantity: string;
+      yoy_kit_quantity: string;
+    }> = await reportingSql`
+      SELECT
+        (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+        COALESCE(SUM(kit_daily_sales_revenue), 0) AS kit_revenue,
+        COALESCE(SUM(yoy_kit_daily_sales_revenue), 0) AS yoy_kit_revenue,
+        COALESCE(SUM(kit_daily_sales_quantity), 0) AS kit_quantity,
+        COALESCE(SUM(yoy_kit_daily_sales_quantity), 0) AS yoy_kit_quantity
+      FROM sales_metrics_lookup
+      WHERE order_date >= ${startDate}
+        AND order_date <= ${endDate}
+        ${channelFilter}
+        ${skuFilter}
+        ${assembledFilter}
+        ${categoryFilter}
+        ${eventTypeFilter}
+        ${peakSeasonFilter}
+      GROUP BY 1
+      ORDER BY 1
+    `;
+
+    const data: KitTimeSeriesPoint[] = rows.map((row) => ({
+      date: typeof row.order_day === 'string'
+        ? row.order_day
+        : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
+      kitDailyRevenue: parseFloat(row.kit_revenue) || 0,
+      yoyKitDailyRevenue: parseFloat(row.yoy_kit_revenue) || 0,
+      kitDailyQuantity: parseFloat(row.kit_quantity) || 0,
+      yoyKitDailyQuantity: parseFloat(row.yoy_kit_quantity) || 0,
+    }));
+
+    return {
+      data,
+      params: {
+        preset,
+        startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+        endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+      },
+    };
+  }
+
   async getSummaryMetrics(params: ForecastingSalesParams): Promise<SummaryMetricsResponse> {
     const { preset } = params;
     const { startDate, endDate } = this.computeDateRange(params);

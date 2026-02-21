@@ -33,7 +33,7 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useKitTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
 import type { SalesDataFilters } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
@@ -453,11 +453,11 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
 }
 
 interface DualLineChartProps {
-  data: RevenueTimeSeriesPoint[];
-  line1Key: keyof RevenueTimeSeriesPoint;
+  data: Array<Record<string, any>>;
+  line1Key: string;
   line1Label: string;
   line1Color: string;
-  line2Key: keyof RevenueTimeSeriesPoint;
+  line2Key: string;
   line2Label: string;
   line2Color: string;
   valueFormatter: (v: number) => string;
@@ -1044,6 +1044,14 @@ export default function Forecasting() {
     activeFilters,
   );
 
+  const { data: kitTimeSeriesResponse, isLoading: kitTimeSeriesLoading } = useKitTimeSeries(
+    preset,
+    hookChannels,
+    preset === TimeRangePreset.CUSTOM ? customStartDate : undefined,
+    preset === TimeRangePreset.CUSTOM ? customEndDate : undefined,
+    activeFilters,
+  );
+
   const { data: summaryResponse, isLoading: summaryLoading } = useSummaryMetrics(
     preset,
     hookChannels,
@@ -1392,6 +1400,76 @@ export default function Forecasting() {
                   chartType="units_yoy"
                   startDate={tsStart}
                   endDate={tsEnd}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const currentYear = kitTimeSeriesResponse?.params
+          ? parseISO(kitTimeSeriesResponse.params.startDate).getFullYear()
+          : new Date().getFullYear();
+        const priorYear = currentYear - 1;
+        const kitStart = kitTimeSeriesResponse?.params?.startDate;
+        const kitEnd = kitTimeSeriesResponse?.params?.endDate;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-base font-medium" data-testid="text-kit-revenue-yoy-title">
+                  Kit Daily Sales Revenue (YoY)
+                </CardTitle>
+                {kitTimeSeriesResponse?.params && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-kit-revenue-yoy-range">
+                    {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent>
+                <DualLineChart
+                  data={kitTimeSeriesResponse?.data ?? []}
+                  line1Key="kitDailyRevenue"
+                  line1Label={`Kit Revenue ${currentYear}`}
+                  line1Color="hsl(var(--primary))"
+                  line2Key="yoyKitDailyRevenue"
+                  line2Label={`Kit Revenue ${priorYear}`}
+                  line2Color="#FF9900"
+                  valueFormatter={formatCurrency}
+                  isLoading={kitTimeSeriesLoading}
+                  chartType="kit_revenue_yoy"
+                  startDate={kitStart}
+                  endDate={kitEnd}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-base font-medium" data-testid="text-kit-units-yoy-title">
+                  Kit Units Sold (YoY)
+                </CardTitle>
+                {kitTimeSeriesResponse?.params && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-kit-units-yoy-range">
+                    {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
+                  </span>
+                )}
+              </CardHeader>
+              <CardContent>
+                <DualLineChart
+                  data={kitTimeSeriesResponse?.data ?? []}
+                  line1Key="kitDailyQuantity"
+                  line1Label={`Kit Units ${currentYear}`}
+                  line1Color="hsl(var(--primary))"
+                  line2Key="yoyKitDailyQuantity"
+                  line2Label={`Kit Units ${priorYear}`}
+                  line2Color="#FF9900"
+                  valueFormatter={(v) => v.toLocaleString()}
+                  isLoading={kitTimeSeriesLoading}
+                  chartType="kit_units_yoy"
+                  startDate={kitStart}
+                  endDate={kitEnd}
                 />
               </CardContent>
             </Card>
