@@ -284,14 +284,19 @@ function SalesChart({ data, channels, isLoading }: SalesChartProps) {
   );
 }
 
-interface SingleLineChartProps {
+interface DualLineChartProps {
   data: RevenueTimeSeriesPoint[];
-  dataKey: keyof RevenueTimeSeriesPoint;
-  color: string;
+  line1Key: keyof RevenueTimeSeriesPoint;
+  line1Label: string;
+  line1Color: string;
+  line2Key: keyof RevenueTimeSeriesPoint;
+  line2Label: string;
+  line2Color: string;
+  valueFormatter: (v: number) => string;
   isLoading: boolean;
 }
 
-function SingleLineChart({ data, dataKey, color, isLoading }: SingleLineChartProps) {
+function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2Label, line2Color, valueFormatter, isLoading }: DualLineChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-[350px] items-center justify-center">
@@ -309,8 +314,9 @@ function SingleLineChart({ data, dataKey, color, isLoading }: SingleLineChartPro
   }
 
   const chartData = data.map((d) => ({
-    ...d,
     dateLabel: format(parseISO(d.date), "MMM d"),
+    [line1Label]: d[line1Key],
+    [line2Label]: d[line2Key],
   }));
 
   return (
@@ -323,12 +329,12 @@ function SingleLineChart({ data, dataKey, color, isLoading }: SingleLineChartPro
           interval="preserveStartEnd"
         />
         <YAxis
-          tickFormatter={(v: number) => formatCurrency(v)}
+          tickFormatter={(v: number) => valueFormatter(v)}
           tick={{ fontSize: 12 }}
           width={80}
         />
         <Tooltip
-          formatter={(value: number) => [formatCurrency(value)]}
+          formatter={(value: number, name: string) => [valueFormatter(value), name]}
           labelFormatter={(label: string) => label}
           contentStyle={{
             borderRadius: "var(--radius)",
@@ -337,10 +343,19 @@ function SingleLineChart({ data, dataKey, color, isLoading }: SingleLineChartPro
             color: "hsl(var(--card-foreground))",
           }}
         />
+        <Legend />
         <Line
           type="monotone"
-          dataKey={dataKey}
-          stroke={color}
+          dataKey={line1Label}
+          stroke={line1Color}
+          strokeWidth={2}
+          dot={false}
+          connectNulls
+        />
+        <Line
+          type="monotone"
+          dataKey={line2Label}
+          stroke={line2Color}
           strokeWidth={2}
           dot={false}
           connectNulls
@@ -760,20 +775,25 @@ export default function Forecasting() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-base font-medium" data-testid="text-daily-revenue-title">
-              Total Daily Sales Revenue
+            <CardTitle className="text-base font-medium" data-testid="text-revenue-yoy-title">
+              Total Daily Sales Revenue (YoY)
             </CardTitle>
             {timeSeriesResponse?.params && (
-              <span className="text-sm text-muted-foreground" data-testid="text-daily-revenue-range">
+              <span className="text-sm text-muted-foreground" data-testid="text-revenue-yoy-range">
                 {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
               </span>
             )}
           </CardHeader>
           <CardContent>
-            <SingleLineChart
+            <DualLineChart
               data={timeSeriesResponse?.data ?? []}
-              dataKey="dailyRevenue"
-              color="hsl(var(--primary))"
+              line1Key="dailyRevenue"
+              line1Label="Daily Revenue"
+              line1Color="hsl(var(--primary))"
+              line2Key="yoyRevenue"
+              line2Label="YoY Revenue"
+              line2Color="#FF9900"
+              valueFormatter={formatCurrency}
               isLoading={timeSeriesLoading}
             />
           </CardContent>
@@ -781,20 +801,25 @@ export default function Forecasting() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-base font-medium" data-testid="text-yoy-revenue-title">
-              Year-over-Year Revenue
+            <CardTitle className="text-base font-medium" data-testid="text-units-yoy-title">
+              Total Units Sold (YoY)
             </CardTitle>
             {timeSeriesResponse?.params && (
-              <span className="text-sm text-muted-foreground" data-testid="text-yoy-revenue-range">
+              <span className="text-sm text-muted-foreground" data-testid="text-units-yoy-range">
                 {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
               </span>
             )}
           </CardHeader>
           <CardContent>
-            <SingleLineChart
+            <DualLineChart
               data={timeSeriesResponse?.data ?? []}
-              dataKey="yoyRevenue"
-              color="#FF9900"
+              line1Key="dailyQuantity"
+              line1Label="Daily Units"
+              line1Color="hsl(var(--primary))"
+              line2Key="yoyQuantity"
+              line2Label="YoY Units"
+              line2Color="#FF9900"
+              valueFormatter={(v) => v.toLocaleString()}
               isLoading={timeSeriesLoading}
             />
           </CardContent>

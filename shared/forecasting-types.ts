@@ -64,6 +64,8 @@ export interface RevenueTimeSeriesPoint {
   date: string;
   dailyRevenue: number;
   yoyRevenue: number;
+  dailyQuantity: number;
+  yoyQuantity: number;
 }
 
 export interface RevenueTimeSeriesResponse {
