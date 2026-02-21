@@ -1242,9 +1242,9 @@ export default function Forecasting() {
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : summaryResponse?.data.confidenceLevel != null ? (
-              <div className={`text-lg sm:text-2xl font-semibold capitalize ${
-                summaryResponse.data.confidenceLevel === 'normal' ? 'text-green-600 dark:text-green-400' :
-                summaryResponse.data.confidenceLevel === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
+              <div className={`text-lg sm:text-2xl font-semibold uppercase ${
+                summaryResponse.data.confidenceLevel.toLowerCase() === 'normal' ? 'text-green-600 dark:text-green-400' :
+                summaryResponse.data.confidenceLevel.toLowerCase() === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
                 'text-red-600 dark:text-red-400'
               }`}>
                 {summaryResponse.data.confidenceLevel}
