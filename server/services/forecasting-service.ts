@@ -14,12 +14,14 @@ import type {
   SummaryMetricsResponse,
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
-import { formatInTimeZone } from 'date-fns-tz';
-import { subDays } from 'date-fns';
+import { subDays, format } from 'date-fns';
 import { getRedisClient } from '../utils/queue';
 
-const CST_TIMEZONE = 'America/Chicago';
 const CACHE_TTL_SECONDS = 3600;
+
+function formatDate(d: Date): string {
+  return format(d, 'yyyy-MM-dd');
+}
 
 function buildCacheKey(prefix: string, params?: ForecastingSalesParams): string {
   if (!params) return `forecasting:${prefix}`;
@@ -146,7 +148,7 @@ export class ForecastingService {
         total_quantity: string;
       }> = await reportingSql`
         SELECT
-          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+          order_date::date AS order_day,
           sales_channel,
           COALESCE(SUM(daily_sales_revenue), 0) AS total_revenue,
           COALESCE(SUM(daily_sales_quantity), 0) AS total_quantity
@@ -166,7 +168,7 @@ export class ForecastingService {
       const data: SalesDataPoint[] = rows.map((row) => ({
         orderDate: typeof row.order_day === 'string'
           ? row.order_day
-          : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
+          : formatDate(new Date(row.order_day)),
         salesChannel: row.sales_channel,
         totalRevenue: parseFloat(row.total_revenue) || 0,
         totalQuantity: parseFloat(row.total_quantity) || 0,
@@ -176,8 +178,8 @@ export class ForecastingService {
         data,
         params: {
           preset,
-          startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
-          endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
           channels: channels ?? [],
         },
       };
@@ -197,7 +199,7 @@ export class ForecastingService {
         yoy_quantity: string;
       }> = await reportingSql`
         SELECT
-          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+          order_date::date AS order_day,
           COALESCE(SUM(daily_sales_revenue), 0) AS daily_revenue,
           COALESCE(SUM(yoy_daily_sales_revenue), 0) AS yoy_revenue,
           COALESCE(SUM(daily_sales_quantity), 0) AS daily_quantity,
@@ -218,7 +220,7 @@ export class ForecastingService {
       const data: RevenueTimeSeriesPoint[] = rows.map((row) => ({
         date: typeof row.order_day === 'string'
           ? row.order_day
-          : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
+          : formatDate(new Date(row.order_day)),
         dailyRevenue: parseFloat(row.daily_revenue) || 0,
         yoyRevenue: parseFloat(row.yoy_revenue) || 0,
         dailyQuantity: parseFloat(row.daily_quantity) || 0,
@@ -229,8 +231,8 @@ export class ForecastingService {
         data,
         params: {
           preset,
-          startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
-          endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
         },
       };
     });
@@ -249,7 +251,7 @@ export class ForecastingService {
         yoy_kit_quantity: string;
       }> = await reportingSql`
         SELECT
-          (order_date AT TIME ZONE ${CST_TIMEZONE})::date AS order_day,
+          order_date::date AS order_day,
           COALESCE(SUM(kit_daily_sales_revenue), 0) AS kit_revenue,
           COALESCE(SUM(yoy_kit_daily_sales_revenue), 0) AS yoy_kit_revenue,
           COALESCE(SUM(kit_daily_sales_quantity), 0) AS kit_quantity,
@@ -270,7 +272,7 @@ export class ForecastingService {
       const data: KitTimeSeriesPoint[] = rows.map((row) => ({
         date: typeof row.order_day === 'string'
           ? row.order_day
-          : formatInTimeZone(new Date(row.order_day), CST_TIMEZONE, 'yyyy-MM-dd'),
+          : formatDate(new Date(row.order_day)),
         kitDailyRevenue: parseFloat(row.kit_revenue) || 0,
         yoyKitDailyRevenue: parseFloat(row.yoy_kit_revenue) || 0,
         kitDailyQuantity: parseFloat(row.kit_quantity) || 0,
@@ -281,8 +283,8 @@ export class ForecastingService {
         data,
         params: {
           preset,
-          startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
-          endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
         },
       };
     });
@@ -418,8 +420,8 @@ export class ForecastingService {
         },
         params: {
           preset,
-          startDate: formatInTimeZone(startDate, CST_TIMEZONE, 'yyyy-MM-dd'),
-          endDate: formatInTimeZone(endDate, CST_TIMEZONE, 'yyyy-MM-dd'),
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate),
         },
       };
     });
