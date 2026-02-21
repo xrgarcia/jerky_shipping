@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter } from "lucide-react";
 import type { ForecastingProduct } from "@shared/forecasting-types";
 import {
   LineChart,
@@ -224,6 +224,7 @@ function ProductFilter({ products, selected, onChange }: ProductFilterProps) {
           className="w-[200px] sm:w-[240px] justify-between"
           data-testid="button-product-filter"
         >
+          {selected.length > 0 && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
           <span className="truncate">{label}</span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -333,6 +334,7 @@ function ChannelFilter({ channels, selected, onChange }: ChannelFilterProps) {
           className="w-[220px] justify-between"
           data-testid="button-channel-filter"
         >
+          {!allSelected && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
           <span className="truncate">{label}</span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -1108,6 +1110,7 @@ export default function Forecasting() {
               onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
             >
               <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
+                {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1138,6 +1141,7 @@ export default function Forecasting() {
               onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
             >
               <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
+                {activeFilters.eventType && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1158,6 +1162,7 @@ export default function Forecasting() {
               onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
             >
               <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
+                {activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1175,6 +1180,7 @@ export default function Forecasting() {
               onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
             >
               <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-assembled">
+                {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
