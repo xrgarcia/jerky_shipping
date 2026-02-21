@@ -145,6 +145,35 @@ async function processNextJob(): Promise<boolean> {
 
       const result = await smartCarrierRateService.analyzeAndSave(shipment);
 
+      if (result.skipped) {
+        log(`Job #${job.id}: Rate check skipped for ${job.shipmentId}: ${result.error}`, 'info', jobCtx);
+        await db.update(rateCheckQueue)
+          .set({
+            status: 'completed',
+            completedAt: new Date(),
+            lastError: result.error ?? null,
+          })
+          .where(eq(rateCheckQueue.id, job.id));
+
+        await db
+          .update(shipments)
+          .set({
+            rateCheckStatus: 'skipped',
+            rateCheckError: result.error ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(shipments.id, job.localShipmentId));
+
+        try {
+          const { queueLifecycleEvaluation } = await import('./lifecycle-service');
+          await queueLifecycleEvaluation(job.localShipmentId, 'rate_check_skipped', orderNumber);
+        } catch (lcErr: any) {
+          log(`Job #${job.id} lifecycle re-eval after skip failed (non-fatal): ${lcErr.message}`, 'warn', jobCtx);
+        }
+
+        return true;
+      }
+
       if (result.success) {
         await db.update(rateCheckQueue)
           .set({

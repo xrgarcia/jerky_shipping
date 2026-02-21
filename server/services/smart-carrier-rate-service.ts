@@ -49,6 +49,7 @@ interface ShipStationRate {
 
 interface RateAnalysisResult {
   success: boolean;
+  skipped?: boolean;
   analysis?: InsertShipmentRateAnalysis;
   error?: string;
 }
@@ -145,7 +146,7 @@ export class SmartCarrierRateService {
     // Gate: check if the customer's shipping method is configured for rate checking
     const canRateCheck = await customerShippingMethodConfig.canRateCheckCustomerMethod(customerMethod);
     if (!canRateCheck) {
-      return { success: false, error: `Customer method "${customerMethod}" has rate checking disabled` };
+      return { success: false, skipped: true, error: `Customer method "${customerMethod}" has rate checking disabled` };
     }
     
     // Gate: check if the package weight is within the customer method's allowed range
@@ -157,7 +158,7 @@ export class SmartCarrierRateService {
           limits.minOz != null ? `min ${limits.minOz}oz` : null,
           limits.maxOz != null ? `max ${limits.maxOz}oz` : null,
         ].filter(Boolean).join(', ');
-        return { success: false, error: `Package weight ${eligibility.weightOz.toFixed(2)}oz outside customer method limits (${rangeDesc})` };
+        return { success: false, skipped: true, error: `Package weight ${eligibility.weightOz.toFixed(2)}oz outside customer method limits (${rangeDesc})` };
       }
     }
     
