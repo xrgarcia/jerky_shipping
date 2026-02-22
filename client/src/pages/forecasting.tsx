@@ -1232,11 +1232,13 @@ export default function Forecasting() {
   }, [setSavedChannels, buildUrl]);
 
   const setCustomStart = useCallback((date: string) => {
+    setActivePeakSeasonKey(null);
     setSavedCustomDates({ start: date, end: customEndDate });
     buildUrl({ range: TimeRangePreset.CUSTOM, start: date });
   }, [setSavedCustomDates, buildUrl, customEndDate]);
 
   const setCustomEnd = useCallback((date: string) => {
+    setActivePeakSeasonKey(null);
     setSavedCustomDates({ start: customStartDate, end: date });
     buildUrl({ range: TimeRangePreset.CUSTOM, end: date });
   }, [setSavedCustomDates, buildUrl, customStartDate]);
@@ -1250,6 +1252,22 @@ export default function Forecasting() {
   const { data: channelsData, isLoading: channelsLoading } = useSalesChannels();
   const { data: filterOptionsData } = useFilterOptions();
   const { data: productsData } = useProducts();
+  const { data: peakSeasonsData } = useUpcomingPeakSeasons();
+
+  const [activePeakSeasonKey, setActivePeakSeasonKey] = useState<string | null>(null);
+
+  const handlePeakSeasonSelect = useCallback((season: PeakSeasonPreset) => {
+    const key = `peak_${season.peakSeasonTypeId}_${season.year}`;
+    setActivePeakSeasonKey(key);
+    setSavedPreset(TimeRangePreset.CUSTOM);
+    setSavedCustomDates({ start: season.startDate, end: season.endDate });
+    buildUrl({ range: TimeRangePreset.CUSTOM, start: season.startDate, end: season.endDate });
+  }, [setSavedPreset, setSavedCustomDates, buildUrl]);
+
+  const handlePresetChange = useCallback((newPreset: TimeRangePreset) => {
+    setActivePeakSeasonKey(null);
+    setPreset(newPreset);
+  }, [setPreset]);
 
   const allChannels = channelsData?.channels ?? [];
   const allProducts = productsData?.products ?? [];
@@ -1319,7 +1337,13 @@ export default function Forecasting() {
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
             <div className="flex flex-wrap items-center gap-2">
-              <TimeRangeSelector value={preset} onChange={setPreset} />
+              <TimeRangeSelector
+                value={preset}
+                onChange={handlePresetChange}
+                peakSeasons={peakSeasonsData ?? []}
+                onPeakSeasonSelect={handlePeakSeasonSelect}
+                activePeakSeasonKey={activePeakSeasonKey}
+              />
               {preset === TimeRangePreset.CUSTOM && (
                 <DateRangePicker
                   startDate={customStartDate}
