@@ -2083,6 +2083,11 @@ export const salesForecasting = pgTable("sales_forecasting", {
   orderDateIdx: index("sales_forecasting_order_date_idx").on(table.orderDate),
   skuChannelIdx: index("sales_forecasting_sku_channel_idx").on(table.sku, table.salesChannel),
   orderDateChannelIdx: index("sales_forecasting_date_channel_idx").on(table.orderDate, table.salesChannel),
+  dateChannelAssembledIdx: index("sales_forecasting_date_channel_assembled_idx").on(table.orderDate, table.salesChannel, table.isAssembledProduct),
+  dateChannelCategoryIdx: index("sales_forecasting_date_channel_category_idx").on(table.orderDate, table.salesChannel, table.category),
+  isPeakSeasonIdx: index("sales_forecasting_is_peak_season_idx").on(table.orderDate, table.isPeakSeason),
+  eventTypeIdx: index("sales_forecasting_event_type_idx").on(table.orderDate, table.eventType),
+  skuDateIdx: index("sales_forecasting_sku_date_idx").on(table.sku, table.orderDate),
 }));
 
 export type SalesForecasting = typeof salesForecasting.$inferSelect;
