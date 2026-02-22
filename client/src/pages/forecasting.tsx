@@ -27,6 +27,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import {
   TimeRangePreset,
@@ -39,6 +40,12 @@ import type { BooleanFilter } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+const CENTRAL_TZ = "America/Chicago";
+function getCentralToday(): string {
+  return format(toZonedTime(new Date(), CENTRAL_TZ), "yyyy-MM-dd");
+}
 
 const CHANNEL_COLORS: Record<string, string> = {
   "amazon.us": "#FF9900",
@@ -154,17 +161,42 @@ interface TimeRangeSelectorProps {
 }
 
 function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
+  const historicalPresets = [
+    TimeRangePreset.LAST_30_DAYS,
+    TimeRangePreset.LAST_60_DAYS,
+    TimeRangePreset.LAST_90_DAYS,
+    TimeRangePreset.LAST_12_MONTHS,
+    TimeRangePreset.YEAR_TO_DATE,
+    TimeRangePreset.CURRENT_MONTH,
+  ];
+  const forecastPresets = [
+    TimeRangePreset.NEXT_30_DAYS,
+    TimeRangePreset.NEXT_90_DAYS,
+    TimeRangePreset.NEXT_12_MONTHS,
+  ];
   return (
     <Select value={value} onValueChange={(v) => onChange(v as TimeRangePreset)}>
       <SelectTrigger className="w-[180px]" data-testid="select-time-range">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.values(TimeRangePreset).map((preset) => (
+        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Historical</div>
+        {historicalPresets.map((preset) => (
           <SelectItem key={preset} value={preset} data-testid={`option-${preset}`}>
             {TIME_RANGE_LABELS[preset]}
           </SelectItem>
         ))}
+        <div className="my-1 border-t" />
+        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Forecast</div>
+        {forecastPresets.map((preset) => (
+          <SelectItem key={preset} value={preset} data-testid={`option-${preset}`}>
+            {TIME_RANGE_LABELS[preset]}
+          </SelectItem>
+        ))}
+        <div className="my-1 border-t" />
+        <SelectItem value={TimeRangePreset.CUSTOM} data-testid={`option-${TimeRangePreset.CUSTOM}`}>
+          {TIME_RANGE_LABELS[TimeRangePreset.CUSTOM]}
+        </SelectItem>
       </SelectContent>
     </Select>
   );
@@ -488,11 +520,16 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
     );
   }
 
+  const todayStr = getCentralToday();
   const chartData = data.map((row) => ({
     ...row,
     fullDate: (() => { try { return format(parseISO(row.date), "MMM d, yyyy"); } catch { return row.date; } })(),
     hasNote: datesWithNotes.has(row.date),
+    isForecast: row.date > todayStr,
   }));
+
+  const todayLabel = chartData.find(d => d.date === todayStr)?.dateLabel;
+  const hasForecastData = chartData.some(d => d.isForecast);
 
   const handleChartClick = (chartState: any) => {
     if (!chartState || !chartState.activePayload || chartState.activePayload.length === 0) return;
@@ -554,6 +591,15 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
           content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={formatCurrency} />}
         />
         <Legend />
+        {todayLabel && hasForecastData && (
+          <ReferenceLine
+            x={todayLabel}
+            stroke="hsl(var(--muted-foreground))"
+            strokeDasharray="4 4"
+            strokeWidth={1.5}
+            label={{ value: "Today", position: "top", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          />
+        )}
         {channels.map((channel, idx) => (
           <Line
             key={channel}
@@ -784,14 +830,19 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
     );
   }
 
+  const todayStr = getCentralToday();
   const chartData = data.map((d) => ({
     dateLabel: format(parseISO(d.date), "MMM d"),
     fullDate: format(parseISO(d.date), "MMM d, yyyy"),
     isoDate: d.date,
     hasNote: datesWithNotes.has(d.date),
+    isForecast: d.date > todayStr,
     [line1Label]: d[line1Key],
     [line2Label]: d[line2Key],
   }));
+
+  const todayLabel = chartData.find(d => d.isoDate === todayStr)?.dateLabel;
+  const hasForecastData = chartData.some(d => d.isForecast);
 
   const handleChartClick = (chartState: any) => {
     if (!chartState || !chartState.activePayload || chartState.activePayload.length === 0) return;
@@ -853,6 +904,15 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
             content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={valueFormatter} />}
           />
           <Legend />
+          {todayLabel && hasForecastData && (
+            <ReferenceLine
+              x={todayLabel}
+              stroke="hsl(var(--muted-foreground))"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              label={{ value: "Today", position: "top", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            />
+          )}
           <Line
             type="monotone"
             dataKey={line1Label}
@@ -988,7 +1048,7 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
             mode="single"
             selected={startValue}
             onSelect={(day) => day && onStartChange(formatDateParam(day))}
-            disabled={(date) => date > new Date() || (endValue ? date > endValue : false)}
+            disabled={(date) => (endValue ? date > endValue : false)}
             initialFocus
           />
         </PopoverContent>
@@ -1010,7 +1070,7 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
             mode="single"
             selected={endValue}
             onSelect={(day) => day && onEndChange(formatDateParam(day))}
-            disabled={(date) => date > new Date() || (startValue ? date < startValue : false)}
+            disabled={(date) => (startValue ? date < startValue : false)}
             initialFocus
           />
         </PopoverContent>

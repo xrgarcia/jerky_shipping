@@ -314,6 +314,26 @@ async function initializeAfterListen(storage: any) {
       }
     }, 3600000); // Sync kit mappings every 1 hour
     
+    // Start daily sales forecast generation job
+    const { generateForecasts } = await import("./services/forecast-generation-service");
+    const FORECAST_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    setTimeout(async () => {
+      try {
+        console.log("[forecast] Running initial forecast generation...");
+        await generateForecasts();
+      } catch (error) {
+        console.error("[forecast] Initial forecast generation failed:", error);
+      }
+    }, 30000); // Delay 30s after startup to let other services initialize
+    setInterval(async () => {
+      try {
+        console.log("[forecast] Running daily forecast generation...");
+        await generateForecasts();
+      } catch (error) {
+        console.error("[forecast] Daily forecast generation failed:", error);
+      }
+    }, FORECAST_INTERVAL);
+
     // QC item hydrator worker DISABLED — replaced by queue-driven QC explosion via lifecycle side effects
     // const { startQCHydratorWorker } = await import("./workers/qc-hydrator-worker");
     // startQCHydratorWorker(60000); // Hydrate QC items every 1 minute

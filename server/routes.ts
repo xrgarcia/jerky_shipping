@@ -16147,6 +16147,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/forecasting/generate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { generateForecasts } = await import('./services/forecast-generation-service');
+      const result = await generateForecasts();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to generate forecasts", message: error.message });
+    }
+  });
+
+  app.get("/api/forecasting/generation-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { db } = await import('./db');
+      const { salesForecasting } = await import('@shared/schema');
+      const { sql: sqlFn } = await import('drizzle-orm');
+      const rows = await db.select({
+        count: sqlFn`COUNT(*)::int`,
+        minDate: sqlFn`MIN(order_date)`,
+        maxDate: sqlFn`MAX(order_date)`,
+        lastGenerated: sqlFn`MAX(generated_at)`,
+      }).from(salesForecasting);
+      res.json(rows[0] ?? { count: 0, minDate: null, maxDate: null, lastGenerated: null });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get forecast status" });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
