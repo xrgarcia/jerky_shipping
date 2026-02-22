@@ -1759,6 +1759,8 @@ function PurchaseOrdersTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [projectionDate, setProjectionDate] = useState<Date | undefined>();
+  const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
 
   const { value: kitFilter, setValue: setKitFilter } = useUserPreference<string>(
     "purchase-orders", "kit-filter", "no", { debounceMs: 300 }
@@ -1818,7 +1820,41 @@ function PurchaseOrdersTab() {
     },
   });
 
+  const projectSalesMutation = useMutation({
+    mutationFn: async ({ snapshotDate, projectionDate: projDate }: { snapshotDate: string; projectionDate: string }) => {
+      const res = await apiRequest("POST", "/api/purchase-orders/project-sales", { snapshotDate, projectionDate: projDate });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Sales Projected",
+        description: `${data.updatedCount} products updated with projected demand`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Projection Failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const clearProjectionMutation = useMutation({
+    mutationFn: async (snapshotDate: string) => {
+      const res = await apiRequest("POST", "/api/purchase-orders/clear-projection", { snapshotDate });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Projection Cleared" });
+      setProjectionDate(undefined);
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Clear Failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const snapshot = snapshotQuery.data ?? [];
+  const hasProjection = snapshot.length > 0 && snapshot[0]?.sales_projection_date != null;
+  const activeProjectionDate = hasProjection ? snapshot[0].sales_projection_date : null;
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -1874,15 +1910,22 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "Total Stock", "In Kits", "Unit Cost"];
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
-      csvRows.push([
+      const row = [
         r.sku, `"${(r.product_title || '').replace(/"/g, '""')}"`, r.product_category || '',
         `"${(r.supplier || '').replace(/"/g, '""')}"`, r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
         r.quantity_incoming ?? '', r.lead_time ?? '', r.moq ?? '',
         r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.total_stock ?? '',
         r.quantity_in_kits ?? '', r.unit_cost ?? ''
-      ].join(","));
+      ];
+      if (hasProjection) {
+        const direct = Math.round(Number(r.projected_units_sold ?? 0));
+        const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
+        row.push(String(direct), String(kits), String(direct + kits));
+      }
+      csvRows.push(row.join(","));
     }
     const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1891,7 +1934,7 @@ function PurchaseOrdersTab() {
     a.download = `po-snapshot-${selectedDate || 'latest'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [filtered, selectedDate]);
+  }, [filtered, selectedDate, hasProjection]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-4">
@@ -1944,6 +1987,61 @@ function PurchaseOrdersTab() {
           <Download className="w-4 h-4 mr-2" />
           Export CSV
         </Button>
+
+        {snapshot.length > 0 && (
+          <>
+            <Popover open={projectionPopoverOpen} onOpenChange={setProjectionPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={hasProjection ? "default" : "outline"}
+                  disabled={projectSalesMutation.isPending}
+                  data-testid="button-project-sales"
+                >
+                  {projectSalesMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                  )}
+                  {hasProjection
+                    ? `Projected to ${new Date(activeProjectionDate).toLocaleDateString('en-CA')}`
+                    : "Project Sales"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={projectionDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setProjectionDate(date);
+                      const dateStr = date.toLocaleDateString('en-CA');
+                      const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
+                      setProjectionPopoverOpen(false);
+                      projectSalesMutation.mutate({ snapshotDate: snapDate, projectionDate: dateStr });
+                    }
+                  }}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {hasProjection && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
+                  clearProjectionMutation.mutate(snapDate);
+                }}
+                disabled={clearProjectionMutation.isPending}
+                data-testid="button-clear-projection"
+                title="Clear projection"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -2065,6 +2163,13 @@ function PurchaseOrdersTab() {
                   <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">In Kits</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
+                  {hasProjection && (
+                    <>
+                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Direct</TableHead>
+                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Kits</TableHead>
+                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Total</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2095,6 +2200,18 @@ function PurchaseOrdersTab() {
                       <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
+                      {hasProjection && (() => {
+                        const direct = Number(row.projected_units_sold ?? 0);
+                        const kits = Number(row.projected_units_sold_from_kits ?? 0);
+                        const total = Math.round(direct + kits);
+                        return (
+                          <>
+                            <TableCell className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
+                          </>
+                        );
+                      })()}
                     </TableRow>
                   );
                 })}
