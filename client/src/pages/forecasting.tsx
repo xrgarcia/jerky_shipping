@@ -1279,109 +1279,128 @@ export default function Forecasting() {
           </h1>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <TimeRangeSelector value={preset} onChange={setPreset} />
-          {preset === TimeRangePreset.CUSTOM && (
-            <DateRangePicker
-              startDate={customStartDate}
-              endDate={customEndDate}
-              onStartChange={setCustomStart}
-              onEndChange={setCustomEnd}
-            />
-          )}
-
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Event Type</span>
-            <Select
-              value={activeFilters.eventType ?? '__all__'}
-              onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
-                {activeFilters.eventType && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
-                {filterEventTypes.map((et) => (
-                  <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
-                    {et}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <span className="text-xs font-semibold text-foreground">Date Range</span>
+            <div className="flex flex-wrap items-end gap-2">
+              <TimeRangeSelector value={preset} onChange={setPreset} />
+              {preset === TimeRangePreset.CUSTOM && (
+                <DateRangePicker
+                  startDate={customStartDate}
+                  endDate={customEndDate}
+                  onStartChange={setCustomStart}
+                  onEndChange={setCustomEnd}
+                />
+              )}
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Event Type</span>
+                <Select
+                  value={activeFilters.eventType ?? '__all__'}
+                  onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
+                >
+                  <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
+                    {activeFilters.eventType && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
+                    {filterEventTypes.map((et) => (
+                      <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
+                        {et}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Peak Season</span>
+                <Select
+                  value={activeFilters.isPeakSeason ?? 'either'}
+                  onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
+                >
+                  <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
+                    {activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
+                    <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
+                    <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Peak Season</span>
-            <Select
-              value={activeFilters.isPeakSeason ?? 'either'}
-              onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
-            >
-              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
-                {activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
-                <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
-                <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {allProducts.length > 0 && (
-            <ProductFilter
-              products={allProducts}
-              selected={activeFilters.skus ?? []}
-              onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
-            />
-          )}
+          <div className="h-8 w-px bg-border self-end" />
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Category</span>
-            <Select
-              value={activeFilters.category ?? '__all__'}
-              onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
-                {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
-                {filterCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <span className="text-xs font-semibold text-foreground">Products</span>
+            <div className="flex flex-wrap items-end gap-2">
+              {allProducts.length > 0 && (
+                <ProductFilter
+                  products={allProducts}
+                  selected={activeFilters.skus ?? []}
+                  onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
+                />
+              )}
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Category</span>
+                <Select
+                  value={activeFilters.category ?? '__all__'}
+                  onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
+                >
+                  <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
+                    {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
+                    {filterCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Assembled</span>
+                <Select
+                  value={activeFilters.isAssembledProduct ?? 'either'}
+                  onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
+                >
+                  <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-assembled">
+                    {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
+                    <SelectItem value="true" data-testid="option-assembled-true">True</SelectItem>
+                    <SelectItem value="false" data-testid="option-assembled-false">False</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
+
+          <div className="h-8 w-px bg-border self-end" />
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Assembled</span>
-            <Select
-              value={activeFilters.isAssembledProduct ?? 'either'}
-              onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
-            >
-              <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-assembled">
-                {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
-                <SelectItem value="true" data-testid="option-assembled-true">True</SelectItem>
-                <SelectItem value="false" data-testid="option-assembled-false">False</SelectItem>
-              </SelectContent>
-            </Select>
+            <span className="text-xs font-semibold text-foreground">Sales Channel</span>
+            <div className="flex flex-wrap items-end gap-2">
+              {!channelsLoading && allChannels.length > 0 && (
+                <ChannelFilter
+                  channels={allChannels}
+                  selected={activeChannels}
+                  onChange={handleChannelChange}
+                />
+              )}
+            </div>
           </div>
-
-          {!channelsLoading && allChannels.length > 0 && (
-            <ChannelFilter
-              channels={allChannels}
-              selected={activeChannels}
-              onChange={handleChannelChange}
-            />
-          )}
         </div>
       </div>
 
