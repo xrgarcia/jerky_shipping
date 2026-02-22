@@ -1760,6 +1760,13 @@ function PurchaseOrdersTab() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
 
+  const { value: kitFilter, setValue: setKitFilter } = useUserPreference<string>(
+    "purchase-orders", "kit-filter", "no", { debounceMs: 300 }
+  );
+  const { value: assembledFilter, setValue: setAssembledFilter } = useUserPreference<string>(
+    "purchase-orders", "assembled-filter", "either", { debounceMs: 300 }
+  );
+
   const readinessQuery = useQuery<{
     ready: boolean;
     ifdDate: string | null;
@@ -1841,8 +1848,18 @@ function PurchaseOrdersTab() {
     if (supplierFilter !== "all") {
       rows = rows.filter((r: any) => r.supplier === supplierFilter);
     }
+    if (kitFilter === "yes") {
+      rows = rows.filter((r: any) => r.is_kit === true);
+    } else if (kitFilter === "no") {
+      rows = rows.filter((r: any) => r.is_kit !== true);
+    }
+    if (assembledFilter === "yes") {
+      rows = rows.filter((r: any) => r.is_assembled_product === true);
+    } else if (assembledFilter === "no") {
+      rows = rows.filter((r: any) => r.is_assembled_product !== true);
+    }
     return rows;
-  }, [snapshot, searchTerm, categoryFilter, supplierFilter]);
+  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter]);
 
   const summaryStats = useMemo(() => {
     const totalSkus = filtered.length;
@@ -1987,6 +2004,26 @@ function PurchaseOrdersTab() {
             {suppliers.map((s) => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={kitFilter} onValueChange={setKitFilter}>
+          <SelectTrigger className="w-[120px]" data-testid="select-po-kit">
+            <SelectValue placeholder="Kit" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="either">Kit: Either</SelectItem>
+            <SelectItem value="yes">Kit: Yes</SelectItem>
+            <SelectItem value="no">Kit: No</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={assembledFilter} onValueChange={setAssembledFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="select-po-assembled">
+            <SelectValue placeholder="Assembled" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="either">Assembled: Either</SelectItem>
+            <SelectItem value="yes">Assembled: Yes</SelectItem>
+            <SelectItem value="no">Assembled: No</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground whitespace-nowrap">
