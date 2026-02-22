@@ -1910,7 +1910,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "Total Stock", "In Kits", "Unit Cost"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -1923,7 +1923,9 @@ function PurchaseOrdersTab() {
       if (hasProjection) {
         const direct = Math.round(Number(r.projected_units_sold ?? 0));
         const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
-        row.push(String(direct), String(kits), String(direct + kits));
+        const projTotal = direct + kits;
+        const recPurchase = projTotal - (r.total_stock ?? 0);
+        row.push(String(direct), String(kits), String(projTotal), recPurchase > 0 ? String(Math.round(recPurchase)) : "");
       }
       csvRows.push(row.join(","));
     }
@@ -2168,6 +2170,7 @@ function PurchaseOrdersTab() {
                       <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Direct</TableHead>
                       <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Kits</TableHead>
                       <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Total</TableHead>
+                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Rec. Purchase</TableHead>
                     </>
                   )}
                 </TableRow>
@@ -2209,6 +2212,9 @@ function PurchaseOrdersTab() {
                             <TableCell className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${(total - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                              {(total - (row.total_stock ?? 0)) > 0 ? Math.round(total - (row.total_stock ?? 0)).toLocaleString() : "—"}
+                            </TableCell>
                           </>
                         );
                       })()}
