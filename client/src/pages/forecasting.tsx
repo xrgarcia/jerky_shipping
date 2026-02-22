@@ -1877,8 +1877,8 @@ function PurchaseOrdersTab() {
   }, [filtered, selectedDate]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col flex-1 min-h-0 gap-4">
+      <div className="flex flex-wrap items-center gap-3 shrink-0">
         <Card className="flex-1 min-w-[200px]">
           <CardContent className="pt-4 pb-3 px-4">
             <div className="flex items-center gap-2">
@@ -1956,7 +1956,7 @@ function PurchaseOrdersTab() {
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 shrink-0">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -2010,8 +2010,8 @@ function PurchaseOrdersTab() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <div className="overflow-auto max-h-[600px]">
+        <Card className="flex flex-col flex-1 min-h-0">
+          <div className="overflow-auto flex-1">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
@@ -2081,22 +2081,22 @@ export default function Forecasting() {
   }, [setLocation]);
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 overflow-auto">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
+      <div className="flex items-center gap-3 shrink-0">
         <TrendingUp className="h-6 w-6 text-primary" />
         <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
           Forecasting
         </h1>
       </div>
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
+        <TabsList className="shrink-0">
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales">
+        <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
           <SalesTab />
         </TabsContent>
-        <TabsContent value="purchase-orders">
+        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-4">
           <PurchaseOrdersTab />
         </TabsContent>
       </Tabs>
