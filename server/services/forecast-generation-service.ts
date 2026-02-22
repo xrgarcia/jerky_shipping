@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { format, addDays, differenceInCalendarDays, addYears, subYears } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import logger from '../utils/logger';
+import { invalidateForecastingCache } from './forecasting-service';
 
 const CST_TIMEZONE = 'America/Chicago';
 const BATCH_SIZE = 500;
@@ -178,8 +179,9 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
     const existingCount = existingDates.size;
 
     if (existingCount >= totalDaysNeeded - 5) {
+      const cleared = await invalidateForecastingCache();
       const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
-      logger.info(`Sales forecast already complete: ${existingCount}/${totalDaysNeeded} days covered, skipping generation (${elapsed}s)`);
+      logger.info(`Sales forecast already complete: ${existingCount}/${totalDaysNeeded} days covered, skipping generation (${elapsed}s, cleared ${cleared} stale cache keys)`);
       return { totalRows: 0, daysProcessed: 0, errors: 0 };
     }
 
@@ -260,6 +262,11 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
 
     const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
     logger.info(`Sales forecast generation complete: ${totalRows} new rows, ${daysProcessed} days generated, ${daysSkipped} days skipped (already existed), ${errors} errors, ${elapsed}s`);
+
+    if (totalRows > 0) {
+      const cleared = await invalidateForecastingCache();
+      logger.info(`Cleared ${cleared} forecasting cache keys after generation`);
+    }
 
     return { totalRows, daysProcessed, errors };
   } finally {

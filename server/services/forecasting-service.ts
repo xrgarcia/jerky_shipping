@@ -24,6 +24,19 @@ import { getRedisClient } from '../utils/queue';
 const CACHE_TTL_SECONDS = 3600;
 const CST_TIMEZONE = 'America/Chicago';
 
+export async function invalidateForecastingCache(): Promise<number> {
+  try {
+    const redis = getRedisClient();
+    const keys = await redis.keys('forecasting:*');
+    if (keys.length > 0) {
+      await Promise.all(keys.map(k => redis.del(k)));
+    }
+    return keys.length;
+  } catch {
+    return 0;
+  }
+}
+
 function formatDate(d: Date): string {
   return format(d, 'yyyy-MM-dd');
 }
