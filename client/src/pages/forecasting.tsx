@@ -1271,14 +1271,13 @@ export default function Forecasting() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 overflow-auto">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <TrendingUp className="h-6 w-6 text-primary" />
-          <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
-            Forecasting
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="flex items-center gap-3">
+        <TrendingUp className="h-6 w-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
+          Forecasting
+        </h1>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
             <div className="flex flex-wrap items-center gap-2">
@@ -1385,7 +1384,6 @@ export default function Forecasting() {
               )}
             </div>
           </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
