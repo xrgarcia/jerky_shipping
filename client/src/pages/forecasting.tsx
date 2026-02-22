@@ -1279,43 +1279,6 @@ export default function Forecasting() {
           </h1>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          {allProducts.length > 0 && (
-            <ProductFilter
-              products={allProducts}
-              selected={activeFilters.skus ?? []}
-              onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
-            />
-          )}
-
-          {!channelsLoading && allChannels.length > 0 && (
-            <ChannelFilter
-              channels={allChannels}
-              selected={activeChannels}
-              onChange={handleChannelChange}
-            />
-          )}
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Category</span>
-            <Select
-              value={activeFilters.category ?? '__all__'}
-              onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
-                {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
-                {filterCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <TimeRangeSelector value={preset} onChange={setPreset} />
           {preset === TimeRangePreset.CUSTOM && (
             <DateRangePicker
@@ -1365,6 +1328,35 @@ export default function Forecasting() {
             </Select>
           </div>
 
+          {allProducts.length > 0 && (
+            <ProductFilter
+              products={allProducts}
+              selected={activeFilters.skus ?? []}
+              onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
+            />
+          )}
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Category</span>
+            <Select
+              value={activeFilters.category ?? '__all__'}
+              onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
+            >
+              <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
+                {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
+                {filterCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Assembled</span>
             <Select
@@ -1382,6 +1374,14 @@ export default function Forecasting() {
               </SelectContent>
             </Select>
           </div>
+
+          {!channelsLoading && allChannels.length > 0 && (
+            <ChannelFilter
+              channels={allChannels}
+              selected={activeChannels}
+              onChange={handleChannelChange}
+            />
+          )}
         </div>
       </div>
 
