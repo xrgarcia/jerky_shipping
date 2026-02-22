@@ -2021,9 +2021,9 @@ function PurchaseOrdersTab() {
             <SelectValue placeholder="Assembled" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="either">Assembled: Either</SelectItem>
-            <SelectItem value="yes">Assembled: Yes</SelectItem>
-            <SelectItem value="no">Assembled: No</SelectItem>
+            <SelectItem value="either">AP: Either</SelectItem>
+            <SelectItem value="yes">AP: Yes</SelectItem>
+            <SelectItem value="no">AP: No</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground whitespace-nowrap">
