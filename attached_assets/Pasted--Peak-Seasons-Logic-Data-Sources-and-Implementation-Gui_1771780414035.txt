@@ -1,0 +1,499 @@
+# Peak Seasons — Logic, Data Sources, and Implementation Guide
+
+This document explains how peak season data is defined, calculated, stored, and consumed across
+the Jerky Analytics ETL system. It is written as a complete implementation reference — an AI
+agent reading only this document should have enough context to implement the peak season system
+from scratch or extend it.
+
+---
+
+## 1. Business Context
+
+Jerky.com sells gift-oriented products (jerky, snacks) across Shopify, Amazon, and Walmart.
+Demand is highly seasonal. Getting inventory right before a peak means capturing full revenue;
+missing it means a stockout (Jerky.com lost $1M+ in a prior year to stockouts).
+
+Peak season data serves two downstream systems:
+
+1. **Purchase Order Recommendation Engine** — uses `days_to_peak`, `days_since_peak`,
+   `is_peak_season`, and `peak_velocity_ratio` fields to apply seasonal multipliers when
+   calculating how much inventory to reorder.
+
+2. **Sales Metrics Lookup** — uses `peak_season_dates` to align year-over-year comparisons to
+   the same position within the equivalent holiday window last year (not flat -365 days), so
+   forecasting math is not distorted by moving holidays like Easter or Father's Day.
+
+---
+
+## 2. The Four Peak Seasons
+
+| ID | Name | Type | Duration | Definition |
+|----|------|------|----------|------------|
+| 1 | Christmas | Fixed | 47 days | Nov 15 – Dec 31 every year |
+| 2 | Father's Day | Floating | 28 days | 4 weeks before the 3rd Sunday in June |
+| 3 | Easter | Floating | 21 days | 3 weeks before Easter Sunday (Butcher's Algorithm) |
+| 4 | Valentine's Day | Fixed | 21 days | Jan 24 – Feb 14 every year |
+
+**Fixed seasons** have the same calendar dates every year.
+
+**Floating seasons** shift by up to ~3 weeks year-over-year:
+- Easter 2024: Mar 31 → season Mar 10 – Mar 31
+- Easter 2025: Apr 20 → season Mar 30 – Apr 20 (20-day shift forward)
+- Father's Day 2024: Jun 16 → season May 19 – Jun 16
+- Father's Day 2025: Jun 15 → season May 18 – Jun 15 (1-day shift, but can vary more)
+
+This shifting is precisely why flat `-365 day` YoY comparisons fail for floating holidays.
+
+---
+
+## 3. Database Schema
+
+### 3.1 `peak_season_types`
+
+Lookup/reference table. Rows are static — do not change them.
+
+```sql
+CREATE TABLE peak_season_types (
+    id                   INTEGER PRIMARY KEY,
+    name                 VARCHAR(50) NOT NULL UNIQUE,  -- "Christmas", "Father's Day", etc.
+    is_floating          BOOLEAN NOT NULL,              -- TRUE for Easter, Father's Day
+    description          TEXT,
+    typical_duration_days INTEGER NOT NULL,
+    created_at           TIMESTAMP,
+    updated_at           TIMESTAMP
+);
+```
+
+Live values:
+
+| id | name | is_floating | typical_duration_days |
+|----|------|-------------|----------------------|
+| 1 | Christmas | false | 47 |
+| 2 | Father's Day | true | 28 |
+| 3 | Easter | true | 21 |
+| 4 | Valentine's Day | false | 21 |
+
+### 3.2 `peak_season_dates`
+
+One row per (season_type, year) combination. Populated by `sync_peak_seasons` job.
+
+```sql
+CREATE TABLE peak_season_dates (
+    id                          INTEGER PRIMARY KEY,
+    peak_season_type_id         INTEGER REFERENCES peak_season_types(id) NOT NULL,
+    year                        INTEGER NOT NULL,
+    start_date                  DATE NOT NULL,       -- marketing window start
+    end_date                    DATE NOT NULL,       -- = actual_peak_date for most seasons
+    actual_peak_date            TIMESTAMPTZ,         -- the holiday itself (e.g., Easter Sunday)
+    notes                       TEXT,                -- e.g., "Easter Sunday on 2025-04-20"
+
+    -- Lead Time Intelligence (from purchase order history)
+    avg_lead_time_days          INTEGER,             -- avg days before season start POs are placed
+    min_lead_time_days          INTEGER,
+    max_lead_time_days          INTEGER,
+    recommended_order_start_date DATE,               -- = season start - avg_lead - buffer
+    critical_order_deadline     DATE,                -- last safe day to place orders
+
+    -- Financial Patterns
+    historical_order_value_avg  NUMERIC(12,2),       -- avg PO $ amount during season
+    order_frequency_multiplier  NUMERIC(4,2),        -- how much more often orders are placed vs baseline
+    total_orders_last_occurrence INTEGER,            -- PO count in most recent occurrence
+    price_trend_indicator       VARCHAR(20),         -- STABLE / INCREASING / DECREASING
+
+    -- Sales Performance (currently DISABLED, columns exist but are NULL)
+    total_units_sold            INTEGER,
+    total_revenue               NUMERIC(12,2),
+    yoy_units_growth_rate       NUMERIC(5,2),
+    yoy_revenue_growth_rate     NUMERIC(5,2),
+    growth_factor               NUMERIC(5,2),
+
+    -- Operational Intelligence
+    optimal_order_window_days   INTEGER,
+    confidence_score            NUMERIC(3,2),        -- 0.00–1.00
+    seasonal_sku_count          INTEGER,             -- unique SKUs ordered during season
+    suggested_buffer_days       INTEGER,
+    risk_level                  VARCHAR(10),         -- HIGH / MEDIUM / LOW
+
+    last_calculated_at          TIMESTAMPTZ,
+    created_at                  TIMESTAMPTZ,
+    updated_at                  TIMESTAMPTZ
+);
+```
+
+> **Note**: `confidence_score` is currently `0.00` and `risk_level` is `HIGH` for all rows.
+> This is a known data quality gap — the confidence calculation requires more historical PO data
+> than is currently available. Do not rely on these fields for business decisions yet.
+
+### 3.3 `peak_season_suppliers`
+
+Top-20 suppliers per peak season, ranked by total seasonal order value.
+
+```sql
+CREATE TABLE peak_season_suppliers (
+    id                     INTEGER PRIMARY KEY,
+    peak_season_date_id    INTEGER REFERENCES peak_season_dates(id) ON DELETE CASCADE,
+    supplier_name          VARCHAR(255) NOT NULL,
+    historical_order_count INTEGER NOT NULL DEFAULT 0,
+    historical_total_value NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    avg_lead_time_days     INTEGER,
+    min_lead_time_days     INTEGER,
+    max_lead_time_days     INTEGER,
+    reliability_score      NUMERIC(3,2),            -- 0.00–1.00
+    on_time_delivery_rate  NUMERIC(3,2),            -- 0.00–1.00
+    avg_order_value        NUMERIC(10,2),
+    last_order_date        DATE,
+    supplier_rank          INTEGER,                  -- 1 = highest value supplier
+    created_at             TIMESTAMPTZ,
+    updated_at             TIMESTAMPTZ
+);
+```
+
+### 3.4 `peak_season_categories`
+
+Top-20 product categories per peak season, ranked by total seasonal order value.
+Categories are derived from SKU prefixes (e.g., `"JCB"` from `"JCB-SS-5-26"`).
+
+```sql
+CREATE TABLE peak_season_categories (
+    id                        INTEGER PRIMARY KEY,
+    peak_season_date_id       INTEGER REFERENCES peak_season_dates(id) ON DELETE CASCADE,
+    category_name             VARCHAR(100) NOT NULL,   -- SKU prefix before first hyphen
+    historical_order_count    INTEGER NOT NULL DEFAULT 0,
+    historical_total_value    NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    historical_total_quantity INTEGER NOT NULL DEFAULT 0,
+    avg_order_value           NUMERIC(10,2),
+    avg_unit_cost             NUMERIC(8,2),
+    unique_sku_count          INTEGER,
+    category_rank             INTEGER,                  -- 1 = highest value category
+    percentage_of_total_value NUMERIC(5,2),            -- 0.00–100.00
+    created_at                TIMESTAMPTZ,
+    updated_at                TIMESTAMPTZ
+);
+```
+
+### 3.5 `peak_season_sku_metrics`
+
+SKU-level metrics per peak season. **Currently DISABLED** — the calculation method was
+commented out because it was redundant with the dedicated `sales_metrics_lookup` table.
+Columns exist in the schema but the table is empty in production.
+
+---
+
+## 4. Date Calculation Rules
+
+All date logic lives in
+[jerky_analytics_etl/etl/jobs/sync_peak_seasons.py](jerky_analytics_etl/etl/jobs/sync_peak_seasons.py)
+in the `SyncPeakSeasonsJob` class.
+
+### 4.1 Christmas (type_id = 1) — Fixed
+
+```python
+start_date = date(year, 11, 15)        # Nov 15
+end_date   = date(year, 12, 31)        # Dec 31
+actual_peak_date = datetime(year, 12, 25, tzinfo=central_tz)  # Christmas Day
+```
+
+### 4.2 Father's Day (type_id = 2) — Floating
+
+```python
+def calculate_fathers_day(year):
+    d = date(year, 6, 1)
+    while d.weekday() != 6:   # find first Sunday in June
+        d += timedelta(days=1)
+    return d + timedelta(weeks=2)   # third Sunday = first Sunday + 2 weeks
+
+fathers_day = calculate_fathers_day(year)
+start_date  = fathers_day - timedelta(weeks=4)   # 4 weeks before
+end_date    = fathers_day
+actual_peak_date = datetime.combine(fathers_day, midnight, tzinfo=central_tz)
+```
+
+**Examples:**
+| Year | Father's Day | Season Start | Season End |
+|------|-------------|--------------|------------|
+| 2023 | Jun 18 | May 21 | Jun 18 |
+| 2024 | Jun 16 | May 19 | Jun 16 |
+| 2025 | Jun 15 | May 18 | Jun 15 |
+| 2026 | Jun 21 | May 24 | Jun 21 |
+
+### 4.3 Easter (type_id = 3) — Floating (Butcher's Algorithm)
+
+```python
+def calculate_easter(year):
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    day_offset = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * day_offset) // 451
+    month = (h + day_offset - 7 * m + 114) // 31
+    day = ((h + day_offset - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+easter = calculate_easter(year)
+start_date = easter - timedelta(weeks=3)   # 3 weeks before Easter Sunday
+end_date   = easter
+actual_peak_date = datetime.combine(easter, midnight, tzinfo=central_tz)
+```
+
+**Examples:**
+| Year | Easter Sunday | Season Start | Season End |
+|------|--------------|--------------|------------|
+| 2023 | Apr 9 | Mar 19 | Apr 9 |
+| 2024 | Mar 31 | Mar 10 | Mar 31 |
+| 2025 | Apr 20 | Mar 30 | Apr 20 |
+| 2026 | Apr 5 | Mar 15 | Apr 5 |
+
+### 4.4 Valentine's Day (type_id = 4) — Fixed
+
+```python
+vday = date(year, 2, 14)
+start_date = vday - timedelta(weeks=3)   # Jan 24
+end_date   = vday
+actual_peak_date = datetime(year, 2, 14, tzinfo=central_tz)
+```
+
+---
+
+## 5. The ETL Job: `sync_peak_seasons`
+
+**Script:** [jerky_analytics_etl/etl/jobs/sync_peak_seasons.py](jerky_analytics_etl/etl/jobs/sync_peak_seasons.py)
+
+**Triggered by:** `deploy/scripts/run_etl_jobs.py` (production) or manual `poetry run`
+
+**Dependencies (must run first):** `purchase_orders`, `orders`
+
+**Default args in production:**
+```bash
+poetry run python jerky_analytics_etl/etl/jobs/sync_peak_seasons.py \
+  --save-to-db --verbose --years=3
+```
+
+### 5.1 What the Job Does
+
+The job has two phases:
+
+**Phase 1 — Date Generation:**
+
+1. Determines the year range: from the earliest year in `purchase_orders` (auto-detected from
+   the `MIN(order_date)` of completed POs) through `current_year + years_ahead - 1`.
+2. For each year, calculates all four seasonal windows using the formulas above.
+3. In full mode (not `--incremental`): deletes all existing `peak_season_dates` rows for
+   those years (cascade deletes dependent `peak_season_suppliers` and `peak_season_categories`
+   rows too), then re-inserts fresh rows.
+
+**Phase 2 — Intelligence Calculation** (runs unless `--no-intelligence`):
+
+1. Fetches all completed purchase orders (`status = 'Completed'`) across the full historical range,
+   including line item detail (SKU, quantity, cost).
+2. Fetches all peak season date rows for the same range.
+3. Categorizes each PO into one of three buckets:
+   - `baseline` — not near any peak season
+   - `pre_seasonal` — within 60 days before a season's `start_date`
+   - `during_seasonal` — between `start_date` and `end_date` (inclusive)
+4. For each season, delegates to `SupplierLeadTimeService.get_seasonal_planning_intelligence()`
+   to calculate lead time fields (`avg_lead_time_days`, `recommended_order_start_date`,
+   `critical_order_deadline`, `suggested_buffer_days`, `confidence_score`, `risk_level`).
+5. Calculates financial pattern fields directly (avg PO value, SKU count).
+6. Calculates and saves supplier intelligence via
+   `SupplierLeadTimeService.get_supplier_planning_intelligence()` — top 20 suppliers ranked
+   by total seasonal order value.
+7. Calculates category intelligence from SKU prefixes — top 20 categories ranked by total
+   seasonal order value.
+8. Commits all changes atomically per season. If one season fails, rolls back and continues.
+
+### 5.2 CLI Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--years` | 3 | Number of years ahead to generate (current year + N ahead) |
+| `--save-to-db` | False | Actually write to database |
+| `--dry-run` | False | Run calculations without writing |
+| `--verbose` | False | Enable verbose logging |
+| `--no-intelligence` | False | Skip intelligence phase (date generation only) |
+| `--incremental` | False | Skip date re-generation; only update intelligence on existing rows |
+| `--analysis-years` | 5 | Max years of historical PO data to analyze |
+
+### 5.3 Idempotency
+
+The job is fully idempotent. Re-running with `--save-to-db` deletes and regenerates all rows
+for the covered year range. You can re-run safely at any time without corrupting data.
+
+---
+
+## 6. Service Layer: `PeakSeasonService`
+
+**File:** [jerky_analytics_etl/services/peak_season_service.py](jerky_analytics_etl/services/peak_season_service.py)
+
+This service provides read-only lookup methods used by downstream consumers (forecasting,
+sales metrics). It never writes data.
+
+### 6.1 Key Methods
+
+```python
+# Get the peak season that contains a given date (or None if off-peak)
+service.get_peak_season_containing_date(reference_date: date) -> Optional[PeakSeasonInfo]
+
+# Get the next upcoming peak season after a date
+service.get_next_peak_season(reference_date: date) -> Optional[PeakSeasonInfo]
+
+# Get last year's equivalent peak season (same type, year-1)
+service.get_last_year_peak_season(peak_season: PeakSeasonInfo) -> Optional[PeakSeasonInfo]
+
+# Get N previous seasons of the same type (descending by year)
+service.get_previous_peak_seasons(peak_season: PeakSeasonInfo, count=3) -> List[PeakSeasonInfo]
+
+# Get a specific season by name and year
+service.get_peak_season_by_type_and_year(peak_season_type: str, year: int) -> Optional[PeakSeasonInfo]
+
+# Get the N most recently completed peak seasons
+service.get_recent_completed_peak_seasons(reference_date: date, count=4) -> List[PeakSeasonInfo]
+
+# Convert a PeakSeasonInfo to a timezone-aware datetime range (US Central)
+service.create_timezone_aware_datetime_range(peak_season: PeakSeasonInfo) -> Tuple[datetime, datetime]
+```
+
+### 6.2 `PeakSeasonInfo` Data Model
+
+```python
+class PeakSeasonInfo:
+    peak_season_id: int        # PK from peak_season_dates
+    peak_season_name: str      # e.g., "Easter"
+    peak_season_type_id: int   # 1=Christmas, 2=Father's Day, 3=Easter, 4=Valentine's
+    year: int
+    start_date: date
+    end_date: date
+    actual_peak_date: date     # the holiday itself
+    notes: Optional[str]
+    days_in_season: int        # computed: (end_date - start_date).days + 1
+```
+
+### 6.3 Usage Pattern
+
+```python
+from jerky_analytics_etl.services.peak_season_service import get_peak_season_service
+from datetime import date
+
+service = get_peak_season_service()
+
+# Check if today is in a peak season
+today = date.today()
+current_season = service.get_peak_season_containing_date(today)
+if current_season:
+    print(f"In peak season: {current_season}")  # "Easter 2025 (2025-03-30 to 2025-04-20)"
+    last_year = service.get_last_year_peak_season(current_season)
+    # last_year = Easter 2024 (2024-03-10 to 2024-03-31)
+```
+
+---
+
+## 7. How Peak Season Data is Used Downstream
+
+### 7.1 Sales Metrics Lookup — YoY Window Alignment
+
+**File:** [jerky_analytics_etl/services/sales_data_repository.py](jerky_analytics_etl/services/sales_data_repository.py)
+
+The `OrdersRepository._get_yoy_daily_date()` method uses peak season data to find the
+equivalent day last year aligned to the same position in the season:
+
+```
+reference_date = 2025-04-10  (day 11 of Easter 2025: Mar 30 – Apr 20)
+Easter 2024: Mar 10 – Mar 31
+aligned YoY date = 2024-03-20  (day 11 of Easter 2024)
+```
+
+The `_get_yoy_window_dates()` method (added in the peak-season YoY fix) builds a 14-day window
+ending at that aligned date, giving `yoy_start_date` and `yoy_end_date` in `sales_metrics_lookup`.
+
+For dates outside any peak season, both methods fall back to a flat `-365 day` offset.
+
+### 7.2 Purchase Order Recommendation Engine
+
+The PO engine reads the following fields from `sales_metrics_lookup` (which are in turn
+populated using peak season context):
+
+| Field | Source | Used For |
+|-------|--------|---------|
+| `is_peak_season` | Whether `order_date BETWEEN start_date AND end_date` | Applies peak velocity multiplier |
+| `peak_season_name` | From `peak_season_types.name` | Labels the recommendation |
+| `days_to_peak` | `start_date - order_date` (when order_date < start_date) | Peak Proximity Index (PPI) |
+| `days_since_peak` | `order_date - end_date` (when order_date > end_date) | Post-Event Decay (PED) |
+| `peak_velocity_ratio` | Ratio of peak sales velocity to baseline | Seasonal demand multiplier |
+| `yoy_units_sold` | Season-aligned 14-day YoY window | Year-over-year growth factor |
+
+---
+
+## 8. Timezone Handling
+
+All timestamps use **US Central timezone** (`America/Chicago`, includes DST handling via `ZoneInfo`).
+
+- `actual_peak_date` in `peak_season_dates` is stored as `TIMESTAMPTZ` (timezone-aware).
+- `start_date` and `end_date` are stored as `DATE` (no timezone).
+- When converting date → datetime for SQL comparisons, use:
+  ```python
+  from zoneinfo import ZoneInfo
+  central_tz = ZoneInfo("America/Chicago")
+  dt = datetime.combine(d, datetime.min.time()).replace(tzinfo=central_tz)
+  ```
+
+---
+
+## 9. Running the Job
+
+```bash
+# Full run (dates + intelligence) — normal production usage
+poetry run python jerky_analytics_etl/etl/jobs/sync_peak_seasons.py \
+  --save-to-db --verbose --years=3
+
+# Date generation only (no intelligence)
+poetry run python jerky_analytics_etl/etl/jobs/sync_peak_seasons.py \
+  --save-to-db --no-intelligence
+
+# Update intelligence only on existing rows (faster, doesn't delete/recreate dates)
+poetry run python jerky_analytics_etl/etl/jobs/sync_peak_seasons.py \
+  --save-to-db --incremental
+
+# Dry run to inspect generated dates without writing
+poetry run python jerky_analytics_etl/etl/jobs/sync_peak_seasons.py \
+  --dry-run --verbose --years=2
+```
+
+---
+
+## 10. Key Implementation Notes
+
+1. **Butcher's Algorithm** is used for Easter — do not replace it with a library without
+   verifying output matches. The algorithm is in `SyncPeakSeasonsJob.calculate_easter()`.
+
+2. **Father's Day** = 3rd Sunday in June. The implementation finds the first Sunday in June
+   then adds exactly 14 days. Do not use `timedelta(weeks=2)` thinking from the holiday itself
+   — the calculation is: first Sunday + 14 days = third Sunday.
+
+3. **Season end_date is inclusive**. When writing SQL, use `BETWEEN start_date AND end_date`
+   or `order_date <= end_date`. The `PeakSeasonService.create_timezone_aware_datetime_range()`
+   method sets end time to `23:59:59` (not `23:59:59.999999`) to avoid microsecond edge cases.
+
+4. **Delete-then-insert pattern** (not upsert). The full-mode job deletes all rows for the
+   processed year range before inserting. This means cascade deletes wipe supplier and category
+   data too — intelligence is fully recalculated from scratch each run.
+
+5. **`confidence_score` is always `0.00`** in the current production data. This is expected
+   and known. The `SupplierLeadTimeService` sets confidence based on PO data recency and
+   volume thresholds not yet met. Do not treat this as a bug.
+
+6. **Sales performance fields are NULL** (`total_units_sold`, `total_revenue`, etc. on
+   `peak_season_dates`). The calculation was explicitly disabled because it's now redundant
+   with the `sales_metrics_lookup` table. The code exists but is commented out.
+
+7. **Year range is auto-detected** from the earliest completed purchase order date. If the
+   `purchase_orders` table is empty, the fallback is `current_year - 3` to `current_year + years_ahead`.
+
+8. **Future seasons are generated** (up to `current_year + years_ahead - 1`). This is
+   intentional so the PO recommendation engine can plan orders for upcoming seasons even before
+   any sales data exists for that year.
