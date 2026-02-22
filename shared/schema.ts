@@ -2139,6 +2139,10 @@ export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
   caseCount: text("case_count"),
   moq: numeric("moq"),
   moqInfo: text("moq_info"),
+  // -- sales projection fields --
+  projectedUnitsSold: numeric("projected_units_sold"),
+  projectedUnitsSoldFromKits: numeric("projected_units_sold_from_kits"),
+  salesProjectionDate: timestamp("sales_projection_date"),
   // -- metadata --
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
