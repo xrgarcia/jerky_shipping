@@ -135,7 +135,7 @@ function AppContent() {
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
       <Route path="/smart-sessions" component={SmartSessions} />
       <Route path="/smart-rate-check" component={SmartRateCheck} />
-      <Route path="/forecasting" component={Forecasting} />
+      <Route path="/forecasting/:tab?" component={Forecasting} />
       <Route path="/skuvault-products" component={SkuvaultProducts} />
       <Route path="/profile" component={Profile} />
       <Route component={NotFound} />

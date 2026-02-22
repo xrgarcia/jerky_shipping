@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useState, useRef, useEffect } from "react";
-import { useSearch, useLocation } from "wouter";
+import { useSearch, useLocation, useRoute } from "wouter";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -1138,7 +1139,7 @@ const DEFAULT_FILTERS: SalesDataFilters = {
   isPeakSeason: 'either',
 };
 
-export default function Forecasting() {
+function SalesTab() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
 
@@ -1326,13 +1327,7 @@ export default function Forecasting() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 overflow-auto">
-      <div className="flex items-center gap-3">
-        <TrendingUp className="h-6 w-6 text-primary" />
-        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
-          Forecasting
-        </h1>
-      </div>
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
@@ -1742,6 +1737,53 @@ export default function Forecasting() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+function PurchaseOrdersTab() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="flex items-center justify-center py-20">
+          <p className="text-muted-foreground text-sm" data-testid="text-po-placeholder">
+            Purchase Orders coming soon
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function Forecasting() {
+  const [, params] = useRoute("/forecasting/:tab?");
+  const [, setLocation] = useLocation();
+  const activeTab = params?.tab || "sales";
+
+  const handleTabChange = useCallback((value: string) => {
+    setLocation(value === "sales" ? "/forecasting" : `/forecasting/${value}`);
+  }, [setLocation]);
+
+  return (
+    <div className="p-4 sm:p-6 space-y-6 overflow-auto">
+      <div className="flex items-center gap-3">
+        <TrendingUp className="h-6 w-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
+          Forecasting
+        </h1>
+      </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
+          <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
+        </TabsList>
+        <TabsContent value="sales">
+          <SalesTab />
+        </TabsContent>
+        <TabsContent value="purchase-orders">
+          <PurchaseOrdersTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
