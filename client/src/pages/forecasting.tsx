@@ -619,7 +619,7 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
   };
 
   return (
-    <div className="relative h-full min-h-[250px]" ref={containerRef}>
+    <div className="relative h-[250px] sm:h-[350px] lg:h-[400px]" ref={containerRef}>
     <ResponsiveContainer width="100%" height="100%">
       <LineChart
         data={chartData}
@@ -1339,8 +1339,8 @@ function SalesTab() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-      <div className="flex flex-wrap items-end gap-3 shrink-0">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
             <div className="flex flex-wrap items-center gap-2">
@@ -1587,8 +1587,8 @@ function SalesTab() {
         </Card>
       </div>
 
-      <Card className="flex flex-col flex-1 min-h-[300px]">
-        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 shrink-0">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
           <CardTitle className="text-base font-medium">
             Sales Revenue by Channel
           </CardTitle>
@@ -1598,7 +1598,7 @@ function SalesTab() {
             </span>
           )}
         </CardHeader>
-        <CardContent className="flex-1 min-h-0">
+        <CardContent>
           <SalesChart
             data={chartData}
             channels={displayChannels}
@@ -2245,7 +2245,7 @@ export default function Forecasting() {
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales" className="flex flex-col flex-1 min-h-0 mt-0 overflow-auto">
+        <TabsContent value="sales" className="flex-1 min-h-0 mt-0 overflow-y-auto">
           <SalesTab />
         </TabsContent>
         <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-0">
