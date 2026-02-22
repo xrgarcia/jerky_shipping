@@ -16185,6 +16185,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PURCHASE ORDER SNAPSHOTS ====================
+
+  app.get("/api/purchase-orders/readiness", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { checkSnapshotReadiness } = await import('./services/purchase-order-snapshot-service');
+      const result = await checkSnapshotReadiness();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to check snapshot readiness", message: error.message });
+    }
+  });
+
+  app.post("/api/purchase-orders/create-snapshot", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { createSnapshot } = await import('./services/purchase-order-snapshot-service');
+      const result = await createSnapshot();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create snapshot", message: error.message });
+    }
+  });
+
+  app.get("/api/purchase-orders/dates", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { getSnapshotDates } = await import('./services/purchase-order-snapshot-service');
+      const dates = await getSnapshotDates();
+      res.json(dates);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get snapshot dates", message: error.message });
+    }
+  });
+
+  app.get("/api/purchase-orders/snapshot", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { getSnapshot } = await import('./services/purchase-order-snapshot-service');
+      const date = req.query.date as string | undefined;
+      const rows = await getSnapshot(date);
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get snapshot", message: error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
