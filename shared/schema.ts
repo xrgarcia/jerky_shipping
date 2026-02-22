@@ -2094,3 +2094,63 @@ export const salesForecasting = pgTable("sales_forecasting", {
 }));
 
 export type SalesForecasting = typeof salesForecasting.$inferSelect;
+
+// ============================================================================
+// PURCHASE ORDER SNAPSHOTS
+// ============================================================================
+
+/**
+ * Purchase Order Snapshots - Daily inventory snapshots combining skuvault_products
+ * and inventory_forecasts_daily (IFD) data from the GCP reporting database.
+ * 
+ * Primary key: composite (stock_check_date + sku)
+ * Created on-demand when warehouse management clicks "Create Purchase Order"
+ * Only enabled when IFD and internal_inventory snapshot dates match and are
+ * newer than the latest local snapshot.
+ */
+export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
+  id: serial("id").primaryKey(),
+  stockCheckDate: timestamp("stock_check_date").notNull(),
+  sku: text("sku").notNull(),
+  // -- skuvault_products fields --
+  productTitle: text("product_title"),
+  barcode: text("barcode"),
+  productCategory: text("product_category"),
+  isAssembledProduct: boolean("is_assembled_product").notNull().default(false),
+  isKit: boolean("is_kit").notNull().default(false),
+  unitCost: text("unit_cost"),
+  productImageUrl: text("product_image_url"),
+  weightValue: real("weight_value"),
+  weightUnit: text("weight_unit"),
+  parentSku: text("parent_sku"),
+  quantityOnHand: integer("quantity_on_hand").notNull().default(0),
+  availableQuantity: integer("available_quantity").notNull().default(0),
+  physicalLocation: text("physical_location"),
+  brand: text("brand"),
+  // -- IFD-specific fields --
+  supplier: text("supplier"),
+  description: text("description"),
+  leadTime: integer("lead_time"),
+  quantityIncoming: integer("quantity_incoming"),
+  extAmznInv: integer("ext_amzn_inv"),
+  extWlmtInv: integer("ext_wlmt_inv"),
+  totalStock: integer("total_stock"),
+  quantityInKits: integer("quantity_in_kits"),
+  caseCount: text("case_count"),
+  moq: numeric("moq"),
+  moqInfo: text("moq_info"),
+  // -- metadata --
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  dateSkuIdx: index("po_snapshots_date_sku_idx").on(table.stockCheckDate, table.sku),
+  stockCheckDateIdx: index("po_snapshots_stock_check_date_idx").on(table.stockCheckDate),
+  skuIdx: index("po_snapshots_sku_idx").on(table.sku),
+}));
+
+export const insertPurchaseOrderSnapshotSchema = createInsertSchema(purchaseOrderSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPurchaseOrderSnapshot = z.infer<typeof insertPurchaseOrderSnapshotSchema>;
+export type PurchaseOrderSnapshot = typeof purchaseOrderSnapshots.$inferSelect;
