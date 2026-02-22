@@ -579,7 +579,7 @@ export class ForecastingService {
         }
 
         if (channelGrowthRows.length === 0) {
-          const localGrowth = await db.select({
+          const localGrowth = await db.selectDistinctOn([salesForecasting.salesChannel], {
             sales_channel: salesForecasting.salesChannel,
             yoy_growth_factor: salesForecasting.yoyGrowthFactor,
           })
@@ -589,6 +589,34 @@ export class ForecastingService {
           channelGrowthRows = localGrowth.map(r => ({
             sales_channel: r.sales_channel,
             yoy_growth_factor: r.yoy_growth_factor,
+          }));
+        }
+
+        if (channelTrendRows.length === 0) {
+          const localTrend = await db.selectDistinctOn([salesForecasting.salesChannel], {
+            sales_channel: salesForecasting.salesChannel,
+            trend_factor: salesForecasting.trendFactor,
+          })
+            .from(salesForecasting)
+            .where(and(where!, isNotNull(salesForecasting.trendFactor)))
+            .orderBy(salesForecasting.salesChannel, desc(salesForecasting.orderDate));
+          channelTrendRows = localTrend.map(r => ({
+            sales_channel: r.sales_channel,
+            trend_factor: r.trend_factor,
+          }));
+        }
+
+        if (channelConfidenceRows.length === 0) {
+          const localConf = await db.selectDistinctOn([salesForecasting.salesChannel], {
+            sales_channel: salesForecasting.salesChannel,
+            confidence_level: salesForecasting.confidenceLevel,
+          })
+            .from(salesForecasting)
+            .where(and(where!, isNotNull(salesForecasting.confidenceLevel)))
+            .orderBy(salesForecasting.salesChannel, desc(salesForecasting.orderDate));
+          channelConfidenceRows = localConf.map(r => ({
+            sales_channel: r.sales_channel,
+            confidence_level: r.confidence_level,
           }));
         }
       }
