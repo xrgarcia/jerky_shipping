@@ -1909,7 +1909,7 @@ function PurchaseOrdersTab() {
 
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
-    const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "Total Stock", "In Kits", "Unit Cost"];
+    const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock", "Unit Cost"];
     if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
@@ -1917,8 +1917,8 @@ function PurchaseOrdersTab() {
         r.sku, `"${(r.product_title || '').replace(/"/g, '""')}"`, r.product_category || '',
         `"${(r.supplier || '').replace(/"/g, '""')}"`, r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
         r.quantity_incoming ?? '', r.lead_time ?? '', r.moq ?? '',
-        r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.total_stock ?? '',
-        r.quantity_in_kits ?? '', r.unit_cost ?? ''
+        r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.quantity_in_kits ?? '',
+        r.total_stock ?? '', r.unit_cost ?? ''
       ];
       if (hasProjection) {
         const direct = Math.round(Number(r.projected_units_sold ?? 0));
@@ -2162,8 +2162,8 @@ function PurchaseOrdersTab() {
                   <TableHead className="text-right sticky top-0 bg-card z-10">MOQ</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Amzn</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Wlmt</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">In Kits</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
                   {hasProjection && (
                     <>
@@ -2200,8 +2200,8 @@ function PurchaseOrdersTab() {
                       <TableCell className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
                       {hasProjection && (() => {
                         const direct = Number(row.projected_units_sold ?? 0);
