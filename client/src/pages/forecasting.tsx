@@ -34,8 +34,8 @@ import {
   TIME_RANGE_LABELS,
 } from "@shared/forecasting-types";
 import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting-types";
-import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useKitTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote } from "@/hooks/use-forecasting";
-import type { SalesDataFilters } from "@/hooks/use-forecasting";
+import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useKitTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote, useUpcomingPeakSeasons } from "@/hooks/use-forecasting";
+import type { SalesDataFilters, PeakSeasonPreset } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
@@ -158,9 +158,12 @@ function MetricCard({
 interface TimeRangeSelectorProps {
   value: TimeRangePreset;
   onChange: (preset: TimeRangePreset) => void;
+  peakSeasons?: PeakSeasonPreset[];
+  onPeakSeasonSelect?: (season: PeakSeasonPreset) => void;
+  activePeakSeasonKey?: string | null;
 }
 
-function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
+function TimeRangeSelector({ value, onChange, peakSeasons, onPeakSeasonSelect, activePeakSeasonKey }: TimeRangeSelectorProps) {
   const historicalPresets = [
     TimeRangePreset.LAST_30_DAYS,
     TimeRangePreset.LAST_60_DAYS,
@@ -174,9 +177,28 @@ function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     TimeRangePreset.NEXT_90_DAYS,
     TimeRangePreset.NEXT_12_MONTHS,
   ];
+
+  const displayValue = activePeakSeasonKey
+    ? activePeakSeasonKey
+    : value;
+
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as TimeRangePreset)}>
-      <SelectTrigger className="w-[180px]" data-testid="select-time-range">
+    <Select
+      value={displayValue}
+      onValueChange={(v) => {
+        if (v.startsWith('peak_')) {
+          const season = peakSeasons?.find(
+            (s) => `peak_${s.peakSeasonTypeId}_${s.year}` === v
+          );
+          if (season && onPeakSeasonSelect) {
+            onPeakSeasonSelect(season);
+          }
+        } else {
+          onChange(v as TimeRangePreset);
+        }
+      }}
+    >
+      <SelectTrigger className="w-[220px]" data-testid="select-time-range">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -193,6 +215,22 @@ function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
             {TIME_RANGE_LABELS[preset]}
           </SelectItem>
         ))}
+        {peakSeasons && peakSeasons.length > 0 && (
+          <>
+            <div className="my-1 border-t" />
+            <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Peak Seasons</div>
+            {peakSeasons.map((season) => {
+              const key = `peak_${season.peakSeasonTypeId}_${season.year}`;
+              const startFormatted = format(parseISO(season.startDate), 'MMM d');
+              const endFormatted = format(parseISO(season.endDate), 'MMM d');
+              return (
+                <SelectItem key={key} value={key} data-testid={`option-${key}`}>
+                  {season.name} {season.year} ({startFormatted} – {endFormatted})
+                </SelectItem>
+              );
+            })}
+          </>
+        )}
         <div className="my-1 border-t" />
         <SelectItem value={TimeRangePreset.CUSTOM} data-testid={`option-${TimeRangePreset.CUSTOM}`}>
           {TIME_RANGE_LABELS[TimeRangePreset.CUSTOM]}
