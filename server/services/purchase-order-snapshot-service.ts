@@ -59,15 +59,18 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
   const snapshotDate = readiness.ifdDate!;
   logger.info(`Creating purchase order snapshot for ${snapshotDate}`);
 
+  const maxTsResult = await reportingSql`SELECT MAX(stock_check_date) as d FROM inventory_forecasts_daily`;
+  const maxTimestamp = maxTsResult[0]?.d;
+
   const ifdRows = await reportingSql`
     SELECT sku, supplier, description, lead_time, quantity_available, quantity_incoming,
            ext_amzn_inv, ext_wlmt_inv, total_stock, quantity_in_kits, case_count, moq, moq_info,
            product_category, is_assembled_product, unit_cost
     FROM inventory_forecasts_daily
-    WHERE stock_check_date::date = ${snapshotDate}::date
+    WHERE stock_check_date = ${maxTimestamp}
   `;
 
-  logger.info(`IFD returned ${ifdRows.length} rows for ${snapshotDate}`);
+  logger.info(`IFD returned ${ifdRows.length} rows for ${snapshotDate} (raw ts: ${maxTimestamp})`);
 
   const ifdMap = new Map<string, any>();
   for (const row of ifdRows) {
