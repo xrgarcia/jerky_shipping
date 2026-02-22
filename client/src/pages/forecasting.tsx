@@ -2010,9 +2010,8 @@ function PurchaseOrdersTab() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="flex flex-col flex-1 min-h-0">
-          <div className="overflow-auto flex-1">
-            <Table>
+        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <Table containerClassName="flex-1 overflow-auto">
               <TableHeader>
                 <TableRow>
                   <TableHead className="whitespace-nowrap sticky top-0 bg-card z-10">SKU</TableHead>
@@ -2064,7 +2063,6 @@ function PurchaseOrdersTab() {
                 })}
               </TableBody>
             </Table>
-          </div>
         </Card>
       )}
     </div>
