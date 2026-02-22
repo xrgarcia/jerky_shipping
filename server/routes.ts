@@ -15837,6 +15837,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== FORECASTING ROUTES ==========
   
+  app.get("/api/forecasting/peak-seasons", async (_req: Request, res: Response) => {
+    try {
+      const { forecastingService } = await import('./services/forecasting-service');
+      const result = await forecastingService.getUpcomingPeakSeasons(3);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Forecasting] Error fetching peak seasons:", error);
+      res.status(500).json({ error: "Failed to fetch peak seasons: " + error.message });
+    }
+  });
+
   app.get("/api/forecasting/channels", async (_req: Request, res: Response) => {
     try {
       const { forecastingService } = await import('./services/forecasting-service');

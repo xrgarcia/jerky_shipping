@@ -204,6 +204,30 @@ export class ForecastingService {
     };
   }
 
+  async getUpcomingPeakSeasons(limit: number = 3): Promise<Array<{ peakSeasonTypeId: number; name: string; year: number; startDate: string; endDate: string }>> {
+    const PEAK_SEASON_NAMES: Record<number, string> = {
+      1: 'Christmas',
+      2: "Father's Day",
+      3: 'Easter',
+      4: "Valentine's Day",
+    };
+    const today = formatDate(nowCentral());
+    const rows = await reportingSql`
+      SELECT peak_season_type_id, year, start_date, end_date
+      FROM peak_season_dates
+      WHERE start_date >= ${today}
+      ORDER BY start_date ASC
+      LIMIT ${limit}
+    `;
+    return rows.map((r: any) => ({
+      peakSeasonTypeId: r.peak_season_type_id,
+      name: PEAK_SEASON_NAMES[r.peak_season_type_id] || `Peak Season ${r.peak_season_type_id}`,
+      year: r.year,
+      startDate: format(new Date(r.start_date), 'yyyy-MM-dd'),
+      endDate: format(new Date(r.end_date), 'yyyy-MM-dd'),
+    }));
+  }
+
   async getDistinctChannels(): Promise<ForecastingChannelsResponse> {
     return cachedFetch(buildCacheKey('channels'), async () => {
       const rows = await reportingSql`
