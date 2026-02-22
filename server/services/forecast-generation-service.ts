@@ -1,6 +1,6 @@
 import { reportingSql } from '../reporting-db';
 import { db } from '../db';
-import { salesForecasting } from '@shared/schema';
+import { salesForecasting, skuvaultProducts, kitComponentMappings } from '@shared/schema';
 import { sql } from 'drizzle-orm';
 import { format, addDays, differenceInCalendarDays, addYears, subYears } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
@@ -90,9 +90,57 @@ async function fetchSourceData(sourceDate: string): Promise<any[]> {
   return rows;
 }
 
-function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string): any {
+interface ProductLookup {
+  isAssembledProduct: boolean;
+  isKit: boolean;
+  parentSku: string;
+}
+
+interface ProductLookupMaps {
+  productMap: Map<string, ProductLookup>;
+  kitComponentMap: Map<string, string[]>;
+}
+
+async function loadProductLookupMaps(): Promise<ProductLookupMaps> {
+  const products = await db.select({
+    sku: skuvaultProducts.sku,
+    isAssembledProduct: skuvaultProducts.isAssembledProduct,
+    productCategory: skuvaultProducts.productCategory,
+    parentSku: skuvaultProducts.parentSku,
+  }).from(skuvaultProducts);
+
+  const productMap = new Map<string, ProductLookup>();
+  for (const p of products) {
+    productMap.set(p.sku, {
+      isAssembledProduct: p.isAssembledProduct,
+      isKit: p.productCategory === 'kit',
+      parentSku: p.parentSku || p.sku,
+    });
+  }
+
+  const components = await db.select({
+    componentSku: kitComponentMappings.componentSku,
+    kitSku: kitComponentMappings.kitSku,
+  }).from(kitComponentMappings);
+
+  const kitComponentMap = new Map<string, string[]>();
+  for (const c of components) {
+    const existing = kitComponentMap.get(c.componentSku) || [];
+    existing.push(c.kitSku);
+    kitComponentMap.set(c.componentSku, existing);
+  }
+
+  logger.info(`Product lookup loaded: ${productMap.size} products, ${kitComponentMap.size} component SKUs mapped to kits`);
+  return { productMap, kitComponentMap };
+}
+
+function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string, lookups: ProductLookupMaps): any {
+  const sku = sourceRow.sku;
+  const product = lookups.productMap.get(sku);
+  const parentKits = lookups.kitComponentMap.get(sku) || [];
+
   return {
-    sku: sourceRow.sku,
+    sku,
     orderDate: targetDate,
     salesChannel: sourceRow.sales_channel,
     dailySalesQuantity: sourceRow.daily_sales_quantity?.toString() ?? null,
@@ -126,7 +174,10 @@ function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string):
     peakVelocityRatio: sourceRow.peak_velocity_ratio?.toString() ?? null,
     velocityStabilityScore: sourceRow.velocity_stability_score?.toString() ?? null,
     growthPatternConfidence: sourceRow.growth_pattern_confidence?.toString() ?? null,
-    isAssembledProduct: sourceRow.is_assembled_product ?? null,
+    isAssembledProduct: product?.isAssembledProduct ?? sourceRow.is_assembled_product ?? null,
+    isKit: product?.isKit ?? false,
+    parentSku: product?.parentSku ?? sku,
+    parentKit: parentKits.length > 0 ? parentKits : null,
     category: sourceRow.category ?? null,
     yoyStartDate: sourceRow.yoy_start_date ? new Date(sourceRow.yoy_start_date) : null,
     yoyEndDate: sourceRow.yoy_end_date ? new Date(sourceRow.yoy_end_date) : null,
@@ -199,6 +250,8 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
 
     logger.info(`Loaded peak season windows: target years ${targetYear}/${targetYear + 1} (${allTargetWindows.length} windows), source years ${sourceYear}/${sourceYear - 1}/${targetYear} (${allSourceWindows.length} windows)`);
 
+    const productLookups = await loadProductLookupMaps();
+
     let totalRows = 0;
     let daysProcessed = 0;
     let daysSkipped = 0;
@@ -237,7 +290,7 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
         }
 
         for (const row of sourceRows) {
-          batch.push(buildForecastRow(row, currentDate, sourceDateStr));
+          batch.push(buildForecastRow(row, currentDate, sourceDateStr, productLookups));
 
           if (batch.length >= BATCH_SIZE) {
             await db.insert(salesForecasting).values(batch);
