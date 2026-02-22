@@ -8,6 +8,7 @@ import logger from '../utils/logger';
 
 const CST_TIMEZONE = 'America/Chicago';
 const BATCH_SIZE = 500;
+let isGenerationRunning = false;
 
 interface PeakSeasonWindow {
   peakSeasonTypeId: number;
@@ -141,91 +142,127 @@ function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string):
   };
 }
 
+async function getExistingForecastDates(): Promise<Set<string>> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT order_date::date::text AS d FROM sales_forecasting
+    WHERE order_date >= CURRENT_DATE
+  `);
+  const dates = new Set<string>();
+  for (const r of rows.rows) {
+    dates.add(r.d as string);
+  }
+  return dates;
+}
+
 export async function generateForecasts(): Promise<{ totalRows: number; daysProcessed: number; errors: number }> {
+  if (isGenerationRunning) {
+    logger.info('Sales forecast generation already in progress, skipping');
+    return { totalRows: 0, daysProcessed: 0, errors: 0 };
+  }
+
+  isGenerationRunning = true;
   const jobStart = Date.now();
-  logger.info('Sales forecast generation starting');
 
-  const today = nowCentral();
-  const todayStr = formatDateStr(today);
-  const targetYear = today.getFullYear();
-  const sourceYear = targetYear - 1;
+  try {
+    logger.info('Sales forecast generation starting');
 
-  const forecastEndDate = addYears(today, 1);
-  const forecastEndStr = formatDateStr(forecastEndDate);
+    const today = nowCentral();
+    const targetYear = today.getFullYear();
+    const sourceYear = targetYear - 1;
 
-  const [targetYearWindows, sourceYearWindows, nextYearWindows, prevYearWindows] = await Promise.all([
-    loadPeakSeasonWindows(targetYear),
-    loadPeakSeasonWindows(sourceYear),
-    loadPeakSeasonWindows(targetYear + 1),
-    loadPeakSeasonWindows(sourceYear - 1),
-  ]);
+    const forecastEndDate = addYears(today, 1);
+    const forecastEndStr = formatDateStr(forecastEndDate);
 
-  const allTargetWindows = [...targetYearWindows, ...nextYearWindows];
-  const allSourceWindows = [...sourceYearWindows, ...prevYearWindows, ...targetYearWindows];
+    const existingDates = await getExistingForecastDates();
+    const totalDaysNeeded = differenceInCalendarDays(forecastEndDate, today) + 1;
+    const existingCount = existingDates.size;
 
-  logger.info(`Loaded peak season windows: target years ${targetYear}/${targetYear + 1} (${allTargetWindows.length} windows), source years ${sourceYear}/${sourceYear - 1}/${targetYear} (${allSourceWindows.length} windows)`);
+    if (existingCount >= totalDaysNeeded - 5) {
+      const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
+      logger.info(`Sales forecast already complete: ${existingCount}/${totalDaysNeeded} days covered, skipping generation (${elapsed}s)`);
+      return { totalRows: 0, daysProcessed: 0, errors: 0 };
+    }
 
-  await db.delete(salesForecasting).where(
-    sql`order_date >= ${todayStr}::timestamp`
-  );
-  logger.info('Cleared existing forecast data from today forward');
+    logger.info(`Sales forecast coverage: ${existingCount}/${totalDaysNeeded} days — generating missing days`);
 
-  let totalRows = 0;
-  let daysProcessed = 0;
-  let errors = 0;
-  let batch: any[] = [];
+    const [targetYearWindows, sourceYearWindows, nextYearWindows, prevYearWindows] = await Promise.all([
+      loadPeakSeasonWindows(targetYear),
+      loadPeakSeasonWindows(sourceYear),
+      loadPeakSeasonWindows(targetYear + 1),
+      loadPeakSeasonWindows(sourceYear - 1),
+    ]);
 
-  let currentDate = new Date(today);
+    const allTargetWindows = [...targetYearWindows, ...nextYearWindows];
+    const allSourceWindows = [...sourceYearWindows, ...prevYearWindows, ...targetYearWindows];
 
-  while (formatDateStr(currentDate) <= forecastEndStr) {
-    const targetDateStr = formatDateStr(currentDate);
+    logger.info(`Loaded peak season windows: target years ${targetYear}/${targetYear + 1} (${allTargetWindows.length} windows), source years ${sourceYear}/${sourceYear - 1}/${targetYear} (${allSourceWindows.length} windows)`);
 
-    try {
-      const targetPeakWindow = findPeakWindow(currentDate, allTargetWindows);
+    let totalRows = 0;
+    let daysProcessed = 0;
+    let daysSkipped = 0;
+    let errors = 0;
+    let batch: any[] = [];
 
-      let sourceDate: Date;
-      if (targetPeakWindow) {
-        const mappedDate = mapPeakDateToSourceYear(currentDate, targetPeakWindow, allSourceWindows);
-        sourceDate = mappedDate ?? subYears(currentDate, 1);
-      } else {
-        sourceDate = subYears(currentDate, 1);
-      }
+    let currentDate = new Date(today);
 
-      const sourceDateStr = formatDateStr(sourceDate);
-      const sourceRows = await fetchSourceData(sourceDateStr);
+    while (formatDateStr(currentDate) <= forecastEndStr) {
+      const targetDateStr = formatDateStr(currentDate);
 
-      if (sourceRows.length === 0) {
+      if (existingDates.has(targetDateStr)) {
+        daysSkipped++;
         currentDate = addDays(currentDate, 1);
-        daysProcessed++;
         continue;
       }
 
-      for (const row of sourceRows) {
-        batch.push(buildForecastRow(row, currentDate, sourceDateStr));
+      try {
+        const targetPeakWindow = findPeakWindow(currentDate, allTargetWindows);
 
-        if (batch.length >= BATCH_SIZE) {
-          await db.insert(salesForecasting).values(batch);
-          totalRows += batch.length;
-          batch = [];
+        let sourceDate: Date;
+        if (targetPeakWindow) {
+          const mappedDate = mapPeakDateToSourceYear(currentDate, targetPeakWindow, allSourceWindows);
+          sourceDate = mappedDate ?? subYears(currentDate, 1);
+        } else {
+          sourceDate = subYears(currentDate, 1);
         }
+
+        const sourceDateStr = formatDateStr(sourceDate);
+        const sourceRows = await fetchSourceData(sourceDateStr);
+
+        if (sourceRows.length === 0) {
+          currentDate = addDays(currentDate, 1);
+          daysProcessed++;
+          continue;
+        }
+
+        for (const row of sourceRows) {
+          batch.push(buildForecastRow(row, currentDate, sourceDateStr));
+
+          if (batch.length >= BATCH_SIZE) {
+            await db.insert(salesForecasting).values(batch);
+            totalRows += batch.length;
+            batch = [];
+          }
+        }
+
+        daysProcessed++;
+      } catch (err: any) {
+        logger.error(`Forecast generation error for ${targetDateStr}: ${err.message}`);
+        errors++;
       }
 
-      daysProcessed++;
-    } catch (err: any) {
-      logger.error(`Forecast generation error for ${targetDateStr}: ${err.message}`);
-      errors++;
+      currentDate = addDays(currentDate, 1);
     }
 
-    currentDate = addDays(currentDate, 1);
+    if (batch.length > 0) {
+      await db.insert(salesForecasting).values(batch);
+      totalRows += batch.length;
+    }
+
+    const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
+    logger.info(`Sales forecast generation complete: ${totalRows} new rows, ${daysProcessed} days generated, ${daysSkipped} days skipped (already existed), ${errors} errors, ${elapsed}s`);
+
+    return { totalRows, daysProcessed, errors };
+  } finally {
+    isGenerationRunning = false;
   }
-
-  if (batch.length > 0) {
-    await db.insert(salesForecasting).values(batch);
-    totalRows += batch.length;
-  }
-
-  const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
-  logger.info(`Sales forecast generation complete: ${totalRows} rows, ${daysProcessed} days, ${errors} errors, ${elapsed}s`);
-
-  return { totalRows, daysProcessed, errors };
 }
