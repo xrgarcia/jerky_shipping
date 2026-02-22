@@ -2013,22 +2013,22 @@ function PurchaseOrdersTab() {
         <Card className="flex flex-col flex-1 min-h-0">
           <div className="overflow-auto flex-1">
             <Table>
-              <TableHeader className="sticky top-0 bg-card z-10">
+              <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">SKU</TableHead>
-                  <TableHead className="min-w-[200px]">Title</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">On Hand</TableHead>
-                  <TableHead className="text-right">Available</TableHead>
-                  <TableHead className="text-right">Incoming</TableHead>
-                  <TableHead className="text-right">Lead Time</TableHead>
-                  <TableHead className="text-right">MOQ</TableHead>
-                  <TableHead className="text-right">Amzn</TableHead>
-                  <TableHead className="text-right">Wlmt</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">In Kits</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
+                  <TableHead className="whitespace-nowrap sticky top-0 bg-card z-10">SKU</TableHead>
+                  <TableHead className="min-w-[200px] sticky top-0 bg-card z-10">Title</TableHead>
+                  <TableHead className="sticky top-0 bg-card z-10">Category</TableHead>
+                  <TableHead className="sticky top-0 bg-card z-10">Supplier</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">On Hand</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Available</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Incoming</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Lead Time</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">MOQ</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Amzn</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Wlmt</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">In Kits</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
