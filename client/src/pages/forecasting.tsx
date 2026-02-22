@@ -1339,8 +1339,8 @@ function SalesTab() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-auto">
-      <div className="flex flex-wrap items-end gap-3 shrink-0">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
             <div className="flex flex-wrap items-center gap-2">
@@ -2233,24 +2233,22 @@ export default function Forecasting() {
   }, [setLocation]);
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-3">
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <TrendingUp className="h-6 w-6 text-primary" />
-          <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
-            Forecasting
-          </h1>
-        </div>
+    <div className="flex flex-col h-full overflow-hidden p-4 sm:p-6">
+      <div className="flex items-center gap-3 shrink-0 mb-2">
+        <TrendingUp className="h-6 w-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
+          Forecasting
+        </h1>
       </div>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
-        <TabsList className="shrink-0 w-fit">
+        <TabsList className="shrink-0 w-fit mb-2">
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales" className="flex flex-col flex-1 min-h-0 mt-3">
+        <TabsContent value="sales" className="flex-1 min-h-0 mt-0 overflow-auto">
           <SalesTab />
         </TabsContent>
-        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-3">
+        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-0">
           <PurchaseOrdersTab />
         </TabsContent>
       </Tabs>
