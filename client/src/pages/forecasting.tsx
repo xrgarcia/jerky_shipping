@@ -1925,7 +1925,7 @@ function PurchaseOrdersTab() {
         const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
         const projTotal = direct + kits;
         const recPurchase = projTotal - (r.total_stock ?? 0);
-        row.push(String(direct), String(kits), String(projTotal), recPurchase > 0 ? String(Math.round(recPurchase)) : "");
+        row.push(String(direct), String(kits), String(projTotal), String(Math.round(recPurchase)));
       }
       csvRows.push(row.join(","));
     }
@@ -2213,7 +2213,7 @@ function PurchaseOrdersTab() {
                             <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
                             <TableCell className={`text-right tabular-nums font-semibold ${(total - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                              {(total - (row.total_stock ?? 0)) > 0 ? Math.round(total - (row.total_stock ?? 0)).toLocaleString() : "—"}
+                              {Math.round(total - (row.total_stock ?? 0)).toLocaleString()}
                             </TableCell>
                           </>
                         );
