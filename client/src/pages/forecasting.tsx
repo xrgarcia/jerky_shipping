@@ -1339,7 +1339,7 @@ function SalesTab() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-6 overflow-auto">
+    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-auto">
       <div className="flex flex-wrap items-end gap-3 shrink-0">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
@@ -1937,7 +1937,7 @@ function PurchaseOrdersTab() {
   }, [filtered, selectedDate, hasProjection]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-4">
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-center gap-3 shrink-0">
         <Card className="flex-1 min-w-[200px]">
           <CardContent className="pt-4 pb-3 px-4">
@@ -2233,22 +2233,24 @@ export default function Forecasting() {
   }, [setLocation]);
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
-      <div className="flex items-center gap-3 shrink-0">
-        <TrendingUp className="h-6 w-6 text-primary" />
-        <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
-          Forecasting
-        </h1>
+    <div className="flex flex-col h-full p-4 sm:p-6 gap-3">
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <TrendingUp className="h-6 w-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-semibold" data-testid="text-page-title">
+            Forecasting
+          </h1>
+        </div>
       </div>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
-        <TabsList className="shrink-0">
+        <TabsList className="shrink-0 w-fit">
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales" className="flex flex-col flex-1 min-h-0 mt-4">
+        <TabsContent value="sales" className="flex flex-col flex-1 min-h-0 mt-3">
           <SalesTab />
         </TabsContent>
-        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-4">
+        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-3">
           <PurchaseOrdersTab />
         </TabsContent>
       </Tabs>
