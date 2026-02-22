@@ -39,8 +39,8 @@ export async function checkSnapshotReadiness(): Promise<SnapshotReadiness> {
       return { ready: false, ifdDate, inventoryDate, localDate, reason: `Reporting dates don't match: IFD=${ifdDate}, inventory=${inventoryDate}` };
     }
 
-    if (localDate && localDate > ifdDate) {
-      return { ready: false, ifdDate, inventoryDate, localDate, reason: `Latest snapshot (${localDate}) is newer than IFD (${ifdDate})` };
+    if (localDate && localDate >= ifdDate) {
+      return { ready: false, ifdDate, inventoryDate, localDate, reason: `Snapshot already exists for ${localDate}` };
     }
 
     return { ready: true, ifdDate, inventoryDate, localDate, reason: `New snapshot available for ${ifdDate}` };
@@ -58,9 +58,6 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
 
   const snapshotDate = readiness.ifdDate!;
   logger.info(`Creating purchase order snapshot for ${snapshotDate}`);
-
-  // Delete any existing snapshot for this date (allows re-creation)
-  await db.execute(sql`DELETE FROM purchase_order_snapshots WHERE stock_check_date::date = ${snapshotDate}::date`);
 
   const ifdRows = await reportingSql`
     SELECT sku, supplier, description, lead_time, quantity_available, quantity_incoming,
