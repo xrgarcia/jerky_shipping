@@ -13,6 +13,20 @@ import type {
 import { TimeRangePreset } from "@shared/forecasting-types";
 import type { ChartNote } from "@shared/schema";
 
+export interface PeakSeasonPreset {
+  peakSeasonTypeId: number;
+  name: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+}
+
+export function useUpcomingPeakSeasons() {
+  return useQuery<PeakSeasonPreset[]>({
+    queryKey: ["/api/forecasting/peak-seasons"],
+  });
+}
+
 export function useSalesChannels() {
   return useQuery<ForecastingChannelsResponse>({
     queryKey: ["/api/forecasting/channels"],
