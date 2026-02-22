@@ -17,7 +17,19 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { ForecastingProduct } from "@shared/forecasting-types";
 import {
   LineChart,
@@ -1742,15 +1754,319 @@ function SalesTab() {
 }
 
 function PurchaseOrdersTab() {
+  const { toast } = useToast();
+  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+
+  const readinessQuery = useQuery<{
+    ready: boolean;
+    ifdDate: string | null;
+    inventoryDate: string | null;
+    localDate: string | null;
+    reason: string;
+  }>({
+    queryKey: ["/api/purchase-orders/readiness"],
+    refetchInterval: 60000,
+  });
+
+  const datesQuery = useQuery<string[]>({
+    queryKey: ["/api/purchase-orders/dates"],
+  });
+
+  const snapshotQuery = useQuery<any[]>({
+    queryKey: ["/api/purchase-orders/snapshot", selectedDate],
+    queryFn: async () => {
+      const url = selectedDate
+        ? `/api/purchase-orders/snapshot?date=${selectedDate}`
+        : "/api/purchase-orders/snapshot";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch snapshot");
+      return res.json();
+    },
+    enabled: (datesQuery.data?.length ?? 0) > 0,
+  });
+
+  const createSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/purchase-orders/create-snapshot");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Snapshot Created",
+        description: `${data.rowCount} products captured for ${data.stockCheckDate}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/dates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/readiness"] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Snapshot Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const snapshot = snapshotQuery.data ?? [];
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    snapshot.forEach((r: any) => { if (r.product_category) set.add(r.product_category); });
+    return Array.from(set).sort();
+  }, [snapshot]);
+
+  const suppliers = useMemo(() => {
+    const set = new Set<string>();
+    snapshot.forEach((r: any) => { if (r.supplier) set.add(r.supplier); });
+    return Array.from(set).sort();
+  }, [snapshot]);
+
+  const filtered = useMemo(() => {
+    let rows = snapshot;
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      rows = rows.filter((r: any) =>
+        r.sku?.toLowerCase().includes(lower) ||
+        r.product_title?.toLowerCase().includes(lower) ||
+        r.description?.toLowerCase().includes(lower)
+      );
+    }
+    if (categoryFilter !== "all") {
+      rows = rows.filter((r: any) => r.product_category === categoryFilter);
+    }
+    if (supplierFilter !== "all") {
+      rows = rows.filter((r: any) => r.supplier === supplierFilter);
+    }
+    return rows;
+  }, [snapshot, searchTerm, categoryFilter, supplierFilter]);
+
+  const summaryStats = useMemo(() => {
+    const totalSkus = filtered.length;
+    const withSupplier = filtered.filter((r: any) => r.supplier).length;
+    const lowStock = filtered.filter((r: any) => (r.available_quantity ?? 0) <= 0 && !r.is_kit).length;
+    const incoming = filtered.filter((r: any) => (r.quantity_incoming ?? 0) > 0).length;
+    return { totalSkus, withSupplier, lowStock, incoming };
+  }, [filtered]);
+
+  const readiness = readinessQuery.data;
+
+  const exportCsv = useCallback(() => {
+    if (filtered.length === 0) return;
+    const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "Total Stock", "In Kits", "Unit Cost"];
+    const csvRows = [headers.join(",")];
+    for (const r of filtered) {
+      csvRows.push([
+        r.sku, `"${(r.product_title || '').replace(/"/g, '""')}"`, r.product_category || '',
+        `"${(r.supplier || '').replace(/"/g, '""')}"`, r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
+        r.quantity_incoming ?? '', r.lead_time ?? '', r.moq ?? '',
+        r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.total_stock ?? '',
+        r.quantity_in_kits ?? '', r.unit_cost ?? ''
+      ].join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `po-snapshot-${selectedDate || 'latest'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filtered, selectedDate]);
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="flex items-center justify-center py-20">
-          <p className="text-muted-foreground text-sm" data-testid="text-po-placeholder">
-            Purchase Orders coming soon
-          </p>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Card className="flex-1 min-w-[200px]">
+          <CardContent className="pt-4 pb-3 px-4">
+            <div className="flex items-center gap-2">
+              {readiness?.ready ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+              ) : (
+                <Clock className="w-5 h-5 text-muted-foreground shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Snapshot Status</p>
+                <p className="text-sm truncate" data-testid="text-po-readiness">
+                  {readinessQuery.isLoading ? "Checking..." : readiness?.reason ?? "Unknown"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button
+          onClick={() => createSnapshotMutation.mutate()}
+          disabled={!readiness?.ready || createSnapshotMutation.isPending}
+          data-testid="button-create-snapshot"
+        >
+          {createSnapshotMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Create Snapshot
+        </Button>
+
+        {(datesQuery.data?.length ?? 0) > 0 && (
+          <Select value={selectedDate ?? ""} onValueChange={(v) => setSelectedDate(v || undefined)}>
+            <SelectTrigger className="w-[180px]" data-testid="select-snapshot-date">
+              <SelectValue placeholder="Latest snapshot" />
+            </SelectTrigger>
+            <SelectContent>
+              {datesQuery.data?.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0} data-testid="button-export-csv">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total SKUs</p>
+            <p className="text-2xl font-semibold" data-testid="text-po-total-skus">{summaryStats.totalSkus}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">With Supplier</p>
+            <p className="text-2xl font-semibold" data-testid="text-po-with-supplier">{summaryStats.withSupplier}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Out of Stock</p>
+            <p className="text-2xl font-semibold text-red-600 dark:text-red-400" data-testid="text-po-low-stock">{summaryStats.lowStock}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Incoming Orders</p>
+            <p className="text-2xl font-semibold" data-testid="text-po-incoming">{summaryStats.incoming}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search SKU, title, or description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+            data-testid="input-po-search"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-po-category">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-po-supplier">
+            <SelectValue placeholder="All Suppliers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Suppliers</SelectItem>
+            {suppliers.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground whitespace-nowrap">
+          {filtered.length} of {snapshot.length} products
+        </p>
+      </div>
+
+      {snapshotQuery.isLoading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      ) : snapshot.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-20 gap-3">
+            <Package className="w-10 h-10 text-muted-foreground" />
+            <p className="text-muted-foreground text-sm" data-testid="text-po-empty">
+              No snapshots yet. Create one when reporting data is ready.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <div className="overflow-auto max-h-[600px]">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">SKU</TableHead>
+                  <TableHead className="min-w-[200px]">Title</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead className="text-right">On Hand</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                  <TableHead className="text-right">Incoming</TableHead>
+                  <TableHead className="text-right">Lead Time</TableHead>
+                  <TableHead className="text-right">MOQ</TableHead>
+                  <TableHead className="text-right">Amzn</TableHead>
+                  <TableHead className="text-right">Wlmt</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">In Kits</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((row: any) => {
+                  const avail = row.available_quantity ?? 0;
+                  const isLow = avail <= 0 && !row.is_kit;
+                  return (
+                    <TableRow key={row.id} data-testid={`row-po-${row.sku}`}>
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {row.sku}
+                        {row.is_kit && <Badge variant="outline" className="ml-1 text-[10px]">Kit</Badge>}
+                        {row.is_assembled_product && <Badge variant="outline" className="ml-1 text-[10px]">Asm</Badge>}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[250px] truncate" title={row.product_title}>
+                        {row.product_title || row.description || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">{row.product_category || "—"}</TableCell>
+                      <TableCell className="text-xs max-w-[120px] truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
+                      <TableCell className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
+                        {avail}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
