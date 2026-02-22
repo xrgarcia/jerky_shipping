@@ -39,8 +39,8 @@ export async function checkSnapshotReadiness(): Promise<SnapshotReadiness> {
       return { ready: false, ifdDate, inventoryDate, localDate, reason: `Reporting dates don't match: IFD=${ifdDate}, inventory=${inventoryDate}` };
     }
 
-    if (localDate && localDate >= ifdDate) {
-      return { ready: false, ifdDate, inventoryDate, localDate, reason: `Snapshot already exists for ${ifdDate}` };
+    if (localDate && localDate > ifdDate) {
+      return { ready: false, ifdDate, inventoryDate, localDate, reason: `Latest snapshot (${localDate}) is newer than IFD (${ifdDate})` };
     }
 
     return { ready: true, ifdDate, inventoryDate, localDate, reason: `New snapshot available for ${ifdDate}` };
@@ -50,7 +50,7 @@ export async function checkSnapshotReadiness(): Promise<SnapshotReadiness> {
   }
 }
 
-export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDate: string }> {
+export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDate: string; ifdMatches: number }> {
   const readiness = await checkSnapshotReadiness();
   if (!readiness.ready) {
     throw new Error(readiness.reason);
@@ -58,6 +58,9 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
 
   const snapshotDate = readiness.ifdDate!;
   logger.info(`Creating purchase order snapshot for ${snapshotDate}`);
+
+  // Delete any existing snapshot for this date (allows re-creation)
+  await db.execute(sql`DELETE FROM purchase_order_snapshots WHERE stock_check_date::date = ${snapshotDate}::date`);
 
   const ifdRows = await reportingSql`
     SELECT sku, supplier, description, lead_time, quantity_available, quantity_incoming,
@@ -67,20 +70,30 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
     WHERE stock_check_date = ${snapshotDate}::date
   `;
 
+  logger.info(`IFD returned ${ifdRows.length} rows for ${snapshotDate}`);
+
   const ifdMap = new Map<string, any>();
   for (const row of ifdRows) {
     ifdMap.set(row.sku, row);
   }
 
+  if (ifdRows.length > 0) {
+    const sampleSkus = Array.from(ifdMap.keys()).slice(0, 5);
+    logger.info(`IFD sample SKUs: ${sampleSkus.join(', ')}`);
+  }
+
   const products = await db.select().from(skuvaultProducts);
+  logger.info(`Local products: ${products.length}, IFD SKUs: ${ifdMap.size}`);
 
   const BATCH_SIZE = 500;
   let batch: any[] = [];
   let totalRows = 0;
   const stockCheckDateTs = new Date(snapshotDate + 'T00:00:00.000Z');
 
+  let ifdMatches = 0;
   for (const p of products) {
     const ifd = ifdMap.get(p.sku);
+    if (ifd) ifdMatches++;
 
     batch.push({
       stockCheckDate: stockCheckDateTs,
@@ -124,8 +137,8 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
     totalRows += batch.length;
   }
 
-  logger.info(`Purchase order snapshot created: ${totalRows} rows for ${snapshotDate}`);
-  return { rowCount: totalRows, stockCheckDate: snapshotDate };
+  logger.info(`Purchase order snapshot created: ${totalRows} rows for ${snapshotDate}, ${ifdMatches} matched IFD data`);
+  return { rowCount: totalRows, stockCheckDate: snapshotDate, ifdMatches };
 }
 
 export async function getSnapshotDates(): Promise<string[]> {
