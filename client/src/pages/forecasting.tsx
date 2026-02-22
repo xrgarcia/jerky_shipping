@@ -1909,16 +1909,17 @@ function PurchaseOrdersTab() {
 
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
-    const headers = ["SKU", "Title", "Category", "Supplier", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock", "Unit Cost"];
+    const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
     if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
         r.sku, `"${(r.product_title || '').replace(/"/g, '""')}"`, r.product_category || '',
-        `"${(r.supplier || '').replace(/"/g, '""')}"`, r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
+        `"${(r.supplier || '').replace(/"/g, '""')}"`, r.unit_cost ?? '',
+        r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
         r.quantity_incoming ?? '', r.lead_time ?? '', r.moq ?? '',
         r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.quantity_in_kits ?? '',
-        r.total_stock ?? '', r.unit_cost ?? ''
+        r.total_stock ?? ''
       ];
       if (hasProjection) {
         const direct = Math.round(Number(r.projected_units_sold ?? 0));
@@ -2155,6 +2156,7 @@ function PurchaseOrdersTab() {
                   <TableHead className="min-w-[200px] sticky top-0 bg-card z-10">Title</TableHead>
                   <TableHead className="sticky top-0 bg-card z-10">Category</TableHead>
                   <TableHead className="sticky top-0 bg-card z-10">Supplier</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">On Hand</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Available</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Incoming</TableHead>
@@ -2164,7 +2166,6 @@ function PurchaseOrdersTab() {
                   <TableHead className="text-right sticky top-0 bg-card z-10">Wlmt</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">In Kits</TableHead>
                   <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
                   {hasProjection && (
                     <>
                       <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Direct</TableHead>
@@ -2191,6 +2192,7 @@ function PurchaseOrdersTab() {
                       </TableCell>
                       <TableCell className="text-xs">{row.product_category || "—"}</TableCell>
                       <TableCell className="text-xs max-w-[120px] truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
                       <TableCell className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
                         {avail}
@@ -2202,7 +2204,6 @@ function PurchaseOrdersTab() {
                       <TableCell className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
                       {hasProjection && (() => {
                         const direct = Number(row.projected_units_sold ?? 0);
                         const kits = Number(row.projected_units_sold_from_kits ?? 0);
