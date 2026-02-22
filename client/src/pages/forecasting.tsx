@@ -1029,6 +1029,16 @@ interface DateRangePickerProps {
 function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: DateRangePickerProps) {
   const startValue = startDate ? parseISO(startDate) : undefined;
   const endValue = endDate ? parseISO(endDate) : undefined;
+  const [endMonth, setEndMonth] = useState<Date>(endValue ?? startValue ?? new Date());
+
+  const handleStartSelect = useCallback((day: Date | undefined) => {
+    if (!day) return;
+    onStartChange(formatDateParam(day));
+    setEndMonth(day);
+    if (endValue && day > endValue) {
+      onEndChange(formatDateParam(day));
+    }
+  }, [endValue, onStartChange, onEndChange]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -1047,8 +1057,8 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
           <Calendar
             mode="single"
             selected={startValue}
-            onSelect={(day) => day && onStartChange(formatDateParam(day))}
-            disabled={(date) => (endValue ? date > endValue : false)}
+            onSelect={handleStartSelect}
+            fixedWeeks
             initialFocus
           />
         </PopoverContent>
@@ -1069,8 +1079,11 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
           <Calendar
             mode="single"
             selected={endValue}
+            month={endMonth}
+            onMonthChange={setEndMonth}
             onSelect={(day) => day && onEndChange(formatDateParam(day))}
             disabled={(date) => (startValue ? date < startValue : false)}
+            fixedWeeks
             initialFocus
           />
         </PopoverContent>
