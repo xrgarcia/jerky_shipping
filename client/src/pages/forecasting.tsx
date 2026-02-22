@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -1761,6 +1761,18 @@ function PurchaseOrdersTab() {
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [projectionDate, setProjectionDate] = useState<Date | undefined>();
   const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = useCallback((col: string) => {
+    if (sortCol === col) {
+      if (sortDir === "asc") setSortDir("desc");
+      else { setSortCol(null); setSortDir("asc"); }
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  }, [sortCol, sortDir]);
 
   const { value: kitFilter, setValue: setKitFilter } = useUserPreference<string>(
     "purchase-orders", "kit-filter", "no", { debounceMs: 300 }
@@ -1894,8 +1906,45 @@ function PurchaseOrdersTab() {
     } else if (assembledFilter === "no") {
       rows = rows.filter((r: any) => r.is_assembled_product !== true);
     }
+    if (sortCol) {
+      rows = [...rows].sort((a: any, b: any) => {
+        let aVal: any, bVal: any;
+        switch (sortCol) {
+          case "sku": aVal = a.sku ?? ""; bVal = b.sku ?? ""; break;
+          case "title": aVal = (a.product_title || a.description || "").toLowerCase(); bVal = (b.product_title || b.description || "").toLowerCase(); break;
+          case "category": aVal = a.product_category ?? ""; bVal = b.product_category ?? ""; break;
+          case "supplier": aVal = a.supplier ?? ""; bVal = b.supplier ?? ""; break;
+          case "cost": aVal = Number(a.unit_cost ?? 0); bVal = Number(b.unit_cost ?? 0); break;
+          case "on_hand": aVal = a.quantity_on_hand ?? 0; bVal = b.quantity_on_hand ?? 0; break;
+          case "available": aVal = a.available_quantity ?? 0; bVal = b.available_quantity ?? 0; break;
+          case "incoming": aVal = a.quantity_incoming ?? 0; bVal = b.quantity_incoming ?? 0; break;
+          case "lead_time": aVal = a.lead_time ?? 0; bVal = b.lead_time ?? 0; break;
+          case "moq": aVal = a.moq ?? 0; bVal = b.moq ?? 0; break;
+          case "amzn": aVal = a.ext_amzn_inv ?? 0; bVal = b.ext_amzn_inv ?? 0; break;
+          case "wlmt": aVal = a.ext_wlmt_inv ?? 0; bVal = b.ext_wlmt_inv ?? 0; break;
+          case "in_kits": aVal = a.quantity_in_kits ?? 0; bVal = b.quantity_in_kits ?? 0; break;
+          case "total": aVal = a.total_stock ?? 0; bVal = b.total_stock ?? 0; break;
+          case "proj_direct": aVal = Number(a.projected_units_sold ?? 0); bVal = Number(b.projected_units_sold ?? 0); break;
+          case "proj_kits": aVal = Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold_from_kits ?? 0); break;
+          case "proj_total": aVal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0); break;
+          case "rec_purchase": {
+            const aTotal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0);
+            const bTotal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0);
+            aVal = aTotal - (a.total_stock ?? 0);
+            bVal = bTotal - (b.total_stock ?? 0);
+            break;
+          }
+          default: aVal = 0; bVal = 0;
+        }
+        if (typeof aVal === "string") {
+          const cmp = aVal.localeCompare(bVal);
+          return sortDir === "asc" ? cmp : -cmp;
+        }
+        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+      });
+    }
     return rows;
-  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter]);
+  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter, sortCol, sortDir]);
 
   const summaryStats = useMemo(() => {
     const totalSkus = filtered.length;
@@ -2152,28 +2201,52 @@ function PurchaseOrdersTab() {
             <Table containerClassName="flex-1 overflow-auto">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap sticky top-0 bg-card z-10">SKU</TableHead>
-                  <TableHead className="min-w-[200px] sticky top-0 bg-card z-10">Title</TableHead>
-                  <TableHead className="sticky top-0 bg-card z-10">Category</TableHead>
-                  <TableHead className="sticky top-0 bg-card z-10">Supplier</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Cost</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">On Hand</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Available</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Incoming</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Lead Time</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">MOQ</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Amzn</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Wlmt</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">In Kits</TableHead>
-                  <TableHead className="text-right sticky top-0 bg-card z-10">Total</TableHead>
-                  {hasProjection && (
-                    <>
-                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Direct</TableHead>
-                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Kits</TableHead>
-                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Proj. Total</TableHead>
-                      <TableHead className="text-right sticky top-0 bg-card z-10 whitespace-nowrap">Rec. Purchase</TableHead>
-                    </>
-                  )}
+                  {[
+                    { key: "sku", label: "SKU", className: "whitespace-nowrap" },
+                    { key: "title", label: "Title", className: "min-w-[200px]" },
+                    { key: "category", label: "Category" },
+                    { key: "supplier", label: "Supplier" },
+                    { key: "cost", label: "Cost", right: true },
+                    { key: "on_hand", label: "On Hand", right: true },
+                    { key: "available", label: "Available", right: true },
+                    { key: "incoming", label: "Incoming", right: true },
+                    { key: "lead_time", label: "Lead Time", right: true },
+                    { key: "moq", label: "MOQ", right: true },
+                    { key: "amzn", label: "Amzn", right: true },
+                    { key: "wlmt", label: "Wlmt", right: true },
+                    { key: "in_kits", label: "In Kits", right: true },
+                    { key: "total", label: "Total", right: true },
+                  ].map((col) => (
+                    <TableHead
+                      key={col.key}
+                      className={`sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""} ${col.className ?? ""}`}
+                      onClick={() => toggleSort(col.key)}
+                      data-testid={`sort-${col.key}`}
+                    >
+                      <span className={`inline-flex items-center gap-1 ${col.right ? "justify-end" : ""}`}>
+                        {col.label}
+                        {sortCol === col.key ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                    </TableHead>
+                  ))}
+                  {hasProjection && [
+                    { key: "proj_direct", label: "Proj. Direct" },
+                    { key: "proj_kits", label: "Proj. Kits" },
+                    { key: "proj_total", label: "Proj. Total" },
+                    { key: "rec_purchase", label: "Rec. Purchase" },
+                  ].map((col) => (
+                    <TableHead
+                      key={col.key}
+                      className="text-right sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => toggleSort(col.key)}
+                      data-testid={`sort-${col.key}`}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        {col.label}
+                        {sortCol === col.key ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
