@@ -2245,12 +2245,14 @@ export default function Forecasting() {
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales" className="flex-1 min-h-0 mt-0 overflow-y-auto">
-          <SalesTab />
-        </TabsContent>
-        <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-0">
-          <PurchaseOrdersTab />
-        </TabsContent>
+        <div className="flex-1 min-h-0">
+          <TabsContent value="sales" className="h-full mt-0 overflow-y-auto">
+            <SalesTab />
+          </TabsContent>
+          <TabsContent value="purchase-orders" className="flex flex-col h-full mt-0">
+            <PurchaseOrdersTab />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );
