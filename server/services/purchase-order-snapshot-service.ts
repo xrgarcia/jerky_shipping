@@ -67,7 +67,7 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
            ext_amzn_inv, ext_wlmt_inv, total_stock, quantity_in_kits, case_count, moq, moq_info,
            product_category, is_assembled_product, unit_cost
     FROM inventory_forecasts_daily
-    WHERE stock_check_date = ${snapshotDate}::date
+    WHERE stock_check_date::date = ${snapshotDate}::date
   `;
 
   logger.info(`IFD returned ${ifdRows.length} rows for ${snapshotDate}`);
