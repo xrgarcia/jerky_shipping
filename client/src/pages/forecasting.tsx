@@ -1339,8 +1339,8 @@ function SalesTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-col flex-1 min-h-0 gap-6 overflow-auto">
+      <div className="flex flex-wrap items-end gap-3 shrink-0">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
             <div className="flex flex-wrap items-center gap-2">
@@ -2245,7 +2245,7 @@ export default function Forecasting() {
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">Purchase Orders</TabsTrigger>
         </TabsList>
-        <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
+        <TabsContent value="sales" className="flex flex-col flex-1 min-h-0 mt-4">
           <SalesTab />
         </TabsContent>
         <TabsContent value="purchase-orders" className="flex flex-col flex-1 min-h-0 mt-4">
