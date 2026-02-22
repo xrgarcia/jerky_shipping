@@ -1,7 +1,7 @@
 import { reportingSql } from '../reporting-db';
 import { db } from '../db';
 import { purchaseOrderSnapshots, skuvaultProducts } from '@shared/schema';
-import { sql, desc, eq } from 'drizzle-orm';
+import { sql, desc, eq, isNull } from 'drizzle-orm';
 import logger from '../utils/logger';
 
 interface SnapshotReadiness {
@@ -82,8 +82,8 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
     logger.info(`IFD sample SKUs: ${sampleSkus.join(', ')}`);
   }
 
-  const products = await db.select().from(skuvaultProducts);
-  logger.info(`Local products: ${products.length}, IFD SKUs: ${ifdMap.size}`);
+  const products = await db.select().from(skuvaultProducts).where(isNull(skuvaultProducts.parentSku));
+  logger.info(`Local products (excluding variants): ${products.length}, IFD SKUs: ${ifdMap.size}`);
 
   const BATCH_SIZE = 500;
   let batch: any[] = [];
