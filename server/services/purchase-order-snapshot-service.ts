@@ -141,6 +141,58 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
   return { rowCount: totalRows, stockCheckDate: snapshotDate, ifdMatches };
 }
 
+export async function projectSales(snapshotDate: string, projectionDate: string): Promise<{ updatedCount: number }> {
+  logger.info(`Projecting sales for snapshot ${snapshotDate} through ${projectionDate}`);
+
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+
+  const result = await db.execute(sql`
+    WITH sales_agg AS (
+      SELECT
+        COALESCE(parent_sku, sku) AS rollup_sku,
+        SUM(COALESCE(daily_sales_quantity::numeric, 0)) AS total_direct,
+        SUM(COALESCE(kit_daily_sales_quantity::numeric, 0)) AS total_from_kits
+      FROM sales_forecasting
+      WHERE order_date::date >= ${todayStr}::date
+        AND order_date::date <= ${projectionDate}::date
+      GROUP BY COALESCE(parent_sku, sku)
+    )
+    UPDATE purchase_order_snapshots pos
+    SET
+      projected_units_sold = COALESCE(sa.total_direct, 0),
+      projected_units_sold_from_kits = COALESCE(sa.total_from_kits, 0),
+      sales_projection_date = ${projectionDate}::timestamp
+    FROM sales_agg sa
+    WHERE pos.sku = sa.rollup_sku
+      AND pos.stock_check_date::date = ${snapshotDate}::date
+  `);
+
+  const zeroResult = await db.execute(sql`
+    UPDATE purchase_order_snapshots
+    SET
+      projected_units_sold = 0,
+      projected_units_sold_from_kits = 0,
+      sales_projection_date = ${projectionDate}::timestamp
+    WHERE stock_check_date::date = ${snapshotDate}::date
+      AND projected_units_sold IS NULL
+  `);
+
+  const totalUpdated = (result.rowCount || 0) + (zeroResult.rowCount || 0);
+  logger.info(`Sales projection complete: ${result.rowCount} SKUs matched sales data, ${zeroResult.rowCount} SKUs zeroed, total ${totalUpdated}`);
+  return { updatedCount: totalUpdated };
+}
+
+export async function clearProjection(snapshotDate: string): Promise<void> {
+  await db.execute(sql`
+    UPDATE purchase_order_snapshots
+    SET projected_units_sold = NULL,
+        projected_units_sold_from_kits = NULL,
+        sales_projection_date = NULL
+    WHERE stock_check_date::date = ${snapshotDate}::date
+  `);
+  logger.info(`Cleared sales projection for snapshot ${snapshotDate}`);
+}
+
 export async function getSnapshotDates(): Promise<string[]> {
   const rows = await db.execute(sql`
     SELECT DISTINCT stock_check_date::date::text AS d

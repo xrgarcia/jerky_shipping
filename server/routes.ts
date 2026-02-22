@@ -16228,6 +16228,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/purchase-orders/project-sales", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { projectSales } = await import('./services/purchase-order-snapshot-service');
+      const { snapshotDate, projectionDate } = req.body;
+      if (!snapshotDate || !projectionDate) {
+        return res.status(400).json({ error: "snapshotDate and projectionDate are required" });
+      }
+      const result = await projectSales(snapshotDate, projectionDate);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to project sales", message: error.message });
+    }
+  });
+
+  app.post("/api/purchase-orders/clear-projection", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { clearProjection } = await import('./services/purchase-order-snapshot-service');
+      const { snapshotDate } = req.body;
+      if (!snapshotDate) {
+        return res.status(400).json({ error: "snapshotDate is required" });
+      }
+      await clearProjection(snapshotDate);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to clear projection", message: error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
