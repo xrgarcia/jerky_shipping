@@ -4,13 +4,17 @@
 
 **Ship.** is a warehouse fulfillment platform for jerky.com that integrates Shopify, ShipStation, and SkuVault to automate packaging decisions, carrier selection, and packing station routing. The frontend is primarily built and maintained in Replit — Claude assists with **backend work** (API routes, services, workers, database, integrations).
 
+**Communication style**: Simple, everyday language. No jargon unless necessary.
+
+**Critical rule**: The production database is the source of truth. Data fixes must target production, not the development database. Dev database changes have no effect on real operations.
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Runtime | Node.js 20, TypeScript 5.6 (ES Modules) |
 | Server | Express 4.21 |
-| Frontend | React 18.3, Vite 5.4, Wouter 3.3 (routing), shadcn/ui, Tailwind CSS 3.4 |
+| Frontend | React 18.3, Vite 5.4, Wouter 3.3 (routing), shadcn/ui (New York style), Tailwind CSS 3.4 |
 | Database | PostgreSQL 16 via Neon serverless (`@neondatabase/serverless`) |
 | ORM | Drizzle ORM 0.39 (type-safe SQL) |
 | Reporting DB | GCP PostgreSQL via `postgres` (node-postgres), read-only |
@@ -178,6 +182,11 @@ Defined in `server/services/lifecycle-state-machine.ts` and `lifecycle-service.t
 
 Side effects trigger on transitions: QC hydration, fingerprinting, rate analysis, package dimension sync.
 
+**Key design rules**:
+- State machine is the single source of truth for phase determination — no backward transitions allowed.
+- Decision subphase chain within `fulfillment_prep` ensures proper evaluation order and data integrity.
+- Split/merge detection in ETL triggers re-hydration and fingerprint recalculation when shipment items change.
+
 ## WebSocket
 
 Server broadcasts to connected browser clients via `server/websocket.ts`:
@@ -214,6 +223,20 @@ import { shipments } from '@shared/schema'         // @shared/* → shared/*
 | `PORT` | Server port (default: 5000) |
 | `NODE_ENV` | development / production |
 
+## Key Design Decisions
+
+- **Two status fields on shipments**: `shipment_status` (from ShipStation API) and `status` (carrier tracking code). Both managed by ETL — never set manually.
+- **Product categorization**: Distinguishes between **kits** (bundles sold as one SKU, exploded into components for picking) and **assembled products** (pre-built items). Fields: `is_kit`, `is_assembled_product`, `parent_sku`, `parent_kit`.
+- **Kit explosion race condition prevention**: Multi-layered approach using caching, GCP sync, proactive hydration, and repair jobs.
+- **Automated package assignment**: Two-table architecture — `fingerprints` (order composition signatures) and `fingerprint_models` (learned packaging rules).
+- **Two-tier inventory tracking**: `skuvault_products` tracks `quantity_on_hand`, `pending_quantity`, `allocated_quantity`, and `available_quantity`.
+- **Shipping cost tracking**: Actual carrier costs stored in `shipments.shipping_cost`.
+- **Correlation ID standard**: Use `orderNumber`, `shipmentId`, `sessionId` consistently for log tracing. Winston `withOrder` helper provides correlation context.
+- **Purchase order snapshots**: `purchase_order_snapshots` (composite key: `stock_check_date` + `sku`) merges `skuvault_products` with `inventory_forecasts_daily` from GCP. Service: `server/services/purchase-order-snapshot-service.ts`.
+- **Sales forecasting**: Daily job projects last year's actuals into `sales_forecasting` table, aligning peak seasons via `peak_season_dates`. Cached in Redis with 1-hour TTL. All dates in US Central time.
+- **Stale shipment audit**: Maintenance job identifies and handles stuck shipments.
+- **On-hold shipment handling**: Managed by Unified Sync Worker's cursor-based polling; lifecycle evaluation gated until hold release to prevent race conditions.
+
 ## Conventions & Rules
 
 1. **Backend focus**: Claude helps with `server/`, `shared/`, and backend logic. Frontend is primarily built in Replit.
@@ -228,4 +251,5 @@ import { shipments } from '@shared/schema'         // @shared/* → shared/*
 10. **Date handling**: Uses `date-fns` and `date-fns-tz`. Business hours are Central Time.
 11. **Webhook security**: All inbound webhooks (Shopify, ShipStation) are HMAC-SHA256 verified.
 12. **Queue reliability**: Dead letter tables catch failed sync operations. ShipStation writes use a PostgreSQL-backed retry queue.
-13. **Connected MCP database**: Claude has read-only SQL access to the production database via the `jerky-postgres-db` MCP server. Use `mcp__jerky-postgres-db__query` to inspect live data when debugging.
+13. **Structured logging**: Winston logger with `withOrder` helper for correlation context. Use standardized correlation IDs.
+14. **Connected MCP database**: Claude has read-only SQL access to the production database via the `jerky-postgres-db` MCP server. Use `mcp__jerky-postgres-db__query` to inspect live data when debugging.
