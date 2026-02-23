@@ -1,0 +1,160 @@
+2026-02-23 08:32:19.75
+a46797f1
+User
+[SmartCarrierRate] Saved analysis for shipment se-958736728: usps_first_class_mail saves $2.80 vs usps_ground_advantage with 4-day delivery (same or faster) (using assigned packaging)
+2026-02-23 08:32:19.86
+a46797f1
+User
+[firestore-session-sync] Synced session 14790 to shipment JK3825365966
+2026-02-23 08:32:19.86
+a46797f1
+User
+2:32:19 PM [info][RateCheckQueue] Job #1581 completed: rate check successful {"orderNumber":"JK3825366098","shipmentId":"se-958736728","queueItemId":"1581"}
+2026-02-23 08:32:20.14
+a46797f1
+User
+2:32:20 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825366103: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825366103","shipmentId":"488ce46c-b4f1-45c0-b628-46d5c2d86475"}
+2026-02-23 08:32:20.18
+a46797f1
+User
+[firestore-session-sync] Synced session 14791 to shipment JK3825365942
+2026-02-23 08:32:20.58
+a46797f1
+User
+[firestore-session-sync] Synced session 14790 to shipment JK3825366069 (1 items updated)
+2026-02-23 08:32:20.81
+a46797f1
+User
+[firestore-session-sync] Synced session 14791 to shipment JK3825365953 (1 items updated)
+2026-02-23 08:32:20.91
+a46797f1
+User
+2:32:20 PM [info][SSWriteQueue] Enqueued write job #1589 for se-958754438 (package_sync) {"orderNumber":"JK3825366103","shipmentId":"se-958754438"}
+2026-02-23 08:32:20.91
+a46797f1
+User
+2:32:20 PM [info][lifecycle-worker] Package sync: Enqueued write job #1589 for JK3825366103 - Poly Bagger (se-168574) {"orderNumber":"JK3825366103","shipmentId":"488ce46c-b4f1-45c0-b628-46d5c2d86475"}
+2026-02-23 08:32:20.99
+a46797f1
+User
+2:32:20 PM [info][RateCheckQueue] Processing job #1582 for se-958754435 (attempt 1/5) {"orderNumber":"JK3825366105","shipmentId":"se-958754435","queueItemId":"1582"}
+2026-02-23 08:32:21.03
+a46797f1
+User
+[firestore-session-sync] Synced session 14791 to shipment JK3825365972
+2026-02-23 08:32:21.34
+a46797f1
+User
+[SmartCarrierRate] Requesting rates for shipment se-958754435 with 7 carriers
+2026-02-23 08:32:21.34
+a46797f1
+User
+[SmartCarrierRate] Using package for se-958754435: 37.50oz, Box #1 (12 x 12 x 8)
+2026-02-23 08:32:21.38
+a46797f1
+User
+2:32:21 PM [info][Lifecycle] JK3825366101: ready_to_session/needs_hydration → ready_to_session/needs_rate_check {"orderNumber":"JK3825366101","shipmentId":"abefc582-03a5-44b9-910c-f8b8caf22e42","phase":"ready_to_session","subphase":"needs_rate_check"}
+2026-02-23 08:32:21.38
+a46797f1
+User
+2:32:21 PM [info][lifecycle-worker] Triggering side effect for #JK3825366101: Enqueue rate check to dedicated queue {"orderNumber":"JK3825366101","shipmentId":"abefc582-03a5-44b9-910c-f8b8caf22e42","subphase":"needs_rate_check"}
+2026-02-23 08:32:21.45
+a46797f1
+User
+[firestore-session-sync] Synced session 14790 to shipment JK3825366003
+2026-02-23 08:32:21.67
+a46797f1
+User
+[firestore-session-sync] Synced session 14793 to shipment JK3825365991 (1 items updated)
+2026-02-23 08:32:22.00
+a46797f1
+User
+2:32:22 PM [info][lifecycle-worker] Side effect: Enqueued rate check job #1584 for JK3825366101
+2026-02-23 08:32:22.00
+a46797f1
+User
+2:32:22 PM [info][RateCheckQueue] Enqueued rate check job #1584 for se-958754439 {"orderNumber":"JK3825366101","shipmentId":"se-958754439"}
+2026-02-23 08:32:22.11
+a46797f1
+User
+2:32:22 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825366101: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825366101","shipmentId":"abefc582-03a5-44b9-910c-f8b8caf22e42"}
+2026-02-23 08:32:24.61
+a46797f1
+User
+2:32:24 PM [info][RateCheckQueue] Job #1582 completed: rate check successful {"orderNumber":"JK3825366105","shipmentId":"se-958754435","queueItemId":"1582"}
+2026-02-23 08:32:24.80
+a46797f1
+User
+[firestore-session-sync] Synced session 14793 to shipment JK3825365960 (1 items updated)
+2026-02-23 08:32:24.90
+a46797f1
+User
+2:32:24 PM [info][SSWriteQueue] Processing job #1589: package_sync for se-958754438 (attempt 1/5) {"orderNumber":"JK3825366103","shipmentId":"se-958754438","queueItemId":"1589"}
+2026-02-23 08:32:24.98
+a46797f1
+User
+2:32:24 PM [info][SSWriteQueue] Resolved carrier_id "se-118080" from service_code "usps_ground_advantage"
+2026-02-23 08:32:24.98
+a46797f1
+User
+2:32:24 PM [info][SSWriteQueue] GET se-958754438 → 200 OK {"orderNumber":"JK3825366103","shipmentId":"se-958754438"}
+2026-02-23 08:32:25.11
+a46797f1
+User
+[firestore-session-sync] Synced session 14793 to shipment JK3825366005 (2 items updated)
+2026-02-23 08:32:25.22
+a46797f1
+User
+2:32:25 PM [info][lifecycle-worker] Triggering side effect for #JK3825366106: Enqueue rate check to dedicated queue {"orderNumber":"JK3825366106","shipmentId":"d60e2684-f4cb-4565-9f5c-2d4e352ecc4d","subphase":"needs_rate_check"}
+2026-02-23 08:32:25.22
+a46797f1
+User
+2:32:25 PM [info][Lifecycle] JK3825366106: ready_to_session/needs_hydration → ready_to_session/needs_rate_check {"orderNumber":"JK3825366106","shipmentId":"d60e2684-f4cb-4565-9f5c-2d4e352ecc4d","phase":"ready_to_session","subphase":"needs_rate_check"}
+2026-02-23 08:32:25.37
+a46797f1
+User
+[firestore-session-sync] Synced session 14789 to shipment JK3825365939
+2026-02-23 08:32:25.54
+a46797f1
+User
+[firestore-session-sync] Synced session 14791 to shipment 113-3375621-4936269
+2026-02-23 08:32:25.62
+a46797f1
+User
+2:32:25 PM [info][SSWriteQueue] PUT se-958754438 → 200 OK {"orderNumber":"JK3825366103","shipmentId":"se-958754438"}
+2026-02-23 08:32:25.67
+a46797f1
+User
+2:32:25 PM [info][SSWriteQueue] Job #1589 completed: package_sync → 200 OK {"orderNumber":"JK3825366103","shipmentId":"se-958754438","queueItemId":"1589"}
+2026-02-23 08:32:25.71
+a46797f1
+User
+2:32:25 PM [info][RateCheckQueue] Processing job #1583 for se-958754438 (attempt 1/5) {"orderNumber":"JK3825366103","shipmentId":"se-958754438","queueItemId":"1583"}
+2026-02-23 08:32:25.74
+a46797f1
+User
+2:32:25 PM [info][SSWriteQueue] Callback: Cleared manual package flag for shipment 488ce46c-b4f1-45c0-b628-46d5c2d86475 {"orderNumber":"JK3825366103","shipmentId":"se-958754438"}
+2026-02-23 08:32:25.84
+a46797f1
+User
+[firestore-session-sync] Synced session 14790 to shipment JK3825366001
+2026-02-23 08:32:25.84
+a46797f1
+User
+2:32:25 PM [info][RateCheckQueue] Enqueued rate check job #1585 for se-958754440 {"orderNumber":"JK3825366106","shipmentId":"se-958754440"}
+2026-02-23 08:32:25.84
+a46797f1
+User
+2:32:25 PM [info][lifecycle-worker] Side effect: Enqueued rate check job #1585 for JK3825366106
+2026-02-23 08:32:25.98
+a46797f1
+User
+2:32:25 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825366106: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825366106","shipmentId":"d60e2684-f4cb-4565-9f5c-2d4e352ecc4d"}
+2026-02-23 08:32:26.06
+a46797f1
+User
+[SmartCarrierRate] Requesting rates for shipment se-958754438 with 7 carriers
+2026-02-23 08:32:26.06
+a46797f1
+User
+[SmartCarrierRate] Using package for se-958754438: 15.00oz, Poly Bagger
