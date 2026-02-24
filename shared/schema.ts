@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision, real, serial, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, uniqueIndex, numeric, doublePrecision, real, serial, primaryKey, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2165,3 +2165,26 @@ export const insertPurchaseOrderSnapshotSchema = createInsertSchema(purchaseOrde
 
 export type InsertPurchaseOrderSnapshot = z.infer<typeof insertPurchaseOrderSnapshotSchema>;
 export type PurchaseOrderSnapshot = typeof purchaseOrderSnapshots.$inferSelect;
+
+// ============================================================================
+// Purchase Order Config - Single-row global config for the PO tab
+// ============================================================================
+
+export const purchaseOrderConfig = pgTable("purchase_order_config", {
+  id: varchar("id").primaryKey().default("global"),
+  activeSnapshotDate: date("active_snapshot_date"),
+  projectionDate: date("projection_date"),
+  velocityWindowStart: date("velocity_window_start"),
+  velocityWindowEnd: date("velocity_window_end"),
+  lowStockThreshold: integer("low_stock_threshold").notNull().default(0),
+  defaultLeadTime: integer("default_lead_time"),
+  safetyStockDays: integer("safety_stock_days").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const updatePurchaseOrderConfigSchema = createInsertSchema(purchaseOrderConfig).omit({
+  id: true,
+  updatedAt: true,
+}).partial();
+
+export type PurchaseOrderConfig = typeof purchaseOrderConfig.$inferSelect;

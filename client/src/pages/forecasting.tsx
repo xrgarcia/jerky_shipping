@@ -50,7 +50,7 @@ import type { SalesDataPoint, RevenueTimeSeriesPoint } from "@shared/forecasting
 import { useSalesData, useSalesChannels, useFilterOptions, useProducts, useRevenueTimeSeries, useKitTimeSeries, useSummaryMetrics, useChartNotes, useCreateChartNote, useUpdateChartNote, useDeleteChartNote, useUpcomingPeakSeasons } from "@/hooks/use-forecasting";
 import type { SalesDataFilters, PeakSeasonPreset } from "@/hooks/use-forecasting";
 import type { BooleanFilter } from "@shared/forecasting-types";
-import type { ChartNote } from "@shared/schema";
+import type { ChartNote, PurchaseOrderConfig } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -1869,12 +1869,39 @@ function PurchaseOrdersTab() {
     onSuccess: () => {
       toast({ title: "Projection Cleared" });
       setProjectionDate(undefined);
+      saveConfigMutation.mutate({ projectionDate: null });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
     },
     onError: (err: any) => {
       toast({ title: "Clear Failed", description: err.message, variant: "destructive" });
     },
   });
+
+  const configQuery = useQuery<PurchaseOrderConfig>({
+    queryKey: ["/api/purchase-orders/config"],
+  });
+
+  const saveConfigMutation = useMutation({
+    mutationFn: async (data: Partial<PurchaseOrderConfig>) => {
+      const res = await apiRequest("PATCH", "/api/purchase-orders/config", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/config"] });
+    },
+  });
+
+  const configInitialized = useRef(false);
+  useEffect(() => {
+    if (!configInitialized.current && configQuery.data) {
+      const cfg = configQuery.data;
+      if (cfg.activeSnapshotDate) setSelectedDate(cfg.activeSnapshotDate);
+      if (cfg.projectionDate) setProjectionDate(new Date(cfg.projectionDate));
+      if (cfg.velocityWindowStart) setVelocityStart(new Date(cfg.velocityWindowStart));
+      if (cfg.velocityWindowEnd) setVelocityEnd(new Date(cfg.velocityWindowEnd));
+      configInitialized.current = true;
+    }
+  }, [configQuery.data]);
 
   const snapshot = snapshotQuery.data ?? [];
   const hasProjection = snapshot.length > 0 && snapshot[0]?.sales_projection_date != null;
@@ -2046,7 +2073,7 @@ function PurchaseOrdersTab() {
         </Button>
 
         {(datesQuery.data?.length ?? 0) > 0 && (
-          <Select value={selectedDate ?? ""} onValueChange={(v) => setSelectedDate(v || undefined)}>
+          <Select value={selectedDate ?? ""} onValueChange={(v) => { setSelectedDate(v || undefined); saveConfigMutation.mutate({ activeSnapshotDate: v || null }); }}>
             <SelectTrigger className="w-[180px]" data-testid="select-snapshot-date">
               <SelectValue placeholder="Latest snapshot" />
             </SelectTrigger>
@@ -2081,6 +2108,7 @@ function PurchaseOrdersTab() {
                       if (date) {
                         setVelocityStart(date);
                         setVelocityStartPopoverOpen(false);
+                        saveConfigMutation.mutate({ velocityWindowStart: date.toLocaleDateString('en-CA') });
                       }
                     }}
                     disabled={(date) => date >= velocityEnd || date > new Date()}
@@ -2103,6 +2131,7 @@ function PurchaseOrdersTab() {
                       if (date) {
                         setVelocityEnd(date);
                         setVelocityEndPopoverOpen(false);
+                        saveConfigMutation.mutate({ velocityWindowEnd: date.toLocaleDateString('en-CA') });
                       }
                     }}
                     disabled={(date) => date <= velocityStart || date > new Date()}
@@ -2139,11 +2168,18 @@ function PurchaseOrdersTab() {
                       const dateStr = date.toLocaleDateString('en-CA');
                       const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
                       setProjectionPopoverOpen(false);
+                      const velStart = velocityStart.toLocaleDateString('en-CA');
+                      const velEnd = velocityEnd.toLocaleDateString('en-CA');
                       projectSalesMutation.mutate({
                         snapshotDate: snapDate,
                         projectionDate: dateStr,
-                        velocityWindowStart: velocityStart.toLocaleDateString('en-CA'),
-                        velocityWindowEnd: velocityEnd.toLocaleDateString('en-CA'),
+                        velocityWindowStart: velStart,
+                        velocityWindowEnd: velEnd,
+                      });
+                      saveConfigMutation.mutate({
+                        projectionDate: dateStr,
+                        velocityWindowStart: velStart,
+                        velocityWindowEnd: velEnd,
                       });
                     }
                   }}

@@ -16262,6 +16262,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/purchase-orders/config", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { purchaseOrderConfig } = await import('../shared/schema');
+      const rows = await db.select().from(purchaseOrderConfig).limit(1);
+      if (rows.length === 0) {
+        await db.insert(purchaseOrderConfig).values({ id: "global" });
+        const fresh = await db.select().from(purchaseOrderConfig).limit(1);
+        return res.json(fresh[0]);
+      }
+      res.json(rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch PO config", message: error.message });
+    }
+  });
+
+  app.patch("/api/purchase-orders/config", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { purchaseOrderConfig, updatePurchaseOrderConfigSchema } = await import('../shared/schema');
+      const parsed = updatePurchaseOrderConfigSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid config data", details: parsed.error.flatten() });
+      }
+      const [updated] = await db
+        .insert(purchaseOrderConfig)
+        .values({ id: "global", ...parsed.data })
+        .onConflictDoUpdate({
+          target: purchaseOrderConfig.id,
+          set: { ...parsed.data, updatedAt: new Date() },
+        })
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update PO config", message: error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
