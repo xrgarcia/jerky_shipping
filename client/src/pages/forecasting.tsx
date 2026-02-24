@@ -15,6 +15,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
@@ -1753,12 +1762,105 @@ function SalesTab() {
   );
 }
 
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onChange,
+  "data-testid": testId,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  "data-testid"?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = options.filter((o) =>
+    o.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="default"
+          className="justify-between gap-2"
+          data-testid={testId}
+        >
+          <span className="truncate">
+            {selected.length === 0
+              ? `All ${label}s`
+              : selected.length === 1
+              ? selected[0]
+              : `${selected.length} ${label}s`}
+          </span>
+          <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[220px] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={`Search ${label.toLowerCase()}s...`}
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            {filtered.length === 0 && (
+              <CommandEmpty>No {label.toLowerCase()}s found.</CommandEmpty>
+            )}
+            <CommandGroup>
+              {filtered.map((option) => (
+                <CommandItem
+                  key={option}
+                  onSelect={() => toggle(option)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selected.includes(option)}
+                    onCheckedChange={() => toggle(option)}
+                    className="pointer-events-none"
+                  />
+                  <span className="truncate text-sm">{option}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+          {selected.length > 0 && (
+            <div className="border-t px-2 py-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={() => { onChange([]); setOpen(false); }}
+              >
+                Clear selection
+              </Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
   const [projectionDate, setProjectionDate] = useState<Date | undefined>();
   const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
   const [velocityStart, setVelocityStart] = useState<Date>(() => {
@@ -1929,11 +2031,11 @@ function PurchaseOrdersTab() {
         r.description?.toLowerCase().includes(lower)
       );
     }
-    if (categoryFilter !== "all") {
-      rows = rows.filter((r: any) => r.product_category === categoryFilter);
+    if (categoryFilter.length > 0) {
+      rows = rows.filter((r: any) => categoryFilter.includes(r.product_category));
     }
-    if (supplierFilter !== "all") {
-      rows = rows.filter((r: any) => r.supplier === supplierFilter);
+    if (supplierFilter.length > 0) {
+      rows = rows.filter((r: any) => supplierFilter.includes(r.supplier));
     }
     if (kitFilter === "yes") {
       rows = rows.filter((r: any) => r.is_kit === true);
@@ -2245,28 +2347,20 @@ function PurchaseOrdersTab() {
             data-testid="input-po-search"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-po-category">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-po-supplier">
-            <SelectValue placeholder="All Suppliers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Suppliers</SelectItem>
-            {suppliers.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          label="Category"
+          options={categories}
+          selected={categoryFilter}
+          onChange={setCategoryFilter}
+          data-testid="select-po-category"
+        />
+        <MultiSelectFilter
+          label="Supplier"
+          options={suppliers}
+          selected={supplierFilter}
+          onChange={setSupplierFilter}
+          data-testid="select-po-supplier"
+        />
         <Select value={kitFilter} onValueChange={setKitFilter}>
           <SelectTrigger className="w-[120px]" data-testid="select-po-kit">
             <SelectValue placeholder="Kit" />
