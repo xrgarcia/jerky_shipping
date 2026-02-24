@@ -1,0 +1,116 @@
+2026-02-24 07:19:56.36
+2451cf7d
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-02-24 07:19:56.36
+2451cf7d
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-02-24 07:19:56.36
+2451cf7d
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:13459:16)
+2026-02-24 07:19:56.36
+2451cf7d
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-02-24 07:29:55.94
+2451cf7d
+User
+[SmartCarrierRate] Error analyzing shipment se-959308795: Error: ShipStation rates API error: 400 {
+2026-02-24 07:29:55.94
+2451cf7d
+User
+"message": "Shipment item options: value is required for option ' Added with Frequently Bought Together button'",
+2026-02-24 07:29:55.94
+2451cf7d
+User
+"error_type": "validation",
+2026-02-24 07:29:55.94
+2451cf7d
+User
+"error_code": "field_value_required",
+2026-02-24 07:29:55.94
+2451cf7d
+User
+"request_id": "fd29b2d6-7a6e-473b-8423-0e8f7a0ef30e",
+2026-02-24 07:29:55.94
+2451cf7d
+User
+{
+2026-02-24 07:29:55.94
+2451cf7d
+User
+"errors": [
+2026-02-24 07:30:19.87
+2451cf7d
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"field_name": "value"
+2026-02-24 07:30:19.87
+2451cf7d
+User
+at getRatesEstimate (file:///home/runner/workspace/dist/index.js:6618:11)
+2026-02-24 07:30:19.87
+2451cf7d
+User
+}
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"errors": [
+2026-02-24 07:30:19.87
+2451cf7d
+User
+{
+2026-02-24 07:30:19.87
+2451cf7d
+User
+]
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"error_code": "field_value_required",
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"error_source": "shipengine",
+2026-02-24 07:30:19.87
+2451cf7d
+User
+at async pollLoop2 (file:///home/runner/workspace/dist/index.js:15918:25)
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"message": "Shipment item options: value is required for option ' Added with Frequently Bought Together button'",
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"error_type": "validation",
+2026-02-24 07:30:19.87
+2451cf7d
+User
+"request_id": "60427c69-5132-49ce-a183-a6ea44c46a9c",
+2026-02-24 07:30:19.87
+2451cf7d
+User
+at async withSpan.shipmentId (file:///home/runner/workspace/dist/index.js:11979:26)
+2026-02-24 07:30:19.87
+2451cf7d
+User
+at async SmartCarrierRateService.fetchRatesEstimate (file:///home/runner/workspace/dist/index.js:12076:24)
+2026-02-24 07:30:19.87
+2451cf7d
+User
+[SmartCarrierRate] Error analyzing shipment se-959308795: Error: ShipStation rates API error: 400 {
+2026-02-24 07:30:45.01
+2451cf7d
+User
+{
+2026-02-24 07:30:45.01
+2451cf7d
+User
+[SmartCarrierRate] Error analyzing shipment se-959308795: Error: ShipStation rates API error: 400 {

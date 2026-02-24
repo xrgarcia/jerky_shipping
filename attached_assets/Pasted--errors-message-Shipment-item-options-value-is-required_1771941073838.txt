@@ -1,0 +1,75 @@
+{
+  "errors": [
+    {
+      "message": "Shipment item options: value is required for option 'beef jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option 'exotic jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option 'bacon jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option 'alligator jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option 'kangaroo jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option 'pork jerky assortment'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option ' boldVariantQtys'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option ' boldLineItemOneTime'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option ' boldProductOneTime'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    },
+    {
+      "message": "Shipment item options: value is required for option ' boldOrderOneTime'",
+      "error_code": "field_value_required",
+      "error_type": "validation",
+      "field_name": "value",
+      "error_source": "shipengine"
+    }
+  ],
+  "request_id": "c6a768d2-13a7-4be2-be8f-44b3cadab706"
+}
