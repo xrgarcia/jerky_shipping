@@ -1859,8 +1859,12 @@ function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const { value: categoryFilter, setValue: setCategoryFilter } = useUserPreference<string[]>(
+    "purchase-orders", "category-filter", [], { debounceMs: 300 }
+  );
+  const { value: supplierFilter, setValue: setSupplierFilter } = useUserPreference<string[]>(
+    "purchase-orders", "supplier-filter", [], { debounceMs: 300 }
+  );
   const [projectionDate, setProjectionDate] = useState<Date | undefined>();
   const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
   const [velocityStart, setVelocityStart] = useState<Date>(() => {
