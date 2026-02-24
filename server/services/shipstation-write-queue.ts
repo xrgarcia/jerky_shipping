@@ -199,6 +199,16 @@ function applyPatch(currentShipment: Record<string, any>, patch: Record<string, 
   return merged;
 }
 
+// Shopify apps (e.g. Bold Commerce, Frequently Bought Together) can inject
+// item-level options with empty/null values into orders. When these orders
+// sync to ShipStation, the empty option values are stored on the shipment.
+// ShipStation's PUT /shipments endpoint rejects payloads containing
+// items[].options[] entries where the value is empty, null, or undefined,
+// causing the entire write to fail. Because the SSWriteQueue's
+// GET-merge-PUT flow reads these bad options back from ShipStation and
+// sends them in the update, every subsequent write attempt for the same
+// shipment will also fail — including rate checks that reference it.
+// Stripping these entries here prevents the cascade of failures.
 function sanitizeItemOptions(payload: Record<string, any>): Record<string, any> {
   if (!payload.items || !Array.isArray(payload.items)) return payload;
 
