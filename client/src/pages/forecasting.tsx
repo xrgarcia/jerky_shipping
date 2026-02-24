@@ -1761,6 +1761,18 @@ function PurchaseOrdersTab() {
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [projectionDate, setProjectionDate] = useState<Date | undefined>();
   const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
+  const [velocityStart, setVelocityStart] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 14);
+    return d;
+  });
+  const [velocityEnd, setVelocityEnd] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d;
+  });
+  const [velocityStartPopoverOpen, setVelocityStartPopoverOpen] = useState(false);
+  const [velocityEndPopoverOpen, setVelocityEndPopoverOpen] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -1833,8 +1845,8 @@ function PurchaseOrdersTab() {
   });
 
   const projectSalesMutation = useMutation({
-    mutationFn: async ({ snapshotDate, projectionDate: projDate }: { snapshotDate: string; projectionDate: string }) => {
-      const res = await apiRequest("POST", "/api/purchase-orders/project-sales", { snapshotDate, projectionDate: projDate });
+    mutationFn: async ({ snapshotDate, projectionDate: projDate, velocityWindowStart, velocityWindowEnd }: { snapshotDate: string; projectionDate: string; velocityWindowStart: string; velocityWindowEnd: string }) => {
+      const res = await apiRequest("POST", "/api/purchase-orders/project-sales", { snapshotDate, projectionDate: projDate, velocityWindowStart, velocityWindowEnd });
       return res.json();
     },
     onSuccess: (data) => {
@@ -1927,11 +1939,15 @@ function PurchaseOrdersTab() {
           case "proj_direct": aVal = Number(a.projected_units_sold ?? 0); bVal = Number(b.projected_units_sold ?? 0); break;
           case "proj_kits": aVal = Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold_from_kits ?? 0); break;
           case "proj_total": aVal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0); break;
+          case "curr_individual": aVal = Number(a.current_velocity_individual ?? 0); bVal = Number(b.current_velocity_individual ?? 0); break;
+          case "curr_kits": aVal = Number(a.current_velocity_kits ?? 0); bVal = Number(b.current_velocity_kits ?? 0); break;
           case "rec_purchase": {
-            const aTotal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0);
-            const bTotal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0);
-            aVal = aTotal - (a.total_stock ?? 0);
-            bVal = bTotal - (b.total_stock ?? 0);
+            const aForecast = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0);
+            const bForecast = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0);
+            const aVelocity = Number(a.current_velocity_individual ?? 0) + Number(a.current_velocity_kits ?? 0);
+            const bVelocity = Number(b.current_velocity_individual ?? 0) + Number(b.current_velocity_kits ?? 0);
+            aVal = Math.max(Math.round(aForecast), Math.round(aVelocity)) - (a.total_stock ?? 0);
+            bVal = Math.max(Math.round(bForecast), Math.round(bVelocity)) - (b.total_stock ?? 0);
             break;
           }
           default: aVal = 0; bVal = 0;
@@ -1959,7 +1975,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Curr. Total Individual", "Curr. Total Kits", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -1974,8 +1990,11 @@ function PurchaseOrdersTab() {
         const direct = Math.round(Number(r.projected_units_sold ?? 0));
         const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
         const projTotal = direct + kits;
-        const recPurchase = projTotal - (r.total_stock ?? 0);
-        row.push(String(direct), String(kits), String(projTotal), String(Math.round(recPurchase)));
+        const currIndividual = Math.round(Number(r.current_velocity_individual ?? 0));
+        const currKits = Math.round(Number(r.current_velocity_kits ?? 0));
+        const maxTotal = Math.max(projTotal, currIndividual + currKits);
+        const recPurchase = maxTotal - (r.total_stock ?? 0);
+        row.push(String(direct), String(kits), String(projTotal), String(currIndividual), String(currKits), String(Math.round(recPurchase)));
       }
       csvRows.push(row.join(","));
     }
@@ -2042,6 +2061,53 @@ function PurchaseOrdersTab() {
 
         {snapshot.length > 0 && (
           <>
+            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card" data-testid="velocity-window">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Velocity Window:</span>
+              <Popover open={velocityStartPopoverOpen} onOpenChange={setVelocityStartPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-velocity-start">
+                    {velocityStart.toLocaleDateString('en-CA')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={velocityStart}
+                    onSelect={(date) => {
+                      if (date) {
+                        setVelocityStart(date);
+                        setVelocityStartPopoverOpen(false);
+                      }
+                    }}
+                    disabled={(date) => date >= velocityEnd || date > new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <span className="text-xs text-muted-foreground">to</span>
+              <Popover open={velocityEndPopoverOpen} onOpenChange={setVelocityEndPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-velocity-end">
+                    {velocityEnd.toLocaleDateString('en-CA')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={velocityEnd}
+                    onSelect={(date) => {
+                      if (date) {
+                        setVelocityEnd(date);
+                        setVelocityEndPopoverOpen(false);
+                      }
+                    }}
+                    disabled={(date) => date <= velocityStart || date > new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <Popover open={projectionPopoverOpen} onOpenChange={setProjectionPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2069,7 +2135,12 @@ function PurchaseOrdersTab() {
                       const dateStr = date.toLocaleDateString('en-CA');
                       const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
                       setProjectionPopoverOpen(false);
-                      projectSalesMutation.mutate({ snapshotDate: snapDate, projectionDate: dateStr });
+                      projectSalesMutation.mutate({
+                        snapshotDate: snapDate,
+                        projectionDate: dateStr,
+                        velocityWindowStart: velocityStart.toLocaleDateString('en-CA'),
+                        velocityWindowEnd: velocityEnd.toLocaleDateString('en-CA'),
+                      });
                     }
                   }}
                   disabled={(date) => date < new Date()}
@@ -2233,6 +2304,8 @@ function PurchaseOrdersTab() {
                     { key: "proj_direct", label: "Proj. Direct" },
                     { key: "proj_kits", label: "Proj. Kits" },
                     { key: "proj_total", label: "Proj. Total" },
+                    { key: "curr_individual", label: "Curr. Total Individual" },
+                    { key: "curr_kits", label: "Curr. Total Kits" },
                     { key: "rec_purchase", label: "Rec. Purchase" },
                   ].map((col) => (
                     <TableHead
@@ -2281,13 +2354,18 @@ function PurchaseOrdersTab() {
                         const direct = Number(row.projected_units_sold ?? 0);
                         const kits = Number(row.projected_units_sold_from_kits ?? 0);
                         const total = Math.round(direct + kits);
+                        const currIndividual = Number(row.current_velocity_individual ?? 0);
+                        const currKits = Number(row.current_velocity_kits ?? 0);
+                        const maxTotal = Math.max(total, Math.round(currIndividual + currKits));
                         return (
                           <>
                             <TableCell className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${(total - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                              {Math.round(total - (row.total_stock ?? 0)).toLocaleString()}
+                            <TableCell className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                              {Math.round(maxTotal - (row.total_stock ?? 0)).toLocaleString()}
                             </TableCell>
                           </>
                         );

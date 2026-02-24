@@ -16230,13 +16230,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/purchase-orders/project-sales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { projectSales } = await import('./services/purchase-order-snapshot-service');
-      const { snapshotDate, projectionDate } = req.body;
+      const { projectSales, projectCurrentVelocity } = await import('./services/purchase-order-snapshot-service');
+      const { snapshotDate, projectionDate, velocityWindowStart, velocityWindowEnd } = req.body;
       if (!snapshotDate || !projectionDate) {
         return res.status(400).json({ error: "snapshotDate and projectionDate are required" });
       }
       const result = await projectSales(snapshotDate, projectionDate);
-      res.json(result);
+
+      let velocityResult = { updatedCount: 0 };
+      if (velocityWindowStart && velocityWindowEnd) {
+        velocityResult = await projectCurrentVelocity(snapshotDate, projectionDate, velocityWindowStart, velocityWindowEnd);
+      }
+
+      res.json({ updatedCount: result.updatedCount, velocityUpdatedCount: velocityResult.updatedCount });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to project sales", message: error.message });
     }

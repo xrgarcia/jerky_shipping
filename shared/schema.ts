@@ -2143,6 +2143,11 @@ export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
   projectedUnitsSold: numeric("projected_units_sold"),
   projectedUnitsSoldFromKits: numeric("projected_units_sold_from_kits"),
   salesProjectionDate: timestamp("sales_projection_date"),
+  // -- current velocity projection fields --
+  currentVelocityIndividual: numeric("current_velocity_individual"),
+  currentVelocityKits: numeric("current_velocity_kits"),
+  velocityWindowStart: timestamp("velocity_window_start"),
+  velocityWindowEnd: timestamp("velocity_window_end"),
   // -- metadata --
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({

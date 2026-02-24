@@ -182,12 +182,72 @@ export async function projectSales(snapshotDate: string, projectionDate: string)
   return { updatedCount: totalUpdated };
 }
 
+export async function projectCurrentVelocity(
+  snapshotDate: string,
+  projectionDate: string,
+  velocityWindowStart: string,
+  velocityWindowEnd: string
+): Promise<{ updatedCount: number }> {
+  logger.info(`Projecting current velocity for snapshot ${snapshotDate}: window ${velocityWindowStart}→${velocityWindowEnd}, project to ${projectionDate}`);
+
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+
+  const windowStart = new Date(velocityWindowStart + 'T00:00:00');
+  const windowEnd = new Date(velocityWindowEnd + 'T00:00:00');
+  const windowDays = Math.max(1, Math.round((windowEnd.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+  const today = new Date(todayStr + 'T00:00:00');
+  const projEnd = new Date(projectionDate + 'T00:00:00');
+  const projectionDays = Math.max(1, Math.round((projEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const result = await db.execute(sql`
+    WITH velocity AS (
+      SELECT
+        COALESCE(parent_sku, sku) AS rollup_sku,
+        SUM(COALESCE(daily_sales_quantity::numeric, 0)) / ${windowDays} AS daily_direct,
+        SUM(COALESCE(kit_daily_sales_quantity::numeric, 0)) / ${windowDays} AS daily_kits
+      FROM sales_forecasting
+      WHERE order_date::date >= ${velocityWindowStart}::date
+        AND order_date::date <= ${velocityWindowEnd}::date
+      GROUP BY COALESCE(parent_sku, sku)
+    )
+    UPDATE purchase_order_snapshots pos
+    SET
+      current_velocity_individual = ROUND(v.daily_direct * ${projectionDays}, 0),
+      current_velocity_kits = ROUND(v.daily_kits * ${projectionDays}, 0),
+      velocity_window_start = ${velocityWindowStart}::timestamp,
+      velocity_window_end = ${velocityWindowEnd}::timestamp
+    FROM velocity v
+    WHERE pos.sku = v.rollup_sku
+      AND pos.stock_check_date::date = ${snapshotDate}::date
+  `);
+
+  const zeroResult = await db.execute(sql`
+    UPDATE purchase_order_snapshots
+    SET
+      current_velocity_individual = 0,
+      current_velocity_kits = 0,
+      velocity_window_start = ${velocityWindowStart}::timestamp,
+      velocity_window_end = ${velocityWindowEnd}::timestamp
+    WHERE stock_check_date::date = ${snapshotDate}::date
+      AND current_velocity_individual IS NULL
+  `);
+
+  const totalUpdated = (result.rowCount || 0) + (zeroResult.rowCount || 0);
+  logger.info(`Velocity projection complete: ${result.rowCount} SKUs matched, ${zeroResult.rowCount} zeroed (window=${windowDays}d, projection=${projectionDays}d)`);
+  return { updatedCount: totalUpdated };
+}
+
 export async function clearProjection(snapshotDate: string): Promise<void> {
   await db.execute(sql`
     UPDATE purchase_order_snapshots
     SET projected_units_sold = NULL,
         projected_units_sold_from_kits = NULL,
-        sales_projection_date = NULL
+        sales_projection_date = NULL,
+        current_velocity_individual = NULL,
+        current_velocity_kits = NULL,
+        velocity_window_start = NULL,
+        velocity_window_end = NULL
     WHERE stock_check_date::date = ${snapshotDate}::date
   `);
   logger.info(`Cleared sales projection for snapshot ${snapshotDate}`);
