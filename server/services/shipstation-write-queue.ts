@@ -199,6 +199,26 @@ function applyPatch(currentShipment: Record<string, any>, patch: Record<string, 
   return merged;
 }
 
+function sanitizeItemOptions(payload: Record<string, any>): Record<string, any> {
+  if (!payload.items || !Array.isArray(payload.items)) return payload;
+
+  let strippedCount = 0;
+  payload.items = payload.items.map((item: any) => {
+    if (!item.options || !Array.isArray(item.options)) return item;
+    const before = item.options.length;
+    item.options = item.options.filter((opt: any) =>
+      opt.value !== null && opt.value !== undefined && opt.value !== ''
+    );
+    strippedCount += before - item.options.length;
+    return item;
+  });
+
+  if (strippedCount > 0) {
+    log(`Stripped ${strippedCount} item option(s) with empty values`);
+  }
+  return payload;
+}
+
 function stripReadOnlyFields(payload: Record<string, any>): Record<string, any> {
   const cleaned = { ...payload };
   for (const field of READ_ONLY_FIELDS) {
@@ -401,6 +421,7 @@ async function processNextJob(): Promise<boolean> {
       const patch = job.patchPayload as Record<string, any>;
       const merged = applyPatch(currentShipment.data, patch);
       const cleaned = stripReadOnlyFields(merged);
+      sanitizeItemOptions(cleaned);
       await resolveCarrierIfNeeded(cleaned);
       fixPastShipDate(cleaned);
 
