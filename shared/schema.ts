@@ -2144,6 +2144,8 @@ export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
   projectedUnitsSoldFromKits: numeric("projected_units_sold_from_kits"),
   salesProjectionDate: timestamp("sales_projection_date"),
   // -- current velocity projection fields --
+  dailyVelocityIndividual: numeric("daily_velocity_individual"),
+  dailyVelocityKits: numeric("daily_velocity_kits"),
   currentVelocityIndividual: numeric("current_velocity_individual"),
   currentVelocityKits: numeric("current_velocity_kits"),
   velocityWindowStart: timestamp("velocity_window_start"),

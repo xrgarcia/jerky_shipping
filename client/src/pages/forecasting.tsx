@@ -1939,6 +1939,8 @@ function PurchaseOrdersTab() {
           case "proj_direct": aVal = Number(a.projected_units_sold ?? 0); bVal = Number(b.projected_units_sold ?? 0); break;
           case "proj_kits": aVal = Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold_from_kits ?? 0); break;
           case "proj_total": aVal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0); break;
+          case "daily_vel_individual": aVal = Number(a.daily_velocity_individual ?? 0); bVal = Number(b.daily_velocity_individual ?? 0); break;
+          case "daily_vel_kits": aVal = Number(a.daily_velocity_kits ?? 0); bVal = Number(b.daily_velocity_kits ?? 0); break;
           case "curr_individual": aVal = Number(a.current_velocity_individual ?? 0); bVal = Number(b.current_velocity_individual ?? 0); break;
           case "curr_kits": aVal = Number(a.current_velocity_kits ?? 0); bVal = Number(b.current_velocity_kits ?? 0); break;
           case "rec_purchase": {
@@ -1975,7 +1977,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Curr. Total Individual", "Curr. Total Kits", "Rec. Purchase");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Daily Vel. Individual", "Daily Vel. Kits", "Curr. Total Individual", "Curr. Total Kits", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -1990,11 +1992,13 @@ function PurchaseOrdersTab() {
         const direct = Math.round(Number(r.projected_units_sold ?? 0));
         const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
         const projTotal = direct + kits;
+        const dailyVelIndividual = Number(r.daily_velocity_individual ?? 0).toFixed(1);
+        const dailyVelKits = Number(r.daily_velocity_kits ?? 0).toFixed(1);
         const currIndividual = Math.round(Number(r.current_velocity_individual ?? 0));
         const currKits = Math.round(Number(r.current_velocity_kits ?? 0));
         const maxTotal = Math.max(projTotal, currIndividual + currKits);
         const recPurchase = maxTotal - (r.total_stock ?? 0);
-        row.push(String(direct), String(kits), String(projTotal), String(currIndividual), String(currKits), String(Math.round(recPurchase)));
+        row.push(String(direct), String(kits), String(projTotal), dailyVelIndividual, dailyVelKits, String(currIndividual), String(currKits), String(Math.round(recPurchase)));
       }
       csvRows.push(row.join(","));
     }
@@ -2304,6 +2308,8 @@ function PurchaseOrdersTab() {
                     { key: "proj_direct", label: "Proj. Direct" },
                     { key: "proj_kits", label: "Proj. Kits" },
                     { key: "proj_total", label: "Proj. Total" },
+                    { key: "daily_vel_individual", label: "Daily Vel. Individual" },
+                    { key: "daily_vel_kits", label: "Daily Vel. Kits" },
                     { key: "curr_individual", label: "Curr. Total Individual" },
                     { key: "curr_kits", label: "Curr. Total Kits" },
                     { key: "rec_purchase", label: "Rec. Purchase" },
@@ -2354,6 +2360,8 @@ function PurchaseOrdersTab() {
                         const direct = Number(row.projected_units_sold ?? 0);
                         const kits = Number(row.projected_units_sold_from_kits ?? 0);
                         const total = Math.round(direct + kits);
+                        const dailyVelIndividual = Number(row.daily_velocity_individual ?? 0);
+                        const dailyVelKits = Number(row.daily_velocity_kits ?? 0);
                         const currIndividual = Number(row.current_velocity_individual ?? 0);
                         const currKits = Number(row.current_velocity_kits ?? 0);
                         const maxTotal = Math.max(total, Math.round(currIndividual + currKits));
@@ -2362,6 +2370,8 @@ function PurchaseOrdersTab() {
                             <TableCell className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>
                             <TableCell className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>
                             <TableCell className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>
                             <TableCell className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>

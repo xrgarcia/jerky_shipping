@@ -213,6 +213,8 @@ export async function projectCurrentVelocity(
     )
     UPDATE purchase_order_snapshots pos
     SET
+      daily_velocity_individual = ROUND(v.daily_direct, 2),
+      daily_velocity_kits = ROUND(v.daily_kits, 2),
       current_velocity_individual = ROUND(v.daily_direct * ${projectionDays}, 0),
       current_velocity_kits = ROUND(v.daily_kits * ${projectionDays}, 0),
       velocity_window_start = ${velocityWindowStart}::timestamp,
@@ -225,6 +227,8 @@ export async function projectCurrentVelocity(
   const zeroResult = await db.execute(sql`
     UPDATE purchase_order_snapshots
     SET
+      daily_velocity_individual = 0,
+      daily_velocity_kits = 0,
       current_velocity_individual = 0,
       current_velocity_kits = 0,
       velocity_window_start = ${velocityWindowStart}::timestamp,
@@ -244,6 +248,8 @@ export async function clearProjection(snapshotDate: string): Promise<void> {
     SET projected_units_sold = NULL,
         projected_units_sold_from_kits = NULL,
         sales_projection_date = NULL,
+        daily_velocity_individual = NULL,
+        daily_velocity_kits = NULL,
         current_velocity_individual = NULL,
         current_velocity_kits = NULL,
         velocity_window_start = NULL,
