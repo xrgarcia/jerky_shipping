@@ -1782,11 +1782,23 @@ function MultiSelectFilter({
     o.toLowerCase().includes(search.toLowerCase())
   );
 
+  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.includes(o));
+  const someFilteredSelected = filtered.some((o) => selected.includes(o));
+
   const toggle = (value: string) => {
     if (selected.includes(value)) {
       onChange(selected.filter((v) => v !== value));
     } else {
       onChange([...selected, value]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (allFilteredSelected) {
+      onChange(selected.filter((v) => !filtered.includes(v)));
+    } else {
+      const toAdd = filtered.filter((v) => !selected.includes(v));
+      onChange([...selected, ...toAdd]);
     }
   };
 
@@ -1821,6 +1833,18 @@ function MultiSelectFilter({
               <CommandEmpty>No {label.toLowerCase()}s found.</CommandEmpty>
             )}
             <CommandGroup>
+              <CommandItem
+                onSelect={toggleAll}
+                className="flex items-center gap-2 cursor-pointer border-b mb-1 pb-2"
+                data-testid={`${testId}-select-all`}
+              >
+                <Checkbox
+                  checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleAll}
+                  className="pointer-events-none"
+                />
+                <span className="text-sm font-medium">Select all</span>
+              </CommandItem>
               {filtered.map((option) => (
                 <CommandItem
                   key={option}
