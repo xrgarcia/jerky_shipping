@@ -2277,24 +2277,25 @@ function PurchaseOrdersTab() {
               <TableHeader>
                 <TableRow>
                   {[
-                    { key: "sku", label: "SKU", className: "whitespace-nowrap" },
-                    { key: "title", label: "Title", className: "min-w-[200px]" },
-                    { key: "category", label: "Category" },
-                    { key: "supplier", label: "Supplier" },
-                    { key: "cost", label: "Cost", right: true },
-                    { key: "on_hand", label: "On Hand", right: true },
-                    { key: "available", label: "Available", right: true },
-                    { key: "incoming", label: "Incoming", right: true },
-                    { key: "lead_time", label: "Lead Time", right: true },
-                    { key: "moq", label: "MOQ", right: true },
-                    { key: "amzn", label: "Amzn", right: true },
-                    { key: "wlmt", label: "Wlmt", right: true },
-                    { key: "in_kits", label: "In Kits", right: true },
-                    { key: "total", label: "Total", right: true },
+                    { key: "sku", label: "SKU", width: 130 },
+                    { key: "title", label: "Title", width: 220 },
+                    { key: "category", label: "Category", width: 100 },
+                    { key: "supplier", label: "Supplier", width: 110 },
+                    { key: "cost", label: "Cost", right: true, width: 70 },
+                    { key: "on_hand", label: "On Hand", right: true, width: 75 },
+                    { key: "available", label: "Available", right: true, width: 80 },
+                    { key: "incoming", label: "Incoming", right: true, width: 80 },
+                    { key: "lead_time", label: "Lead Time", right: true, width: 80 },
+                    { key: "moq", label: "MOQ", right: true, width: 65 },
+                    { key: "amzn", label: "Amzn", right: true, width: 65 },
+                    { key: "wlmt", label: "Wlmt", right: true, width: 65 },
+                    { key: "in_kits", label: "In Kits", right: true, width: 70 },
+                    { key: "total", label: "Total", right: true, width: 70 },
                   ].map((col) => (
                     <TableHead
                       key={col.key}
-                      className={`sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""} ${col.className ?? ""}`}
+                      style={{ width: col.width, minWidth: col.width }}
+                      className={`sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""}`}
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
                     >
@@ -2305,17 +2306,18 @@ function PurchaseOrdersTab() {
                     </TableHead>
                   ))}
                   {hasProjection && [
-                    { key: "proj_direct", label: "Proj. Direct" },
-                    { key: "proj_kits", label: "Proj. Kits" },
-                    { key: "proj_total", label: "Proj. Total" },
-                    { key: "daily_vel_individual", label: "Daily Vel. Individual" },
-                    { key: "daily_vel_kits", label: "Daily Vel. Kits" },
-                    { key: "curr_individual", label: "Curr. Total Individual" },
-                    { key: "curr_kits", label: "Curr. Total Kits" },
-                    { key: "rec_purchase", label: "Rec. Purchase" },
+                    { key: "proj_direct", label: "Proj. Direct", width: 90 },
+                    { key: "proj_kits", label: "Proj. Kits", width: 90 },
+                    { key: "proj_total", label: "Proj. Total", width: 90 },
+                    { key: "daily_vel_individual", label: "Daily Vel. Individual", width: 90 },
+                    { key: "daily_vel_kits", label: "Daily Vel. Kits", width: 90 },
+                    { key: "curr_individual", label: "Curr. Total Individual", width: 90 },
+                    { key: "curr_kits", label: "Curr. Total Kits", width: 90 },
+                    { key: "rec_purchase", label: "Rec. Purchase", width: 90 },
                   ].map((col) => (
                     <TableHead
                       key={col.key}
+                      style={{ width: col.width, minWidth: col.width }}
                       className="text-right sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
@@ -2334,28 +2336,28 @@ function PurchaseOrdersTab() {
                   const isLow = avail <= 0 && !row.is_kit;
                   return (
                     <TableRow key={row.id} data-testid={`row-po-${row.sku}`}>
-                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                      <TableCell style={{ width: 130, minWidth: 130 }} className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                         {row.sku}
                         {row.is_kit && <Badge variant="outline" className="ml-1 text-[10px]">Kit</Badge>}
                         {row.is_assembled_product && <Badge variant="outline" className="ml-1 text-[10px]">Asm</Badge>}
                       </TableCell>
-                      <TableCell className="text-sm max-w-[250px] truncate" title={row.product_title}>
+                      <TableCell style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="text-sm truncate" title={row.product_title}>
                         {row.product_title || row.description || "—"}
                       </TableCell>
-                      <TableCell className="text-xs">{row.product_category || "—"}</TableCell>
-                      <TableCell className="text-xs max-w-[120px] truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
-                      <TableCell className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
+                      <TableCell style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>
+                      <TableCell style={{ width: 110, minWidth: 110, maxWidth: 110 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
+                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
+                      <TableCell style={{ width: 75, minWidth: 75 }} className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
+                      <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
                         {avail}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
+                      <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>
+                      <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>
+                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>
+                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>
+                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
+                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
+                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
                       {hasProjection && (() => {
                         const direct = Number(row.projected_units_sold ?? 0);
                         const kits = Number(row.projected_units_sold_from_kits ?? 0);
@@ -2367,14 +2369,14 @@ function PurchaseOrdersTab() {
                         const maxTotal = Math.max(total, Math.round(currIndividual + currKits));
                         return (
                           <>
-                            <TableCell className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>
+                            <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                               {Math.round(maxTotal - (row.total_stock ?? 0)).toLocaleString()}
                             </TableCell>
                           </>
