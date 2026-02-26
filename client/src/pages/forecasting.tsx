@@ -26,7 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -262,372 +262,12 @@ function TimeRangeSelector({ value, onChange, peakSeasons, onPeakSeasonSelect, a
   );
 }
 
-interface ProductFilterProps {
-  products: ForecastingProduct[];
-  selected: string[];
-  onChange: (skus: string[]) => void;
+type MultiSelectOption = string | { label: string; value: string; sublabel?: string };
+
+function normalizeOpt(opt: MultiSelectOption): { label: string; value: string; sublabel?: string } {
+  return typeof opt === "string" ? { label: opt, value: opt } : opt;
 }
 
-function ProductFilter({ products, selected, onChange }: ProductFilterProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        (p.category && p.category.toLowerCase().includes(q))
-    );
-  }, [products, searchQuery]);
-
-  const toggleSku = (sku: string) => {
-    if (selected.includes(sku)) {
-      onChange(selected.filter((s) => s !== sku));
-    } else {
-      onChange([...selected, sku]);
-    }
-  };
-
-  const clearAll = () => {
-    onChange([]);
-  };
-
-  const label =
-    selected.length === 0
-      ? "All Products"
-      : selected.length === 1
-        ? products.find((p) => p.sku === selected[0])?.title ?? selected[0]
-        : `${selected.length} Products`;
-
-  return (
-    <Popover onOpenChange={(open) => {
-      if (open) {
-        setTimeout(() => inputRef.current?.focus(), 0);
-      } else {
-        setSearchQuery("");
-      }
-    }}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-[200px] sm:w-[240px] justify-between"
-          data-testid="button-product-filter"
-        >
-          {selected.length > 0 && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-          <span className="truncate">{label}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-2" align="start">
-        <div className="relative mb-2" onKeyDown={(e) => e.stopPropagation()}>
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            placeholder="Search title, SKU, or category..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 text-sm"
-            data-testid="input-product-search"
-          />
-        </div>
-        {selected.length > 0 && (
-          <>
-            <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate active-elevate-2"
-              onClick={clearAll}
-              data-testid="button-clear-products"
-            >
-              <X className="h-3 w-3" />
-              <span>Clear selection ({selected.length})</span>
-            </button>
-            <div className="my-1 h-px bg-border" />
-          </>
-        )}
-        <div className="max-h-[280px] overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-              No products found
-            </div>
-          ) : (
-            filtered.map((product) => {
-              const isSelected = selected.includes(product.sku);
-              return (
-                <button
-                  key={product.sku}
-                  className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
-                  onClick={() => toggleSku(product.sku)}
-                  data-testid={`button-product-${product.sku}`}
-                >
-                  <div
-                    className={`flex h-4 w-4 mt-0.5 items-center justify-center rounded-sm border shrink-0 ${
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground"
-                    }`}
-                  >
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </div>
-                  <div className="flex flex-col items-start min-w-0">
-                    <span className="truncate w-full text-left">{product.title}</span>
-                    <span className="text-xs text-muted-foreground truncate w-full text-left">{product.sku}</span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-interface ChannelFilterProps {
-  channels: string[];
-  selected: string[];
-  onChange: (channels: string[]) => void;
-}
-
-function ChannelFilter({ channels, selected, onChange }: ChannelFilterProps) {
-  const allSelected = selected.length === channels.length;
-
-  const toggleChannel = (channel: string) => {
-    if (selected.includes(channel)) {
-      onChange(selected.filter((c) => c !== channel));
-    } else {
-      onChange([...selected, channel]);
-    }
-  };
-
-  const toggleAll = () => {
-    if (allSelected) {
-      onChange([]);
-    } else {
-      onChange([...channels]);
-    }
-  };
-
-  const label =
-    allSelected
-      ? "All Channels"
-      : selected.length === 0
-        ? "No Channels"
-        : selected.length === 1
-          ? selected[0]
-          : `${selected.length} Channels`;
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-[220px] justify-between"
-          data-testid="button-channel-filter"
-        >
-          {!allSelected && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-          <span className="truncate">{label}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-2" align="start">
-        <button
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
-          onClick={toggleAll}
-          data-testid="button-toggle-all-channels"
-        >
-          <div
-            className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
-              allSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground"
-            }`}
-          >
-            {allSelected && <Check className="h-3 w-3" />}
-          </div>
-          <span className="font-medium">Select All</span>
-        </button>
-        <div className="my-1 h-px bg-border" />
-        {channels.map((channel, idx) => {
-          const isSelected = selected.includes(channel);
-          return (
-            <button
-              key={channel}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
-              onClick={() => toggleChannel(channel)}
-              data-testid={`button-channel-${channel}`}
-            >
-              <div
-                className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
-                  isSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-muted-foreground"
-                }`}
-              >
-                {isSelected && <Check className="h-3 w-3" />}
-              </div>
-              <span
-                className="h-2.5 w-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: getChannelColor(channel, idx) }}
-              />
-              <span className="truncate">{channel}</span>
-            </button>
-          );
-        })}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-interface CategoryFilterProps {
-  categories: string[];
-  selected: string[];
-  onChange: (categories: string[]) => void;
-}
-
-function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return categories;
-    const q = searchQuery.toLowerCase();
-    return categories.filter((c) => c.toLowerCase().includes(q));
-  }, [categories, searchQuery]);
-
-  const allSelected = selected.length === categories.length;
-
-  const visibleSelected = filtered.filter((c) => selected.includes(c));
-  const allFilteredSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
-  const someFilteredSelected = visibleSelected.length > 0 && !allFilteredSelected;
-
-  const toggleCategory = (cat: string) => {
-    if (selected.includes(cat)) {
-      onChange(selected.filter((c) => c !== cat));
-    } else {
-      onChange([...selected, cat]);
-    }
-  };
-
-  const toggleAll = () => {
-    if (allFilteredSelected) {
-      onChange(selected.filter((c) => !filtered.includes(c)));
-    } else {
-      onChange(Array.from(new Set([...selected, ...filtered])));
-    }
-  };
-
-  const clearAll = () => onChange([]);
-
-  const isFiltered = !allSelected;
-
-  const label = allSelected
-    ? "All Categories"
-    : selected.length === 0
-      ? "No Categories"
-      : selected.length === 1
-        ? selected[0]
-        : `${selected.length} Categories`;
-
-  return (
-    <Popover onOpenChange={(open) => {
-      if (open) {
-        setTimeout(() => inputRef.current?.focus(), 0);
-      } else {
-        setSearchQuery("");
-      }
-    }}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-[180px] sm:w-[200px] justify-between"
-          data-testid="button-category-filter"
-        >
-          {isFiltered && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-          <span className="truncate">{label}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[240px] p-2" align="start">
-        <div className="relative mb-2" onKeyDown={(e) => e.stopPropagation()}>
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            placeholder="Search categories..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 text-sm"
-            data-testid="input-category-search"
-          />
-        </div>
-        {isFiltered && (
-          <>
-            <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate active-elevate-2"
-              onClick={clearAll}
-              data-testid="button-clear-categories"
-            >
-              <X className="h-3 w-3" />
-              <span>Clear selection ({selected.length})</span>
-            </button>
-            <div className="my-1 h-px bg-border" />
-          </>
-        )}
-        <button
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
-          onClick={toggleAll}
-          data-testid="button-toggle-all-categories"
-        >
-          <div
-            className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
-              allFilteredSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : someFilteredSelected
-                  ? "border-primary bg-primary/20"
-                  : "border-muted-foreground"
-            }`}
-          >
-            {allFilteredSelected && <Check className="h-3 w-3" />}
-            {someFilteredSelected && <Minus className="h-3 w-3 text-primary" />}
-          </div>
-          <span className="font-medium">Select All</span>
-        </button>
-        <div className="my-1 h-px bg-border" />
-        <div className="max-h-[240px] overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-              No categories found
-            </div>
-          ) : (
-            filtered.map((cat) => {
-              const isSelected = selected.includes(cat);
-              return (
-                <button
-                  key={cat}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
-                  onClick={() => toggleCategory(cat)}
-                  data-testid={`button-category-${cat}`}
-                >
-                  <div
-                    className={`flex h-4 w-4 items-center justify-center rounded-sm border shrink-0 ${
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground"
-                    }`}
-                  >
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </div>
-                  <span className="truncate">{cat}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 function NotesTooltipContent({
   active,
@@ -1397,9 +1037,9 @@ function SalesTab() {
     buildUrl({ range: newPreset });
   }, [setSavedPreset, buildUrl]);
 
-  const setChannels = useCallback((channels: string[]) => {
+  const setChannels = useCallback((channels: string[] | null) => {
     setSavedChannels(channels);
-    buildUrl({ channels });
+    buildUrl({ channels: channels ?? undefined });
   }, [setSavedChannels, buildUrl]);
 
   const setCustomStart = useCallback((date: string) => {
@@ -1492,10 +1132,6 @@ function SalesTab() {
     return buildChartData(salesResponse.data, displayChannels);
   }, [salesResponse?.data, displayChannels]);
 
-  const handleChannelChange = (channels: string[]) => {
-    setChannels(channels);
-  };
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -1557,17 +1193,22 @@ function SalesTab() {
             <span className="text-xs font-semibold text-foreground">Products</span>
             <div className="flex flex-wrap items-center gap-2">
               {allProducts.length > 0 && (
-                <ProductFilter
-                  products={allProducts}
+                <MultiSelectFilter
+                  label="Product"
+                  options={allProducts.map((p) => ({ label: p.title, value: p.sku, sublabel: p.sku }))}
                   selected={activeFilters.skus ?? []}
                   onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
+                  popoverWidth="w-[300px]"
+                  data-testid="select-products-filter"
                 />
               )}
               {filterCategories.length > 0 && (
-                <CategoryFilter
-                  categories={filterCategories}
-                  selected={activeFilters.categories ?? filterCategories}
-                  onChange={(cats) => updateFilter('categories', cats.length === filterCategories.length ? undefined : cats.length > 0 ? cats : undefined)}
+                <MultiSelectFilter
+                  label="Category"
+                  options={filterCategories}
+                  selected={activeFilters.categories ?? []}
+                  onChange={(cats) => updateFilter('categories', cats.length > 0 ? cats : undefined)}
+                  data-testid="select-category-filter"
                 />
               )}
               <Select
@@ -1593,10 +1234,12 @@ function SalesTab() {
             <span className="text-xs font-semibold text-foreground">Sales Channel</span>
             <div className="flex flex-wrap items-center gap-2">
               {!channelsLoading && allChannels.length > 0 && (
-                <ChannelFilter
-                  channels={allChannels}
-                  selected={activeChannels}
-                  onChange={handleChannelChange}
+                <MultiSelectFilter
+                  label="Channel"
+                  options={allChannels}
+                  selected={selectedChannels ?? []}
+                  onChange={(channels) => setChannels(channels.length === 0 ? null : channels)}
+                  data-testid="select-channel-filter"
                 />
               )}
             </div>
@@ -1971,23 +1614,28 @@ function MultiSelectFilter({
   options,
   selected,
   onChange,
+  popoverWidth = "w-[220px]",
   "data-testid": testId,
 }: {
   label: string;
-  options: string[];
+  options: MultiSelectOption[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  popoverWidth?: string;
   "data-testid"?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const filtered = options.filter((o) =>
-    o.toLowerCase().includes(search.toLowerCase())
+  const normalized = useMemo(() => options.map(normalizeOpt), [options]);
+
+  const filtered = normalized.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.value.toLowerCase().includes(search.toLowerCase())
   );
 
-  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.includes(o));
-  const someFilteredSelected = filtered.some((o) => selected.includes(o));
+  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.includes(o.value));
+  const someFilteredSelected = filtered.some((o) => selected.includes(o.value));
 
   const toggle = (value: string) => {
     if (selected.includes(value)) {
@@ -1999,12 +1647,18 @@ function MultiSelectFilter({
 
   const toggleAll = () => {
     if (allFilteredSelected) {
-      onChange(selected.filter((v) => !filtered.includes(v)));
+      onChange(selected.filter((v) => !filtered.some((o) => o.value === v)));
     } else {
-      const toAdd = filtered.filter((v) => !selected.includes(v));
+      const toAdd = filtered.filter((o) => !selected.includes(o.value)).map((o) => o.value);
       onChange([...selected, ...toAdd]);
     }
   };
+
+  const displayLabel = selected.length === 0
+    ? `All ${label}s`
+    : selected.length === 1
+      ? (normalized.find((o) => o.value === selected[0])?.label ?? selected[0])
+      : `${selected.length} ${label}s`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -2015,17 +1669,12 @@ function MultiSelectFilter({
           className="justify-between gap-2"
           data-testid={testId}
         >
-          <span className="truncate">
-            {selected.length === 0
-              ? `All ${label}s`
-              : selected.length === 1
-              ? selected[0]
-              : `${selected.length} ${label}s`}
-          </span>
+          {selected.length > 0 && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
+          <span className="truncate">{displayLabel}</span>
           <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0" align="start">
+      <PopoverContent className={`${popoverWidth} p-0`} align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={`Search ${label.toLowerCase()}s...`}
@@ -2051,16 +1700,21 @@ function MultiSelectFilter({
               </CommandItem>
               {filtered.map((option) => (
                 <CommandItem
-                  key={option}
-                  onSelect={() => toggle(option)}
+                  key={option.value}
+                  onSelect={() => toggle(option.value)}
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <Checkbox
-                    checked={selected.includes(option)}
-                    onCheckedChange={() => toggle(option)}
+                    checked={selected.includes(option.value)}
+                    onCheckedChange={() => toggle(option.value)}
                     className="pointer-events-none"
                   />
-                  <span className="truncate text-sm">{option}</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate text-sm">{option.label}</span>
+                    {option.sublabel && option.sublabel !== option.label && (
+                      <span className="truncate text-xs text-muted-foreground">{option.sublabel}</span>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
