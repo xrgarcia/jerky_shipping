@@ -121,6 +121,19 @@ function formatDateLabel(dateStr: string): string {
   }
 }
 
+function buildYearRangeLabel(
+  startStr: string | undefined,
+  endStr: string | undefined
+): { current: string; prior: string } {
+  const now = new Date().getFullYear();
+  const sy = startStr ? parseISO(startStr).getFullYear() : now;
+  const ey = endStr ? parseISO(endStr).getFullYear() : now;
+  if (sy === ey) {
+    return { current: String(ey), prior: String(ey - 1) };
+  }
+  return { current: `${sy}–${ey}`, prior: `${sy - 1}–${ey - 1}` };
+}
+
 function formatCurrency(value: number): string {
   return `$${value.toLocaleString("en-US", {
     minimumFractionDigits: 0,
@@ -268,14 +281,16 @@ function NotesTooltipContent({
   payload,
   notesByDate,
   valueFormatter,
+  labelFormatters,
 }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string; payload?: Record<string, any> }>;
   notesByDate: Record<string, ChartNote[]>;
   valueFormatter: (v: number) => string;
+  labelFormatters?: [(payload: Record<string, any>) => string, (payload: Record<string, any>) => string];
 }) {
   if (!active || !payload || payload.length === 0) return null;
-  const dataPayload = payload[0]?.payload;
+  const dataPayload = payload[0]?.payload ?? {};
   const dateLabel = dataPayload?.fullDate ?? dataPayload?.dateLabel ?? "";
   const isoDate = dataPayload?.isoDate ?? dataPayload?.date ?? "";
   const dateNotes = isoDate ? notesByDate[isoDate] ?? [] : [];
@@ -291,12 +306,17 @@ function NotesTooltipContent({
       }}
     >
       <p className="font-medium mb-1">{dateLabel}</p>
-      {payload.map((entry, idx) => (
-        <div key={idx} className="flex items-center justify-between gap-3">
-          <span style={{ color: entry.color }}>{entry.name}</span>
-          <span className="font-medium">{valueFormatter(entry.value)}</span>
-        </div>
-      ))}
+      {payload.map((entry, idx) => {
+        const label = labelFormatters && idx < 2
+          ? labelFormatters[idx](dataPayload)
+          : entry.name;
+        return (
+          <div key={idx} className="flex items-center justify-between gap-3">
+            <span style={{ color: entry.color }}>{label}</span>
+            <span className="font-medium">{valueFormatter(entry.value)}</span>
+          </div>
+        );
+      })}
       {dateNotes.length > 0 && (
         <div className="mt-2 pt-2 border-t space-y-1" style={{ borderColor: "hsl(var(--border))" }}>
           {dateNotes.map((note) => (
@@ -484,6 +504,7 @@ interface DualLineChartProps {
   chartType: string;
   startDate?: string;
   endDate?: string;
+  labelFormatters?: [(payload: Record<string, any>) => string, (payload: Record<string, any>) => string];
 }
 
 function ChartNotesPopover({
@@ -633,7 +654,7 @@ function ChartNotesPopover({
   );
 }
 
-function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2Label, line2Color, valueFormatter, isLoading, chartType, startDate, endDate }: DualLineChartProps) {
+function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2Label, line2Color, valueFormatter, isLoading, chartType, startDate, endDate, labelFormatters }: DualLineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedPoint, setSelectedPoint] = useState<{
     date: string;
@@ -678,6 +699,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
     dateLabel: format(parseISO(d.date), "MMM d"),
     fullDate: format(parseISO(d.date), "MMM d, yyyy"),
     isoDate: d.date,
+    year: d.year ?? parseInt(d.date.slice(0, 4), 10),
     hasNote: datesWithNotes.has(d.date),
     isForecast: d.date > todayStr,
     [line1Label]: d[line1Key],
@@ -744,7 +766,7 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
             width={80}
           />
           <Tooltip
-            content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={valueFormatter} />}
+            content={<NotesTooltipContent notesByDate={notesByDate} valueFormatter={valueFormatter} labelFormatters={labelFormatters} />}
           />
           <Legend />
           {todayLabel && hasForecastData && (
@@ -1466,12 +1488,9 @@ function SalesTab() {
       </Card>
 
       {(() => {
-        const currentYear = timeSeriesResponse?.params
-          ? parseISO(timeSeriesResponse.params.startDate).getFullYear()
-          : new Date().getFullYear();
-        const priorYear = currentYear - 1;
         const tsStart = timeSeriesResponse?.params?.startDate;
         const tsEnd = timeSeriesResponse?.params?.endDate;
+        const { current: currentYearLabel, prior: priorYearLabel } = buildYearRangeLabel(tsStart, tsEnd);
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -1503,10 +1522,11 @@ function SalesTab() {
                 <DualLineChart
                   data={timeSeriesResponse?.data ?? []}
                   line1Key="dailyRevenue"
-                  line1Label={`Revenue ${currentYear}`}
+                  line1Label={`Revenue ${currentYearLabel}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyRevenue"
-                  line2Label={`Revenue ${priorYear}`}
+                  line2Label={`Revenue ${priorYearLabel}`}
+                  labelFormatters={[(p) => `Revenue ${p.year}`, (p) => `Revenue ${p.year - 1}`]}
                   line2Color="#FF9900"
                   valueFormatter={formatCurrency}
                   isLoading={timeSeriesLoading}
@@ -1546,10 +1566,11 @@ function SalesTab() {
                 <DualLineChart
                   data={timeSeriesResponse?.data ?? []}
                   line1Key="dailyQuantity"
-                  line1Label={`Units ${currentYear}`}
+                  line1Label={`Units ${currentYearLabel}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyQuantity"
-                  line2Label={`Units ${priorYear}`}
+                  line2Label={`Units ${priorYearLabel}`}
+                  labelFormatters={[(p) => `Units ${p.year}`, (p) => `Units ${p.year - 1}`]}
                   line2Color="#FF9900"
                   valueFormatter={(v) => v.toLocaleString()}
                   isLoading={timeSeriesLoading}
@@ -1564,12 +1585,9 @@ function SalesTab() {
       })()}
 
       {(() => {
-        const currentYear = kitTimeSeriesResponse?.params
-          ? parseISO(kitTimeSeriesResponse.params.startDate).getFullYear()
-          : new Date().getFullYear();
-        const priorYear = currentYear - 1;
         const kitStart = kitTimeSeriesResponse?.params?.startDate;
         const kitEnd = kitTimeSeriesResponse?.params?.endDate;
+        const { current: currentYearLabel, prior: priorYearLabel } = buildYearRangeLabel(kitStart, kitEnd);
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -1601,10 +1619,11 @@ function SalesTab() {
                 <DualLineChart
                   data={kitTimeSeriesResponse?.data ?? []}
                   line1Key="kitDailyRevenue"
-                  line1Label={`Kit Revenue ${currentYear}`}
+                  line1Label={`Kit Revenue ${currentYearLabel}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyKitDailyRevenue"
-                  line2Label={`Kit Revenue ${priorYear}`}
+                  line2Label={`Kit Revenue ${priorYearLabel}`}
+                  labelFormatters={[(p) => `Kit Revenue ${p.year}`, (p) => `Kit Revenue ${p.year - 1}`]}
                   line2Color="#FF9900"
                   valueFormatter={formatCurrency}
                   isLoading={kitTimeSeriesLoading}
@@ -1644,10 +1663,11 @@ function SalesTab() {
                 <DualLineChart
                   data={kitTimeSeriesResponse?.data ?? []}
                   line1Key="kitDailyQuantity"
-                  line1Label={`Kit Units ${currentYear}`}
+                  line1Label={`Kit Units ${currentYearLabel}`}
                   line1Color="hsl(var(--primary))"
                   line2Key="yoyKitDailyQuantity"
-                  line2Label={`Kit Units ${priorYear}`}
+                  line2Label={`Kit Units ${priorYearLabel}`}
+                  labelFormatters={[(p) => `Kit Units ${p.year}`, (p) => `Kit Units ${p.year - 1}`]}
                   line2Color="#FF9900"
                   valueFormatter={(v) => v.toLocaleString()}
                   isLoading={kitTimeSeriesLoading}

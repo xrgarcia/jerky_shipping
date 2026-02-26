@@ -22,7 +22,7 @@ import { toZonedTime } from 'date-fns-tz';
 import { getRedisClient } from '../utils/queue';
 
 const CACHE_TTL_SECONDS = 43200;
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CST_TIMEZONE = 'America/Chicago';
 
 export async function invalidateForecastingCache(): Promise<number> {
@@ -360,6 +360,7 @@ export class ForecastingService {
 
       let allRows: Array<{
         order_day: string;
+        year: string;
         daily_revenue: string;
         yoy_revenue: string;
         daily_quantity: string;
@@ -371,6 +372,7 @@ export class ForecastingService {
         const histRows = await reportingSql`
           SELECT
             order_date::date AS order_day,
+            EXTRACT(YEAR FROM order_date)::int AS year,
             COALESCE(SUM(daily_sales_revenue), 0) AS daily_revenue,
             COALESCE(SUM(yoy_daily_sales_revenue), 0) AS yoy_revenue,
             COALESCE(SUM(daily_sales_quantity), 0) AS daily_quantity,
@@ -384,7 +386,7 @@ export class ForecastingService {
             ${categoryFilter}
             ${eventTypeFilter}
             ${peakSeasonFilter}
-          GROUP BY 1
+          GROUP BY 1, 2
           ORDER BY 1
         `;
         allRows.push(...(histRows as any[]));
@@ -394,6 +396,7 @@ export class ForecastingService {
         const where = buildLocalWhereConditions(params, split.forecastStart, split.forecastEnd);
         const forecastRows = await db.select({
           order_day: drizzleSql<string>`order_date::date`,
+          year: drizzleSql<string>`EXTRACT(YEAR FROM order_date)::int`,
           daily_revenue: drizzleSql<string>`COALESCE(SUM(${salesForecasting.dailySalesRevenue}), 0)`,
           yoy_revenue: drizzleSql<string>`COALESCE(SUM(${salesForecasting.yoyDailySalesRevenue}), 0)`,
           daily_quantity: drizzleSql<string>`COALESCE(SUM(${salesForecasting.dailySalesQuantity}), 0)`,
@@ -405,6 +408,7 @@ export class ForecastingService {
           .orderBy(drizzleSql`1`);
         allRows.push(...forecastRows.map(r => ({
           order_day: String(r.order_day),
+          year: String(r.year),
           daily_revenue: String(r.daily_revenue),
           yoy_revenue: String(r.yoy_revenue),
           daily_quantity: String(r.daily_quantity),
@@ -412,15 +416,19 @@ export class ForecastingService {
         })));
       }
 
-      const data: RevenueTimeSeriesPoint[] = allRows.map((row) => ({
-        date: typeof row.order_day === 'string'
+      const data: RevenueTimeSeriesPoint[] = allRows.map((row) => {
+        const dateStr = typeof row.order_day === 'string'
           ? row.order_day
-          : formatDate(new Date(row.order_day)),
-        dailyRevenue: parseFloat(row.daily_revenue) || 0,
-        yoyRevenue: parseFloat(row.yoy_revenue) || 0,
-        dailyQuantity: parseFloat(row.daily_quantity) || 0,
-        yoyQuantity: parseFloat(row.yoy_quantity) || 0,
-      }));
+          : formatDate(new Date(row.order_day));
+        return {
+          date: dateStr,
+          year: parseInt(row.year, 10) || parseInt(dateStr.slice(0, 4), 10),
+          dailyRevenue: parseFloat(row.daily_revenue) || 0,
+          yoyRevenue: parseFloat(row.yoy_revenue) || 0,
+          dailyQuantity: parseFloat(row.daily_quantity) || 0,
+          yoyQuantity: parseFloat(row.yoy_quantity) || 0,
+        };
+      });
 
       return {
         data,
@@ -441,6 +449,7 @@ export class ForecastingService {
 
       let allRows: Array<{
         order_day: string;
+        year: string;
         kit_revenue: string;
         yoy_kit_revenue: string;
         kit_quantity: string;
@@ -452,6 +461,7 @@ export class ForecastingService {
         const histRows = await reportingSql`
           SELECT
             order_date::date AS order_day,
+            EXTRACT(YEAR FROM order_date)::int AS year,
             COALESCE(SUM(kit_daily_sales_revenue), 0) AS kit_revenue,
             COALESCE(SUM(yoy_kit_daily_sales_revenue), 0) AS yoy_kit_revenue,
             COALESCE(SUM(kit_daily_sales_quantity), 0) AS kit_quantity,
@@ -465,7 +475,7 @@ export class ForecastingService {
             ${categoryFilter}
             ${eventTypeFilter}
             ${peakSeasonFilter}
-          GROUP BY 1
+          GROUP BY 1, 2
           ORDER BY 1
         `;
         allRows.push(...(histRows as any[]));
@@ -475,6 +485,7 @@ export class ForecastingService {
         const where = buildLocalWhereConditions(params, split.forecastStart, split.forecastEnd);
         const forecastRows = await db.select({
           order_day: drizzleSql<string>`order_date::date`,
+          year: drizzleSql<string>`EXTRACT(YEAR FROM order_date)::int`,
           kit_revenue: drizzleSql<string>`COALESCE(SUM(${salesForecasting.kitDailySalesRevenue}), 0)`,
           yoy_kit_revenue: drizzleSql<string>`COALESCE(SUM(${salesForecasting.yoyKitDailySalesRevenue}), 0)`,
           kit_quantity: drizzleSql<string>`COALESCE(SUM(${salesForecasting.kitDailySalesQuantity}), 0)`,
@@ -486,6 +497,7 @@ export class ForecastingService {
           .orderBy(drizzleSql`1`);
         allRows.push(...forecastRows.map(r => ({
           order_day: String(r.order_day),
+          year: String(r.year),
           kit_revenue: String(r.kit_revenue),
           yoy_kit_revenue: String(r.yoy_kit_revenue),
           kit_quantity: String(r.kit_quantity),
@@ -493,15 +505,19 @@ export class ForecastingService {
         })));
       }
 
-      const data: KitTimeSeriesPoint[] = allRows.map((row) => ({
-        date: typeof row.order_day === 'string'
+      const data: KitTimeSeriesPoint[] = allRows.map((row) => {
+        const dateStr = typeof row.order_day === 'string'
           ? row.order_day
-          : formatDate(new Date(row.order_day)),
-        kitDailyRevenue: parseFloat(row.kit_revenue) || 0,
-        yoyKitDailyRevenue: parseFloat(row.yoy_kit_revenue) || 0,
-        kitDailyQuantity: parseFloat(row.kit_quantity) || 0,
-        yoyKitDailyQuantity: parseFloat(row.yoy_kit_quantity) || 0,
-      }));
+          : formatDate(new Date(row.order_day));
+        return {
+          date: dateStr,
+          year: parseInt(row.year, 10) || parseInt(dateStr.slice(0, 4), 10),
+          kitDailyRevenue: parseFloat(row.kit_revenue) || 0,
+          yoyKitDailyRevenue: parseFloat(row.yoy_kit_revenue) || 0,
+          kitDailyQuantity: parseFloat(row.kit_quantity) || 0,
+          yoyKitDailyQuantity: parseFloat(row.yoy_kit_quantity) || 0,
+        };
+      });
 
       return {
         data,

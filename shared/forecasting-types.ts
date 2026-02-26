@@ -85,6 +85,7 @@ export interface ForecastingFilterOptionsResponse {
 
 export interface RevenueTimeSeriesPoint {
   date: string;
+  year: number;
   dailyRevenue: number;
   yoyRevenue: number;
   dailyQuantity: number;
@@ -102,6 +103,7 @@ export interface RevenueTimeSeriesResponse {
 
 export interface KitTimeSeriesPoint {
   date: string;
+  year: number;
   kitDailyRevenue: number;
   yoyKitDailyRevenue: number;
   kitDailyQuantity: number;
