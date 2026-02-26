@@ -2010,6 +2010,21 @@ function PurchaseOrdersTab() {
     return { totalSkus, withSupplier, lowStock, incoming };
   }, [filtered]);
 
+  const hasActivePoFilters =
+    searchTerm !== "" ||
+    categoryFilter.length > 0 ||
+    supplierFilter.length > 0 ||
+    kitFilter !== "no" ||
+    assembledFilter !== "either";
+
+  const clearPoFilters = useCallback(() => {
+    setSearchTerm("");
+    setCategoryFilter([]);
+    setSupplierFilter([]);
+    setKitFilter("no");
+    setAssembledFilter("either");
+  }, [setCategoryFilter, setSupplierFilter, setKitFilter, setAssembledFilter]);
+
   const readiness = readinessQuery.data;
 
   const exportCsv = useCallback(() => {
@@ -2290,6 +2305,18 @@ function PurchaseOrdersTab() {
             <SelectItem value="no">AP: No</SelectItem>
           </SelectContent>
         </Select>
+        {hasActivePoFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearPoFilters}
+            className="gap-1.5 text-muted-foreground"
+            data-testid="button-po-clear-filters"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear Filters
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground whitespace-nowrap">
           {filtered.length} of {snapshot.length} products
         </p>
